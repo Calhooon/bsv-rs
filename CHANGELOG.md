@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
+
+The finding (#331's fourth fold's cold re-review, at `bb80a525`): five
+`fuzz_script_spend` crashes on beta independent of #331, the numeric shifts'
+overflow refusal writing the count in decimal into its text (`splice.rs`,
+then `:262-263` and `:275-276`), and no refusal of a shift count above
+`INT_MAX` in the default mode, where the reference refuses one: `1 <2^31>
+OP_RSHIFTNUM` was 0 here, a valid spend, and invalid in the reference.
+
+The crash inputs, eight (the six kept under
+`/Volumes/Lanes/out/bsv-rs/fix-331-fold5/fuzz/pre-existing/` and two of the
+fifth fold's re-review, `27c51236…` and `e36fe93d…`), each run at `-runs=1`
+through the target's counting allocator on `bb80a525`, `b744f4b6` (beta.2,
+#331 landed) and `949f2782` (#348, #349 landed) under one bound, the base's
+(a single request at most twice the 1 MiB budget, at most ten budgets live,
+the input's term added, a reservation left out): none crashes on
+`949f2782` or on the tip, and nothing in this change was needed for them.
+
+- `e91f18e1…`, `ed740084…`, `e36fe93d…` (the shift's refusal) and
+  `27c51236…` (`OP_NUM2BIN`'s): one request of 2,900,134, 2,525,294,
+  2,525,296 and 2,382,952 bytes at `bb80a525` and at `b744f4b6`, the count's
+  or the size's decimal text; 602,128, 524,304, 524,304 and 494,744 at
+  `949f2782` (the operand itself, charged), closed by #349's `number_text`
+  (`a shift by a 602113-byte number bits`).
+- `44d4c72f…`, `4914d789…`, `d44dc981…` (`OP_NUM2BIN`'s refusal): 5,473,403,
+  4,442,360 and 5,335,707 bytes live at `bb80a525`, past that target's live
+  bound of four budgets, 5,141,890, 4,442,360 and 5,325,288 at `b744f4b6`;
+  1,730,212, 1,022,688 and 1,484,734 at `949f2782`, closed by #349's
+  `number_text` (the size's 1.2 to 1.6 MB of decimal gone), under four
+  budgets too.
+- `3c8497a5…`: 4,696,294 bytes live at `bb80a525`, past four budgets;
+  4,068,812 at `b744f4b6` and since, under it, with the step probe's
+  3,941,802-byte reservation (#374), which the target leaves out since #331:
+  closed by #331.
+
+All eight are in `fuzz/corpus/fuzz_script_spend/` under their sha1 (no
+key-shaped bytes; `gitleaks` clean). The target runs under a word only, so
+the default mode's change below is outside its reach.
+
+The count: the reference reads it, refuses a negative one, then refuses one
+above `INT_MAX` before it reads the value (`ts-stack@edf6e03`
+`Spend.ts:1058-1060`, `1084-1086`: `OP_LSHIFTNUM shift count exceeds
+INT_MAX.`, `OP_RSHIFTNUM shift count exceeds INT_MAX.`; run under Node
+22.18.0 on counts of 2^31, 2^34, 2^64 and a 100-byte number, on values 1, 0
+and -1). The default mode now does the same, in its words, a verdict and
+never a decline (the owner's ruling (c)): no shift is sized, so a caller's
+budget no longer declines `1 <2^31> OP_LSHIFTNUM` (a 268 MB result) and V8's
+`Maximum BigInt size exceeded` is no longer this case's words; `1 <INT_MAX>
+OP_RSHIFTNUM` stays valid and `1 <INT_MAX> OP_LSHIFTNUM` keeps the `BigInt`
+words, as the reference. Under a word nothing moves: the node refuses the
+count in `bint::operator<<=` and `operator>>=` (`big_int.cpp:359-369`,
+`383-393` at v1.2.2, `879fc8b`), after the value's read
+(`interpreter.cpp:716-719`, `752-755`) and a left shift's size test
+(`script_num.cpp:305-308`), `SCRIPT_ERR_BIG_INT` (`interpreter.cpp:1819-1821`),
+which this crate's word path already applied there
+(`OP_RSHIFTNUM count (2147483648) does not fit an int.`).
+
+Pinned by `tests/script_shift_count_int_max_383.rs` (seven tests, four red on
+`949f2782`: the right shift by 2^31 valid, the left shift in the `BigInt`
+words and its zero value valid, a decline under a budget, a 9-byte and a
+100-byte count; the seventh, the cold review's, pins the order: a count
+above `INT_MAX` on a 67,108,863-byte value, which the default mode cannot
+read (`Invalid string length` with a count of 1), refused in the count's
+words, red on the tip with the check moved after the value's read, where
+the other six stay green), and three default-mode rows of
+`tests/script_shift_count_witness.rs` that pinned the old reading moved to
+the reference's (the witness, `1 OP_RSHIFTNUM 2147483648`, was `Ok(true)`;
+`INT_MAX + 1` under a caller's 32,000,000 bytes a decline; the zero value's
+two shifts `Ok(true)`), its word rows unchanged. Two pins of #331 met a count
+above `INT_MAX` and move with it, the shift still refused before it
+allocates: `tests/transaction_verify_budget_331.rs`'s left shift by 2^40
+(the 1 GiB element bound uncapped, a decline under 32,000,000 bytes; now the
+count's verdict under both) and the by-hand left shift by 2^33 + 8 in
+`tests/script_default_mode_uncapped_331.rs`. The element bound stays at the
+shift's site but is out of its reach in the default mode: a readable value
+(536,870,888 bits) shifted by `INT_MAX` is 335 MB, and V8's `BigInt` cap
+refuses past 2^30 bits before it; the word branch never reaches it. No test
+pins it (none can reach it); a comment at `splice.rs:327` says so.
+
 ### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
 
 The toolbox's #311 lane (toolbox PR #375, divergence row D12) found that of
@@ -359,80 +438,6 @@ counter at or below `docs/ratchets.json` (`tools/ratchet/run --check
 --against origin/beta`: duplicate windows 8,247 of 8,257, after the two
 `AsyncStreamVerifier` setters were put memory first in `budget.rs:58-68`, the
 natural order measuring 8,260); not re-recorded.
-
-### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the five overflow-message crashes confirmed closed (#383)
-
-The finding (#331's fourth fold's cold re-review, at `bb80a525`): five
-`fuzz_script_spend` crashes on beta independent of #331, the numeric shifts'
-overflow refusal writing the count in decimal into its text (`splice.rs`,
-then `:262-263` and `:275-276`), and no refusal of a shift count above
-`INT_MAX` in the default mode, where the reference refuses one: `1 <2^31>
-OP_RSHIFTNUM` was 0 here, a valid spend, and invalid in the reference.
-
-The crash inputs, eight (the six kept under
-`/Volumes/Lanes/out/bsv-rs/fix-331-fold5/fuzz/pre-existing/` and two of the
-fifth fold's re-review, `27c51236…` and `e36fe93d…`), each run at `-runs=1`
-through the target's counting allocator on `bb80a525`, `b744f4b6` (beta.2,
-#331 landed) and `949f2782` (#348, #349 landed) under one bound, the base's
-(a single request at most twice the 1 MiB budget, at most ten budgets live,
-the input's term added, a reservation left out): none crashes on
-`949f2782` or on the tip, and nothing in this change was needed for them.
-
-- `e91f18e1…`, `ed740084…`, `e36fe93d…` (the shift's refusal) and
-  `27c51236…` (`OP_NUM2BIN`'s): one request of 2,900,134, 2,525,294,
-  2,525,296 and 2,382,952 bytes at `bb80a525` and at `b744f4b6`, the count's
-  or the size's decimal text; 602,128, 524,304, 524,304 and 494,744 at
-  `949f2782` (the operand itself, charged), closed by #349's `number_text`
-  (`a shift by a 602113-byte number bits`).
-- `44d4c72f…`, `4914d789…`, `d44dc981…` (`OP_NUM2BIN`'s refusal): 5,473,403,
-  4,442,360 and 5,335,707 bytes live at `bb80a525`, past that target's live
-  bound of four budgets, 5,141,890, 4,442,360 and 5,325,288 at `b744f4b6`;
-  1,730,212, 1,022,688 and 1,484,734 at `949f2782`, closed by #349's
-  `number_text` (the size's 1.2 to 1.6 MB of decimal gone), under four
-  budgets too.
-- `3c8497a5…`: 4,696,294 bytes live at `bb80a525`, past four budgets;
-  4,068,812 at `b744f4b6` and since, under it, with the step probe's
-  3,941,802-byte reservation (#374), which the target leaves out since #331:
-  closed by #331.
-
-All eight are in `fuzz/corpus/fuzz_script_spend/` under their sha1 (no
-key-shaped bytes; `gitleaks` clean). The target runs under a word only, so
-the default mode's change below is outside its reach.
-
-The count: the reference reads it, refuses a negative one, then refuses one
-above `INT_MAX` before it reads the value (`ts-stack@edf6e03`
-`Spend.ts:1058-1060`, `1084-1086`: `OP_LSHIFTNUM shift count exceeds
-INT_MAX.`, `OP_RSHIFTNUM shift count exceeds INT_MAX.`; run under Node
-22.18.0 on counts of 2^31, 2^34, 2^64 and a 100-byte number, on values 1, 0
-and -1). The default mode now does the same, in its words, a verdict and
-never a decline (the owner's ruling (c)): no shift is sized, so a caller's
-budget no longer declines `1 <2^31> OP_LSHIFTNUM` (a 268 MB result) and V8's
-`Maximum BigInt size exceeded` is no longer this case's words; `1 <INT_MAX>
-OP_RSHIFTNUM` stays valid and `1 <INT_MAX> OP_LSHIFTNUM` keeps the `BigInt`
-words, as the reference. Under a word nothing moves: the node refuses the
-count in `bint::operator<<=` and `operator>>=` (`big_int.cpp:359-369`,
-`383-393` at v1.2.2, `879fc8b`), after the value's read
-(`interpreter.cpp:716-719`, `752-755`) and a left shift's size test
-(`script_num.cpp:305-308`), `SCRIPT_ERR_BIG_INT` (`interpreter.cpp:1819-1821`),
-which this crate's word path already applied there
-(`OP_RSHIFTNUM count (2147483648) does not fit an int.`).
-
-Pinned by `tests/script_shift_count_int_max_383.rs` (six tests, four red on
-`949f2782`: the right shift by 2^31 valid, the left shift in the `BigInt`
-words and its zero value valid, a decline under a budget, a 9-byte and a
-100-byte count), and three default-mode rows of
-`tests/script_shift_count_witness.rs` that pinned the old reading moved to
-the reference's (the witness, `1 OP_RSHIFTNUM 2147483648`, was `Ok(true)`;
-`INT_MAX + 1` under a caller's 32,000,000 bytes a decline; the zero value's
-two shifts `Ok(true)`), its word rows unchanged. Two pins of #331 met a count
-above `INT_MAX` and move with it, the shift still refused before it
-allocates: `tests/transaction_verify_budget_331.rs`'s left shift by 2^40
-(the 1 GiB element bound uncapped, a decline under 32,000,000 bytes; now the
-count's verdict under both) and the by-hand left shift by 2^33 + 8 in
-`tests/script_default_mode_uncapped_331.rs`. The element bound stays at the
-shift's site but is out of its reach in the default mode: a readable value
-(536,870,888 bits) shifted by `INT_MAX` is 335 MB, and V8's `BigInt` cap
-refuses past 2^30 bits before it.
 
 ## [0.9.0-beta.2] - 2026-10-28
 
