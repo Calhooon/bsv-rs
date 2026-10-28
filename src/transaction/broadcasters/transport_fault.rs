@@ -208,19 +208,6 @@ pub(crate) fn auth_error(e: &reqwest::Error, context: &str) -> crate::Error {
     fault_or(error_fault(e), None, detail, crate::Error::AuthError)
 }
 
-/// The auth handshake's error for an answer that is not a success, the
-/// status read before the body: [`crate::Error::TransportFault`] when the
-/// status is a fault, else [`crate::Error::AuthError`], both
-/// `"Auth endpoint returned {status}: {body}"`.
-#[cfg(feature = "auth")]
-pub(crate) async fn auth_status_error(response: Response) -> crate::Error {
-    let status = response.status();
-    let fault = status_fault(status, response.headers());
-    let body = response.text().await.unwrap_or_default();
-    let detail = format!("Auth endpoint returned {}: {}", status, body);
-    fault_or(fault, Some(status), detail, crate::Error::AuthError)
-}
-
 /// The wallet substrates' error of a failed send or body read:
 /// [`crate::Error::WalletTransport`] with no status when it is a fault (0.8.2's
 /// shape), else [`crate::Error::WalletError`].

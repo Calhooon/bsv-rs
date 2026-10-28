@@ -66,24 +66,17 @@ async fn elsewhere() -> MockServer {
     server
 }
 
-fn redirect_refused(named: &MockServer, at: &str, status: &str) -> Error {
+fn redirect_refused(named: &MockServer, at: &str) -> Error {
     Error::AuthError(format!(
-        "Network error while sending authenticated request to {}{}: redirect refused: {}",
+        "Network error while sending authenticated request to {}{}: fetch failed",
         named.uri(),
         at,
-        status
     ))
 }
 
 #[tokio::test]
 async fn a_handshake_answered_with_a_redirect_is_refused_and_not_replayed() {
-    for (status, text) in [
-        (301, "301 Moved Permanently"),
-        (302, "302 Found"),
-        (303, "303 See Other"),
-        (307, "307 Temporary Redirect"),
-        (308, "308 Permanent Redirect"),
-    ] {
+    for status in [301, 302, 303, 307, 308] {
         let other = elsewhere().await;
         let named = redirecting(status, "POST", "/.well-known/auth", &other).await;
         let err = SimplifiedFetchTransport::new(&named.uri())
@@ -92,7 +85,7 @@ async fn a_handshake_answered_with_a_redirect_is_refused_and_not_replayed() {
             .unwrap_err();
         assert_eq!(
             err,
-            redirect_refused(&named, "/.well-known/auth", text),
+            redirect_refused(&named, "/.well-known/auth"),
             "{status}"
         );
         assert_eq!(err.transport_fault(), None, "the named host's answer");
@@ -105,18 +98,14 @@ async fn a_handshake_answered_with_a_redirect_is_refused_and_not_replayed() {
 
 #[tokio::test]
 async fn a_general_message_answered_with_a_redirect_is_refused_and_not_replayed() {
-    for (status, text) in [(302, "302 Found"), (307, "307 Temporary Redirect")] {
+    for status in [302, 307] {
         let other = elsewhere().await;
         let named = redirecting(status, "POST", "/sendMessage", &other).await;
         let err = SimplifiedFetchTransport::new(&named.uri())
             .send(&general())
             .await
             .unwrap_err();
-        assert_eq!(
-            err,
-            redirect_refused(&named, "/sendMessage", text),
-            "{status}"
-        );
+        assert_eq!(err, redirect_refused(&named, "/sendMessage"), "{status}");
         assert!(
             other.received_requests().await.unwrap().is_empty(),
             "{status}"
@@ -145,7 +134,10 @@ async fn a_client_supplied_through_with_client_is_the_one_used() {
     let err = transport.send(&handshake()).await.unwrap_err();
     assert_eq!(
         err,
-        Error::AuthError("Auth endpoint returned 401 Unauthorized: marked".into())
+        Error::AuthError(format!(
+            "Received HTTP 401 Unauthorized from {}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: marked",
+            server.uri()
+        ))
     );
 }
 
@@ -161,7 +153,10 @@ async fn a_supplied_client_that_follows_redirects_carries_its_own_policy() {
         .unwrap_err();
     assert_eq!(
         err,
-        Error::AuthError("Auth endpoint returned 401 Unauthorized: replayed".into())
+        Error::AuthError(format!(
+            "Received HTTP 401 Unauthorized from {}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: replayed",
+            named.uri()
+        ))
     );
     assert_eq!(other.received_requests().await.unwrap().len(), 1);
 }
@@ -178,6 +173,6 @@ async fn a_supplied_client_that_does_not_follow_is_refused_by_the_transport() {
         .send(&general())
         .await
         .unwrap_err();
-    assert_eq!(err, redirect_refused(&named, "/sendMessage", "302 Found"));
+    assert_eq!(err, redirect_refused(&named, "/sendMessage"));
     assert!(other.received_requests().await.unwrap().is_empty());
 }

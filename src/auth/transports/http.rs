@@ -31,6 +31,10 @@ use tokio::sync::RwLock;
 #[cfg(feature = "http")]
 mod client;
 #[cfg(feature = "http")]
+mod handshake;
+#[cfg(feature = "http")]
+mod json_syntax;
+#[cfg(feature = "http")]
 mod unauthenticated;
 
 /// Transport trait for sending/receiving auth messages.
@@ -640,35 +644,7 @@ impl Transport for SimplifiedFetchTransport {
                 | MessageType::InitialResponse
                 | MessageType::CertificateRequest
                 | MessageType::CertificateResponse => {
-                    // Send as JSON POST to .well-known/auth
-                    let response = self
-                        .client
-                        .post(self.auth_url())
-                        .json(message)
-                        .send()
-                        .await
-                        .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
-                    client::refuse_redirect(&self.auth_url(), &response)?;
-                    if !response.status().is_success() {
-                        return Err(fault::auth_status_error(response).await);
-                    }
-
-                    // Parse response as AuthMessage
-                    let response_text = response
-                        .text()
-                        .await
-                        .map_err(|e| fault::auth_error(&e, "Failed to read auth response"))?;
-
-                    let response_message: AuthMessage = serde_json::from_str(&response_text)
-                        .map_err(|e| {
-                            Error::AuthError(format!(
-                                "Failed to parse auth response: {} - body: {}",
-                                e, response_text
-                            ))
-                        })?;
-
-                    // Invoke callback with response
-                    self.invoke_callback(response_message).await?;
+                    self.send_auth_message(message).await?;
                 }
                 MessageType::General => {
                     // BRC-104: For General messages, deserialize payload as HTTP request,
@@ -766,6 +742,8 @@ impl Transport for SimplifiedFetchTransport {
                         &response_headers,
                         &response_body,
                     )?;
+                    let requested_certificates =
+                        handshake::requested_certificates(&url, &response_headers)?;
 
                     // Extract request ID from response
                     let response_request_id: [u8; 32] =
@@ -819,21 +797,8 @@ impl Transport for SimplifiedFetchTransport {
                     // Extract signature
                     response_message.signature = unauthenticated::signature(&response_headers);
 
-                    // Check for certificate request in response
-                    if let Some(msg_type) = response_headers.get(headers::MESSAGE_TYPE) {
-                        if msg_type.to_str().ok() == Some("certificateRequest") {
-                            // Handle certificate request in response
-                            if let Some(req_certs) =
-                                response_headers.get(headers::REQUESTED_CERTIFICATES)
-                            {
-                                if let Ok(requested) =
-                                    serde_json::from_str(req_certs.to_str().unwrap_or("{}"))
-                                {
-                                    response_message.requested_certificates = Some(requested);
-                                }
-                            }
-                        }
-                    }
+                    // Parse the certificate header even on a general reply (#410).
+                    response_message.requested_certificates = requested_certificates;
 
                     // Invoke callback with response
                     self.invoke_callback(response_message).await?;
