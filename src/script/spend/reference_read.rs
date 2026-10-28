@@ -31,7 +31,8 @@
 //! string is written, so a shifted magnitude past 2^30 bits is invalid in
 //! those words, one from 536,870,889 to 2^30 bits in the string's
 //! ([`shift_refusal`]). No other result can pass 2^30 bits in one step:
-//! two readable operands' product is at most 2^30 - 48 bits. `mul` sets its magnitude without
+//! two readable operands' product is at most 2^30 - 48 bits. `mul` sets its
+//! magnitude without
 //! a string (`BigNumber.ts:926-933`), so an `OP_MUL` or `OP_2MUL` result past
 //! the figure is pushed there and here (and invalid at its next read); no
 //! other result can pass its operands' magnitude.

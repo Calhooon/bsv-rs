@@ -318,7 +318,8 @@ minimal-encoding check, and a result past the figure is invalid at its push in t
 where the reference builds it through `toString(2)`: `OP_ADD`, `OP_SUB`, `OP_1ADD`, `OP_1SUB`
 (`BigNumber.ts:771-781`) and `OP_LSHIFTNUM` (`Spend.ts:1066`, judged before the shift
 allocates; past 2^30 bits in the words of V8's `BigInt` cap, `Maximum BigInt size exceeded`,
-the reference's shift throwing before its string), a caller's budget declining the push first (the keeper's word of 21:5xZ;
+the reference's shift throwing before its string), a caller's budget declining
+the push first (the keeper's word of 21:5xZ;
 `OP_MUL`'s and `OP_2MUL`'s pushed, as the reference's `mul` writes no string); under a word
 the node's number length decides. A memory budget bounds memory, never time: `work_limit` does. Under a word the count is the
 node's (`LimitedStack`: one budget over both stacks, `STACK_ELEMENT_OVERHEAD` = 32

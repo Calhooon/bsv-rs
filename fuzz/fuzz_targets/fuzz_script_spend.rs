@@ -8,6 +8,13 @@
 //! that is the budget's, plus a term linear in the input (the parsed chunks
 //! and an error's rendering of the scripts).
 //!
+//! The input: byte 0 picks the word (bit 0: block or standard), the era
+//! (bit 1: post-Genesis or post-Chronicle) and the spending transaction's
+//! version (bit 2: 1 or 2); bytes 1 and 2 are the unlocking script's length
+//! (little-endian); then the unlocking script, and the rest is the locking
+//! script. `fuzz/corpus-gen` writes the sibling harness's seed rows in this
+//! shape.
+//!
 //! Both reads leave out a reservation: an allocation freed before the
 //! allocator's next call, nothing allocated, grown or freed in between
 //! (bsv-rs#331, the keeper's pick of 2026-10-27). The interpreter's step
