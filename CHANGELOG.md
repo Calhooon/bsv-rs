@@ -775,7 +775,8 @@ the cold review's required change). 2 of 3 tests and 93 of the first 109
 bodies red on `5f8fc526` (the 21 forms the reference reads refused, the
 72 refusals in `serde_json`'s words), the 16 that agree the twelve arrays
 and #339's four action `tx` forms; the fold's body, the 110th, and 2 of
-the 4 tests red on `e0fe1b33` (``missing field `tx` ``); green after. The walk and the refusal are unit-tested in `byte_fields.rs`. #339's
+the 4 tests red on `e0fe1b33` (``missing field `tx` ``); green after. The walk
+and the refusal are unit-tested in `byte_fields.rs`. #339's
 `{"tx": "x"}` pin moves to `bytes`' words
 (`a_success_answer_neither_reading_takes_is_refused_in_serdes_or_the_references_words`,
 renamed from `..._in_serdes_words`). No public shape moves; no migration.
