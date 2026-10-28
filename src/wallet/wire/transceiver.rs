@@ -93,7 +93,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     }
 
     /// Transmits a message and handles the response.
-    async fn transmit(
+    pub(super) async fn transmit(
         &self,
         call: WalletCall,
         originator: Option<&str>,

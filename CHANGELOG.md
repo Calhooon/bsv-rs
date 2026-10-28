@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the wire transceiver makes revealCounterpartyKeyLinkage and revealSpecificKeyLinkage as the reference's does; the client's existing linkage arms route to it (#406)
+
+The finding (#404's second item, split out by the keeper on 2026-10-28
+under the owner's ruling (c)): the processor has read both linkage calls
+(call codes 9 and 10) since #191 and written both answers since #194, but
+`WalletWireTransceiver` had neither method; #335 added both calls to
+`WalletClient`, but its wire arms refused them, so a client over the wire
+substrate could not reveal a linkage; the
+fixtures recorded the two calls through a test-side shim of the low-level
+codec (`docs/FIXTURES.md` F2).
+
+`WalletWireTransceiver::reveal_counterparty_key_linkage` and
+`reveal_specific_key_linkage` (`src/wallet/wire/linkage.rs`) write the
+reference's request and read its answer (`ts-stack@edf6e03`
+`WalletWireTransceiver.ts:790-924`; the same bytes as ts-sdk@9e3ede6b
+`:1139-1251`):
+
+- revealCounterpartyKeyLinkage: the privileged flag (`i8`, -1 absent), the
+  reason's length (`i8`, -1 absent) and its UTF-8 bytes
+  (`#encodePrivilegedParams`, `:1448-1462`), the counterparty's 33 bytes,
+  the verifier's 33 bytes (`:809-811`); the answer the prover, verifier and
+  counterparty, 33 bytes each, the revelation time, the encrypted linkage
+  and its proof, each behind a `readVarIntNumStrict(false)` length
+  (`:817-836`).
+- revealSpecificKeyLinkage: the key-related parameters (the security level
+  byte, the protocol name and the key ID behind their lengths, the
+  counterparty: `11` self, `12` anyone, else its 33 bytes, then the
+  privileged pair; `#encodeKeyRelatedParams`, `:1351-1376`), the verifier's
+  33 bytes (`:874-883`); the answer the three keys, the security level
+  byte, the protocol name, the key ID, the encrypted linkage, its proof and
+  the proof type byte (`:889-908`).
+
+As the reference's transceiver does, the arguments are judged before a
+byte is sent (`validateWalletArgs`: the privileged reason 5 to 50 bytes and
+required when privileged, the protocol name 5 to 400 bytes, the key ID 1 to
+800; `WalletRefusal` of class `InvalidParameter` in its words, nothing
+sent) and the answer after it is read: each key a compressed point
+(`#readCompressedPublicKey`, `:2004-2008`), the level 0 to 2 (`Invalid
+revealSpecificKeyLinkage security level: N`, `:2010-2016`), no byte after
+the last field (`Wallet Wire <call> response contains trailing data`,
+`:1936-1938`), then `validateWalletResult` bound to the request (the
+requested verifier and counterparty, the prover for `self`, the anyone key
+for `anyone`, the protocol and key ID, the revelation time an ISO
+timestamp; `WalletResultValidation.ts:2226-2281`), the processor's own
+checks of #216 and #226 reused (`validation.rs`), the result refusals
+`WalletError` in the reference's words. `WalletClient`'s existing
+`reveal_counterparty_key_linkage` and `reveal_specific_key_linkage` arms
+are routed to the transceiver through `forward!` (`src/wallet/client.rs`),
+which also forwards them to the JSON substrate or the caller's instance
+as before. The duplicate `client/linkage.rs` and the obsolete `wire_lacks`
+refusal are removed in the fold over #335.
+
+The fixtures moved nowhere: `tests/support/fixtures/` now calls the two
+methods where its shim stood, and the 323 wire entries replay unchanged
+(the shim wrote the reference's bytes since #191).
+
+Pinned by `tests/wire_linkage_calls_406.rs` (7 tests) against
+`tests/vectors/wallet_wire/linkage_calls_406.json` (6 cases, 8 refusals),
+recorded by `tests/support/wire_linkage_calls_406.mjs` from the reference's
+transceiver over a transport handing each frame to the reference's
+processor, whose wallet answers fixed values bound to the request
+(`ts-stack@edf6e03`, Node v22.18.0): the transceiver writes each request
+frame byte for byte and reads each answer to the reference's result; the
+processor reads each request to the args the reference's wallet saw and
+writes each answer byte for byte; `WalletClient`'s wire type
+(`WalletWireTransceiver<HttpWalletWire>`, on an in-process wiremock) carries
+both calls; the eight changed answers refused as the reference refuses
+them; a four-byte privileged reason refused unsent; a `ProtoWallet`
+answering both across the wire; Go's two args and result vectors written
+and read. On the base (`485848ba`) the file does not compile (`E0599`, no
+method `reveal_counterparty_key_linkage` or `reveal_specific_key_linkage`
+on `WalletWireTransceiver`, five sites); its processor test alone passes
+there. This RED remains the pre-fix `485848ba` transceiver replay; the
+fold over #335 changes neither that replay nor its vectors. A unit test,
+`the_clients_wire_arms_send_both_linkage_calls_406`, injects an HTTP wire
+on an in-process wiremock into `WalletClient`'s actual `ConnectedSubstrate::WireApi` path
+and checks both calls' recorded request bodies, originator and results;
+no default URL or port is used.
+
+Semver: additive, two public methods on `WalletWireTransceiver`; the
+existing `WalletClient` methods now make both calls over the wire.
+
+### Notes: cross-SDK parity (#406)
+
+The bytes are the reference's both ways; ts-stack@edf6e03 and
+ts-sdk@9e3ede6b write and read the six recorded frames identically. Where
+the two references differ this crate follows edf6e03, as its transceiver
+does elsewhere: 9e3ede6b's transceiver validates neither the arguments nor
+the answer (no point check, no level check, no trailing-data check, no
+binding to the request) and returns all eight answers edf6e03 refuses. One
+refusal is in other words: a malformed prover in the answer is refused
+here as `Invalid revealCounterpartyKeyLinkage prover: expected a compressed
+secp256k1 public key` (the wire's `require_compressed_key`). For a `05`
+prefix the reference's `PublicKey.fromDER` throws `Unknown point format`.
+For the x > p case (`x = p + 1`), `fromDER` accepts the point and the
+reference's result validator throws `Invalid revealCounterpartyKeyLinkage
+result prover: expected a valid compressed secp256k1 public key` (confirmed
+under Node v22.18.0); this crate keeps its refusal above, so the words
+still differ. go-sdk@2ca481c's transceiver writes the same
+bytes for a reason of 1 to 252 bytes (`wallet/substrates/wallet_wire_transceiver.go:146-168`,
+`wallet/serializer/reveal_counterparty_key_linkage.go:11-29`,
+`reveal_specific_key_linkage.go:11-35`: the reason a varint-length string,
+where the reference writes an `i8` length; an empty reason is written as
+absent, `serializer.go:177-190`), reads the answer to its end
+(`CheckComplete`) with each key through `ec.PublicKeyFromBytes`, reads the
+security level unbounded (`serializer.go:165-174`), and checks nothing
+against the request; its two vectors are this transceiver's bytes both
+ways.
+
 ### Changed: the auth and identity certificate maps and `resolve_by_attributes`'s attributes keep insertion order, the reference's `Record` order, one order through the crate after the wallet's (#394)
 
 #385 moved the wallet types' certificate maps to insertion order and left
@@ -181,6 +290,7 @@ maps (`auth/certificates/certificate.go:49`, `verifiable.go:23`,
 (`encoding/json`), so a certificate's JSON with unsorted fields that this
 crate or the reference writes differs from Go's text. Go's readers require
 no order.
+
 ### Added: `WalletClient::with_substrate` takes a `WalletInterface` instance as the client's substrate, the reference's constructor's own alternative; the client carries the two linkage calls (#335)
 
 The finding (the #323 fold re-review's note, 2026-10-27): `WalletClient::new`
@@ -225,12 +335,11 @@ and each call is `this.substrate.<call>(args, this.originator)`.
 - `WalletClient::reveal_counterparty_key_linkage` and
   `reveal_specific_key_linkage`: the client carried 26 of the 28 calls; it
   carries all 28, as the reference's does. The JSON substrate and an
-  instance forward them; the wire substrate refuses both before a byte is
-  sent, `WalletError("<call> is not available over the wallet wire
-  substrate")`: this crate's `WalletWireTransceiver` writes neither call
-  (its processor reads both), where the reference's transceiver writes both
-  (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790`, `:851`; #406 ports
-  them with fixtures recorded both ways).
+  instance forward them; since #406 the wire substrate forwards them too,
+  through `WalletWireTransceiver`'s methods (`ts-stack@edf6e03`
+  `WalletWireTransceiver.ts:790`, `:851`), with fixtures recorded both ways.
+  #406 removes the earlier wire refusal and its test, which would now reach
+  the default wallet URL.
 - The forwarding is one macro over the three substrates (`client.rs` 745
   lines to 582, with the two calls); the instance's shape adapters are
   `src/wallet/client_instance.rs`.
@@ -242,14 +351,14 @@ CLI's in-process wallets) hands it to the code that takes a `WalletClient`:
 let mut client = WalletClient::with_substrate(Arc::new(wallet), Some("myapp.com".into()));
 ```
 
-Pinned by `tests/wallet_client_instance_335.rs` (4): the counting wallet of
+Pinned by `tests/wallet_client_instance_335.rs` (3 retained tests): the counting wallet of
 #318 behind the client receives all 28 calls, in a table, each with the
 client's originator, and each with `None` when none is set; a `ProtoWallet`'s
-answers and refusals come back through the client unchanged; the wire
-substrate's two linkage refusals, unsent. Red on a scratch copy of
-`485848ba` (the file does not compile: `with_substrate` and the two linkage
-methods absent, 7 errors); red 1 of 4 on the tip with the instance arm
-passing `None` for the originator. The `Auto` path and the named substrates
+answers and refusals come back through the client unchanged. The original
+four-test file was red on a scratch copy of `485848ba` (it did not compile:
+`with_substrate` and the two linkage methods absent, 7 errors), and red
+1 of 4 with the instance arm passing `None` for the originator; #406 removes
+only the obsolete wire-refusal test. The `Auto` path and the named substrates
 on their default URLs stay unpinned: a test of them reaches whatever
 listens on 2121, 3321 and 3301, in the reference too (its `'auto'` probes
 the named substrates on their defaults, `:126-196`).
