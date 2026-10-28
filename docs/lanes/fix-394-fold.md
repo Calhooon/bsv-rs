@@ -1,0 +1,16 @@
+# #394 fold: the lookup question's attributes serialised from the `IndexMap` without the `Value` round trip (`lane/fix-394-auth-identity-maps` at 6741a44a on 5f8fc526)
+
+Work in this worktree on the branch as it stands (two commits: the auth and identity maps ordered; the entry). The keeper's word on the item you left (2026-10-28 04:5xZ, under the owner's ruling (c)): (a), one more commit: the overlay lookup question's attributes serialised from the `IndexMap` directly, without the `serde_json::Value` round trip that sorts keys, local to the overlay lookup and the identity client, no feature flip. "One order through the crate" is the data model (the map type wherever the reference holds a Record), not a claim about every body's bytes; JSON key order is a parity item only where the reference's bytes are hashed, signed or compared whole, and the lookup question is the one place found where the port's bytes sit beside the reference's recorded body (`IdentityClient.ts:667` at edf6e03: the attributes in insertion order through `JSON.stringify`). `preserve_order` crate-wide is #400's charter, not yours. Read `src/identity/client.rs` (`resolve_by_attributes`, the question it builds), `src/overlay/` (the lookup question's type and its serialisation: where a `Value` is built, where a derived `Serialize` would keep the map's order), the branch's entry (the paragraph that states the body left in byte order: it changes). Do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole. Run every gate in the foreground; never end your turn with a gate running in the background. Never push. A MetaNet Client listens on 3301, 3321 and 2121 on this host, and something else on 3390: no test or probe on a default URL or port. `CARGO_TARGET_DIR=~/bsv/targets/bsv-rs-lanes/fix-394` (warm; nothing else uses it now).
+
+## What to do
+
+1. The lookup question's body built so the attributes object's keys are the `IndexMap`'s order (a derived `Serialize` on the question with the map inside it, or a direct `serde_json::to_vec` of a struct, never through `Value`), local to the overlay lookup and the identity client; nothing else's bytes change (say which other bodies pass through the same code and whether their key order moved: if any did, stop and say). One commit.
+2. A test, RED before green (a scratch copy of 6741a44a, its own target dir): `resolve_by_attributes` with two attributes whose byte order and insertion order disagree sends them in insertion order (the body witnessed by a wiremock); the entry's paragraph re-worded (the body in insertion order, the keeper's reading quoted, #400 for the rest); the rows if a count moves.
+
+## Gate
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http"` on every test file matching `identity_*`, `overlay_*`, `auth_*`, `wallet_*`, `arch_*` (not the `arch_support` module), `fixtures_replay`; `--lib identity`; `--lib overlay`; the doc tests; the wasm32 build of the CLAUDE.md feature set; `cargo semver-checks --release-type minor --baseline-rev 5f8fc526`; `tools/ratchet/run --check --against origin/beta`.
+
+## Report
+
+A REPORT: the tip, the commit, the body before and after (the bytes of one question), RED then green, the gate's results, anything unverified.
