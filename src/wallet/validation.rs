@@ -31,6 +31,7 @@
 use crate::error::{Error, Result};
 use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TxId, MAX_SATOSHIS};
 mod create_action_input;
+pub(crate) mod crypto;
 mod internalize;
 mod originator;
 pub use create_action_input::validate_create_action_input;
@@ -39,9 +40,7 @@ pub use internalize::validate_internalize_action_args;
 pub(crate) use originator::trim_js;
 pub use originator::validate_originator;
 
-// =============================================================================
-// Basic Validation Functions
-// =============================================================================
+// Basic validation functions.
 
 /// Validates a satoshi amount.
 ///

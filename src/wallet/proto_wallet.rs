@@ -46,6 +46,7 @@ use super::key_args::{
 };
 use super::key_deriver::{verify_hmac_tag, KeyDeriverApi};
 use super::types::{Counterparty, Protocol, SecurityLevel};
+use super::validation::crypto;
 use super::CachedKeyDeriver;
 
 // =============================================================================
@@ -121,11 +122,11 @@ pub struct RevealSpecificKeyLinkageResult {
 /// ProtoWallet provides cryptographic operations without blockchain interaction.
 /// It uses [`CachedKeyDeriver`] internally for efficient key derivation.
 ///
-/// It reads no `privileged`, `privileged_reason` or `seek_permission`: it has
-/// one keyring and asks no one, as the reference's ProtoWallet "is also not
-/// concerned with privileged keys" (`ProtoWallet.ts:147` at `ts-stack@edf6e03`)
-/// and never reads seekPermission; the two linkage calls drop their pair the
-/// same way (#193).
+/// It has one keyring and asks no one. The signature and HMAC calls validate
+/// `privileged` and `privileged_reason`, as the reference's argument validators
+/// do (#415); `seek_permission` is already a boolean. These fields do not
+/// change key derivation. The other calls' validators remain outstanding;
+/// the two linkage calls drop their privilege pair (#193).
 ///
 /// # Example
 ///
@@ -271,6 +272,7 @@ impl ProtoWallet {
     ///
     /// Uses HMAC-SHA256 with the derived symmetric key.
     pub fn create_hmac(&self, args: CreateHmacArgs) -> Result<CreateHmacResult> {
+        crypto::create_hmac_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -290,6 +292,7 @@ impl ProtoWallet {
     /// minimal-length key is [`Error::HmacMinimalLengthKey`], any other miss
     /// `WalletError("HMAC is not valid")`.
     pub fn verify_hmac(&self, args: VerifyHmacArgs) -> Result<VerifyHmacResult> {
+        crypto::verify_hmac_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -306,17 +309,12 @@ impl ProtoWallet {
     ///
     /// If `data` is provided, it will be SHA-256 hashed before signing.
     /// If `hash_to_directly_sign` is provided, it will be signed directly.
-    /// At least one must be provided.
+    /// Exactly one must be provided. Arguments are validated before hashing.
     pub fn create_signature(&self, args: CreateSignatureArgs) -> Result<CreateSignatureResult> {
-        let hash = match (args.hash_to_directly_sign, args.data.as_ref()) {
-            (Some(hash), _) => hash,
-            (None, Some(data)) => sha256(data),
-            (None, None) => {
-                return Err(Error::WalletError(
-                    "data or hashToDirectlySign must be provided".to_string(),
-                ));
-            }
-        };
+        crypto::create_signature_args(&args)?;
+        let hash = args
+            .hash_to_directly_sign
+            .unwrap_or_else(|| sha256(args.data.as_deref().unwrap_or_default()));
 
         // Default counterparty is 'anyone' for signatures
         let counterparty = args.counterparty.unwrap_or(Counterparty::Anyone);
@@ -335,17 +333,13 @@ impl ProtoWallet {
     ///
     /// If `data` is provided, it will be SHA-256 hashed before verification.
     /// If `hash_to_directly_verify` is provided, it will be verified directly.
-    /// At least one must be provided.
+    /// Exactly one must be provided. Arguments are validated before hashing,
+    /// key derivation or DER parsing, as the reference's ProtoWallet does.
     pub fn verify_signature(&self, args: VerifySignatureArgs) -> Result<VerifySignatureResult> {
-        let hash = match (args.hash_to_directly_verify, args.data.as_ref()) {
-            (Some(hash), _) => hash,
-            (None, Some(data)) => sha256(data),
-            (None, None) => {
-                return Err(Error::WalletError(
-                    "data or hashToDirectlyVerify must be provided".to_string(),
-                ));
-            }
-        };
+        crypto::verify_signature_args(&args)?;
+        let hash = args
+            .hash_to_directly_verify
+            .unwrap_or_else(|| sha256(args.data.as_deref().unwrap_or_default()));
 
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let for_self = args.for_self.unwrap_or(false);

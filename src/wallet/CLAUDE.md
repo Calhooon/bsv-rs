@@ -17,7 +17,8 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
 | `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
-| `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl; reads neither `privileged` nor `seek_permission`, as the reference's ProtoWallet does not | ~1284 |
+| `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl; the signature/HMAC family validates its arguments before crypto (#415); one keyring, no permission prompts | ~1280 |
+| `validation/crypto.rs` | Shared typed argument checks for ProtoWallet and the wire processor: protocol, key ID, privilege, data/hash exclusivity, byte bounds and canonical DER, in the reference's order (#415) | ~200 |
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
@@ -171,6 +172,57 @@ ProtoWallet implements `WalletInterface` (via `#[async_trait]`) with full suppor
 - `z` (32 bytes, scalar)
 
 Both the linkage and proof are encrypted for the verifier using the "counterparty linkage revelation" protocol with the revelation timestamp as key_id.
+
+### ProtoWallet argument-validator inventory (#415)
+
+Read at `ts-stack@edf6e03`, `packages/sdk/src/wallet/ProtoWallet.ts:159-396`
+and `validationHelpers.ts:1717-1804`. These are all nine methods in that
+ProtoWallet; its constructor has no argument validator. `ts-sdk@9e3ede6b`
+has none of these calls. The common encryption checks are the raw protocol
+name (5..400 UTF-8 bytes), key ID (1..800 bytes), optional counterparty,
+then privilege. A present privileged reason must have 5..50 UTF-8 bytes
+even when not privileged; a true privileged flag requires a reason.
+
+| Method | Reference validator, in order | Rust at base 326b0836 | Rust after #415 |
+|---|---|---|---|
+| `get_public_key` | `validateGetPublicKeyArgs`: identityKey true/absent, forSelf boolean; identity branch validates any supplied protocol/key/counterparty and privilege, otherwise common encryption checks | Required protocol/key checks; key-deriver validation only on derivation, identity branch bypasses it | Unchanged; follow-up |
+| `reveal_counterparty_key_linkage` | `validateRevealCounterpartyKeyLinkageArgs`: counterparty public key, verifier public key, privilege (no seekPermission) | Parsed keys; trait adapter drops privilege fields | Unchanged; follow-up |
+| `reveal_specific_key_linkage` | `validateRevealSpecificKeyLinkageArgs`: counterparty, verifier, protocol, key ID, privilege (no seekPermission) | Parsed keys and key-deriver checks; trait adapter drops privilege fields | Unchanged; follow-up |
+| `encrypt` | `validateWalletEncryptArgs`: common encryption checks, plaintext byte array <=268435456 bytes | Key-deriver checks only, then encryption | Unchanged; follow-up |
+| `decrypt` | `validateWalletDecryptArgs`: common encryption checks, ciphertext byte array <=268435456 bytes | Key-deriver checks only, then decryption | Unchanged; follow-up |
+| `create_hmac` | `validateCreateHmacArgs`: common encryption checks, data byte array <=268435456 bytes | Key-deriver checks only, then HMAC | Shared validator before crypto |
+| `verify_hmac` | `validateVerifyHmacArgs`: common encryption checks, data byte array <=268435456 bytes, HMAC exactly 32 bytes | Key-deriver checks; HMAC length enforced by type | Shared validator before crypto; same type guarantee |
+| `create_signature` | `validateCreateSignatureArgs`: common encryption checks, exactly one data/hash, selected byte array (data <=268435456, hash exactly 32) | Missing data/hash refused; both accepted (hash wins); key-deriver checks | Shared validator before crypto; hash length enforced by type |
+| `verify_signature` | `validateVerifySignatureArgs`: common encryption checks, exclusive data/hash and their bytes, signature byte array <=72, canonical DER with both scalars in 1..n-1, forSelf boolean | Missing data/hash refused; both accepted; key-deriver then DER parser | Shared validator before crypto; hash/forSelf types enforced |
+
+Every refusal is `Error::WalletRefusal { class: InvalidParameter, message }`,
+the reference's `WERR_INVALID_PARAMETER` (code 6), like the sibling originator
+and internalize validators. No low-S rule is added. The key deriver's later
+name normalization and syntax rules still run after argument validation.
+The wire processor used the same typed checks except that its data-type
+flag already guaranteed exclusivity; it now shares the four whole validators
+and common checks. The canonical DER predicate is also shared with its result
+validator. Neither path reclassifies a valid DER signature's crypto miss.
+
+The reference's JS-only checks are recorded too: a plain object, at most
+100000 properties, safe string keys and data properties; a two-element
+protocol tuple with a safe integer in 0..2; string fields; a compressed
+counterparty point (or self/anyone); booleans; dense byte arrays and exact
+hash/HMAC lengths. Rust's structs, enums, parsed `PublicKey`, strings, byte
+vectors, fixed arrays and `Option<bool>` enforce these without runtime
+refusals. `tests/vectors/wallet_proto_args_415.json` records 202 cases from
+the actual reference under Node 22: 117 replayable and 85 type-enforced.
+`tests/wallet_proto_args_415.rs` pins each representable refusal text and
+ordering; `auth_peer_general_message_words_407.rs` pins propagation through
+both Peer entry points. No current-reference DER-word divergence remains;
+the older ts-sdk still throws `Signature DER must start with 0x30` for the
+recorded malformed bytes because it has no argument validator.
+
+Follow-up for the captain: conform the remaining five methods above, including
+the getPublicKey identity branch's supplied fields, both linkage trait
+adapters' privilege checks, and encrypt/decrypt's byte bounds, in the
+reference's order and words. Preserve the typed guarantees and record base-red
+witnesses for each reachable refusal. These methods are not conformed here.
 
 ### Validation Module
 

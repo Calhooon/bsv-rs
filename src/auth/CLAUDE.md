@@ -442,11 +442,12 @@ TypeScript references, and neither the Peer's wallet call nor its dispatcher
 catches it. Only a returned `valid: false` produces `Invalid signature in
 generalMessage from <identityKey>`, with the session identity's compressed
 hex (no `0x`). Rust's existing behavior is the same. Unparseable bytes throw
-before that branch: `ts-stack@edf6e03` has the wallet's canonical-DER parameter
-error (code 6), `ts-sdk@9e3ede6b` has the DER parser's words, and Rust retains
-its own `InvalidSignature` parser error. The two references and that existing
-wording difference are recorded in `tests/auth_peer_general_message_words_407.rs`
-and the #407 changelog entry. Do not turn every wallet error into a signature
+before that branch: since #415 Rust propagates the wallet's canonical-DER
+parameter error (code 6), matching `ts-stack@edf6e03`; `ts-sdk@9e3ede6b` still
+has the DER parser's words. #415 removes the old #407 parser-word divergence
+row. The two references are recorded in
+`tests/auth_peer_general_message_words_407.rs` and the #407 changelog entry.
+Do not turn every wallet error into a signature
 verdict: an unavailable wallet must keep its own error.
 
 ### Nonce Generation

@@ -22,12 +22,14 @@ use super::requests::{RevealCounterpartyRequest, RevealSpecificRequest};
 use crate::primitives::PublicKey;
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
 use crate::wallet::types::{Counterparty, Protocol};
+use crate::wallet::validation::crypto;
 use crate::wallet::{
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
     RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult, VerifyHmacArgs,
     VerifySignatureArgs,
 };
 use crate::Error;
+pub(super) use crypto::is_canonical_der_signature;
 use std::fmt::Display;
 
 /// `walletErrors.invalidParameter` (`WalletError.ts:78`), the code
@@ -43,12 +45,6 @@ const MAX_SIGNATURE_BYTES: usize = 72;
 /// The canonical anyone key, `PrivateKey(1)`'s (`WalletResultValidation.ts:221`).
 const ANYONE_PUBLIC_KEY: &str =
     "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
-/// The secp256k1 group order, big-endian.
-const GROUP_ORDER: [u8; 32] = [
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
-    0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41,
-];
-
 /// A refusal the processor frames with its own code and words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Refusal {
@@ -129,61 +125,30 @@ fn invalid_result(call: &str, field: &str, expectation: impl Display) -> Refusal
 // The arguments (`validationHelpers.ts`)
 // ============================================================================
 
-/// `validateStringLength` (`:348-356`): the length in UTF-8 bytes.
+/// The common typed checks use the same validators as ProtoWallet (#415).
 fn string_length(value: &str, name: &str, min: usize, max: usize) -> Checked {
-    if value.len() < min {
-        return Err(invalid(name, format!("at least {min} length.")));
-    }
-    if value.len() > max {
-        return Err(invalid(name, format!("no more than {max} length.")));
-    }
-    Ok(())
+    crypto::string_length(value, name, min, max).map_err(Into::into)
 }
 
-/// `validateByteArray` (`:146-177`) on a length the reader produced: dense
-/// bytes always, so the bound and the exact length are what can fail.
 fn byte_array(length: usize, name: &str) -> Checked {
-    if length > MAX_WALLET_WIRE_FRAME_BYTES {
-        return Err(invalid(
-            name,
-            format!("at most {MAX_WALLET_WIRE_FRAME_BYTES} bytes"),
-        ));
-    }
-    Ok(())
+    crypto::byte_array(length, name).map_err(Into::into)
 }
 
-/// `validateProtocol` (`:198-205`): the level the reader has refused already
-/// (`read_protocol_id`), the name 5 to 400 bytes.
 fn protocol(protocol: &Protocol) -> Checked {
-    string_length(&protocol.protocol_name, "protocolID[1]", 5, 400)
+    crypto::protocol(protocol).map_err(Into::into)
 }
 
-/// `validatePrivilege` (`:207-222`): the reason 5 to 50 bytes when given,
-/// then required when `privileged`; seekPermission a boolean by its type.
 fn privilege(privileged: Option<bool>, reason: Option<&str>) -> Checked {
-    if let Some(reason) = reason {
-        string_length(reason, "privilegedReason", 5, 50)?;
-    }
-    if privileged == Some(true) && reason.is_none() {
-        return Err(invalid(
-            "privilegedReason",
-            "a value when 'privileged' is true",
-        ));
-    }
-    Ok(())
+    crypto::privilege(privileged, reason).map_err(Into::into)
 }
 
-/// `validateEncryptionArgs` (`:224-230`): the protocol, the key ID 1 to 800
-/// bytes, the counterparty (a point by the reader), the privilege.
 fn encryption(
     protocol_id: &Protocol,
     key_id: &str,
     privileged: Option<bool>,
     reason: Option<&str>,
 ) -> Checked {
-    protocol(protocol_id)?;
-    string_length(key_id, "keyID", 1, 800)?;
-    privilege(privileged, reason)
+    crypto::encryption(protocol_id, key_id, privileged, reason).map_err(Into::into)
 }
 
 /// `validateAbortActionArgs` (`:893-899`, `WalletArgumentValidation.ts:44-46`):
@@ -226,52 +191,21 @@ pub(super) fn decrypt_args(args: &DecryptArgs) -> Checked {
     byte_array(args.ciphertext.len(), "ciphertext")
 }
 
-/// `validateCreateHmacArgs` (`:1764-1768`).
+/// The four signature/HMAC validators shared with ProtoWallet (#415).
 pub(super) fn create_hmac_args(args: &CreateHmacArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    encryption(&args.protocol_id, &args.key_id, args.privileged, reason)?;
-    byte_array(args.data.len(), "data")
+    crypto::create_hmac_args(args).map_err(Into::into)
 }
 
-/// `validateVerifyHmacArgs` (`:1770-1775`): the HMAC is read as 32 bytes.
 pub(super) fn verify_hmac_args(args: &VerifyHmacArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    encryption(&args.protocol_id, &args.key_id, args.privileged, reason)?;
-    byte_array(args.data.len(), "data")
+    crypto::verify_hmac_args(args).map_err(Into::into)
 }
 
-/// `validateCreateSignatureArgs` (`:1789-1793`): exactly one of the data and
-/// the hash by the reader's flag, the hash read as 32 bytes.
 pub(super) fn create_signature_args(args: &CreateSignatureArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    encryption(&args.protocol_id, &args.key_id, args.privileged, reason)?;
-    match &args.data {
-        Some(data) => byte_array(data.len(), "data"),
-        None => Ok(()),
-    }
+    crypto::create_signature_args(args).map_err(Into::into)
 }
 
-/// `validateVerifySignatureArgs` (`:1795-1804`): the encryption arguments,
-/// the data, then the signature at most 72 bytes and canonical DER.
 pub(super) fn verify_signature_args(args: &VerifySignatureArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    encryption(&args.protocol_id, &args.key_id, args.privileged, reason)?;
-    if let Some(data) = &args.data {
-        byte_array(data.len(), "data")?;
-    }
-    if args.signature.len() > MAX_SIGNATURE_BYTES {
-        return Err(invalid(
-            "signature",
-            format!("at most {MAX_SIGNATURE_BYTES} bytes"),
-        ));
-    }
-    if !is_canonical_der_signature(&args.signature) {
-        return Err(invalid(
-            "signature",
-            "a canonical DER-encoded ECDSA signature",
-        ));
-    }
-    Ok(())
+    crypto::verify_signature_args(args).map_err(Into::into)
 }
 
 /// `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`): a `02` or
@@ -344,55 +278,6 @@ pub(super) fn read_header_height(reader: &mut WireReader<'_>) -> Result<u32, Ref
             u32::MAX.into(),
         ))),
     }
-}
-
-/// `isCanonicalDERSignature` (`Secp256k1Validation.ts:33-53`): a strict,
-/// minimally encoded DER signature, both scalars in 1 to n - 1.
-pub(super) fn is_canonical_der_signature(bytes: &[u8]) -> bool {
-    if bytes.len() < 8 || bytes.len() > MAX_SIGNATURE_BYTES || bytes[0] != 0x30 {
-        return false;
-    }
-    if usize::from(bytes[1]) != bytes.len() - 2 {
-        return false;
-    }
-    let mut offset = 2;
-    for _ in 0..2 {
-        if bytes.get(offset) != Some(&0x02) {
-            return false;
-        }
-        let Some(&length) = bytes.get(offset + 1) else {
-            return false;
-        };
-        let length = usize::from(length);
-        offset += 2;
-        if !(1..=33).contains(&length) || offset + length > bytes.len() {
-            return false;
-        }
-        let scalar = &bytes[offset..offset + length];
-        if scalar[0] & 0x80 != 0 || (length > 1 && scalar[0] == 0 && scalar[1] & 0x80 == 0) {
-            return false;
-        }
-        if !scalar_in_range(scalar) {
-            return false;
-        }
-        offset += length;
-    }
-    offset == bytes.len()
-}
-
-/// A big-endian scalar in 1 to n - 1.
-fn scalar_in_range(scalar: &[u8]) -> bool {
-    let leading = scalar.iter().position(|&b| b != 0);
-    let Some(leading) = leading else {
-        return false;
-    };
-    let digits = &scalar[leading..];
-    if digits.len() > 32 {
-        return false;
-    }
-    let mut padded = [0u8; 32];
-    padded[32 - digits.len()..].copy_from_slice(digits);
-    padded < GROUP_ORDER
 }
 
 // ============================================================================

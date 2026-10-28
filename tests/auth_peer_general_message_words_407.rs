@@ -17,7 +17,7 @@ use bsv_rs::auth::{
 };
 use bsv_rs::primitives::{to_base64, PrivateKey};
 use bsv_rs::wallet::{Counterparty, CreateSignatureArgs, ProtoWallet, Protocol, SecurityLevel};
-use bsv_rs::{Error, Result};
+use bsv_rs::{Error, Result, WalletRefusalClass};
 use serde_json::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -146,14 +146,18 @@ async fn another_keys_general_signature_throws_the_wallet_words_before_the_peer_
 }
 
 #[tokio::test]
-async fn unparseable_general_signature_throws_before_the_peer_words_and_delivers_nothing() {
+async fn malformed_general_signature_uses_the_argument_validator_words_before_the_peer() {
     for server in [false, true] {
         let (result, calls) = deliver("malformed", TestWallet::new(key(41), false), server).await;
-        // The wallet's parser words are a pre-existing difference, not a
-        // `valid: false` result. The two reference versions also differ here.
+        // #415 follows the current reference's validator, ahead of DER parsing.
+        // The older ts-sdk has no argument validator and keeps its parser words.
         assert_eq!(
             result,
-            Err(Error::InvalidSignature("Expected sequence tag 0x30".into()))
+            Err(Error::WalletRefusal {
+                class: WalletRefusalClass::InvalidParameter,
+                message: "The signature parameter must be a canonical DER-encoded ECDSA signature"
+                    .into(),
+            })
         );
         assert_eq!(calls, 0);
         let fixture = vector();

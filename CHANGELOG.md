@@ -115,6 +115,104 @@ absent, `serializer.go:177-190`), reads the answer to its end
 security level unbounded (`serializer.go:165-174`), and checks nothing
 against the request; its two vectors are this transceiver's bytes both
 ways.
+### Fixed: ProtoWallet validates signature and HMAC arguments before cryptography (#415)
+
+`create_signature`, `verify_signature`, `create_hmac` and `verify_hmac` now
+run the reference's argument checks, in order, before hashing, deriving keys
+or parsing a signature. They previously ran only the key deriver's checks:
+malformed DER exposed parser errors, both data and a direct hash silently
+selected the hash, privilege fields were ignored, and oversized data was
+hashed. Refusals now use `Error::WalletRefusal` with class `InvalidParameter`,
+the sibling validators' representation of `WERR_INVALID_PARAMETER` (code 6).
+No public type changes; valid cryptographic results and genuine signature
+or HMAC misses retain their behavior.
+
+The common checks and canonical DER predicate live in
+`src/wallet/validation/crypto.rs`, shared with the wire processor. Its old
+checks covered the same typed fields except data/hash exclusivity, already
+enforced by its decoder's data-type flag. The direct ProtoWallet API needed
+that check as well. The full inventory of all nine reference-guarded methods,
+before and after this lane, is in `src/wallet/CLAUDE.md`; getPublicKey,
+encrypt/decrypt and the two linkage methods are follow-up work for the captain.
+
+`tests/wallet_proto_args_415.rs` has one test for each of the twelve reachable
+refusal texts, an ordering test, and valid-boundary/crypto-miss replays. The
+Node v22.18.0 recorder `tests/support/wallet_proto_args_415.mjs` calls the
+actual ProtoWallet built from `ts-stack@edf6e03`: 202 cases, 117 replayable
+here and 85 documenting JS states excluded by Rust's types. The twelve
+refusal tests and ordering test fail on base `326b0836` (the old words or
+success); the success/miss test passes. The imported #407 Peer pins and their
+two-reference recorder were re-run: the malformed-signature test is red on
+the base and green here, with no listener called on either start path.
+No current-reference DER-word divergence remains; #415 removes the old #407
+divergence row after conforming the wallet's argument refusal.
+
+Downstream migration, old -> new (new `Display` is the message alone):
+
+```text
+invalid signature: DER too short
+invalid signature: Expected sequence tag 0x30
+invalid signature: Expected integer tag 0x02 for R
+invalid signature: Expected integer tag 0x02 for S
+invalid signature: DER length mismatch / R length overflow / S length missing / S length overflow
+  -> The signature parameter must be a canonical DER-encoded ECDSA signature
+signature >72 bytes, previously parser error or crypto miss
+  -> The signature parameter must be at most 72 bytes
+wallet error: data or hashToDirectlySign must be provided; both inputs previously accepted
+  -> The data, hashToDirectlySign parameter must be exactly one value
+wallet error: data or hashToDirectlyVerify must be provided; both inputs previously accepted
+  -> The data, hashToDirectlyVerify parameter must be exactly one value
+protocol validation error: protocol name must be at least 5 characters
+  -> The protocolID[1] parameter must be at least 5 length.
+protocol validation error: protocol name must be 400 characters or less
+  -> The protocolID[1] parameter must be no more than 400 length.
+protocol validation error: key ID must be at least 1 character
+  -> The keyID parameter must be at least 1 length.
+protocol validation error: key ID must be 800 characters or less
+  -> The keyID parameter must be no more than 800 length.
+privileged reason missing/short/long, previously ignored
+  -> The privilegedReason parameter must be a value when 'privileged' is true
+  -> The privilegedReason parameter must be at least 5 length.
+  -> The privilegedReason parameter must be no more than 50 length.
+data >268435456 bytes, previously processed
+  -> The data parameter must be at most 268435456 bytes
+```
+
+Rows for the toolbox's operator-visible table:
+
+| Condition | New operator-visible words | Class |
+|---|---|---|
+| Malformed general-answer signature / direct verifySignature DER | `The signature parameter must be a canonical DER-encoded ECDSA signature` | InvalidParameter, code 6 |
+| Signature over 72 bytes | `The signature parameter must be at most 72 bytes` | InvalidParameter, code 6 |
+| Missing or conflicting signature data/hash | `The data, hashToDirectlySign parameter must be exactly one value` / `The data, hashToDirectlyVerify parameter must be exactly one value` | InvalidParameter, code 6 |
+| Invalid protocol/key/reason/data bounds | The field-specific validator words in the migration block above | InvalidParameter, code 6 |
+| Canonical signature made by another key | `wallet error: Signature is not valid` | Unchanged WalletError |
+
+### Notes: cross-SDK parity (#415)
+
+The authority is `ts-stack@edf6e03` `ProtoWallet.ts:283-396`,
+`validationHelpers.ts:146-230,1752-1804`, and
+`Secp256k1Validation.ts:33-53`. Checks are: a plain argument record; protocol
+tuple and its level/name; key ID; optional counterparty; privilege flag,
+optional reason, required reason when privileged, seekPermission; then data
+or exactly one data/hash for signatures; then signature length/canonical DER
+and forSelf, or HMAC length. Byte and string lengths are inclusive; strings
+are measured in UTF-8 before key-deriver normalization. Canonical DER allows
+high-S but requires both scalars in 1..n-1. Structs, enums, parsed keys, byte
+vectors, fixed 32-byte arrays and booleans enforce the corresponding JS type
+checks here. Their exact reference errors are recorded in the vector.
+
+The older `ts-sdk@9e3ede6b` ProtoWallet has no argument validators
+(`ProtoWallet.ts:267-302` calls its DER parser directly); the re-recorded
+#407 witness still returns `Signature DER must start with 0x30` there.
+Go at `2ca481c` likewise has no equivalent validator: `wallet/proto_wallet.go`
+rejects verification when both data/hash byte slices have zero length, checks
+a nil parsed signature, prefers a present hash, then derives and verifies. Its HMAC is `[32]byte`, and its
+signature is already `*ec.Signature`. The key deriver validates key ID and
+normalized protocol later, in its own words (`key_deriver.go:214-253`);
+privilege and frame-byte bounds are not checked. Its linkage methods only
+check nil keys. These are stated reference-version differences, not reasons
+to retain the missing current-reference checks.
 
 ### Changed: the auth and identity certificate maps and `resolve_by_attributes`'s attributes keep insertion order, the reference's `Record` order, one order through the crate after the wallet's (#394)
 
@@ -457,8 +555,10 @@ and run under Node v22.18.0. The recorder runs an honest handshake before
 each message and records both `ProtoWallet` and an explicitly adapting wallet
 that returns `false` on a verification error. Rust reconstructs the messages
 with its own nonce writer, as #353's witness does, because the nonce HMAC
-inputs differ. These parity tests are already green on the base; the two
-proposed replacement expectations are red there, not evidence of a parity fix.
+inputs differ. These parity tests were green when #407 landed; #415 updates
+the malformed-signature expectation to the current reference's code-6 refusal.
+The two proposed Peer-error replacement expectations were red, not evidence
+of a parity fix.
 
 Downstream old / proposed new (replacement **not applied**): `wallet error: Signature is not valid` / `authentication error: Invalid signature in generalMessage from <identityKey>`.
 
@@ -478,9 +578,11 @@ Unparseable bytes are a different refusal, also propagated: `ts-stack`'s
 wallet validation throws `The signature parameter must be a canonical
 DER-encoded ECDSA signature` (code 6, `validationHelpers.ts:1795-1802`),
 while `ts-sdk`'s parser throws `Signature DER must start with 0x30` for the
-recorded bytes. Rust retains its existing `InvalidSignature` parser error,
-`invalid signature: Expected sequence tag 0x30`; that wording difference is
-recorded, not normalized into a false verification result. Go at `2ca481c`
+recorded bytes. At #407's landing Rust propagated its `InvalidSignature`
+parser error, `invalid signature: Expected sequence tag 0x30`. #415 now
+propagates the current reference's code-6 argument refusal, removing the old
+#407 divergence row. It remains a thrown refusal, never a false verification
+result. Go at `2ca481c`
 parses first (`auth/peer.go:1013-1017`, `failed to parse signature`), then
 classifies a wallet's `ErrInvalidSignature` or `Valid: false` as
 `general message - invalid-signature` (`:414-435`, `:1036-1038`), wrapping
