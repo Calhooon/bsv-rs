@@ -43,7 +43,12 @@ builds. Serde reads and writes them in the text's order. The walks:
   arrive; acquireCertificate's `keyring_for_subject`, written in the
   `HashMap`'s iteration order before, is written in the map's
   (`WalletWireTransceiver.ts:1416`). The certificate frame keeps the signed
-  order (`checked_field_names`, below).
+  order (`checked_field_names`, below); its bound checks (each name's length
+  and safety, then its value's 1 MiB) walk the map's order, so of two bad
+  names it refuses the first given, as the reference's
+  `snapshotCertificateFields` walks `Reflect.ownKeys` before `toBinary`
+  sorts (`Certificate.ts:56-83`, `:281-282`), where it judged them in the
+  sorted order (the review's finding).
 - `identity` (2): `publicly_reveal_attributes` judges and publishes the
   wallet's keyring in the wallet's key order (`IdentityClient.ts:485`,
   `:492-499`), where it used the order of the names asked, so of two values
@@ -63,7 +68,7 @@ signature is the same whatever order the fields were given in (the issue's
 "signs in that order" is the validators' walk, not the signer's). This
 crate's signer and `write_wallet_certificate` keep that order (#246, #249).
 
-Pinned by `tests/wallet_certificate_field_order_385.rs` (8): 26 field names
+Pinned by `tests/wallet_certificate_field_order_385.rs` (9): 26 field names
 over 50 bytes, longest first, refused at the first (76 bytes); a reveal whose
 wallet answers two bad keyring values, `name` then `email`, for names asked
 `email` then `name`, refused naming `keyringForVerifier.name`; the identity
@@ -75,12 +80,16 @@ read back; each of the nine maps read from JSON text in its order and
 written back in it; acquireCertificate's request writing the fields and
 keyring in order; a proveCertificate keyring read in arrival order; a
 discovery entry's maps written and read in order, the certificate's fields
-crossing in the signed order. The signer's order is pinned from the code's
+crossing in the signed order; the wallet's certificate writer given a
+51-byte name then a 52-byte one, which sorts first, refused naming the
+51-byte one. The signer's order is pinned from the code's
 reading (`Certificate.ts:282-284`) and the reference-recorded #249 vector
-(`auth_certificate_field_order_249.json`), no new recording. Red 8 of 8 on a
-scratch copy of `1791d2f8` with the file added (three runs); the signer test
-red there only at its map-order assertion, its preimage half green without
-it. `tests/wire_identity_certificate_writer.rs` pinned the discovery maps in
+(`auth_certificate_field_order_249.json`), no new recording. The first
+eight red 8 of 8 on a scratch copy of `1791d2f8` with the file added (three
+runs); the signer test red there only at its map-order assertion, its
+preimage half green without it. The writer's test red on a scratch copy of
+`63d3e858` (the refusal named the 52-byte name), green after.
+`tests/wire_identity_certificate_writer.rs` pinned the discovery maps in
 go-sdk's sorted order as the reference's; its expected bytes are now the
 reference's order. The golden fixtures (`tests/fixtures/{wire,http_json}`)
 did not move: every recorded map of two or more keys is already in byte
@@ -94,7 +103,10 @@ Migration: a struct literal that built a `HashMap` builds an `IndexMap`
 for `HashMap::from([...])`); code that reads a map with the map API compiles
 as it is and now gets order; `validate_certificate_fields`,
 `WireReader::read_string_map`, `read_optional_string_map` and
-`WireWriter::write_string_map` take or return the `IndexMap`. `IndexMap`'s
+`WireWriter::write_string_map` take or return the `IndexMap`. This crate
+does not re-export `indexmap`: a downstream that names the type adds
+`indexmap = "2"` to its own manifest, or builds the map with `collect()`
+from pairs and names no type. `IndexMap`'s
 `==` ignores order, as `HashMap`'s does. Downstreams that build these maps:
 the toolbox (its re-pin flips D12) and any wallet over `WalletInterface`'s
 certificate calls.
