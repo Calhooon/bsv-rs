@@ -30,6 +30,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 mod answer;
+mod byte_fields;
 mod key_requests;
 mod review_actions;
 use key_requests::{
@@ -142,8 +143,7 @@ impl HttpWalletJson {
         self.request_bound(method, args, originator, None).await
     }
 
-    /// [`request`](Self::request), a code-5 body with its results read
-    /// against `review`, the createAction or signAction asked (#339).
+    /// [`request`](Self::request), a code-5 body read against `review` (#339).
     async fn request_bound<T: Serialize, R: for<'de> Deserialize<'de>>(
         &self,
         method: &str,
@@ -179,7 +179,7 @@ impl HttpWalletJson {
         if !response.status().is_success() {
             return Err(answer::refusal(response, method, review).await);
         }
-        answer::success(response, review).await
+        answer::success(response, method).await
     }
 
     // =========================================================================
