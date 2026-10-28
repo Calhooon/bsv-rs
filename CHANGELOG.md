@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the KVStore reader accepts the reference writer's untagged token (#344)
+
+The public token reader now distinguishes exactly five fields (no tags,
+signature at index 4) from six (tags at index 4, signature at index 5).
+Previously `extract_fields` also treated the five-field token's signature as
+its tags, concatenating the signature into its own signed message and
+rejecting every untagged token. A present tag field is parsed as a JSON array
+of at most 32 strings; each must occupy 1 to 256 UTF-8 bytes and be unique.
+The checks run in the reference's order: array/count, then each tag's
+length/type before its uniqueness. Invalid tags are skipped by the store
+and interpreter, as the reference skips them, with the validator's exact
+`KVStore tags must be a bounded array`, `KVStore tag has an invalid length`
+and `KVStore tags must be unique` words pinned in the unit test.
+
+Reading the actual reference token also requires its signature derivation:
+the JSON wallet protocol and the token's key as key ID, with its locking key
+bound to that controller. The reader now recognizes that form and verifies
+it on both the global lookup and history paths. The store's string
+configuration `kvstore` matches that same App namespace `[1,"kvstore"]`, so
+the reference token reads through the default store configuration. The
+writer and the store implementations are unchanged; their older raw-protocol
+tokens retain their existing verification path. An explicit empty tag array remains a present,
+signed field; an absent field never includes the signature in the message.
+
+`tests/support/signaction_reference_326.mjs --kvstore-tags` extends the #326
+recorder. Its 18 cases in `tests/vectors/kvstore_tags_344.json` were recorded
+twice identically under Node v22.18.0 from `ts-stack@edf6e03` built from the
+clone's commit. Accepted tokens come from `GlobalKVStore.set`; the malformed
+tag and explicit-empty witnesses come from the reference's signed
+`PushDrop.lock`, since the store refuses to write malformed tags.
+`tests/kvstore_untagged_token_344.rs` pins field separation, reading the
+writer's untagged token through an injected, offline-only resolver, all
+accepted boundaries, signing an explicit empty array, and rejecting the
+malformed tokens. The five tests are RED on base `bf97cc74` in a scratch
+copy with its own target directory. The unit
+`malformed_reference_token_tags_use_the_reference_words_and_order` checks
+the nine validator refusals, including competing failures, against the
+recorded words. Two older `kvstore_integration_tests` expectations now refuse
+empty and zero-byte tag fields: the reference writer encodes both as `00`
+and its reader skips both as invalid JSON (recorded too). These are not an
+absent tag field or the valid JSON array `[]`. Both corrected expectations
+are also RED on the same scratch base.
+
+### Notes: cross-SDK parity (#344)
+
+Under the owner's ruling (c), the tag rule follows
+`ts-stack@edf6e03` `packages/sdk/src/kvstore/kvStoreTokenValidation.ts:58-74`
+and `:88-118`: exactly five or six fields, tags only in the six-field form,
+the signature always last, and all preceding fields signed. The interpreter
+names both layouts at `kvStoreInterpreter.ts:15-18`, authenticates at `:37`,
+then filters and returns the value at `:39-47`, skipping failures at `:48-50`.
+The global writer omits the tags field for absent or empty tags
+(`GlobalKVStore.ts:279-304`); its reader authenticates at `:627` and skips a
+refusal at `:657-659`. Untagged means no payload tags, not an invalid token;
+an explicit `[]` is also accepted. The local store's tag is different: its
+wallet output is tagged with the key (`LocalKVStore.ts:175-188`), while its
+token contains only value and signature (`:278-298`), authenticated before
+optional decryption (`:340-368`).
+
+The older `ts-sdk@9e3ede6b` interpreter also accepts exactly five/six fields
+(`src/kvstore/kvStoreInterpreter.ts:34-46`); its global reader calls
+`verifySignature` on the last field, then treats unparseable tags as absent
+(`GlobalKVStore.ts:456-498`), unlike the current reference's strict tag
+checks. `go-sdk@2ca481c` has only the local store: wallet lookup by `[key]`
+(`kvstore/local_kv_store.go:174-188`), value in field 0 (`:131-156`), its
+writer's value-only payload (`:265-278`); no public five/six-field reader.
+
+This closes #326's untagged-token finding. Other existing differences remain:
+this crate's writer uses a raw protocol name and the fixed `kvstore-token`
+key ID, its reader continues to accept that older form, and its public
+context has no controller selector. The rest of the reference's canonical
+PushDrop, protocol/value/controller bounds, overlay selector/active-state checks and
+local-token authentication are outside this tag fix; it does not claim full
+reader parity. The #326 signAction/previous-token findings remain separate.
+
 ## [0.9.0-beta.3] - 2026-10-28
 
 The 0.9.0 line's third prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (the brief's 19.7: bsv-rs 0.9.0-beta.3, then the toolbox's 0.14.0-beta.3 carrying its re-pin, then the CLI's one pin PR) at the tip after #429 landed (a53a9492), so the canaries re-pin the interpreter's default-mode changes of #397 and #429 once. The pin set the canaries waited on: #385 and #394 (the ordered maps), #373 (the streaming reader's memory budget), #335 and #404 (`WalletClient` as a `WalletInterface` under the `wallet` feature, its methods on `&self`: the one API break of this prerelease, named in #404's entry), #415 and #420 (`ProtoWallet`'s argument validators in the reference's words), #406 (the wire transceiver's two linkage calls), #416 (the HTTP auth transport's bounds) and #417 (the script engine's version-1 words). Every entry below was cold-reviewed on a model other than its lane's and landed through the sequencer; the fixtures' diff since beta.2 is in the announcement.

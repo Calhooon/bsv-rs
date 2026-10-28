@@ -975,11 +975,11 @@ fn test_kvstore_fields_value_bytes() {
 }
 
 #[test]
-fn test_kvstore_fields_empty_tags() {
+fn an_empty_tag_field_is_refused_instead_of_being_read_as_untagged() {
     let privkey = PrivateKey::random();
     let pubkey = privkey.public_key();
 
-    // Create a token with empty tags field (new format with empty tags)
+    // #344: an empty byte field is not the JSON array [] or an absent field.
     let fields = vec![
         b"proto".to_vec(),
         b"key".to_vec(),
@@ -993,26 +993,21 @@ fn test_kvstore_fields_empty_tags() {
     let script = pushdrop.lock();
 
     let extracted = KVStoreInterpreter::extract_fields(&script);
-    assert!(extracted.is_some());
-
-    let extracted = extracted.unwrap();
-    // Empty tags means has_tags returns false
-    assert!(!extracted.has_tags());
-    assert!(extracted.tags_vec().is_empty());
+    assert!(extracted.is_none());
 }
 
 #[test]
-fn test_kvstore_fields_single_zero_byte_tags() {
+fn a_zero_byte_tag_field_is_refused_instead_of_being_read_as_untagged() {
     let privkey = PrivateKey::random();
     let pubkey = privkey.public_key();
 
-    // Create a token with single zero byte tags (placeholder for no tags)
+    // #344: the reference refuses a zero byte; it is not a no-tags marker.
     let fields = vec![
         b"proto".to_vec(),
         b"key".to_vec(),
         b"value".to_vec(),
         pubkey.to_compressed().to_vec(),
-        vec![0u8],     // Single zero byte tags (no tags marker)
+        vec![0u8],     // Invalid tag JSON
         vec![0u8; 64], // Signature at index 5 for new format
     ];
 
@@ -1020,12 +1015,7 @@ fn test_kvstore_fields_single_zero_byte_tags() {
     let script = pushdrop.lock();
 
     let extracted = KVStoreInterpreter::extract_fields(&script);
-    assert!(extracted.is_some());
-
-    let extracted = extracted.unwrap();
-    // Single zero byte is treated as no tags
-    assert!(!extracted.has_tags());
-    assert!(extracted.tags_vec().is_empty());
+    assert!(extracted.is_none());
 }
 
 // =============================================================================

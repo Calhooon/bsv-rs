@@ -1,17 +1,20 @@
 //! KVStore token interpreter.
 //!
 //! Extracts key-value data from transaction outputs to build
-//! the history of an entry. Supports both old format (4 fields without tags)
-//! and new format (5 fields with tags).
+//! the history of an entry. Supports five fields without tags and six with
+//! tags, including the final signature in either format.
 
 use crate::primitives::{to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
-use crate::wallet::{Counterparty, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs};
+use crate::wallet::{
+    Counterparty, KeyDeriverApi, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs,
+};
 use std::sync::OnceLock;
 
 use super::types::{KVStoreEntry, KvProtocolFields};
+use crate::{Error, Result};
 
 /// Cached "anyone" wallet for signature verification.
 static ANYONE_WALLET: OnceLock<ProtoWallet> = OnceLock::new();
@@ -19,6 +22,31 @@ static ANYONE_WALLET: OnceLock<ProtoWallet> = OnceLock::new();
 /// Returns a cached "anyone" wallet for signature verification.
 fn get_anyone_wallet() -> &'static ProtoWallet {
     ANYONE_WALLET.get_or_init(ProtoWallet::anyone)
+}
+
+/// The reference's tag checks, in its order (kvStoreTokenValidation.ts:58-74).
+/// Absence is handled by the field count, before parsing any tag JSON.
+fn validate_tags(value: &serde_json::Value) -> Result<Vec<String>> {
+    let tags = value
+        .as_array()
+        .filter(|tags| tags.len() <= 32)
+        .ok_or_else(|| Error::KvStoreError("KVStore tags must be a bounded array".into()))?;
+    let mut result = Vec::with_capacity(tags.len());
+    for tag in tags {
+        let tag = tag
+            .as_str()
+            .filter(|tag| !tag.is_empty() && tag.len() <= 256)
+            .ok_or_else(|| Error::KvStoreError("KVStore tag has an invalid length".into()))?;
+        if result.iter().any(|seen| seen == tag) {
+            return Err(Error::KvStoreError("KVStore tags must be unique".into()));
+        }
+        result.push(tag.to_owned());
+    }
+    Ok(result)
+}
+
+fn parse_tags(bytes: &[u8]) -> Option<Vec<String>> {
+    validate_tags(&serde_json::from_slice::<serde_json::Value>(bytes).ok()?).ok()
 }
 
 /// Context for KVStore interpreter operations.
@@ -84,57 +112,37 @@ impl KVStoreInterpreter {
         script: &LockingScript,
         ctx: Option<&KVStoreContext>,
     ) -> Option<KVStoreEntry> {
-        // Try to decode as PushDrop
-        let pushdrop = PushDrop::decode(script).ok()?;
+        let fields = Self::extract_fields(script)?;
+        let protocol_id = fields.protocol_id_string()?;
+        let key = fields.key_string()?;
 
-        // Need at least 5 fields for old format (without tags) or 6 for new format
-        if pushdrop.fields.len() < KvProtocolFields::MIN_FIELDS_OLD {
+        // Public tokens written by the reference carry a JSON wallet protocol.
+        // Authenticate those on the history path too. The crate's older raw
+        // protocol format keeps its separate verify_signature call.
+        if protocol_id.starts_with('[') && !Self::verify_signature(&fields, &protocol_id) {
             return None;
         }
 
-        // Extract protocol ID (field 0)
-        let protocol_id_bytes = pushdrop.fields.get(KvProtocolFields::PROTOCOL_ID)?;
-        let protocol_id = String::from_utf8(protocol_id_bytes.clone()).ok()?;
-
-        // Extract key (field 1)
-        let key_bytes = pushdrop.fields.get(KvProtocolFields::KEY)?;
-        let key = String::from_utf8(key_bytes.clone()).ok()?;
-
         // If context provided, check for match
         if let Some(ctx) = ctx {
-            if ctx.key != key || ctx.protocol_id != protocol_id {
+            // The store's string configuration denotes an App protocol;
+            // the reference writes that same namespace as [1, name].
+            let protocol_matches = ctx.protocol_id == protocol_id
+                || serde_json::from_str::<(u8, String)>(&protocol_id).is_ok_and(|(level, name)| {
+                    level == SecurityLevel::App.as_u8() && name == ctx.protocol_id
+                });
+            if ctx.key != key || !protocol_matches {
                 return None;
             }
         }
 
-        // Extract value (field 2)
-        let value_bytes = pushdrop.fields.get(KvProtocolFields::VALUE)?;
-        let value = String::from_utf8(value_bytes.clone()).ok()?;
-
-        // Extract controller (field 3) - should be 33-byte compressed pubkey
-        let controller_bytes = pushdrop.fields.get(KvProtocolFields::CONTROLLER)?;
-        let controller = if controller_bytes.len() == 33 {
-            to_hex(controller_bytes)
+        let value = fields.value_string()?;
+        let controller = if fields.controller.len() == 33 {
+            to_hex(&fields.controller)
         } else {
-            // Try to parse as hex string
-            String::from_utf8(controller_bytes.clone()).ok()?
+            String::from_utf8(fields.controller.clone()).ok()?
         };
-
-        // Extract tags (field 4) - optional in old format
-        let tags = if pushdrop.fields.len() >= KvProtocolFields::MIN_FIELDS_NEW {
-            let tags_bytes = pushdrop.fields.get(KvProtocolFields::TAGS)?;
-            // Tags are stored as JSON array or empty
-            if tags_bytes.is_empty() || (tags_bytes.len() == 1 && tags_bytes[0] == 0) {
-                Vec::new()
-            } else {
-                let tags_str = String::from_utf8(tags_bytes.clone()).ok()?;
-                serde_json::from_str::<Vec<String>>(&tags_str).unwrap_or_default()
-            }
-        } else {
-            Vec::new()
-        };
-
-        Some(KVStoreEntry::new(key, value, controller, protocol_id).with_tags(tags))
+        Some(KVStoreEntry::new(key, value, controller, protocol_id).with_tags(fields.tags_vec()))
     }
 
     /// Verify that a signature field is valid.
@@ -149,8 +157,8 @@ impl KVStoreInterpreter {
     ///
     /// # Returns
     ///
-    /// `Ok(true)` if signature is valid, `Ok(false)` if invalid or missing.
-    /// Errors are converted to `Ok(false)` for graceful degradation.
+    /// `true` if the signature is valid, `false` if invalid or missing.
+    /// Errors are converted to `false` for graceful degradation.
     pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool {
         // Get signature - if missing, verification fails
         let signature = match &fields.signature {
@@ -171,19 +179,48 @@ impl KVStoreInterpreter {
         data.extend_from_slice(&fields.value);
         data.extend_from_slice(&fields.controller);
         if let Some(tags) = &fields.tags {
-            if !tags.is_empty() && tags != &[0u8] {
-                data.extend_from_slice(tags);
+            if parse_tags(tags).is_none() {
+                return false;
             }
+            data.extend_from_slice(tags);
         }
 
-        // Create verification args matching create_token_signature() in global.rs
-        let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+        // The reference signs with the token's wallet protocol and key, and
+        // binds its locking key to the same derivation (validation.ts:106-117).
+        // Keep reading this crate's earlier raw-protocol tokens as well.
+        let (protocol, key_id) = match serde_json::from_slice::<(u8, String)>(&fields.protocol_id) {
+            Ok((level, name)) => {
+                let Some(protocol) = Protocol::from_tuple((level, &name)) else {
+                    return false;
+                };
+                if serde_json::to_vec(&(level, &name)).ok().as_ref() != Some(&fields.protocol_id) {
+                    return false;
+                }
+                let Some(key_id) = fields.key_string() else {
+                    return false;
+                };
+                let expected_key = get_anyone_wallet().key_deriver().derive_public_key(
+                    &protocol,
+                    &key_id,
+                    &Counterparty::Other(controller_pubkey.clone()),
+                    false,
+                );
+                if !expected_key.is_ok_and(|key| key == fields.locking_public_key) {
+                    return false;
+                }
+                (protocol, key_id)
+            }
+            Err(_) => (
+                Protocol::new(SecurityLevel::App, protocol_id),
+                "kvstore-token".to_owned(),
+            ),
+        };
         let args = VerifySignatureArgs {
             data: Some(data),
             hash_to_directly_verify: None,
             signature,
             protocol_id: protocol,
-            key_id: "kvstore-token".to_string(),
+            key_id,
             counterparty: Some(Counterparty::Other(controller_pubkey)),
             for_self: Some(false), // Verify counterparty's signature
             ..Default::default()
@@ -233,7 +270,16 @@ impl KVStoreInterpreter {
     pub fn extract_fields(script: &LockingScript) -> Option<KVStoreFields> {
         let pushdrop = PushDrop::decode(script).ok()?;
 
-        if pushdrop.fields.len() < KvProtocolFields::MIN_FIELDS_OLD {
+        let has_tags = match pushdrop.fields.len() {
+            KvProtocolFields::MIN_FIELDS_OLD => false,
+            KvProtocolFields::MIN_FIELDS_NEW => true,
+            _ => return None,
+        };
+        let tags = has_tags.then(|| pushdrop.fields[KvProtocolFields::TAGS].clone());
+        if tags
+            .as_deref()
+            .is_some_and(|bytes| parse_tags(bytes).is_none())
+        {
             return None;
         }
 
@@ -245,19 +291,8 @@ impl KVStoreInterpreter {
             key: pushdrop.fields.get(KvProtocolFields::KEY).cloned()?,
             value: pushdrop.fields.get(KvProtocolFields::VALUE).cloned()?,
             controller: pushdrop.fields.get(KvProtocolFields::CONTROLLER).cloned()?,
-            tags: pushdrop.fields.get(KvProtocolFields::TAGS).cloned(),
-            signature: pushdrop
-                .fields
-                .get(KvProtocolFields::SIGNATURE)
-                .or_else(|| {
-                    // In old format, signature is at index 4
-                    if pushdrop.fields.len() == KvProtocolFields::MIN_FIELDS_OLD {
-                        pushdrop.fields.get(4)
-                    } else {
-                        None
-                    }
-                })
-                .cloned(),
+            tags,
+            signature: pushdrop.fields.last().cloned(),
             locking_public_key: pushdrop.locking_public_key,
         })
     }
@@ -315,23 +350,14 @@ impl KVStoreFields {
     /// Get tags as string vector.
     pub fn tags_vec(&self) -> Vec<String> {
         self.tags
-            .as_ref()
-            .and_then(|bytes| {
-                if bytes.is_empty() || (bytes.len() == 1 && bytes[0] == 0) {
-                    None
-                } else {
-                    String::from_utf8(bytes.clone()).ok()
-                }
-            })
-            .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+            .as_deref()
+            .and_then(parse_tags)
             .unwrap_or_default()
     }
 
     /// Check if this token has tags (new format).
     pub fn has_tags(&self) -> bool {
-        self.tags
-            .as_ref()
-            .is_some_and(|t| !t.is_empty() && t != &[0])
+        self.tags.is_some()
     }
 }
 
@@ -344,6 +370,35 @@ mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
     use crate::script::templates::PushDrop;
+
+    #[test]
+    fn malformed_reference_token_tags_use_the_reference_words_and_order() {
+        let recorded: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/vectors/kvstore_tags_344.json"))
+                .unwrap();
+        let cases = recorded["cases"].as_array().unwrap();
+        let mut refused = 0;
+        for case in cases.iter().filter(|case| {
+            case["error"]
+                .as_str()
+                .is_some_and(|error| error.starts_with("KVStore "))
+        }) {
+            let script = LockingScript::from_hex(case["script"].as_str().unwrap()).unwrap();
+            let token = PushDrop::decode(&script).unwrap();
+            let tags = serde_json::from_slice(&token.fields[KvProtocolFields::TAGS]).unwrap();
+            assert_eq!(
+                validate_tags(&tags),
+                Err(Error::KvStoreError(
+                    case["error"].as_str().unwrap().to_owned()
+                )),
+                "{}",
+                case["name"]
+            );
+            assert!(KVStoreInterpreter::extract_fields(&script).is_none());
+            refused += 1;
+        }
+        assert_eq!(refused, 9);
+    }
 
     fn create_test_token(
         protocol_id: &str,

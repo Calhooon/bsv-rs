@@ -16,6 +16,16 @@
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/signaction_reference_326.mjs \
 //     "$W/sdk326.mjs" > tests/vectors/signaction_reference_326.json
 //
+// #344 extends this recorder with --kvstore-tags. For that mode also export
+// decodeAndVerifyKVStoreToken344 and kvStoreInterpreter344 from the entry's
+// src/kvstore/kvStoreTokenValidation.js and kvStoreInterpreter.js, respectively.
+// Rebuild that entry with the bun command above, then record with:
+//   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/signaction_reference_326.mjs \
+//     "$W/sdk326.mjs" --kvstore-tags > tests/vectors/kvstore_tags_344.json
+// The store writes the accepted tokens; the SDK's PushDrop writer signs the
+// malformed tag witnesses (which GlobalKVStore.set itself refuses to write).
+// No token bytes or signatures are constructed by hand.
+//
 // The randomness is #310's SHA-256 counter stream, installed before the SDK
 // loads, so two runs print the same file. The wallet is the ProtoWallet of the
 // scalar 9 under a recorder: createAction answers a signable transaction (its
@@ -49,7 +59,7 @@ Object.defineProperty(globalThis, 'crypto', {
 const [sdkPath] = process.argv.slice(2)
 const {
   ContactsManager326: ContactsManager, GlobalKVStore, LocalKVStore, LookupResolver, ProtoWallet, PrivateKey,
-  Script, Transaction, Utils
+  Script, Transaction, Utils, PushDrop, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344
 } = await import(pathToFileURL(sdkPath).href)
 
 const REFERENCE = Utils.toBase64(new Array(8).fill(0x52))
@@ -157,6 +167,75 @@ const stop = async (f) => {
 }
 
 const fresh = () => ({ createAction: [], signAction: [], abortAction: [], sources: {} })
+
+if (process.argv.includes('--kvstore-tags')) {
+  counter = 0
+  const state = fresh()
+  const wallet = recording(state)
+  let answer = { type: 'output-list', outputs: [] }
+  const store = new GlobalKVStore({
+    wallet,
+    networkPreset: 'local',
+    lookupResolver: { async query () { return answer } }
+  })
+  const controller = (await wallet.getPublicKey({ identityKey: true })).publicKey
+  const protocolID = [1, 'kvstore']
+  const key = 'alpha'
+  const cases = []
+  const observe = async (name, script, writer) => {
+    const source = sourceOf([{ satoshis: 1, lockingScript: script.toHex() }])
+    answer = { type: 'output-list', outputs: [{ beef: source.toBEEF(), outputIndex: 0 }] }
+    let decoded = null
+    let error = null
+    try {
+      decoded = await decodeAndVerifyKVStoreToken344(script)
+    } catch (e) {
+      error = e.message
+    }
+    const entry = await store.get({ key, controller, protocolID })
+    const value = await kvStoreInterpreter344(source, 0, { key, controller, protocolID })
+    cases.push({
+      name, writer, script: script.toHex(), fields: PushDrop.decode(script).fields.map(Utils.toHex),
+      decoded, error, entry: entry ?? null, interpreted: value ?? null
+    })
+    answer = { type: 'output-list', outputs: [] }
+  }
+  for (const [name, tags] of [
+    ['untagged', undefined], ['empty_tags_omitted', []], ['tagged', ['t']],
+    ['32_tags', Array.from({ length: 32 }, (_, i) => `tag${i}`)],
+    ['256_byte_tag', ['é'.repeat(128)]], ['distinct_unicode_tags', ['é', 'e\u0301']]
+  ]) {
+    const run = record(state, await stop(() => store.set(key, 'one', { tags })))
+    await observe(name, Script.fromHex(run.create_action_outputs[0].lockingScript), 'GlobalKVStore.set')
+  }
+  const baseFields = PushDrop.decode(Script.fromHex(cases[0].script)).fields.slice(0, -1)
+  for (const [name, tags] of [
+    ['explicit_empty_tags', []], ['null_tags', null], ['object_tags', {}],
+    ['33_tags_before_bad_element', [null, ...Array.from({ length: 32 }, (_, i) => `tag${i}`)]],
+    ['empty_tag', ['']], ['257_byte_tag', ['é'.repeat(128) + 'x']],
+    ['non_string_tag', [7]], ['duplicate_tag', ['t', 't']],
+    ['invalid_length_before_duplicate', ['', '']],
+    ['duplicate_before_later_invalid_length', ['t', 't', '']]
+  ]) {
+    const script = await new PushDrop(wallet).lock(
+      [...baseFields, Utils.toArray(JSON.stringify(tags), 'utf8')], protocolID, key, 'anyone', true
+    )
+    await observe(name, script, 'PushDrop.lock')
+  }
+  for (const [name, tagBytes] of [['empty_tag_bytes', []], ['zero_tag_byte', [0]]]) {
+    const script = await new PushDrop(wallet).lock(
+      [...baseFields, tagBytes], protocolID, key, 'anyone', true
+    )
+    await observe(name, script, 'PushDrop.lock')
+  }
+  console.log(JSON.stringify({
+    description: '#344: public KVStore tag presence, bounds and refusal order; actual SDK writer output',
+    reference: 'ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9, built from git archive with bun; Node ' + process.version,
+    site: 'kvStoreTokenValidation.ts:58-74,88-118; kvStoreInterpreter.ts:33-50; GlobalKVStore.ts:279-304,627-659',
+    wallet_key: 9, cases
+  }, null, 2))
+  process.exit(0)
+}
 
 // The contacts manager.
 counter = 0

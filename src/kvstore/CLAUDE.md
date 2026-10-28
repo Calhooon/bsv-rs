@@ -19,7 +19,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `local.rs` | LocalKVStore implementation with MockWallet tests | ~1729 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~838 |
 | `bound.rs` | `bound_sign_options` (crate-private): the signAction options the reference's `completeBoundAction` sends, `{ acceptDelayedBroadcast, returnTXIDOnly: false, noSend, sendWith }` carried from the createAction's (`ts-stack@edf6e03` `completeBoundAction.ts:1111-1120`; #326) | ~47 |
-| `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | ~620 |
 
 ## Key Exports
 
@@ -174,7 +174,7 @@ Global entries use PushDrop tokens with the following field layout:
 
 | Index | Constant | Field | Description |
 |-------|----------|-------|-------------|
-| 0 | `PROTOCOL_ID` | Protocol ID | String identifier (e.g., "kvstore") |
+| 0 | `PROTOCOL_ID` | Protocol ID | Reference: JSON wallet protocol (e.g., `[1,"kvstore"]`); older crate tokens: raw name |
 | 1 | `KEY` | Key | The key string |
 | 2 | `VALUE` | Value | The value (plaintext for global, encrypted for local) |
 | 3 | `CONTROLLER` | Controller | 33-byte compressed public key |
@@ -203,7 +203,22 @@ impl KvProtocolFields {
 - **Old format**: 5 fields (no tags), signature at index 4
 - **New format**: 6 fields (with tags), signature at index 5
 
-Both formats are supported for backward compatibility.
+Both formats are supported. With five fields, field 4 is only the signature;
+with six, field 4 is a JSON array of tags and field 5 the signature (#344).
+A present tag array has at most 32 strings, each 1 to 256 UTF-8 bytes and
+unique. Array/count is checked first, then each element's type/length before
+its uniqueness (`kvStoreTokenValidation.ts:58-74,88-118`, ts-stack@edf6e03).
+The refusal words are `KVStore tags must be a bounded array`,
+`KVStore tag has an invalid length`, and `KVStore tags must be unique`.
+The store and interpreter skip refused tokens. No tags means an absent
+field, distinct from a present, signed `[]`; both read successfully.
+`tests/kvstore_untagged_token_344.rs` and the interpreter unit
+`malformed_reference_token_tags_use_the_reference_words_and_order` replay
+`kvstore_tags_344.json`, recorded by the extended #326 reference writer.
+
+The local store uses a different layout: a value and its signature, with
+`[key]` on the wallet output for lookup. Payload tags belong to the public
+five/six-field token, not to that wallet metadata.
 
 ## Configuration
 
@@ -556,8 +571,19 @@ it after completion.
 
 `GlobalKVStore` verifies token signatures on retrieval. The verification:
 1. Concatenates fields 0-4 (protocol_id + key + value + controller + optional tags)
-2. Uses `SecurityLevel::App` protocol with key_id `"kvstore-token"`
-3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`
+2. For the reference writer's JSON protocol, uses that wallet protocol and
+   the token's key as key ID, checking the derived locking key first (#344).
+   The older raw protocol form written by this crate retains
+   `SecurityLevel::App` with key ID `"kvstore-token"`.
+3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`.
+   All present fields preceding the signature are signed, including `[]`.
+
+The reference form is also authenticated by `interpret_script` for history.
+A string context names an App protocol, matching the reference's `[1, name]`;
+the default `kvstore` configuration reads the reference's `[1,"kvstore"]`.
+The raw-protocol form keeps the historical extraction-only history behavior.
+The reference's other canonical PushDrop/protocol/value/controller checks and its
+controller context are not fully implemented here; see #344's parity note.
 
 ### History Building
 
