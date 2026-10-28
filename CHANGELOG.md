@@ -23,10 +23,11 @@ error. Previously the stores signed whatever transaction the wallet returned,
 used positional empty spends, ignored the completed transaction, and made none
 of these checks.
 
-`KVStoreConfig` adds `accept_delayed_broadcast: bool` and
-`overlay_broadcast: bool`, both defaulting to `false`, with corresponding
-`with_*` builders. The first reaches both stores; the second is the global
-store's `noSend` option, named `overlayBroadcast` by the reference. createAction
+Both stores expose `with_accept_delayed_broadcast(bool)` for the reference's
+`acceptDelayedBroadcast` option, and `GlobalKVStore` exposes `with_no_send(bool)`
+for its `noSend` option, named `overlayBroadcast` by the reference. Both default
+to `false` and live in private store configuration; `KVStoreConfig` retains its
+existing fields so exhaustive literals continue to compile. createAction
 also sends `signAndProcess: false`, `returnTXIDOnly: false`, and
 `randomizeOutputs: false` except on local removal. signAction carries that
 same createAction's `acceptDelayedBroadcast`, `noSend` and `sendWith`, alongside
@@ -38,7 +39,10 @@ so a configured broadcast policy could not reach either call.
 the unsigned funding input, signed-template checks, the completed txid, and
 both calls' default options. Its seven tests are RED on base `bf97cc74` in a
 scratch checkout with a separate target directory. `tests/kvstore_options_342.rs`
-pins enabled configuration on new, update and removal paths for both stores.
+pins the setters on new, update and removal paths for both stores and an
+exhaustive config literal against the recorded defaults. That six-field
+literal is RED at compile time on `b3654dba` (`E0063`, missing the two newly
+added fields) and compiles here without a source change.
 The unused-signer refusal is pinned separately by the recording-wallet test
 `an_unused_input_signer_is_refused_in_the_recorded_words_341`, which asserts
 createAction then abortAction, with no signAction; it is also RED with only
@@ -48,13 +52,17 @@ stores with a fake wallet, records both calls' options and sixteen boundary
 refusals in `tests/vectors/kvstore_bound_action_341_342.json`; two recordings are
 byte-identical. Existing mock wallets now build their transactions with this
 crate's writer, and the #326 tests retain their reference-text checks.
+The default recording omits both reference constructor options and remains
+byte-identical to the vector; all global-store operation tests inject a
+resolver that cannot reach a live overlay host.
+Recording resolvers use distinct fake-host keys so the process-wide reputation
+tracker cannot make parallel cases back off each other's lookups.
 
-Public shape: the two config fields and builders are additions with the
-reference's defaults. Exhaustive Rust config literals must provide the two
-fields or use `..Default::default()`. The required minor semver check reports
-`constructible_struct_adds_field`: defaults do not preserve exhaustive literal
-construction. Existing default/builder callers need no source edit.
-Migration: none. Stored data and wallet references are unchanged.
+Public shape: three additive store setters; no fields added to `KVStoreConfig`.
+`cargo semver-checks --release-type minor --baseline-rev bf97cc74` (0.51.0),
+also run with `--all-features`, reports `202 checks: 202 pass, 58 skip` and
+`no semver update required`.
+Migration: none; additive. Stored data and wallet references are unchanged.
 
 ### Notes: cross-SDK parity (#341, #342)
 

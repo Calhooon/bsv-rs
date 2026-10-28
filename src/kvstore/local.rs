@@ -13,6 +13,7 @@ use crate::wallet::{
 };
 use crate::{Error, Result};
 
+use super::action_options::ActionOptions;
 use super::bound::complete_action;
 use super::interpreter::KVStoreInterpreter;
 use super::types::{
@@ -46,6 +47,7 @@ use tokio::sync::Mutex;
 pub struct LocalKVStore<W: WalletInterface + std::fmt::Debug> {
     wallet: W,
     config: KVStoreConfig,
+    action_options: ActionOptions,
     /// Mutex for atomic operations.
     state: Arc<Mutex<LocalKVStoreState>>,
 }
@@ -89,8 +91,16 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         Ok(Self {
             wallet,
             config,
+            action_options: ActionOptions::default(),
             state: Arc::new(Mutex::new(LocalKVStoreState::default())),
         })
+    }
+
+    /// Sets the wallet's `acceptDelayedBroadcast` option (default: false).
+    #[must_use]
+    pub fn with_accept_delayed_broadcast(mut self, accept: bool) -> Self {
+        self.action_options.accept_delayed_broadcast = accept;
+        self
     }
 
     /// Get a value by key.
@@ -319,7 +329,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 lock_time: None,
                 version: None,
                 labels: None,
-                options: Some(self.config.action_options(false, false)),
+                options: Some(self.action_options.for_action(false, false)),
             },
             self.originator(),
         )
@@ -386,7 +396,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     lock_time: None,
                     version: None,
                     labels: None,
-                    options: Some(self.config.action_options(false, true)),
+                    options: Some(self.action_options.for_action(false, true)),
                 },
                 self.originator(),
             )

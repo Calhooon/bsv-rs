@@ -17,6 +17,7 @@ use crate::wallet::{
 };
 use crate::{Error, Result};
 
+use super::action_options::ActionOptions;
 use super::bound::complete_action;
 use super::interpreter::{KVStoreContext, KVStoreInterpreter};
 use super::types::{
@@ -50,6 +51,7 @@ use tokio::sync::Mutex;
 pub struct GlobalKVStore<W: WalletInterface> {
     wallet: W,
     config: KVStoreConfig,
+    action_options: ActionOptions,
     resolver: Arc<LookupResolver>,
     network_preset: NetworkPreset,
     /// Cached identity key.
@@ -88,11 +90,28 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         Self {
             wallet,
             config,
+            action_options: ActionOptions::default(),
             resolver: Arc::new(resolver),
             network_preset: network,
             cached_identity_key: Arc::new(Mutex::new(None)),
             key_locks: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Sets the wallet's `acceptDelayedBroadcast` option (default: false).
+    #[must_use]
+    pub fn with_accept_delayed_broadcast(mut self, accept: bool) -> Self {
+        self.action_options.accept_delayed_broadcast = accept;
+        self
+    }
+
+    /// Sets the wallet's `noSend` option (default: false).
+    ///
+    /// This is the reference global store's `overlayBroadcast` setting.
+    #[must_use]
+    pub fn with_no_send(mut self, no_send: bool) -> Self {
+        self.action_options.no_send = no_send;
+        self
     }
 
     /// Get a value by key.
@@ -269,7 +288,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                 lock_time: None,
                 version: None,
                 labels: Some(self.config.topics.clone()),
-                options: Some(self.config.action_options(true, false)),
+                options: Some(self.action_options.for_action(true, false)),
             },
             self.originator(),
         )
@@ -372,7 +391,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                 lock_time: None,
                 version: None,
                 labels: Some(self.config.topics.clone()),
-                options: Some(self.config.action_options(true, true)),
+                options: Some(self.action_options.for_action(true, true)),
             },
             self.originator(),
         )

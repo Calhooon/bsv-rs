@@ -8,7 +8,13 @@ use bsv_rs::overlay::{
 use bsv_rs::script::LockingScript;
 use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::{ListOutputsResult, Outpoint, WalletOutput};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
+
+// The resolver shares a process-wide reputation tracker, even with a fake facilitator.
+static NEXT_LOOKUP: AtomicUsize = AtomicUsize::new(0);
 
 struct Lookup(Arc<Mutex<Option<Vec<u8>>>>);
 #[async_trait::async_trait(?Send)]
@@ -75,6 +81,14 @@ pub fn source(lock: &[u8], value: u64) -> Transaction {
 }
 
 pub async fn setup(global: bool, config: KVStoreConfig) -> (Store, Counting) {
+    setup_with_options(global, config, None).await
+}
+
+pub async fn setup_with_options(
+    global: bool,
+    config: KVStoreConfig,
+    options: Option<(bool, bool)>,
+) -> (Store, Counting) {
     let wallet = Counting::of_scalar(9);
     *wallet.spending.lock().unwrap() = Some(source(&[0x51], 2));
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
@@ -89,7 +103,10 @@ pub async fn setup(global: bool, config: KVStoreConfig) -> (Store, Counting) {
             host_overrides: Some(
                 [(
                     config.service_name.clone(),
-                    vec!["https://kvstore.invalid".into()],
+                    vec![format!(
+                        "https://kvstore-{}.invalid",
+                        NEXT_LOOKUP.fetch_add(1, Ordering::Relaxed)
+                    )],
                 )]
                 .into(),
             ),
@@ -97,14 +114,22 @@ pub async fn setup(global: bool, config: KVStoreConfig) -> (Store, Counting) {
             facilitator: Some(Arc::new(Lookup(token.clone()))),
             ..Default::default()
         });
-        Store::Global(GlobalKVStore::with_resolver(
-            wallet.clone(),
-            config,
-            NetworkPreset::Local,
-            resolver,
-        ))
+        let store =
+            GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
+        Store::Global(match options {
+            Some((accept_delayed_broadcast, no_send)) => store
+                .with_accept_delayed_broadcast(accept_delayed_broadcast)
+                .with_no_send(no_send),
+            None => store,
+        })
     } else {
-        Store::Local(LocalKVStore::new(wallet.clone(), config).unwrap())
+        let store = LocalKVStore::new(wallet.clone(), config).unwrap();
+        Store::Local(match options {
+            Some((accept_delayed_broadcast, _)) => {
+                store.with_accept_delayed_broadcast(accept_delayed_broadcast)
+            }
+            None => store,
+        })
     };
     store.set("one").await.unwrap_err();
     let args = wallet.created.lock().unwrap().clone().unwrap();

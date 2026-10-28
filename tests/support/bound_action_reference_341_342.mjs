@@ -8,8 +8,12 @@ async function stores(c, enabled) {
     c.LookupResolver.prototype.query = async () => answer
     const wallet = c.recording(state)
     const store = kind === 'global'
-      ? new c.GlobalKVStore({ wallet, acceptDelayedBroadcast: enabled, overlayBroadcast: enabled })
-      : new c.LocalKVStore(wallet, 'kvstore default', true, undefined, enabled)
+      ? new c.GlobalKVStore(enabled
+        ? { wallet, acceptDelayedBroadcast: true, overlayBroadcast: true }
+        : { wallet })
+      : enabled
+        ? new c.LocalKVStore(wallet, 'kvstore default', true, undefined, true)
+        : new c.LocalKVStore(wallet, 'kvstore default', true)
     const runs = {}
     runs.set_new = c.record(state, await c.stop(() => store.set('alpha', 'one')))
     const source = c.tokenOf(state, runs.set_new)

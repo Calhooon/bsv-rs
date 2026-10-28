@@ -27,10 +27,19 @@ pub struct KVStoreConfig {
     pub originator: Option<String>,
     /// Whether to encrypt values (LocalKVStore only).
     pub encrypt: bool,
-    /// Whether the wallet may delay broadcasting (default: false).
-    pub accept_delayed_broadcast: bool,
-    /// Global store's `noSend` setting, named `overlayBroadcast` in TypeScript (default: false).
-    pub overlay_broadcast: bool,
+}
+
+impl Default for KVStoreConfig {
+    fn default() -> Self {
+        Self {
+            protocol_id: "kvstore".to_string(),
+            service_name: "ls_kvstore".to_string(),
+            token_amount: 1,
+            topics: vec!["tm_kvstore".to_string()],
+            originator: None,
+            encrypt: true,
+        }
+    }
 }
 
 impl KVStoreConfig {

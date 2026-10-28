@@ -13,9 +13,8 @@
 //! - Token field layout correctness
 //! - Wallet interaction patterns via a MockWallet
 //!
-//! The mock wallet returns empty overlay results by default, so tests exercise
-//! the code paths around wallet calls, validation, and error propagation without
-//! requiring a live overlay network.
+//! Every store operation uses an injected resolver with no hosts or trackers,
+//! so wallet calls, validation, and error propagation cannot reach a live overlay.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "kvstore")]
 
@@ -75,6 +74,10 @@ impl OverlayLookupFacilitator for FailingLookupFacilitator {
 /// a query with no competent hosts before any request), the SLAP tracker list
 /// is empty (nothing to discover from), and the facilitator refuses anyway.
 fn hermetic_store() -> GlobalKVStore<MockWallet> {
+    hermetic_store_with_wallet(MockWallet::new())
+}
+
+fn hermetic_store_with_wallet(wallet: MockWallet) -> GlobalKVStore<MockWallet> {
     let config = KVStoreConfig::default();
     let mut host_overrides = std::collections::HashMap::new();
     host_overrides.insert(config.service_name.clone(), Vec::<String>::new());
@@ -85,7 +88,7 @@ fn hermetic_store() -> GlobalKVStore<MockWallet> {
         host_overrides: Some(host_overrides),
         ..Default::default()
     });
-    GlobalKVStore::with_resolver(MockWallet::new(), config, NetworkPreset::Local, resolver)
+    GlobalKVStore::with_resolver(wallet, config, NetworkPreset::Local, resolver)
 }
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -489,7 +492,7 @@ fn test_global_kvstore_default_config_matches_spec() {
 async fn test_global_get_empty_key_returns_error() {
     // get("") should return an error since empty keys are not allowed.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.get("", None).await;
     assert!(result.is_err());
@@ -511,7 +514,7 @@ async fn test_global_get_empty_key_returns_error() {
 async fn test_global_set_empty_key_returns_error() {
     // set("", ...) should return an error since empty keys are not allowed.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.set("", "some_value", None).await;
     assert!(result.is_err());
@@ -533,7 +536,7 @@ async fn test_global_set_empty_key_returns_error() {
 async fn test_global_remove_empty_key_returns_error() {
     // remove("") should return an error since empty keys are not allowed.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.remove("", None).await;
     assert!(result.is_err());
@@ -553,21 +556,12 @@ async fn test_global_remove_empty_key_returns_error() {
 
 #[tokio::test]
 async fn test_global_set_wallet_create_action_error() {
-    // GlobalKVStore::set() calls query_overlay() before create_action().
-    // Without a live overlay network, the overlay query fails first, so
-    // the create_action error is unreachable in this mock setup.
-    // We verify that set() fails regardless (the overlay error occurs first).
+    // Lookup is confined to the injected resolver before the wallet refuses.
     let wallet = MockWallet::new().with_create_action_error();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.set("test_key", "test_value", None).await;
-    // The set() should fail. With no overlay, the overlay query fails before
-    // create_action is reached. The create_action_error flag is a defense-in-depth
-    // test that verifies the operation does not succeed in any case.
-    assert!(
-        result.is_err(),
-        "set() should fail when overlay is unavailable"
-    );
+    assert!(result.is_err(), "set() should propagate the refusal");
 }
 
 // =============================================================================
@@ -579,7 +573,7 @@ async fn test_global_set_wallet_get_public_key_error() {
     // If the wallet's get_public_key returns an error, set should propagate it
     // because set() calls get_identity_key() first.
     let wallet = MockWallet::new().with_get_public_key_error();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.set("test_key", "test_value", None).await;
     assert!(result.is_err());
@@ -597,7 +591,7 @@ async fn test_global_set_wallet_get_public_key_error() {
 async fn test_global_remove_wallet_get_public_key_error() {
     // remove() calls get_identity_key() first, so a get_public_key error should propagate.
     let wallet = MockWallet::new().with_get_public_key_error();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.remove("test_key", None).await;
     assert!(result.is_err());
@@ -693,7 +687,7 @@ async fn test_global_get_by_tags_overlay_error() {
 async fn test_global_batch_get_empty_key_returns_error() {
     // batch_get calls get() for each key, so an empty key should fail.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.batch_get(&[""]).await;
     assert!(result.is_err());
@@ -707,7 +701,7 @@ async fn test_global_batch_get_empty_key_returns_error() {
 async fn test_global_batch_set_empty_key_returns_error() {
     // batch_set calls set() for each pair, so an empty key should fail.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.batch_set(&[("", "value")]).await;
     assert!(result.is_err());
@@ -721,7 +715,7 @@ async fn test_global_batch_set_empty_key_returns_error() {
 async fn test_global_batch_remove_empty_key_returns_error() {
     // batch_remove calls remove() for each key, so an empty key should fail.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.batch_remove(&[""]).await;
     assert!(result.is_err());
@@ -735,7 +729,7 @@ async fn test_global_batch_remove_empty_key_returns_error() {
 async fn test_global_batch_get_empty_succeeds() {
     // An empty batch should succeed with an empty result.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let keys: Vec<&str> = vec![];
     let result = store.batch_get(&keys).await;
@@ -751,7 +745,7 @@ async fn test_global_batch_get_empty_succeeds() {
 async fn test_global_batch_set_empty_succeeds() {
     // An empty batch should succeed as a no-op.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let entries: Vec<(&str, &str)> = vec![];
     let result = store.batch_set(&entries).await;
@@ -766,7 +760,7 @@ async fn test_global_batch_set_empty_succeeds() {
 async fn test_global_batch_remove_empty_succeeds() {
     // An empty batch should succeed as a no-op.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let keys: Vec<&str> = vec![];
     let result = store.batch_remove(&keys).await;
@@ -1792,7 +1786,7 @@ async fn test_global_remove_progresses_past_wallet_calls() {
     // remove() calls get_public_key before reaching the overlay.
     // With a working MockWallet, the error should come from the overlay layer.
     let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store_with_wallet(wallet);
 
     let result = store.remove("test_key", None).await;
     assert!(result.is_err());

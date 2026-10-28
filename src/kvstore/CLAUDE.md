@@ -19,7 +19,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `local.rs` | LocalKVStore implementation; tests in local_tests.rs | ~894 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~788 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | — |
-| `action_options.rs` | Config builders and the reference's per-store createAction options (#342) | — |
+| `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | — |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | — |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | ~620 |
 
@@ -59,6 +59,9 @@ Private key-value store using wallet transactions and baskets.
 impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     /// Create a new LocalKVStore (returns error if protocol_id is empty)
     pub fn new(wallet: W, config: KVStoreConfig) -> Result<Self>;
+
+    /// Set acceptDelayedBroadcast (default: false)
+    pub fn with_accept_delayed_broadcast(self, accept: bool) -> Self;
 
     /// Get a value by key (returns default_value if not found or TTL-expired)
     /// Matches Go SDK signature: Get(ctx, key, defaultValue string) (string, error)
@@ -140,6 +143,12 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 
     /// Create with custom network preset
     pub fn with_network(wallet: W, config: KVStoreConfig, network: NetworkPreset) -> Self;
+
+    /// Set acceptDelayedBroadcast (default: false)
+    pub fn with_accept_delayed_broadcast(self, accept: bool) -> Self;
+
+    /// Set noSend, the reference's overlayBroadcast setting (default: false)
+    pub fn with_no_send(self, no_send: bool) -> Self;
 
     /// Get a value by key
     pub async fn get(&self, key: &str, options: Option<KVStoreGetOptions>) -> Result<Option<KVStoreEntry>>;
@@ -242,10 +251,6 @@ pub struct KVStoreConfig {
     pub originator: Option<String>,
     /// Whether to encrypt values (LocalKVStore only, default: true)
     pub encrypt: bool,
-    /// Both stores; default false
-    pub accept_delayed_broadcast: bool,
-    /// Global noSend; default false, ignored by local
-    pub overlay_broadcast: bool,
 }
 
 impl KVStoreConfig {
@@ -256,10 +261,15 @@ impl KVStoreConfig {
     pub fn with_topics(self, topics: Vec<String>) -> Self;
     pub fn with_originator(self, originator: impl Into<String>) -> Self;
     pub fn with_encrypt(self, encrypt: bool) -> Self;
-    pub fn with_accept_delayed_broadcast(self, accept: bool) -> Self;
-    pub fn with_overlay_broadcast(self, enabled: bool) -> Self;
 }
 ```
+
+Broadcast settings are private store configuration, exposed through
+`LocalKVStore::with_accept_delayed_broadcast`,
+`GlobalKVStore::with_accept_delayed_broadcast` and `GlobalKVStore::with_no_send`.
+Each takes a `bool` and returns `Self`; both options default to `false`.
+`KVStoreConfig` keeps its existing public shape, including exhaustive literals.
+Migration: none; additive.
 
 ## Query Parameters
 
@@ -580,8 +590,10 @@ validated signed result supplies the stores' result; failures after accepting
 a reference abort best-effort. Rust ownership replaces the reference's dynamic
 property snapshots and shared-JavaScript-intrinsics checks.
 
-`action_options` sends the reference's false defaults for
-`acceptDelayedBroadcast` and global `noSend` (`overlay_broadcast`), with
+`action_options` keeps broadcast settings private on each store and sends the
+reference's false defaults for `acceptDelayedBroadcast` (set through
+`with_accept_delayed_broadcast`) and global `noSend` (the reference's
+`overlayBroadcast`, set through `with_no_send`), with
 `randomizeOutputs: false` except on local removal. The boundary forces
 `signAndProcess: false` and `returnTXIDOnly: false`; `bound_sign_options` carries
 the same create options into signAction, including `sendWith` if present.
