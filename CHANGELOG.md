@@ -56,7 +56,8 @@ is #1423's at `109bc7017`
 (`packages/sdk/src/wallet/__tests/ProtoWallet.brc56-hmac-key.test.ts`): the
 same six keys, its `hmac` this file's `tag`, its `legacyTag` this file's
 `minimal_tag`, string for string. RED on a copy of this tip with the strict
-verdict made the default: 3 of 11 (the three acceptance tests).
+verdict made the default: 3 of 11 (the three acceptance tests), or 4 of 11
+when the enum's default is flipped instead.
 
 Migration: none for a caller that only verifies (a tag that verified still
 verifies; the four rows' legacy tags now verify too). A caller that matched
@@ -75,7 +76,7 @@ PR 1370 (the 32 bytes, merged then refused under ts-stack's compatibility
 invariant; issue #1369). PR #1423's first commit (`109bc7017`) is the
 verifier this entry follows: it issues under the minimal-length key and
 accepts both. Its head at this entry (`511d01aa0`, `9a2787b8c`, 2026-10-27
-20:24Z) backs the verifier of both out: minimal-length both ways, "no
+20:30Z) backs the verifier of both out: minimal-length both ways, "no
 second encoding, selection option or fallback", with a BRC-56/BRC-100
 amendment named to make that encoding explicit. go-sdk@2ca481c issues and
 verifies the 32 bytes only (`wallet/proto_wallet.go:350-361`,
