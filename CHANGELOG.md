@@ -276,6 +276,7 @@ multi-substrate client (its `wallet/README.md` names a
 `NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
 originator per call.
 ### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release` (#401)
+### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release`; the #382 dhat pin at a twelfth of its memory (#401)
 
 The finding (#383's fold's re-review, at `5f8fc526`): under `cargo test
 --release`, three of the four tests in
@@ -313,6 +314,20 @@ the same three red with symbols stripped
 profile (`ci.yml`, `Run every integration test`, `cargo test --features
 "full,http,websocket" --tests`), where it passed before the fix too; the
 release profile is the lanes' and the re-reviews' gate.
+
+The second finding (#382's fold's re-review): the #382 pin in
+`tests/memory_profiling.rs`, `test_issue_382_a_minimal_splice_operand_is_not_decoded`,
+built an 800,000,000-byte operand, and the file ran at 4,454,236,160 bytes
+resident under `/usr/bin/time -l` (149 s). The proof does not need the
+size: the guard is that a minimal splice operand past 8 bytes is not
+decoded, and the decode is a second copy of the whole operand at any size.
+At 64 MiB (67,108,864 bytes) the peak is 67,108,963 bytes with the guard
+and 134,217,827 on a scratch copy of #396's head with `splice.rs`'s guard
+removed (the test red there), the same factor of two as 800,000,099 against
+1,600,000,099; the file now runs at 730,480,640 bytes resident (147 s, the
+time the other eleven tests'). CI runs the file in the debug
+profile, alone (`ci.yml`, `Run the memory profiling tests`, `cargo test
+--test memory_profiling --all-features -- --test-threads=1`).
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 
@@ -460,10 +475,11 @@ copied nothing. It is now judged from the operand's last two bytes
 (`ScriptNum::is_minimally_encoded`), the decoder called only for the
 refusal's words, so a minimal operand is read by its first 8 bytes alone.
 Pinned by `tests/memory_profiling.rs`'s
-`test_issue_382_a_minimal_splice_operand_is_not_decoded` (`dhat`): an
-800,000,000-byte minimal `OP_LEFT` length at version 1 peaks at
-800,000,099 bytes (its one copy onto the stack), 1,600,000,099 on a scratch
-copy of `b149d6b6` without the guard.
+`test_issue_382_a_minimal_splice_operand_is_not_decoded` (`dhat`): a
+64 MiB (67,108,864-byte) minimal `OP_LEFT` length at version 1 peaks at
+67,108,963 bytes (its one copy onto the stack), 134,217,827 on a scratch
+copy without the guard (the operand was 800,000,000 bytes until #401,
+800,000,099 and 1,600,000,099).
 
 Migration: none in the API. A caller matching the default mode's
 `OP_NUM2BIN` text for a size above `INT32_MAX` or below 0 reads the
