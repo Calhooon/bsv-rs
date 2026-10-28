@@ -95,12 +95,14 @@ equality on either side, `Some(literal)` comparisons, and equality involving
 `to_string`/`to_owned`. It intentionally checks more than variables named
 `error`: renaming an error to `message` must not bypass the guard.
 
-The conservative scan needs **19 protocol comparisons in 6 files** allowed
+The conservative scan needs **21 protocol comparisons in 8 files** allowed
 as whole source lines, with duplicate-count ceilings:
 
 | File | Sites | Existing purpose |
 | --- | ---: | --- |
 | `src/wallet/substrates/origin.rs` | 5 | The constructors' base URL path, scheme and loopback hosts (#323) |
+| `src/wallet/substrates/http_json/result_values.rs` | 1 | The requested call is revealSpecificKeyLinkage, selecting its tuple shape (#408) |
+| `src/wallet/substrates/http_json/result_values/shapes.rs` | 1 | The schema member is outputs, selecting output tags (#408) |
 | `src/auth/transports/http.rs` | 8 | Auth header names and message types |
 | `src/auth/transports/http/unauthenticated.rs` | 1 | The answer's `Content-Type` `charset=`, for the refusal's body preview (#354) |
 | `src/auth/transports/socketio/mod.rs` | 1 | Socket.IO event name |

@@ -32,49 +32,8 @@
     {
       "expected": {
         "client_result": {
-          "ok": {
-            "beef": "0100beef0000",
-            "inputType": "P2PKH",
-            "inputs": [
-              {
-                "inputDescription": "fixture input",
-                "outpoint": "3131313131313131313131313131313131313131313131313131313131313131.2",
-                "sequenceNumber": 4294967294,
-                "unlockingScript": "51",
-                "unlockingScriptLength": 1
-              }
-            ],
-            "noSendChange": [
-              "3131313131313131313131313131313131313131313131313131313131313131.2"
-            ],
-            "referenceNumber": "fixture",
-            "sendWithResults": [
-              {
-                "status": "unproven",
-                "txid": "3232323232323232323232323232323232323232323232323232323232323232"
-              }
-            ],
-            "signableTransaction": {
-              "reference": "Zml4dHVyZQ==",
-              "tx": [
-                1,
-                0,
-                190,
-                239,
-                0,
-                0
-              ]
-            },
-            "tx": [
-              1,
-              0,
-              190,
-              239,
-              0,
-              0
-            ],
-            "txid": "3131313131313131313131313131313131313131313131313131313131313131"
-          }
+          "display": "wallet error: Invalid createAction result signableTransaction: expected exclusive of txid and tx",
+          "error": "WalletError(\"Invalid createAction result signableTransaction: expected exclusive of txid and tx\")"
         },
         "request": {
           "headers": {

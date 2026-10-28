@@ -236,12 +236,15 @@ mod tests {
         with["privilegedReason"] = "json reason".into();
         with["seekPermission"] = false.into();
         for (body, signature) in [(base, 1), (with, 2)] {
+            // #408 validates returned signatures; keep this request-shape
+            // test's two distinguishable responses canonical DER.
+            let signature = vec![48, 6, 2, 1, signature, 2, 1, signature];
             Mock::given(method("POST"))
                 .and(path("/createSignature"))
                 .and(body_json(body))
                 .respond_with(
                     ResponseTemplate::new(200)
-                        .set_body_json(serde_json::json!({"signature": [signature]})),
+                        .set_body_json(serde_json::json!({"signature": signature})),
                 )
                 .mount(&server)
                 .await;
@@ -262,6 +265,7 @@ mod tests {
             ..args
         };
         let privileged = client.create_signature(with, None).await.unwrap();
-        assert_eq!((plain.signature, privileged.signature), (vec![1], vec![2]));
+        assert_eq!(plain.signature, vec![48, 6, 2, 1, 1, 2, 1, 1]);
+        assert_eq!(privileged.signature, vec![48, 6, 2, 1, 2, 2, 1, 2]);
     }
 }

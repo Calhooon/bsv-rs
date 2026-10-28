@@ -1,11 +1,11 @@
 //! The wallet's answer read, moved out of `http_json.rs` (#339): an error
 //! status's body by its busy word, its code-5 results (`review_actions`),
 //! a 429's wait, its class by name or code (#137) and a gateway status, in
-//! that order; a success body by its type, every byte field by the byte
-//! reader (`byte_fields`) when the typed reading refuses it.
+//! that order; a success body's value checks (`result_values`, #408),
+//! then its type, with #365's byte normalization on the fallback path.
 
-use super::byte_fields;
 use super::review_actions::{self, ReviewRequest};
+use super::{byte_fields, result_values};
 use super::{request_error, wallet_busy_from_response, wallet_error_from_body};
 use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, TransportFault};
@@ -68,20 +68,19 @@ pub(super) async fn refusal(
     Error::WalletError(detail)
 }
 
-/// A success answer to `call` read as `R`; one the typed reading refuses
-/// read again with its byte fields normalized (#339, #365).
+/// A success answer's value checks, then its reading as `R`; one the typed
+/// reading refuses read again with its byte fields normalized (#339, #365).
 pub(super) async fn success<R: for<'de> Deserialize<'de>>(
     response: Response,
     call: &str,
 ) -> Result<R, Error> {
-    // every byte field read as the reference normalizes the body
-    // (`HTTPWalletJSON.ts:322-341`); the answer the typed reading takes
-    // costs what it cost, the byte reader's `Value` tree (about 32 bytes
-    // a byte) built only for one it refuses
+    // #408 borrows field slices and checks ordinary bytes without a Value
+    // per byte. Only #365's fallback constructs the normalized Value tree.
     let text = response
         .bytes()
         .await
         .map_err(|e| request_error(e, "failed to parse JSON response"))?;
+    result_values::validate(call, &text)?;
     let typed = match serde_json::from_slice::<R>(&text) {
         Ok(result) => return Ok(result),
         Err(e) => e,

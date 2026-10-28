@@ -284,8 +284,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: invalid HMAC length: expected 32, got 3",
-          "error": "WalletError(\"invalid HMAC length: expected 32, got 3\")"
+          "display": "wallet error: Invalid createHmac result hmac: expected 32 bytes",
+          "error": "WalletError(\"Invalid createHmac result hmac: expected 32 bytes\")"
         },
         "request": {
           "headers": {

@@ -16,6 +16,18 @@ const HOMES: &[&str] = &[
 // (docs/ARCH-RULES.md section 3): every line a protocol comparison, no
 // error-message allowance.
 const ALLOWED: &[(&str, &str, usize)] = &[
+    // #408: dispatch on the requested wallet method and on the schema's
+    // member name. Neither comparison inspects an error message.
+    (
+        "src/wallet/substrates/http_json/result_values.rs",
+        "if call == \"revealSpecificKeyLinkage\"",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/shapes.rs",
+        "if name == \"outputs\" {",
+        1,
+    ),
     // The constructors' base URL and originator (#323): the caller's own
     // strings read at construction, the reference's
     // `normalizeWalletHttpBaseUrl` and `isLoopbackHostname`; no answer read.
@@ -175,7 +187,7 @@ fn transport_code_adds_no_text_classification() {
     }
     arch_support::check_sites("text classification in a transport", &sites, ALLOWED);
     println!(
-        "text comparison exceptions: {} sites in 6 files",
+        "text comparison exceptions: {} sites in 8 files",
         sites.len()
     );
 }

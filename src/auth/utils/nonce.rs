@@ -334,9 +334,9 @@ mod tests {
                 });
                 assert_eq!(
                     answer,
-                    Err(Error::WalletError(format!(
-                        "invalid HMAC length: expected 32, got {short}"
-                    )))
+                    Err(Error::WalletError(
+                        "Invalid createHmac result hmac: expected 32 bytes".into()
+                    ))
                 );
             }
         }
