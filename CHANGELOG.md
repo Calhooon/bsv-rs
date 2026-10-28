@@ -1165,6 +1165,115 @@ multi-substrate client (its `wallet/README.md` names a
 (`substrates.NewHTTPWalletJSON(originator, baseURL, httpClient)`,
 `NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
 originator per call.
+### Fixed: SimplifiedFetchTransport applies the reference's six response bounds and mappings (#416)
+
+The #410 fold left three response mappings as documented divergences; its
+re-review found the missing body, request-ID and signed-header checks too.
+The keeper's 2026-10-28 word under ruling (c) calls for parity with
+`ts-stack@edf6e03`, with no new owner word. Previously the transport could
+deliver an oversized requested-certificate header, decode a base64 signature,
+retype a certificate request as general, buffer an unbounded body, use its
+own request ID when none was returned, and sign unbounded response headers.
+
+The pinned `packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts`
+now supplies all six rules:
+
+| Rule and reference site | Accepted boundary and refusal |
+|---|---|
+| `x-bsv-auth-requested-certificates`, `:234-258` | At most 262,144 UTF-8 bytes; 262,145 refused before JSON parsing with `[oversized]. header exceeds its byte limit` in the header wrapper |
+| `x-bsv-auth-signature`, `:328-340` | Nonempty even-length ASCII hexadecimal, at most 2,048 characters (1,024 decoded bytes), either case; otherwise `[invalid]. signature must be bounded even-length hexadecimal` in the header wrapper. This is a shape check, not DER validation. Missing or blank still uses #354's missing-header refusal |
+| `x-bsv-auth-message-type`, `:343-346` | Exact `certificateRequest` stays `CertificateRequest`; every other value is `General` |
+| Buffered bodies, `:23-25`, `:375-428` | Handshake default 1,048,576 bytes; authenticated application response default 16,777,216 bytes. Check Content-Length first, then every chunk before buffering it, on success and error responses. One byte over uses `Authenticated response from {url} exceeds {maximum} bytes`; invalid Content-Length uses `Invalid Content-Length returned by {url}` |
+| `x-bsv-auth-request-id`, `:293-303` | Optional; when present, canonical standard padded base64 encoding exactly 32 bytes. Grammar failures use `Authenticated response request ID must be canonical base64`; wrong byte count or padding bits use `Authenticated response request ID must encode exactly 32 bytes`. No equality check against the outgoing ID; absent means no ID bytes in the payload |
+| Signed response headers, `:261-289` | `x-bsv-*` except `x-bsv-auth*`, plus `authorization`: at most 512 distinct headers, name 1–1,024 UTF-8 bytes, value at most 32,768 UTF-8 bytes, sum of names and values at most 262,144 bytes. Individual overflow uses `Authenticated response contains an oversized signed header`; count or total overflow uses `Authenticated response signed headers exceed their limit` |
+
+Repeated values join with `, ` before measurement, as fetch's Headers does;
+wire values are Latin-1 interpreted as text, then counted and signed as UTF-8.
+The reference's byte-sorted header walk determines the first refusal, and
+its `localeCompare` order determines the signed payload (the existing ASCII
+collation table covers HTTP names). The signature shape is checked before
+the certificate header and payload checks, as in the reference.
+
+`with_max_response_bytes` and `with_max_handshake_response_bytes` configure
+the two body limits on either `new` or `with_client`. They accept positive
+`usize` values up to JavaScript's maximum safe integer; zero and larger
+values use the reference's `maxResponseBytes must be a positive safe integer`
+and `maxHandshakeResponseBytes must be a positive safe integer`. Rust uses
+builder methods instead of the reference constructor's options object;
+negative and fractional values cannot be represented. The defaults are the
+same even with a caller-supplied client. Returning a size error drops the
+response and stops consuming its stream. The new work is in `http/body.rs`,
+`http/response_bounds.rs` and `http/general.rs`; `http.rs` shrinks and
+`transport_fault.rs` is unchanged.
+
+Pinned by the six tests in `tests/auth_transport_bounds_416.rs`, one per
+rule: `certificate_header_accepts_262144_utf8_bytes_and_refuses_one_more`,
+`signatures_require_nonempty_even_hex_at_most_2048_characters`,
+`certificate_request_response_keeps_its_type`,
+`bodies_use_the_1_mib_handshake_and_16_mib_application_defaults`,
+`optional_request_id_requires_canonical_base64_of_exactly_32_bytes`, and
+`signed_headers_bound_names_values_count_and_total_utf8_bytes` (each prefixed
+`issue_416_`). All six are RED on a scratch copy of base
+`bfdd4e7fa5a5b17df5eff4a5ccb54d31c85b8d3f`, with its own Cargo target directory:
+`0 passed; 6 failed`, with deliveries, decoded signatures and retyped
+messages printed in the failures. The three #410 divergence tests now
+assert the conforming outcomes and have names saying so.
+`auth_transport_body_options_416.rs` adds the configurable-limit and invalid
+option checks, including chunked responses without Content-Length.
+The two signed-response pins in `transport_unsigned_response_354.rs` now
+expect omission of an absent request ID too; their recorded headers and
+bodies are unchanged. The architecture test's exact-line protocol-comparison
+inventory follows the moved header checks and includes the message-type
+comparison. No error-text classification is added.
+
+`tests/vectors/auth_transport_bounds_416.json` is the unedited output of
+`tests/support/auth_transport_bounds_416.mjs`: 66 cases per reference and
+four option refusals at the newer pin, under Node 22.18.0, with fake fetch
+and streaming bodies, never a listening socket. Both references were built
+from their clone's pinned commit. Large values are recipes, not copied
+blobs; successful deliveries pin message types, signature bytes and payload
+SHA-256. The Rust replay uses wiremock, HTTP/2 for large header sets so
+hyper's 100-header HTTP/1 limit cannot preempt the SDK's 512. The two fake-fetch Content-Length cases are retained in the vector and
+tested against constructed Responses in `http/body_tests.rs`, isolating
+the SDK guard from native HTTP framing, without I/O.
+
+Migration for callers matching refusal payloads (the `authentication error: `
+display prefix remains). All six old/new behaviors in one block for the
+toolbox's matching table; `{url}` includes the response path:
+
+certificate header old: 262,145-byte valid requested set delivered
+certificate header new: Failed to parse x-bsv-auth-requested-certificates returned by {url}: [oversized]. header exceeds its byte limit
+signature old: MAA= decoded to [48, 0]; undecodable forms delivered as None
+signature new: Failed to parse x-bsv-auth-signature returned by {url}: [invalid]. signature must be bounded even-length hexadecimal
+message type old: certificateRequest delivered as General
+message type new: certificateRequest delivered as CertificateRequest
+body old: response.bytes() buffered without a limit
+body new: Authenticated response from {url} exceeds 1048576 bytes (handshake); exceeds 16777216 bytes (application)
+request ID old: library base64 errors or Invalid request ID length; absent replaced by the outgoing ID
+request ID new: Authenticated response request ID must be canonical base64; Authenticated response request ID must encode exactly 32 bytes; absent omitted
+signed headers old: names, values, count and total unbounded; repeated/non-ASCII values not fetch's text
+signed headers new: Authenticated response contains an oversized signed header; Authenticated response signed headers exceed their limit; fetch's joined UTF-8 text signed
+
+### Notes: cross-SDK parity (#416)
+
+`ts-sdk@9e3ede6b`'s `src/auth/transports/SimplifiedFetchTransport.ts` preserves
+`certificateRequest` too, but has none of the certificate-header, body,
+request-ID or signed-header limits. Its signature reader is hex-only but
+unbounded and permits odd-length hex; `MAA=` uses `Invalid hex string`.
+The recorder measures each of these older outcomes alongside the newer pin.
+
+At `go-sdk@2ca481c`, `auth/transports/http.go` does not exist; the corresponding
+code is `auth/transports/simplified_http_transport.go:125-237` and
+`auth/authpayload/http.go:165-178,226-251,381-395`. Go uses unbounded
+`io.ReadAll` for both paths, unbounded certificate JSON and `hex.DecodeString`
+for the signature, and no signed-header size or count bounds. It rejects a
+`certificateRequest` response with `unexpectedly received non-general message
+type certificateRequest in response to general message`. It serializes the
+outgoing request ID rather than checking the returned header. This change
+follows the newer TypeScript reference, not Go. #410's typed JSON, JS
+cause/stack, non-ASCII reason-phrase and caller-client redirect differences
+remain; they are separate from these six rules.
+
 ### Changed: the auth and identity certificate maps and `resolve_by_attributes`'s attributes keep insertion order, the reference's `Record` order, one order through the crate after the wallet's (#394)
 
 #385 moved the wallet types' certificate maps to insertion order and left
@@ -1340,6 +1449,419 @@ maps (`auth/certificates/certificate.go:49`, `verifiable.go:23`,
 crate or the reference writes differs from Go's text. Go's readers require
 no order.
 
+The finding (the #323 fold re-review's note, 2026-10-27): `WalletClient::new`
+builds its substrate itself from `SubstrateType` (`Auto`, the HTTP JSON and
+wire substrates on their default URLs), so a caller holding a wallet (an
+in-process one, a substrate built with its own URL or client) could not put
+it behind the client, and no `WalletClient` test could run without reaching
+the default ports. The reference's constructor takes the instance as the
+same parameter as the names (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/WalletClient.ts:83-107`):
+
+```ts
+constructor(
+  substrate: 'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api'
+    | 'react-native' | 'secure-json-api' | WalletInterface = 'auto',
+  originator?: OriginatorDomainNameStringUnder250Bytes
+)
+```
+
+and each call is `this.substrate.<call>(args, this.originator)`.
+
+- `WalletClient::with_substrate(substrate: Arc<dyn WalletInterface>,
+  originator: Option<String>) -> WalletClient`, beside `new`. A constructor,
+  not a `SubstrateType::Custom(..)` variant: `SubstrateType` is `Copy`, `Eq`
+  and exhaustive, and a variant holding a trait object would take all three
+  away from every downstream that matches or copies it; the instance is the
+  reference's parameter's other kind, not another name, and a second
+  constructor is how this crate spells a parameter of two kinds (`new` and
+  `with_client` on the substrates, #323). `Arc`, as `Peer` holds its wallet,
+  so a caller keeps using the wallet it hands over (`Arc::from(boxed)` for a
+  `Box`); `Send + Sync` come with the trait.
+- Every call goes to the instance with the client's originator, the
+  configured one or `None` (#329), exactly as to a named substrate:
+  internalizeAction's arguments validated first as before (#117, #384), the
+  status calls answered in the client's shapes (`get_height` the height,
+  `get_version` the string, `is_authenticated` and `wait_for_authentication`
+  the flag, `get_network` the `Network`), `get_header` reaching
+  `get_header_for_height`. Nothing is probed: the instance is the connected
+  substrate from construction, as the reference's `connectToSubstrate`
+  returns at once for an object (`:121-124`); `substrate_type()` answers
+  `Auto`, the reference's default parameter.
+- `WalletClient::reveal_counterparty_key_linkage` and
+  `reveal_specific_key_linkage`: the client carried 26 of the 28 calls; it
+  carries all 28, as the reference's does. The JSON substrate and an
+  instance forward them; the wire substrate refuses both before a byte is
+  sent, `WalletError("<call> is not available over the wallet wire
+  substrate")`: this crate's `WalletWireTransceiver` writes neither call
+  (its processor reads both), where the reference's transceiver writes both
+  (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790`, `:851`; #406 ports
+  them with fixtures recorded both ways).
+- The forwarding is one macro over the three substrates (`client.rs` 745
+  lines to 582, with the two calls); the instance's shape adapters are
+  `src/wallet/client_instance.rs`.
+
+The use: a downstream that already holds a wallet (the toolbox's and the
+CLI's in-process wallets) hands it to the code that takes a `WalletClient`:
+
+```rust,ignore
+let mut client = WalletClient::with_substrate(Arc::new(wallet), Some("myapp.com".into()));
+```
+
+Pinned by `tests/wallet_client_instance_335.rs` (4): the counting wallet of
+#318 behind the client receives all 28 calls, in a table, each with the
+client's originator, and each with `None` when none is set; a `ProtoWallet`'s
+answers and refusals come back through the client unchanged; the wire
+substrate's two linkage refusals, unsent. Red on a scratch copy of
+`485848ba` (the file does not compile: `with_substrate` and the two linkage
+methods absent, 7 errors); red 1 of 4 on the tip with the instance arm
+passing `None` for the originator. The `Auto` path and the named substrates
+on their default URLs stay unpinned: a test of them reaches whatever
+listens on 2121, 3321 and 3301, in the reference too (its `'auto'` probes
+the named substrates on their defaults, `:126-196`).
+
+Migration: none; additive (a constructor and two methods). The client stays
+behind `http`, as it was; #404 moves the client core under `wallet` with the
+HTTP substrates behind `http` (the keeper's word of 2026-10-28), and has the
+client implement `WalletInterface` as the reference's does (`WalletClient.ts:82`).
+
+### Notes: cross-SDK parity (#335)
+
+The reference's client validates every call's arguments and its result
+(`validateCreateActionArgs` and the rest, `validateWalletResult`,
+`WalletClient.ts:111-118`, `:200-209` and each call after) and normalizes its originator at construction
+(`validateOriginator`, `:97`) before handing it to the instance; this
+crate's client validates internalizeAction's arguments alone and hands the
+instance the originator as configured (the HTTP substrates validate theirs
+at construction since #323), the same for an instance as for its own
+substrates. `'XDM'`, `'window.CWI'` and `'react-native'` are browser and
+React Native substrates with no counterpart here. go-sdk@2ca481c has no
+multi-substrate client (its `wallet/README.md` names a
+`wallet.NewWalletClient()` no Go file defines): a caller builds a substrate
+(`substrates.NewHTTPWalletJSON(originator, baseURL, httpClient)`,
+`NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
+originator per call.
+### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release` (#401)
+### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release`; the #382 dhat pin at a twelfth of its memory (#401)
+
+The finding (#383's fold's re-review, at `5f8fc526`): under `cargo test
+--release`, three of the four tests in
+`tests/script_budget_before_allocation_348.rs` failed on beta (`a single
+allocation site holds more than the allowed live bytes`: 4,117,104 bytes
+for #348's input, 4,955,436 for #349's, 600,012 for the 100,001-byte
+product) and passed in the debug profile. The test leaves the interpreter's
+step probe out of its single-site read (`arithmetic_room.rs`, `reserve`:
+`try_reserve_exact` of the step's room, given back at once, #374) by finding
+the frame `arithmetic_room::reserve` in dhat's backtraces; a release build
+inlines `reserve` into its callers and has no debug info to name an inlined
+frame, so each reservation was read as a site (600,012 is the product's
+step room, 6 times its operands).
+
+`reserve` is now `#[inline(never)]`: the symbol table names its frame in
+every profile, debug info or none, and the reservation is found by the same
+name. The fuzz target keeps its own rule (an allocation freed before the
+allocator's next call, nothing allocated, grown or freed in between, #331):
+it counts in an allocator of its own, which the test cannot have (the
+crate's `unsafe_code = "forbid"` reaches every target, and a `GlobalAlloc`
+is an `unsafe impl`), and a backtrace per allocation is too slow for a
+fuzzer. Two readings of one thing: the probe's allocation, and nothing else
+under its frame. A build stripped of its symbols (`strip = "symbols"`, no
+profile here sets it) names no frame: each of the three tests now asserts
+it found a reservation, and says so in those words rather than as a bound.
+The probe runs only at a step of 64 KiB or more, so the frame costs nothing
+measurable.
+
+Pinned: the file's four tests, green under `--release` and in the debug
+profile; with the new test on the base's library (`reserve` inlined), three
+of four red under `--release`, ``no allocation under
+`arithmetic_room::reserve`: dhat's backtraces do not name the probe``, and
+the same three red with symbols stripped
+(`CARGO_PROFILE_RELEASE_STRIP=symbols`). CI runs the file in the debug
+profile (`ci.yml`, `Run every integration test`, `cargo test --features
+"full,http,websocket" --tests`), where it passed before the fix too; the
+release profile is the lanes' and the re-reviews' gate.
+
+The second finding (#382's fold's re-review): the #382 pin in
+`tests/memory_profiling.rs`, `test_issue_382_a_minimal_splice_operand_is_not_decoded`,
+built an 800,000,000-byte operand, and the file ran at 4,454,236,160 bytes
+resident under `/usr/bin/time -l` (149 s). The proof does not need the
+size: the guard is that a minimal splice operand past 8 bytes is not
+decoded, and the decode is a second copy of the whole operand at any size.
+At 64 MiB (67,108,864 bytes) the peak is 67,108,963 bytes with the guard
+and 134,217,827 on a scratch copy of #396's head with `splice.rs`'s guard
+removed (the test red there), the same factor of two as 800,000,099 against
+1,600,000,099; the file now runs at 730,480,640 bytes resident (147 s, the
+time the other eleven tests'). CI runs the file in the debug
+profile, alone (`ci.yml`, `Run the memory profiling tests`, `cargo test
+--test memory_profiling --all-features -- --test-threads=1`).
+### Verified: a general message's wallet refusal precedes the Peer's own signature words (#407)
+
+The proposed change in #407 would replace a `ProtoWallet`'s error with the
+Peer's error. The premise was wrong: both pinned TypeScript references
+already propagate `Signature is not valid` from `ProtoWallet.verifySignature`
+for a signature made by another key. Neither `processGeneralMessage` nor
+the incoming-message dispatcher catches that rejection. The Peer throws
+`Invalid signature in generalMessage from <identityKey>` only when its
+wallet **returns** `{ valid: false }`. Rust already preserves that distinction;
+no runtime behavior or public API changes in this entry.
+
+`tests/auth_peer_general_message_words_407.rs` pins both paths on `start`
+and `start_server`, no listener called on either refusal, an honest message,
+and an unrelated wallet error propagated unchanged. Its fixture is recorded
+by `tests/support/auth_peer_general_message_words_407.mjs` from the actual
+Peers in `ts-stack@edf6e03` and `ts-sdk@9e3ede6b`, built from those commits
+and run under Node v22.18.0. The recorder runs an honest handshake before
+each message and records both `ProtoWallet` and an explicitly adapting wallet
+that returns `false` on a verification error. Rust reconstructs the messages
+with its own nonce writer, as #353's witness does, because the nonce HMAC
+inputs differ. These parity tests are already green on the base; the two
+proposed replacement expectations are red there, not evidence of a parity fix.
+
+Downstream old / proposed new (replacement **not applied**): `wallet error: Signature is not valid` / `authentication error: Invalid signature in generalMessage from <identityKey>`.
+
+Line for the toolbox's operator-visible table: `| Bad signature in a certifier's general answer (ProtoWallet) | wallet error: Signature is not valid | Unchanged; a wallet returning valid: false instead produces authentication error: Invalid signature in generalMessage from <identityKey>. |`
+
+### Notes: cross-SDK parity
+
+The Peer's own words interpolate the established session identity string
+directly (`ts-stack` `Peer.ts:1286-1304`), the compressed public-key hex in
+these witnesses (66 lowercase characters, no `0x`). The wallet call has no
+catch (`:1292-1301`), and neither does its dispatcher (`:766-800`). Both
+reference `ProtoWallet`s throw `Signature is not valid` with code
+`ERR_INVALID_SIGNATURE`; they do not return `false` for a non-verifying
+signature (`ts-stack` `ProtoWallet.ts:358-396`, `ts-sdk` `:267-302`).
+
+Unparseable bytes are a different refusal, also propagated: `ts-stack`'s
+wallet validation throws `The signature parameter must be a canonical
+DER-encoded ECDSA signature` (code 6, `validationHelpers.ts:1795-1802`),
+while `ts-sdk`'s parser throws `Signature DER must start with 0x30` for the
+recorded bytes. Rust retains its existing `InvalidSignature` parser error,
+`invalid signature: Expected sequence tag 0x30`; that wording difference is
+recorded, not normalized into a false verification result. Go at `2ca481c`
+parses first (`auth/peer.go:1013-1017`, `failed to parse signature`), then
+classifies a wallet's `ErrInvalidSignature` or `Valid: false` as
+`general message - invalid-signature` (`:414-435`, `:1036-1038`), wrapping
+other wallet errors separately. Its classification is not the TypeScript
+Peer's propagation rule.
+### Fixed: the HTTP auth transport's handshake, JSON, certificate-header and redirect refusals use the reference's words (#410)
+
+The four changes cover three operator-visible refusals whose words differed
+from `SimplifiedFetchTransport` at `ts-stack@edf6e03`, found by the toolbox's
+#315 review, and one silently accepted header: a non-2xx
+handshake used `Auth endpoint returned ...`, malformed handshake JSON used
+`Failed to parse auth response: ...`, and a redirect used `redirect refused:
+...`; a malformed `x-bsv-auth-requested-certificates` header was discarded.
+Downstreams match these texts. The owner's ruling (c) requires the
+reference's words, including its status description, URL, header message
+and body preview.
+
+The handshake now shares #354's status/preview formatter, passing the
+reference's empty missing-header list: `response lacked required BSV auth
+headers`, even if some or all headers are present. The HTTP status is read
+before the body and still selects #87's fault class. Malformed JSON uses Node
+22's unwrapped syntax diagnostic; an iterative scanner runs only after
+serde refuses, with pending states proportional to input depth, no fixed
+depth cutoff, and a 20-UTF-16-unit context,
+and constructs no JSON value. A malformed `x-bsv-auth-requested-certificates`
+header uses the reference's separate wrapper and syntax cause; previously
+this crate silently dropped it. The header is parsed on every general
+response, not only one labelled `certificateRequest`, as in the reference.
+Redirect refusals on both paths use Node 22's outer fetch wrapper, and still
+never replay a request with the default client.
+
+Pinned by `tests/auth_transport_refusal_words_410.rs` (12 tests): six tests RED on a
+scratch copy of `7257d73dcc258643f64b63e296d9b3bc0bcfa624`, with its own
+target directory (404, malformed body, malformed header, 307, fault classes,
+and the syntax replay); the seventh pins the existing typed refusal of
+well-formed non-auth JSON. Two more tests, at depth 127 and 200, are RED on
+both that base and `aaa6b79f` (the latter 2 failed, 10 passed; the base
+8 failed, 4 passed). Three tests now pin #416's conforming response mappings,
+replacing the original divergence assertions.
+`auth_transport_refusal_words_410.json` is the
+unmodified output of `tests/support/auth_transport_refusal_words_410.mjs`
+under Node 22.18.0 / undici 6.21.2, 75 cases per reference: six statuses, 57
+JSON syntax errors (empty/truncated JSON, numbers, keys, escapes, Unicode
+positions, context cuts, BOM, and four array/object cases at each of depths
+127 and 200), six malformed headers (empty and Latin-1 values included),
+two redirects, the valid JSON shape difference, and the three mappings below.
+Both SDKs were bundled from their
+clone's pinned commit. The recorder uses fake fetch and, for redirects,
+Node's native fetch with a network-disabled MockAgent; no listening socket.
+The Rust replay uses wiremock's ephemeral ports. The #320 and #87 tests now
+assert the new texts; #354's general-response fixtures are unchanged.
+
+Migration for callers matching the error payload (the existing
+`authentication error: ` / `transport fault ...: ` display prefixes remain).
+The four old/new pairs, on the recorded bodies `not found` and `not auth`,
+are together here; `{url}` is the configured origin:
+
+```text
+404 old: Auth endpoint returned 404 Not Found: not found
+404 new: Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found
+200 old: Failed to parse auth response: expected ident at line 1 column 2 - body: not auth
+200 new: Unexpected token 'o', "not auth" is not valid JSON
+307 old: Network error while sending authenticated request to {url}/.well-known/auth: redirect refused: 307 Temporary Redirect
+307 new: Network error while sending authenticated request to {url}/.well-known/auth: fetch failed
+header old: accepted, malformed certificate-request header silently dropped
+header new: Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: not auth. Unexpected token 'o', "not auth" is not valid JSON
+```
+
+Line for the toolbox's `src/wallet/CLAUDE.md` matching table (that checkout
+is not changed by this commit):
+
+| bsv-rs #410 | `Auth endpoint returned ...` → `Received HTTP ... without valid BSV authentication (response lacked required BSV auth headers)` plus optional body preview; `Failed to parse auth response: ...` for malformed JSON → Node 22's unwrapped syntax error; `redirect refused: 307 Temporary Redirect` → `fetch failed` within the same URL wrapper; malformed certificate header → `Failed to parse x-bsv-auth-requested-certificates returned by {url}: {value}. {syntax cause}` |
+
+### Notes: cross-SDK parity (#410)
+
+The full paths were read at both pins. At `ts-stack@edf6e03`, the handshake
+fetch sets `redirect: 'error'` (`SimplifiedFetchTransport.ts:115-173`), a
+non-2xx calls `#createUnauthenticatedResponseError` with no missing-header
+list (`:143-151`, `:464-494`), and the body uses unwrapped `JSON.parse`
+(`:158-162`). The general fetch also refuses redirects (`:206-218`); the
+certificate header's wrapper is separate (`:234-258`, `:496-510`). Node
+22.18.0 measured the outer redirect text as `Network error while sending
+authenticated request to {url}: fetch failed`, with causes `TypeError:
+fetch failed` then `Error: unexpected redirect`. Rust matches the outer
+payload byte for byte and keeps `AuthError` with no transport fault; it has
+no equivalent JS stack/cause chain. A caller-supplied reqwest client that
+follows redirects still follows before the transport can refuse (#320).
+
+Node 22.18.0's `JSON.parse` accepts valid arrays and objects at depth 127,
+128, 200, 1,000, 10,000 and 100,000. The actual reference transport also
+delivers them. It delivers a 1,048,575-byte array at depth 524,287 and a
+1,048,573-byte object at depth 174,762; the next depth with a scalar exceeds
+its default 1 MiB handshake-body limit and is refused for size, not nesting.
+`JSON.parse` itself also accepts empty arrays nested 524,288 and 1,000,000
+deep (1 MiB and 2,000,000 bytes): no parser cutoff was reached. Rust's
+diagnostic scanner therefore has no fixed nesting bound or recursive call
+stack. Its pending states are bounded by input length. Since #416, Rust applies the same configurable 1 MiB handshake-body
+default, including before the syntax scanner.
+
+The saved review probe (`diff_flat.mjs`, 40,000 generated cases plus 48 depth
+cases with each seed 3 and 99) now matches 80,087 of 80,096 inputs. All nine
+remaining inputs are valid numbers outside finite double range:
+`86e427`, `29E390`, `40e663`, `4e10382`, `5e624`, `2e8332`, `56e955`,
+`44e360`, `7e515` (some with surrounding whitespace). V8 reads each as
+`Infinity`; serde refuses it with `number out of range`. The saved corpus
+reproduces 71 differences before this fold, not the review summary's 86;
+62 depth-related differences are removed. The exact 86-input run was not
+available for replay.
+
+The three response mappings originally documented here are conforming since
+#416: the 262,144-byte certificate-header bound, the bounded even-length
+hex signature, and preservation of `certificateRequest`. The three tests
+in `auth_transport_refusal_words_410.rs` now assert those outcomes against
+the same recorded vectors. The older pin still accepts an oversized
+certificate header and uses `Invalid hex string` for `MAA=`; both pins keep
+`certificateRequest`. See #416 for the full bound set and migration block.
+
+`ts-sdk@9e3ede6b` agrees on status, body and header texts (`:55-93`,
+`:163-170`, `:252-307`), but does not set a redirect option (`:58-64`,
+`:141-145`): the recorded 307 follows and reaches its callback. This crate
+follows the newer pin's refusal. Both references pass syntactically valid
+JSON such as `{"ok":true}` to their callback, where this crate's typed
+`AuthMessage` refuses it in its existing serde words. A syntactically valid
+certificate header outside `RequestedCertificateSet`'s shape is refused
+with the header wrapper and serde's cause; the reference only casts its
+parsed value and passes it to the callback. Other typed shape and
+lone-surrogate refusals remain serde's; only the diagnostic scanner's
+artificial cutoff is removed. Node's syntax wording is runtime
+specific, pinned here to 22.18.0. A lone surrogate left by a diagnostic's
+context cut is recorded as U+FFFD, its UTF-8 wire representation, as in
+#354. The existing non-ASCII HTTP reason-phrase difference of #354 remains.
+
+The Go pin is `2ca481c5931b987a0c8f48bb341c70b7477b6b07`; its file is
+`auth/transports/simplified_http_transport.go` (there is no
+`auth/transports/http.go` at this pin). It wraps a non-2xx handshake in
+`HTTP server failed to authenticate` (`ErrHTTPServerFailedToAuthenticate`)
+and `request failed with status %d: %s`
+(`:102-130`), malformed bodies in `failed to unmarshal authmessage from body
+(%q): %w` (`:141-152`) and a bad certificate header in `invalid format of
+requested certificates in response: %w` (`:220-227`). Its default
+`http.Client{}` and supplied client use their own redirect policy
+(`:31-44`, `:111`, `:175`); no `CheckRedirect` is installed. Those Go words
+and policy are not the TypeScript reference's.
+
+### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
+
+The finding (#331's fourth fold's cold re-review, at `bb80a525`): five
+`fuzz_script_spend` crashes on beta independent of #331, the numeric shifts'
+overflow refusal writing the count in decimal into its text (`splice.rs`,
+then `:262-263` and `:275-276`), and no refusal of a shift count above
+`INT_MAX` in the default mode, where the reference refuses one: `1 <2^31>
+OP_RSHIFTNUM` was 0 here, a valid spend, and invalid in the reference.
+
+The crash inputs, eight (the six kept under
+`/Volumes/Lanes/out/bsv-rs/fix-331-fold5/fuzz/pre-existing/` and two of the
+fifth fold's re-review, `27c51236…` and `e36fe93d…`), each run at `-runs=1`
+through the target's counting allocator on `bb80a525`, `b744f4b6` (beta.2,
+#331 landed) and `949f2782` (#348, #349 landed) under one bound, the base's
+(a single request at most twice the 1 MiB budget, at most ten budgets live,
+the input's term added, a reservation left out): none crashes on
+`949f2782` or on the tip, and nothing in this change was needed for them.
+
+- `e91f18e1…`, `ed740084…`, `e36fe93d…` (the shift's refusal) and
+  `27c51236…` (`OP_NUM2BIN`'s): one request of 2,900,134, 2,525,294,
+  2,525,296 and 2,382,952 bytes at `bb80a525` and at `b744f4b6`, the count's
+  or the size's decimal text; 602,128, 524,304, 524,304 and 494,744 at
+  `949f2782` (the operand itself, charged), closed by #349's `number_text`
+  (`a shift by a 602113-byte number bits`).
+- `44d4c72f…`, `4914d789…`, `d44dc981…` (`OP_NUM2BIN`'s refusal): 5,473,403,
+  4,442,360 and 5,335,707 bytes live at `bb80a525`, past that target's live
+  bound of four budgets, 5,141,890, 4,442,360 and 5,325,288 at `b744f4b6`;
+  1,730,212, 1,022,688 and 1,484,734 at `949f2782`, closed by #349's
+  `number_text` (the size's 1.2 to 1.6 MB of decimal gone), under four
+  budgets too.
+- `3c8497a5…`: 4,696,294 bytes live at `bb80a525`, past four budgets;
+  4,068,812 at `b744f4b6` and since, under it, with the step probe's
+  3,941,802-byte reservation (#374), which the target leaves out since #331:
+  closed by #331.
+
+All eight are in `fuzz/corpus/fuzz_script_spend/` under their sha1 (no
+key-shaped bytes; `gitleaks` clean). The target runs under a word only, so
+the default mode's change below is outside its reach.
+
+The count: the reference reads it, refuses a negative one, then refuses one
+above `INT_MAX` before it reads the value (`ts-stack@edf6e03`
+`Spend.ts:1058-1060`, `1084-1086`: `OP_LSHIFTNUM shift count exceeds
+INT_MAX.`, `OP_RSHIFTNUM shift count exceeds INT_MAX.`; run under Node
+22.18.0 on counts of 2^31, 2^34, 2^64 and a 100-byte number, on values 1, 0
+and -1). The default mode now does the same, in its words, a verdict and
+never a decline (the owner's ruling (c)): no shift is sized, so a caller's
+budget no longer declines `1 <2^31> OP_LSHIFTNUM` (a 268 MB result) and V8's
+`Maximum BigInt size exceeded` is no longer this case's words; `1 <INT_MAX>
+OP_RSHIFTNUM` stays valid and `1 <INT_MAX> OP_LSHIFTNUM` keeps the `BigInt`
+words, as the reference. Under a word nothing moves: the node refuses the
+count in `bint::operator<<=` and `operator>>=` (`big_int.cpp:359-369`,
+`383-393` at v1.2.2, `879fc8b`), after the value's read
+(`interpreter.cpp:716-719`, `752-755`) and a left shift's size test
+(`script_num.cpp:305-308`), `SCRIPT_ERR_BIG_INT` (`interpreter.cpp:1819-1821`),
+which this crate's word path already applied there
+(`OP_RSHIFTNUM count (2147483648) does not fit an int.`).
+
+Pinned by `tests/script_shift_count_int_max_383.rs` (seven tests, four red on
+`949f2782`: the right shift by 2^31 valid, the left shift in the `BigInt`
+words and its zero value valid, a decline under a budget, a 9-byte and a
+100-byte count; the seventh, the cold review's, pins the order: a count
+above `INT_MAX` on a 67,108,863-byte value, which the default mode cannot
+read (`Invalid string length` with a count of 1), refused in the count's
+words, red on the tip with the check moved after the value's read, where
+the other six stay green), and three default-mode rows of
+`tests/script_shift_count_witness.rs` that pinned the old reading moved to
+the reference's (the witness, `1 OP_RSHIFTNUM 2147483648`, was `Ok(true)`;
+`INT_MAX + 1` under a caller's 32,000,000 bytes a decline; the zero value's
+two shifts `Ok(true)`), its word rows unchanged. Two pins of #331 met a count
+above `INT_MAX` and move with it, the shift still refused before it
+allocates: `tests/transaction_verify_budget_331.rs`'s left shift by 2^40
+(the 1 GiB element bound uncapped, a decline under 32,000,000 bytes; now the
+count's verdict under both) and the by-hand left shift by 2^33 + 8 in
+`tests/script_default_mode_uncapped_331.rs`. The element bound stays at the
+shift's site but is out of its reach in the default mode: a readable value
+(536,870,888 bits) shifted by `INT_MAX` is 335 MB, below the 1 GiB bound, so
+the bound (which runs before the shift's refusal at `splice.rs:332`) never
+trips, and V8's `BigInt` cap refuses the result past 2^30 bits; the word
+branch never reaches it. No test pins it (none can reach it); a comment at
+`splice.rs:327` says so.
 ### Fixed: the default mode reads the splice operands as the reference does: a substring operand past 8 bytes by its first 8, every one clamped to the `int` range, and `OP_NUM2BIN`'s size refused in the reference's words (#382)
 
 The #331 third fold's cold re-review noted that this crate read a splice

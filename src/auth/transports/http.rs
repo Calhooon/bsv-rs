@@ -13,15 +13,13 @@
 //! ## Payload Format for General Messages
 //!
 //! Request payload: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
-//! Response payload: `[request_id: 32][status: varint][headers: varint+pairs][body: varint+bytes]`
+//! Response payload: `[request_id: 32, if present][status: varint][headers: varint+pairs][body: varint+bytes]`
 
 use crate::auth::types::AuthMessage;
 
 #[cfg(feature = "http")]
 use crate::auth::types::MessageType;
 use crate::primitives::bounded_capacity;
-#[cfg(feature = "http")]
-use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -29,11 +27,17 @@ use std::sync::RwLock as StdRwLock;
 use tokio::sync::RwLock;
 
 #[cfg(feature = "http")]
+mod body;
+#[cfg(feature = "http")]
 mod client;
+#[cfg(feature = "http")]
+mod general;
 #[cfg(feature = "http")]
 mod handshake;
 #[cfg(feature = "http")]
 mod json_syntax;
+#[cfg(feature = "http")]
+mod response_bounds;
 #[cfg(feature = "http")]
 mod unauthenticated;
 
@@ -67,7 +71,7 @@ pub mod headers {
     pub const NONCE: &str = "x-bsv-auth-nonce";
     /// Recipient's nonce from previous message (base64).
     pub const YOUR_NONCE: &str = "x-bsv-auth-your-nonce";
-    /// Message signature (base64 or hex).
+    /// Response signature (nonempty, even-length hex, at most 2048 characters).
     pub const SIGNATURE: &str = "x-bsv-auth-signature";
     /// Message type.
     pub const MESSAGE_TYPE: &str = "x-bsv-auth-message-type";
@@ -500,6 +504,8 @@ pub struct SimplifiedFetchTransport {
     /// HTTP client (only available with `http` feature).
     #[cfg(feature = "http")]
     client: reqwest::Client,
+    #[cfg(feature = "http")]
+    limits: body::ResponseLimits,
     /// Callback for incoming messages (uses std RwLock for synchronous access).
     callback: Arc<StdRwLock<Option<Box<TransportCallback>>>>,
 }
@@ -525,6 +531,8 @@ impl SimplifiedFetchTransport {
             base_url: base_url.trim_end_matches('/').to_string(),
             #[cfg(feature = "http")]
             client: client::default_client(),
+            #[cfg(feature = "http")]
+            limits: body::ResponseLimits::default(),
             callback: Arc::new(StdRwLock::new(None)),
         }
     }
@@ -647,161 +655,7 @@ impl Transport for SimplifiedFetchTransport {
                     self.send_auth_message(message).await?;
                 }
                 MessageType::General => {
-                    // BRC-104: For General messages, deserialize payload as HTTP request,
-                    // add auth headers, and make actual HTTP request
-
-                    let payload = message.payload.as_ref().ok_or_else(|| {
-                        Error::AuthError("General message must have payload".into())
-                    })?;
-
-                    // Parse the HTTP request from payload
-                    let http_request = HttpRequest::from_payload(payload)?;
-
-                    // Build URL
-                    let url = format!("{}{}", self.base_url, http_request.url_postfix());
-
-                    // Build request with auth headers
-                    let mut request_builder = match http_request.method.to_uppercase().as_str() {
-                        "GET" => self.client.get(&url),
-                        "POST" => self.client.post(&url),
-                        "PUT" => self.client.put(&url),
-                        "DELETE" => self.client.delete(&url),
-                        "PATCH" => self.client.patch(&url),
-                        "HEAD" => self.client.head(&url),
-                        _ => self.client.request(
-                            reqwest::Method::from_bytes(http_request.method.as_bytes())
-                                .unwrap_or(reqwest::Method::GET),
-                            &url,
-                        ),
-                    };
-
-                    // Add auth headers
-                    request_builder = request_builder
-                        .header(headers::VERSION, &message.version)
-                        .header(headers::IDENTITY_KEY, message.identity_key.to_hex());
-
-                    if let Some(ref nonce) = message.nonce {
-                        request_builder = request_builder.header(headers::NONCE, nonce);
-                    }
-
-                    if let Some(ref your_nonce) = message.your_nonce {
-                        request_builder = request_builder.header(headers::YOUR_NONCE, your_nonce);
-                    }
-
-                    if let Some(ref sig) = message.signature {
-                        request_builder = request_builder
-                            .header(headers::SIGNATURE, crate::primitives::to_hex(sig));
-                    }
-
-                    // Add request ID header
-                    request_builder = request_builder.header(
-                        headers::REQUEST_ID,
-                        crate::primitives::to_base64(&http_request.request_id),
-                    );
-
-                    // Add original headers from payload (x-bsv-*, authorization, content-type)
-                    for (key, value) in &http_request.headers {
-                        let lower_key = key.to_lowercase();
-                        if lower_key.starts_with("x-bsv-")
-                            || lower_key == "authorization"
-                            || lower_key == "content-type"
-                        {
-                            // Skip x-bsv-auth-* headers (we add our own)
-                            if !lower_key.starts_with("x-bsv-auth") {
-                                request_builder =
-                                    request_builder.header(key.as_str(), value.as_str());
-                            }
-                        }
-                    }
-
-                    // Add body if present
-                    if !http_request.body.is_empty() {
-                        request_builder = request_builder.body(http_request.body.clone());
-                    }
-
-                    // Send request
-                    let response = request_builder
-                        .send()
-                        .await
-                        .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
-                    client::refuse_redirect(&url, &response)?;
-                    // Extract response headers and body
-                    let (response_status, reason, response_headers) =
-                        unauthenticated::head(&response);
-                    let response_body = response
-                        .bytes()
-                        .await
-                        .map_err(|e| fault::auth_error(&e, "Failed to read response"))?
-                        .to_vec();
-
-                    // Refused unless signed, before it becomes a message (#354)
-                    unauthenticated::refuse_unauthenticated(
-                        &url,
-                        response_status,
-                        reason.as_deref(),
-                        &response_headers,
-                        &response_body,
-                    )?;
-                    let requested_certificates =
-                        handshake::requested_certificates(&url, &response_headers)?;
-
-                    // Extract request ID from response
-                    let response_request_id: [u8; 32] =
-                        if let Some(rid) = response_headers.get(headers::REQUEST_ID) {
-                            let rid_str = rid.to_str().unwrap_or_default();
-                            crate::primitives::from_base64(rid_str)?
-                                .try_into()
-                                .map_err(|_| Error::AuthError("Invalid request ID length".into()))?
-                        } else {
-                            http_request.request_id // Use original if not provided
-                        };
-
-                    // Extract non-auth headers (x-bsv-* except x-bsv-auth-*, authorization)
-                    let mut included_headers: Vec<(String, String)> = Vec::new();
-                    for (key, value) in response_headers.iter() {
-                        let key_str = key.as_str().to_lowercase();
-                        if (key_str.starts_with("x-bsv-") || key_str == "authorization")
-                            && !key_str.starts_with("x-bsv-auth")
-                        {
-                            if let Ok(v) = value.to_str() {
-                                included_headers.push((key_str, v.to_string()));
-                            }
-                        }
-                    }
-                    // Sort headers for consistent ordering
-                    included_headers.sort_by(|a, b| a.0.cmp(&b.0));
-
-                    // Build response payload
-                    let http_response = HttpResponse {
-                        request_id: response_request_id,
-                        status: response_status.as_u16(),
-                        headers: included_headers,
-                        body: response_body,
-                    };
-
-                    // Build response AuthMessage, its sender the answer's identity key (#354)
-                    let response_identity = unauthenticated::sender(&response_headers)?;
-
-                    let mut response_message =
-                        AuthMessage::new(MessageType::General, response_identity);
-                    response_message.payload = Some(http_response.to_payload());
-
-                    // Extract nonces from response headers
-                    if let Some(nonce) = response_headers.get(headers::NONCE) {
-                        response_message.nonce = nonce.to_str().ok().map(String::from);
-                    }
-                    if let Some(your_nonce) = response_headers.get(headers::YOUR_NONCE) {
-                        response_message.your_nonce = your_nonce.to_str().ok().map(String::from);
-                    }
-
-                    // Extract signature
-                    response_message.signature = unauthenticated::signature(&response_headers);
-
-                    // Parse the certificate header even on a general reply (#410).
-                    response_message.requested_certificates = requested_certificates;
-
-                    // Invoke callback with response
-                    self.invoke_callback(response_message).await?;
+                    self.send_general_message(message).await?;
                 }
             }
 

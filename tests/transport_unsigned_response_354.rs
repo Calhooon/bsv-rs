@@ -349,13 +349,24 @@ async fn a_signed_503_is_read_as_the_named_hosts_answer() {
     let (result, seen, _) = sent(&case).await;
     result.expect("a signed 503 is read");
     assert_eq!(seen.len(), 1);
-    let response = HttpResponse::from_payload(seen[0].payload.as_deref().unwrap()).unwrap();
-    assert_eq!(response.status, 503);
-    assert_eq!(response.body, b"signed");
+    assert_response_without_request_id(&seen[0], 503);
+}
+
+// #416: neither recorded response contains a request-ID header. The
+// reference writes no ID bytes, rather than copying the outgoing ID.
+fn assert_response_without_request_id(message: &AuthMessage, status: u16) {
+    let with_id = HttpResponse {
+        request_id: [7; 32],
+        status,
+        headers: vec![],
+        body: b"signed".to_vec(),
+    }
+    .to_payload();
+    assert_eq!(message.payload.as_deref(), Some(&with_id[32..]));
 }
 
 #[tokio::test]
-async fn a_response_with_the_three_headers_is_read_as_before() {
+async fn a_response_with_the_three_headers_omits_an_absent_request_id_416() {
     let case = case("all_three_present");
     assert_eq!(case.refusal, None);
     assert!(case.reached_on_data);
@@ -376,8 +387,5 @@ async fn a_response_with_the_three_headers_is_read_as_before() {
                 .as_slice()
         )
     );
-    let response = HttpResponse::from_payload(message.payload.as_deref().unwrap()).unwrap();
-    assert_eq!(response.request_id, [7; 32]);
-    assert_eq!(response.status, 200);
-    assert_eq!(response.body, b"signed");
+    assert_response_without_request_id(message, 200);
 }

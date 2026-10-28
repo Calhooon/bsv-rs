@@ -1,0 +1,1807 @@
+{
+  "node": "v22.18.0",
+  "description": "#416 pinned SimplifiedFetchTransport bounds; fake fetch with streaming bodies; recipes measured in UTF-8 bytes; {url} is the configured origin",
+  "references": [
+    {
+      "reference": "ts-stack@edf6e03",
+      "cases": [
+        {
+          "family": "certificate_header",
+          "name": "certificate_ascii_262143",
+          "certificate_bytes": 262143,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_ascii_262144",
+          "certificate_bytes": 262144,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_ascii_262145",
+          "certificate_bytes": 262145,
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: [oversized]. header exceeds its byte limit"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_latin1_262144",
+          "certificate_bytes": 262144,
+          "latin1": true,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_latin1_262145",
+          "certificate_bytes": 262145,
+          "latin1": true,
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: [oversized]. header exceeds its byte limit"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"MAA=\"",
+          "signature": "MAA=",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"0\"",
+          "signature": "0",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"300\"",
+          "signature": "300",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"0g\"",
+          "signature": "0g",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"0x30\"",
+          "signature": "0x30",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"30 00\"",
+          "signature": "30 00",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"é\"",
+          "signature": "é",
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"00\"",
+          "signature": "00",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "00",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\" 00 \"",
+          "signature": " 00 ",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "00",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"ABcd\"",
+          "signature": "ABcd",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "abcd",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"\"",
+          "signature": "",
+          "error": {
+            "name": "Error",
+            "message": "Received HTTP 200 OK from {url}/sendMessage without valid BSV authentication (missing headers: x-bsv-auth-signature) - body preview: signed"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"   \"",
+          "signature": "   ",
+          "error": {
+            "name": "Error",
+            "message": "Received HTTP 200 OK from {url}/sendMessage without valid BSV authentication (missing headers: x-bsv-auth-signature) - body preview: signed"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_2048_characters",
+          "signature_chars": 2048,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_2049_characters",
+          "signature_chars": 2049,
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_2050_characters",
+          "signature_chars": 2050,
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_repeated",
+          "extra_headers": [
+            {
+              "name": "x-bsv-auth-signature",
+              "character": "0",
+              "count": 2
+            }
+          ],
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_refused_before_oversized_certificates",
+          "signature": "MAA=",
+          "certificate_bytes": 262145,
+          "error": {
+            "name": "Error",
+            "message": "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_certificateRequest",
+          "message_type": "certificateRequest",
+          "error": null,
+          "delivered": {
+            "message_type": "certificateRequest",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_CertificateRequest",
+          "message_type": "CertificateRequest",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_certificateResponse",
+          "message_type": "certificateResponse",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_general",
+          "message_type": "general",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_",
+          "message_type": "",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_1048575",
+          "handshake": true,
+          "body_bytes": 1048575,
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_1048576",
+          "handshake": true,
+          "body_bytes": 1048576,
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_1048577",
+          "handshake": true,
+          "body_bytes": 1048577,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response from {url}/.well-known/auth exceeds 1048576 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_over_limit_404",
+          "handshake": true,
+          "body_bytes": 1048577,
+          "status": 404,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response from {url}/.well-known/auth exceeds 1048576 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "general_1048577",
+          "body_bytes": 1048577,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 1048584,
+            "payload_sha256": "51e624d0064a45be80a31480b3d5930b9b10bbf5069e415cfa9838e5718e403c"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "general_16777216",
+          "body_bytes": 16777216,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 16777223,
+            "payload_sha256": "e9b06bce3dab02afbc4b4524c70bc35773c4a24f51b8cbad08f168a5d1348205"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "general_16777217",
+          "body_bytes": 16777217,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response from {url}/sendMessage exceeds 16777216 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_declared_oversized",
+          "handshake": true,
+          "content_length": "1048577",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response from {url}/.well-known/auth exceeds 1048576 bytes"
+          },
+          "delivered": null,
+          "cancelled": true
+        },
+        {
+          "family": "body",
+          "name": "handshake_invalid_length",
+          "handshake": true,
+          "content_length": "nope",
+          "error": {
+            "name": "Error",
+            "message": "Invalid Content-Length returned by {url}/.well-known/auth"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "handshake_limit_256_body_256",
+          "handshake": true,
+          "body_bytes": 256,
+          "options": {
+            "maxHandshakeResponseBytes": 256
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "handshake_limit_256_body_257",
+          "handshake": true,
+          "body_bytes": 257,
+          "options": {
+            "maxHandshakeResponseBytes": 256
+          },
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response from {url}/.well-known/auth exceeds 256 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "general_limit_8_body_8",
+          "body_bytes": 8,
+          "options": {
+            "maxResponseBytes": 8
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 11,
+            "payload_sha256": "b70b2944bd43d31c8ef3545cc1e3a76d64364ea1391cf456c56a19298825746e"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "general_limit_8_body_9",
+          "body_bytes": 9,
+          "options": {
+            "maxResponseBytes": 8
+          },
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response from {url}/sendMessage exceeds 8 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "handshake_raised_limit",
+          "handshake": true,
+          "body_bytes": 1048577,
+          "options": {
+            "maxHandshakeResponseBytes": 1048577
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_31_bytes",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must encode exactly 32 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_32_bytes",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "0688d9f4fcc61a946050709e0d22b10fa77be1acf807ff7aac316bd5b5d8b8a0"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_33_bytes",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must encode exactly 32 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"\"",
+          "request_id": "",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must encode exactly 32 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"!\"",
+          "request_id": "!",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must be canonical base64"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"Bw\"",
+          "request_id": "Bw",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must be canonical base64"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\"",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must be canonical base64"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwd=\"",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwd=",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must encode exactly 32 bytes"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"___________________________________________=\"",
+          "request_id": "___________________________________________=",
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response request ID must be canonical base64"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_absent",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_different_from_request",
+          "request_id": "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "6191ccf95f5e3f2f586d0ebccd6f6c1db73038dee396d38a94bfd8d358b68f32"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_name_1024",
+          "signed_key_bytes": 1024,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 1038,
+            "payload_sha256": "819ce0ebd4eeb12bc64e1ad53ceacf3d3bb74a302d79e5513609ec02732fe36c"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_name_1025",
+          "signed_key_bytes": 1025,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response contains an oversized signed header"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_value_32768",
+          "signed_value_bytes": 32768,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32792,
+            "payload_sha256": "b1adb3f82079405495bb0b557c8ad258374117cd02d1df5a4e54704d92e26a2c"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_latin1_value_32768",
+          "signed_value_bytes": 32768,
+          "latin1": true,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32792,
+            "payload_sha256": "64a3be53856fce85762c41019d9f4fba783f28d2c46d7b1afb85e778499b32c2"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_value_32769",
+          "signed_value_bytes": 32769,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response contains an oversized signed header"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_latin1_value_32769",
+          "signed_value_bytes": 32769,
+          "latin1": true,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response contains an oversized signed header"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_count_512",
+          "signed_count": 512,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 6155,
+            "payload_sha256": "b3feb9e3dfc0bced042e7c71a51d94e85d1c533839eaf58a3c9d3c4d7ccad446"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_count_513",
+          "signed_count": 513,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response signed headers exceed their limit"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_total_262144",
+          "signed_total_bytes": 262144,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 262185,
+            "payload_sha256": "d6c973748e872911e1b1d2747169acdb3ace1a19214c51213eacc8fd3d866471"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_total_262145",
+          "signed_total_bytes": 262145,
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response signed headers exceed their limit"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_authorization_over",
+          "extra_headers": [
+            {
+              "name": "authorization",
+              "character": "x",
+              "count": 32769
+            }
+          ],
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response contains an oversized signed header"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "unsigned_headers_excluded",
+          "extra_headers": [
+            {
+              "name": "unrelated",
+              "character": "x",
+              "count": 32769
+            },
+            {
+              "name": "x-bsv-auth-extra",
+              "character": "x",
+              "count": 32769
+            }
+          ],
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_repeated_value_at",
+          "extra_headers": [
+            {
+              "name": "x-bsv-repeat",
+              "character": "a",
+              "count": 16383
+            },
+            {
+              "name": "x-bsv-repeat",
+              "character": "b",
+              "count": 16383
+            }
+          ],
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32793,
+            "payload_sha256": "f906aa6137585d13377485b7606ff94f0aab881e1ebfc571b1c270b73aa6afa7"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_repeated_value_over",
+          "extra_headers": [
+            {
+              "name": "x-bsv-repeat",
+              "character": "a",
+              "count": 16384
+            },
+            {
+              "name": "x-bsv-repeat",
+              "character": "b",
+              "count": 16383
+            }
+          ],
+          "error": {
+            "name": "Error",
+            "message": "Authenticated response contains an oversized signed header"
+          },
+          "delivered": null,
+          "cancelled": false
+        }
+      ],
+      "option_errors": [
+        {
+          "name": "maxResponseBytes",
+          "value": 0,
+          "message": "maxResponseBytes must be a positive safe integer"
+        },
+        {
+          "name": "maxResponseBytes",
+          "value": 9007199254740992,
+          "message": "maxResponseBytes must be a positive safe integer"
+        },
+        {
+          "name": "maxHandshakeResponseBytes",
+          "value": 0,
+          "message": "maxHandshakeResponseBytes must be a positive safe integer"
+        },
+        {
+          "name": "maxHandshakeResponseBytes",
+          "value": 9007199254740992,
+          "message": "maxHandshakeResponseBytes must be a positive safe integer"
+        }
+      ]
+    },
+    {
+      "reference": "ts-sdk@9e3ede6b",
+      "cases": [
+        {
+          "family": "certificate_header",
+          "name": "certificate_ascii_262143",
+          "certificate_bytes": 262143,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_ascii_262144",
+          "certificate_bytes": 262144,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_ascii_262145",
+          "certificate_bytes": 262145,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_latin1_262144",
+          "certificate_bytes": 262144,
+          "latin1": true,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "certificate_header",
+          "name": "certificate_latin1_262145",
+          "certificate_bytes": 262145,
+          "latin1": true,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"MAA=\"",
+          "signature": "MAA=",
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"0\"",
+          "signature": "0",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "00",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"300\"",
+          "signature": "300",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "0300",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"0g\"",
+          "signature": "0g",
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"0x30\"",
+          "signature": "0x30",
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"30 00\"",
+          "signature": "30 00",
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"é\"",
+          "signature": "é",
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"00\"",
+          "signature": "00",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "00",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\" 00 \"",
+          "signature": " 00 ",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "00",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"ABcd\"",
+          "signature": "ABcd",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "abcd",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"\"",
+          "signature": "",
+          "error": {
+            "name": "Error",
+            "message": "Received HTTP 200 OK from {url}/sendMessage without valid BSV authentication (missing headers: x-bsv-auth-signature) - body preview: signed"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_\"   \"",
+          "signature": "   ",
+          "error": {
+            "name": "Error",
+            "message": "Received HTTP 200 OK from {url}/sendMessage without valid BSV authentication (missing headers: x-bsv-auth-signature) - body preview: signed"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_2048_characters",
+          "signature_chars": 2048,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_2049_characters",
+          "signature_chars": 2049,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_2050_characters",
+          "signature_chars": 2050,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_repeated",
+          "extra_headers": [
+            {
+              "name": "x-bsv-auth-signature",
+              "character": "0",
+              "count": 2
+            }
+          ],
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "signature",
+          "name": "signature_refused_before_oversized_certificates",
+          "signature": "MAA=",
+          "certificate_bytes": 262145,
+          "error": {
+            "name": "Error",
+            "message": "Invalid hex string"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_certificateRequest",
+          "message_type": "certificateRequest",
+          "error": null,
+          "delivered": {
+            "message_type": "certificateRequest",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_CertificateRequest",
+          "message_type": "CertificateRequest",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_certificateResponse",
+          "message_type": "certificateResponse",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_general",
+          "message_type": "general",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "message_type",
+          "name": "type_",
+          "message_type": "",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_1048575",
+          "handshake": true,
+          "body_bytes": 1048575,
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_1048576",
+          "handshake": true,
+          "body_bytes": 1048576,
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_1048577",
+          "handshake": true,
+          "body_bytes": 1048577,
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_over_limit_404",
+          "handshake": true,
+          "body_bytes": 1048577,
+          "status": 404,
+          "error": {
+            "name": "Error",
+            "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: {\"version\":\"0.1\",\"messageType\":\"initialRequest\",\"identityKey\":\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\"}                                                                                                                                                                                                                                                                                                                                                                                             … (truncated)"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "general_1048577",
+          "body_bytes": 1048577,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 1048584,
+            "payload_sha256": "51e624d0064a45be80a31480b3d5930b9b10bbf5069e415cfa9838e5718e403c"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "general_16777216",
+          "body_bytes": 16777216,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 16777223,
+            "payload_sha256": "e9b06bce3dab02afbc4b4524c70bc35773c4a24f51b8cbad08f168a5d1348205"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "general_16777217",
+          "body_bytes": 16777217,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 16777224,
+            "payload_sha256": "5f2224652e6adaf7261cfcd884ec6f8c72d193baa878b3b19e372e06366de65b"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_declared_oversized",
+          "handshake": true,
+          "content_length": "1048577",
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "body",
+          "name": "handshake_invalid_length",
+          "handshake": true,
+          "content_length": "nope",
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "handshake_limit_256_body_256",
+          "handshake": true,
+          "body_bytes": 256,
+          "options": {
+            "maxHandshakeResponseBytes": 256
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "handshake_limit_256_body_257",
+          "handshake": true,
+          "body_bytes": 257,
+          "options": {
+            "maxHandshakeResponseBytes": 256
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "general_limit_8_body_8",
+          "body_bytes": 8,
+          "options": {
+            "maxResponseBytes": 8
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 11,
+            "payload_sha256": "b70b2944bd43d31c8ef3545cc1e3a76d64364ea1391cf456c56a19298825746e"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "general_limit_8_body_9",
+          "body_bytes": 9,
+          "options": {
+            "maxResponseBytes": 8
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 12,
+            "payload_sha256": "42b8cbffab558ca74b73a9e414d763151ef3be762f78f09d07895f1db24245f6"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "options",
+          "name": "handshake_raised_limit",
+          "handshake": true,
+          "body_bytes": 1048577,
+          "options": {
+            "maxHandshakeResponseBytes": 1048577
+          },
+          "error": null,
+          "delivered": {
+            "message_type": "initialRequest",
+            "signature_hex": "",
+            "payload_bytes": 0,
+            "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_31_bytes",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 40,
+            "payload_sha256": "1f033ef9ed50c14fa49c8485124f235d86d9d6a41e1d60378f93d4d906a15ec4"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_32_bytes",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "0688d9f4fcc61a946050709e0d22b10fa77be1acf807ff7aac316bd5b5d8b8a0"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_33_bytes",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 42,
+            "payload_sha256": "d3ff98bf920c129872433fc1e72f41fc48fa5c5fd19b964417ac597fab59b8d6"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"\"",
+          "request_id": "",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"!\"",
+          "request_id": "!",
+          "error": {
+            "name": "Error",
+            "message": "Invalid base64 character at index 0"
+          },
+          "delivered": null,
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"Bw\"",
+          "request_id": "Bw",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 10,
+            "payload_sha256": "1959bd25f77ad09cffb2463ebb521e5e8fbcc23de8f53eadafa675c6d48bc632"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc\"",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "0688d9f4fcc61a946050709e0d22b10fa77be1acf807ff7aac316bd5b5d8b8a0"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwd=\"",
+          "request_id": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwd=",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "0688d9f4fcc61a946050709e0d22b10fa77be1acf807ff7aac316bd5b5d8b8a0"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_\"___________________________________________=\"",
+          "request_id": "___________________________________________=",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "e0746636fb828788a31b90ee21284fb84c953a15216dadcc959b76e355808730"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_absent",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "request_id",
+          "name": "request_id_different_from_request",
+          "request_id": "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=",
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 41,
+            "payload_sha256": "6191ccf95f5e3f2f586d0ebccd6f6c1db73038dee396d38a94bfd8d358b68f32"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_name_1024",
+          "signed_key_bytes": 1024,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 1038,
+            "payload_sha256": "819ce0ebd4eeb12bc64e1ad53ceacf3d3bb74a302d79e5513609ec02732fe36c"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_name_1025",
+          "signed_key_bytes": 1025,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 1039,
+            "payload_sha256": "14f0ee01919514611305be0908e42a59897794dbceb4a81b1755c526237ed4cf"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_value_32768",
+          "signed_value_bytes": 32768,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32792,
+            "payload_sha256": "b1adb3f82079405495bb0b557c8ad258374117cd02d1df5a4e54704d92e26a2c"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_latin1_value_32768",
+          "signed_value_bytes": 32768,
+          "latin1": true,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32792,
+            "payload_sha256": "64a3be53856fce85762c41019d9f4fba783f28d2c46d7b1afb85e778499b32c2"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_value_32769",
+          "signed_value_bytes": 32769,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32793,
+            "payload_sha256": "0feb488350e14b4a9d68f6594014ff748ec1b612e299f9fb12190092ca0bd1fd"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_latin1_value_32769",
+          "signed_value_bytes": 32769,
+          "latin1": true,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32793,
+            "payload_sha256": "82136fd1b1e201212046e151f1ae59d09772441cef697f8d06580238e6844f9e"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_count_512",
+          "signed_count": 512,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 6155,
+            "payload_sha256": "b3feb9e3dfc0bced042e7c71a51d94e85d1c533839eaf58a3c9d3c4d7ccad446"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_count_513",
+          "signed_count": 513,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 6167,
+            "payload_sha256": "e1371dd62d5868cfb825ae26a8bfb36cf598019d8d8c31b9d22fd85d5e4e12b0"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_total_262144",
+          "signed_total_bytes": 262144,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 262185,
+            "payload_sha256": "d6c973748e872911e1b1d2747169acdb3ace1a19214c51213eacc8fd3d866471"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_total_262145",
+          "signed_total_bytes": 262145,
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 262186,
+            "payload_sha256": "f9dfbf9b9902612218e29986be87ec6122189d03b504f3e03d7739186c2496c1"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_authorization_over",
+          "extra_headers": [
+            {
+              "name": "authorization",
+              "character": "x",
+              "count": 32769
+            }
+          ],
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32795,
+            "payload_sha256": "85b5a538a76b7429316fc4adc318288a9e862fcefa248fb69e4550409d25c8c1"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "unsigned_headers_excluded",
+          "extra_headers": [
+            {
+              "name": "unrelated",
+              "character": "x",
+              "count": 32769
+            },
+            {
+              "name": "x-bsv-auth-extra",
+              "character": "x",
+              "count": 32769
+            }
+          ],
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 9,
+            "payload_sha256": "7898e0a62a0dd2c0869d9c6b9fea66760aad77e4a67cd57c514a7a3c4255ff26"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_repeated_value_at",
+          "extra_headers": [
+            {
+              "name": "x-bsv-repeat",
+              "character": "a",
+              "count": 16383
+            },
+            {
+              "name": "x-bsv-repeat",
+              "character": "b",
+              "count": 16383
+            }
+          ],
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32793,
+            "payload_sha256": "f906aa6137585d13377485b7606ff94f0aab881e1ebfc571b1c270b73aa6afa7"
+          },
+          "cancelled": false
+        },
+        {
+          "family": "signed_headers",
+          "name": "signed_repeated_value_over",
+          "extra_headers": [
+            {
+              "name": "x-bsv-repeat",
+              "character": "a",
+              "count": 16384
+            },
+            {
+              "name": "x-bsv-repeat",
+              "character": "b",
+              "count": 16383
+            }
+          ],
+          "error": null,
+          "delivered": {
+            "message_type": "general",
+            "signature_hex": "3006020101020101",
+            "payload_bytes": 32794,
+            "payload_sha256": "85e4633a2d2a828b0e967bf292b5124a632a13dcb7ace40b13995c95845f7e02"
+          },
+          "cancelled": false
+        }
+      ],
+      "option_errors": []
+    }
+  ]
+}
