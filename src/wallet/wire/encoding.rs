@@ -1426,10 +1426,10 @@ fn decoded_32_bytes(text: &str, what: &str) -> Result<Vec<u8>, Error> {
     Ok(bytes)
 }
 
-/// The certificate's field names in the signed order, every bound checked
-/// first: at most 100,000 fields (`Certificate.ts:57-58`), each name 1 to 50
-/// bytes and safe, each value at most 1 MiB (`:76-79`), in the readers' words
-/// (bsv-rs#246).
+/// The field names in the signed order, every bound checked first in the map's
+/// order, as `snapshotCertificateFields` walks `Reflect.ownKeys` before `toBinary`
+/// sorts (`Certificate.ts:56-83`, `:281-282`): at most 100,000 fields, each name
+/// 1 to 50 bytes and safe, each value at most 1 MiB, in the readers' words (#246, #385).
 fn checked_field_names(fields: &IndexMap<String, String>) -> Result<Vec<&str>, Error> {
     if fields.len() > super::MAX_CERTIFICATE_FIELDS {
         return Err(super::refused(format!(
@@ -1437,15 +1437,15 @@ fn checked_field_names(fields: &IndexMap<String, String>) -> Result<Vec<&str>, E
             super::MAX_CERTIFICATE_FIELDS
         )));
     }
-    let mut names: Vec<&str> = fields.keys().map(String::as_str).collect();
-    crate::wallet::collation::sort_field_names(&mut names);
-    for &name in &names {
+    for (name, value) in fields {
         super::require_certificate_field_name_length(name.len())?;
         super::require_safe_certificate_field_name(name)?;
-        if fields[name].len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+        if value.len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
             return Err(super::refused(super::certificate_field_value_refusal(name)));
         }
     }
+    let mut names: Vec<&str> = fields.keys().map(String::as_str).collect();
+    crate::wallet::collation::sort_field_names(&mut names);
     Ok(names)
 }
 
