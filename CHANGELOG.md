@@ -228,7 +228,9 @@ and each call is `this.substrate.<call>(args, this.originator)`.
   instance forward them; the wire substrate refuses both before a byte is
   sent, `WalletError("<call> is not available over the wallet wire
   substrate")`: this crate's `WalletWireTransceiver` writes neither call
-  (its processor reads both).
+  (its processor reads both), where the reference's transceiver writes both
+  (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790`, `:851`; #406 ports
+  them with fixtures recorded both ways).
 - The forwarding is one macro over the three substrates (`client.rs` 745
   lines to 582, with the two calls); the instance's shape adapters are
   `src/wallet/client_instance.rs`.
@@ -253,7 +255,9 @@ listens on 2121, 3321 and 3301, in the reference too (its `'auto'` probes
 the named substrates on their defaults, `:126-196`).
 
 Migration: none; additive (a constructor and two methods). The client stays
-behind `http`, as it was.
+behind `http`, as it was; #404 moves the client core under `wallet` with the
+HTTP substrates behind `http` (the keeper's word of 2026-10-28), and has the
+client implement `WalletInterface` as the reference's does (`WalletClient.ts:82`).
 
 ### Notes: cross-SDK parity (#335)
 
