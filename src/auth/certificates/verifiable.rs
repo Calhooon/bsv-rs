@@ -12,8 +12,8 @@ use super::Certificate;
 use crate::primitives::{PublicKey, SymmetricKey};
 use crate::wallet::{Counterparty, DecryptArgs, WalletInterface};
 use crate::{Error, Result};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Certificate with verifier-specific keyring for field decryption.
 ///
@@ -35,16 +35,16 @@ pub struct VerifiableCertificate {
     /// decoded only where the wallet decrypts (#268). Only fields in the
     /// keyring can be decrypted.
     #[serde(default)]
-    pub keyring: HashMap<String, String>,
+    pub keyring: IndexMap<String, String>,
 
     /// Cached decrypted field values.
     #[serde(skip)]
-    decrypted_fields: Option<HashMap<String, String>>,
+    decrypted_fields: Option<IndexMap<String, String>>,
 }
 
 impl VerifiableCertificate {
     /// Creates a verifiable certificate from a base certificate and keyring.
-    pub fn new(certificate: Certificate, keyring: HashMap<String, String>) -> Self {
+    pub fn new(certificate: Certificate, keyring: IndexMap<String, String>) -> Self {
         Self {
             certificate,
             keyring,
@@ -56,7 +56,7 @@ impl VerifiableCertificate {
     pub fn from_certificate(certificate: Certificate) -> Self {
         Self {
             certificate,
-            keyring: HashMap::new(),
+            keyring: IndexMap::new(),
             decrypted_fields: None,
         }
     }
@@ -191,7 +191,7 @@ impl VerifiableCertificate {
     /// fields`, `:164-166`), and every failure decrypting an entry is
     /// `Failed to decrypt selectively revealed certificate fields using
     /// keyring: <words>` (`:168-218`; bsv-rs#297). The entries are taken in
-    /// byte order.
+    /// the keyring's order, the reference's `Reflect.ownKeys` (`:160`; #394).
     ///
     /// Results are cached for subsequent calls.
     pub async fn decrypt_fields<W: WalletInterface>(
@@ -200,7 +200,7 @@ impl VerifiableCertificate {
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: Option<&str>,
-    ) -> Result<HashMap<String, String>> {
+    ) -> Result<IndexMap<String, String>> {
         // Return cached result if available
         if let Some(ref cached) = self.decrypted_fields {
             return Ok(cached.clone());
@@ -216,11 +216,9 @@ impl VerifiableCertificate {
                 "Certificate keyring cannot contain more than {MAX_RECORD_ENTRIES} fields"
             )));
         }
-        let mut entries: Vec<(&String, &String)> = self.keyring.iter().collect();
-        entries.sort_unstable();
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
 
-        for (field_name, encrypted_key) in entries {
+        for (field_name, encrypted_key) in &self.keyring {
             let value = self
                 .decrypt_keyring_field(
                     verifier_wallet,
@@ -242,7 +240,7 @@ impl VerifiableCertificate {
     }
 
     /// Returns cached decrypted fields if available.
-    pub fn get_decrypted_fields(&self) -> Option<&HashMap<String, String>> {
+    pub fn get_decrypted_fields(&self) -> Option<&IndexMap<String, String>> {
         self.decrypted_fields.as_ref()
     }
 
@@ -316,7 +314,7 @@ mod tests {
         );
         cert.sign(&certifier).unwrap();
 
-        let mut keyring = HashMap::new();
+        let mut keyring = IndexMap::new();
         keyring.insert("name".to_string(), "AQID".to_string());
 
         let verifiable = VerifiableCertificate::new(cert, keyring);
@@ -369,7 +367,7 @@ mod tests {
         cert.set_field("email", "BAUG");
         cert.sign(&certifier).unwrap();
 
-        let mut keyring = HashMap::new();
+        let mut keyring = IndexMap::new();
         keyring.insert("email".to_string(), "BwgJ".to_string());
 
         let verifiable = VerifiableCertificate::new(cert, keyring);

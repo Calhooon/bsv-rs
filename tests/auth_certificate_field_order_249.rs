@@ -15,8 +15,8 @@ use bsv_rs::auth::Certificate;
 use bsv_rs::primitives::{from_hex, to_hex, PrivateKey};
 use bsv_rs::wallet::types::Outpoint;
 use bsv_rs::Error;
+use indexmap::IndexMap;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Witnesses {
@@ -251,7 +251,7 @@ fn the_serializer_orders_names_as_local_compare_does_on_the_latin_1_corpus() {
     let corpus: Corpus = serde_json::from_str(&data).unwrap();
     assert_eq!(corpus.collation_corpus.len(), 1402);
 
-    let fields: HashMap<String, String> = corpus
+    let fields: IndexMap<String, String> = corpus
         .collation_corpus
         .iter()
         .map(|n| (n.clone(), String::new()))

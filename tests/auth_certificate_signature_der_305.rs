@@ -27,8 +27,8 @@
 use bsv_rs::auth::certificates::Certificate;
 use bsv_rs::primitives::{from_hex, to_hex, PrivateKey};
 use bsv_rs::Error;
+use indexmap::IndexMap;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::sync::OnceLock;
 
 /// The cases' ids, in the vector's order.
@@ -73,7 +73,7 @@ fn key(byte: u8) -> PrivateKey {
 fn certificate(signature: Option<Vec<u8>>) -> Certificate {
     let value = vector()["field_value"].as_str().unwrap().to_string();
     Certificate::new([1; 32], [2; 32], key(47).public_key(), key(43).public_key())
-        .with_fields(HashMap::from([("f00".to_string(), value)]))
+        .with_fields(IndexMap::from([("f00".to_string(), value)]))
         .with_signature(signature)
 }
 

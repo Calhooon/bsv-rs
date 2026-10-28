@@ -18,7 +18,7 @@ use bsv_rs::primitives::{sha256, to_base64, PrivateKey};
 use bsv_rs::wallet::wire::{WireReader, WireWriter};
 use bsv_rs::wallet::{Counterparty, KeyDeriver, ProtoWallet, Protocol, SecurityLevel};
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 const MIB: usize = 1024 * 1024;
 const OVER: &str = "Certificate field big exceeds the maximum of 1048576 bytes";
@@ -198,7 +198,7 @@ async fn issued() -> (MasterCertificate, VerifiableCertificate) {
         &ProtoWallet::new(Some(certifier.clone())),
         &certifier,
         subject.public_key(),
-        HashMap::from([("name".to_string(), "Alice".to_string())]),
+        IndexMap::from([("name".to_string(), "Alice".to_string())]),
         [8u8; 32],
         Some([9u8; 32]),
         Some("test"),

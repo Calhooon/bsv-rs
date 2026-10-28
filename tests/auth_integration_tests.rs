@@ -11,7 +11,7 @@ use bsv_rs::auth::{
     VerifiableCertificate,
 };
 use bsv_rs::primitives::{to_base64, PrivateKey};
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -420,7 +420,7 @@ fn test_verifiable_certificate_creation() {
     cert.sign(&certifier_key).unwrap();
 
     // Create verifiable certificate with keyring
-    let mut keyring = HashMap::new();
+    let mut keyring = IndexMap::new();
     keyring.insert("name".to_string(), to_base64(b"decryption_key"));
 
     let verifiable = VerifiableCertificate::new(cert.clone(), keyring);
@@ -658,7 +658,7 @@ fn test_verifiable_certificate_json_roundtrip() {
     );
     cert.sign(&certifier_key).unwrap();
 
-    let mut keyring = HashMap::new();
+    let mut keyring = IndexMap::new();
     keyring.insert("field1".to_string(), to_base64(b"key1"));
 
     let verifiable = VerifiableCertificate::new(cert, keyring);
@@ -976,7 +976,7 @@ async fn test_master_certificate_issue_for_subject() {
     let subject_key = PrivateKey::random();
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
     plain_fields.insert("department".to_string(), "Engineering".to_string());
@@ -1069,7 +1069,7 @@ async fn test_master_certificate_decrypt_fields() {
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
     plain_fields.insert("department".to_string(), "Engineering".to_string());
@@ -1126,7 +1126,7 @@ async fn test_master_certificate_decrypt_single_field() {
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
 
@@ -1184,7 +1184,7 @@ async fn test_master_certificate_create_keyring_for_verifier() {
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
     plain_fields.insert("department".to_string(), "Engineering".to_string());
@@ -1254,7 +1254,7 @@ async fn test_verifiable_certificate_full_chain() {
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
     let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
     plain_fields.insert("organization".to_string(), "Example Corp".to_string());
@@ -1334,7 +1334,7 @@ async fn test_verifiable_certificate_selective_disclosure() {
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
     let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
     plain_fields.insert("department".to_string(), "Engineering".to_string());
@@ -1410,7 +1410,7 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
     let wrong_wallet = ProtoWallet::new(Some(verifier_b_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
 
@@ -1473,7 +1473,7 @@ async fn test_full_issuance_to_verification_chain() {
     let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
     let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
     plain_fields.insert("email".to_string(), "alice@example.com".to_string());
     plain_fields.insert("clearance_level".to_string(), "Top Secret".to_string());
@@ -1739,7 +1739,7 @@ async fn test_master_certificate_issue_with_random_serial() {
     let subject_key = PrivateKey::random();
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Bob".to_string());
 
     // Pass None for serial_number to get random one
@@ -1789,7 +1789,7 @@ async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
     let wrong_wallet = ProtoWallet::new(Some(wrong_key));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
 
     let master_cert = MasterCertificate::issue_for_subject(
@@ -1831,7 +1831,7 @@ async fn test_self_signed_master_certificate() {
     let self_key = PrivateKey::random();
     let self_wallet = ProtoWallet::new(Some(self_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Self-Certifier".to_string());
     plain_fields.insert("email".to_string(), "self@example.com".to_string());
     plain_fields.insert("role".to_string(), "admin".to_string());
@@ -1970,7 +1970,7 @@ fn test_verifiable_certificate_with_garbage_keyring() {
     cert.sign(&certifier_key).unwrap();
 
     // Create VerifiableCertificate with garbage keyring
-    let mut garbage_keyring = HashMap::new();
+    let mut garbage_keyring = IndexMap::new();
     garbage_keyring.insert("name".to_string(), to_base64(&[0xFF, 0xFE, 0xFD, 0xFC]));
 
     let verifiable = VerifiableCertificate::new(cert, garbage_keyring);
@@ -2034,7 +2034,7 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
     let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
     let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
 
-    let mut plain_fields = HashMap::new();
+    let mut plain_fields = IndexMap::new();
     plain_fields.insert("name".to_string(), "Alice".to_string());
 
     let master_cert = MasterCertificate::issue_for_subject(
@@ -2050,7 +2050,7 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
     .unwrap();
 
     // Create VerifiableCertificate with garbage keyring bytes
-    let mut garbage_keyring = HashMap::new();
+    let mut garbage_keyring = IndexMap::new();
     garbage_keyring.insert(
         "name".to_string(),
         to_base64(&[0x00, 0x01, 0x02, 0x03, 0x04]),

@@ -13,7 +13,7 @@ use crate::wallet::wire::{
     MAX_CERTIFICATE_SIGNATURE_BYTES,
 };
 use crate::{Error, Result};
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 /// A master certificate's fields, its keyring's entries and the fields to
 /// reveal: at most 100 (`MasterCertificate.ts:18`); a verifier's keyring
@@ -120,26 +120,18 @@ pub(crate) fn require_master_field_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// A record's names in byte order: the reference walks its own key order,
-/// this crate's map has none, so a refusal among several names is the
-/// first in byte order.
-fn sorted_names(record: &HashMap<String, String>) -> Vec<&str> {
-    let mut names: Vec<&str> = record.keys().map(String::as_str).collect();
-    names.sort_unstable();
-    names
-}
-
 /// `snapshotStringRecord` (`MasterCertificate.ts:31-61`): at most 100
-/// entries, each name safe and 1 to 50 bytes.
-pub(crate) fn snapshot_record(record: &HashMap<String, String>, what: &str) -> Result<()> {
+/// entries, each name safe and 1 to 50 bytes, walked in the map's order, the
+/// reference's `Reflect.ownKeys` (`:43`, `:48`; #394).
+pub(crate) fn snapshot_record(record: &IndexMap<String, String>, what: &str) -> Result<()> {
     if record.len() > MAX_RECORD_ENTRIES {
         return Err(refused(format!(
             "{what} cannot contain more than {MAX_RECORD_ENTRIES} entries"
         )));
     }
-    sorted_names(record)
-        .into_iter()
-        .try_for_each(require_master_field_name)
+    record
+        .keys()
+        .try_for_each(|name| require_master_field_name(name))
 }
 
 /// `snapshotFieldsToReveal` (`MasterCertificate.ts:125-146`): at most 100
@@ -167,29 +159,25 @@ pub(crate) fn snapshot_fields_to_reveal(fields_to_reveal: &[String]) -> Result<(
 /// snapshotted, every field's text canonical base64 of 1 byte to 1 MiB
 /// (bsv-rs#275) and every keyring entry's of 1 to 2048 bytes, revealed or not.
 pub(crate) fn require_keyring_for_verifier_inputs(
-    fields: &HashMap<String, String>,
+    fields: &IndexMap<String, String>,
     fields_to_reveal: &[String],
-    master_keyring: &HashMap<String, String>,
+    master_keyring: &IndexMap<String, String>,
 ) -> Result<()> {
     snapshot_fields_to_reveal(fields_to_reveal)?;
     snapshot_record(fields, "Certificate fields")?;
     snapshot_record(master_keyring, "Master certificate keyring")?;
-    for name in sorted_names(fields) {
-        field_ciphertext(name, &fields[name])?;
+    for (name, value) in fields {
+        field_ciphertext(name, value)?;
     }
-    for name in sorted_names(master_keyring) {
-        keyring_ciphertext(
-            "Master certificate keyring field",
-            name,
-            &master_keyring[name],
-        )?;
+    for (name, entry) in master_keyring {
+        keyring_ciphertext("Master certificate keyring field", name, entry)?;
     }
     Ok(())
 }
 
 /// A field to reveal, present and not empty (`MasterCertificate.ts:371-380`).
 pub(crate) fn field_to_reveal<'a>(
-    fields: &'a HashMap<String, String>,
+    fields: &'a IndexMap<String, String>,
     field_name: &str,
 ) -> Result<&'a String> {
     fields
@@ -207,12 +195,12 @@ pub(crate) fn field_to_reveal<'a>(
 /// text canonical base64 of 1 byte to 1 MiB and the entry's of 1 to 2048
 /// bytes, then every keyring entry so.
 pub(crate) fn require_master_certificate(
-    fields: &HashMap<String, String>,
-    master_keyring: &HashMap<String, String>,
+    fields: &IndexMap<String, String>,
+    master_keyring: &IndexMap<String, String>,
 ) -> Result<()> {
     snapshot_record(fields, "Certificate fields")?;
     snapshot_record(master_keyring, "Master certificate keyring")?;
-    for name in sorted_names(fields) {
+    for (name, value) in fields {
         let entry = master_keyring
             .get(name)
             .filter(|entry| !entry.is_empty())
@@ -221,15 +209,11 @@ pub(crate) fn require_master_certificate(
                     "Master keyring must contain a value for every field. Missing or empty key for field: \"{name}\"."
                 ))
             })?;
-        field_ciphertext(name, &fields[name])?;
+        field_ciphertext(name, value)?;
         keyring_ciphertext("Master certificate keyring field", name, entry)?;
     }
-    for name in sorted_names(master_keyring) {
-        keyring_ciphertext(
-            "Master certificate keyring field",
-            name,
-            &master_keyring[name],
-        )?;
+    for (name, entry) in master_keyring {
+        keyring_ciphertext("Master certificate keyring field", name, entry)?;
     }
     Ok(())
 }
@@ -250,16 +234,16 @@ pub(crate) fn field_ciphertext(field_name: &str, field_value: &str) -> Result<Ve
 /// `Certificate.toBinary`'s field checks (`Certificate.ts:281-297`, the
 /// snapshot `:44-84`): at most 100,000 fields, then each name 1 to 50 bytes
 /// and safe (`assertCertificateFieldName`, `:117-126`) and its value at most
-/// 1 MiB, before anything is written; the names returned in the signed order.
-pub(crate) fn checked_field_names(fields: &HashMap<String, String>) -> Result<Vec<&str>> {
+/// 1 MiB, in the map's order, as the snapshot walks `Reflect.ownKeys`
+/// (`:55-83`), before anything is written; the names returned sorted to the
+/// signed order only then (`:282`; #394, the wallet writer's since #385).
+pub(crate) fn checked_field_names(fields: &IndexMap<String, String>) -> Result<Vec<&str>> {
     if fields.len() > MAX_CERTIFICATE_FIELDS {
         return Err(refused(format!(
             "Certificate field count exceeds the maximum of {MAX_CERTIFICATE_FIELDS}"
         )));
     }
-    let mut names: Vec<&str> = fields.keys().map(String::as_str).collect();
-    crate::wallet::collation::sort_field_names(&mut names);
-    for &name in &names {
+    for (name, value) in fields {
         if !(1..=50).contains(&name.len()) {
             return Err(refused(format!(
                 "Invalid certificate field name length: expected 1–50 bytes, received {}",
@@ -267,10 +251,12 @@ pub(crate) fn checked_field_names(fields: &HashMap<String, String>) -> Result<Ve
             )));
         }
         require_safe_field_name(name)?;
-        if fields[name].len() > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+        if value.len() > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
             return Err(refused(certificate_field_value_refusal(name)));
         }
     }
+    let mut names: Vec<&str> = fields.keys().map(String::as_str).collect();
+    crate::wallet::collation::sort_field_names(&mut names);
     Ok(names)
 }
 

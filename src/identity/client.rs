@@ -31,6 +31,7 @@ use super::types::{
     StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
 
+use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -236,7 +237,7 @@ impl<W: WalletInterface> IdentityClient<W> {
 
     /// Try to parse identity information from unknown certificate types.
     fn try_parse_generic_identity(
-        decrypted: &HashMap<String, String>,
+        decrypted: &IndexMap<String, String>,
         certifier_info: &CertifierInfo,
     ) -> (String, String, String, String, String) {
         // Try to find a name from common field patterns
@@ -657,13 +658,13 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     ///
     /// # Example
     /// ```rust,ignore
-    /// let mut attrs = HashMap::new();
+    /// let mut attrs = IndexMap::new();
     /// attrs.insert("email".to_string(), "user@example.com".to_string());
     /// let identities = client.resolve_by_attributes(attrs, true).await?;
     /// ```
     pub async fn resolve_by_attributes(
         &self,
-        attributes: HashMap<String, String>,
+        attributes: IndexMap<String, String>,
         override_with_contacts: bool,
     ) -> Result<Vec<DisplayableIdentity>> {
         // Load contacts in parallel if override is enabled
@@ -994,14 +995,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Each field held as its base64 text, as BRC-52 signs it (#261)
-        if let Some(fields_obj) = cert_data["fields"].as_object() {
-            for (field_name, field_value) in fields_obj {
-                if let Some(value_str) = field_value.as_str() {
-                    certificate.set_field(field_name.clone(), value_str);
-                }
-            }
-        }
+        // Each field held as its base64 text, as BRC-52 signs it (#261), the
+        // fields and the keyring in the order of the token's text (#394)
+        let maps = super::token_maps::read(&cert_json_str);
+        certificate.set_fields(maps.fields);
 
         // The signature is hex, as the reference's WalletCertificate carries it;
         // one that is not skips the output below (`IdentityClient.ts:823-825`)
@@ -1011,14 +1008,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
         // Step 6: Parse the keyring from JSON, each entry held as its base64
         // text and decoded only where the wallet decrypts (#268)
-        let mut keyring: HashMap<String, String> = HashMap::new();
-        if let Some(keyring_obj) = cert_data["keyring"].as_object() {
-            for (field_name, key_value) in keyring_obj {
-                if let Some(key_str) = key_value.as_str() {
-                    keyring.insert(field_name.clone(), key_str.to_string());
-                }
-            }
-        }
+        let keyring = maps.keyring;
 
         // Create the verifiable certificate with the keyring
         let mut verifiable_cert = VerifiableCertificate::new(certificate, keyring.clone());
@@ -1033,7 +1023,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         let anyone_wallet = ProtoWallet::anyone();
         let originator = self.originator();
 
-        let decrypted_fields: HashMap<String, String> = verifiable_cert
+        let decrypted_fields: IndexMap<String, String> = verifiable_cert
             .decrypt_fields(&anyone_wallet, None, None, originator)
             .await
             .unwrap_or_default();
@@ -1164,14 +1154,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Each field held as its base64 text, as BRC-52 signs it (#261)
-        if let Some(fields_obj) = cert_data["fields"].as_object() {
-            for (field_name, field_value) in fields_obj {
-                if let Some(value_str) = field_value.as_str() {
-                    certificate.set_field(field_name.clone(), value_str);
-                }
-            }
-        }
+        // Each field held as its base64 text, as BRC-52 signs it (#261), the
+        // fields and the keyring in the order of the token's text (#394)
+        let maps = super::token_maps::read(&cert_json_str);
+        certificate.set_fields(maps.fields);
 
         // The signature is hex, as the reference's WalletCertificate carries it
         if let Some(sig_str) = cert_data["signature"].as_str() {
@@ -1180,14 +1166,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
         // Parse the keyring from JSON, each entry held as its base64 text and
         // decoded only where the wallet decrypts (#268)
-        let mut keyring: HashMap<String, String> = HashMap::new();
-        if let Some(keyring_obj) = cert_data["keyring"].as_object() {
-            for (field_name, key_value) in keyring_obj {
-                if let Some(key_str) = key_value.as_str() {
-                    keyring.insert(field_name.clone(), key_str.to_string());
-                }
-            }
-        }
+        let keyring = maps.keyring;
 
         // Create the verifiable certificate with the keyring
         let verifiable_cert = VerifiableCertificate::new(certificate, keyring);
@@ -1206,7 +1185,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_x_cert() {
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         decrypted.insert("userName".to_string(), "alice_x".to_string());
         decrypted.insert(
             "profilePhoto".to_string(),
@@ -1235,7 +1214,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_generic_fallback() {
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         decrypted.insert("firstName".to_string(), "Alice".to_string());
         decrypted.insert("lastName".to_string(), "Smith".to_string());
 
@@ -1260,7 +1239,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_no_fields() {
-        let decrypted = HashMap::new();
+        let decrypted = IndexMap::new();
         let certifier_info = CertifierInfo::default();
 
         let (name, avatar, badge, icon, click_url) =
@@ -1360,7 +1339,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_email_cert() {
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         decrypted.insert("email".to_string(), "alice@example.com".to_string());
 
         let certifier_info = CertifierInfo {
@@ -1387,7 +1366,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_phone_cert() {
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         decrypted.insert("phoneNumber".to_string(), "+1-555-123-4567".to_string());
 
         let certifier_info = CertifierInfo {
@@ -1410,7 +1389,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_identicert() {
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         decrypted.insert("firstName".to_string(), "John".to_string());
         decrypted.insert("lastName".to_string(), "Doe".to_string());
         decrypted.insert(
@@ -1441,7 +1420,7 @@ mod tests {
 
     #[test]
     fn test_parse_identity_registrant_cert() {
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         decrypted.insert("name".to_string(), "Example Organization".to_string());
         decrypted.insert(
             "icon".to_string(),
@@ -1660,13 +1639,13 @@ mod tests {
     fn test_identity_query_by_multiple_attributes() {
         use crate::identity::IdentityQuery;
 
-        let mut attrs = HashMap::new();
+        let mut attrs = IndexMap::new();
         attrs.insert("firstName".to_string(), "John".to_string());
         attrs.insert("lastName".to_string(), "Doe".to_string());
 
         let query = IdentityQuery::by_attributes(attrs);
 
-        // Use Option comparison since attributes is Option<HashMap>
+        // Use Option comparison since attributes is Option<IndexMap>
         let attrs_map = query.attributes.as_ref().unwrap();
         assert_eq!(attrs_map.get("firstName"), Some(&"John".to_string()));
         assert_eq!(attrs_map.get("lastName"), Some(&"Doe".to_string()));

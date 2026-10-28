@@ -112,7 +112,7 @@ fn assert_codec_reads(bytes: &[u8], cert: &WalletCertificate) {
         format!("{}.{}", to_hex(&outpoint.txid), outpoint.vout),
         cert.revocation_outpoint
     );
-    assert_eq!(parsed.fields, cert.fields.clone().into_iter().collect());
+    assert_eq!(parsed.fields, cert.fields);
     assert_eq!(to_hex(&parsed.signature.unwrap()), cert.signature);
 }
 

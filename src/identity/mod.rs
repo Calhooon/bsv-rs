@@ -48,7 +48,7 @@
 //! }
 //!
 //! // Search by attribute
-//! let mut attrs = std::collections::HashMap::new();
+//! let mut attrs = indexmap::IndexMap::new();
 //! attrs.insert("email".to_string(), "user@example.com".to_string());
 //! let identities = client.resolve_by_attributes(attrs).await?;
 //!
@@ -82,6 +82,7 @@ pub mod contacts;
 mod double_spend;
 mod reveal;
 mod revoke;
+mod token_maps;
 pub mod types;
 
 // Re-exports

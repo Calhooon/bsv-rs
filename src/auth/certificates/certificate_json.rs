@@ -10,8 +10,8 @@ use super::Certificate;
 use crate::primitives::PublicKey;
 use crate::wallet::types::Outpoint;
 use crate::Result;
+use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashMap;
 
 impl Serialize for Certificate {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
@@ -47,7 +47,7 @@ struct CertificateJson {
     revocation_outpoint: Option<Outpoint>,
 
     #[serde(default)]
-    fields: HashMap<String, String>,
+    fields: IndexMap<String, String>,
 
     #[serde(
         default,

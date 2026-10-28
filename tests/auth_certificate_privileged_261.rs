@@ -13,7 +13,7 @@
 use bsv_rs::auth::certificates::{MasterCertificate, VerifiableCertificate};
 use bsv_rs::primitives::{PrivateKey, PublicKey};
 use bsv_rs::wallet::*;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::sync::Mutex;
 
 const REASON: &str = "prove the field";
@@ -132,8 +132,8 @@ fn parties() -> Parties {
     }
 }
 
-fn plaintexts() -> HashMap<String, String> {
-    HashMap::from([
+fn plaintexts() -> IndexMap<String, String> {
+    IndexMap::from([
         ("name".to_string(), "Alice".to_string()),
         ("email".to_string(), "alice@example.com".to_string()),
     ])

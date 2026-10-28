@@ -22,7 +22,7 @@ use bsv_rs::auth::{
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::wallet::ProtoWallet;
 use bsv_rs::Result;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
@@ -696,7 +696,7 @@ async fn test_certificate_response_flow() {
     cert.set_field("name", "encrypted_bob");
     cert.sign(&certifier_key).unwrap();
 
-    let keyring = HashMap::new();
+    let keyring = IndexMap::new();
     let verifiable = VerifiableCertificate::new(cert, keyring);
 
     // Bob sends certificate response to Alice

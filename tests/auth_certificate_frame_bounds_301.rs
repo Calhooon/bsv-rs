@@ -25,8 +25,8 @@ use bsv_rs::auth::certificates::Certificate;
 use bsv_rs::primitives::{from_hex, sha256, to_hex, PrivateKey};
 use bsv_rs::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use bsv_rs::Error;
+use indexmap::IndexMap;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::sync::OnceLock;
 
 const MIB: usize = 1024 * 1024;
@@ -78,7 +78,7 @@ fn lengths(input: &Value) -> Vec<usize> {
 }
 
 fn certificate(lengths: &[usize], signature: Option<Vec<u8>>) -> Certificate {
-    let fields: HashMap<String, String> = lengths
+    let fields: IndexMap<String, String> = lengths
         .iter()
         .enumerate()
         .map(|(i, &n)| (format!("f{i:02}"), a_text()[..n].to_string()))
