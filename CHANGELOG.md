@@ -721,7 +721,7 @@ The fields, per call, as `validateWalletResult` reads them
 | Call | Field | Reference's site | Byte reader before | After |
 |---|---|---|---|---|
 | createAction | `tx` | `validateActionResult`, `:1247-1248` | yes (#339) | yes |
-| createAction | `signableTransaction.tx` | `:1266-1271` | no | yes |
+| createAction | `signableTransaction.tx` | `:1266-1272` | no | yes |
 | signAction | `tx` | `:1247-1248` | yes (#339) | yes |
 | encrypt | `ciphertext` | `:2210-2212` | no | yes |
 | decrypt | `plaintext` | `:2213-2215` | no | yes |
@@ -743,19 +743,23 @@ depth, one it does not read walked into, as `visitBRC100WalletByteField`
 does) and the fields above (`refusal`: the first in the reference's order
 that is no array of bytes after the walk, present or, for the required
 ones, absent, refused `Error::WalletError` in `bytes`' words, `Invalid
-<call> result <field>: expected an array of bytes`, `:868-906`).
+<call> result <field>: expected an array of bytes`, `:868-906`; the
+signable transaction's `tx` required when `signableTransaction` is an
+object, as `actionBeefTransaction(signable.tx, ..)` requires it,
+`:1271-1272`, where this crate gave `serde_json`'s ``missing field `tx` ``).
 `answer::success` reads every call's answer as #339's second fold read the
 two action calls': the typed reading first, at the cost it costs, the
 `Value` tree built only for an answer the typed reading refuses, then the
 walk, the refusal, and the typed reading of the tree; an answer neither
 takes is refused in `serde_json`'s words as before. A body that is no JSON
-is refused in `serde_json`'s words on every call now, where the calls other
-than createAction and signAction gave reqwest's (`error decoding response
-body`): one recorded fixture moves, in its own commit (F22,
+is refused in `serde_json`'s words on every call now (not the reference's:
+its `JSON.parse` throws a `SyntaxError` in its runtime's words), where the
+calls other than createAction and signAction gave reqwest's (`error
+decoding response body`): one recorded fixture moves, in its own commit (F22,
 `http_json/errors.json`'s `malformed_json`).
 
 Pinned by `tests/wallet_http_json_success_bytes_365.rs` against
-`tests/vectors/http_json_success_bytes_365.json` (109 bodies, the
+`tests/vectors/http_json_success_bytes_365.json` (110 bodies, the
 reference's `HTTPWalletJSON` under Node v22.18.0, written by
 `tests/support/http_json_success_bytes_365.mjs`, the body's text recorded
 as served so `1.0` and `-0` cross as written, the BEEF and action requests
@@ -764,11 +768,14 @@ with every byte `1.0`, read to the reference's bytes; with its first byte
 `256`, `-1` or `1.5` in the array and in the object form, refused in the
 reference's words; ciphertext's object form with the integer text `-0`
 read as the byte 0, as `isByte` reads it (the #339 re-review's unpinned
-case, `the_integer_text_minus_zero_in_the_object_form_is_the_byte_zero`).
-2 of 3 tests and 93 of the 109 bodies red on `5f8fc526` (the 21 forms the
-reference reads refused, the 72 refusals in `serde_json`'s words), the 16
-that agree the twelve arrays and #339's four action `tx` forms; green
-after. The walk and the refusal are unit-tested in `byte_fields.rs`. #339's
+case, `the_integer_text_minus_zero_in_the_object_form_is_the_byte_zero`);
+a `signableTransaction` object without its `tx` refused in `bytes`' words
+(`a_signable_transaction_without_its_tx_is_refused_in_the_references_words`,
+the cold review's required change). 2 of 3 tests and 93 of the first 109
+bodies red on `5f8fc526` (the 21 forms the reference reads refused, the
+72 refusals in `serde_json`'s words), the 16 that agree the twelve arrays
+and #339's four action `tx` forms; the fold's body, the 110th, and 2 of
+the 4 tests red on `e0fe1b33` (``missing field `tx` ``); green after. The walk and the refusal are unit-tested in `byte_fields.rs`. #339's
 `{"tx": "x"}` pin moves to `bytes`' words
 (`a_success_answer_neither_reading_takes_is_refused_in_serdes_or_the_references_words`,
 renamed from `..._in_serdes_words`). No public shape moves; no migration.
@@ -779,15 +786,18 @@ The typed reading still answers first, so an answer it takes and the
 reference refuses is read here, as before #365: `validateWalletResult`'s
 other checks of these fields are not ported (createHmac's `hmac` 32
 bytes, which the typed reading's `[u8; 32]` holds, createSignature's 72
-bytes and canonical DER, `:2217-2225`; an action `tx` of `null`, which the
-typed `Option` reads as absent where the reference refuses it; the BEEF
+bytes and canonical DER, `:2217-2225`; an action `tx` and a listOutputs
+`BEEF` of `null`, which the typed `Option` reads as absent where the
+reference refuses it, `:1247-1248`, `:2082`; the BEEF
 checks of listOutputs and the signable transaction). Where a byte field
 and another member are both malformed, the byte field is named here, where
 the reference names whichever it checks first (the linkages' keys before
 their bytes, `:2167-2170`). go-sdk@2ca481c's JSON substrate decodes each
 result with `json.Unmarshal` (`wallet/substrates/http_wallet_json.go:77-79`,
 `:187-189`), its byte fields `BytesList` read as `[]uint8`
-(`wallet/encoding.go:24-31`), and normalizes nothing.
+(`wallet/encoding.go:24-31`), which `encoding/json` also reads from a
+base64 string (`"AQID"` is `[1 2 3]`, a text the reference refuses), and
+normalizes nothing.
 
 ### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
 
