@@ -262,7 +262,9 @@ impl ProtoWallet {
 
     /// Creates an HMAC of the data using a derived symmetric key.
     ///
-    /// Uses HMAC-SHA256 with the derived symmetric key.
+    /// Uses HMAC-SHA256 with the derived child-key ECDH X coordinate in
+    /// minimal-length unsigned big-endian form (amended BRC-56, #379).
+    /// Encryption and keyring keys retain BRC-2's fixed 32-byte form.
     pub fn create_hmac(&self, args: CreateHmacArgs) -> Result<CreateHmacResult> {
         crypto::create_hmac_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
@@ -272,18 +274,22 @@ impl ProtoWallet {
             &counterparty,
         )?;
 
-        let hmac = sha256_hmac(symmetric_key.as_bytes(), &args.data);
+        let hmac = sha256_hmac(
+            super::hmac_tag::minimal_length_key(&symmetric_key),
+            &args.data,
+        );
 
         Ok(CreateHmacResult { hmac })
     }
 
     /// Verifies an HMAC using a derived symmetric key, in constant time.
     ///
-    /// The tag under BRC-56's 32-byte key is accepted, and under the default
-    /// [`HmacVerifyPolicy`](super::HmacVerifyPolicy) the tag under the
-    /// minimal-length key on a miss (ts-sdk's), counted in
-    /// [`ProtoWallet::minimal_length_hmac_acceptances`] and named by
-    /// [`ProtoWallet::verify_hmac_encoding`] (#379); any other tag is
+    /// The amended BRC-56 minimal-length key's tag is accepted first. Under
+    /// the default policy, the legacy 32-byte key's tag is accepted on a miss,
+    /// named by [`ProtoWallet::verify_hmac_encoding`] and counted by
+    /// [`ProtoWallet::legacy_hmac_acceptances`]. The strict
+    /// [`HmacVerifyPolicy::MinimalLengthOnly`](super::HmacVerifyPolicy::MinimalLengthOnly)
+    /// refuses legacy tags as [`Error::HmacLegacyKey`]. Other tags are
     /// `WalletError("HMAC is not valid")`.
     pub fn verify_hmac(&self, args: VerifyHmacArgs) -> Result<VerifyHmacResult> {
         self.verify_hmac_encoding(args)?;

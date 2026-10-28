@@ -1,17 +1,12 @@
-//! BRC-56 HMAC tag verification under both key encodings (#379).
+//! BRC-56 HMAC issuance and verification (#379).
 //!
-//! BRC-56 (`5119a9b` `wallet/0056.md:66`) keys the HMAC with the shared
-//! point's X coordinate as exactly 32 big-endian bytes; ts-sdk's
-//! `ProtoWallet` keys it with that number's minimal-length encoding (the
-//! leading zero bytes dropped, `:73`), a different tag for one key in 256,
-//! and keeps that as its default after the revert of ts-stack PR 1370.
-//! This crate issues the 32-byte tag (as go-sdk and py-sdk do) and, by the
-//! owner's 18.10 (a) of 2026-10-27, verifies the 32-byte tag first and the
-//! minimal-length tag on a miss, both computed and compared in constant time
-//! (ts-stack PR #1423's verifier, `109bc7017`), the second acceptance named
-//! in [`HmacKeyEncoding`] and counted on the wallet. A caller that wants the
-//! BRC's key alone sets [`HmacVerifyPolicy::ThirtyTwoByteOnly`], under which
-//! a minimal-length tag is refused by name, [`Error::HmacMinimalLengthKey`].
+//! BRCs PR 362 (`d4ce8119f`, `wallet/0056.md`) specifies the child-key ECDH
+//! X coordinate as minimal-length unsigned big-endian bytes, without another
+//! hash. Zero retains one zero octet. This is the issuance and strict
+//! verification of ts-stack PR 1423 (`9a2787b8c`). AES-GCM retains 32 bytes.
+//! By the owner's 19.5 (a) of 2026-10-28, this crate also accepts a tag under
+//! the former 32-byte key on a miss, named and counted as legacy. A store
+//! without pre-amendment tags should use [`HmacVerifyPolicy::MinimalLengthOnly`].
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -29,16 +24,13 @@ use super::{KeyDeriverApi, ProtoWallet};
 /// The key encoding a verified HMAC tag was made under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HmacKeyEncoding {
-    /// BRC-56's key: the X coordinate as exactly 32 bytes (`wallet/0056.md:66`),
-    /// the key this crate, go-sdk and py-sdk issue under. A key with no
-    /// leading zero byte has this encoding only.
-    ThirtyTwoByte,
-    /// The minimal-length key: the 32-byte key with its leading zero bytes
-    /// dropped, the key ts-sdk issues under (`wallet/0056.md:73`). Accepted
-    /// on a miss of the 32-byte tag under [`HmacVerifyPolicy::BothEncodings`].
-    MinimalLength {
-        /// How many zero bytes the 32-byte key begins with: the bytes the
-        /// sender dropped.
+    /// The amended BRC-56 key: minimal-length unsigned big-endian X
+    /// coordinate. A key with no leading zero octet has this encoding only.
+    MinimalLength,
+    /// The pre-amendment 32-byte key, accepted on a miss of the standard tag
+    /// under [`HmacVerifyPolicy::BothEncodings`] and counted as legacy.
+    Legacy {
+        /// The leading zero octets retained by the legacy key.
         leading_zero_bytes: usize,
     },
 }
@@ -46,92 +38,100 @@ pub enum HmacKeyEncoding {
 /// Which HMAC key encodings [`ProtoWallet::verify_hmac`] accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum HmacVerifyPolicy {
-    /// The 32-byte key's tag, and the minimal-length key's on a miss (the
-    /// default, the owner's 18.10 (a); ts-stack PR #1423's verifier).
+    /// The standard minimal-length key's tag, then the legacy 32-byte key's
+    /// tag on a miss (the default, the owner's 19.5 (a)).
     #[default]
     BothEncodings,
-    /// The 32-byte key's tag alone; a tag under the minimal-length key is
-    /// refused as [`Error::HmacMinimalLengthKey`] (this crate's verifier
-    /// from #148 to #379).
-    ThirtyTwoByteOnly,
+    /// The amended BRC-56 and ts-stack PR 1423 verifier. Use for a store
+    /// without pre-amendment tags; a legacy tag is [`Error::HmacLegacyKey`].
+    MinimalLengthOnly,
 }
 
-/// A wallet's HMAC verification policy and its count of minimal-length
-/// acceptances (shared by the wallet's clones).
+/// BRC-56's serialization, distinct from BRC-2's fixed-width AES-GCM key.
+pub(crate) fn minimal_length_key(key: &SymmetricKey) -> &[u8] {
+    let bytes = key.as_bytes();
+    let omitted = bytes
+        .iter()
+        .take_while(|b| **b == 0)
+        .count()
+        .min(bytes.len() - 1);
+    &bytes[omitted..]
+}
+
+/// A wallet's HMAC verification policy and legacy acceptance count,
+/// shared by its clones.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct HmacVerifier {
     policy: HmacVerifyPolicy,
-    minimal_length_acceptances: Arc<AtomicU64>,
+    legacy_acceptances: Arc<AtomicU64>,
 }
 
 impl HmacVerifier {
-    /// Checks `tag` under both encodings of `key`, in constant time.
-    ///
-    /// Both tags are always computed and compared; a key with no leading
-    /// zero byte has one encoding, so both comparisons agree. A tag matching
-    /// neither key is `WalletError("HMAC is not valid")`.
+    /// Both tags are always computed and compared in constant time, even
+    /// under the strict policy. When both match, the standard wins.
     pub(crate) fn verify(
         &self,
         key: &SymmetricKey,
         data: &[u8],
         tag: &[u8],
     ) -> Result<HmacKeyEncoding> {
-        let key = key.as_bytes();
-        // ts-sdk's `toArray()` keeps one byte of a zero number
-        let leading_zero_bytes = key
-            .iter()
-            .take_while(|b| **b == 0)
-            .count()
-            .min(key.len().saturating_sub(1));
-        let full = bool::from(sha256_hmac(key, data).ct_eq(tag));
-        let minimal = bool::from(sha256_hmac(&key[leading_zero_bytes..], data).ct_eq(tag));
-        if full {
-            return Ok(HmacKeyEncoding::ThirtyTwoByte);
+        let minimal_key = minimal_length_key(key);
+        let leading_zero_bytes = key.as_bytes().len() - minimal_key.len();
+        let minimal = bool::from(sha256_hmac(minimal_key, data).ct_eq(tag));
+        let legacy = bool::from(sha256_hmac(key.as_bytes(), data).ct_eq(tag));
+        if minimal {
+            return Ok(HmacKeyEncoding::MinimalLength);
         }
-        if !minimal || leading_zero_bytes == 0 {
+        if !legacy || leading_zero_bytes == 0 {
             return Err(Error::WalletError("HMAC is not valid".to_string()));
         }
-        if self.policy == HmacVerifyPolicy::ThirtyTwoByteOnly {
-            return Err(Error::HmacMinimalLengthKey { leading_zero_bytes });
+        if self.policy == HmacVerifyPolicy::MinimalLengthOnly {
+            return Err(Error::HmacLegacyKey { leading_zero_bytes });
         }
-        self.minimal_length_acceptances
-            .fetch_add(1, Ordering::Relaxed);
-        Ok(HmacKeyEncoding::MinimalLength { leading_zero_bytes })
+        self.legacy_acceptances.fetch_add(1, Ordering::Relaxed);
+        Ok(HmacKeyEncoding::Legacy { leading_zero_bytes })
     }
 }
 
 impl ProtoWallet {
-    /// Sets which HMAC key encodings [`ProtoWallet::verify_hmac`] accepts
-    /// (#379); the default is [`HmacVerifyPolicy::BothEncodings`].
+    /// Sets which HMAC keys verification accepts. Issuance always uses the
+    /// minimal-length key, regardless of this policy.
     ///
     /// ```rust
     /// use bsv_rs::wallet::{HmacVerifyPolicy, ProtoWallet};
     /// use bsv_rs::primitives::PrivateKey;
     ///
     /// let strict = ProtoWallet::new(Some(PrivateKey::random()))
-    ///     .with_hmac_verify_policy(HmacVerifyPolicy::ThirtyTwoByteOnly);
-    /// assert_eq!(strict.hmac_verify_policy(), HmacVerifyPolicy::ThirtyTwoByteOnly);
+    ///     .with_hmac_verify_policy(HmacVerifyPolicy::MinimalLengthOnly);
+    /// assert_eq!(strict.hmac_verify_policy(), HmacVerifyPolicy::MinimalLengthOnly);
     /// ```
+    #[must_use]
     pub fn with_hmac_verify_policy(mut self, policy: HmacVerifyPolicy) -> Self {
         self.hmac.policy = policy;
         self
     }
 
     /// The wallet's HMAC verification policy.
+    #[must_use]
     pub fn hmac_verify_policy(&self) -> HmacVerifyPolicy {
         self.hmac.policy
     }
 
-    /// How many tags this wallet (and its clones) accepted under the
-    /// minimal-length key: the count of [`HmacKeyEncoding::MinimalLength`]
-    /// verdicts, through [`ProtoWallet::verify_hmac`] and
-    /// [`ProtoWallet::verify_hmac_encoding`] alike.
-    pub fn minimal_length_hmac_acceptances(&self) -> u64 {
-        self.hmac.minimal_length_acceptances.load(Ordering::Relaxed)
+    /// The number of legacy 32-byte-key tags accepted by this wallet and its
+    /// clones, through the inherent and async verification methods alike.
+    /// Standard tags, invalid tags and strict-policy refusals do not count.
+    #[must_use]
+    pub fn legacy_hmac_acceptances(&self) -> u64 {
+        self.hmac.legacy_acceptances.load(Ordering::Relaxed)
     }
 
     /// Verifies an HMAC as [`ProtoWallet::verify_hmac`] does and names the
     /// key encoding the tag was made under.
+    ///
+    /// # Errors
+    /// Returns argument or key-derivation errors, [`Error::HmacLegacyKey`]
+    /// for a legacy tag under the strict policy, or [`Error::WalletError`]
+    /// when neither tag matches.
     pub fn verify_hmac_encoding(&self, args: VerifyHmacArgs) -> Result<HmacKeyEncoding> {
         super::validation::crypto::verify_hmac_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
@@ -141,5 +141,25 @@ impl ProtoWallet {
             &counterparty,
         )?;
         self.hmac.verify(&symmetric_key, &args.data, &args.hmac)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_retains_one_octet_and_nonzero_keys_omit_only_leading_zeros() {
+        let mut bytes = [0; 32];
+        assert_eq!(
+            minimal_length_key(&SymmetricKey::from_bytes(&bytes).unwrap()),
+            &[0]
+        );
+        for start in 0..32 {
+            bytes[start] = 1;
+            let key = SymmetricKey::from_bytes(&bytes).unwrap();
+            assert_eq!(minimal_length_key(&key), &bytes[start..]);
+            bytes[start] = 0;
+        }
     }
 }

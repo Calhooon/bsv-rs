@@ -7,84 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed: `verify_hmac` accepts the minimal-length-key tag on a miss of the 32-byte key, named and counted; the refusal by name kept behind `HmacVerifyPolicy::ThirtyTwoByteOnly` (#379)
+### Changed: issue the amended BRC-56 minimal-length HMAC key; name and count the 32-byte-key tag as legacy (#379, PR #389)
 
-The owner's word of 2026-10-27, 20:0xZ, through the keeper (18.10 RULED
-(a)): "bsv-rs's verifier accepts the 32-byte-key tag first and the
-minimal-length-key tag on a miss, the acceptance counted and named in the
-result (a field or a warning the caller can read; the refusal by name kept
-behind that), issuance unchanged". The keeper's shape: ts-stack PR #1423's
-verifier, both tags computed and compared in constant time, either accepted,
-the six BRC-56 vectors shared with its test file.
+The owner's two words, through the keeper:
 
-Until now `verify_hmac` accepted BRC-56's 32-byte-key tag only and answered
-a tag under the minimal-length key (the leading zero bytes of the X
-coordinate dropped, the key ts-sdk issues under, one key in 256) with
-`Error::HmacMinimalLengthKey` (#148): a reference-issued tag over such a key
-was refused here. `ProtoWallet` now computes both tags on every call
-(`src/wallet/hmac_tag.rs`, `HmacVerifier::verify`; `subtle`'s `ct_eq` for
-each) and accepts the 32-byte one, else the minimal-length one. The
-acceptance is named and counted, the shape chosen as a sibling of the
-verdict rather than a field on `VerifyHmacResult`: that struct is built by
-literal in downstream wallets and mocks (a new public field breaks them) and
-the binary wire carries the verdict byte alone, so a field would not survive
-the transceiver.
+- 2026-10-27, 20:0xZ, **18.10 RULED (a)**: "bsv-rs's verifier accepts the
+  32-byte-key tag first and the minimal-length-key tag on a miss, the
+  acceptance counted and named in the result (a field or a warning the caller
+  can read; the refusal by name kept behind that), issuance unchanged".
+- 2026-10-28, 14:2xZ, **19.5 RULED (a)**: "bsv-rs issues the minimal-length
+  HMAC key from the next prerelease after v0.9.0-beta.3; the verifier keeps
+  both forms with the 32-byte-key tag as the named and counted legacy form,
+  and the strict policy for a store with no pre-amendment tags."
 
-- `ProtoWallet::verify_hmac_encoding(args) -> Result<HmacKeyEncoding>`:
-  `ThirtyTwoByte`, or `MinimalLength { leading_zero_bytes }` for the legacy
-  acceptance (a key with no leading zero byte has one encoding and is
-  always `ThirtyTwoByte`).
-- `ProtoWallet::minimal_length_hmac_acceptances() -> u64`: the count of
-  `MinimalLength` verdicts, through `verify_hmac`, `verify_hmac_encoding` and
-  `WalletInterface::verify_hmac` alike, shared by the wallet's clones.
-- `ProtoWallet::with_hmac_verify_policy(HmacVerifyPolicy::ThirtyTwoByteOnly)`:
-  the strict option; a minimal-length tag is refused by name as before,
-  `Error::HmacMinimalLengthKey { leading_zero_bytes }`, and not counted. The
-  default is `HmacVerifyPolicy::BothEncodings`; `hmac_verify_policy()` reads it.
+This entry implements the second word after the beta.3 cut. BRCs PR 362
+(`d4ce8119f`) amended BRC-56 after the earlier word: compute the BRC-43
+invoice from security level, protocol ID and key ID, derive both parties'
+BRC-42 child keys, then their ECDH point. Its X coordinate is the HMAC key
+as minimal-length unsigned big-endian bytes: omit leading zero octets,
+retain one zero octet for zero, apply no further hash. HMAC-SHA256 still
+returns 32 bytes. A leading-zero X coordinate previously produced a tag
+that the merged TypeScript verifier refused.
 
-A tag matching neither key is `WalletError("HMAC is not valid")` under both
-policies. Issuance is unchanged: `create_hmac` keys the HMAC with the BRC's
-32 bytes, as go-sdk, py-sdk and rs-sdk issue. Pinned by
-`tests/wallet_brc56_hmac_tests.rs` (11 tests): the six vectors of
-`wallet/0056.md:91-96` verified in both encodings
-(`verify_hmac_accepts_both_encodings_of_the_six_brc56_tags`, ten tags),
-the four legacy tags named and counted
-(`a_minimal_length_key_tag_is_accepted_named_and_counted`, and through the
-async interface), the strict policy's refusal by name (sync and async), the
-two keys with no leading zero byte, a tag matching neither key. The table
-is #1423's at `109bc7017`
-(`packages/sdk/src/wallet/__tests/ProtoWallet.brc56-hmac-key.test.ts`): the
-same six keys, its `hmac` this file's `tag`, its `legacyTag` this file's
-`minimal_tag`, string for string. RED on a copy of this tip with the strict
-verdict made the default: 3 of 11 (the three acceptance tests), or 4 of 11
-when the enum's default is flipped instead.
+`ProtoWallet::create_hmac` now uses that serialization, including through
+`WalletInterface::create_hmac`, wallet clients and transports that dispatch
+to it, the auth nonce helpers and the private contact identity-tag helper. `derive_symmetric_key` still returns the
+fixed-width key required by BRC-2 AES-GCM. Its callers were traced: encrypt,
+decrypt and specific-linkage encryption, including certificate field-key
+wrapping and verifier keyrings. Certificate fields' random AES keys and
+those keyrings remain 32 bytes, as the amendment explicitly requires.
 
-Migration: none for a caller that only verifies (a tag that verified still
-verifies; the four rows' legacy tags now verify too). A caller that matched
-`Error::HmacMinimalLengthKey` to refuse the legacy tag sets
-`with_hmac_verify_policy(HmacVerifyPolicy::ThirtyTwoByteOnly)`. New public
-items, additive: `HmacKeyEncoding`, `HmacVerifyPolicy` (both in
-`bsv_rs::wallet`) and the four `ProtoWallet` methods; `ProtoWallet` gains a
-private field.
+Both verification tags are computed and compared with `subtle::ct_eq` on
+every call; the standard wins if both match. The named acceptance is a
+sibling of `VerifyHmacResult`, whose literal construction and wire verdict
+byte stay compatible:
 
-### Notes: cross-SDK parity (#379)
+- `verify_hmac_encoding` returns `HmacKeyEncoding::MinimalLength`, or
+  `HmacKeyEncoding::Legacy { leading_zero_bytes }` for the 32-byte-key tag.
+  A key without leading zeros always returns `MinimalLength`.
+- `legacy_hmac_acceptances()` counts only legacy acceptances, across sync,
+  async and encoding-returning verification and shared by clones. Neither
+  standard tags nor refusals increment it.
+- `with_hmac_verify_policy(HmacVerifyPolicy::MinimalLengthOnly)` configures
+  strict verification for a store with no pre-amendment tags. It refuses a
+  32-byte-key tag as `Error::HmacLegacyKey { leading_zero_bytes }`.
+  `BothEncodings` remains the default; neither policy changes issuance.
 
-The TypeScript SDK issues and verifies under the minimal-length key
-(`ts-stack@edf6e03` `packages/sdk/src/wallet/ProtoWallet.ts:295,311`,
-`key.toArray()`), and keeps it as its default after the revert of ts-stack
-PR 1370 (the 32 bytes, merged then refused under ts-stack's compatibility
-invariant; issue #1369). PR #1423's first commit (`109bc7017`) is the
-verifier this entry follows: it issues under the minimal-length key and
-accepts both. Its head at this entry (`511d01aa0`, `9a2787b8c`, 2026-10-27
-20:30Z) backs the verifier of both out: minimal-length both ways, "no
-second encoding, selection option or fallback", with a BRC-56/BRC-100
-amendment named to make that encoding explicit. go-sdk@2ca481c issues and
-verifies the 32 bytes only (`wallet/proto_wallet.go:350-361`,
-`primitives/ec/symmetric.go:82-90`). So this crate now verifies every tag
-each of the three issues, and a tag it issues over a leading-zero key (one
-in 256) still fails at the TypeScript verifier at `edf6e03` and at #1423's
-head. The row is ours, by the owner's 18.10 (a); the filings are ts-stack
-#1369, PR 1370 and PR #1423.
+A tag matching neither key remains `WalletError("HMAC is not valid")`.
+Migration from the earlier #389 proposal: `ThirtyTwoByte` (standard) and
+`MinimalLength { leading_zero_bytes }` (legacy) become `MinimalLength`
+(standard) and `Legacy { leading_zero_bytes }`; the count changes from
+`minimal_length_hmac_acceptances` to `legacy_hmac_acceptances`, and strict
+`ThirtyTwoByteOnly` becomes `MinimalLengthOnly`. The emitted refusal changes
+from `Error::HmacMinimalLengthKey` to `Error::HmacLegacyKey`. The old error
+variant is retained for source compatibility with beta.3, but is no longer
+emitted. Persisted 32-byte-key tags require the compatibility policy until
+migrated; changing issuance does not rewrite stored values. `verify_nonce`
+recomputes through `create_hmac`, so a pre-amendment nonce whose key has
+leading zero octets no longer matches; the HMAC verifier's compatibility
+policy does not apply to that recomputation.
+
+Pinned by `wallet_brc56_hmac_tests` (the six keys and ten distinct tags,
+standard-first verdicts, legacy counts including clones and the async
+interface, both policies and strict refusals), `wallet_hmac_issuance_379`
+(issuance through the async interface, the two names, and the HMAC of the
+issued certificate), and `auth_hmac_issuance_379` (fresh certificate
+issuance and the reference's verification and decryption of both keyrings).
+`tests/support/hmac_key_379.mjs` re-records the six vectors directly from
+PR 1423's merged test table under Node v22.18.0: every `hmacKey`, `hmac` and
+`rejectedTag` is byte-for-byte the reference's, without hand editing. It
+also runs the pinned reference's `verifyHmac` and `Certificate.verify` on
+this crate's issued output and decrypts its master and verifier keyrings,
+including a leading-zero derived key on each side. The recorder checks all
+verdicts before writing. The issuance and naming regressions were run RED
+on a scratch copy of `282f8a3d` rebased onto beta `1fb5a851` (pre-fix
+`b3a5d108`), with a separate target: all four wallet issuance/naming tests and the fresh
+certificate HMAC test failed on assertions, then passed with the change.
+
+### Notes: cross-SDK parity (#379, #375)
+
+BRC-56 at BRCs PR 362 (`d4ce8119f`, `wallet/0056.md`, "Established HMAC
+Encoding") now requires minimal-length keys for issuance and verification,
+explicitly disallowing alternate encodings or relaxed verification.
+Merged ts-stack PR 1423 (`9a2787b8c`, `@bsv/sdk` 4.0.1) implements this:
+`ProtoWallet.ts` uses `key.toArray()` for both calls; its six-vector test
+names the padded form `rejectedTag`. Our issuance and strict policy conform.
+Our default compatibility acceptance is **ours**, the owner's 19.5 (a),
+and remains a divergence from that strict requirement. The earlier filings
+are ts-stack #1369 and PR 1370, superseded by PR 1423 and BRCs PR 362.
+Go at `2ca481c5931b987a0c8f48bb341c70b7477b6b07` still issues and verifies
+only the 32-byte key (`wallet/proto_wallet.go`, `key.ToBytes()`;
+`primitives/ec/symmetric.go:82-90`, left padding). Its padded tags verify
+here under `BothEncodings`, but it refuses our leading-zero minimal-key
+tags. No claim is made about Go after that pin. This is the HMAC row's
+reading for #375; the main-merge gate is not changed.
 
 ### Fixed: the KVStore reader accepts the reference writer's untagged token (#344)
 
