@@ -20,8 +20,8 @@ use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
+use indexmap::IndexMap;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
@@ -38,7 +38,7 @@ struct Vector {
 struct Witness {
     name: String,
     fields_to_reveal: Vec<String>,
-    keyring: HashMap<String, String>,
+    keyring: IndexMap<String, String>,
     wallet_calls: Vec<serde_json::Value>,
     locking_script: String,
     published_json: String,
@@ -52,7 +52,7 @@ struct Witness {
 struct Reader {
     admitted: bool,
     #[serde(default)]
-    decrypted_fields: HashMap<String, String>,
+    decrypted_fields: std::collections::HashMap<String, String>,
     #[serde(default)]
     refusal: Option<String>,
 }
@@ -183,7 +183,9 @@ async fn the_token_key_and_signature_are_asked_with_the_references_arguments() {
 /// two fields in the canonical signed shape, the key the subject's under
 /// `[1, 'identity']` key `1` for anyone, the signature the subject's over
 /// the JSON, the certificate verifying, the fields decrypted by anyone.
-async fn read_as_the_overlay_reads(script: &LockingScript) -> HashMap<String, String> {
+async fn read_as_the_overlay_reads(
+    script: &LockingScript,
+) -> std::collections::HashMap<String, String> {
     let decoded = PushDrop::decode(script).unwrap();
     assert_eq!(decoded.fields.len(), 2);
     let chunks = script.chunks();

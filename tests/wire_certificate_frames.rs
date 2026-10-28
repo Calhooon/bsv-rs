@@ -16,7 +16,7 @@ use bsv_rs::primitives::{to_base64, to_hex};
 use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver, WireWriter};
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 const G: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 const TWO_G: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
@@ -40,7 +40,7 @@ fn client(body: Vec<u8>) -> WalletWireTransceiver<CannedWire> {
     WalletWireTransceiver::new(CannedWire { body })
 }
 
-fn map(entries: &[(&str, &str)]) -> HashMap<String, String> {
+fn map(entries: &[(&str, &str)]) -> IndexMap<String, String> {
     entries
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -112,7 +112,7 @@ fn assert_codec_reads(bytes: &[u8], cert: &WalletCertificate) {
         format!("{}.{}", to_hex(&outpoint.txid), outpoint.vout),
         cert.revocation_outpoint
     );
-    assert_eq!(parsed.fields, cert.fields);
+    assert_eq!(parsed.fields, cert.fields.clone().into_iter().collect());
     assert_eq!(to_hex(&parsed.signature.unwrap()), cert.signature);
 }
 
@@ -121,7 +121,7 @@ fn acquire_args() -> AcquireCertificateArgs {
         certificate_type: to_base64(&[0x11; 32]),
         certifier: TWO_G.to_string(),
         acquisition_protocol: AcquisitionProtocol::Issuance,
-        fields: HashMap::new(),
+        fields: IndexMap::new(),
         serial_number: None,
         revocation_outpoint: None,
         signature: None,

@@ -348,7 +348,10 @@ fn certificate_fields_serialize_as_the_base64_strings_they_hold() {
     assert_eq!(back.fields, cert.fields);
     assert!(back.verify().unwrap());
     let wallet = cert.to_wallet_certificate();
-    assert_eq!(wallet.fields, r.certificate.fields);
+    assert_eq!(
+        wallet.fields.into_iter().collect::<HashMap<_, _>>(),
+        r.certificate.fields
+    );
 }
 
 /// Prints a certificate issued here, as the JSON the reference script reads

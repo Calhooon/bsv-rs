@@ -17,7 +17,7 @@ use bsv_rs::identity::{IdentityClient, IdentityClientConfig};
 use bsv_rs::wallet::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
@@ -33,7 +33,7 @@ struct Vector {
 struct Witness {
     name: String,
     fields_to_reveal: Vec<String>,
-    keyring: HashMap<String, String>,
+    keyring: indexmap::IndexMap<String, String>,
     originator: String,
     create_action: Value,
     members: Vec<String>,

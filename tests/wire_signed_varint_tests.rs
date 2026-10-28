@@ -27,7 +27,7 @@ use bsv_rs::primitives::PrivateKey;
 use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver, WireReader, WireWriter};
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::sync::Mutex;
 
 const ABSENT: [u8; 9] = [0xFF; 9];
@@ -116,7 +116,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 sequence_number: u(),
             };
             let args = SignActionArgs {
-                spends: HashMap::from([(0, spend)]),
+                spends: std::collections::HashMap::from([(0, spend)]),
                 reference: "cmVm".to_string(),
                 options: None,
             };
@@ -179,7 +179,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
         }
         DiscoverByAttributesLimit | DiscoverByAttributesOffset => {
             let args = DiscoverByAttributesArgs {
-                attributes: HashMap::from([("name".to_string(), "Alice".to_string())]),
+                attributes: IndexMap::from([("name".to_string(), "Alice".to_string())]),
                 limit: only(DiscoverByAttributesLimit),
                 offset: only(DiscoverByAttributesOffset),
                 seek_permission: None,

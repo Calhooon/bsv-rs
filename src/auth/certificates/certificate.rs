@@ -533,7 +533,10 @@ impl Certificate {
         self.fields.keys().collect()
     }
 
-    /// Converts to wallet certificate format, each field its text (#261).
+    /// Converts to wallet certificate format, each field its text (#261), the
+    /// fields in the order they are signed over (`localeCompare`'s,
+    /// `Certificate.ts:282`): this type's map keeps no order, the wallet's
+    /// does (#385).
     pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate {
         crate::wallet::types::Certificate {
             certificate_type: self.type_base64(),
@@ -541,7 +544,14 @@ impl Certificate {
             serial_number: self.serial_number_base64(),
             certifier: self.certifier.clone(),
             revocation_outpoint: self.revocation_outpoint.clone(),
-            fields: self.fields.clone(),
+            fields: {
+                let mut names: Vec<&str> = self.fields.keys().map(String::as_str).collect();
+                crate::wallet::collation::sort_field_names(&mut names);
+                names
+                    .into_iter()
+                    .map(|name| (name.to_string(), self.fields[name].clone()))
+                    .collect()
+            },
             signature: self.signature.clone(),
         }
     }

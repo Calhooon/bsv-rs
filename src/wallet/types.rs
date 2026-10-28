@@ -762,7 +762,7 @@ pub struct Certificate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revocation_outpoint: Option<Outpoint>,
     /// Certificate fields.
-    pub fields: HashMap<String, String>,
+    pub fields: indexmap::IndexMap<String, String>,
     /// Signature (hex encoded).
     #[serde(
         with = "hex_bytes_option",
@@ -1339,7 +1339,7 @@ pub struct WalletCertificate {
     /// Signature (hex encoded).
     pub signature: String,
     /// Certificate fields.
-    pub fields: HashMap<String, String>,
+    pub fields: indexmap::IndexMap<String, String>,
 }
 
 /// Arguments for acquiring a certificate.
@@ -1354,7 +1354,7 @@ pub struct AcquireCertificateArgs {
     /// Acquisition protocol ("direct" or "issuance").
     pub acquisition_protocol: AcquisitionProtocol,
     /// Certificate fields.
-    pub fields: HashMap<String, String>,
+    pub fields: indexmap::IndexMap<String, String>,
     /// Serial number (required for direct acquisition).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub serial_number: Option<String>,
@@ -1372,7 +1372,7 @@ pub struct AcquireCertificateArgs {
     pub keyring_revealer: Option<KeyringRevealer>,
     /// Keyring for subject (required for direct acquisition).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub keyring_for_subject: Option<HashMap<String, String>>,
+    pub keyring_for_subject: Option<indexmap::IndexMap<String, String>>,
     /// Whether this is a privileged request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub privileged: Option<bool>,
@@ -1412,7 +1412,7 @@ pub struct CertificateResult {
     pub certificate: WalletCertificate,
     /// Optional keyring for field decryption.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub keyring: Option<HashMap<String, String>>,
+    pub keyring: Option<indexmap::IndexMap<String, String>>,
     /// Optional verifier (for prove operations).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verifier: Option<String>,
@@ -1451,7 +1451,7 @@ pub struct ProveCertificateArgs {
 #[serde(rename_all = "camelCase")]
 pub struct ProveCertificateResult {
     /// Keyring for the verifier to decrypt revealed fields.
-    pub keyring_for_verifier: HashMap<String, String>,
+    pub keyring_for_verifier: indexmap::IndexMap<String, String>,
     /// The certificate (if requested).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub certificate: Option<WalletCertificate>,
@@ -1510,9 +1510,9 @@ pub struct IdentityCertificate {
     pub certifier_info: IdentityCertifier,
     /// Publicly revealed keyring for field decryption (base64 values); an
     /// empty map when nothing is revealed.
-    pub publicly_revealed_keyring: HashMap<String, String>,
+    pub publicly_revealed_keyring: indexmap::IndexMap<String, String>,
     /// Decrypted field values; an empty map when none.
-    pub decrypted_fields: HashMap<String, String>,
+    pub decrypted_fields: indexmap::IndexMap<String, String>,
 }
 
 /// Arguments for discovering certificates by identity key.
@@ -1537,7 +1537,7 @@ pub struct DiscoverByIdentityKeyArgs {
 #[serde(rename_all = "camelCase")]
 pub struct DiscoverByAttributesArgs {
     /// Attributes to search for.
-    pub attributes: HashMap<String, String>,
+    pub attributes: indexmap::IndexMap<String, String>,
     /// Maximum number of certificates to return.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,

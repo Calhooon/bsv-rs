@@ -20,7 +20,7 @@ use bsv_rs::primitives::to_base64;
 use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver, WireWriter};
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 const G: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 const TWO_G: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
@@ -39,7 +39,7 @@ impl WalletWire for CannedWire {
     }
 }
 
-fn map(entries: &[(&str, &str)]) -> HashMap<String, String> {
+fn map(entries: &[(&str, &str)]) -> IndexMap<String, String> {
     entries
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -120,7 +120,9 @@ async fn an_identity_certificate_the_writer_writes_reads_through_the_transceiver
 }
 
 /// The entry as `#serializeDiscoveryResult` writes it (the lines in the file's
-/// header), assembled byte by byte; the maps in Go's sorted order.
+/// header), assembled byte by byte; the maps in the order they are held, the
+/// reference's `#recordEntries` (`WalletWireProcessor.ts:2523`, `:2542`;
+/// #385), where go-sdk sorts them.
 #[test]
 fn an_identity_certificate_is_written_as_the_reference_writes_it() {
     let mut certificate_bytes = WireWriter::new();
@@ -134,15 +136,15 @@ fn an_identity_certificate_is_written_as_the_reference_writes_it() {
     var_bytes(&mut reference, b"fixture only");
     reference.push(5);
     reference.push(2);
-    var_bytes(&mut reference, b"name");
-    var_bytes(&mut reference, b"key-1");
     var_bytes(&mut reference, b"role");
     var_bytes(&mut reference, b"key-2");
-    reference.push(2);
     var_bytes(&mut reference, b"name");
-    var_bytes(&mut reference, b"Fixture");
+    var_bytes(&mut reference, b"key-1");
+    reference.push(2);
     var_bytes(&mut reference, b"role");
     var_bytes(&mut reference, b"reader");
+    var_bytes(&mut reference, b"name");
+    var_bytes(&mut reference, b"Fixture");
     assert_eq!(written(&identity_certificate()), reference);
 }
 
@@ -160,7 +162,7 @@ fn the_shared_discovery_vector_entry_is_the_writers_bytes() {
     assert_eq!(&wire[..2], &[0, 1], "a success frame of one entry");
     let e = &v["json"]["certificates"][0];
     let s = |key: &str| e[key].as_str().unwrap().to_string();
-    let strings = |value: &serde_json::Value| -> HashMap<String, String> {
+    let strings = |value: &serde_json::Value| -> IndexMap<String, String> {
         serde_json::from_value(value.clone()).unwrap()
     };
     let cert = IdentityCertificate {
@@ -195,8 +197,8 @@ async fn an_identity_certificate_with_empty_members_writes_empty_strings_and_cou
     let cert = IdentityCertificate {
         certificate: certificate(),
         certifier_info: certifier.clone(),
-        publicly_revealed_keyring: HashMap::new(),
-        decrypted_fields: HashMap::new(),
+        publicly_revealed_keyring: IndexMap::new(),
+        decrypted_fields: IndexMap::new(),
     };
     let bytes = written(&cert);
     let mut certificate_bytes = WireWriter::new();

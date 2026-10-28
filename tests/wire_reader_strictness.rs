@@ -17,7 +17,7 @@ use bsv_rs::wallet::wire::{WalletCall, WalletWire, WalletWireProcessor, WalletWi
 use bsv_rs::wallet::wire::{WireReader, WireWriter};
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 const G: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 const TWO_G: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
@@ -632,7 +632,7 @@ async fn a_list_certificates_keyring_key_out_of_bounds_or_repeated_is_refused() 
     let read = list(list_frame(&cert, &keyring(&[(b"name", b"key")]), &[]))
         .await
         .unwrap();
-    let expected: HashMap<String, String> = [("name".to_string(), to_base64(b"key"))].into();
+    let expected: IndexMap<String, String> = [("name".to_string(), to_base64(b"key"))].into();
     assert_eq!(read.certificates[0].keyring.as_ref(), Some(&expected));
 }
 
@@ -774,8 +774,8 @@ async fn a_discovery_record_key_out_of_bounds_or_repeated_is_refused() {
     .await
     .unwrap();
     let entry = &read.certificates[0];
-    let keyring: HashMap<String, String> = [("name".to_string(), to_base64(b"key"))].into();
-    let decrypted: HashMap<String, String> = [("name".to_string(), "Fixture".to_string())].into();
+    let keyring: IndexMap<String, String> = [("name".to_string(), to_base64(b"key"))].into();
+    let decrypted: IndexMap<String, String> = [("name".to_string(), "Fixture".to_string())].into();
     assert_eq!(entry.publicly_revealed_keyring, keyring);
     assert_eq!(entry.decrypted_fields, decrypted);
 }
@@ -899,8 +899,8 @@ fn identity_certificate(info: IdentityCertifier) -> IdentityCertificate {
     IdentityCertificate {
         certificate: cert,
         certifier_info: info,
-        publicly_revealed_keyring: HashMap::new(),
-        decrypted_fields: HashMap::new(),
+        publicly_revealed_keyring: IndexMap::new(),
+        decrypted_fields: IndexMap::new(),
     }
 }
 
@@ -987,7 +987,7 @@ fn a_certificate_subject_or_certifier_that_is_not_a_compressed_key_is_refused_by
 /// `Certificate.toBinary` refuses a field name outside 1 to 50 bytes or
 /// unsafe (`Certificate.ts:289`, `assertCertificateFieldName`, `:117-126`; and
 /// `snapshotCertificateFields`, `:74`), as `fromBinary` refuses it (`:367-373`).
-/// A repeated name cannot reach this writer: its fields are a `HashMap`.
+/// A repeated name cannot reach this writer: its fields are an `IndexMap`.
 #[test]
 fn a_certificate_field_name_outside_1_to_50_bytes_or_unsafe_is_refused_by_the_writer() {
     let valid = read_certificate(&Parts::valid().bytes()).unwrap();
@@ -1270,7 +1270,7 @@ async fn every_page_reader(
     let by_attributes = client(discovery_frame)
         .discover_by_attributes(
             DiscoverByAttributesArgs {
-                attributes: HashMap::from([("name".to_string(), "x".to_string())]),
+                attributes: IndexMap::from([("name".to_string(), "x".to_string())]),
                 limit,
                 offset: None,
                 seek_permission: None,

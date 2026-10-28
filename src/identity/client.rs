@@ -1306,7 +1306,7 @@ mod tests {
             certifier: "".to_string(),
             revocation_outpoint: "".to_string(),
             signature: "".to_string(),
-            fields: HashMap::new(),
+            fields: indexmap::IndexMap::new(),
         };
 
         let result = client
@@ -1315,7 +1315,7 @@ mod tests {
         assert!(matches!(result, Err(Error::IdentityError(_))));
 
         // Certificate with fields but empty fields_to_reveal should be rejected
-        let mut fields = HashMap::new();
+        let mut fields = indexmap::IndexMap::new();
         fields.insert("name".to_string(), "Alice".to_string());
         let cert_with_fields = WalletCertificate {
             certificate_type: "test".to_string(),
@@ -1767,7 +1767,7 @@ mod tests {
     #[test]
     fn test_wallet_certificate_validation() {
         // Test the WalletCertificate structure used in publiclyRevealAttributes
-        let mut fields = HashMap::new();
+        let mut fields = indexmap::IndexMap::new();
         fields.insert("name".to_string(), "Alice".to_string());
         fields.insert("email".to_string(), "alice@example.com".to_string());
 

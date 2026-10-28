@@ -19,8 +19,9 @@ use crate::wallet::{
     WalletInterface,
 };
 use crate::{Error, Result};
+use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
 
 /// The most names one reveal may ask for (`IdentityClient.ts:431-433`).
 const MAX_FIELDS_TO_REVEAL: usize = 100;
@@ -131,12 +132,11 @@ fn master_signature_verifies(certificate: &WalletCertificate) -> bool {
 /// count matches; then any other name than those asked, or one missing
 /// (`:484-491`); then each value through [`keyring_value`] (`:492-499`).
 /// The answer is the keyring with each value trimmed, the one the PushDrop
-/// carries, in the order of the names asked. The reference judges and
-/// publishes the values in the wallet's key order; the crate's keyring is a
-/// map, so they are judged and published in the order of the names asked,
-/// the reference's own wallet's order (`MasterCertificate.ts:348`, `:370`).
+/// carries, judged and published in the wallet's key order, the reference's
+/// `Object.keys` (`:485`, `:492`; #385, the order the wallet's answer
+/// arrived in on either substrate).
 pub(super) fn check_keyring(
-    keyring: &HashMap<String, String>,
+    keyring: &IndexMap<String, String>,
     fields_to_reveal: &[String],
 ) -> Result<Vec<(String, String)>> {
     if keyring.keys().any(|k| is_unsafe_record_key(k)) {
@@ -150,9 +150,8 @@ pub(super) fn check_keyring(
             "Public reveal failed: wallet returned a keyring for unrequested fields!",
         ));
     }
-    fields_to_reveal
+    keyring
         .iter()
-        .filter_map(|name| keyring.get_key_value(name))
         .map(|(name, value)| Ok((name.clone(), keyring_value(value, name)?)))
         .collect()
 }
@@ -236,9 +235,8 @@ fn is_js_whitespace(c: char) -> bool {
 /// The certificate JSON the identity token carries, the reference's
 /// `JSON.stringify({ ...certificate, keyring })` (`IdentityClient.ts:502`):
 /// the wallet certificate's members in `WalletCertificate`'s order
-/// (`Wallet.interfaces.ts:851`), then the keyring in the order of the names
-/// asked. The fields are written by name, since the crate's map keeps no
-/// order of the wallet's.
+/// (`Wallet.interfaces.ts:851`), the fields in the map's order, then the
+/// keyring in the wallet's order (#385).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Published<'a> {
@@ -249,7 +247,7 @@ struct Published<'a> {
     certifier: &'a str,
     revocation_outpoint: &'a str,
     signature: &'a str,
-    fields: BTreeMap<&'a str, &'a str>,
+    fields: &'a IndexMap<String, String>,
     keyring: InOrder<'a>,
 }
 
@@ -285,11 +283,7 @@ pub(super) async fn identity_token<W: WalletInterface + ?Sized>(
         certifier: &certificate.certifier,
         revocation_outpoint: &certificate.revocation_outpoint,
         signature: &certificate.signature,
-        fields: certificate
-            .fields
-            .iter()
-            .map(|(k, v)| (k.as_str(), v.as_str()))
-            .collect(),
+        fields: &certificate.fields,
         keyring: InOrder(keyring),
     };
     let json = serde_json::to_vec(&published)

@@ -47,7 +47,7 @@ struct Witness {
     wallet_calls: usize,
     /// The keyring the wallet answers, when not the names asked.
     #[serde(default)]
-    keyring: Option<HashMap<String, String>>,
+    keyring: Option<indexmap::IndexMap<String, String>>,
     /// The refusal's class, `Error` or `WERR_INVALID_PARAMETER`.
     #[serde(default, rename = "refusal_name")]
     refusal_name: Option<String>,
@@ -279,7 +279,7 @@ async fn a_keyring_value_is_published_trimmed_as_the_reference_publishes_it() {
 async fn a_keyring_for_another_field_is_refused_before_create_action() {
     let w = witness("signed");
     let mut wallet = Counting::new();
-    wallet.keyring = Some(HashMap::from([
+    wallet.keyring = Some(indexmap::IndexMap::from([
         ("email".to_string(), "AAAA".to_string()),
         ("name".to_string(), "AAAA".to_string()),
     ]));

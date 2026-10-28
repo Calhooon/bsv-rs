@@ -93,7 +93,7 @@ fn wallet_certificate(cert: &Certificate) -> WalletCertificate {
         certifier: cert.certifier.to_hex(),
         revocation_outpoint: format!("{}.{index}", to_hex(&txid)),
         signature: to_hex(cert.signature.as_ref().unwrap()),
-        fields: cert.fields.clone(),
+        fields: cert.fields.clone().into_iter().collect(),
     }
 }
 
