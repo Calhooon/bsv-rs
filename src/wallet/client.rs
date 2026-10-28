@@ -4,10 +4,8 @@
 //! for communicating with wallets over various transport substrates.
 
 #[cfg(feature = "http")]
-use crate::wallet::substrates::{HttpWalletJson, HttpWalletWire, SECURE_JSON_URL};
-#[cfg(feature = "http")]
-use crate::wallet::wire::WalletWireTransceiver;
-use std::sync::Arc;
+use futures::lock::Mutex;
+use std::sync::{Arc, OnceLock};
 
 use super::client_instance::Instance;
 use crate::wallet::interface::{
@@ -16,6 +14,8 @@ use crate::wallet::interface::{
 use crate::wallet::types::{
     Network, RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult,
 };
+#[cfg(feature = "http")]
+use crate::wallet::{substrates::HttpWalletWire, wire::WalletWireTransceiver};
 use crate::wallet::{
     AbortActionArgs, AbortActionResult, AcquireCertificateArgs, CreateActionArgs,
     CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
@@ -39,21 +39,26 @@ pub enum SubstrateType {
     /// 1. Secure JSON API (https://localhost:2121)
     /// 2. JSON API (http://localhost:3321)
     /// 3. Wire protocol over HTTP (http://localhost:3301)
+    ///
+    /// Without `http`, no transport can be discovered; use `with_substrate`.
     Auto,
 
     /// HTTP JSON API (simpler, higher overhead).
     ///
     /// Default URL: http://localhost:3321
+    #[cfg(feature = "http")]
     JsonApi,
 
     /// Wallet wire protocol over HTTP (efficient binary).
     ///
     /// Default URL: http://localhost:3301
+    #[cfg(feature = "http")]
     Cicada,
 
     /// Secure local JSON API.
     ///
     /// URL: https://localhost:2121
+    #[cfg(feature = "http")]
     SecureJsonApi,
 }
 
@@ -79,7 +84,7 @@ pub enum SubstrateType {
 /// use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
 ///
 /// // Create client with auto-detection
-/// let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.example.com".into()));
+/// let client = WalletClient::new(SubstrateType::Auto, Some("myapp.example.com".into()));
 ///
 /// // Get wallet version (triggers auto-detection)
 /// let version = client.get_version().await?;
@@ -99,17 +104,24 @@ pub enum SubstrateType {
 /// built with its own URL or client) is handed over with
 /// [`WalletClient::with_substrate`], the reference's `WalletInterface`
 /// alternative of the constructor's `substrate` parameter (#335).
+/// The core and its [`WalletInterface`] implementation need only `wallet`;
+/// named HTTP substrates and discovery require `http` (#404). Trait calls
+/// use this client's configured originator, just like inherent calls.
 pub struct WalletClient {
     substrate_type: SubstrateType,
     originator: Option<String>,
+    // The reference only reassigns its substrate during connection. Keep that
+    // one-time resolution interior so wallet operations can all borrow &self.
+    connected: OnceLock<ConnectedSubstrate>,
     #[cfg(feature = "http")]
-    connected: Option<ConnectedSubstrate>,
+    connecting: Mutex<()>,
 }
 
 /// Connected substrate variant.
-#[cfg(feature = "http")]
 enum ConnectedSubstrate {
-    JsonApi(HttpWalletJson),
+    #[cfg(feature = "http")]
+    JsonApi(http::JsonApi),
+    #[cfg(feature = "http")]
     WireApi(WalletWireTransceiver<HttpWalletWire>),
     /// The instance handed to [`WalletClient::with_substrate`] (#335).
     Instance(Instance),
@@ -118,23 +130,38 @@ enum ConnectedSubstrate {
 /// Forwards a call to the connected substrate with the client's originator:
 /// the configured one, `None` when none is set (#329).
 macro_rules! forward {
-    ($client:ident.$method:ident($($args:ident)?)) => {{
+    ($client:ident.internalize_action($args:ident)) => {{
+        crate::wallet::validation::validate_internalize_action_args(&$args)?;
+        forward!(@call $client.internalize_action($args))
+    }};
+    ($client:ident.$method:ident($($args:ident)?)) => {
+        forward!(@call $client.$method($($args)?))
+    };
+    (@call $client:ident.$method:ident($($args:ident)?)) => {{
         let originator = $client.effective_originator();
         let originator = originator.as_deref();
         match $client.connect().await? {
+            #[cfg(feature = "http")]
             ConnectedSubstrate::JsonApi(s) => s.$method($($args,)? originator).await,
+            #[cfg(feature = "http")]
             ConnectedSubstrate::WireApi(s) => s.$method($($args,)? originator).await,
             ConnectedSubstrate::Instance(s) => s.$method($($args,)? originator).await,
         }
     }};
 }
 
+#[cfg(feature = "http")]
+mod http;
+mod interface;
+
 impl WalletClient {
     /// Creates a new wallet client.
     ///
     /// # Arguments
     ///
-    /// * `substrate_type` - The type of substrate to use
+    /// * `substrate_type` - The type of substrate to use (`http` for named transports).
+    ///   Without `http`, `Auto` reports no available substrate on a call;
+    ///   use [`Self::with_substrate`] to supply an in-process wallet.
     /// * `originator` - Optional originator identifier for the client
     ///
     /// # Example
@@ -150,8 +177,9 @@ impl WalletClient {
         Self {
             substrate_type,
             originator,
+            connected: OnceLock::new(),
             #[cfg(feature = "http")]
-            connected: None,
+            connecting: Mutex::new(()),
         }
     }
 
@@ -167,16 +195,25 @@ impl WalletClient {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```rust
+    /// use std::sync::Arc;
+    /// use bsv_rs::primitives::PrivateKey;
+    /// use bsv_rs::wallet::{ProtoWallet, WalletClient};
+    ///
+    /// # async fn example() -> bsv_rs::Result<()> {
     /// let wallet = Arc::new(ProtoWallet::new(Some(PrivateKey::random())));
-    /// let mut client = WalletClient::with_substrate(wallet, Some("myapp.com".into()));
+    /// let client = WalletClient::with_substrate(wallet, Some("myapp.com".into()));
     /// let version = client.get_version().await?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn with_substrate(substrate: Arc<dyn WalletInterface>, originator: Option<String>) -> Self {
         Self {
             substrate_type: SubstrateType::Auto,
             originator,
-            connected: Some(ConnectedSubstrate::Instance(Instance(substrate))),
+            connected: OnceLock::from(ConnectedSubstrate::Instance(Instance(substrate))),
+            #[cfg(feature = "http")]
+            connecting: Mutex::new(()),
         }
     }
 
@@ -196,78 +233,24 @@ impl WalletClient {
         self.originator.clone()
     }
 
-    /// Ensures a substrate is connected, auto-detecting if necessary.
-    #[cfg(feature = "http")]
-    async fn connect(&mut self) -> Result<&ConnectedSubstrate, Error> {
-        // If already connected, return existing connection
-        if let Some(ref connected) = self.connected {
+    /// Ensures a substrate is connected, serializing discovery only.
+    async fn connect(&self) -> Result<&ConnectedSubstrate, Error> {
+        if let Some(connected) = self.connected.get() {
             return Ok(connected);
         }
-
-        // Connect based on substrate type
-        match self.substrate_type {
-            SubstrateType::Auto => {
-                // Auto-detect: try substrates in order
-                self.auto_detect().await?;
+        #[cfg(feature = "http")]
+        {
+            let _connecting = self.connecting.lock().await;
+            if let Some(connected) = self.connected.get() {
+                return Ok(connected);
             }
-            SubstrateType::JsonApi => {
-                let client = HttpWalletJson::new(self.originator.clone(), None)?;
-                self.connected = Some(ConnectedSubstrate::JsonApi(client));
-            }
-            SubstrateType::Cicada => {
-                let wire = HttpWalletWire::new(self.originator.clone(), None)?;
-                let transceiver = WalletWireTransceiver::new(wire);
-                self.connected = Some(ConnectedSubstrate::WireApi(transceiver));
-            }
-            SubstrateType::SecureJsonApi => {
-                let client = HttpWalletJson::new(
-                    self.originator.clone(),
-                    Some(SECURE_JSON_URL.to_string()),
-                )?;
-                self.connected = Some(ConnectedSubstrate::JsonApi(client));
-            }
+            let connected = http::connect(self.substrate_type, self.originator.clone()).await?;
+            let _ = self.connected.set(connected);
+            self.connected
+                .get()
+                .ok_or_else(|| Error::WalletError("no wallet substrate connected".to_string()))
         }
-
-        // set just above (or by auto_detect)
-        self.connected
-            .as_ref()
-            .ok_or_else(|| Error::WalletError("no wallet substrate connected".to_string()))
-    }
-
-    /// Auto-detects available substrate by trying each in order.
-    #[cfg(feature = "http")]
-    async fn auto_detect(&mut self) -> Result<(), Error> {
-        let originator = self.effective_originator();
-
-        // Try secure JSON API first
-        let secure_client =
-            HttpWalletJson::new(self.originator.clone(), Some(SECURE_JSON_URL.to_string()))?;
-        if let Ok(version) = secure_client.get_version(originator.as_deref()).await {
-            if !version.is_empty() {
-                self.connected = Some(ConnectedSubstrate::JsonApi(secure_client));
-                return Ok(());
-            }
-        }
-
-        // Try standard JSON API
-        let json_client = HttpWalletJson::new(self.originator.clone(), None)?;
-        if let Ok(version) = json_client.get_version(originator.as_deref()).await {
-            if !version.is_empty() {
-                self.connected = Some(ConnectedSubstrate::JsonApi(json_client));
-                return Ok(());
-            }
-        }
-
-        // Try wire protocol
-        let wire = HttpWalletWire::new(self.originator.clone(), None)?;
-        let wire_client = WalletWireTransceiver::new(wire);
-        if let Ok(version) = wire_client.get_version(originator.as_deref()).await {
-            if !version.is_empty() {
-                self.connected = Some(ConnectedSubstrate::WireApi(wire_client));
-                return Ok(());
-            }
-        }
-
+        #[cfg(not(feature = "http"))]
         Err(Error::WalletError(
             "no wallet available over any communication substrate".to_string(),
         ))
@@ -278,83 +261,72 @@ impl WalletClient {
     // =========================================================================
 
     /// Gets a public key from the wallet.
-    #[cfg(feature = "http")]
     pub async fn get_public_key(
-        &mut self,
+        &self,
         args: GetPublicKeyArgs,
     ) -> Result<GetPublicKeyResult, Error> {
         forward!(self.get_public_key(args))
     }
 
     /// Encrypts data using the wallet's derived key.
-    #[cfg(feature = "http")]
-    pub async fn encrypt(&mut self, args: EncryptArgs) -> Result<EncryptResult, Error> {
+    pub async fn encrypt(&self, args: EncryptArgs) -> Result<EncryptResult, Error> {
         forward!(self.encrypt(args))
     }
 
     /// Decrypts data using the wallet's derived key.
-    #[cfg(feature = "http")]
-    pub async fn decrypt(&mut self, args: DecryptArgs) -> Result<DecryptResult, Error> {
+    pub async fn decrypt(&self, args: DecryptArgs) -> Result<DecryptResult, Error> {
         forward!(self.decrypt(args))
     }
 
     /// Creates an HMAC using the wallet's derived key.
-    #[cfg(feature = "http")]
-    pub async fn create_hmac(&mut self, args: CreateHmacArgs) -> Result<CreateHmacResult, Error> {
+    pub async fn create_hmac(&self, args: CreateHmacArgs) -> Result<CreateHmacResult, Error> {
         forward!(self.create_hmac(args))
     }
 
     /// Verifies an HMAC using the wallet's derived key.
-    #[cfg(feature = "http")]
-    pub async fn verify_hmac(&mut self, args: VerifyHmacArgs) -> Result<VerifyHmacResult, Error> {
+    pub async fn verify_hmac(&self, args: VerifyHmacArgs) -> Result<VerifyHmacResult, Error> {
         forward!(self.verify_hmac(args))
     }
 
     /// Creates a signature using the wallet's derived key.
-    #[cfg(feature = "http")]
     pub async fn create_signature(
-        &mut self,
+        &self,
         args: CreateSignatureArgs,
     ) -> Result<CreateSignatureResult, Error> {
         forward!(self.create_signature(args))
     }
 
     /// Verifies a signature using the wallet's derived key.
-    #[cfg(feature = "http")]
     pub async fn verify_signature(
-        &mut self,
+        &self,
         args: VerifySignatureArgs,
     ) -> Result<VerifySignatureResult, Error> {
         forward!(self.verify_signature(args))
     }
 
     /// Checks if the wallet is authenticated.
-    #[cfg(feature = "http")]
-    pub async fn is_authenticated(&mut self) -> Result<bool, Error> {
+    pub async fn is_authenticated(&self) -> Result<bool, Error> {
         forward!(self.is_authenticated())
     }
 
     /// Gets the current block height.
-    #[cfg(feature = "http")]
-    pub async fn get_height(&mut self) -> Result<u64, Error> {
+    pub async fn get_height(&self) -> Result<u64, Error> {
         forward!(self.get_height())
     }
 
     /// Gets the network the wallet is connected to.
-    #[cfg(feature = "http")]
-    pub async fn get_network(&mut self) -> Result<Network, Error> {
+    pub async fn get_network(&self) -> Result<Network, Error> {
         forward!(self.get_network())
     }
 
     /// Gets the wallet version.
-    #[cfg(feature = "http")]
-    pub async fn get_version(&mut self) -> Result<String, Error> {
+    pub async fn get_version(&self) -> Result<String, Error> {
         forward!(self.get_version())
     }
 
     /// Reveals the key linkage with a counterparty to a verifier.
     pub async fn reveal_counterparty_key_linkage(
-        &mut self,
+        &self,
         args: RevealCounterpartyKeyLinkageArgs,
     ) -> Result<RevealCounterpartyKeyLinkageResult, Error> {
         forward!(self.reveal_counterparty_key_linkage(args))
@@ -362,7 +334,7 @@ impl WalletClient {
 
     /// Reveals the linkage of one derived key to a verifier.
     pub async fn reveal_specific_key_linkage(
-        &mut self,
+        &self,
         args: RevealSpecificKeyLinkageArgs,
     ) -> Result<RevealSpecificKeyLinkageResult, Error> {
         forward!(self.reveal_specific_key_linkage(args))
@@ -373,45 +345,30 @@ impl WalletClient {
     // =========================================================================
 
     /// Creates a new transaction action.
-    #[cfg(feature = "http")]
-    pub async fn create_action(
-        &mut self,
-        args: CreateActionArgs,
-    ) -> Result<CreateActionResult, Error> {
+    pub async fn create_action(&self, args: CreateActionArgs) -> Result<CreateActionResult, Error> {
         forward!(self.create_action(args))
     }
 
     /// Signs a previously created transaction.
-    #[cfg(feature = "http")]
-    pub async fn sign_action(&mut self, args: SignActionArgs) -> Result<SignActionResult, Error> {
+    pub async fn sign_action(&self, args: SignActionArgs) -> Result<SignActionResult, Error> {
         forward!(self.sign_action(args))
     }
 
     /// Aborts an in-progress action.
-    #[cfg(feature = "http")]
-    pub async fn abort_action(
-        &mut self,
-        args: AbortActionArgs,
-    ) -> Result<AbortActionResult, Error> {
+    pub async fn abort_action(&self, args: AbortActionArgs) -> Result<AbortActionResult, Error> {
         forward!(self.abort_action(args))
     }
 
     /// Lists wallet actions (transactions).
-    #[cfg(feature = "http")]
-    pub async fn list_actions(
-        &mut self,
-        args: ListActionsArgs,
-    ) -> Result<ListActionsResult, Error> {
+    pub async fn list_actions(&self, args: ListActionsArgs) -> Result<ListActionsResult, Error> {
         forward!(self.list_actions(args))
     }
 
     /// Internalizes an external transaction.
-    #[cfg(feature = "http")]
     pub async fn internalize_action(
-        &mut self,
+        &self,
         args: InternalizeActionArgs,
     ) -> Result<InternalizeActionResult, Error> {
-        crate::wallet::validation::validate_internalize_action_args(&args)?;
         forward!(self.internalize_action(args))
     }
 
@@ -420,18 +377,13 @@ impl WalletClient {
     // =========================================================================
 
     /// Lists wallet outputs.
-    #[cfg(feature = "http")]
-    pub async fn list_outputs(
-        &mut self,
-        args: ListOutputsArgs,
-    ) -> Result<ListOutputsResult, Error> {
+    pub async fn list_outputs(&self, args: ListOutputsArgs) -> Result<ListOutputsResult, Error> {
         forward!(self.list_outputs(args))
     }
 
     /// Relinquishes an output from a basket.
-    #[cfg(feature = "http")]
     pub async fn relinquish_output(
-        &mut self,
+        &self,
         args: RelinquishOutputArgs,
     ) -> Result<RelinquishOutputResult, Error> {
         forward!(self.relinquish_output(args))
@@ -442,36 +394,32 @@ impl WalletClient {
     // =========================================================================
 
     /// Acquires a certificate.
-    #[cfg(feature = "http")]
     pub async fn acquire_certificate(
-        &mut self,
+        &self,
         args: AcquireCertificateArgs,
     ) -> Result<WalletCertificate, Error> {
         forward!(self.acquire_certificate(args))
     }
 
     /// Lists certificates.
-    #[cfg(feature = "http")]
     pub async fn list_certificates(
-        &mut self,
+        &self,
         args: ListCertificatesArgs,
     ) -> Result<ListCertificatesResult, Error> {
         forward!(self.list_certificates(args))
     }
 
     /// Proves a certificate.
-    #[cfg(feature = "http")]
     pub async fn prove_certificate(
-        &mut self,
+        &self,
         args: ProveCertificateArgs,
     ) -> Result<ProveCertificateResult, Error> {
         forward!(self.prove_certificate(args))
     }
 
     /// Relinquishes a certificate.
-    #[cfg(feature = "http")]
     pub async fn relinquish_certificate(
-        &mut self,
+        &self,
         args: RelinquishCertificateArgs,
     ) -> Result<RelinquishCertificateResult, Error> {
         forward!(self.relinquish_certificate(args))
@@ -482,18 +430,16 @@ impl WalletClient {
     // =========================================================================
 
     /// Discovers certificates by identity key.
-    #[cfg(feature = "http")]
     pub async fn discover_by_identity_key(
-        &mut self,
+        &self,
         args: DiscoverByIdentityKeyArgs,
     ) -> Result<DiscoverCertificatesResult, Error> {
         forward!(self.discover_by_identity_key(args))
     }
 
     /// Discovers certificates by attributes.
-    #[cfg(feature = "http")]
     pub async fn discover_by_attributes(
-        &mut self,
+        &self,
         args: DiscoverByAttributesArgs,
     ) -> Result<DiscoverCertificatesResult, Error> {
         forward!(self.discover_by_attributes(args))
@@ -504,14 +450,12 @@ impl WalletClient {
     // =========================================================================
 
     /// Gets a block header for a given height.
-    #[cfg(feature = "http")]
-    pub async fn get_header(&mut self, args: GetHeaderArgs) -> Result<GetHeaderResult, Error> {
+    pub async fn get_header(&self, args: GetHeaderArgs) -> Result<GetHeaderResult, Error> {
         forward!(self.get_header(args))
     }
 
     /// Waits for authentication.
-    #[cfg(feature = "http")]
-    pub async fn wait_for_authentication(&mut self) -> Result<bool, Error> {
+    pub async fn wait_for_authentication(&self) -> Result<bool, Error> {
         forward!(self.wait_for_authentication())
     }
 }
@@ -520,96 +464,16 @@ impl WalletClient {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn the_clients_wire_arms_send_both_linkage_calls_406() {
-        use crate::wallet::{Counterparty, Protocol, SecurityLevel};
-        use serde_json::Value;
-        use wiremock::matchers::{body_bytes, header, method, path};
-        use wiremock::{Mock, MockServer, ResponseTemplate};
-
-        let vector: Value = serde_json::from_str(include_str!(
-            "../../tests/vectors/wallet_wire/linkage_calls_406.json"
-        ))
-        .unwrap();
-        let originator = vector["originator"].as_str().unwrap();
-        for name in ["counterparty-minimal", "specific-key"] {
-            let case = vector["cases"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|case| case["name"] == name)
-                .unwrap();
-            let request = hex::decode(case["request_hex"].as_str().unwrap()).unwrap();
-            let server = MockServer::start().await;
-            Mock::given(method("POST"))
-                .and(path(format!("/{}", case["call"].as_str().unwrap())))
-                .and(header("Origin", originator))
-                .and(body_bytes(request[2 + originator.len()..].to_vec()))
-                .respond_with(
-                    ResponseTemplate::new(200).set_body_bytes(
-                        hex::decode(case["response_hex"].as_str().unwrap()).unwrap(),
-                    ),
-                )
-                .expect(1)
-                .mount(&server)
-                .await;
-            let wire = HttpWalletWire::new(Some(originator.into()), Some(server.uri())).unwrap();
-            // Set the actual wire arm; no default URL or auto-detection is used.
-            let mut client = WalletClient {
-                substrate_type: SubstrateType::Cicada,
-                originator: Some(originator.into()),
-                connected: Some(ConnectedSubstrate::WireApi(WalletWireTransceiver::new(
-                    wire,
-                ))),
-            };
-            let key = |field: &str| {
-                crate::primitives::PublicKey::from_bytes(
-                    &hex::decode(case["args"][field].as_str().unwrap()).unwrap(),
-                )
-                .unwrap()
-            };
-            let result = if name == "counterparty-minimal" {
-                serde_json::to_value(
-                    client
-                        .reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs {
-                            counterparty: key("counterparty"),
-                            verifier: key("verifier"),
-                            privileged: None,
-                            privileged_reason: None,
-                        })
-                        .await
-                        .unwrap(),
-                )
-            } else {
-                serde_json::to_value(
-                    client
-                        .reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs {
-                            counterparty: Counterparty::Other(key("counterparty")),
-                            verifier: key("verifier"),
-                            protocol_id: Protocol::new(
-                                SecurityLevel::Counterparty,
-                                "fixture linkage",
-                            ),
-                            key_id: "key-1".into(),
-                            privileged: None,
-                            privileged_reason: None,
-                        })
-                        .await
-                        .unwrap(),
-                )
-            }
-            .unwrap();
-            assert_eq!(result, case["result"], "{name}");
-        }
-    }
-
     #[test]
     fn test_substrate_type() {
         let client = WalletClient::new(SubstrateType::Auto, None);
         assert_eq!(client.substrate_type(), SubstrateType::Auto);
 
-        let client = WalletClient::new(SubstrateType::JsonApi, None);
-        assert_eq!(client.substrate_type(), SubstrateType::JsonApi);
+        #[cfg(feature = "http")]
+        {
+            let client = WalletClient::new(SubstrateType::JsonApi, None);
+            assert_eq!(client.substrate_type(), SubstrateType::JsonApi);
+        }
     }
 
     #[test]

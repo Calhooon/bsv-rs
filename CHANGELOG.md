@@ -252,6 +252,90 @@ normalized protocol later, in its own words (`key_deriver.go:214-253`);
 privilege and frame-byte bounds are not checked. Its linkage methods only
 check nil keys. These are stated reference-version differences, not reasons
 to retain the missing current-reference checks.
+### Fixed: `WalletClient` is a `WalletInterface` and its core needs only `wallet` (#404)
+
+#335 added `with_substrate`, but the entire client still required `http`.
+A Worker with `wallet,auth,transaction,overlay,socketio,wasm` could not wrap
+its in-process wallet, and a client could not be passed to `Peer`, another
+client or any other consumer of `WalletInterface`.
+
+The core (`WalletClient`, `SubstrateType`, `with_substrate` and all 28 calls,
+including both linkage calls) is now under `wallet`. Only the HTTP JSON and
+wire variants, imports, construction and discovery need `http`.
+`SubstrateType` remains `Copy + Eq`: `JsonApi`, `Cicada` and `SecureJsonApi`
+are absent at compile time without `http`, rather than accepting an unusable
+transport and failing later. `Auto` remains available; without `http` its
+first call reports no available substrate. `with_substrate` always works
+without discovery. With `http`, the variants, default URLs and probe order
+(secure JSON, JSON, wire) are unchanged. Both wire linkage calls go through
+the transceiver since #406.
+
+`src/wallet/client/interface.rs` implements all 28 trait methods using the
+same `forward!` macro as the inherent API. Both surfaces keep the client's
+configured originator, including `None` and `Some("")` (#329), even when a
+trait caller supplies another; a nested client applies its own configured
+originator. The trait returns its status records and names the header call
+`get_header_for_height`; the inherent names and result types stay available.
+The inherent methods now borrow `&self`, matching the reference's operations
+and the trait's receivers. A `OnceLock` holds the resolved substrate through
+interior mutability; a runtime-independent futures mutex serializes HTTP
+discovery. No lock is held across subsequent wallet calls and no dependency
+is added. `src/wallet/client/http.rs` holds the HTTP construction and probes;
+the client file shrinks, and no new function exceeds 60 lines.
+
+Pinned by `tests/wallet_client_instance_335.rs` under `wallet` alone and
+`tests/wallet_client_interface_404.rs`: all 28 calls through an instance,
+all 28 through a client wrapping another client (absent, empty and named
+originators), the trait's status answers, validation before dispatch and
+unchanged refusals. On base `94b74c03`, the wallet-only instance test is RED
+with 11 missing-client/type errors; with `wallet,http` the trait test is RED
+with four missing-`WalletInterface` implementation errors.
+`tests/wallet_client_shared_404.rs` calls through both `&WalletClient` and
+`Arc<WalletClient>` and pins the replies and configured originator; both
+calls are compile errors on the base's mutable receivers. No test probes
+`Auto` or the default URLs. The standard wasm32 feature slice now exports
+`WalletClient` and can wrap a wallet without enabling native HTTP.
+
+The requested minor-release check against `94b74c03` passes: cargo-semver-checks
+0.51.0 reports 202 checks passed, 58 skipped, and no semver update required.
+Its default feature heuristic includes `http`, so the three cfg-gated names
+are present on both sides; without `http` the base exported no client at all.
+The explicit `wallet`-only comparison also passes all 202 checks (58 skipped).
+The checker does not lint the receiver change.
+
+Rebased over #406 at `d510bc36`: the wire arm holds its transceiver
+directly, and the fixture-backed client test lives under the HTTP module,
+using the shared connection fields. The obsolete unsent-linkage test is
+removed, so no test calls a default wallet port. The unreconciled rebase
+fails to compile without `http`; this fold is kept as one compiling commit.
+
+API break (beta line): `WalletClient`'s methods take `&self`
+(the reference's and the trait's receivers).
+
+- A method-path reference such as `.map(WalletClient::get_version)` becomes `.map(|client| client.get_version())`.
+- A `let mut client` binding may drop `mut`.
+
+Wasm Workers gain the client under `wallet`, without enabling `http`.
+
+### Notes: cross-SDK parity (#404)
+
+The reference defines `class WalletClient implements WalletInterface`
+(`ts-stack@edf6e03`, `packages/sdk/src/wallet/WalletClient.ts:82-110`;
+`ts-sdk@9e3ede6b`, `src/wallet/WalletClient.ts:67`). Its constructor accepts
+`'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api' | 'react-native' |
+'secure-json-api' | WalletInterface`: the HTTP, wire, browser and React
+Native substrates are imports it resolves, not requirements of its core.
+Rust keeps separate `new` and `with_substrate` constructors so the named
+selector stays `Copy + Eq`, and has no browser or React Native substrate.
+After construction, the reference only assigns `this.substrate` in
+`connectToSubstrate` (`:121-198`); its wallet methods read the substrate and
+originator. The shared receivers here preserve that shape, with the one-time
+resolution held in `OnceLock` rather than a public `&mut self` requirement.
+The #335 differences remain: only internalizeAction's arguments are
+validated here, and the configured originator is preserved rather than
+normalized; the reference validates every request and result. Go at
+`2ca481c` has no multi-substrate client; callers hold a `wallet.Interface`
+or construct a concrete substrate.
 
 ### Added: the wire transceiver makes revealCounterpartyKeyLinkage and revealSpecificKeyLinkage as the reference's does; the client's existing linkage arms route to it (#406)
 
