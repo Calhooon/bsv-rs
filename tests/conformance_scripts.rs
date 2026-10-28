@@ -41,6 +41,9 @@
 #[path = "support/conformance_script_allowlist.rs"]
 mod conformance_script_allowlist;
 use conformance_script_allowlist::{classify_chronicle_hash_type, EVALUATION_UNSUPPORTED_PINS};
+#[path = "support/conformance_signature_words_417.rs"]
+mod conformance_signature_words_417;
+use conformance_signature_words_417::classify_signature_words_417;
 
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -629,8 +632,9 @@ fn eval_node_script_vector(
 
 /// Shared mismatch recording: unsupported class, known failure, or failure.
 fn record_mismatch(id: &str, ctx: &MismatchContext<'_>, got: bool, summary: &mut Summary) {
-    if let Some(class) =
-        classify_chronicle_hash_type(id, ctx).or_else(|| classify_node_mismatch(ctx))
+    if let Some(class) = classify_chronicle_hash_type(id, ctx)
+        .or_else(|| classify_signature_words_417(id, ctx))
+        .or_else(|| classify_node_mismatch(ctx))
     {
         summary
             .unsupported

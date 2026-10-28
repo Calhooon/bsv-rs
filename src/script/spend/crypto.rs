@@ -382,38 +382,6 @@ impl Spend {
     // Signature Verification Helpers
     // ========================================================================
 
-    pub(super) fn check_signature_encoding(&self, sig: &[u8]) -> Result<(), ScriptEvaluationError> {
-        if sig.is_empty() {
-            return Ok(());
-        }
-
-        // Check basic DER format
-        if !is_valid_signature_encoding(sig) {
-            return Err(self.error("The signature format is invalid."));
-        }
-
-        // Parse and check additional requirements
-        let tx_sig = TransactionSignature::from_checksig_format(sig)
-            .map_err(|_| self.error("The signature format is invalid."))?;
-
-        // LOW_S as the reference checks it (`CPubKey::CheckLowS`, pubkey.cpp:356-365):
-        // the lax parser (146-173) turns an `r` or `s` at or above the curve order
-        // into the zero signature, which is low, so the check passes and the
-        // signature fails to verify afterwards (NULLFAIL under the flag, else a
-        // false top). Only n/2 < s < n is a high-S refusal.
-        if self.require_low_s && !tx_sig.has_low_s() && !signature_overflows_the_order(&tx_sig) {
-            return Err(self.error("The signature must have a low S value."));
-        }
-
-        self.check_signature_hash_type(tx_sig.scope())?;
-
-        if (tx_sig.scope() & SIGHASH_FORKID) == 0 {
-            return Err(self.error("The signature must use SIGHASH_FORKID."));
-        }
-
-        Ok(())
-    }
-
     pub(super) fn check_public_key_encoding(
         &self,
         pubkey: &[u8],

@@ -69,13 +69,13 @@ fn s_at_or_above_the_order_passes_the_low_s_check_as_the_zero_signature() {
     let high = c
         .check_signature_encoding(&der(one, &s_plus(HALF, 1)))
         .unwrap_err();
-    assert_eq!(high.message, "The signature must have a low S value.");
+    assert_eq!(high.message, "The signature format is invalid.");
     let n_minus_1 = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140";
     assert_eq!(
         c.check_signature_encoding(&der(one, n_minus_1))
             .unwrap_err()
             .message,
-        "The signature must have a low S value."
+        "The signature format is invalid."
     );
     // and such a signature never verifies: a CHECKSIG with s = n at version 1 under the
     // block word is NULLFAIL, in the default mode a false top

@@ -1,7 +1,6 @@
 //! Bitcoin Script interpreter for spend validation.
 //!
-// Allow large error type - ScriptEvaluationError intentionally captures full
-// execution state for debugging failed script executions.
+// ScriptEvaluationError carries execution state for diagnostics.
 #![allow(clippy::result_large_err)]
 //!
 //! This module implements the full Bitcoin Script interpreter for BSV, enabling
@@ -112,6 +111,7 @@ mod limits;
 mod num;
 mod push;
 mod reference_read;
+mod signature_encoding;
 mod splice;
 mod stack;
 mod stack_ops;

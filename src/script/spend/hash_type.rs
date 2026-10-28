@@ -17,7 +17,8 @@ impl Spend {
     ) -> Result<(), ScriptEvaluationError> {
         // STRICTENC (interpreter.cpp:291-294; sighashtype.h:82-90): ALL,
         // NONE or SINGLE after clearing the three modifier bits. Both node
-        // words and the default mode check this (bsv-rs#23).
+        // words and the default mode check this (bsv-rs#23). At version 1
+        // the default caller wraps this reason in the DER words (#417).
         if self
             .flags
             .is_none_or(|word| word.contains(ScriptFlags::STRICTENC))
