@@ -1,6 +1,7 @@
 //! Signature hash-type legality. The default's Chronicle gate is the
-//! transaction version, refused in the reference's visible words; under a word it is CHRONICLE, independently of the
-//! UTXO's opcode/number-length era (bsv-rs#22, #397).
+//! transaction version, refused in the reference's visible words; under a word
+//! it is CHRONICLE, independently of the UTXO's opcode/number-length era
+//! (bsv-rs#22, #397).
 
 use crate::primitives::bsv::sighash::{
     SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE, SIGHASH_FORKID, SIGHASH_SINGLE,

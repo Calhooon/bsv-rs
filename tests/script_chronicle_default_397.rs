@@ -1,8 +1,8 @@
 //! #397's second fold: all Chronicle opcodes run without a word, while the
 //! Chronicle hash type needs transaction version > 1. Recorded from the
 //! unmodified ts-stack@edf6e03 under Node 22 by the adjacent support recorder.
-//! The keeper requires the hash gate's own words (Spend.ts:591); the reference
-//! catches that error at :622-625 and exposes its generic DER error instead.
+//! The reference catches the hash gate's own error (Spend.ts:586-591) at
+//! :622-625 and exposes its DER wrapper's text, the visible words pinned here.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bsv_rs::primitives::bsv::sighash::{
