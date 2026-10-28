@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-beta.2] - 2026-10-28
+
+The 0.9.0 line's second prerelease (RELEASING.md point 14), cut from `beta` at the owner's word once #329 and #331 landed (the keeper's rulings under the owner's ruling (c): `WalletInterface`'s `originator: Option<&str>`, `Transaction::verify`'s caller budget with `None` uncapped; #331 at e813ce4f), for the toolbox's 0.14.0-beta.2 and the CLI's beta line to build against; the entries below are 0.9.0's since 0.9.0-beta.1, unreleased on `main` until the minor merges at the phase exit.
+
 ### Changed: `Transaction::verify` takes the caller's memory budget as the reference's third parameter, and `Spend` and `verify` run uncapped without one, as the reference does (#331)
 
 `Transaction::verify` evaluated every input under `memory_limit: None`, the
