@@ -25,4 +25,9 @@ fuzz_target!(|data: &[u8]| {
 
     let mut reader = bsv_rs::wallet::wire::WireReader::new(data);
     let _ = reader.read_bytes(data.len().min(1024));
+
+    // Encoded counterparties must be validated before their encoding is lost.
+    if let Ok(encoded) = std::str::from_utf8(data) {
+        let _ = bsv_rs::wallet::Counterparty::from_hex(encoded);
+    }
 });

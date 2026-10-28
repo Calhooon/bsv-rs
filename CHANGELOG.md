@@ -195,10 +195,79 @@ wallet error: data or hashToDirectlySign must be provided; both inputs previousl
   -> The data, hashToDirectlySign parameter must be exactly one value
 wallet error: data or hashToDirectlyVerify must be provided; both inputs previously accepted
   -> The data, hashToDirectlyVerify parameter must be exactly one value
+### Fixed: ProtoWallet's remaining five argument validators share the wire's checks (#420)
+
+`get_public_key`, `encrypt`, `decrypt`, `reveal_counterparty_key_linkage`
+and `reveal_specific_key_linkage` now run the reference's argument checks
+before returning the identity key, deriving a secret or doing cryptography.
+Previously the identity branch bypassed checks, encryption and decryption
+relied on the key deriver, and the linkage trait adapters discarded privilege
+fields. The five validators moved from `wire/validation.rs` into the shared
+`validation/crypto.rs`, beside #415's four validators. The wire wrappers
+convert errors and construct typed arguments; their existing wire refusal
+texts are unchanged. All nine methods' inventory is closed in
+`src/wallet/CLAUDE.md`, with the type-enforced cases stated.
+
+The reference's order (`ts-stack@edf6e03`, `validationHelpers.ts:1717-1762`):
+
+- `validateGetPublicKeyArgs`: record, identityKey true/absent, forSelf
+  boolean; on the identity branch each supplied protocol, key ID and
+  counterparty, then privilege; otherwise the common encryption checks.
+- `validateWalletEncryptArgs` / `validateWalletDecryptArgs`: record, common
+  encryption checks, then plaintext / ciphertext byte array, at most
+  268435456 bytes.
+- `validateRevealCounterpartyKeyLinkageArgs`: record, counterparty public
+  key, verifier public key, privilege without seekPermission.
+- `validateRevealSpecificKeyLinkageArgs`: record, required counterparty,
+  verifier public key, protocol, key ID, privilege without seekPermission.
+
+Common encryption checks are protocol name 5..400 raw UTF-8 bytes, key ID
+1..800 bytes, optional counterparty, then privilege. A present privileged
+reason needs 5..50 UTF-8 bytes, even without privilege; privileged=true needs
+a reason. Key checks trim as JavaScript does, require even hex, then exactly
+66 characters, then a compressed secp256k1 point. `Counterparty::from_hex`
+checks that encoding before parsing; a valid uncompressed key used to lose
+its 130-character encoding and be accepted. It now fails in the reference's
+words. The shared point check also judges the wire's raw linkage keys.
+
+The inherent linkage arguments contain no privilege fields; their typed
+checks run there, and the trait adapters validate their additional privilege
+fields first. Specific linkage derives its internal encryption key directly,
+as the reference does, so a valid 400-byte public protocol can still produce
+a 430-byte revelation protocol. The public encryption validator is not
+reapplied to that internal protocol. No public type changes. The trait
+implementation and unit tests moved into `proto_wallet/` to keep the core
+below 800 lines; the moved proof test was split without changing assertions.
+
+`tests/wallet_proto_args_420.rs` pins sixteen reachable refusal texts,
+ordering, identity-branch checks, both linkage entry points, and valid
+boundaries including the 430-byte internal protocol. Its 257 cases come
+from the actual reference ProtoWallet under Node v22.18.0, through
+`tests/support/wallet_proto_args_415.mjs --remaining` and its #420 extension:
+148 replayable and 109 explicitly excluded by the typed API, both counts
+pinned. Entropy and time are fixed for reproducible recording; a second
+recording matches byte for byte. The original #415 corpus remains 117/85.
+The existing `fuzz_wire_protocol` target also exercises encoded-counterparty
+intake, seeded from this recording in the lane's external corpus.
+All sixteen refusal tests, the ordering test and the inherent-linkage test
+are RED on `6daf5afb` in a scratch copy with a separate target directory
+(18 failed, one valid-boundary test passed), then all 19 pass after the fix.
+
+Old Display text or behavior -> new Display text (each new refusal is a
+`WalletRefusal` of class `InvalidParameter`, code 6; the wire already used
+these words):
+
 protocol validation error: protocol name must be at least 5 characters
   -> The protocolID[1] parameter must be at least 5 length.
 protocol validation error: protocol name must be 400 characters or less
   -> The protocolID[1] parameter must be no more than 400 length.
+wallet error: protocolID is required when identityKey is false
+  -> The protocolID parameter must be a [securityLevel, protocolName] tuple
+# Absent key:
+wallet error: keyID is required when identityKey is false
+  -> The keyID parameter must be a string
+# Empty key:
+wallet error: keyID is required when identityKey is false
 protocol validation error: key ID must be at least 1 character
   -> The keyID parameter must be at least 1 length.
 protocol validation error: key ID must be 800 characters or less
@@ -336,6 +405,44 @@ validated here, and the configured originator is preserved rather than
 normalized; the reference validates every request and result. Go at
 `2ca481c` has no multi-substrate client; callers hold a `wallet.Interface`
 or construct a concrete substrate.
+accepted short / long / missing privileged reason
+accepted oversized plaintext
+  -> The plaintext parameter must be at most 268435456 bytes
+decryption failed
+  -> The ciphertext parameter must be at most 268435456 bytes
+invalid hex string: Odd number of digits
+  -> The counterparty parameter must be even length, not 1.
+invalid hex string: Invalid character 'z' at position 0
+  -> The counterparty parameter must be hexadecimal string.
+invalid public key: Invalid public key encoding: elliptic curve point encoding error
+  -> The counterparty parameter must be at least 66 length.
+accepted uncompressed counterparty (or parser error for malformed long hex)
+  -> The counterparty parameter must be no more than 66 length.
+invalid public key: Point not on curve
+  -> The counterparty parameter must be a valid compressed secp256k1 public key
+
+### Notes: cross-SDK parity (#420)
+
+The five validators and every reachable refusal follow `ts-stack@edf6e03`
+(`ProtoWallet.ts:159-280`, `validationHelpers.ts:146-230,348-356,522-535,1717-1762`).
+`ts-sdk@9e3ede6b` has none of those five validator calls; its ProtoWallet
+relies on derivation/parsing and ignores privilege. Go at `2ca481c`
+(`wallet/proto_wallet.go:63-177`, `proto_wallet_reveal.go:14-161`) likewise
+has no equivalent argument-validation layer; its linkage methods check
+required public keys and otherwise derive/encrypt. This follows the newer
+reference under the owner's ruling (c), as #415 did.
+
+Typed structs already enforce record shape, booleans, tuples, security
+levels, byte elements and parsed public keys. `identity_key: false` denotes
+an absent flag here and cannot separately represent the reference's
+explicitly false flag. The mandatory counterparty in counterparty linkage
+and both verifiers are `PublicKey` points; they have no original encoding
+to reject after construction. A generic `PublicKey` still accepts an
+uncompressed encoding and serializes the resulting point compressed; raw
+encoded counterparty intake now applies the bound before that information
+is lost. Each excluded recording states its reason. Later cipher misses
+(empty or wrong-key ciphertext) reach cryptography on both sides; their
+error texts are outside this argument-validation change.
 
 ### Added: the wire transceiver makes revealCounterpartyKeyLinkage and revealSpecificKeyLinkage as the reference's does; the client's existing linkage arms route to it (#406)
 

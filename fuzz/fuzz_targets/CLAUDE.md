@@ -66,6 +66,7 @@ Tests `bsv_rs::wallet::wire::WireReader` deserialization:
 - `read_protocol_id()`: protocol ID tuple deserialization
 - `read_optional_protocol_id()`: optional protocol ID deserialization
 - `read_bytes(n)`: raw byte slice reading (capped at 1024 bytes)
+- `Counterparty::from_hex`: UTF-8 encoded key validation before parsing (#420)
 
 Each method is tested with a fresh `WireReader` instance to independently fuzz each code path.
 

@@ -316,9 +316,9 @@ pub enum Counterparty {
 }
 
 impl Counterparty {
-    /// Creates a counterparty from a public key hex string.
+    /// Parses compressed key hex, checking the encoding before the point (#420).
     pub fn from_hex(hex: &str) -> crate::Result<Self> {
-        let pubkey = PublicKey::from_hex(hex)?;
+        let pubkey = super::validation::crypto::public_key_hex(hex, "counterparty")?;
         Ok(Counterparty::Other(pubkey))
     }
 

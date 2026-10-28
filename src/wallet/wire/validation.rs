@@ -21,7 +21,7 @@ use super::encoding::WireReader;
 use super::requests::{RevealCounterpartyRequest, RevealSpecificRequest};
 use crate::primitives::PublicKey;
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
-use crate::wallet::types::{Counterparty, Protocol};
+use crate::wallet::types::Counterparty;
 use crate::wallet::validation::crypto;
 use crate::wallet::{
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
@@ -126,29 +126,9 @@ fn invalid_result(call: &str, field: &str, expectation: impl Display) -> Refusal
 // ============================================================================
 
 /// The common typed checks use the same validators as ProtoWallet (#415).
-fn string_length(value: &str, name: &str, min: usize, max: usize) -> Checked {
-    crypto::string_length(value, name, min, max).map_err(Into::into)
-}
-
+#[cfg(test)]
 fn byte_array(length: usize, name: &str) -> Checked {
     crypto::byte_array(length, name).map_err(Into::into)
-}
-
-fn protocol(protocol: &Protocol) -> Checked {
-    crypto::protocol(protocol).map_err(Into::into)
-}
-
-fn privilege(privileged: Option<bool>, reason: Option<&str>) -> Checked {
-    crypto::privilege(privileged, reason).map_err(Into::into)
-}
-
-fn encryption(
-    protocol_id: &Protocol,
-    key_id: &str,
-    privileged: Option<bool>,
-    reason: Option<&str>,
-) -> Checked {
-    crypto::encryption(protocol_id, key_id, privileged, reason).map_err(Into::into)
 }
 
 /// `validateAbortActionArgs` (`:893-899`, `WalletArgumentValidation.ts:44-46`):
@@ -168,27 +148,19 @@ pub(super) fn abort_action_args(reference: &str) -> Checked {
 /// privilege alone (the wire carries no protocol, key ID or counterparty),
 /// otherwise the encryption arguments.
 pub(super) fn get_public_key_args(args: &GetPublicKeyArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    match (&args.protocol_id, &args.key_id) {
-        (Some(protocol_id), Some(key_id)) if !args.identity_key => {
-            encryption(protocol_id, key_id, args.privileged, reason)
-        }
-        _ => privilege(args.privileged, reason),
-    }
+    crypto::get_public_key_args(args)
+        .map(|_| ())
+        .map_err(Into::into)
 }
 
 /// `validateWalletEncryptArgs` (`:1752-1756`).
 pub(super) fn encrypt_args(args: &EncryptArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    encryption(&args.protocol_id, &args.key_id, args.privileged, reason)?;
-    byte_array(args.plaintext.len(), "plaintext")
+    crypto::encrypt_args(args).map_err(Into::into)
 }
 
 /// `validateWalletDecryptArgs` (`:1758-1762`).
 pub(super) fn decrypt_args(args: &DecryptArgs) -> Checked {
-    let reason = args.privileged_reason.as_deref();
-    encryption(&args.protocol_id, &args.key_id, args.privileged, reason)?;
-    byte_array(args.ciphertext.len(), "ciphertext")
+    crypto::decrypt_args(args).map_err(Into::into)
 }
 
 /// The four signature/HMAC validators shared with ProtoWallet (#415).
@@ -211,16 +183,7 @@ pub(super) fn verify_signature_args(args: &VerifySignatureArgs) -> Checked {
 /// `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`): a `02` or
 /// `03` prefix, x below the field prime, a point on the curve.
 fn compressed_key(bytes: &[u8]) -> Option<PublicKey> {
-    if !matches!(bytes.first(), Some(0x02 | 0x03)) {
-        return None;
-    }
-    PublicKey::from_bytes(bytes).ok()
-}
-
-/// `validatePublicKey` (`:182-188`) on 33 bytes the reader read raw: their
-/// hex is 66 characters, so the point check is what can fail.
-fn public_key(bytes: &[u8; 33], name: &str) -> Checked<PublicKey> {
-    compressed_key(bytes).ok_or_else(|| invalid(name, "a valid compressed secp256k1 public key"))
+    crypto::public_key(bytes, "publicKey").ok()
 }
 
 /// `validateRevealCounterpartyKeyLinkageArgs` (`:1734-1741`): the
@@ -229,9 +192,12 @@ fn public_key(bytes: &[u8; 33], name: &str) -> Checked<PublicKey> {
 pub(super) fn reveal_counterparty_args(
     request: RevealCounterpartyRequest,
 ) -> Checked<RevealCounterpartyKeyLinkageArgs> {
-    let counterparty = public_key(&request.counterparty, "counterparty")?;
-    let verifier = public_key(&request.verifier, "verifier")?;
-    privilege(request.privileged, request.privileged_reason.as_deref())?;
+    let (counterparty, verifier) = crypto::reveal_counterparty_args(
+        &request.counterparty,
+        &request.verifier,
+        request.privileged,
+        request.privileged_reason.as_deref(),
+    )?;
     Ok(RevealCounterpartyKeyLinkageArgs {
         counterparty,
         verifier,
@@ -247,13 +213,17 @@ pub(super) fn reveal_counterparty_args(
 pub(super) fn reveal_specific_args(
     request: RevealSpecificRequest,
 ) -> Checked<RevealSpecificKeyLinkageArgs> {
+    let verifier = crypto::reveal_specific_args(
+        request.counterparty.as_ref(),
+        &request.verifier,
+        &request.protocol_id,
+        &request.key_id,
+        request.privileged,
+        request.privileged_reason.as_deref(),
+    )?;
     let counterparty = request
         .counterparty
         .ok_or_else(|| invalid("counterparty", "a hexadecimal string"))?;
-    let verifier = public_key(&request.verifier, "verifier")?;
-    protocol(&request.protocol_id)?;
-    string_length(&request.key_id, "keyID", 1, 800)?;
-    privilege(request.privileged, request.privileged_reason.as_deref())?;
     Ok(RevealSpecificKeyLinkageArgs {
         counterparty,
         verifier,

@@ -1,15 +1,17 @@
-//! The typed portion of ProtoWallet's argument validators (#415).
+//! All nine ProtoWallet argument validators, shared with the wire (#415, #420).
 //!
-//! `ts-stack@edf6e03`, `validationHelpers.ts:146-230,1752-1804`.
-//! Order matters: encryption arguments, data/hash, signature, then forSelf.
+//! `ts-stack@edf6e03`, `validationHelpers.ts:146-230,1717-1804`.
+//! Encoded keys are bounded before parsing; typed keys already hold points.
 //! Rust's types already enforce records, byte elements, security levels,
 //! counterparties, booleans and the 32-byte hashes/HMACs. The wire processor
 //! shares these checks; its decoder additionally enforces those types.
 
 use super::originator::invalid_parameter;
 use crate::error::Result;
+use crate::primitives::PublicKey;
 use crate::wallet::{
-    CreateHmacArgs, CreateSignatureArgs, Protocol, VerifyHmacArgs, VerifySignatureArgs,
+    Counterparty, CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
+    Protocol, VerifyHmacArgs, VerifySignatureArgs,
 };
 
 const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
@@ -73,6 +75,112 @@ pub(crate) fn encryption(
     protocol(protocol_id)?;
     string_length(key_id, "keyID", 1, 800)?;
     privilege(privileged, reason)
+}
+
+/// `validateGetPublicKeyArgs`: identity still validates every supplied field.
+/// `identity_key: false` represents the reference's absent flag in this API.
+pub(crate) fn get_public_key_args(args: &GetPublicKeyArgs) -> Result<Option<(&Protocol, &str)>> {
+    let protocol_id = args.protocol_id.as_ref();
+    if let Some(protocol_id) = protocol_id {
+        protocol(protocol_id)?;
+    } else if !args.identity_key {
+        return Err(invalid_parameter(
+            "protocolID",
+            "a [securityLevel, protocolName] tuple",
+        ));
+    }
+    let key_id = args.key_id.as_deref();
+    if let Some(key_id) = key_id {
+        string_length(key_id, "keyID", 1, 800)?;
+    } else if !args.identity_key {
+        return Err(invalid_parameter("keyID", "a string"));
+    }
+    // An optional Counterparty is already either a special value or a point.
+    privilege(args.privileged, args.privileged_reason.as_deref())?;
+    Ok(protocol_id.zip(key_id).filter(|_| !args.identity_key))
+}
+
+/// `validateWalletEncryptArgs`: encryption arguments, then plaintext.
+pub(crate) fn encrypt_args(args: &EncryptArgs) -> Result<()> {
+    encryption(
+        &args.protocol_id,
+        &args.key_id,
+        args.privileged,
+        args.privileged_reason.as_deref(),
+    )?;
+    byte_array(args.plaintext.len(), "plaintext")
+}
+
+/// `validateWalletDecryptArgs`: encryption arguments, then ciphertext.
+pub(crate) fn decrypt_args(args: &DecryptArgs) -> Result<()> {
+    encryption(
+        &args.protocol_id,
+        &args.key_id,
+        args.privileged,
+        args.privileged_reason.as_deref(),
+    )?;
+    byte_array(args.ciphertext.len(), "ciphertext")
+}
+
+/// `validatePublicKey`: JavaScript trim, even hex, length, then curve point.
+/// Used at encoded-counterparty intake before its encoding is lost (#420).
+pub(crate) fn public_key_hex(value: &str, name: &str) -> Result<PublicKey> {
+    let value = super::originator::trim_js(value);
+    let length = value.encode_utf16().count();
+    if !length.is_multiple_of(2) {
+        return Err(invalid_parameter(
+            name,
+            &format!("even length, not {length}."),
+        ));
+    }
+    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(invalid_parameter(name, "hexadecimal string."));
+    }
+    string_length(value, name, 66, 66)?;
+    // The byte length is checked before either decoding or parsing the point.
+    let bytes = hex::decode(value).map_err(|_| invalid_parameter(name, "hexadecimal string."))?;
+    public_key(&bytes, name)
+}
+
+/// `isValidCompressedPublicKey`, including the 02/03 prefix before parsing.
+pub(crate) fn public_key(bytes: &[u8], name: &str) -> Result<PublicKey> {
+    let invalid = || invalid_parameter(name, "a valid compressed secp256k1 public key");
+    if bytes.len() != 33 || !matches!(bytes.first(), Some(0x02 | 0x03)) {
+        return Err(invalid());
+    }
+    PublicKey::from_bytes(bytes).map_err(|_| invalid())
+}
+
+/// `validateRevealCounterpartyKeyLinkageArgs`: both keys, then privilege.
+/// The wire supplies raw keys; ProtoWallet supplies its already parsed keys.
+pub(crate) fn reveal_counterparty_args(
+    counterparty: &[u8],
+    verifier: &[u8],
+    privileged: Option<bool>,
+    reason: Option<&str>,
+) -> Result<(PublicKey, PublicKey)> {
+    let counterparty = public_key(counterparty, "counterparty")?;
+    let verifier = public_key(verifier, "verifier")?;
+    privilege(privileged, reason)?;
+    Ok((counterparty, verifier))
+}
+
+/// `validateRevealSpecificKeyLinkageArgs`: counterparty, verifier, protocol,
+/// key ID, privilege. Unlike encryption, the counterparty must be present.
+pub(crate) fn reveal_specific_args(
+    counterparty: Option<&Counterparty>,
+    verifier: &[u8],
+    protocol_id: &Protocol,
+    key_id: &str,
+    privileged: Option<bool>,
+    reason: Option<&str>,
+) -> Result<PublicKey> {
+    counterparty.ok_or_else(|| invalid_parameter("counterparty", "a hexadecimal string"))?;
+    let verifier = public_key(verifier, "verifier")?;
+    protocol(protocol_id)?;
+    string_length(key_id, "keyID", 1, 800)?;
+    privilege(privileged, reason)?;
+    Ok(verifier)
 }
 
 /// `validateCreateHmacArgs`, before derivation or hashing.

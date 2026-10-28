@@ -11,6 +11,13 @@ import { pathToFileURL } from 'node:url'
 
 if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
 const { ProtoWallet, PrivateKey } = await import(pathToFileURL(process.argv[2]).href)
+// The five remaining methods and encoded-key intake use the same pinned build.
+// Add --remaining to record #420 without changing #415's 202-case corpus.
+if (process.argv[3] === '--remaining') {
+  const { recordRemaining } = await import('./wallet_proto_args_420.mjs')
+  await recordRemaining({ ProtoWallet, PrivateKey })
+  process.exit(0)
+}
 const wallet = new ProtoWallet(new PrivateKey(42))
 const common = { protocolID: [2, 'wallet tests'], keyID: 'key', counterparty: 'self', data: [1, 2, 3] }
 const { signature } = await wallet.createSignature(common)
