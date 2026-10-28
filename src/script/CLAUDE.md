@@ -272,7 +272,7 @@ impl Spend {
     pub fn flags(&self) -> Option<ScriptFlags>
     pub fn set_require_minimal(&mut self, require: bool)    // overrides, also after set_flags
     pub fn set_require_push_only(&mut self, require: bool)  // overrides, also after set_flags
-    pub fn set_utxo_after_chronicle(&mut self, after: bool)  // the Chronicle opcodes' gate; overrides the word's bit
+    pub fn set_utxo_after_chronicle(&mut self, after: bool)  // the coin's era: sets both switches (the 0xb3-0xb7 gate, the era); overrides the word's bit (#397)
     pub fn memory_limit(&self) -> usize                      // the local budget in force (0.3.30)
     pub fn stack_memory_policy(&self) -> Option<usize>       // the mempool path's verdict figure in force (0.3.30)
     pub fn set_stack_memory_policy(&mut self, bytes: usize)  // the node's -maxstackmemoryusagepolicy, 0 = none (0.3.30)
@@ -438,7 +438,7 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 - **Caching**: Raw bytes and hex strings are cached and invalidated on mutation
 - **PUSHDATA**: Uses smallest encoding (direct push 0x01-0x4b, PUSHDATA1/2/4)
 - **BSV Opcodes**: All BSV re-enabled opcodes supported (CAT, SPLIT, MUL, DIV, MOD, etc.)
-- **Disabled before Chronicle only**: OP_2MUL, OP_2DIV (disabled), OP_VER, OP_VERIF, OP_VERNOTIF (BAD_OPCODE when executed, skipped when not), 0xb3–0xb7 (NOPs); for a post-Chronicle UTXO (`UTXO_AFTER_CHRONICLE`, or version > 1 by default) all run per bitcoin-sv v1.2.2 (0.3.27). Undefined opcodes 0xba–0xff executed, a truncated push reached, a second OP_ELSE: failures in every mode.
+- **Disabled before Chronicle only**: OP_2MUL, OP_2DIV (disabled), OP_VER, OP_VERIF, OP_VERNOTIF (BAD_OPCODE when executed, skipped when not), 0xb3–0xb7 (NOPs); for a post-Chronicle UTXO (`UTXO_AFTER_CHRONICLE`) all run per bitcoin-sv v1.2.2 (0.3.27). Without a word two switches (#397): the opcode gate (`chronicle_opcodes`) runs 0xb3–0xb7 at every version, as the reference's default does (`Spend.ts:827-828`); the era switch (`utxo_after_chronicle`, version > 1, the reference's `isAfterChronicle()`) the other five. `set_utxo_after_chronicle` sets both. Undefined opcodes 0xba–0xff executed, a truncated push reached, a second OP_ELSE: failures in every mode.
 - **ASM Rendering**: `OP_FALSE`/`OP_0` renders as `"0"`, not `"OP_0"` in `to_asm()`
 
 ### The interpreter's layout (`spend/`, #85)

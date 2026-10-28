@@ -60,8 +60,18 @@ impl Spend {
         // operand's shrink half again, asked first (bsv-rs#374)
         let len = bytes.len() as u64;
         self.number_room(len + others, len + len / 2 + 8)?;
-        ScriptNum::from_bytes(bytes, self.require_minimal)
-            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))
+        ScriptNum::from_bytes(bytes, self.require_minimal).map_err(|e| self.non_minimal(e))
+    }
+
+    /// A non-minimal number's refusal (`ScriptNum::from_bytes`'s one error):
+    /// in the default mode the reference's words at every number site
+    /// (`BigNumber.ts:1684`, `Spend.ts:547`; bsv-rs#397), under a word this
+    /// crate's reader's.
+    pub(super) fn non_minimal(&self, e: crate::Error) -> ScriptEvaluationError {
+        match self.flags {
+            None => self.error("non-minimally encoded script number"),
+            Some(_) => self.error(&format!("Invalid script number: {}", e)),
+        }
     }
 
     /// [`read_number`](Self::read_number)'s verdicts without the decode, so a

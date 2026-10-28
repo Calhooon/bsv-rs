@@ -108,6 +108,14 @@ fn run_spend_vector(index: usize, vector: &SpendVector) -> Result<bool, String> 
 /// (`conditional_tracker.cpp:51-55`, `interpreter.cpp:829-831`), and every
 /// UTXO here is post-Genesis, so they are refused in every mode (0.3.27). The
 /// TypeScript SDK's default still accepts them: a stated divergence.
+///
+/// Vectors 80 and 311 (`1 OP_NOP1 .. OP_NOP10 1 OP_EQUAL`, twins) assert
+/// `0xb3`-`0xb7` as NOPs. The default mode runs them as the Chronicle opcodes
+/// at every version since bsv-rs#397, as the reference's default does, and
+/// the reference refuses the vector in the same words at version 1 without
+/// flags (`ts-stack@edf6e03` under Node 22.18.0); its own copy carries
+/// `P2SH,STRICTENC` (`script.valid.vectors.ts:340`), a word whose
+/// `UTXO_AFTER_CHRONICLE` bit is off, which this file has no column for.
 const SPEND_VALID_KNOWN_DIVERGENCES: &[(usize, &str)] = &[
     (27, "OP_ELSE may only be used once"),
     (28, "OP_ELSE may only be used once"),
@@ -119,6 +127,10 @@ const SPEND_VALID_KNOWN_DIVERGENCES: &[(usize, &str)] = &[
     (34, "OP_ELSE may only be used once"),
     (35, "OP_ELSE may only be used once"),
     (36, "OP_ELSE may only be used once"),
+    (
+        80,
+        "OP_SUBSTR requires at least three items to be on the stack.",
+    ),
     (258, "OP_ELSE may only be used once"),
     (259, "OP_ELSE may only be used once"),
     (260, "OP_ELSE may only be used once"),
@@ -129,6 +141,10 @@ const SPEND_VALID_KNOWN_DIVERGENCES: &[(usize, &str)] = &[
     (265, "OP_ELSE may only be used once"),
     (266, "OP_ELSE may only be used once"),
     (267, "OP_ELSE may only be used once"),
+    (
+        311,
+        "OP_SUBSTR requires at least three items to be on the stack.",
+    ),
 ];
 
 #[test]

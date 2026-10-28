@@ -236,8 +236,12 @@ fn discourage_upgradable_nops_refuses_an_executed_nop1_to_nop10_under_the_standa
         );
         let msg = message(with_flags(&lock, "", 2, ScriptFlags::standard(era)).validate());
         assert_eq!(msg, format!("{nop} is discouraged by verification flags."));
+        // the default mode has no such rule; 0xb3-0xb7 run there unless the
+        // coin is set pre-Chronicle (bsv-rs#397)
+        let mut s = spend(&lock, "", 1);
+        s.set_utxo_after_chronicle(era == ProtocolEra::PostChronicle);
         assert!(
-            valid(spend(&lock, "", 1).validate()),
+            valid(s.validate()),
             "{nop}: the default mode has no such rule"
         );
     }

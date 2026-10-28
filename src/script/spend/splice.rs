@@ -417,8 +417,7 @@ impl Spend {
                         // the read's own refusal in its words: `from_bytes` refuses
                         // a non-minimal operand before it decodes anything, and a
                         // minimal one never reaches it (judged from the last two bytes)
-                        ScriptNum::from_bytes(bytes, true)
-                            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                        ScriptNum::from_bytes(bytes, true).map_err(|e| self.non_minimal(e))?;
                     }
                     i64::from_le_bytes(*first)
                 }

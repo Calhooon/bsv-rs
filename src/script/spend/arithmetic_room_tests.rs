@@ -162,11 +162,8 @@ fn an_operands_encoding_verdict_precedes_the_bound() {
         run(&[widest(600), padded], &then_true(OP_MUL), 1, None).expect_err("the read's verdict")
     });
     assert!(!error.is_resource_limit(), "{}", error.message);
-    assert!(
-        error.message.starts_with("Invalid script number:"),
-        "{}",
-        error.message
-    );
+    // the reference's words in the default mode (bsv-rs#397)
+    assert_eq!(error.message, "non-minimally encoded script number");
 }
 
 /// Runs `operands` then `lock` under a modelled allocator that refuses more

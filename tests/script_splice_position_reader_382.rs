@@ -137,23 +137,15 @@ fn issue_382_a_non_minimal_9_byte_length_is_read_without_minimaldata() {
 }
 
 /// Reference: `non-minimally encoded script number` at version 1
-/// (MINIMALDATA): refused before it is read. This crate's words for a
-/// non-minimal number are its reader's at every site (the same verdict
-/// before #382). The coin is marked post-Chronicle: at version 1 this crate's
-/// default mode runs `0xb4` as `OP_NOP5` otherwise, where the reference runs
-/// `OP_LEFT`.
+/// (MINIMALDATA): refused before it is read, in the reference's words since
+/// #397 (the same verdict before #382), and `0xb4` run as `OP_LEFT` at
+/// version 1 in the default mode as the reference runs it (#397).
 #[test]
 fn a_non_minimal_9_byte_length_is_refused_under_minimaldata() {
-    let mut s = spend(1, &[DATA, NINE_TWO_SIGNED], LEFT, None);
-    s.set_utxo_after_chronicle(true);
-    let got = s.validate().map_err(|e| e.message);
-    assert_eq!(
-        got,
-        Err(
-            "Invalid script number: script execution error: Non-minimally encoded script number"
-                .to_string()
-        )
-    );
+    let got = spend(1, &[DATA, NINE_TWO_SIGNED], LEFT, None)
+        .validate()
+        .map_err(|e| e.message);
+    assert_eq!(got, Err("non-minimally encoded script number".to_string()));
 }
 
 /// Reference: `OP_LEFT length (2147483647) must be in range [0, 3]`: the
