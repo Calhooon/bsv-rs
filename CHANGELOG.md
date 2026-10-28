@@ -57,7 +57,9 @@ across the two.
 
 The reference's `validateInternalizeActionArgs` (`:1046-1074`) and the
 remittance validators check more than this crate's validator does, and
-none of it is ported here: the output index a non-negative integer
+little of it is ported here (the wire transceiver alone checks a payment
+remittance's prefix and suffix as base64 and its sender key as hex when it
+writes them, `transceiver.rs:825-833`): the output index a non-negative integer
 (`:979`; a `u32` here by type), `derivationPrefix` and `derivationSuffix`
 base64 and `senderIdentityKey` a public key (`validateWalletPayment`,
 `:914-923`), the basket and the tags (`validateBasketInsertion`,
@@ -65,8 +67,9 @@ base64 and `senderIdentityKey` a public key (`validateWalletPayment`,
 bytes, the labels, and at least one output (`:1050-1071`). go-sdk at
 `2ca481c` has no internalizeAction argument validator: its writer refuses
 an absent remittance in its own words (`payment remittance is required for
-wallet payment protocol`, `wallet/serializer/internalize_action.go:29-30`,
-`:38-39`) and writes the protocol's remittance alone, dropping the other.
+wallet payment protocol`, `wallet/serializer/internalize_action.go:29-30`;
+`insertion remittance is required for basket insertion protocol`, `:38-39`)
+and writes the protocol's remittance alone, dropping the other.
 
 ### Fixed: the interpreter holds no number's bytes twice and writes no huge number in an error's text, under a caller's memory budget (#348, #349)
 
