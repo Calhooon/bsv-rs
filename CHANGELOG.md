@@ -7,6 +7,128 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
+
+The toolbox's #311 lane (toolbox PR #375, divergence row D12) found that of
+several bad field names a direct acquire named the lowest-sorting one, where
+the reference names the first given: the reference walks a certificate's
+fields and a keyring in `Object.keys` order (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/validationHelpers.ts:1236`, `:1254`), its
+`Record`s holding insertion order (`Wallet.interfaces.ts`), and this crate's
+maps were `HashMap<String, String>`, which hold none whatever order the JSON
+or the wire gave. The keeper's reading (2026-10-28 00:5xZ): an
+insertion-ordered map is the reference's own field type in Rust, so under the
+owner's ruling (c) and the keeper's reading of 2026-10-26 on #288 it needs
+no new word.
+
+The nine maps of `src/wallet/types.rs` are `indexmap::IndexMap<String,
+String>`: `Certificate.fields`, `WalletCertificate.fields`,
+`AcquireCertificateArgs.fields` and `.keyring_for_subject`,
+`CertificateResult.keyring`, `ProveCertificateResult.keyring_for_verifier`,
+`IdentityCertificate.publicly_revealed_keyring` and `.decrypted_fields`,
+`DiscoverByAttributesArgs.attributes`. `indexmap` (2, `serde`) moves from
+`auth` to `wallet`; `auth` has it through `wallet`, and the wasm32 slice
+builds. Serde reads and writes them in the text's order. The walks:
+
+- `wallet::validation` (1): `validate_certificate_fields` takes and returns
+  the `IndexMap` and refuses the first bad name given.
+- `wallet::wire` (9): `WireWriter::write_string_map` writes the map's order,
+  the reference's `Object.entries` (`WalletWireTransceiver.ts:1389`,
+  `:1583`, `:1815`; `WalletWireProcessor.ts:2542`), where it sorted keys as
+  go-sdk does; `write_identity_certificate`'s public keyring the same
+  (`#recordEntries`, `WalletWireProcessor.ts:2523`), where it sorted;
+  `read_string_map`, `read_optional_string_map`, the strict record readers
+  (`read_counted_wire_record`, the discovery maps, `read_certificate_fields`)
+  and the transceiver's proveCertificate keyring read in the order the bytes
+  arrive; acquireCertificate's `keyring_for_subject`, written in the
+  `HashMap`'s iteration order before, is written in the map's
+  (`WalletWireTransceiver.ts:1416`). The certificate frame keeps the signed
+  order (`checked_field_names`, below).
+- `identity` (2): `publicly_reveal_attributes` judges and publishes the
+  wallet's keyring in the wallet's key order (`IdentityClient.ts:485`,
+  `:492-499`), where it used the order of the names asked, so of two values
+  it refuses it names the wallet's first; the identity token's JSON writes
+  the certificate's fields in the order held (`:502`), where it wrote them by
+  name.
+- `auth` (2): `Certificate::to_wallet_certificate` writes the fields in the
+  signed order (`auth::Certificate.fields` stays a `HashMap`, below);
+  `get_verifiable_certificates` converts at the boundary.
+- `kvstore`, `registry`: none touches these maps (the local store's test
+  wallet only names the argument types).
+
+The signer is the one walk that does not follow the map, here as in the
+reference: `Certificate.toBinary` sorts the names by `localeCompare`
+(`Certificate.ts:282`) and signs and verifies that preimage, so the
+signature is the same whatever order the fields were given in (the issue's
+"signs in that order" is the validators' walk, not the signer's). This
+crate's signer and `write_wallet_certificate` keep that order (#246, #249).
+
+Pinned by `tests/wallet_certificate_field_order_385.rs` (8): 26 field names
+over 50 bytes, longest first, refused at the first (76 bytes); a reveal whose
+wallet answers two bad keyring values, `name` then `email`, for names asked
+`email` then `name`, refused naming `keyringForVerifier.name`; the identity
+token's JSON with the fields and keyring in their order (`name` first) and
+the #307 vector's certifier signature verifying; twelve names given out of
+order signed, the wallet's frame the sorted preimage `Certificate::to_binary`
+signs (`alpha, bravo, ..., Kilo, Mike, name, role, x9, zeta`), verifying when
+read back; each of the nine maps read from JSON text in its order and
+written back in it; acquireCertificate's request writing the fields and
+keyring in order; a proveCertificate keyring read in arrival order; a
+discovery entry's maps written and read in order, the certificate's fields
+crossing in the signed order. The signer's order is pinned from the code's
+reading (`Certificate.ts:282-284`) and the reference-recorded #249 vector
+(`auth_certificate_field_order_249.json`), no new recording. Red 8 of 8 on a
+scratch copy of `1791d2f8` with the file added (three runs); the signer test
+red there only at its map-order assertion, its preimage half green without
+it. `tests/wire_identity_certificate_writer.rs` pinned the discovery maps in
+go-sdk's sorted order as the reference's; its expected bytes are now the
+reference's order. The golden fixtures (`tests/fixtures/{wire,http_json}`)
+did not move: every recorded map of two or more keys is already in byte
+order (`name`, `role`; the recorder wrote them through `serde_json::Value`,
+which sorts keys in this build) and every certificate carries one field, so
+insertion order reads them unchanged; `fixtures_replay` green, nothing
+re-recorded.
+
+Migration: a struct literal that built a `HashMap` builds an `IndexMap`
+(`[(k, v)].into_iter().collect()` compiles unchanged, `IndexMap::from([...])`
+for `HashMap::from([...])`); code that reads a map with the map API compiles
+as it is and now gets order; `validate_certificate_fields`,
+`WireReader::read_string_map`, `read_optional_string_map` and
+`WireWriter::write_string_map` take or return the `IndexMap`. `IndexMap`'s
+`==` ignores order, as `HashMap`'s does. Downstreams that build these maps:
+the toolbox (its re-pin flips D12) and any wallet over `WalletInterface`'s
+certificate calls.
+
+Semver: nine public field types and four public signatures change, under
+the keeper's reading carried by (c). `cargo semver-checks --release-type
+minor --baseline-rev 1791d2f8 --all-features` passes 202 checks and names
+nothing: it has no lint for a changed field or parameter type, so the pass
+is not evidence; the change is this entry's. Ratchet: every counter at or
+below `docs/ratchets.json` (`tools/ratchet/run --check --against
+origin/beta`), four files at their bound kept there (`types.rs` names
+`indexmap::IndexMap` in place, one comment line each); not re-recorded.
+
+### Notes: cross-SDK parity (#385)
+
+A JavaScript object moves an integer-like key (`"1"`, `"42"`) ahead of the
+others in ascending order, so the reference's `Object.keys` walks a field
+named `"7"` first whatever its place; `IndexMap` keeps it where it was given.
+`validateCertificateFields` refuses no integer-like name (1 to 50 bytes is
+its rule), so on such a certificate the first name refused, the keyring's
+judged and published order and the wire maps' bytes differ from the
+reference's; on every other certificate they are the same. go-sdk@2ca481c
+holds every map as `map[string]string` and orders none: its wire writer
+sorts the keys (`WriteStringMap`, `util/writer.go:247-258`;
+acquireCertificate's keyring, `wallet/serializer/acquire_certificate.go:67-71`) and its certificate frame
+sorts the field names by bytes (`sort.Strings`,
+`wallet/serializer/certificate.go:42-49`), so a frame with unsorted maps that
+this crate or the reference writes differs from Go's bytes. Go's readers
+require no order. The Go wire vectors carry maps already sorted and still
+pass. `auth::Certificate`, `MasterCertificate`, `VerifiableCertificate` and
+`identity::IdentityCertificate` keep `HashMap` fields and keyrings: their
+signer sorts and their JSON is #268's (a follow-up decides whether they move
+too); a wallet certificate converted from one takes the signed order.
+
 ### Fixed: internalizeAction judges an output's protocol and its one remittance before the remittances' fields, as the reference orders it (#384)
 
 `wallet::validation::validate_internalize_action_args` read each output's
