@@ -38,6 +38,15 @@ struct Case {
     body_hex: String,
     error: Option<Vec<RecordedError>>,
     reached_on_data: bool,
+    requested_certificates_padding: Option<usize>,
+    delivered: Option<Delivery>,
+}
+
+#[derive(Deserialize)]
+struct Delivery {
+    message_type: String,
+    signature: Vec<u8>,
+    requested_certificates: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -79,7 +88,7 @@ fn message(general: bool) -> AuthMessage {
     message
 }
 
-async fn replay(case: &Case) -> (Error, String) {
+async fn exchange(case: &Case) -> (bsv_rs::Result<()>, Vec<AuthMessage>, String) {
     let server = MockServer::start().await;
     let at = if case.general {
         "/sendMessage"
@@ -100,6 +109,14 @@ async fn replay(case: &Case) -> (Error, String) {
             reqwest::header::HeaderValue::from_bytes(&bytes).unwrap(),
         );
     }
+    if let Some(padding) = case.requested_certificates_padding {
+        let value = format!(
+            "{{\"certifiers\":[],\"types\":{{{}}}}}",
+            " ".repeat(padding)
+        );
+        assert_eq!(value.len(), 262145);
+        answer = answer.insert_header("x-bsv-auth-requested-certificates", value);
+    }
     if case.redirect {
         answer = answer.insert_header("location", format!("{}/never-replayed", server.uri()));
     }
@@ -115,20 +132,21 @@ async fn replay(case: &Case) -> (Error, String) {
         .mount(&server)
         .await;
     let transport = SimplifiedFetchTransport::new(&server.uri());
-    let seen = Arc::new(Mutex::new(0));
+    let seen = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
-    transport.set_callback(Box::new(move |_| {
-        *sink.lock().unwrap() += 1;
+    transport.set_callback(Box::new(move |message| {
+        sink.lock().unwrap().push(message);
         Box::pin(async { Ok(()) })
     }));
     let result = transport.send(&message(case.general)).await;
-    assert_eq!(
-        *seen.lock().unwrap(),
-        0,
-        "{} reached the callback",
-        case.name
-    );
-    (result.expect_err(&case.name), server.uri())
+    let messages = std::mem::take(&mut *seen.lock().unwrap());
+    (result, messages, server.uri())
+}
+
+async fn replay(case: &Case) -> (Error, String) {
+    let (result, messages, origin) = exchange(case).await;
+    assert!(messages.is_empty(), "{} reached the callback", case.name);
+    (result.expect_err(&case.name), origin)
 }
 
 async fn assert_words(case: &Case) {
@@ -266,4 +284,94 @@ async fn issue_410_replays_every_recorded_json_syntax_error() {
         }
     }
     assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+}
+
+async fn assert_depth_words(depth: usize) {
+    for reference in references() {
+        let cases: Vec<_> = reference
+            .cases
+            .iter()
+            .filter(|case| case.name.starts_with(&format!("depth_{depth}_")))
+            .collect();
+        assert_eq!(cases.len(), 4);
+        for case in cases {
+            assert_words(case).await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn issue_410_json_syntax_at_depth_127_uses_the_reference_words() {
+    assert_depth_words(127).await;
+}
+
+#[tokio::test]
+async fn issue_410_json_syntax_at_depth_200_uses_the_reference_words() {
+    assert_depth_words(200).await;
+}
+
+#[tokio::test]
+async fn issue_410_oversized_certificate_header_is_a_documented_divergence() {
+    for reference in references() {
+        let case = reference
+            .cases
+            .iter()
+            .find(|c| c.name == "mapping_oversized")
+            .unwrap();
+        if reference.reference == "ts-stack@edf6e03" {
+            assert_eq!(case.error.as_ref().unwrap()[0].message,
+                "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: [oversized]. header exceeds its byte limit");
+            assert!(!case.reached_on_data);
+        } else {
+            assert!(case.error.is_none() && case.reached_on_data);
+            assert_eq!(
+                case.delivered.as_ref().unwrap().requested_certificates,
+                Some(serde_json::json!({"certifiers": [], "types": {}}))
+            );
+        }
+        let (result, messages, _) = exchange(case).await;
+        result.unwrap();
+        assert_eq!(messages.len(), 1);
+        assert!(messages[0]
+            .requested_certificates
+            .as_ref()
+            .unwrap()
+            .is_empty());
+    }
+}
+
+#[tokio::test]
+async fn issue_410_base64_signature_is_a_documented_divergence() {
+    let reference = references().remove(0);
+    let case = reference
+        .cases
+        .iter()
+        .find(|c| c.name == "mapping_signature")
+        .unwrap();
+    assert_eq!(case.error.as_ref().unwrap()[0].message,
+        "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal");
+    assert!(!case.reached_on_data);
+    let (result, messages, _) = exchange(case).await;
+    result.unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].signature, Some(vec![48, 0]));
+}
+
+#[tokio::test]
+async fn issue_410_certificate_request_type_is_a_documented_divergence() {
+    for reference in references() {
+        let case = reference
+            .cases
+            .iter()
+            .find(|c| c.name == "mapping_certificate_request")
+            .unwrap();
+        assert!(case.error.is_none() && case.reached_on_data);
+        let delivered = case.delivered.as_ref().unwrap();
+        assert_eq!(delivered.message_type, "certificateRequest");
+        assert_eq!(delivered.signature, vec![48, 6, 2, 1, 1, 2, 1, 1]);
+        let (result, messages, _) = exchange(case).await;
+        result.unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].message_type, MessageType::General);
+    }
 }

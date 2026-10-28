@@ -13,7 +13,7 @@ This module provides transport layer implementations for sending and receiving a
 | `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1200 |
 | `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | ~80 |
 | `http/handshake.rs` | Handshake send, status refusal, and the certificate header parse on every general response (#410) | ~70 |
-| `http/json_syntax.rs` | Node 22 JSON syntax diagnostics after serde refuses; iterative, bounded nesting and context (#410) | ~310 |
+| `http/json_syntax.rs` | Node 22 JSON syntax diagnostics after serde refuses; iterative, input-bounded states, no fixed depth cutoff, 20-unit context (#410) | ~310 |
 | `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `head` (the status, the status line's own reason phrase from hyper's `ext::ReasonPhrase`, the headers), `refuse_unauthenticated`, `sender` (the answer's identity key), `signature` (its signature, hex then base64), the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview, an unsigned 429, 502, 503 or 504 a transport fault by `status_fault` | ~226 |
 | `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
 
@@ -422,6 +422,24 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `TransportError("no handler registered")` | WebSocket send before setting callback |
 | `TransportError("failed to marshal auth message: {}")` | JSON serialization error |
 | `TransportError("WebSocket connection not available")` | Connection dropped after error |
+
+The #410 entry names four changes and four old/new pairs: handshake status,
+malformed JSON, malformed certificate header (previously accepted), and
+redirect words. Its 12 tests replay 75 cases per reference. Three unchanged
+response mappings are stated divergences: a 262,145-byte valid certificate
+header is delivered here (reference `[oversized]. header exceeds its byte
+limit`); signature `MAA=` decodes as base64 `[48, 0]` here (reference
+`[invalid]. signature must be bounded even-length hexadecimal`); and a
+`certificateRequest` header still yields `MessageType::General` here.
+See the changelog's #410 parity paragraph and the root known-divergences list.
+
+The syntax scanner has no fixed depth cutoff; its states grow with input
+depth. Node 22 accepts arrays and objects at 127, 128, 200, 1,000, 10,000 and
+100,000 levels, up to its handshake-body default of 1 MiB and beyond in
+`JSON.parse` alone. Rust's body reader has no matching byte cap. Valid-JSON
+typed refusals remain serde's, including out-of-range numbers: nine inputs
+in the saved 80,096-case probe, all finite-double overflows (`86e427` reads
+as `Infinity` in V8).
 
 ## Testing
 

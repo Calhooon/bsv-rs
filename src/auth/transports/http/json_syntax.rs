@@ -25,7 +25,9 @@ struct Scanner<'a> {
     at: usize,
 }
 
-/// None means syntactically valid JSON, or nesting past serde's own bound.
+/// None means syntactically valid JSON. The pending states grow with the
+/// input's nesting, with no recursion or fixed depth cutoff: Node 22 accepts
+/// nesting throughout the reference's buffered-body limit (#410).
 pub(super) fn diagnostic(text: &str) -> Option<String> {
     let mut scanner = Scanner { text, at: 0 };
     let mut states = vec![State::End, State::Value];
@@ -33,9 +35,6 @@ pub(super) fn diagnostic(text: &str) -> Option<String> {
         scanner.space();
         if let Err(failure) = scanner.step(state, &mut states) {
             return Some(scanner.describe(failure));
-        }
-        if states.len() > 128 {
-            return None;
         }
     }
     None
