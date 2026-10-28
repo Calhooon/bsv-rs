@@ -2,9 +2,10 @@
 
 use reqwest::header::HeaderMap;
 
-use super::{body, client, handshake, headers, response_bounds, unauthenticated, write_varint};
+use super::{body, client, handshake, headers, response_bounds, unauthenticated};
 use super::{HttpRequest, SimplifiedFetchTransport};
 use crate::auth::{AuthMessage, MessageType};
+use crate::primitives::Writer;
 use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, Result};
 
@@ -118,21 +119,22 @@ fn response_message(url: &str, status: u16, map: &HeaderMap, body: &[u8]) -> Res
 }
 
 fn response_payload(status: u16, map: &HeaderMap, body: &[u8]) -> Result<Vec<u8>> {
-    let mut payload = response_bounds::request_id(map)?.unwrap_or_default();
-    payload.extend(write_varint(i64::from(status)));
-    let included = response_bounds::signed_headers(map)?;
-    payload.extend(write_varint(included.len() as i64));
-    for (key, value) in included {
-        payload.extend(write_varint(key.len() as i64));
-        payload.extend_from_slice(key.as_bytes());
-        payload.extend(write_varint(value.len() as i64));
-        payload.extend_from_slice(value.as_bytes());
+    let mut payload = Writer::new();
+    if let Some(request_id) = response_bounds::request_id(map)? {
+        payload.write_bytes(&request_id);
     }
-    payload.extend(write_varint(if body.is_empty() {
-        -1
+    payload.write_var_int(u64::from(status));
+    let included = response_bounds::signed_headers(map)?;
+    payload.write_var_int(included.len() as u64);
+    for (key, value) in included {
+        payload.write_var_bytes(key.as_bytes());
+        payload.write_var_bytes(value.as_bytes());
+    }
+    if body.is_empty() {
+        // The empty-body marker is the all-ones varint, written as -1 before.
+        payload.write_var_int(u64::MAX);
     } else {
-        body.len() as i64
-    }));
-    payload.extend_from_slice(body);
-    Ok(payload)
+        payload.write_var_bytes(body);
+    }
+    Ok(payload.into_bytes())
 }
