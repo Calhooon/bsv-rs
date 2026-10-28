@@ -91,7 +91,7 @@ fn string_length(s: &str, name: &str, min: usize, max: usize) -> Result<()> {
 }
 
 /// `WERR_INVALID_PARAMETER`: `The <parameter> parameter must be <mustBe>`.
-fn invalid_parameter(parameter: &str, must_be: &str) -> Error {
+pub(super) fn invalid_parameter(parameter: &str, must_be: &str) -> Error {
     Error::WalletRefusal {
         class: WalletRefusalClass::InvalidParameter,
         message: format!("The {parameter} parameter must be {must_be}"),

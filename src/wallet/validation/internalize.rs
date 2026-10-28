@@ -5,24 +5,48 @@
 //! rejected; the TypeScript SDK's `validateBasketInsertion` carries the same
 //! bound in bytes (`validationHelpers.ts:942-946`). The createAction output's
 //! `customInstructions` carries no bound in either, and none here.
+//!
+//! Each output is judged in the reference's `validateInternalizeOutput` order
+//! (`ts-stack@edf6e03` `validationHelpers.ts:966-984`): the protocol
+//! (`:968-970`), then the one remittance its protocol names and no other
+//! (`:971-977`), then the remittances' fields (`:978-983`; bsv-rs#384).
 
+use super::originator::invalid_parameter;
 use super::validate_optional_string_length;
 use crate::error::Result;
-use crate::wallet::types::InternalizeActionArgs;
+use crate::wallet::types::{InternalizeActionArgs, InternalizeOutput};
 
 /// The most UTF-8 bytes a basket insertion's `customInstructions` may carry.
 const MAX_INSERTION_CUSTOM_INSTRUCTIONS_BYTES: usize = 1000;
 
 /// Validates internalize action arguments.
 ///
-/// Every output's `insertionRemittance.customInstructions`, when present, is at
-/// most 1,000 UTF-8 bytes (`str::len`, bytes not characters). A longer one is
-/// refused with `Error::WalletError` naming the field with its output index and
-/// the byte count: `Invalid outputs[1].insertionRemittance.customInstructions:
-/// must be no more than 1000 bytes, got 1001`. BRC-100's scoped exception for a
-/// supported module (such as BRC-207) is not modelled: no such module is.
+/// Per output, in the reference's order (`ts-stack@edf6e03`
+/// `validationHelpers.ts:966-984`):
+///
+/// 1. the protocol is `wallet payment` or `basket insertion`, else
+///    `The protocol parameter must be 'basket insertion' or 'wallet payment'`;
+/// 2. a wallet payment carries a `paymentRemittance` and no
+///    `insertionRemittance`, else `The output remittance parameter must be
+///    only paymentRemittance for wallet payment`, and a basket insertion the
+///    twin, `The output remittance parameter must be only insertionRemittance
+///    for basket insertion` (bsv-rs#384);
+/// 3. the insertion's `customInstructions`, when present, is at most 1,000
+///    UTF-8 bytes (`str::len`, bytes not characters): `Error::WalletError`
+///    naming the field with its output index and the byte count,
+///    `Invalid outputs[1].insertionRemittance.customInstructions: must be no
+///    more than 1000 bytes, got 1001`.
+///
+/// The first two are [`Error::WalletRefusal`] of class
+/// [`WalletRefusalClass::InvalidParameter`] in the reference's words, which
+/// name no output index. BRC-100's scoped exception for a supported module
+/// (such as BRC-207) is not modelled: no such module is.
+///
+/// [`Error::WalletRefusal`]: crate::error::Error::WalletRefusal
+/// [`WalletRefusalClass::InvalidParameter`]: crate::error::WalletRefusalClass::InvalidParameter
 pub fn validate_internalize_action_args(args: &InternalizeActionArgs) -> Result<()> {
     for (index, output) in args.outputs.iter().enumerate() {
+        validate_one_remittance(output)?;
         if let Some(insertion) = &output.insertion_remittance {
             validate_optional_string_length(
                 insertion.custom_instructions.as_deref(),
@@ -33,4 +57,25 @@ pub fn validate_internalize_action_args(args: &InternalizeActionArgs) -> Result<
         }
     }
     Ok(())
+}
+
+/// The protocol and its one remittance (`validationHelpers.ts:968-977`).
+fn validate_one_remittance(output: &InternalizeOutput) -> Result<()> {
+    let payment = output.payment_remittance.is_some();
+    let insertion = output.insertion_remittance.is_some();
+    match output.protocol.as_str() {
+        "wallet payment" if !payment || insertion => Err(invalid_parameter(
+            "output remittance",
+            "only paymentRemittance for wallet payment",
+        )),
+        "basket insertion" if !insertion || payment => Err(invalid_parameter(
+            "output remittance",
+            "only insertionRemittance for basket insertion",
+        )),
+        "wallet payment" | "basket insertion" => Ok(()),
+        _ => Err(invalid_parameter(
+            "protocol",
+            "'basket insertion' or 'wallet payment'",
+        )),
+    }
 }
