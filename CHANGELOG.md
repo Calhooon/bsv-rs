@@ -182,6 +182,37 @@ Go at `2ca481c` writes the nil sentinel for that entry
 here with the precision words, as the TypeScript reference refuses it.
 The pre-existing getHeight, unbounded satoshis and missing collection-size
 checks are filed separately and unchanged by this fold.
+### Changed: per-input verification work budget (#378, part 2)
+
+`Transaction::verify_with_work_budget` and
+`verify_with_chain_params_and_work_budget` add an optional work budget beside
+the memory budget. Both stream verifiers add `with_work_budget`, beside the
+existing `set_work_limit`. Each input uses the same `SpendParams::work_limit`
+counter: reached opcodes and bytes hashed, reserved before execution.
+
+A refused charge is `NotJudgedCause::WorkBudgetExceeded { input, budget,
+work_done }`, carried by `Error::TransactionNotJudged`,
+`SpendRefusal::NotJudged` and `Verdict::NotJudged`. Migration: callers
+matching `set_work_limit` exhaustion through `SpendRefusal::Resource` must now
+match `SpendRefusal::NotJudged` and its `NotJudgedCause::WorkBudgetExceeded`
+cause. The diagnostic names the input once, the budget and already charged
+work, never script failure. A spend inside the budget keeps its verdict; the
+memory-budget classes and checks are unchanged. The work budget does not
+interrupt a running arithmetic opcode or impose an elapsed-time bound.
+
+### Notes: cross-SDK parity (#378, part 2)
+
+The reference's `Transaction.verify` has no work bound. Existing crate entry
+points and both new budget surfaces default to `None`, preserving that
+behavior byte for byte. The budget is each service door's policy: the
+toolbox's internalize and signer, the engine's script door and the tracker's
+door set it at their re-pin, each brief naming its value beside the sibling's
+memory rows. `tests/transaction_work_budget_378.rs` covers whole, sync and
+async verification, exact and exhausted budgets, deferred inputs, resume and
+unchanged verdicts; it also pins `NotJudgedCause` at 24 bytes and `Error` at
+56 on 64-bit targets, with the cause's input index a `u32` as in the streaming
+verdict. `tests/script_work_budget.rs` pins the existing signature accounting
+and `beef_stream::not_judged_tests` pins the underlying typed spend refusal.
 
 ### Fixed: the reference's ECIES byte bounds before work (#333)
 
@@ -305,6 +336,7 @@ The downstream scan checked the old sentences, missing-flag prefixes and
 `~/bsv/bsv-wallet-cli`: no matches. `~/bsv/bsv-middleware-cloudflare-public`
 and `~/bsv/rust-chaintracks` were absent at those paths and remain unverified.
 A downstream matching these errors must use the new sentences above.
+
 ### Fixed: one wallet double-spend retry for revocation and the global key-value store (#340)
 
 The global store now retries `set` and `remove` after a wallet's structured

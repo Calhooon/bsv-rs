@@ -8,6 +8,18 @@ use crate::transaction::{MerklePath, Transaction, TransactionInput, TransactionO
 
 #[cfg(test)] // Keep the fixture visibly test-only to the lexical architecture guard.
 fn stop(chain: ChainParams, coin: u32, tip_height: u32) -> Stop {
+    stop_with_evaluation(
+        Evaluation {
+            chain: Some(chain),
+            ..Evaluation::NONE
+        },
+        coin,
+        tip_height,
+    )
+}
+
+#[cfg(test)]
+fn stop_with_evaluation(evaluation: Evaluation, coin: u32, tip_height: u32) -> Stop {
     let mut parent = Transaction::new();
     let mut input = TransactionInput::new("aa".repeat(32), 0);
     input.set_unlocking_script(UnlockingScript::new());
@@ -28,10 +40,6 @@ fn stop(chain: ChainParams, coin: u32, tip_height: u32) -> Stop {
         LockingScript::from_hex("51").unwrap(),
     ))
     .unwrap();
-    let evaluation = Evaluation {
-        chain: Some(chain),
-        ..Evaluation::NONE
-    };
     #[allow(deprecated)] // Populate the compatibility field; only ChainParams is read (#451).
     let tip = Some(ChainTip {
         height: tip_height,
@@ -104,4 +112,24 @@ fn a_zero_activation_returns_a_not_judged_spend_refusal_452() {
     assert_refusal(stop(chain, 10_000, 15_000),
         NotJudgedCause::ZeroActivationHeight(ActivationHeightsError::ZeroChronicle),
         "input 0 not judged: Chronicle activation height 0 is outside the supported range 1..=4294967295.");
+}
+
+#[test]
+fn work_exhaustion_returns_a_not_judged_spend_refusal_378() {
+    assert_refusal(
+        stop_with_evaluation(
+            Evaluation {
+                work: Some(0),
+                ..Evaluation::NONE
+            },
+            10_000,
+            15_000,
+        ),
+        NotJudgedCause::WorkBudgetExceeded {
+            input: 0,
+            budget: 0,
+            work_done: 0,
+        },
+        "input 0 not judged: input 0 exceeded work budget 0 units after 0 units of work.",
+    );
 }

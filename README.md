@@ -71,17 +71,24 @@ valid proof; do not rewrite an offset on trust.
 [tests/merkle_path_lone_leaf.rs](tests/merkle_path_lone_leaf.rs) pins this rule.
 
 `SpendParams` and `TxSpendParams` accept `work_limit: Option<u64>`.
-The default `None` leaves work accounting off. With a bound, reached opcodes
-and bytes fed to hashes are charged before that work. Exhaustion returns
-`ScriptResource::Work`, a LOCAL evaluator decline, not an invalid-script
-verdict. It is not a wall-clock or total computation bound.
-[tests/script_work_budget.rs](tests/script_work_budget.rs) exercises charging
-and the distinction from validity.
+`Transaction::verify_with_work_budget` adds the same per-input bound beside the
+memory budget; live doors use `verify_with_chain_params_and_work_budget`.
+The default `None` leaves work accounting off, matching the reference's
+`verify`, which has no work bound. With a bound, reached opcodes and bytes fed
+to hashes are charged before that work. The interpreter reports
+`ScriptResource::Work`; transaction and stream verifiers carry
+`NotJudgedCause::WorkBudgetExceeded { input, budget, work_done }` on their
+`NotJudged` class. A spend inside the budget retains its verdict. Each door
+names its policy value in its brief beside its memory budget. This is not a
+wall-clock or total computation bound.
+[tests/script_work_budget.rs](tests/script_work_budget.rs) pins the accounting;
+[tests/transaction_work_budget_378.rs](tests/transaction_work_budget_378.rs)
+pins the verification paths.
 
 The streaming BEEF reader verifies element by element, checks proof roots
 through supplied headers and executes unproven inputs. It holds an ancestry
 index and needed outputs, so streaming does not mean constant memory.
-`StreamVerifier::set_work_limit` and `AsyncStreamVerifier::set_work_limit`
+`StreamVerifier::set_work_limit` / `with_work_budget` and their async equivalents
 apply the local work bound per input. Reapply it after resuming a cursor.
 Pausing is between elements or inputs; a work decline cannot resume within a
 script. The implementation is [src/transaction/beef_stream.rs](src/transaction/beef_stream.rs).
@@ -89,14 +96,15 @@ script. The implementation is [src/transaction/beef_stream.rs](src/transaction/b
 Script defaults follow SDK evaluation mode; callers modelling node validation
 select explicit `ScriptFlags` and interpret resource limits separately from
 validity. `Transaction::verify` keeps the two apart: an invalid script is
-`TransactionError`, an input whose evaluation stopped at a budget is
-`Error::ScriptEvaluationDeclined`. Its third parameter is that budget, the
+`TransactionError`, an input whose evaluation stopped at a memory budget is
+`Error::ScriptEvaluationDeclined`. Work exhaustion through a budgeted verifier
+is `Error::TransactionNotJudged`. Its third parameter is that budget, the
 reference's `memoryLimit`: `None` runs uncapped, as the reference does, and
 `Some(n)` is `n` bytes per stack, the figure a door judging untrusted
 transactions passes. `SpendParams::memory_limit: None` is uncapped in the
 default mode too (the reference's `Spend`); a memory budget bounds memory,
-while `SpendParams::work_limit` and the stream's `set_work_limit` bound charged
-work. Neither can interrupt an arithmetic opcode or bound its elapsed time. On the block path
+while the budgeted transaction methods, `SpendParams::work_limit` and the
+stream's `set_work_limit` share one counter for charged work. Neither can interrupt an arithmetic opcode or bound its elapsed time. On the block path
 `Spend::set_stack_memory_consensus` is a node's
 `-maxstackmemoryusageconsensus`, a verdict; `memory_limit` only declines. The flag and resource witnesses live in [tests](./tests).
 

@@ -1,16 +1,25 @@
-//! Typed reasons why chain facts cannot select a supported script word.
+//! Typed reasons why a verifier cannot judge an input within its scope or resources.
 
 use std::fmt;
 
 use crate::block::ActivationHeightsError;
 
-/// A refusal of the verifier's scope, never a judgment of a transaction.
+/// A refusal of the verifier's scope or resources, never a transaction judgment.
 ///
-/// The chain-parameter verifiers carry this cause beside the input index.
+/// The transaction and stream verifiers carry this cause beside the input index.
 /// Match its fields instead of parsing its diagnostic text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum NotJudgedCause {
+    /// The input exhausted the verifier's local work budget before its next charge.
+    WorkBudgetExceeded {
+        /// The index of the input whose evaluation stopped.
+        input: usize,
+        /// The local per-input budget in `SpendParams::work_limit` units.
+        budget: u64,
+        /// Work already charged, at or below the budget; excludes the refused charge.
+        work_done: u64,
+    },
     /// The proven coin predates the interpreter's supported eras.
     PreGenesisCoin {
         /// The coin's verified BUMP height.
@@ -47,6 +56,9 @@ impl NotJudgedCause {
     // Preserve the standalone word selector's existing error API and text.
     pub(crate) fn flags_message(self) -> &'static str {
         match self {
+            Self::WorkBudgetExceeded { .. } => {
+                "The input exceeded the verifier's local work budget."
+            }
             Self::PreGenesisCoin { .. } => {
                 "The source output was created before Genesis; its script era is unsupported."
             }
@@ -63,6 +75,14 @@ impl NotJudgedCause {
 impl fmt::Display for NotJudgedCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::WorkBudgetExceeded {
+                input,
+                budget,
+                work_done,
+            } => write!(
+                f,
+                "input {input} exceeded work budget {budget} units after {work_done} units of work."
+            ),
             Self::PreGenesisCoin {
                 height,
                 genesis_height,

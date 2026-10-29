@@ -9,9 +9,10 @@ use bsv_rs::primitives::bsv::sighash::{
 use bsv_rs::primitives::bsv::tx_signature::TransactionSignature;
 use bsv_rs::primitives::{sha256d, PrivateKey, Writer};
 use bsv_rs::script::{
-    LockingScript, Script, ScriptResource, Spend, SpendParams, TxSpendParams, UnlockingScript,
+    LockingScript, NotJudgedCause, Script, ScriptResource, Spend, SpendParams, TxSpendParams,
+    UnlockingScript,
 };
-use bsv_rs::transaction::beef_stream::{SpendRefusal, StreamVerifier, Verdict};
+use bsv_rs::transaction::beef_stream::{StreamVerifier, Verdict};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -285,14 +286,18 @@ fn stream_names_the_decline_at_input_zero_and_preserves_its_cursor() {
         start.elapsed().as_secs_f64() * 1000.0
     );
     match verdict {
-        Verdict::SpendRefused {
-            input: Some(0),
-            why: SpendRefusal::Resource(resource),
+        Verdict::NotJudged {
+            input: 0,
+            cause:
+                NotJudgedCause::WorkBudgetExceeded {
+                    input: 0,
+                    budget,
+                    work_done,
+                },
             ..
         } => {
-            assert_eq!(resource.resource, ScriptResource::Work);
-            assert_eq!(resource.limit, BUDGET);
-            assert!(resource.work_spent.unwrap() <= BUDGET);
+            assert_eq!(budget, BUDGET);
+            assert!(work_done <= BUDGET);
         }
         other => panic!("expected a named local decline: {other:?}"),
     }
@@ -378,6 +383,41 @@ async fn asynchronous_reader_names_the_same_resource_decline() {
     reader.set_work_limit(Some(10_000));
     let verdict = reader.run(&mut Chunk(Some(beef)), &tracker).await.unwrap();
     assert!(
-        matches!(verdict, Verdict::SpendRefused { input: Some(0), why: SpendRefusal::Resource(resource), .. } if resource.resource == ScriptResource::Work && resource.limit == 10_000 && resource.work_spent.unwrap() <= 10_000)
+        matches!(verdict, Verdict::NotJudged { input: 0, cause: NotJudgedCause::WorkBudgetExceeded { input: 0, budget: 10_000, work_done }, .. } if work_done <= 10_000)
     );
+}
+
+#[tokio::test]
+async fn whole_transaction_charges_the_existing_signature_work_378() {
+    use bsv_rs::transaction::{MerklePath, MockChainTracker, Transaction};
+    use bsv_rs::Error;
+
+    let fixture = witness(16, ORIGINAL);
+    let mut parent = Transaction::from_binary(&fixture.parent).unwrap();
+    parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 800_000));
+    let mut tracker = MockChainTracker::new(800_000);
+    tracker.add_root(800_000, parent.id());
+    let mut tx = Transaction::from_binary(&fixture.raw).unwrap();
+    tx.inputs[0].source_transaction = Some(Box::new(parent));
+    let mut spend = fixture.spend(Some(10_000));
+    let limit = spend.validate().unwrap_err().resource_limit.unwrap();
+    assert_eq!(
+        tx.verify_with_work_budget(&tracker, None, None, Some(10_000))
+            .await,
+        Err(Error::TransactionNotJudged {
+            txid: tx.id(),
+            input_index: 0,
+            cause: NotJudgedCause::WorkBudgetExceeded {
+                input: 0,
+                budget: 10_000,
+                work_done: limit.work_spent.unwrap(),
+            },
+        })
+    );
+    for budget in [None, Some(fixture.work), Some(fixture.work + 1)] {
+        assert!(tx
+            .verify_with_work_budget(&tracker, None, None, budget)
+            .await
+            .unwrap());
+    }
 }

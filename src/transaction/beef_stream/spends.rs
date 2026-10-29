@@ -163,10 +163,19 @@ impl<T: TxFields> InputCheck<'_, T> {
         match spend.validate() {
             Ok(true) => Ok(()),
             Ok(false) => Err(script_error("the script did not succeed".to_string())),
-            Err(e) => Err(match e.resource_limit {
-                Some(limit) => refuse(SpendRefusal::Resource(limit)),
-                None => script_error(e.message),
-            }),
+            Err(e) => {
+                let cause = e
+                    .resource_limit
+                    .and_then(|limit| super::super::verify_refusal::work_budget_cause(vin, limit));
+                Err(match (cause, e.resource_limit) {
+                    (Some(cause), _) => refuse(SpendRefusal::NotJudged {
+                        input: vin as u32,
+                        cause,
+                    }),
+                    (_, Some(limit)) => refuse(SpendRefusal::Resource(limit)),
+                    (_, None) => script_error(e.message),
+                })
+            }
         }
     }
 }

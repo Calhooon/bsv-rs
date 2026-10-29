@@ -12,7 +12,7 @@ This module provides complete Bitcoin transaction functionality:
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs with iterative ancestry collection (no walk over `source_transaction` recurses: link, sort, serializers, `verify`, `Clone`, `Drop`; 0.3.35, bsv-stack-lean #57)
 - The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (twenty kinds, none a size or a count) or `SpendRefused`, with `NotJudged { offset, txid, input, cause }` for a word outside scope (#452); `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
-- The stream's two budgets for its scripts (#373): `StreamVerifier::set_work_limit` and `set_memory_limit` (the same on `AsyncStreamVerifier`), per input, `None` the default and uncapped, `Some(n)` the caller's (the memory budget `n` bytes per stack, `Transaction::verify`'s third parameter, #331); one spent is `Verdict::SpendRefused { txid, input, why: SpendRefusal::Resource(limit) }`, a decline naming the transaction and the input, never a verdict; local configuration, absent from the `Cursor` and set again after `resume`; the structure-only reader spends none; the reader's own bound per element is the charter's (NL-3), not a cap on a script. The `verify_stream*` functions take neither: a caller with a budget builds the reader. Pinned by `tests/beef_stream_memory_budget_373.rs` and `tests/script_work_budget.rs`
+- The stream's two budgets for its scripts (#373): `StreamVerifier::set_work_limit` and `set_memory_limit` (the same on `AsyncStreamVerifier`), per input, `None` the default and uncapped, `Some(n)` the caller's (the memory budget `n` bytes per stack, `Transaction::verify`'s third parameter, #331); work exhaustion is `Verdict::NotJudged` with `WorkBudgetExceeded`; memory exhaustion is `Verdict::SpendRefused { txid, input, why: SpendRefusal::Resource(limit) }`, a decline naming the transaction and the input, never a verdict; local configuration, absent from the `Cursor` and set again after `resume`; the structure-only reader spends none; the reader's own bound per element is the charter's (NL-3), not a cap on a script. The `verify_stream*` functions take neither: a caller with a budget builds the reader. Pinned by `tests/beef_stream_memory_budget_373.rs` and `tests/script_work_budget.rs`
 - A raw transaction with no input is invalid bytes (0.4.1, bsv-stack-lean #58): `Kind::NoInputs` at the transaction's offset from the streaming reader, not valid from `Beef::verify_valid`, with or without a BUMP index. The rule is the node's (bsv-script-lean `lean/BsvScript/TxRules.lean`, `checkTransactionCommon_vinEmpty`); a test BEEF's root needs an input and a merkle path
 - A raw transaction with an input and no output is invalid bytes too (0.4.3, bsv-stack-lean #59): `Kind::NoOutputs` at the transaction's offset, after the inputs' check (the sibling's `TxRules.lean:85-86`, `checkTransactionCommon_voutEmpty`); `beef_stream::no_transaction` answers both for every path. `Transaction::verify` refuses a transaction it reaches with either, proven or not (`invalid transaction <txid>: NoInputs`): there is no synthetic root
 - The whole path on the reader's walk and rules (0.4.2, bsv-stack-lean #61): `Beef::verify_valid` computes each BUMP's root by `beef_stream`'s `bump_root` (linear; 0.4.1 walked once per leaf), and `Beef::verify_structure` answers the roots or the reader's `Kind`. A lone leaf at an offset other than 0 is `MissingSibling`; `from_binary` refuses a byte after the frame (`TrailingBytes`, in the reader's words); an atomic BEEF is held to the reader's atomic rule (`SubjectMissing`, `UnrelatedTransaction`); a txid-only entry is valid when a BUMP of the BEEF proves it (`StubNotProven` otherwise) and `allow_txid_only` decides nothing
@@ -48,7 +48,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants; `BeefTx::from_reader` reads one entry (no BEEF reader calls it since #86); `tx_mut` makes the transaction the entry's only reading (#171): the bytes and txid it was read with dropped, the BUMP index kept, `input_txids` refreshed (`refresh`) by the BEEF's next whole-BEEF reader, which re-keys the index; `has_txid` checks an index hit, so a renamed entry is not found by its old txid |
 | `beef_stream.rs` | The streaming reader: `BeefDecoder` (and its collect mode, the whole reader's parser), `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`, `SpendRefusal` (its `Display` beside the enum, one sentence per arm, the texts pinned in `tests/beef_stream.rs`'s `a_spend_refusal_prints_*`, #213); the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
 | `beef_stream/reason.rs` | The refusal's names, `Kind` (twenty-six, `Kind::ALL`; `LeftDuplicateBelow` since #167's re-read) and `Reason`, re-exported from `beef_stream`; both `#[non_exhaustive]` (#86, #167): a `match` outside the crate ends in a wildcard arm |
-| `beef_stream/budget.rs` | The readers' `set_work_limit` and `set_memory_limit` (#373); budgets remain local and absent from cursors |
+| `beef_stream/budget.rs` | The readers' `set_work_limit`, `with_work_budget` and `set_memory_limit` (#373, #378); budgets remain local and absent from cursors |
 | `beef_stream/evaluation.rs` | Local `Evaluation { work, memory, chain }`, `with_chain_params` on sync/async readers and `verify_stream_two_pass_with_chain_params`; no caller-made word or era resolver |
 | `beef_stream/spends.rs` | In-order/deferred input checks, only referenced source scripts retained, one shared sighash cache; source heights from the verified BUMP index; scope refusals are `SpendRefusal::NotJudged { input, cause }` before script parsing/execution (#452) |
 | `beef_stream/deferred.rs` | What the stream holds for a parent not read yet (#240): `HeldTx` (a transaction's index entry, its raw bytes dropped), `TxFields` (one fold for a transaction read in order and one released), `Deferred` (the held entries by offset, the txids each waits on, the ready ones, the bytes held; no bound; `unresolved`, what the end refuses), the index's and the reader's sides of the release (`BeefIndex::held_for_a_parent`, `BeefIndex::release_one`, `Judge::release_next`, one per step; `AsyncStreamVerifier::release_all`, every released one at once), `write_held` and `read_held` (a BSC4 cursor's held entries) |
@@ -61,7 +61,30 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 
 ## Budgets
 
-`Transaction::verify` has no work budget; `SpendParams::work_limit` and `StreamVerifier::set_work_limit` bound charged work, while an elapsed-time bound must be external because a work counter cannot interrupt one arithmetic opcode (#378). Part 2 of #378 (the keeper's word of 2026-10-29 19:1xZ) adds an additive work budget to `Transaction::verify`, `None` the reference's behaviour, a spend over it not judged under #452's class with a resource cause.
+`Transaction::verify_with_work_budget(tracker, fee_model, memory_limit, work_limit)`
+adds `Option<u64>` beside the memory budget. Live doors use
+`verify_with_chain_params_and_work_budget(tracker, fee_model, memory_limit, work_limit, chain)`.
+Existing `verify` and `verify_with_chain_params` default to `None`. The reference's
+`verify` has no work bound; `None` keeps that behavior byte for byte.
+
+The bound lives in `SpendParams::work_limit` (also `TxSpendParams`), passed anew
+for each input by the whole-transaction evaluator and by
+`StreamVerifier::set_work_limit` / `with_work_budget` (the async reader too).
+There is one counter: `Spend::charge_work` in `src/script/spend/limits.rs`, one
+unit per reached opcode plus bytes hashed, including double-hash intermediates
+and uncached sighash midstates. Charges precede the work; `work_done` is work
+already charged, not the next refused charge. Each input gets the entire budget;
+a proof or structure-only read executes no script and spends no work.
+
+Exhaustion is `NotJudgedCause::WorkBudgetExceeded { input, budget, work_done }`,
+carried by `Error::TransactionNotJudged` or `SpendRefusal::NotJudged` and then
+`Verdict::NotJudged`. A spend inside the budget retains its verdict; memory
+exhaustion retains `ScriptEvaluationDeclined` / `SpendRefusal::Resource`.
+The bound is a service door's policy, never a consensus rule. Each captain names
+its value in the door's brief beside the sibling's memory policy rows. A work
+counter cannot interrupt one arithmetic opcode, so elapsed time needs an
+external bound. Stream budgets are local configuration, absent from cursors and
+reapplied after every resume. See `tests/transaction_work_budget_378.rs`.
 
 ## Core Types
 
@@ -482,7 +505,9 @@ Existing callers keep SDK default mode. A live door selects
 `StreamVerifier::new(...).with_chain_params(chain)` (also on the retaining and
 resumed reader), `verify_stream_two_pass_with_chain_params(..., &chain)`, or
 `Transaction::verify_with_chain_params(..., &chain)`. Async readers have the same
-builder. Apply it before stepping; reapply it after any resume, including a
+builder. Add `.with_work_budget(Some(policy_units))` on each stream door, or use
+`verify_with_chain_params_and_work_budget(..., Some(policy_units), &chain)` on
+the whole path. Each door names `policy_units` in its brief. Apply it before stepping; reapply it after any resume, including a
 decoded cursor, exactly as the local budgets. No flag word is serialized.
 
 The verifier obtains source heights only from header-verified BUMPs; unproven
