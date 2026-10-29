@@ -16,9 +16,9 @@ These utilities are used internally by the `Peer` implementation but are also ex
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and a runtime-independent certificate continuation turn; preserves Promise await boundaries for Peer validation and wallet decryption (#445) | 38 |
 | `nonce.rs` | Cryptographic nonce creation and verification | ~201 |
-| `validation.rs` | Public certificate validation, encoding checks, and retrieval; Peer uses its own shared validator | ~972 |
-| `requested_set.rs` | Requested-policy validation and canonical-base64 text/length checks | - |
-| `received_message.rs` | #445: received certificate bound and every required nonce, checked before handlers | - |
+| `validation.rs` | Public certificate validation, encoding checks, and retrieval; Peer uses its own shared validator | 964 |
+| `requested_set.rs` | Requested-policy validation and canonical-base64 text/length checks | 292 |
+| `received_message.rs` | #445: received certificate bound and every required nonce, checked before handlers | 76 |
 
 ## Key Exports
 
