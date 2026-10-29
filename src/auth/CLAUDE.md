@@ -15,11 +15,12 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `session_manager.rs` | Session management with dual indexing and nonce-claim API | 452 |
 | `session_nonces.rs` | #362: atomic signed claims (100,000 per session), initial-request window (100,000 total / 256 per identity / 30 minutes), expiry and removal | 156 |
 | `session_nonces_tests.rs` | Four #362 store-capacity, eviction and lifetime witnesses against the Node recorder | 116 |
-| `peer.rs` | Peer API, transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 675 |
-| `peer_incoming.rs` | #362-364: signed nonce claims and authentication; certificate yourNonce, exact session and identity checks; listener errors; ready flag on the response session | 234 |
-| `peer_initial.rs` | #362-364 fold: responder policy and matching proofs in the initial response; initiator validation, exact-session readiness, listeners and automatic answer (`Peer.ts:832-874,957-1035`) | 231 |
+| `peer.rs` | Peer API, transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 680 |
+| `peer_incoming.rs` | #362-364: signed nonce claims and authentication; certificate yourNonce, exact session and identity checks; listener errors; ready flag on the response session; since #445 a certificate response matched to the policy, then the shared validator | 235 |
+| `peer_initial.rs` | #362-364 fold: responder policy and matching proofs in the initial response; initiator validation, exact-session readiness, listeners and automatic answer (`Peer.ts:832-874,957-1035`); the signer decodes both nonces with `?` (#445) | 187 |
+| `peer_certificates.rs` | #445: the one validator both certificate paths call, the reference's `validateCertificates` in its words (`validateCertificates.ts:64-137`: no certificates, more than 100, subject, signature, then under a policy certifier, type, decryption, disclosed fields), and `require_requested_certificates`, its `#matchesCertificatePolicy` (`Peer.ts:359-389,1229-1241`) on the certificate-response path; with no policy only subject and signature, as before (the #445 parity note) | 128 |
 | `peer_certificate_wait.rs` | #364: shared per-session certificate wait and 30-second deadline, resolved after validation | 83 |
-| `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
+| `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound); the shared validator's empty and 101 refusals before any signature (#445) | 81 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
 | `utils/` | Utility functions | - |
@@ -57,7 +58,8 @@ Utility functions:
 - `mod.rs` - Re-exports
 - `nonce.rs` - Nonce creation and verification
 - `validation.rs` - Certificate validation, matching, encoding validation, and request set validation
-- `requested_set.rs` - `assert_requested_certificate_set`, the reference's `assertRequestedCertificateSet` in its words, and the receipt check `Peer` calls before any handler (#294)
+- `requested_set.rs` - `assert_requested_certificate_set`, the reference's `assertRequestedCertificateSet` in its words, and the receipt check `Peer` calls before any handler (#294); `canonical_base64`, the text half of `assertCanonicalBase64` (#445)
+- `received_message.rs` - `check_received_message`, the rest of the intake `Peer` applies before any handler (#445): more than 100 certificates on any message refused (`Authentication certificates exceed their limit.`, `AuthMessageValidation.ts:348-352`), an initialRequest's `initialNonce` and an initialResponse's `initialNonce` and `yourNonce` refused when not canonical base64 (`<type>.<field> must be canonical base64.`, `:355-361`); the 48-byte length and the other types' nonces not applied (the #445 parity note)
 
 ## Constants
 
@@ -262,6 +264,8 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 }
 ```
 
+`Peer`'s intake (#445) refuses, after the requested set, a message with more than 100 certificates and a handshake nonce that is not canonical base64, in the reference's words (`utils/received_message.rs`), so neither certificate path verifies a certificate of such a message.
+
 `Peer` refuses a malformed requested certificate set where the reference does (#294), with `assert_requested_certificate_set`: `request_certificates` before it seeks a session or signs (`Peer.ts:434`); its own `certificates_to_request` in `initiate_handshake` before a nonce or the initialRequest (`:630`) and on a received initialRequest before `process_initial_request` signs the response (`:811`), the reference's construction-time refusal (`:158`) moved to the first snapshot since `new` cannot fail; a received message's `requestedCertificates` in `handle_incoming_message` (the `start` callback since #353) after the version check, before routing (`AuthMessageValidation.ts:345-346`; a certificateRequest without one `requestedCertificates must be an object.`, `:367`), the refusal the callback's `Err`.
 
 **Internal methods** (private):
@@ -272,7 +276,7 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 - `process_initial_response()` - Authenticates, validates nonempty certificates under its own policy, marks the exact session ready and releases certificate waiters before listeners, then releases handshake waiters and answers the responder's request; errors before handshake release go through its oneshot (`Peer.ts:957-1035`)
 - `authenticate_initial_response()` - The reference's `authenticateInitialResponse` (`Peer.ts:886-956`): own `your_nonce`, its session, pinned identity, signature, initial nonce, replay claim; updates the session before certificate validation (#353, #362)
 - `process_certificate_request()` - Own `yourNonce`, exact session and matching identity, signature, nonce claim, authentication; returns a listener's error (#362, #363)
-- `process_certificate_response()` - Same checks, validates nonempty certificates, marks the response's session ready and releases its waiters, then returns any listener error (#362-364)
+- `process_certificate_response()` - Same checks, matches nonempty certificates to its policy and validates them with the initial path's validator in the reference's words (#445), marks the response's session ready and releases its waiters, then returns any listener error (#362-364)
 - `process_general_message()` - The reference's `processGeneralMessage` (`Peer.ts:1270-1314`) in its order and words: `your_nonce` made by this wallet, its session, the session's peer the sender, the signature, the nonce and the session's nonce present; claims the nonce, marks the session authenticated, waits for required certificate validation, notifies callbacks (a listener's error the message's) (#353, #362, #364)
 - `verify_own_nonce()` - `verify_nonce` with counterparty self, a malformed nonce `false` (the reference's `verifyNonce`)
 
@@ -440,7 +444,7 @@ The InitialResponse field mapping follows the TypeScript SDK:
 
 On the initiator side, the responder's session nonce (`initial_nonce`) is stored as `peer_nonce`.
 
-**TS SDK compatibility**: Rust and TypeScript send `initialNonce` and `yourNonce` without `nonce`. The Go SDK sends both `Nonce` and `InitialNonce`. Rust reads and requires `initial_nonce` (`Initial response message nonce is required.`, #353). The initial response carries `certificates` when automatic selection ran (including an empty array, which no test pins yet: #445), followed by `requestedCertificates` (the responder's own policy, including an empty set), then `signature` (`Peer.ts:865-874`).
+**TS SDK compatibility**: Rust and TypeScript send `initialNonce` and `yourNonce` without `nonce`. The Go SDK sends both `Nonce` and `InitialNonce`. Rust reads and requires `initial_nonce` (`Initial response message nonce is required.`, #353). The initial response carries `certificates` when automatic selection ran (including an empty array, read by the initiator as the reference reads it: the session waits for certificates, no listener runs, nothing answered; `tests/auth_peer_certificate_paths_445.rs`, #445), followed by `requestedCertificates` (the responder's own policy, including an empty set), then `signature` (`Peer.ts:865-874`).
 
 ### Error Propagation
 

@@ -197,6 +197,120 @@ corrects the recorder's comment and output description only; all cases are
 unchanged, and the revised output is byte-identical on rerun. No vector bytes
 were edited by hand. Recording and tests inject all lookup and broadcast
 answers in process; no live host or default port is used.
+### Fixed: the Peer's certificate paths, nonce intake and sending bound (#445)
+
+Both certificate paths call one validator in the reference's words
+(`ts-stack@edf6e03`, `packages/sdk/src/auth/utils/validateCertificates.ts:64-137`,
+called by `Peer.ts:970,1242`). Certificate responses match the locally requested
+policy before validation (`Peer.ts:359-389,1229-1242`). An absent policy is the
+reference's empty policy (`:154-157`), so it cannot authorize a nonempty
+response. The toolbox's BRC-104 client uses this configuration; its previously
+accepted unsolicited response is now refused. The e2e witness
+`test_certificate_response_without_policy_is_refused` pins that change.
+
+The intake checks every required nonce, in the reference's order
+(`AuthMessageValidation.ts:64-79,355-389`), before wallet or session work.
+Missing or noncanonical text is `<type>.<field> must be canonical base64.`;
+canonical text of the wrong length is `<type>.<field> must encode exactly
+<N> bytes.` An empty string is canonical but the wrong length. On a
+certificateRequest the required-policy check follows the nonce checks; the
+100-certificate bound precedes both, as in the reference.
+
+| Message | Required nonce fields and decoded lengths, in check order |
+|---|---|
+| initialRequest | initialNonce: 48 |
+| initialResponse | initialNonce: 48, yourNonce: 48 |
+| certificateRequest | nonce: 32, initialNonce: 48, yourNonce: 48 |
+| certificateResponse | nonce: 32, initialNonce: 48, yourNonce: 48 |
+| general | nonce: 32, yourNonce: 48 |
+
+This **deliberately removes the Peer's 32-byte legacy session-nonce acceptance
+window introduced in 0.3.6**. Releases through 0.3.5 emitted 16 random bytes
+plus a truncated 16-byte HMAC; 0.3.6 began emitting 48 bytes and kept accepting
+32 for migration. Peer intake now requires 48, as the reference does. The
+standalone `verify_nonce` and `validate_nonce_format` helpers retain their
+legacy behavior for direct callers. Outgoing certificate requests and
+responses now include the session's `initialNonce`, required by that intake.
+The signer also propagates decoding failures instead of signing empty bytes.
+An HTTP certificateRequest lacking initialNonce is now refused at full intake
+in `certificateRequest.initialNonce must be canonical base64.`, matching the
+existing #416 reference recording. Its signature witnesses supply a valid
+initialNonce to reach the handler; a separate full-intake witness pins the
+new refusal without altering the transport or its recorded vectors.
+
+Certificates are judged concurrently, with the reference's mandatory promise
+continuations between subject, signature/policy, and decryption results. The
+Node v22.18.0 measurements with two failing certificates in both orders show:
+a subject mismatch beats an invalid signature in either order; signature and
+policy failures at the same stage follow array order; an invalid signature
+beats a keyring-decryption failure in either order. A decryption failure
+before a wallet await also beats one after a wallet await, in either order. Two subject mismatches or
+two invalid signatures return the earlier array entry's words. Rust now uses
+an unordered set of futures with these continuation boundaries; the wallet's
+asynchronous completions decide between decryption failures, as in
+`Promise.all` (`validateCertificates.ts:80-136`).
+
+The changes in the toolbox's table, relative to the code before #445.
+Certificate-fault rows assume a configured policy; the absent-policy row
+names the toolbox client's configuration:
+
+| Received or sent | Before | Now |
+| certificateResponse: a certificate's subject not the sender | `Certificate subject does not match message sender` | `The subject of one of your certificates ("<subject>") is not the same as the request sender ("<sender>").` |
+| certificateResponse: an unrequested certifier | `Certificate from untrusted certifier: <certifier>` | `Certificates do not match a locally requested set for this session.` |
+| certificateResponse: an unrequested type | `Certificate type not in requested set: <type>` | the same match words |
+| certificateResponse: a nonempty keyring revealing fewer than all requested fields | `Required field '<field>' not revealed in certificate` | accepted, as the reference accepts a nonempty subset (`validateCertificates.ts:59-62`, `Peer.ts:375-378`) |
+| certificateResponse: an empty keyring, revealing no field | accepted, because the old helper skipped the field check for an empty keyring | the same match words; an empty keyring is refused (`Peer.ts:375-377`) |
+| certificateResponse: a keyring revealing an unrequested field | accepted | the same match words |
+| certificateResponse: nonempty certificates with no configured policy | accepted after subject and signature checks | the same match words (`Peer.ts:1239`) |
+| any message with more than 100 certificates | each certificate judged | `Authentication certificates exceed their limit.` |
+| send more than 100 certificates | signed and sent | `certificates must be an array of at most 100 entries`, before session lookup, signing or sending (`Peer.ts:1132-1134`) |
+| a handshake nonce not canonical base64 | signed or verified over the decoded bytes, or none | the intake's canonical-base64 words |
+| a 32-byte session nonce, or a later message's missing, malformed or wrong-length nonce | a 32-byte session nonce accepted (the 0.3.6 legacy window); a missing nonce refused by the Peer's own words (`General message nonce is required.`, `Certificate request message nonce is required.`, `Certificate response message nonce is required.`: the #353 and #362-364 witnesses), a malformed or wrong-length one passed intake | the intake's canonical-base64 or exact-length words above |
+| a malformed initial response (a bad signature, a refused certificate, a listener error) | the handshake failed at once with the refusal | the handshake waits and returns `Handshake timeout` (`Peer.ts:1029-1035`; `tests/auth_peer_e2e_tests.rs`, test 21) |
+
+An initial response with `certificates: []` still completes the handshake,
+leaves the session waiting for required certificates, calls no certificate
+listener and sends no automatic answer (`Peer.ts:845-874,961-967`). An empty
+certificate response with no policy still reaches listeners. More than 100
+certificates is refused at intake, ahead of any nonce or certificate
+validation (`AuthMessageValidation.ts:348-352`). The validator's own bound,
+`AuthMessage cannot contain more than 100 certificates.`, remains behind it.
+
+`tests/auth_peer_certificate_paths_445.rs` pins these behaviors over in-process
+transports, including 88 nonce cases and three required-policy ordering cases, both certificate paths' rejection
+order, concurrent wallet decryptions, the absent policy, empty/subset/extra
+keyrings and the sender's 0/100/101 boundary with and without a session. The
+original handshake, empty-array, certificate-fault and receive-bound pins are
+retained. `tests/support/auth_peer_certificate_paths_445.mjs` records 140
+cases plus two decoder observations from an unmodified edf6e03 bundle under
+Node v22.18.0, built outside the worktree. Both recordings are byte-identical;
+all 18 earlier cases retain their bytes. Expected vectors are recorder output,
+never hand-edited. The fold's regressions are RED on scratch 344973e7; the
+empty-keyring change is RED on scratch 9a37a832, before the original #445
+validator change. The public `validate_certificates` keeps its words and
+rules; Peer does not call it.
+
+### Notes: cross-SDK parity (#445)
+
+The measured rejection order above is deterministic for synchronous checks;
+which asynchronous wallet failure arrives earlier depends on the wallet's
+completion order. Rust futures are dropped after the returned error, whereas
+JavaScript's other promises may continue running. Rust keeps `AuthError` as
+the error class where the reference's sender bound uses `TypeError`.
+The Peer keeps no pending dynamic certificate-request policies, so only its
+configured handshake policy authorizes a response (`Peer.ts:1231-1238`). An
+intake-refused initial response never releases its handshake waiter: the
+reference's actual 30-second wait returns `Timeout waiting for the BRC-103
+initial response.` (`Peer.ts:674`), while Rust retains `Handshake timeout`.
+
+go-sdk@2ca481c applies no 100-certificate bound (`auth/peer.go:689-720,935-966`;
+`auth/utils/validate_certificates.go:143-145` refuses an empty list alone),
+wraps its validator's lower-case words (`:227,273,288,304`) in
+`invalid certificates: ` on the initial-response path (`auth/peer.go:716`,
+`auth/errors.go:48-53`) and joins them under `ErrCertificateValidation` on the
+certificate-response path (`auth/peer.go:961-963`). It refuses a nonce that
+`base64.StdEncoding` cannot decode at the signer as `failed to decode initial
+nonce` (`auth/peer.go:585-588`). Go was read, not executed for this fold.
 
 ### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
 

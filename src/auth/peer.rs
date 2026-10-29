@@ -12,8 +12,9 @@ use crate::auth::{
         AUTH_VERSION,
     },
     utils::{
-        assert_requested_certificate_set, check_received_requested_certificates, create_nonce,
-        get_verifiable_certificates, validate_certificates, verify_nonce,
+        assert_requested_certificate_set, check_received_message,
+        check_received_requested_certificates, create_nonce, get_verifiable_certificates,
+        verify_nonce, MAX_CERTIFICATES,
     },
 };
 use crate::primitives::to_base64;
@@ -506,6 +507,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             )));
         }
         check_received_requested_certificates(&message)?; // before any handler (#294)
+        check_received_message(&message)?; // the certificate bound, the handshake nonces (#445)
 
         match message.message_type {
             MessageType::InitialRequest => {
@@ -673,3 +675,6 @@ mod certificate_wait;
 
 #[path = "peer_initial.rs"]
 mod initial;
+
+#[path = "peer_certificates.rs"]
+mod certificates_received;

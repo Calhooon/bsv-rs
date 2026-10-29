@@ -1,0 +1,137 @@
+{
+  "reference": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "decodings": [
+    {
+      "text": "not base64!",
+      "buffer_from": [
+        158,
+        139,
+        91,
+        106,
+        199,
+        186
+      ],
+      "to_array": {
+        "threw": "Invalid base64 character at index 9"
+      }
+    },
+    {
+      "text": "AB==",
+      "buffer_from": [
+        0
+      ],
+      "to_array": [
+        0
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "certificate_response_subject",
+      "path": "handler",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "certificate_response_signature",
+      "path": "handler",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "certificate_response_certifier",
+      "path": "handler",
+      "error": "Certificates do not match a locally requested set for this session."
+    },
+    {
+      "id": "certificate_response_type",
+      "path": "handler",
+      "error": "Certificates do not match a locally requested set for this session."
+    },
+    {
+      "id": "certificate_response_field",
+      "path": "handler",
+      "error": "Certificates do not match a locally requested set for this session."
+    },
+    {
+      "id": "certificate_response_100_handler",
+      "path": "handler",
+      "error": null
+    },
+    {
+      "id": "certificate_response_100_intake",
+      "path": "intake",
+      "error": null
+    },
+    {
+      "id": "certificate_response_101_handler",
+      "path": "handler",
+      "error": "AuthMessage cannot contain more than 100 certificates."
+    },
+    {
+      "id": "certificate_response_101_intake",
+      "path": "intake",
+      "error": "Authentication certificates exceed their limit."
+    },
+    {
+      "id": "initial_response_101_intake",
+      "path": "intake",
+      "error": "Authentication certificates exceed their limit."
+    },
+    {
+      "id": "initial_response_101_validator",
+      "path": "validateInitialResponseCertificates",
+      "error": "AuthMessage cannot contain more than 100 certificates."
+    },
+    {
+      "id": "initial_response_empty_certificates",
+      "error": null,
+      "response_fields": [
+        "version",
+        "messageType",
+        "identityKey",
+        "initialNonce",
+        "yourNonce",
+        "certificates",
+        "requestedCertificates",
+        "signature"
+      ],
+      "certificates": [],
+      "ready": false,
+      "certificates_received_calls": 0,
+      "automatic_answers": 0
+    },
+    {
+      "id": "initial_request_nonce",
+      "nonce": "not base64!",
+      "error": "initialRequest.initialNonce must be canonical base64.",
+      "answered": 0
+    },
+    {
+      "id": "initial_response_nonce",
+      "nonce": "not base64!",
+      "error": "initialResponse.initialNonce must be canonical base64."
+    },
+    {
+      "id": "initial_request_nonce",
+      "nonce": "AB==",
+      "error": "initialRequest.initialNonce must be canonical base64.",
+      "answered": 0
+    },
+    {
+      "id": "initial_response_nonce",
+      "nonce": "AB==",
+      "error": "initialResponse.initialNonce must be canonical base64."
+    },
+    {
+      "id": "initial_request_nonce",
+      "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes.",
+      "answered": 0
+    },
+    {
+      "id": "initial_response_nonce",
+      "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    }
+  ]
+}

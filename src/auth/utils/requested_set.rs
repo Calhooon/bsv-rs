@@ -107,23 +107,27 @@ fn assert_auth_identity_key(value: &str) -> Result<()> {
 /// bits: the text this crate's encoder writes back for the bytes), decoding
 /// to `decoded_bytes`.
 fn assert_canonical_base64(value: &str, name: &str, decoded_bytes: usize) -> Result<()> {
-    use base64::engine::general_purpose::STANDARD;
-    use base64::Engine;
-
-    let decoded = match STANDARD.decode(value) {
-        Ok(decoded) if value.len() <= 128 && STANDARD.encode(&decoded) == value => decoded,
-        _ => {
-            return Err(Error::AuthError(format!(
-                "{name} must be canonical base64."
-            )))
-        }
-    };
+    let decoded = canonical_base64(value, name)?;
     if decoded.len() != decoded_bytes {
         return Err(Error::AuthError(format!(
             "{name} must encode exactly {decoded_bytes} bytes."
         )));
     }
     Ok(())
+}
+
+/// The text half of `assertCanonicalBase64` (`AuthMessageValidation.ts:69-75`),
+/// its bytes, or the refusal in its words.
+pub(crate) fn canonical_base64(value: &str, name: &str) -> Result<Vec<u8>> {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+
+    match STANDARD.decode(value) {
+        Ok(decoded) if value.len() <= 128 && STANDARD.encode(&decoded) == value => Ok(decoded),
+        _ => Err(Error::AuthError(format!(
+            "{name} must be canonical base64."
+        ))),
+    }
 }
 
 /// A received message's `requestedCertificates`, refused before any handler

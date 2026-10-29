@@ -44,3 +44,38 @@ async fn test_session_manager_access() {
     let mgr = peer.session_manager.read().await;
     assert!(mgr.is_empty());
 }
+
+/// The validator both certificate paths call refuses an empty list and more
+/// than 100 certificates in `validateCertificates`' words, before any
+/// certificate is verified (`validateCertificates.ts:73-78`; #445). Through
+/// the Peer the intake's bound is met earlier (`auth_peer_certificate_paths_445`).
+#[tokio::test]
+async fn the_shared_certificate_validator_bounds_the_list_before_verifying() {
+    use crate::auth::certificates::{Certificate, VerifiableCertificate};
+
+    let peer = make_peer();
+    let sender = PrivateKey::random().public_key();
+    let unsigned = VerifiableCertificate::new(
+        Certificate::new([1; 32], [2; 32], sender.clone(), sender.clone()),
+        Default::default(),
+    );
+    let mut message = AuthMessage::new(MessageType::CertificateResponse, sender);
+    let refusal = |words: &str| Err(Error::AuthError(words.into()));
+    message.set_certificates(Vec::new());
+    assert_eq!(
+        peer.validate_received_certificates(&message, None).await,
+        refusal("No certificates were provided in the AuthMessage.")
+    );
+    message.set_certificates(vec![unsigned.clone(); 101]);
+    assert_eq!(
+        peer.validate_received_certificates(&message, None).await,
+        refusal("AuthMessage cannot contain more than 100 certificates.")
+    );
+    message.set_certificates(vec![unsigned; 100]);
+    assert_eq!(
+        peer.validate_received_certificates(&message, None).await,
+        refusal(
+            "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+        )
+    );
+}
