@@ -61,6 +61,8 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 
 ## Core Types
 
+`Transaction::verify` has no work budget; `SpendParams::work_limit` and `StreamVerifier::set_work_limit` bound charged work, while an elapsed-time bound must be external because a work counter cannot interrupt one arithmetic opcode (#378).
+
 ### TransactionInput
 
 ```rust

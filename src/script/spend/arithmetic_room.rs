@@ -64,17 +64,20 @@ impl Spend {
     /// Room for `opcode`'s result on `operands` (in stack order, the deepest
     /// first), before any is decoded; their encodings judged from the top, as
     /// the reference reads them (`bn2` first, `Spend.ts:1560-1561`).
-    pub(super) fn arithmetic_room(
+    pub(super) fn arithmetic_room<const N: usize>(
         &self,
         opcode: u8,
-        operands: &[&[u8]],
+        operands: &[&[u8]; N],
     ) -> Result<(), ScriptEvaluationError> {
         for operand in operands.iter().rev() {
             self.check_number(operand)?;
         }
-        let bits: Vec<u64> = operands.iter().map(|o| magnitude_bits(o)).collect();
-        let lens: Vec<usize> = operands.iter().map(|o| o.len()).collect();
-        if self.flags.is_none() {
+        // Unary and binary handlers know their operand count. Keep the
+        // guard's metadata on the stack, and only scan magnitudes when a
+        // product's lower bound is needed (#378).
+        let lens = operands.map(|o| o.len());
+        if self.flags.is_none() && opcode == OP_MUL {
+            let bits = operands.map(magnitude_bits);
             let least = encoded_len(least_result_bits(opcode, &bits));
             if least > element_bound() as u64 {
                 return Err(self.result_declined(opcode, &lens, least, "at least "));

@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
+
+Arithmetic guards keep their one- or two-operand metadata in stack arrays, removing
+two heap allocations per arithmetic step, and inspect result-bound magnitudes only
+for `OP_MUL`. Script-number encoding fills fixed slices of its pre-sized buffer,
+removing a Vec growth check per limb. No arithmetic algorithm, verdict, result byte,
+resource limit or public API changes.
+
+Measured on 2026-10-29 during the 19:00 UTC hour on an Apple M1 Max, from base
+`1dc611a188f2d8a61cdb2e841e5154ee6cb7d47e` in a scratch copy with its own target
+directory, `cargo 1.95.0` release builds and the system allocator. Each entry is the
+median-total run of three, with its own component times; seconds, Rust
+**before / after**. A MiB is 1,048,576 bytes per operand. The reference is
+`~/bsv/ts-stack` at `edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`, bundled from that
+revision in scratch and run via nvm's Node 22.18.0 (V8 12.4.254.21-node.27), on the
+same machine in the same hour. Node's two columns are the isolated step and the
+original review harness's full `Spend.validate()`; every 16 MiB run was sequential. The machine's one-minute load average was about 65 during these runs (other
+lanes building), so the 16 MiB rows are load-bound: the same code gave 7.70,
+12.04 and 16.37 s after the fold and 9.60, 14.16 and 18.71 s before it across
+the runs, and V8's multiply 3.14 to 5.06 s.
+
+| Operand MiB | Rust total | Decode | Multiply | Encode + push | Budget + dispatch | Node step / Spend |
+|---|---|---|---|---|---|---|
+| 1 | 0.168292 / 0.118788 | 0.000956 / 0.000960 | 0.166628 / 0.117193 | 0.000698 / 0.000624 | 0.000010 / 0.000011 | 0.831143 / 0.890 |
+| 4 | 2.388460 / 2.011892 | 0.005036 / 0.006089 | 2.379867 / 1.987554 | 0.003532 / 0.017669 | 0.000024 / 0.000581 | 2.414153 / 3.169 |
+| 16 | 14.162800 / 12.044710 | 0.045203 / 0.022944 | 14.021576 / 12.001423 | 0.095994 / 0.020304 | 0.000027 / 0.000039 | 10.612733 / 8.450 |
+
+The script and operands are the review's
+`OP_1 <n> OP_NUM2BIN OP_INVERT OP_DUP OP_MUL OP_DROP OP_1`: two negative
+numbers of magnitude `2^(8n-1)-2`. Timers bracket the actual `ScriptNum` decoder,
+owned `num-bigint` multiply, result encoding and stack insertion. The remainder
+includes preflight reservations, memory/length checks, dispatch, operand releases
+and timer overhead. Product lengths and SHA-256 hashes match the closed-form
+square and the reference at all sizes, and the final stack is `[1]`.
+
+Attribution: decoding reads bytes directly into magnitude digits and clears the
+sign bit there; moving through `BigNumber` adds no copy. Encoding still makes one
+fallible, exactly sized Vec, then moves it onto the stack. `bounded_capacity` is
+not on this arithmetic path. Stack budgets use stored byte counts, not a stack
+walk; allocation probes reserve and release capacity without filling it. The
+remaining magnitude scan is required for `OP_MUL`'s pre-allocation result bound.
+The two metadata allocations were this crate's waste: a single-digit `OP_MUL`
+falls from **5 allocations / 49 bytes to 3 / 17**, leaving two decoder buffers
+and the result. Alternating 82 samples per encoder on already built 2, 8 and 32 MiB
+results gave **0.693 / 0.623 ms, 2.787 / 2.509 ms, 14.254 / 12.056 ms**
+(before / after). Those local improvements are small beside multiplication;
+whole-step differences include scheduling noise and are not a claimed algorithm
+speedup or a wall-clock regression threshold.
+
+The filed **288 s versus 8.6 s** compared different instrumentation. The supplied
+`review-331-fold-2/src/main.rs` installs `dhat::Alloc` and enables its heap profiler;
+its Node driver has no such observer. Reusing that Rust script with active dhat
+here took **147.629 s**, **147.516 s inside multiplication**, with **8,432,047
+allocations / 13,640,634,303 cumulative bytes**. The ordinary release measurements
+above do not reproduce 288 s; the repeat with profiling demonstrates the large
+observer cost. The original 288 s sample itself was not rerun on its historical
+machine state, and neither its exact latency nor a thirty-fold uninstrumented gap
+is asserted by this measurement. Uninstrumented, the two are of the same order:
+the cold review measured 4.43 s here against 5.07 s for the reference at 16 MiB,
+and at 1 MiB this crate is about seven times faster (0.12 s against 0.83 s).
+
+Algorithm finding: the resolved `num-bigint` is **0.4.8**, read at
+`~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-bigint-0.4.8/src/biguint/multiplication.rs`.
+For equal operands, `mac3` uses schoolbook through 32 native digits, Karatsuba
+through 256, then Toom-3; unequal operands can use half-Karatsuba. All three
+measured sizes enter Toom-3. Multiplication occupies **99.64%** of the
+16 MiB after step. V8 bigint's public
+[dispatch source](https://github.com/nodejs/node/blob/v22.18.0/deps/v8/src/bigint/bigint-internal.cc),
+[thresholds](https://github.com/nodejs/node/blob/v22.18.0/deps/v8/src/bigint/bigint-internal.h),
+and [enabled build configuration](https://github.com/nodejs/node/blob/v22.18.0/tools/v8_gypfiles/features.gypi)
+select schoolbook below 34 digits, Karatsuba below 193, Toom-Cook below 1,500,
+then FFT; all these operands enter its FFT path. The installed Node binary also
+contains `MultiplyFFT`, `MultiplyToomCook` and `MultiplyKaratsuba`. The gap is
+size-dependent (Toom-3 against FFT at these operand sizes) and no saving figure is
+claimed: the loaded runs compared one crate's multiply with another's from a
+different run, and the cold review's one quiet re-measurement (load 45 to 49) put
+this crate's whole 16 MiB step at 4.43 s against 5.07 s for the reference's
+`Spend`. Changing the bignum dependency or adding an FFT multiply is a design
+decision for the owner, not made here.
+
+`Transaction::verify` has no work budget; `SpendParams::work_limit` and
+`StreamVerifier::set_work_limit` bound charged work, while an elapsed-time bound
+must be external because those counters cannot interrupt one arithmetic opcode.
+The verify rustdoc and `src/transaction/CLAUDE.md` state this explicitly. Part 2 (the keeper's word of 2026-10-29 19:1xZ, on #378): `Transaction::verify`
+gains an additive work budget beside the memory budget, `None` the reference's
+behaviour, a spend over it not judged under #452's class with a resource cause;
+a lane after this and #455 land.
+
+The allocation ceiling is pinned by `tests/script_arithmetic_allocations_378.rs`,
+and `encoding_across_limb_boundaries_keeps_the_sign_and_exact_bytes` covers both
+encoder forms, signs and limb boundaries. The script witness and fixture suites
+retain their expected verdicts and bytes. Measurements, raw samples, source
+probes and gate/fuzz logs are under
+`/Volumes/Lanes/out/bsv-rs/fix-378-op-mul-time/`; the table is the performance pin,
+with no wall-clock assertion or 16 MiB bench in the crate.
+
 ### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
 
 `HmacKeyEncoding` and `HmacVerifyPolicy` are now `#[non_exhaustive]`, so

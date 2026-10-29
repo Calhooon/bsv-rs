@@ -97,11 +97,10 @@ impl ScriptNum {
     /// before the magnitude is written, so nothing grows.
     fn write(value: &BigNumber, bytes: &mut Vec<u8>) {
         let len = Self::encoded_len(value);
-        for digit in value.as_bigint().iter_u64_digits() {
-            let take = (len - bytes.len()).min(8);
-            bytes.extend_from_slice(&digit.to_le_bytes()[..take]);
-        }
         bytes.resize(len, 0);
+        for (chunk, digit) in bytes.chunks_mut(8).zip(value.as_bigint().iter_u64_digits()) {
+            chunk.copy_from_slice(&digit.to_le_bytes()[..chunk.len()]);
+        }
         if value.is_negative() {
             if let Some(last) = bytes.last_mut() {
                 *last |= 0x80;
@@ -246,6 +245,25 @@ mod tests {
             let bytes = ScriptNum::to_bytes(&bn);
             let decoded = ScriptNum::from_bytes(&bytes, true).unwrap();
             assert_eq!(bn, decoded, "Roundtrip failed for {}", val);
+        }
+    }
+
+    #[test]
+    fn encoding_across_limb_boundaries_keeps_the_sign_and_exact_bytes() {
+        for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 65] {
+            for high in [0x01, 0x7f, 0x80, 0xff] {
+                let mut magnitude = vec![0x5a; len];
+                magnitude[len - 1] = high;
+                let positive = BigNumber::from_bytes_le(&magnitude);
+                if high & 0x80 != 0 {
+                    magnitude.push(0);
+                }
+                assert_eq!(ScriptNum::to_bytes(&positive), magnitude);
+                assert_eq!(ScriptNum::try_to_bytes(&positive).unwrap(), magnitude);
+                *magnitude.last_mut().unwrap() |= 0x80;
+                assert_eq!(ScriptNum::to_bytes(&positive.neg()), magnitude);
+                assert_eq!(ScriptNum::try_to_bytes(&positive.neg()).unwrap(), magnitude);
+            }
         }
     }
 
