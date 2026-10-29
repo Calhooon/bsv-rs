@@ -46,6 +46,11 @@ The cold-review fold pins the plaintext variant and exact Display in both
 encrypt tests, including the Electrum helpers: both fail on a scratch copy with
 the old `EciesDecryptionFailed` plaintext refusal, and all eight pass after it.
 
+The encrypt-side refusal is carried by `Error::EciesInvalidPlaintext(String)`,
+whose Display is the reference's words alone; no release and not this PR's base
+ever printed a wrapped `ECIES decryption failed: ...` text for an encrypt call (the
+plaintext bound is new in this change), so no caller matched it.
+
 ### Notes: cross-SDK parity
 
 Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-153`
@@ -61,6 +66,10 @@ bytes for Electrum or 97 for Bitcore, Rust keeps `Data too short`
 calls use `Electrum ECIES envelope must be a bounded dense byte array` and
 `Bitcore ECIES envelope must be a bounded dense byte array`
 (`ECIES.ts:589-594,704-709`, `CompatValidation.ts:14-15`).
+
+The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
+`:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
+`:704-709`) are filed as #463 for a lane.
 
 ### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
 
