@@ -16,11 +16,11 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 842 |
-| `local.rs` | LocalKVStore implementation; tests in local_tests.rs | 733 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 595 |
+| `local.rs` | LocalKVStore with injectable retry broadcaster; tests in local_tests.rs | 761 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
-| `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer and replacement/removal | 223 |
-| `local_actions.rs` | #343: replace/remove every listed token; unchanged shortcut only for one output | 128 |
+| `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: removal batch retries under the shared rule, keeping completed batches | 150 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 150 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 727 |
@@ -583,7 +583,7 @@ match store.get("key", "default").await {
 
 ### Bound actions (#326, #341, #342)
 
-Both stores call `bound::complete_action` for set and removal. It owns the
+Both stores call `bound::complete_with_signers` through `token_spends::complete_token_action` for set and removal. It owns the
 request before createAction, validates the signable reference and atomic BEEF,
 binds version, lock time, requested input outpoints/sequences/scripts, requested
 outputs and values, then maps token signers onto those input indexes. Wallet
@@ -609,13 +609,36 @@ key/controller/JSON protocol namespace and merge their BEEFs. The global
 writer uses that protocol and key for its locking key and field signature.
 Raw-protocol tokens remain readable but are outside that mutation namespace.
 Local set/remove already collect all listed outputs; the same-value shortcut
-now requires one output. Local lookup authentication/pagination and global
-double-spend retries remain separate findings. The untagged-token reader is
+now requires one output. Local lookup authentication/pagination remains a separate finding. The untagged-token reader is
 fixed by #344. Pinned by `tests/kvstore_tokens_343.rs` (eleven tests),
 `tests/kvstore_signaction_326.rs`,
 `tests/kvstore_bound_action_341_342.rs`, `tests/kvstore_options_342.rs` and the
 unused-signer unit test; the reference's calls and refusals are recorded by
 `tests/support/signaction_reference_326.mjs --bound-actions` under Node 22.
+
+### Wallet double-spend retry (#340)
+
+`overlay::wallet_retry::with_wallet_double_spend_retry` is the single internal
+rule used by revocation and both stores: five attempts at most for structured
+wallet double-spend evidence, each retry after acknowledgment of the competing
+transactions. Set and remove repeat their lookup and input selection inside
+the key lock; local remove retries each batch. The bound action aborts the
+failed reference before the retry obtains another. `with_broadcaster` on each
+store supplies an injectable broadcaster, used by global completed broadcasts
+too; default construction is lazy, so an ordinary local write does not need
+an overlay host. The global default keeps the configured topics and network;
+the local default uses the configured topics on mainnet.
+
+The helper's TypeScript home is `overlay-tools/withDoubleSpendRetry.ts`, not
+`wallet/completeBoundAction.ts`. At `edf6e03`, global set/remove wrap their
+lookup and bound action; local set/remove call the boundary without retry.
+Local retry here is the owner's #340 extension. Go's `kvstore/local_kv_store.go`
+at `2ca481c` does not retry a double spend. Tests:
+`tests/kvstore_double_spend_retry_340.rs`, eleven cases using the #326 recording
+wallet, with nine RED on the base algorithms and two non-retry controls.
+The #340 Node 22 recorder mode records the actual distinction; all older
+modes regenerate byte-identically. Migration: no public item moved;
+`with_broadcaster` is additive and config literals are unchanged.
 
 ### Per-Key Locking
 

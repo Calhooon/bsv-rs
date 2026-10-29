@@ -1,0 +1,1229 @@
+{
+  "description": "#340: actual global retry and local non-retry sequences; local retries in Rust are the owner-requested extension",
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9; Node v22.18.0",
+  "runs": [
+    {
+      "name": "global_set_once",
+      "kind": "global",
+      "operation": "set",
+      "mode": "once",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 0,
+          "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 1,
+          "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 2,
+          "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000"
+      },
+      "result": "4121bfacc50b2130975868bd0f41d238eb02c7463728d3721dc8f5d7b4bfcdfd.0",
+      "error": null,
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "broadcast"
+      ],
+      "broadcasts": [
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "4121bfacc50b2130975868bd0f41d238eb02c7463728d3721dc8f5d7b4bfcdfd"
+      ],
+      "create_actions": [
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b037906e81e5d0f15a4e3c40ee8f9a38c3c76eda6a056fdfee76e61bfee63c3f0220469f78261c371a09fdcd6dcf50e7fb1ed131e99111242ffa3914400d0e97551241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "U1NTU1NTU1M=",
+          "spends": {
+            "0": {
+              "unlockingScript": "4830450221008185606408034d948fd47f42d0820c84b7c9a28c2962bae30faa3f06eaabcc0802203d7edfcccff905c9a1b42a54181c93f0bc1739d07aba39cde89261e80806d9f741"
+            },
+            "1": {
+              "unlockingScript": "483045022100f4bdbc8e130b807643fbf578e5ffc745270be2325bc61841ece14701187a8ab902203f87f9063f5266c46cacd78a542d1564309987e3eeec79877c51c4e10c71cd5241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "name": "global_set_always",
+      "kind": "global",
+      "operation": "set",
+      "mode": "always",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 0,
+          "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 1,
+          "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 2,
+          "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000"
+      },
+      "result": null,
+      "error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review."
+      },
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction"
+      ],
+      "broadcasts": [
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866"
+      ],
+      "create_actions": [
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Update KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous KVStore token"
+            }
+          ],
+          "outputs": [
+            {
+              "satoshis": 1,
+              "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75",
+              "outputDescription": "KVStore token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b037906e81e5d0f15a4e3c40ee8f9a38c3c76eda6a056fdfee76e61bfee63c3f0220469f78261c371a09fdcd6dcf50e7fb1ed131e99111242ffa3914400d0e97551241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "U1NTU1NTU1M=",
+          "spends": {
+            "0": {
+              "unlockingScript": "4830450221008185606408034d948fd47f42d0820c84b7c9a28c2962bae30faa3f06eaabcc0802203d7edfcccff905c9a1b42a54181c93f0bc1739d07aba39cde89261e80806d9f741"
+            },
+            "1": {
+              "unlockingScript": "483045022100f4bdbc8e130b807643fbf578e5ffc745270be2325bc61841ece14701187a8ab902203f87f9063f5266c46cacd78a542d1564309987e3eeec79877c51c4e10c71cd5241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "VFRUVFRUVFQ=",
+          "spends": {
+            "0": {
+              "unlockingScript": "4830450221008185606408034d948fd47f42d0820c84b7c9a28c2962bae30faa3f06eaabcc0802203d7edfcccff905c9a1b42a54181c93f0bc1739d07aba39cde89261e80806d9f741"
+            },
+            "1": {
+              "unlockingScript": "483045022100f4bdbc8e130b807643fbf578e5ffc745270be2325bc61841ece14701187a8ab902203f87f9063f5266c46cacd78a542d1564309987e3eeec79877c51c4e10c71cd5241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "VVVVVVVVVVU=",
+          "spends": {
+            "0": {
+              "unlockingScript": "4830450221008185606408034d948fd47f42d0820c84b7c9a28c2962bae30faa3f06eaabcc0802203d7edfcccff905c9a1b42a54181c93f0bc1739d07aba39cde89261e80806d9f741"
+            },
+            "1": {
+              "unlockingScript": "483045022100f4bdbc8e130b807643fbf578e5ffc745270be2325bc61841ece14701187a8ab902203f87f9063f5266c46cacd78a542d1564309987e3eeec79877c51c4e10c71cd5241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "VlZWVlZWVlY=",
+          "spends": {
+            "0": {
+              "unlockingScript": "4830450221008185606408034d948fd47f42d0820c84b7c9a28c2962bae30faa3f06eaabcc0802203d7edfcccff905c9a1b42a54181c93f0bc1739d07aba39cde89261e80806d9f741"
+            },
+            "1": {
+              "unlockingScript": "483045022100f4bdbc8e130b807643fbf578e5ffc745270be2325bc61841ece14701187a8ab902203f87f9063f5266c46cacd78a542d1564309987e3eeec79877c51c4e10c71cd5241"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        },
+        {
+          "reference": "U1NTU1NTU1M="
+        },
+        {
+          "reference": "VFRUVFRUVFQ="
+        },
+        {
+          "reference": "VVVVVVVVVVU="
+        },
+        {
+          "reference": "VlZWVlZWVlY="
+        }
+      ]
+    },
+    {
+      "name": "global_remove_once",
+      "kind": "global",
+      "operation": "remove",
+      "mode": "once",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 0,
+          "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 1,
+          "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 2,
+          "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000"
+      },
+      "result": "a651a7e9eda3b7d701491f58d8f0f0086028a31644b0b1d691826423ae58a1d0",
+      "error": null,
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "broadcast"
+      ],
+      "broadcasts": [
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "a651a7e9eda3b7d701491f58d8f0f0086028a31644b0b1d691826423ae58a1d0"
+      ],
+      "create_actions": [
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "473044022007a542061a1c537397f0e2f3b24c36c5a3857e114e61c06ee90cd9729c5d3bdd02207e7c03d2e0e920ca48806c302536f87545cec223ab2c138c1fea8d78cf307d2541"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "U1NTU1NTU1M=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b79d3ef5adbd3f51b19ef39b6cc471d72e870ab02b889380f664d1819a94f34e0220365fe57193669fbd8caa544d1888643e97f12d342f740bc4d0b5d31f5a1aa01841"
+            },
+            "1": {
+              "unlockingScript": "47304402207aabe04852f9ac5948c11bd989b7d3d9d828582218e670223ac6132cb54752ac022027e955f86397789da19c8042f4115f0b0a1cc7a70fdbb19135f8697ad0a9fd3841"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "name": "global_remove_always",
+      "kind": "global",
+      "operation": "remove",
+      "mode": "always",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 0,
+          "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 1,
+          "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+          "output_index": 2,
+          "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000"
+      },
+      "result": null,
+      "error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review."
+      },
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction",
+        "broadcast",
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction"
+      ],
+      "broadcasts": [
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866",
+        "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866"
+      ],
+      "create_actions": [
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        },
+        {
+          "description": "Remove KVStore value for alpha",
+          "inputBEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a0400000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a0500000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+          "inputs": [
+            {
+              "outpoint": "b5efde7f42879b4c36fcfb023d53ac66dfb8d88a248a41fed14e81b1c117b866.1",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            },
+            {
+              "outpoint": "8208af1962975b4c515b8533517afbd4b87e2cca77ccc78f09f7de077f94440d.2",
+              "unlockingScriptLength": 74,
+              "inputDescription": "KVStore token to remove"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "noSend": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "473044022007a542061a1c537397f0e2f3b24c36c5a3857e114e61c06ee90cd9729c5d3bdd02207e7c03d2e0e920ca48806c302536f87545cec223ab2c138c1fea8d78cf307d2541"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "U1NTU1NTU1M=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b79d3ef5adbd3f51b19ef39b6cc471d72e870ab02b889380f664d1819a94f34e0220365fe57193669fbd8caa544d1888643e97f12d342f740bc4d0b5d31f5a1aa01841"
+            },
+            "1": {
+              "unlockingScript": "47304402207aabe04852f9ac5948c11bd989b7d3d9d828582218e670223ac6132cb54752ac022027e955f86397789da19c8042f4115f0b0a1cc7a70fdbb19135f8697ad0a9fd3841"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "VFRUVFRUVFQ=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b79d3ef5adbd3f51b19ef39b6cc471d72e870ab02b889380f664d1819a94f34e0220365fe57193669fbd8caa544d1888643e97f12d342f740bc4d0b5d31f5a1aa01841"
+            },
+            "1": {
+              "unlockingScript": "47304402207aabe04852f9ac5948c11bd989b7d3d9d828582218e670223ac6132cb54752ac022027e955f86397789da19c8042f4115f0b0a1cc7a70fdbb19135f8697ad0a9fd3841"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "VVVVVVVVVVU=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b79d3ef5adbd3f51b19ef39b6cc471d72e870ab02b889380f664d1819a94f34e0220365fe57193669fbd8caa544d1888643e97f12d342f740bc4d0b5d31f5a1aa01841"
+            },
+            "1": {
+              "unlockingScript": "47304402207aabe04852f9ac5948c11bd989b7d3d9d828582218e670223ac6132cb54752ac022027e955f86397789da19c8042f4115f0b0a1cc7a70fdbb19135f8697ad0a9fd3841"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        },
+        {
+          "reference": "VlZWVlZWVlY=",
+          "spends": {
+            "0": {
+              "unlockingScript": "483045022100b79d3ef5adbd3f51b19ef39b6cc471d72e870ab02b889380f664d1819a94f34e0220365fe57193669fbd8caa544d1888643e97f12d342f740bc4d0b5d31f5a1aa01841"
+            },
+            "1": {
+              "unlockingScript": "47304402207aabe04852f9ac5948c11bd989b7d3d9d828582218e670223ac6132cb54752ac022027e955f86397789da19c8042f4115f0b0a1cc7a70fdbb19135f8697ad0a9fd3841"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false,
+            "noSend": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        },
+        {
+          "reference": "U1NTU1NTU1M="
+        },
+        {
+          "reference": "VFRUVFRUVFQ="
+        },
+        {
+          "reference": "VVVVVVVVVVU="
+        },
+        {
+          "reference": "VlZWVlZWVlY="
+        }
+      ]
+    },
+    {
+      "name": "local_set_once",
+      "kind": "local",
+      "operation": "set",
+      "mode": "once",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 0,
+          "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 1,
+          "outpoint": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a05000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 2,
+          "outpoint": "6f0aa4e19fb58aaa0048d84be3a52c8d19482fbe1950f6e05f12e4b1fe357900.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000"
+      },
+      "result": null,
+      "error": {
+        "name": "Error",
+        "message": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review."
+      },
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction"
+      ],
+      "broadcasts": [],
+      "create_actions": [
+        {
+          "description": "Update alpha in kvstore",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d00000000",
+          "inputs": [
+            {
+              "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous key-value token"
+            }
+          ],
+          "outputs": [
+            {
+              "basket": "kvstore",
+              "tags": [
+                "alpha"
+              ],
+              "lockingScript": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d",
+              "satoshis": 1,
+              "outputDescription": "Key-value token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "473044022024c6c5bcd8375451d8f39fa18026f1c952d7fc315497cdbb93f5427f410f14eb0220622f5c83322d33787494664ff2bcabec77f2819382de4d22141081f7184fb63e41"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "name": "local_set_always",
+      "kind": "local",
+      "operation": "set",
+      "mode": "always",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 0,
+          "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 1,
+          "outpoint": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a05000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 2,
+          "outpoint": "6f0aa4e19fb58aaa0048d84be3a52c8d19482fbe1950f6e05f12e4b1fe357900.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000"
+      },
+      "result": null,
+      "error": {
+        "name": "Error",
+        "message": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review."
+      },
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction"
+      ],
+      "broadcasts": [],
+      "create_actions": [
+        {
+          "description": "Update alpha in kvstore",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d00000000",
+          "inputs": [
+            {
+              "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous key-value token"
+            }
+          ],
+          "outputs": [
+            {
+              "basket": "kvstore",
+              "tags": [
+                "alpha"
+              ],
+              "lockingScript": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d",
+              "satoshis": 1,
+              "outputDescription": "Key-value token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "randomizeOutputs": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "473044022024c6c5bcd8375451d8f39fa18026f1c952d7fc315497cdbb93f5427f410f14eb0220622f5c83322d33787494664ff2bcabec77f2819382de4d22141081f7184fb63e41"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "name": "local_remove_once",
+      "kind": "local",
+      "operation": "remove",
+      "mode": "once",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 0,
+          "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 1,
+          "outpoint": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a05000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 2,
+          "outpoint": "6f0aa4e19fb58aaa0048d84be3a52c8d19482fbe1950f6e05f12e4b1fe357900.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000"
+      },
+      "result": null,
+      "error": {
+        "name": "Error",
+        "message": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review."
+      },
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction"
+      ],
+      "broadcasts": [],
+      "create_actions": [
+        {
+          "description": "Remove alpha in kvstore",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d00000000",
+          "inputs": [
+            {
+              "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous key-value token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "473044022048ca6e1b3af42b561011ff7ca5dc21221a0c7116bd9e478f26fe04e697e279560220469b05ce0540cee186557c9e66d62d231d737fab92eabd9041f6d188f0e124fb41"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "name": "local_remove_always",
+      "kind": "local",
+      "operation": "remove",
+      "mode": "always",
+      "initial_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 0,
+          "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0"
+        }
+      ],
+      "fresh_tokens": [
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 1,
+          "outpoint": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830.1"
+        },
+        {
+          "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff03000000000000000002006a000000000000000002006a05000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+          "output_index": 2,
+          "outpoint": "6f0aa4e19fb58aaa0048d84be3a52c8d19482fbe1950f6e05f12e4b1fe357900.2"
+        }
+      ],
+      "review_error": {
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "code": 5
+      },
+      "competing": {
+        "txid": "d1a93ae5b66cab0a91e2e4f0497a365a2ddb8ebe72352e6ae617623db47e5830",
+        "beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff02000000000000000002006a04000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000"
+      },
+      "result": null,
+      "error": {
+        "name": "Error",
+        "message": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review."
+      },
+      "events": [
+        "lookup",
+        "createAction",
+        "signAction",
+        "abortAction"
+      ],
+      "broadcasts": [],
+      "create_actions": [
+        {
+          "description": "Remove alpha in kvstore",
+          "inputBEEF": "0200beef00010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d00000000",
+          "inputs": [
+            {
+              "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0",
+              "unlockingScriptLength": 74,
+              "inputDescription": "Previous key-value token"
+            }
+          ],
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "signAndProcess": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "sign_actions": [
+        {
+          "reference": "UlJSUlJSUlI=",
+          "spends": {
+            "0": {
+              "unlockingScript": "473044022048ca6e1b3af42b561011ff7ca5dc21221a0c7116bd9e478f26fe04e697e279560220469b05ce0540cee186557c9e66d62d231d737fab92eabd9041f6d188f0e124fb41"
+            }
+          },
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "returnTXIDOnly": false
+          }
+        }
+      ],
+      "abort_actions": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    }
+  ]
+}

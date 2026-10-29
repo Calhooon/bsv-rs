@@ -79,7 +79,6 @@
 
 pub mod client;
 pub mod contacts;
-mod double_spend;
 mod reveal;
 mod revoke;
 mod token_maps;

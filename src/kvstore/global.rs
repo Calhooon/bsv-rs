@@ -4,8 +4,8 @@
 //! by other users via lookup services.
 
 use crate::overlay::{
-    LookupAnswer, LookupResolver, LookupResolverConfig, NetworkPreset, TopicBroadcaster,
-    TopicBroadcasterConfig,
+    with_wallet_double_spend_retry, LookupAnswer, LookupResolver, LookupResolverConfig,
+    NetworkPreset, TopicBroadcaster, TopicBroadcasterConfig,
 };
 use crate::transaction::Broadcaster;
 use crate::transaction::Transaction;
@@ -48,6 +48,7 @@ pub struct GlobalKVStore<W: WalletInterface> {
     wallet: W,
     config: KVStoreConfig,
     action_options: ActionOptions,
+    broadcaster: Option<Arc<TopicBroadcaster>>,
     resolver: Arc<LookupResolver>,
     network_preset: NetworkPreset,
     /// Cached identity key.
@@ -87,11 +88,21 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             wallet,
             config,
             action_options: ActionOptions::default(),
+            broadcaster: None,
             resolver: Arc::new(resolver),
             network_preset: network,
             cached_identity_key: Arc::new(Mutex::new(None)),
             key_locks: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Uses a caller-built broadcaster for completed transactions and conflict synchronization.
+    ///
+    /// Its resolver, facilitator, topics and acknowledgment requirements are used as given.
+    #[must_use]
+    pub fn with_broadcaster(mut self, broadcaster: TopicBroadcaster) -> Self {
+        self.broadcaster = Some(Arc::new(broadcaster));
+        self
     }
 
     /// Sets the wallet's `acceptDelayedBroadcast` option (default: false).
@@ -210,7 +221,12 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         // Acquire lock
         self.acquire_key_lock(key).await;
 
-        let result = self.remove_internal(key, &controller, &options).await;
+        let result = with_wallet_double_spend_retry(
+            || self.remove_internal(key, &controller, &options),
+            || self.topic_broadcaster(),
+            Error::KvStoreError,
+        )
+        .await;
 
         self.release_key_lock(key).await;
 
@@ -342,6 +358,20 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     // Internal Helper Methods
     // =========================================================================
 
+    fn topic_broadcaster(&self) -> Result<Arc<TopicBroadcaster>> {
+        if let Some(broadcaster) = &self.broadcaster {
+            return Ok(broadcaster.clone());
+        }
+        TopicBroadcaster::new(
+            self.config.topics.clone(),
+            TopicBroadcasterConfig {
+                network_preset: self.network_preset,
+                ..Default::default()
+            },
+        )
+        .map(Arc::new)
+    }
+
     fn originator(&self) -> Option<&str> {
         self.config.originator.as_deref()
     }
@@ -466,13 +496,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     }
 
     async fn broadcast_to_overlay(&self, beef: &[u8]) -> Result<()> {
-        let broadcaster = TopicBroadcaster::new(
-            self.config.topics.clone(),
-            TopicBroadcasterConfig {
-                network_preset: self.network_preset,
-                ..Default::default()
-            },
-        )?;
+        let broadcaster = self.topic_broadcaster()?;
 
         // Parse transaction from BEEF
         let tx = Transaction::from_beef(beef, None)?;

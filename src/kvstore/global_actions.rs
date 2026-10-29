@@ -4,7 +4,7 @@ use crate::kvstore::token_spends::{complete_token_action, inputs, merge_beef, Si
 use crate::kvstore::{
     KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
-use crate::overlay::LookupQuestion;
+use crate::overlay::{with_wallet_double_spend_retry, LookupQuestion};
 use crate::primitives::{from_hex, to_hex, PublicKey};
 use crate::script::{templates::PushDrop, LockingScript};
 use crate::wallet::{
@@ -22,10 +22,26 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         protocol_id: &str,
         options: &KVStoreSetOptions,
     ) -> Result<String> {
-        let tokens = self.current_tokens(key, controller, protocol_id).await?;
         let locking_script = self
             .token_lock(key, value, controller, protocol_id, options)
             .await?;
+        with_wallet_double_spend_retry(
+            || self.set_tokens(key, controller, protocol_id, options, &locking_script),
+            || self.topic_broadcaster(),
+            Error::KvStoreError,
+        )
+        .await
+    }
+
+    async fn set_tokens(
+        &self,
+        key: &str,
+        controller: &str,
+        protocol_id: &str,
+        options: &KVStoreSetOptions,
+        locking_script: &LockingScript,
+    ) -> Result<String> {
+        let tokens = self.current_tokens(key, controller, protocol_id).await?;
         let inputs = inputs(
             tokens.iter().map(KVStoreToken::outpoint_string),
             "Previous KVStore token",

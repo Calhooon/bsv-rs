@@ -8,17 +8,16 @@
 //! number, the certificate's signature, the token's signature by the
 //! wallet), a malformed or unauthenticated output skipped; then each
 //! authenticated output spent at its own index, the spend wrapped in the
-//! reference's double-spend retry ([`super::double_spend`]), a failure after
+//! reference's double-spend retry ([`crate::overlay::wallet_retry`]), a failure after
 //! createAction aborting the action.
 //!
 //! [`IdentityClient::revoke_certificate_revelation`]: super::IdentityClient::revoke_certificate_revelation
 
-use super::double_spend::with_double_spend_retry;
 use super::types::IdentityClientConfig;
 use crate::auth::certificates::Certificate;
 use crate::overlay::{
-    LookupAnswer, LookupQuestion, LookupResolver, OutputListItem, OverlayBroadcastFacilitator,
-    TopicBroadcaster, TopicBroadcasterConfig,
+    with_wallet_double_spend_retry, LookupAnswer, LookupQuestion, LookupResolver, OutputListItem,
+    OverlayBroadcastFacilitator, TopicBroadcaster, TopicBroadcasterConfig,
 };
 use crate::primitives::bsv::sighash::{
     compute_sighash_dispatched_for_signing, parse_transaction, SighashParams, SIGHASH_ALL,
@@ -90,16 +89,21 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
                 "No authenticated revelation output matches the requested certificate.",
             ));
         }
-        let broadcaster = TopicBroadcaster::new(
+        let broadcaster = Arc::new(TopicBroadcaster::new(
             vec!["tm_identity".to_string()],
             TopicBroadcasterConfig {
                 network_preset: self.config.network_preset,
                 facilitator: self.facilitator.clone(),
                 ..Default::default()
             },
-        )?;
+        )?);
         for revelation in &revelations {
-            with_double_spend_retry(|| self.spend(revelation, &broadcaster), &broadcaster).await?;
+            with_wallet_double_spend_retry(
+                || self.spend(revelation, &broadcaster),
+                || Ok(broadcaster.clone()),
+                Error::IdentityError,
+            )
+            .await?;
         }
         Ok(())
     }
