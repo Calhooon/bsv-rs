@@ -18,7 +18,10 @@ const TEN_MINUTES: i64 = 10 * 60;
 ///
 /// The fields are public so a host can describe another chain starting from
 /// one of the constructors; new fields may be added in a minor release.
-/// Genesis activation is authoritative here; `ChainTip`'s deprecated copy is ignored.
+/// Genesis activation is authoritative here when a `ChainParams` is supplied; with
+/// none, the default stream path still reads `ChainTip`'s deprecated copy until its
+/// removal at the next api-break, when mainnet's heights become the default and a
+/// caller on another chain supplies its `ChainParams`.
 ///
 /// STN is not modelled. Nothing in the stack runs on STN, and bitcoin-sv
 /// v1.2.2 (`879fc8b`) leaves its BIP65, BIP66 and CSV heights uninitialized
