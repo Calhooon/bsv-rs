@@ -2,8 +2,8 @@
 
 use super::{
     create_nonce, get_verifiable_certificates, AuthMessage, Counterparty, CreateSignatureArgs,
-    Error, MessageType, Peer, PeerSession, Protocol, RequestedCertificateSet, Result,
-    SecurityLevel, Transport, VerifiableCertificate, WalletInterface, AUTH_PROTOCOL_ID,
+    Error, MessageType, Peer, PeerSession, Protocol, Result, SecurityLevel, Transport,
+    VerifiableCertificate, WalletInterface, AUTH_PROTOCOL_ID,
 };
 
 impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
@@ -49,10 +49,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let certificates = self.initial_response_certificates(message).await?;
         let their_nonce = message.initial_nonce.as_deref().unwrap_or_default();
         let our_nonce = session.session_nonce.as_deref().unwrap_or_default();
+        // Both canonical: theirs refused at intake otherwise (#445), ours created here.
         let data = [their_nonce, our_nonce]
             .into_iter()
-            .flat_map(|nonce| crate::primitives::from_base64(nonce).unwrap_or_default())
-            .collect();
+            .map(crate::primitives::from_base64)
+            .collect::<Result<Vec<_>>>()?
+            .concat();
         let signed = self
             .wallet
             .create_signature(
@@ -160,10 +162,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             return Ok(());
         };
         let policy = self.certificates_to_request.clone().unwrap_or_default();
-        for certificate in certificates {
-            self.validate_initial_certificate(certificate, message, &policy)
-                .await?;
-        }
+        self.validate_received_certificates(message, Some(&policy))
+            .await?;
         let nonce = session
             .session_nonce
             .as_deref()
@@ -181,50 +181,6 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let callbacks = self.certificate_callbacks.read().await;
         for callback in callbacks.values() {
             callback(message.identity_key.clone(), certificates.clone()).await?;
-        }
-        Ok(())
-    }
-
-    /// The validator used at Peer.ts:970: subject, signature, policy, decryption, disclosure.
-    async fn validate_initial_certificate(
-        &self,
-        certificate: &VerifiableCertificate,
-        message: &AuthMessage,
-        policy: &RequestedCertificateSet,
-    ) -> Result<()> {
-        let cert = &certificate.certificate;
-        if cert.subject != message.identity_key {
-            return Err(Error::AuthError(format!(
-                "The subject of one of your certificates (\"{}\") is not the same as the request sender (\"{}\").",
-                cert.subject.to_hex(), message.identity_key.to_hex()
-            )));
-        }
-        let serial = cert.serial_number_base64();
-        if !certificate.verify()? {
-            return Err(Error::AuthError(format!(
-                "The signature for the certificate with serial number {serial} is invalid!"
-            )));
-        }
-        let certifier = cert.certifier.to_hex();
-        if !policy.certifiers.contains(&certifier) {
-            return Err(Error::AuthError(format!(
-                "Certificate with serial number {serial} has an unrequested certifier: {certifier}"
-            )));
-        }
-        let cert_type = cert.type_base64();
-        let requested = policy.types.get(&cert_type).ok_or_else(|| {
-            Error::AuthError(format!(
-                "Certificate with type {cert_type} was not requested"
-            ))
-        })?;
-        let disclosed = certificate
-            .clone()
-            .decrypt_fields(&*self.wallet, None, None, self.originator.as_deref())
-            .await?;
-        if disclosed.is_empty() || disclosed.keys().any(|field| !requested.contains(field)) {
-            return Err(Error::AuthError(format!(
-                "Certificate {serial} did not reveal a non-empty requested field set"
-            )));
         }
         Ok(())
     }

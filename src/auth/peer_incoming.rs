@@ -1,8 +1,9 @@
 //! Incoming Peer messages: nonce claims, certificate authorization and callbacks.
 
+use super::certificates_received::require_requested_certificates;
 use super::{
-    validate_certificates, verify_nonce, AuthMessage, Error, MessageType, Peer, PeerSession,
-    Result, Transport, WalletInterface,
+    verify_nonce, AuthMessage, Error, MessageType, Peer, PeerSession, Result, Transport,
+    WalletInterface,
 };
 
 impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
@@ -192,13 +193,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     pub(super) async fn process_certificate_response(&self, message: AuthMessage) -> Result<()> {
         let session = self.authenticate_message(&message).await?;
         if let Some(certs) = message.certificates.as_ref().filter(|c| !c.is_empty()) {
-            validate_certificates(
-                &*self.wallet,
-                &message,
-                self.certificates_to_request.as_ref(),
-                self.originator.as_deref(),
-            )
-            .await?;
+            // Match, then the one validator, as Peer.ts:1229-1242 (#445)
+            let policy = self.certificates_to_request.as_ref();
+            policy.map_or(Ok(()), |policy| {
+                require_requested_certificates(certs, policy)
+            })?;
+            self.validate_received_certificates(&message, policy)
+                .await?;
             let nonce = session.session_nonce.as_deref().unwrap_or_default();
             let mut manager = self.session_manager.write().await;
             if let Some(current) = manager.get_session_mut(nonce) {
