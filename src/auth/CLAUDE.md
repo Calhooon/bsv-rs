@@ -440,7 +440,7 @@ The InitialResponse field mapping follows the TypeScript SDK:
 
 On the initiator side, the responder's session nonce (`initial_nonce`) is stored as `peer_nonce`.
 
-**TS SDK compatibility**: Rust and TypeScript send `initialNonce` and `yourNonce` without `nonce`. The Go SDK sends both `Nonce` and `InitialNonce`. Rust reads and requires `initial_nonce` (`Initial response message nonce is required.`, #353). The initial response carries `certificates` when automatic selection ran (including an empty array), followed by `requestedCertificates` (the responder's own policy, including an empty set), then `signature` (`Peer.ts:865-874`).
+**TS SDK compatibility**: Rust and TypeScript send `initialNonce` and `yourNonce` without `nonce`. The Go SDK sends both `Nonce` and `InitialNonce`. Rust reads and requires `initial_nonce` (`Initial response message nonce is required.`, #353). The initial response carries `certificates` when automatic selection ran (including an empty array, which no test pins yet: #445), followed by `requestedCertificates` (the responder's own policy, including an empty set), then `signature` (`Peer.ts:865-874`).
 
 ### Error Propagation
 
