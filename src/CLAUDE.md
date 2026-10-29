@@ -11,6 +11,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 |------|---------|
 | `lib.rs` | Crate root with module declarations and re-exports |
 | `error.rs` | Unified `Error` enum and `Result` type alias |
+| `error/wallet_fault.rs` | `WalletFaultFamily`, `WalletFault`, `AbortAcceptance`: port extensions beyond the reference; original strings and refusal classes retained (#439) |
 | `error/wallet_refusal.rs` | The reference's twenty `WalletRefusalClass` values and impls, re-exported at `error::WalletRefusalClass` |
 
 ## Subdirectories
@@ -68,7 +69,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 | (core) | `InvalidKeyLength`, `InvalidDataLength`, `InvalidHex`, `InvalidBase58`, `InvalidBase64`, `CryptoError`, `InvalidSignature`, `InvalidPublicKey`, `InvalidPrivateKey`, `PointAtInfinity`, `DecryptionFailed`, `InvalidNonce`, `InvalidTag`, `InvalidUtf8`, `ReaderUnderflow`, `InvalidChecksum` |
 | `script` | `ScriptParseError`, `ScriptExecutionError`, `InvalidOpcode`, `DisabledOpcode`, `StackUnderflow`, `StackOverflow`, `Bip276Error`, `InvalidAddress`, `InvalidAddressLength`, `UnsupportedAddress` |
 | `transaction` | `TransactionError`, `ScriptEvaluationDeclined` (`Transaction::verify`'s decline, #38), `MerklePathError`, `BeefError`, `FeeModelError` |
-| `wallet` | `WalletError`, `WalletRefusal`, `WalletReviewActions` (a `WERR_REVIEW_ACTIONS` with its results, #327), `WalletBusy`, `WalletTransport`, `TransportFault` (with the `TransportFault` class of `transaction`, #87), `HmacLegacyKey` (strict refusal, #379), `HmacMinimalLengthKey` (retained, never emitted), `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
+| `wallet` | `WalletError`, `WalletFault`, `AbortAccepted` (the port extensions of #439), `WalletRefusal`, `WalletReviewActions` (a `WERR_REVIEW_ACTIONS` with its results, #327), `WalletBusy`, `WalletTransport`, `TransportFault` (with the `TransportFault` class of `transaction`, #87), `HmacLegacyKey` (strict refusal, #379), `HmacMinimalLengthKey` (retained, never emitted), `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
 | `messages` | `MessageVersionMismatch`, `MessageError`, `MessageRecipientMismatch` |
 | `compat` | `InvalidMnemonic`, `InvalidEntropyLength`, `InvalidMnemonicWord`, `InvalidExtendedKey`, `HardenedFromPublic`, `InvalidDerivationPath`, `EciesDecryptionFailed`, `EciesHmacMismatch` |
 | `auth` | `AuthError`, `SessionNotFound`, `CertificateValidationError`, `TransportError` |

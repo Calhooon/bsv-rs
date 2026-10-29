@@ -3,6 +3,11 @@
 use thiserror::Error;
 
 #[cfg(feature = "wallet")]
+mod wallet_fault;
+#[cfg(feature = "wallet")]
+pub use wallet_fault::{AbortAcceptance, WalletFault, WalletFaultFamily};
+
+#[cfg(feature = "wallet")]
 mod wallet_refusal;
 #[cfg(feature = "wallet")]
 pub use wallet_refusal::WalletRefusalClass;
@@ -200,6 +205,18 @@ pub enum Error {
     #[cfg(feature = "wallet")]
     #[error("wallet error: {0}")]
     WalletError(String),
+
+    /// The port's typed fault extension; displays exactly as `WalletError`.
+    /// This crate emits no such variant; see [`WalletFault`].
+    #[cfg(feature = "wallet")]
+    #[error("wallet error: {0}")]
+    WalletFault(WalletFault),
+
+    /// The port's stored-acceptance extension for a refused abort, not a successful abort.
+    /// Preserves the guard's class and complete string; see [`AbortAcceptance`].
+    #[cfg(feature = "wallet")]
+    #[error("{0}")]
+    AbortAccepted(AbortAcceptance),
 
     /// A wallet's refusal with its class: the reference's classed wallet error.
     ///

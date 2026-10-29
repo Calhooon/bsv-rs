@@ -1,5 +1,6 @@
 //! The reference's wallet refusal classes, re-exported by the error module.
 
+#[cfg(doc)]
 use super::Error;
 
 /// The class of a wallet's refusal: the reference's wallet error table by
