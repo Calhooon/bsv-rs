@@ -114,6 +114,83 @@ match is exact, where the reference lower-cases both sides
 here, `data: sha256(preimage)` in the reference's `PushDrop.ts:246-248`) is
 crate-wide and older than this change; it and the local lookup pagination gap
 (`LocalKVStore.ts:332-339,574-590`) are filed as follow-ups.
+### Verified: handshake refusal words and signed-header order (#366, #369)
+
+Both filings predate fixes already in base `823a798e`: #410 changed the
+handshake's refusal words, and #416 moved signed-header collection to
+`http/response_bounds.rs` and reused the reference collation. This entry
+adds focused recorded witnesses; it changes neither runtime behavior nor
+the public API.
+
+For #366, the old `Auth endpoint returned {status}: {body}` omitted the
+reference's URL, authentication explanation and bounded body preview.
+`tests/support/transport_unsigned_response_354.mjs --handshake` now records
+16 cases from the actual `ts-stack@edf6e03` transport under Node 22.18.0:
+200 and 201 with missing headers, 300, 304, 307, 401, 404, 429 with and
+without Retry-After, 500, 502, 503 with and without Retry-After, 504, and
+binary/truncated previews. `transport_handshake_refusal_366.json` records
+the words byte for byte, with the ephemeral server's origin as `{url}`.
+The handshake does not call `#validateResponseAuthentication`; a non-2xx
+uses the generic `response lacked required BSV auth headers` explanation
+even when all three auth headers are present. A successful handshake needs
+no auth response headers. Redirects fail in fetch before that formatter.
+
+For #369, the filing's mixed-case/non-ASCII explanation does not apply to
+the lowercased ASCII letter/digit/dash BRC-104 names. Node 22.18.0's ICU 77.1
+(`en-US`, numeric false, punctuation significant) orders dash, digits, then
+letters, exactly as bytes do on that set. The recorder measures all 1,407
+`x-bsv-` suffixes of lengths 0 through 2 over `-0123456789abcdefghijklmnopqrstuvwxyz`:
+zero differing positions, identical SHA-256 of the sorted names. Raw mixed
+case does differ, but the transport lowercases before collecting. HTTP
+also accepts token punctuation outside that set: `x-bsv-a_` precedes
+`x-bsv-a-` under localeCompare, reversing their byte order. The actual
+transport accepts those names too. #416's existing collation already
+handles them; changing it to a byte sort would change the signed payload.
+`tests/support/transport_header_collation_369.mjs` records three full
+response payloads, their included headers, the measurement and rejected
+non-ASCII names in `transport_header_collation_369.json`.
+
+Pinned by `tests/transport_handshake_refusal_366.rs` (four tests) and
+`tests/transport_header_collation_369.rs` (three tests), using wiremock
+ephemeral ports. The requested base already passes. RED was therefore
+measured by restoring only the historical sentence and byte sort in a
+scratch copy with its own target directory: the two refusal tests and
+the wider HTTP-token payload test fail their equality assertions; four
+other tests still pass. All seven pass with the base's fixes retained.
+Both new vectors and #354's unchanged 22-case vector are byte-identical
+on recorder re-run. No production function or file grew.
+
+Downstream matching table, replacing the historical text (no downstream
+files changed):
+
+| Site | Old | New / finding |
+| Handshake refusal | `Auth endpoint returned {status}: {body}` | `Received HTTP {status} {reason} from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)` plus ` - body preview: {preview}` for a nonempty body |
+| `~/bsv/rust-message-box/src/` | Exact old sentence/prefix searched | No matching sites |
+| `~/bsv/bsv-middleware-cloudflare-public/src/` | Exact old sentence/prefix search attempted | Checkout absent; downstream sites unverified |
+
+### Notes: cross-SDK parity (#366, #369)
+
+At `ts-stack@edf6e03`, `SimplifiedFetchTransport.ts:115-173` fetches the
+handshake; `:143-150` calls `#createUnauthenticatedResponseError` with no
+missing-header list, `:464-494` constructs its words, and `:512-579`
+constructs its preview. The general path alone calls the three-header
+validator (`:220-232`, `:365`). Rust preserves #87's existing classes:
+429 is `TransportFault::RateLimited`, 503 with Retry-After likewise,
+502/503/504 otherwise `MayHaveBeenReceived`; other statuses are
+`AuthError`. Those details use the reference's words; Rust's Display
+prefix and the previously recorded non-ASCII reason-phrase and split
+surrogate differences remain. The reference throws a plain Error.
+
+Signed-response collection lowercases at `:264`, filters at `:265-266`,
+and sorts with localeCompare at `:286`; the old filing's `:281` is now a
+bound refusal. No new sort is needed. At `go-sdk@2ca481c`,
+`auth/transports/simplified_http_transport.go:125-131` refuses a non-2xx
+handshake in its own `request failed with status %d: %s` words joined to
+`ErrHTTPServerFailedToAuthenticate`, without the URL or a bounded preview.
+That transport calls `authpayload.FromHTTPResponse` at `:195`;
+`auth/authpayload/http.go:324-351` lowercases then byte-sorts included
+headers. Go agrees on letter/digit/dash names and differs on the wider
+token punctuation witness. Go was read, not executed in this lane.
 
 ### Added: the node's per-input script word from chain facts (#440)
 

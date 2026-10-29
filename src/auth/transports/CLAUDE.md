@@ -462,6 +462,15 @@ as `Infinity` in V8).
 
 ## Testing
 
+`transport_handshake_refusal_366` replays 16 responses recorded by #354's
+recorder on Node 22.18.0: #410's non-2xx words and #87's fault classes,
+successful handshakes without authentication headers, and fetch's redirect
+refusal. `transport_header_collation_369` pins #416's existing sort with
+three actual reference payloads: lowercased letter/digit/dash names have
+the same byte and locale order, but accepted HTTP token punctuation can
+differ. Its 1,407-name Node/ICU measurement is in the vector. Both tests use
+wiremock ephemeral ports; neither runtime path changed for #366/#369.
+
 Run transport tests:
 
 ```bash
