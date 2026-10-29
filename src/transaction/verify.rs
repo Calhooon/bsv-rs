@@ -15,7 +15,7 @@ impl Transaction {
     /// SPV verification with the node's standard word derived per input from
     /// `chain`, the tracker's tip + 1 and the source's BUMP height. With no tip,
     /// the latest era in `chain` applies. An unproven source takes the spend's
-    /// era; a pre-Genesis source is refused in the error's words.
+    /// era; unsupported chain facts return [`Error::TransactionNotJudged`].
     ///
     /// The graph, proof, value, fee and resource behavior is [`Self::verify`]'s.
     /// Proven transactions still use their verified proof without executing
@@ -23,8 +23,9 @@ impl Transaction {
     ///
     /// # Errors
     /// Propagates tracker and proof failures, unavailable source data and fee
-    /// errors. Script failures and unsupported eras are transaction errors;
-    /// a local resource limit remains [`Error::ScriptEvaluationDeclined`].
+    /// errors. Script failures are transaction errors; unsupported chain facts
+    /// are [`Error::TransactionNotJudged`], and a local resource limit remains
+    /// [`Error::ScriptEvaluationDeclined`].
     pub async fn verify_with_chain_params(
         &self,
         chain_tracker: &dyn ChainTracker,
@@ -173,6 +174,16 @@ impl Evaluation<'_> {
         source: &Source<'_>,
         shared: Arc<TxSighashCache>,
     ) -> Result<()> {
+        let flags = self
+            .chain
+            .map(|chain| {
+                super::verification_flags::verification_flags(chain, self.tip_height, source.height)
+                    .map_err(|cause| Error::TransactionNotJudged {
+                        input_index: vin,
+                        cause,
+                    })
+            })
+            .transpose()?;
         let unlocking = tx.inputs[vin].unlocking_script.as_ref().ok_or_else(|| {
             Error::TransactionError(format!("Input {vin} is missing unlocking script"))
         })?;
@@ -185,15 +196,7 @@ impl Evaluation<'_> {
             memory_limit: self.memory_limit,
             work_limit: None,
         })?;
-        if let Some(chain) = self.chain {
-            let flags = super::verification_flags::verification_flags(
-                chain,
-                self.tip_height,
-                source.height,
-            )
-            .map_err(|e| {
-                Error::TransactionError(format!("Script validation failed for input {vin}: {e}"))
-            })?;
+        if let Some(flags) = flags {
             spend.set_flags(flags);
         }
         spend

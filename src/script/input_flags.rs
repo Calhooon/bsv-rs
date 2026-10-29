@@ -1,6 +1,6 @@
 //! The node's transaction flags combined with each coin's creation-era bits.
 
-use super::{ProtocolEra, ScriptFlags, ScriptFlagsError};
+use super::{NotJudgedCause, ProtocolEra, ScriptFlags, ScriptFlagsError};
 use crate::block::ChainParams;
 
 /// Computes the node's word for one input from chain facts, never a caller's
@@ -37,19 +37,30 @@ pub fn input_script_flags(
     source_proven_height: Option<u32>,
     mined: bool,
 ) -> Result<ScriptFlags, ScriptFlagsError> {
+    checked_input_script_flags(chain, spend_height, source_proven_height, mined)
+        .map_err(|cause| ScriptFlagsError::NotApplicable(cause.flags_message()))
+}
+
+pub(crate) fn checked_input_script_flags(
+    chain: &ChainParams,
+    spend_height: u32,
+    source_proven_height: Option<u32>,
+    mined: bool,
+) -> Result<ScriptFlags, NotJudgedCause> {
     chain
         .check_activation_heights()
-        .map_err(|error| ScriptFlagsError::NotApplicable(error.message()))?;
+        .map_err(NotJudgedCause::ZeroActivationHeight)?;
     let era_at =
         |height| ProtocolEra::at_height(height, chain.genesis_height, chain.chronicle_height);
-    let spend_era = era_at(spend_height).ok_or(ScriptFlagsError::NotApplicable(
-        "The spending transaction is before Genesis; its script era is unsupported.",
-    ))?;
-    let source_era = era_at(source_proven_height.unwrap_or(spend_height)).ok_or(
-        ScriptFlagsError::NotApplicable(
-            "The source output was created before Genesis; its script era is unsupported.",
-        ),
-    )?;
+    let spend_era = era_at(spend_height).ok_or(NotJudgedCause::PreGenesisSpend {
+        height: spend_height,
+        genesis_height: chain.genesis_height,
+    })?;
+    let source_height = source_proven_height.unwrap_or(spend_height);
+    let source_era = era_at(source_height).ok_or(NotJudgedCause::PreGenesisCoin {
+        height: source_height,
+        genesis_height: chain.genesis_height,
+    })?;
     let word = if mined {
         ScriptFlags::block(spend_era)
     } else {

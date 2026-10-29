@@ -8,7 +8,7 @@ use std::io::Cursor;
 
 use bsv_rs::block::ChainParams;
 use bsv_rs::primitives::{PrivateKey, Writer};
-use bsv_rs::script::{LockingScript, Script, SigningContext, UnlockingScript};
+use bsv_rs::script::{LockingScript, NotJudgedCause, Script, SigningContext, UnlockingScript};
 use bsv_rs::transaction::beef_stream::{ChainTip, Hash32, Headers, SpendRefusal};
 use bsv_rs::transaction::{
     verify_stream_two_pass, verify_stream_two_pass_with_chain_params, AsyncStreamVerifier,
@@ -18,8 +18,6 @@ use bsv_rs::transaction::{
 
 const GENESIS: u32 = 620_538;
 const CHRONICLE: u32 = 943_816;
-const PRE_GENESIS: &str =
-    "The source output was created before Genesis; its script era is unsupported.";
 const FORKID: &str = "The signature must use SIGHASH_FORKID.";
 const HASH_GATE: &str = "The signature must not use SIGHASH_CHRONICLE before Chronicle.";
 
@@ -37,6 +35,7 @@ impl Headers for HeaderFacts {
     }
 }
 
+#[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
 fn tip(height: u32) -> ChainTip {
     ChainTip {
         height,
@@ -219,8 +218,11 @@ fn unproven_parent_takes_the_spend_era_including_without_a_tip() {
 #[test]
 fn pre_genesis_coin_is_explicitly_refused_at_the_live_door() {
     let tx = signed(0x61, Some(GENESIS - 1));
-    refused(verdict(&tx, Some(CHRONICLE), true), &tx, PRE_GENESIS);
-    refused(verdict(&tx, None, true), &tx, PRE_GENESIS);
+    for tip in [Some(CHRONICLE), None] {
+        assert!(matches!(verdict(&tx, tip, true), Verdict::NotJudged {
+            txid, input: 0, cause: NotJudgedCause::PreGenesisCoin { height, genesis_height }, ..
+        } if txid == tx.hash() && height == GENESIS - 1 && genesis_height == GENESIS));
+    }
 }
 
 #[test]
@@ -423,9 +425,9 @@ fn regtest_activation_defaults_and_tip_overflow_are_used_without_network_guessin
     )
     .unwrap()
     .is_valid());
-    refused(
-        verdict(&tx, Some(u32::MAX), true),
-        &tx,
-        "The mining tip has no next block height in u32.",
+    assert!(
+        matches!(verdict(&tx, Some(u32::MAX), true), Verdict::NotJudged {
+        txid, input: 0, cause: NotJudgedCause::TipHeightOverflow { tip: u32::MAX }, ..
+    } if txid == tx.hash())
     );
 }

@@ -244,6 +244,7 @@ impl MockChainTracker {
     }
 
     /// The tip set, or the synthetic mainnet tip at `height`.
+    #[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
     fn tip(&self) -> Option<ChainTip> {
         self.tip.unwrap_or(Some(ChainTip {
             height: self.height,
@@ -357,6 +358,8 @@ mod tests {
     #[tokio::test]
     async fn the_mock_answers_a_synthetic_mainnet_tip_at_its_height() {
         let mut tracker = MockChainTracker::new(1000);
+        #[allow(deprecated)]
+        // Populate the retained ChainTip field for source compatibility (#451).
         let expected = ChainTip {
             height: 1000,
             median_time_past: 1_700_000_000,
@@ -377,6 +380,8 @@ mod tests {
         let none = MockChainTracker::new(1000).with_mining_tip(None);
         assert_eq!(ChainTracker::mining_tip(&none).await, Ok(None));
         assert_eq!(Headers::mining_tip(&none), None);
+        #[allow(deprecated)]
+        // Populate the retained ChainTip field for source compatibility (#451).
         let tip = ChainTip {
             height: 7,
             median_time_past: 1,

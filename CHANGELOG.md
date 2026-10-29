@@ -102,6 +102,92 @@ retain their expected verdicts and bytes. Measurements, raw samples, source
 probes and gate/fuzz logs are under
 `/Volumes/Lanes/out/bsv-rs/fix-378-op-mul-time/`; the table is the performance pin,
 with no wall-clock assertion or 16 MiB bench in the crate.
+### Fixed: out-of-scope words are not judged; live Genesis authority (#452, #451)
+
+A pre-Genesis coin, a tip at `u32::MAX`, or a zero Genesis/Chronicle
+activation set through public fields previously became `SpendRefusal::Script`
+and `TransactionError("Script validation failed for input N: ...")`.
+Those answers falsely judged a transaction for an unsupported era or a broken
+configuration. The keeper's word of 2026-10-29 18:1xZ is implemented as
+`Verdict::NotJudged { offset, txid, input, cause }` and
+`SpendRefusal::NotJudged { input, cause }`, with `input: u32` and the shared
+`script::NotJudgedCause`. The whole path returns
+`Error::TransactionNotJudged { txid: String, input_index: usize, cause }`.
+The display txid identifies the unproven transaction being checked, including
+an ancestor reached by the whole-path walk. Its cause is not a resource limit
+and must not inhabit `ScriptEvaluationDeclined`. New arms
+are appended, preserving every existing variant's discriminant.
+
+`NotJudgedCause` carries `PreGenesisCoin { height, genesis_height }`,
+`TipHeightOverflow { tip }`, or `ZeroActivationHeight(ActivationHeightsError)`
+(`ZeroGenesis` / `ZeroChronicle`). The existing pre-Genesis spend and streaming
+source-height overflow refusals also retain their facts in `PreGenesisSpend`
+and `SourceHeightOverflow`. The latter is reachable through synchronous
+streaming `Headers`, whose heights are `u64`; the in-memory `MerklePath`
+conversion and async `ChainTracker` path refuse those heights earlier.
+Every diagnostic is one sentence naming the input and the bound it falls
+outside, with the height where the cause has one (the zero-activation sentence
+names the parameter's value, not a height).
+No such refusal says that script validation failed.
+The standalone `input_script_flags` API retains its error type and text, while
+the live verifiers use the same checked composition with typed causes.
+The whole path checks word scope before checking for a missing unlocking
+script, so an out-of-scope input with no unlocking script reports `NotJudged`.
+
+`ChainTip.genesis_height` is deprecated since `0.9.0-beta.4`. With `ChainParams`,
+the params alone decide Genesis, including the stream's P2SH output check.
+With no `ChainParams`, that check still reads the tip's deprecated copy,
+falling back to mainnet's figure only when no tip is supplied. There are no
+default-path verdict changes. The copy still functions until its removal at
+the next api-break, when the default stream path judges by mainnet's heights
+as the reference does with no chain parameters (the keeper's word of
+2026-10-29 20:1xZ): a caller on another chain supplies its `ChainParams`, told
+so by the deprecation message now and the docs then. Compatibility
+constructors and the one default-path reader have scoped and explained
+deprecation allowances. STN is not modelled: nothing in the stack runs there,
+and the node at `879fc8b` leaves BIP65, BIP66 and CSV
+heights uninitialized (`bsv-script-lean/docs/PARAMETERS.md:205`, finding #39),
+so a verdict there is not reproducible. Additive support waits for a consumer
+that names a use.
+
+`tests/beef_not_judged_452.rs` pins all five causes' typed `Verdict` and
+whole `Error`, with exact sentences, both zero fields, a nonzero input, no-tip cases,
+synchronous/two-pass/asynchronous readers and deferred transactions. Its
+`a_pre_genesis_coin_is_not_judged_by_the_stream_452`,
+`an_overflowing_tip_is_not_judged_by_the_stream_452` and
+`a_zero_activation_is_not_judged_by_the_stream_452` each have a matching
+`*_by_the_whole_path_452` witness. The three
+`beef_stream::not_judged_tests` witnesses match the actual `SpendRefusal` before
+its conversion to `Verdict`. `chain_params_alone_decide_when_the_tip_disagrees_451`
+pins disagreeing authorities, including the P2SH check in both directions.
+`a_pre_genesis_spend_is_not_judged_452` covers a mainnet tip below 620,537
+on both paths; its base-API witness is RED on the pre-#452 base with
+`SpendRefused::Script` and `TransactionError`. Further witnesses name the
+unproven ancestor, pin scope before a missing unlocking script, and reach
+`SourceHeightOverflow` through the synchronous and two-pass stream readers.
+The 13 #440 witnesses retain their decisions; their two scope refusals now
+assert `NotJudged`. The word witnesses retain their verdicts. The historical
+P2SH boundary witness retains its original regtest heights: a tip of 9,998
+accepts the output and 9,999 refuses it with Genesis at 10,000.
+
+**API break (`api-break`, beta line):** adding `SpendRefusal::NotJudged` extends
+an exhaustive enum. Migration: downstream `match` expressions add
+`SpendRefusal::NotJudged { input, cause } => ...`; `Verdict` and `Error` remain
+non-exhaustive. Match typed causes for the toolbox's #461 skip and pre-Genesis
+refusal, and in the CLI; never match diagnostic text. Migrate Genesis readers
+to `ChainParams`; remove `ChainTip.genesis_height` initializers at the next
+api-break, when the deprecated field is removed.
+
+### Notes: cross-SDK parity
+
+The reference has no automatic per-input word in `Transaction.verify`
+(`ts-stack@edf6e03 packages/sdk/src/transaction/Transaction.ts:1391-1456`);
+this is the live chain-parameter path's refusal contract, not a change to SDK
+default evaluation. The sibling's `engine.word-out-of-scope` reading is two
+refusals, not a judgment (`bsv-script-lean/docs/CONFORMANCE-2026-09-27.md:351-354`),
+which this typed class makes visible to hosts. Go's interpreter supports the
+pre-Genesis eras (`go-sdk@2ca481c spv/verify.go:537-560`); our refusal states our
+scope, never that a coin the node can spend is invalid.
 
 ### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
 
