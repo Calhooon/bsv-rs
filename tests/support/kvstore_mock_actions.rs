@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use super::sdk;
 use sdk::script::{LockingScript, UnlockingScript};
-use sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+use sdk::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
 use sdk::wallet::{
     CreateActionArgs, CreateActionResult, Outpoint, SignActionArgs, SignActionResult,
     SignableTransaction,
@@ -14,6 +14,26 @@ use std::sync::Mutex;
 pub struct Actions(Mutex<(HashMap<String, Transaction>, Option<Transaction>)>);
 
 impl Actions {
+    #[allow(dead_code)] // Used by the integration wallet, not the unit wallet.
+    pub fn pending_id(&self) -> [u8; 32] {
+        Outpoint::from_string(&format!(
+            "{}.0",
+            self.0.lock().unwrap().1.as_ref().unwrap().id()
+        ))
+        .unwrap()
+        .txid
+    }
+
+    #[allow(dead_code)] // Used by the integration wallet, not the unit wallet.
+    pub fn beef(&self, txids: impl Iterator<Item = String>) -> Vec<u8> {
+        let state = self.0.lock().unwrap();
+        let mut beef = Beef::new();
+        for id in txids {
+            beef.merge_transaction(state.0[&id].clone());
+        }
+        beef.to_binary()
+    }
+
     pub fn create(&self, args: &CreateActionArgs) -> CreateActionResult {
         let mut state = self.0.lock().unwrap();
         let mut tx = Transaction::new();
@@ -80,6 +100,7 @@ impl Actions {
                 Some(UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
         }
         tx.invalidate_caches();
+        state.0.insert(tx.id(), tx.clone());
         let id = Outpoint::from_string(&format!("{}.0", tx.id()))
             .unwrap()
             .txid;

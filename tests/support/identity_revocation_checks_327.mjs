@@ -66,12 +66,12 @@ export async function record (ctx) {
   const competingBeef = competing.toBEEF(true)
 
   const run = async (name, outputs, signAnswers, serialNumber = certificate.serialNumber) => {
-    const state = { calls: [], createAction: [], signAction: [], abortAction: [], broadcasts: [] }
+    const state = { calls: [], createAction: [], signAction: [], abortAction: [], broadcasts: [], createSignature: [] }
     const note = (n) => state.calls.push(n)
     let signable
     const wallet = {
       async getPublicKey (args) { note('getPublicKey'); return subjectWallet.getPublicKey(args) },
-      async createSignature (args) { note('createSignature'); return subjectWallet.createSignature(args) },
+      async createSignature (args) { note('createSignature'); state.createSignature.push(JSON.stringify(args)); return subjectWallet.createSignature(args) },
       async verifySignature (args) { note('verifySignature'); return subjectWallet.verifySignature(args) },
       async createAction (args) {
         note('createAction')

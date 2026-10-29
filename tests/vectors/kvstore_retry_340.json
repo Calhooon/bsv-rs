@@ -1225,5 +1225,81 @@
         }
       ]
     }
+  ],
+  "local_error_counts": [
+    {
+      "operation": "set",
+      "count": 0,
+      "total": 0,
+      "key": "two keys",
+      "error": "There are 0 outputs with tag two keys that cannot be unlocked. Original error: wallet said no",
+      "listed": {
+        "totalOutputs": 0,
+        "outputs": [],
+        "BEEF": "0200beef0000"
+      }
+    },
+    {
+      "operation": "set",
+      "count": 2,
+      "total": 2,
+      "key": "two keys",
+      "error": "There are 2 outputs with tag two keys that cannot be unlocked. Original error: wallet said no",
+      "listed": {
+        "totalOutputs": 2,
+        "outputs": [
+          {
+            "outpoint": "9b53cb913c85192bbcd4c9a496cff7a8250e866e511cbcfdbbfe990f486cff9c.0",
+            "satoshis": 2,
+            "spendable": true,
+            "lockingScript": "2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d",
+            "tags": [
+              "two keys"
+            ]
+          },
+          {
+            "outpoint": "d87a6097e010e2060b7d4e74fdac8f229d7d1f32514750e28170710a787095d7.0",
+            "satoshis": 3,
+            "spendable": true,
+            "lockingScript": "2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d",
+            "tags": [
+              "two keys"
+            ]
+          }
+        ],
+        "BEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0102000000000000006f2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d00000000"
+      }
+    },
+    {
+      "operation": "remove",
+      "count": 2,
+      "total": 7,
+      "key": "two keys",
+      "error": "There are 7 outputs with tag two keys that cannot be unlocked. Original error: wallet said no",
+      "listed": {
+        "totalOutputs": 7,
+        "outputs": [
+          {
+            "outpoint": "9b53cb913c85192bbcd4c9a496cff7a8250e866e511cbcfdbbfe990f486cff9c.0",
+            "satoshis": 2,
+            "spendable": true,
+            "lockingScript": "2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d",
+            "tags": [
+              "two keys"
+            ]
+          },
+          {
+            "outpoint": "d87a6097e010e2060b7d4e74fdac8f229d7d1f32514750e28170710a787095d7.0",
+            "satoshis": 3,
+            "spendable": true,
+            "lockingScript": "2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d",
+            "tags": [
+              "two keys"
+            ]
+          }
+        ],
+        "BEEF": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0102000000000000006f2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f2103a971cc7d68e377e957ef2743248a77d1a2854b8066744a621517019995fdd9a2ac036f6e6546304402204f9d2d218f24f6c065400dfdbf86947cc4da8606050c72c656a737fd45e3d26a02205d9472a6babc02fead2f91cf78b065cdf0a90d02dc18c42c2b9dd6d2d329c14d6d00000000"
+      }
+    }
   ]
 }

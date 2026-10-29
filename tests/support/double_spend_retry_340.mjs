@@ -125,6 +125,35 @@ export async function recordDoubleSpendRetry (ctx) {
   return {
     description: '#340: global retry and local single-attempt sequences, preserved by the Rust stores',
     reference: 'ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9; Node ' + process.version,
-    runs
+    runs,
+    local_error_counts: await localErrorCounts(ctx)
   }
+}
+
+async function localErrorCounts (c) {
+  const runs = []
+  for (const [operation, count, total] of [['set', 0, 0], ['set', 2, 2], ['remove', 2, 7]]) {
+    c.resetCounter()
+    const state = c.fresh()
+    const wallet = c.recording(state)
+    const key = 'two keys'
+    const store = new c.LocalKVStore(wallet, 'kvstore', false)
+    const seed = c.record(state, await c.stop(() => store.set(key, 'one')))
+    const beef = new c.Beef()
+    const outputs = []
+    for (let i = 0; i < count; i++) {
+      const tx = c.sourceOf([{ satoshis: i + 2, lockingScript: seed.create_action_outputs[0].lockingScript }])
+      state.sources[tx.id('hex')] = tx
+      beef.mergeBeef(tx.toBEEF())
+      outputs.push({ outpoint: `${tx.id('hex')}.0`, satoshis: i + 2, spendable: true,
+        lockingScript: tx.outputs[0].lockingScript.toHex(), tags: [key] })
+    }
+    state.listed = { totalOutputs: total, outputs, BEEF: beef.toBinary() }
+    wallet.signAction = async () => { throw new Error('wallet said no') }
+    const error = await c.stop(() => operation === 'set' ? store.set(key, 'two') : store.remove(key))
+    runs.push({ operation, count, total, key, error, listed: {
+      ...state.listed, BEEF: c.Utils.toHex(state.listed.BEEF)
+    } })
+  }
+  return runs
 }

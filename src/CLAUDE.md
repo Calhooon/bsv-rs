@@ -76,7 +76,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 | `auth` | `AuthError`, `SessionNotFound`, `CertificateValidationError`, `TransportError` |
 | `overlay` | `OverlayError`, `NoHostsFound`, `OverlayBroadcastFailed` |
 | `registry` | `RegistryError`, `DefinitionNotFound`, `InvalidDefinitionData` |
-| `kvstore` | `KvStoreError`, `KvStoreKeyNotFound`, `KvStoreCorruptedState`, `KvStoreEmptyContext`, `KvStoreInvalidKey`, `KvStoreInvalidValue` |
+| `kvstore` | `KvStoreError`, `KvStoreLocalError` (reference local lookup/action words, #454/#470), `KvStoreKeyNotFound`, `KvStoreCorruptedState`, `KvStoreEmptyContext`, `KvStoreInvalidKey`, `KvStoreInvalidValue` |
 | `identity` | `IdentityError`, `IdentityNotFound`, `ContactNotFound` |
 
 **Result alias**: `pub type Result<T> = std::result::Result<T, Error>;`

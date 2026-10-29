@@ -47,11 +47,7 @@ async fn local_single_attempt(name: &str) {
     assert_attempts(&h, 1, 1);
     assert_eq!(h.case["create_actions"].as_array().unwrap().len(), 1);
     assert_eq!(h.case["abort_actions"].as_array().unwrap().len(), 1);
-    assert_eq!(result, Err(review(&h.case)), "keep the wallet error");
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        h.case["review_error"]["message"]
-    );
+    assert_eq!(result.unwrap_err().to_string(), h.case["error"]["message"]);
     assert!(h.sent.lock().unwrap().is_empty());
     assert!(h.case["broadcasts"].as_array().unwrap().is_empty());
 }
@@ -117,7 +113,7 @@ async fn double_spend_words_without_review_evidence_are_not_retried_340() {
         let h = setup(name);
         let error = Error::WalletError("txn-mempool-conflict: double spend".into());
         *h.wallet.sign_answers.lock().unwrap() = [Err(error.clone())].into();
-        assert_eq!(h.run().await, Err(error));
+        assert_eq!(h.run().await, Err(local_error(&h, error)));
         assert_attempts(&h, 1, 1);
         assert!(h.sent.lock().unwrap().is_empty());
     }
@@ -137,10 +133,23 @@ async fn malformed_review_evidence_is_not_retried_340() {
             review.review_action_results[0].competing_txs = None;
         }
         *h.wallet.sign_answers.lock().unwrap() = [Err(error.clone())].into();
-        assert_eq!(h.run().await, Err(error));
+        assert_eq!(h.run().await, Err(local_error(&h, error)));
         assert_attempts(&h, 1, 1);
         assert!(h.sent.lock().unwrap().is_empty());
     }
+}
+
+fn local_error(h: &support::Harness, error: Error) -> Error {
+    if h.case["kind"] != "local" {
+        return error;
+    }
+    let message = match error {
+        Error::WalletError(message) => message,
+        error => error.to_string(),
+    };
+    Error::KvStoreLocalError(format!(
+        "There are 1 outputs with tag alpha that cannot be unlocked. Original error: {message}"
+    ))
 }
 
 #[tokio::test]

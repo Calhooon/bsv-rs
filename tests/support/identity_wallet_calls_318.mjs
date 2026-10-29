@@ -96,7 +96,7 @@ const recording = (state) => {
   return {
     async proveCertificate (args, o) { note('proveCertificate', o); return { keyringForVerifier: { ...keyring } } },
     async getPublicKey (args, o) { note('getPublicKey', o); return subjectWallet.getPublicKey(args) },
-    async createSignature (args, o) { note('createSignature', o); return subjectWallet.createSignature(args) },
+    async createSignature (args, o) { note('createSignature', o); state.createSignature.push(JSON.stringify(args)); return subjectWallet.createSignature(args) },
     async verifySignature (args, o) { note('verifySignature', o); return subjectWallet.verifySignature(args) },
     async createAction (args, o) {
       note('createAction', o)
@@ -134,7 +134,7 @@ let revocation
 let tokenScript
 for (const [name, originator] of [['no_originator', undefined], ['configured', 'identity-client']]) {
   counter = 0
-  const state = { calls: [], createAction: [], signAction: [], abortAction: [] }
+  const state = { calls: [], createAction: [], signAction: [], abortAction: [], createSignature: [] }
   const client = new IdentityClient(recording(state), { networkPreset: 'mainnet' }, originator)
 
   try {
@@ -143,6 +143,7 @@ for (const [name, originator] of [['no_originator', undefined], ['configured', '
     if (e.message !== 'Public reveal failed: failed to create action!') throw e
   }
   const revealCalls = state.calls.splice(0)
+  state.createSignature.length = 0
   const lockingScript = state.createAction.splice(0)[0].outputs[0].lockingScript
   tokenScript ??= lockingScript
 
@@ -174,6 +175,7 @@ for (const [name, originator] of [['no_originator', undefined], ['configured', '
   const createAction = { ...state.createAction[0], inputBEEF: hex(state.createAction[0].inputBEEF) }
   const run = {
     stopped,
+    create_signature_json: state.createSignature,
     lookup_beef: hex(lookupBeef),
     signable_tx: hex(state.signable),
     signable_reference: REFERENCE,

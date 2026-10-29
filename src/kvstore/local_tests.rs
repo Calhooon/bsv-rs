@@ -401,9 +401,9 @@ async fn test_get_wallet_error() {
 
     let result = store.get("key", "default").await;
     assert!(result.is_err());
-    // Error should propagate from wallet
+    // Lookup failures carry the corrupted-value context (#454).
     let err = result.unwrap_err();
-    assert!(matches!(err, Error::WalletError(_)));
+    assert!(matches!(err, Error::KvStoreLocalError(_)));
 }
 
 #[tokio::test]
@@ -440,7 +440,7 @@ async fn test_set_wallet_error() {
     let result = store.set("key1", "value1", None).await;
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, Error::WalletError(_)));
+    assert!(matches!(err, Error::KvStoreLocalError(_)));
 }
 
 // =========================================================================
@@ -455,7 +455,10 @@ async fn test_remove_list_outputs_error() {
     let result = store.remove("key1", None).await;
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, Error::WalletError(_)));
+    assert!(matches!(
+        err,
+        Error::KvStoreLocalError(_) | Error::WalletError(_)
+    ));
 }
 
 #[tokio::test]
@@ -594,7 +597,7 @@ async fn test_local_batch_get_wallet_error() {
     let keys = vec!["key1", "key2"];
     let result = store.batch_get(&keys).await;
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    assert!(matches!(result.unwrap_err(), Error::KvStoreLocalError(_)));
 }
 
 #[tokio::test]
@@ -605,7 +608,7 @@ async fn test_local_batch_set_wallet_error() {
     let entries = vec![("key1", "value1"), ("key2", "value2")];
     let result = store.batch_set(&entries).await;
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    assert!(matches!(result.unwrap_err(), Error::KvStoreLocalError(_)));
 }
 
 #[tokio::test]

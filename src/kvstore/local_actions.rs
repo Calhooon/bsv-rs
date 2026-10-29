@@ -1,7 +1,8 @@
 //! Local replacement/removal with a signer for every existing token (#343).
+use super::lookup::{LookupValueResult, MAX_LOCAL_OUTPUTS};
 use super::LocalKVStore;
 use crate::kvstore::token_spends::{complete_token_action, SigningProtocol};
-use crate::kvstore::types::{encode_value_with_ttl, LookupValueResult};
+use crate::kvstore::types::encode_value_with_ttl;
 use crate::kvstore::{KVStoreRemoveOptions, KVStoreSetOptions};
 use crate::primitives::to_hex;
 use crate::script::LockingScript;
@@ -20,7 +21,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             || value.to_string(),
             |ttl| encode_value_with_ttl(value, ttl),
         );
-        let current = self.lookup_value(key, 10).await?;
+        let current = self.lookup_current(key, MAX_LOCAL_OUTPUTS, true).await?;
         if current.value_exists && current.value == stored && current.outpoints.len() == 1 {
             if let Some(outpoint) = current.outpoints.last() {
                 return Ok(outpoint.clone());
@@ -32,7 +33,9 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             stored.into_bytes()
         };
         let lock = self.create_locking_script(key, &bytes).await?;
-        self.replace_outputs(key, options, &current, lock).await
+        self.replace_outputs(key, options, &current, lock)
+            .await
+            .map_err(|error| unlock_error(current.outputs.len() as u32, key, error))
     }
 
     async fn replace_outputs(
@@ -81,41 +84,64 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         options: &KVStoreRemoveOptions,
     ) -> Result<Vec<String>> {
         let mut txids = Vec::new();
+        let mut consumed = std::collections::HashSet::new();
         loop {
-            let current = self.lookup_value(key, 100).await?;
-            if !current.value_exists || current.outputs.is_empty() {
-                break;
+            let listed = self.get_outputs(key, MAX_LOCAL_OUTPUTS).await?;
+            let count = listed.outputs.len();
+            if count > 0 {
+                let outputs = self.authenticate_outputs(key, &listed).await?;
+                for output in &outputs {
+                    if !consumed.insert(output.outpoint.clone()) {
+                        return Err(super::lookup::refused(
+                            "Wallet repeated a KVStore output after it was removed",
+                        ));
+                    }
+                }
+                let result = self
+                    .remove_outputs(key, options, outputs, listed.beef)
+                    .await
+                    .map_err(|error| unlock_error(listed.total_outputs, key, error))?;
+                if let Some(txid) = result.txid {
+                    txids.push(to_hex(&txid));
+                }
             }
-            let inputs = self.build_inputs(&current)?;
-            if inputs.is_empty() {
-                break;
-            }
-            let result = complete_token_action(
-                &self.wallet,
-                CreateActionArgs {
-                    description: options.description.clone().unwrap_or_else(|| {
-                        format!("Remove {key} from {}", self.config.protocol_id)
-                    }),
-                    inputs: Some(inputs),
-                    input_beef: current.input_beef,
-                    outputs: None,
-                    lock_time: None,
-                    version: None,
-                    labels: None,
-                    options: Some(self.action_options.for_action(false, true)),
-                },
-                self.signing_protocol(key),
-                self.originator(),
-            )
-            .await?;
-            if let Some(txid) = result.txid {
-                txids.push(to_hex(&txid));
-            }
-            if current.outputs.len() < 100 {
+            if count == listed.total_outputs as usize {
                 break;
             }
         }
         Ok(txids)
+    }
+
+    async fn remove_outputs(
+        &self,
+        key: &str,
+        options: &KVStoreRemoveOptions,
+        outputs: Vec<super::lookup::WalletOutput>,
+        input_beef: Option<Vec<u8>>,
+    ) -> Result<crate::wallet::CreateActionResult> {
+        let inputs = crate::kvstore::token_spends::inputs(
+            outputs.into_iter().map(|output| output.outpoint),
+            "Previous key-value token",
+        )?;
+        complete_token_action(
+            &self.wallet,
+            CreateActionArgs {
+                description: options
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| format!("Remove {key} from {}", self.config.protocol_id)),
+                inputs: Some(inputs),
+                input_beef,
+                outputs: None,
+                lock_time: None,
+                version: None,
+                labels: None,
+                options: Some(self.action_options.for_action(false, true)),
+            },
+            self.signing_protocol(key),
+            self.originator(),
+        )
+        .await
     }
 
     fn signing_protocol(&self, key: &str) -> SigningProtocol {
@@ -125,4 +151,11 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             counterparty: Counterparty::Self_,
         }
     }
+}
+
+fn unlock_error(total: u32, key: &str, error: Error) -> Error {
+    super::lookup::refused(format!(
+        "There are {total} outputs with tag {key} that cannot be unlocked. Original error: {}",
+        super::lookup::message(&error)
+    ))
 }

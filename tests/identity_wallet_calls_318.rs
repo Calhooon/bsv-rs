@@ -33,6 +33,8 @@ use std::sync::Arc;
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
 use identity_reveal_wallet::Counting;
+#[path = "support/signaction_reference_326.rs"]
+mod signaction_reference_326;
 
 #[derive(Deserialize)]
 struct Vector {
@@ -60,6 +62,7 @@ struct Witness {
 /// The revocation's answers and arguments, the same for both witnesses.
 #[derive(Deserialize)]
 struct Revocation {
+    create_signature_json: Vec<String>,
     #[serde(deserialize_with = "hex")]
     lookup_beef: Vec<u8>,
     #[serde(deserialize_with = "hex")]
@@ -74,6 +77,25 @@ struct Revocation {
     sign_action: Value,
     sign_action_members: Vec<String>,
     sign_action_option_members: Vec<String>,
+}
+
+#[tokio::test]
+async fn revocation_pushdrop_sends_the_recorded_data_request_454() {
+    let v = vector();
+    for witness in &v.witnesses {
+        let wallet = revoked(&v, witness).await;
+        let expected: Vec<Value> = v
+            .revocation
+            .create_signature_json
+            .iter()
+            .map(|text| serde_json::from_str(text).unwrap())
+            .collect();
+        assert_eq!(
+            signaction_reference_326::signature_requests(&wallet.signature_args.lock().unwrap()),
+            Value::Array(expected),
+            "#454: the wallet sees data, protocol, key and counterparty"
+        );
+    }
 }
 
 fn hex<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {

@@ -33,6 +33,8 @@ use std::sync::{Arc, Mutex};
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
 use identity_reveal_wallet::Counting;
+#[path = "support/signaction_reference_326.rs"]
+mod signaction_reference_326;
 
 #[derive(Deserialize)]
 struct Vector {
@@ -63,6 +65,8 @@ struct Competing {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Run {
+    #[serde(rename = "createSignature")]
+    create_signature_json: Vec<String>,
     name: String,
     verdict: Option<String>,
     calls: Vec<String>,
@@ -202,6 +206,17 @@ fn review(competing: Option<&Competing>) -> Error {
 
 /// The run's wallet calls, arguments and broadcasts equal to the reference's.
 fn same_calls(r: &Run, wallet: &Counting, sent: &[String]) {
+    let expected: Vec<Value> = r
+        .create_signature_json
+        .iter()
+        .map(|text| serde_json::from_str(text).unwrap())
+        .collect();
+    assert_eq!(
+        signaction_reference_326::signature_requests(&wallet.signature_args.lock().unwrap()),
+        Value::Array(expected),
+        "{}: #454 signature request text",
+        r.name
+    );
     let reference: Vec<String> = r.calls.iter().map(|c| snake(c).to_string()).collect();
     assert_eq!(wallet.calls(), reference, "{}", r.name);
     let creates: Vec<Value> = wallet

@@ -34,7 +34,9 @@ use bsv_rs::transaction::Transaction;
 use bsv_rs::wallet::{ListOutputsResult, Outpoint, WalletOutput};
 use identity_reveal_wallet::Counting;
 use serde_json::Value;
-use signaction_reference_326::{assert_reference_sign, source_of, vector};
+use signaction_reference_326::{
+    assert_reference_sign_metadata as assert_reference_sign, source_of, vector,
+};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,

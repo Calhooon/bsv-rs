@@ -492,6 +492,11 @@ pub enum Error {
     #[error("kvstore error: {0}")]
     KvStoreError(String),
 
+    /// Local KVStore failure in the reference's words, including action context.
+    #[cfg(feature = "kvstore")]
+    #[error("{0}")]
+    KvStoreLocalError(String),
+
     /// Key not found in kvstore.
     #[cfg(feature = "kvstore")]
     #[error("kvstore key not found: {0}")]
