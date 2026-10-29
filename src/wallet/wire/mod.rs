@@ -191,25 +191,8 @@ impl WireReader<'_> {
     /// `readVarIntNumStrict(false)` (`readVarIntNumStrict.ts`): a canonical
     /// varint, refused past `2^53 - 1` (nine 0xFF included: no NIL sentinel).
     pub(crate) fn read_var_int_num_strict(&mut self) -> Result<usize, Error> {
-        let value = self.read_var_int()?;
-        if value > MAX_SAFE_INTEGER {
-            return Err(refused(
-                "number too large to retain precision - use readVarIntBn",
-            ));
-        }
+        let value = self.read_var_int_num_strict_u64()?;
         usize::try_from(value).map_err(|_| refused("Wallet Wire count exceeds the platform"))
-    }
-
-    /// `readVarIntNumStrict(false)` as a byte length: the strict bound, then
-    /// the bytes remaining before it is narrowed (`wire_length`, bsv-rs#192).
-    fn read_strict_length(&mut self) -> Result<usize, Error> {
-        let value = self.read_var_int()?;
-        if value > MAX_SAFE_INTEGER {
-            return Err(refused(
-                "number too large to retain precision - use readVarIntBn",
-            ));
-        }
-        self.wire_length(value)
     }
 
     /// `#readActionSatoshis` (`WalletWireTransceiver.ts:400-416`): a negative
@@ -330,13 +313,13 @@ impl WireReader<'_> {
 
     /// A varint-length value as UTF-8 (`toUTF8Strict`).
     pub(crate) fn read_utf8_value(&mut self) -> Result<String, Error> {
-        let length = self.read_strict_length()?;
+        let length = self.read_length()?;
         utf8(self.read_bytes(length)?)
     }
 
     /// A varint-length value as the base64 of its bytes.
     pub(crate) fn read_base64_value(&mut self) -> Result<String, Error> {
-        let length = self.read_strict_length()?;
+        let length = self.read_length()?;
         Ok(crate::primitives::to_base64(self.read_bytes(length)?))
     }
 

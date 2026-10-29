@@ -138,11 +138,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         } else {
             // Error
             let message = reader.read_string()?;
-            // Skip stack trace (Go uses VarInt(len) + bytes)
-            let stack_len = reader.read_var_int()?;
-            if stack_len > 0 && stack_len != u64::MAX {
-                let _stack = reader.read_bytes(reader.wire_length(stack_len)?)?;
-            }
+            // Stack lengths are unsigned, including the precision check.
+            let stack_len = reader.read_length()?;
+            let _stack = reader.read_bytes(stack_len)?;
 
             Ok(Err((error_byte, message)))
         }
@@ -606,7 +604,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         };
 
         // Parse no_send_change (Go uses VarInt(MaxUint64) for nil)
-        let no_send_change_len = reader.read_var_int()?;
+        let no_send_change_len = reader.read_optional_count()?;
         let no_send_change = if no_send_change_len != u64::MAX {
             let mut outpoints = Vec::with_capacity(bounded_capacity(
                 no_send_change_len as usize,
@@ -1150,7 +1148,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
             // Verifier: absent (length 0) or a 33-byte compressed key, as hex
             // (`:1533-1542`)
-            let verifier = match reader.read_var_int()? {
+            let verifier = match reader.read_var_int_num_strict_u64()? {
                 0 => None,
                 33 => Some(reader.read_compressed_key("listCertificates verifier")?),
                 n => {
@@ -1234,7 +1232,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let num_fields = reader.read_var_int()?;
+        let num_fields = reader.read_var_int_num_strict_u64()?;
         let mut keyring_for_verifier = indexmap::IndexMap::with_capacity(bounded_capacity(
             usize::try_from(num_fields).unwrap_or(usize::MAX),
             reader.remaining(),

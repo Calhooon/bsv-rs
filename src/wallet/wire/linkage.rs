@@ -45,7 +45,7 @@ fn read_key(reader: &mut WireReader<'_>, what: &str) -> Result<PublicKey, Error>
 
 /// The bytes behind a `readVarIntNumStrict(false)` length.
 fn read_bytes(reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
-    let length = reader.read_var_int_num_strict()?;
+    let length = reader.read_length()?;
     Ok(reader.read_bytes(length)?.to_vec())
 }
 

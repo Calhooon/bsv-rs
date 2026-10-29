@@ -156,7 +156,7 @@ pub(super) fn read_reveal_specific_key_linkage_args(
 /// The bytes behind a varint length, the length read as the reference's
 /// `readVarIntNumStrict(false)` reads it.
 fn read_length_prefixed(reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
-    let length = reader.read_var_int_num_strict()?;
+    let length = reader.read_length()?;
     Ok(reader.read_bytes(length)?.to_vec())
 }
 

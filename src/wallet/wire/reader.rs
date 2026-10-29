@@ -79,10 +79,37 @@ impl<'a> WireReader<'a> {
         self.inner.read_var_int().map_err(reference_error)
     }
 
-    /// Narrows a byte length only if it fits within the remaining frame.
-    /// A short frame has the same refusal on every target, including a length
-    /// past `usize::MAX` on wasm32 (#192); it is never truncated by a cast.
+    /// The reference's number precision check, before any length or count use.
+    pub(crate) fn wire_number(value: u64) -> Result<u64, Error> {
+        if value > super::super::MAX_SAFE_INTEGER {
+            Err(Error::WalletError(
+                "number too large to retain precision - use readVarIntBn".into(),
+            ))
+        } else {
+            Ok(value)
+        }
+    }
+
+    /// An unsigned `readVarIntNumStrict(false)` without platform narrowing.
+    pub(crate) fn read_var_int_num_strict_u64(&mut self) -> Result<u64, Error> {
+        Self::wire_number(self.read_var_int()?)
+    }
+
+    /// A collection length with the reference's signed -1 absence sentinel.
+    pub(crate) fn read_optional_count(&mut self) -> Result<u64, Error> {
+        let value = self.read_var_int()?;
+        if value == u64::MAX {
+            Ok(value)
+        } else {
+            Self::wire_number(value)
+        }
+    }
+
+    /// Checks number precision, then the remaining bytes before narrowing.
+    /// A safe length past `usize::MAX` on wasm32 uses the reader's refusal
+    /// (#192); a length past `2^53 - 1` uses the precision refusal (#458).
     pub(crate) fn wire_length(&self, length: u64) -> Result<usize, Error> {
+        Self::wire_number(length)?;
         match usize::try_from(length) {
             Ok(needed) if needed <= self.remaining() => Ok(needed),
             _ => Err(underflow()),
