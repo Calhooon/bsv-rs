@@ -342,6 +342,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         msg.nonce = Some(to_base64(&random_bytes));
 
         msg.your_nonce = session.peer_nonce.clone();
+        msg.initial_nonce = session.session_nonce.clone();
         msg.set_requested_certificates(requested);
 
         self.sign_message(&mut msg, &session).await?;
@@ -358,6 +359,11 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         verifier_identity_key: &str,
         certificates: Vec<VerifiableCertificate>,
     ) -> Result<()> {
+        if certificates.len() > MAX_CERTIFICATES {
+            return Err(Error::AuthError(
+                "certificates must be an array of at most 100 entries".into(),
+            ));
+        }
         let mgr = self.session_manager.read().await;
         let session = mgr
             .get_session(verifier_identity_key)
@@ -374,6 +380,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         msg.nonce = Some(to_base64(&random_bytes));
 
         msg.your_nonce = session.peer_nonce.clone();
+        msg.initial_nonce = session.session_nonce.clone();
         msg.set_certificates(certificates);
 
         self.sign_message(&mut msg, &session).await?;
@@ -507,7 +514,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             )));
         }
         check_received_requested_certificates(&message)?; // before any handler (#294)
-        check_received_message(&message)?; // the certificate bound, the handshake nonces (#445)
+        check_received_message(&message)?; // the certificate bound and all nonces (#445)
 
         match message.message_type {
             MessageType::InitialRequest => {

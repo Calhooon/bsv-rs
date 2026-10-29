@@ -1,10 +1,10 @@
 //! The rest of the reference's message intake that this crate applies
 //! before any handler (#445): `assertValidAuthMessageShape`'s certificate
-//! bound and the handshake nonces' text (`ts-stack@edf6e03`
+//! bound and every required nonce's text and length (`ts-stack@edf6e03`
 //! `packages/sdk/src/auth/AuthMessageValidation.ts:330-404`, called through
 //! `snapshotAuthMessage` at `Peer.ts:767`).
 
-use super::requested_set::canonical_base64;
+use super::requested_set::assert_canonical_base64;
 use crate::auth::types::{AuthMessage, MessageType};
 use crate::{Error, Result};
 
@@ -13,15 +13,11 @@ use crate::{Error, Result};
 pub(crate) const MAX_CERTIFICATES: usize = 100;
 
 /// Refuses a received message carrying more than 100 certificates
-/// (`AuthMessageValidation.ts:348-352`), then a handshake nonce that is not
-/// canonical base64 (`:355-361`), in the reference's words, before any
-/// handler: so neither certificate path verifies a certificate of such a
-/// message, and no handshake signs or verifies over a nonce the reference
-/// cannot decode.
-///
-/// Two of the intake's rules are not applied, stated in the #445 entry: a
-/// nonce's length (`must encode exactly 48 bytes`; the 32-byte legacy nonce
-/// is still accepted, 0.3.6) and the nonces of the other three types.
+/// (`AuthMessageValidation.ts:348-352`), then missing, noncanonical or
+/// wrong-length nonces (`:355-389`), in the reference's order and words.
+/// Session nonces must encode 48 bytes; later message nonces 32 bytes.
+/// This deliberately closes the Peer's legacy 32-byte session-nonce
+/// acceptance window introduced in 0.3.6.
 pub(crate) fn check_received_message(message: &AuthMessage) -> Result<()> {
     if message
         .certificates
@@ -32,18 +28,49 @@ pub(crate) fn check_received_message(message: &AuthMessage) -> Result<()> {
             "Authentication certificates exceed their limit.".into(),
         ));
     }
-    let nonces: &[(&Option<String>, &str)] = match message.message_type {
-        MessageType::InitialRequest => &[(&message.initial_nonce, "initialRequest.initialNonce")],
-        MessageType::InitialResponse => &[
-            (&message.initial_nonce, "initialResponse.initialNonce"),
-            (&message.your_nonce, "initialResponse.yourNonce"),
-        ],
-        _ => &[],
-    };
-    for (nonce, name) in nonces {
-        if let Some(nonce) = nonce {
-            canonical_base64(nonce, name)?;
+    let nonces: &[(&Option<String>, &str, usize)] = match message.message_type {
+        MessageType::InitialRequest => {
+            &[(&message.initial_nonce, "initialRequest.initialNonce", 48)]
         }
+        MessageType::InitialResponse => &[
+            (&message.initial_nonce, "initialResponse.initialNonce", 48),
+            (&message.your_nonce, "initialResponse.yourNonce", 48),
+        ],
+        MessageType::CertificateRequest => &[
+            (&message.nonce, "certificateRequest.nonce", 32),
+            (
+                &message.initial_nonce,
+                "certificateRequest.initialNonce",
+                48,
+            ),
+            (&message.your_nonce, "certificateRequest.yourNonce", 48),
+        ],
+        MessageType::CertificateResponse => &[
+            (&message.nonce, "certificateResponse.nonce", 32),
+            (
+                &message.initial_nonce,
+                "certificateResponse.initialNonce",
+                48,
+            ),
+            (&message.your_nonce, "certificateResponse.yourNonce", 48),
+        ],
+        MessageType::General => &[
+            (&message.nonce, "general.nonce", 32),
+            (&message.your_nonce, "general.yourNonce", 48),
+        ],
+    };
+    for (nonce, name, bytes) in nonces {
+        let nonce = nonce
+            .as_deref()
+            .ok_or_else(|| Error::AuthError(format!("{name} must be canonical base64.")))?;
+        assert_canonical_base64(nonce, name, *bytes)?;
+    }
+    if message.message_type == MessageType::CertificateRequest
+        && message.requested_certificates.is_none()
+    {
+        return Err(Error::AuthError(
+            "requestedCertificates must be an object.".into(),
+        ));
     }
     Ok(())
 }

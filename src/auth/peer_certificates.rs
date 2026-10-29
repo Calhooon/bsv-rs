@@ -8,9 +8,11 @@ use super::{
     AuthMessage, Error, Peer, RequestedCertificateSet, Result, Transport, VerifiableCertificate,
     WalletInterface, MAX_CERTIFICATES,
 };
+use crate::auth::utils::certificate_continuation;
+use futures::{stream::FuturesUnordered, TryStreamExt};
 
 impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
-    /// The message's certificates, at most 100, each judged in order:
+    /// The message's certificates, at most 100, judged concurrently, each in order:
     /// subject, signature, then under a policy its certifier, type, decryption
     /// and disclosed fields (`validateCertificates.ts:73-134`).
     pub(super) async fn validate_received_certificates(
@@ -31,11 +33,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                 "AuthMessage cannot contain more than {MAX_CERTIFICATES} certificates."
             )));
         }
-        for certificate in certificates {
-            self.validate_received_certificate(certificate, message, policy)
-                .await?;
-        }
-        Ok(())
+        certificates
+            .iter()
+            .map(|certificate| self.validate_received_certificate(certificate, message, policy))
+            .collect::<FuturesUnordered<_>>()
+            .try_collect::<Vec<_>>()
+            .await
+            .map(|_| ())
     }
 
     async fn validate_received_certificate(
@@ -52,23 +56,29 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             )));
         }
         let serial = cert.serial_number_base64();
-        if !certificate.verify()? {
+        let verified = certificate.verify();
+        // JS verify() computes synchronously but returns a Promise. Its
+        // mandatory await lets every subject check run before this result.
+        certificate_continuation().await;
+        if !verified? {
             return Err(Error::AuthError(format!(
                 "The signature for the certificate with serial number {serial} is invalid!"
             )));
         }
-        // No policy: a certificate response to a Peer with none, which the
-        // reference refuses at its match (`Peer.ts:1239-1241`) and this crate,
-        // keeping no pending request, accepts after these two checks as before.
-        let Some(policy) = policy else {
-            return Ok(());
-        };
-        let requested = requested_fields(certificate, policy, &serial)?;
+        let requested = policy
+            .map(|policy| requested_fields(certificate, policy, &serial))
+            .transpose()?;
         let disclosed = certificate
             .clone()
             .decrypt_fields(&*self.wallet, None, None, self.originator.as_deref())
-            .await?;
-        if disclosed.is_empty() || disclosed.keys().any(|field| !requested.contains(field)) {
+            .await;
+        // Even a synchronous decryptFields rejection resumes after the
+        // other certificates' signature and policy checks (Promise.all).
+        certificate_continuation().await;
+        let disclosed = disclosed?;
+        if requested.is_some_and(|requested| {
+            disclosed.is_empty() || disclosed.keys().any(|field| !requested.contains(field))
+        }) {
             return Err(Error::AuthError(format!(
                 "Certificate {serial} did not reveal a non-empty requested field set"
             )));

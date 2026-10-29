@@ -16,8 +16,9 @@
 //!
 //! Older bsv-rs releases emitted a 32-byte nonce (16 random + 16 truncated
 //! HMAC). `verify_nonce` still accepts these so in-flight sessions and
-//! derivation prefixes created by older peers keep working through a single
-//! release cycle. The dual-accept path will be removed in v0.3.7.
+//! derivation prefixes can still be checked by direct callers. Peer intake
+//! deliberately closes its 0.3.6 legacy acceptance window in #445 and requires
+//! canonical 48-byte session nonces before calling these helpers.
 
 use crate::primitives::{from_base64, to_base64};
 use crate::wallet::{Counterparty, CreateHmacArgs, Protocol, SecurityLevel, WalletInterface};
@@ -37,7 +38,7 @@ const NONCE_HMAC_SIZE: usize = 32;
 const NONCE_TOTAL_SIZE: usize = NONCE_RANDOM_SIZE + NONCE_HMAC_SIZE;
 
 /// Legacy nonce size from bsv-rs ≤ 0.3.5 (16 random + 16 truncated HMAC).
-/// `verify_nonce` accepts both formats for one release cycle.
+/// The standalone `verify_nonce` accepts both; Peer intake requires 48 bytes.
 const NONCE_LEGACY_SIZE: usize = NONCE_RANDOM_SIZE + NONCE_RANDOM_SIZE;
 
 /// Creates a cryptographic nonce.
@@ -113,8 +114,7 @@ pub async fn verify_nonce<W: WalletInterface>(
     let nonce_bytes = from_base64(nonce)?;
 
     // Accept canonical (48-byte) and legacy (32-byte) formats. Legacy support
-    // keeps in-flight sessions and derivation prefixes working across the
-    // v0.3.6 upgrade window and will be removed in v0.3.7.
+    // remains for direct callers; Peer intake closes the v0.3.6 window (#445).
     let (random_bytes, hmac_bytes) = match nonce_bytes.len() {
         NONCE_TOTAL_SIZE => (
             &nonce_bytes[..NONCE_RANDOM_SIZE],
@@ -255,8 +255,7 @@ mod tests {
 
     // Upgrade-window coverage: nonces produced by bsv-rs ≤ 0.3.5 (16 random ||
     // first 16 bytes of HMAC, 32 bytes total) must still verify against the
-    // v0.3.6 verify_nonce path, so a mid-flight session doesn't break when a
-    // peer upgrades. Dual-accept is planned to be removed in v0.3.7.
+    // standalone verify_nonce path. Peer intake rejects this length (#445).
     #[tokio::test]
     async fn test_verify_legacy_32_byte_nonce_still_passes() {
         let wallet = ProtoWallet::new(Some(

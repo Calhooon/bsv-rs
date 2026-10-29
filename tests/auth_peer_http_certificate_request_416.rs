@@ -1,5 +1,7 @@
 //! #416 fold: HTTP certificate requests reach the actual Peer callback and
 //! signature verifier after a signed handshake on wiremock's ephemeral port.
+//! Handler probes supply the unsigned initialNonce that HTTP omits. #445
+//! separately pins the unmodified transport's recorded full-intake refusal.
 //! The reference records its request handler separately from the newer Peer's
 //! initialNonce intake refusal; see the fixture's explicit scope and changelog.
 #![cfg(all(feature = "auth", feature = "http"))]
@@ -144,6 +146,7 @@ async fn server(case: &Value) -> MockServer {
 struct ObservedTransport {
     inner: SimplifiedFetchTransport,
     seen: Arc<Mutex<Vec<AuthMessage>>>,
+    supply_initial_nonce: bool,
 }
 
 #[async_trait]
@@ -154,8 +157,12 @@ impl Transport for ObservedTransport {
 
     fn set_callback(&self, callback: Box<TransportCallback>) {
         let seen = self.seen.clone();
-        self.inner.set_callback(Box::new(move |message| {
+        let supply_initial_nonce = self.supply_initial_nonce;
+        self.inner.set_callback(Box::new(move |mut message| {
             seen.lock().unwrap().push(message.clone());
+            if supply_initial_nonce && message.message_type == MessageType::CertificateRequest {
+                message.initial_nonce = Some(to_base64(&[11; 48]));
+            }
             callback(message)
         }));
     }
@@ -173,6 +180,10 @@ struct Exchange {
 }
 
 async fn exchange(case: &Value) -> Exchange {
+    exchange_with_intake(case, true).await
+}
+
+async fn exchange_with_intake(case: &Value, supply_initial_nonce: bool) -> Exchange {
     let server = server(case).await;
     let seen = Arc::new(Mutex::new(Vec::new()));
     let peer = Peer::new(PeerOptions {
@@ -180,6 +191,7 @@ async fn exchange(case: &Value) -> Exchange {
         transport: ObservedTransport {
             inner: SimplifiedFetchTransport::new(&server.uri()),
             seen: seen.clone(),
+            supply_initial_nonce,
         },
         certificates_to_request: None,
         session_manager: None,
@@ -382,4 +394,18 @@ async fn issue_426_duplicate_keys_keep_the_last_value_and_first_position() {
 #[tokio::test]
 async fn issue_426_numbers_use_json_stringify_rounding_and_notation() {
     both_preimages("numbers").await;
+}
+
+#[tokio::test]
+async fn issue_445_http_certificate_request_missing_initial_nonce_is_refused_at_intake() {
+    let case = witness("property_order");
+    let observed = exchange_with_intake(&case, false).await;
+    assert_eq!(
+        observed.result,
+        Err(Error::AuthError(
+            case["intake_error"].as_str().unwrap().into()
+        ))
+    );
+    assert!(observed.requests.is_empty());
+    assert!(observed.general.is_empty());
 }

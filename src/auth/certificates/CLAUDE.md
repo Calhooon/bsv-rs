@@ -15,7 +15,7 @@ This module implements identity certificates for the BSV authentication system, 
 | `certificate_tests.rs` | `certificate.rs`'s unit tests (`#![cfg(test)]`, included by `#[path]`; the file-size ratchet) | 146 |
 | `certificate_json.rs` | `Certificate`'s JSON (#268): the serde impls (a remote derive over its fields), `base64_32_bytes`, `revocation_outpoint_from_str`, `revocation_outpoint_json` (the sentinel), `signature_hex` | 195 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | 549 |
-| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | 382 |
+| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring; wallet decryption retains the reference Promise continuation before consuming even an immediately ready result, so concurrent Peer refusals surface at the same stage (#445) | 385 |
 
 ## Certificate Flow
 

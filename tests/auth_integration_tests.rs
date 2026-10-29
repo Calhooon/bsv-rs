@@ -2262,7 +2262,7 @@ async fn test_ts_style_initial_response_through_mock_transport() {
     }
 
     // Craft a TS-style InitialResponse (no nonce field)
-    let server_nonce = bsv_rs::primitives::to_base64(&[0xBB; 32]);
+    let server_nonce = bsv_rs::primitives::to_base64(&[0xBB; 48]);
     let mut ts_response = AuthMessage::new(MessageType::InitialResponse, server_key.public_key());
     ts_response.initial_nonce = Some(server_nonce.clone());
     ts_response.your_nonce = Some(our_nonce.clone());
