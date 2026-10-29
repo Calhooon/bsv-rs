@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: short ECIES envelopes use the reference's bounded words (#463)
+
+The lower and upper envelope limits now share the guard in `ecies_bounds.rs`,
+before parsing a key, deriving a secret or hashing. The separate minimum checks
+returned `Data too short`, where the reference's same bounded-array check rejects
+both edges with its bounded words. The minimum lengths and accepted inputs do not
+change; framing and MAC checks after the guard stay as before.
+
+| Reader | Minimum bytes | Old refusal payload | New refusal payload |
+| --- | --- | --- | --- |
+| `electrum_decrypt` | 52 (`4 + 16 + 32`) | `Data too short` | `Electrum ECIES envelope must be a bounded dense byte array` |
+| `bitcore_decrypt` | 97 (`33 + 16 + 16 + 32`) | `Data too short` | `Bitcore ECIES envelope must be a bounded dense byte array` |
+
+Both refusals remain `Error::EciesDecryptionFailed`, the variant used by #333's
+upper envelope limit. Its Display still prefixes the payload with
+`ECIES decryption failed: `. Downstream callers matching `Data too short` or
+`ECIES decryption failed: Data too short` must update their text match to the new
+payload or displayed text for the relevant reader.
+
+`tests/compat_ecies_short_envelope_463.rs` pins the variant and exact Display for
+51-byte Electrum and 96-byte Bitcore envelopes. Both refusal tests were RED on
+scratch `ad2c0001`, while its two exact-minimum controls passed: a writer-produced
+envelope decrypts, then a flipped MAC byte reaches `EciesHmacMismatch`. All four
+pass with the shared guard. The eight #333 tests, including its three boundary
+controls, remain unchanged and pass.
+
+### Notes: cross-SDK parity
+
+The TypeScript minimums and upper bound are passed together to `compatBytes` at
+`ts-stack@edf6e03` `packages/sdk/src/compat/ECIES.ts:589-594,704-709`;
+`packages/sdk/src/compat/CompatValidation.ts:10-15` supplies the refusal words.
+Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-108`
+also rejects below 52 bytes, with `invalid encrypted text: length`. This change
+follows the TypeScript words under the owner's ruling (c).
+
+Go's `BitcoreDecrypt` (`compat/ecies/ecies.go:191-208` at `2ca481c`) has no length
+check at all: from reading the code, a short envelope would panic when it is
+sliced (not run).
+
 ### Fixed: the reference's ECIES byte bounds before work (#333)
 
 A framed envelope over the bound was read and failed on its MAC; it is now
@@ -32,7 +71,8 @@ decrypt-side envelope refusals keep their existing variants and Display text.
 The single/shared and base64 helpers inherit the Electrum bounds; the reference
 defines no separate helper or base64-text bound, so none is added.
 The fixed-size Bitcore IV already has the reference's 16-byte size in its Rust type.
-Existing short-input, framing and MAC refusals within the limits are unchanged.
+This change left short-input, framing and MAC refusals within the limits unchanged;
+#463 above updates the short-input words.
 
 `tests/compat_ecies_bounds_333.rs` pins one byte over each limit, the exact limits,
 and a framed oversized Electrum envelope (the exact cap is not a valid Electrum
@@ -60,16 +100,8 @@ also have no upper byte bound. Rust follows the TypeScript bounds here.
 At the exact envelope cap Rust retains its existing Electrum framing error
 and Bitcore MAC error; TypeScript rejects Bitcore's unaligned frame before
 the MAC (`ECIES.ts:710-711`). These framing and MAC checks are unchanged.
-Short envelopes remain a recorded difference for a separate lane: below 52
-bytes for Electrum or 97 for Bitcore, Rust keeps `Data too short`
-(`src/compat/ecies.rs:180-181,327-328`), while the same TypeScript `compatBytes`
-calls use `Electrum ECIES envelope must be a bounded dense byte array` and
-`Bitcore ECIES envelope must be a bounded dense byte array`
-(`ECIES.ts:589-594,704-709`, `CompatValidation.ts:14-15`).
+The short-envelope words left unchanged by #333 are corrected by #463 above.
 
-The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
-`:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
-`:704-709`) are filed as #463 for a lane.
 ### Fixed: required flag reasons and the original sighash census (#453)
 
 `ScriptFlags::check` now explains why an unsupported word is refused and
@@ -494,6 +526,7 @@ refusals, not a judgment (`bsv-script-lean/docs/CONFORMANCE-2026-09-27.md:351-35
 which this typed class makes visible to hosts. Go's interpreter supports the
 pre-Genesis eras (`go-sdk@2ca481c spv/verify.go:537-560`); our refusal states our
 scope, never that a coin the node can spend is invalid.
+
 ### Fixed: internalizeAction's unreachable wire fallbacks and JSON null remittances (#393)
 
 The two notes from #384's review are resolved. The transceiver's
