@@ -33,6 +33,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging; `ScriptResource`, `ScriptResourceLimit` and its `Display`, the one place the resource sentences live (#228) |
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError` |
+| `input_flags.rs` | Under `block`, `input_script_flags` computes spend-era transaction flags plus source-era UTXO bits from `ChainParams` and heights (#440); pre-Genesis explicitly refused |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
 | `templates/mod.rs` | Templates module declarations and re-exports |
@@ -361,6 +362,22 @@ impl ScriptFlags {
     pub fn requires_push_only(self, tx_version: i32) -> bool        // interpreter.cpp:2321-2334
 }
 ```
+
+### Per-input live word (`input_flags.rs`, `block` feature, #440)
+
+`input_script_flags(&ChainParams, spend_height, source_proven_height, mined)` is
+one composition function for all doors: spend-era transaction flags plus only
+the source-era `UTXO_AFTER_GENESIS` / `UTXO_AFTER_CHRONICLE` bits. Heights are
+inclusive. `None` for an unproven source uses the spend era; no tip is resolved
+by the verifier to the latest activation height. `mined` selects the block
+word, otherwise standard policy. A pre-Genesis source or spend is an explicit
+`ScriptFlagsError::NotApplicable`, never silently PostGenesis.
+
+The node sites are `bitcoin-sv@879fc8b policy.h:226-245` and
+`validation.cpp:2973-2982`; sibling `docs/PARAMETERS.md:103,123,125,168`.
+Unit tests pin the numeric same-era and mixed-era words and both boundaries;
+`tests/beef_stream_word_440.rs` exercises them through the verifier. The
+existing `flags.rs` words and the four interpreter witness files are unchanged.
 
 ### ScriptEvaluationError
 

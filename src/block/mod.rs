@@ -13,6 +13,7 @@
 //! assert!(ChainWork::from_bits(0x1d00ffff) > ChainWork::ZERO);
 //! ```
 
+mod activation;
 pub mod difficulty;
 pub mod header;
 pub mod merkle;

@@ -96,14 +96,11 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::future::Future;
-use std::io::{Read, Seek, SeekFrom};
-use std::sync::Arc;
+use std::io::{Read, Seek};
 
 use sha2::{Digest, Sha256};
 
-use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::primitives::{to_hex, Reader, Writer};
-use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError};
@@ -125,9 +122,12 @@ pub fn display_hex(hash: &Hash32) -> String {
 
 mod budget;
 mod deferred;
+mod evaluation;
 mod reason;
-use budget::Budget;
+mod spends;
 use deferred::{read_held, write_held, Deferred, TxFields};
+pub use evaluation::verify_stream_two_pass_with_chain_params;
+use evaluation::Evaluation;
 pub use reason::{Kind, Reason};
 
 /// A refusal: the offset of the byte it names, and the reason.
@@ -1934,10 +1934,13 @@ impl BeefIndex {
     /// A transaction or a txid-only entry, and every held transaction it
     /// releases (bsv-rs#240), in wire order.
     fn fold_checked(&mut self, element: &Element, tip: Option<ChainTip>) -> Result<(), Stop> {
-        let budget = Budget::NONE;
-        self.fold_checked_from(element, 0, &mut || false, budget, tip)
+        let evaluation = Evaluation::NONE;
+        self.fold_checked_from(element, 0, &mut || false, &evaluation, tip)
             .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))?;
-        while self.release_one(0, &mut || false, budget, tip)?.is_some() {}
+        while self
+            .release_one(0, &mut || false, &evaluation, tip)?
+            .is_some()
+        {}
         Ok(())
     }
 
@@ -1956,10 +1959,10 @@ impl BeefIndex {
         element: &Element,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        budget: Budget,
+        evaluation: &Evaluation,
         tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
-        match self.fold_one(element, from, spent, budget, tip)? {
+        match self.fold_one(element, from, spent, evaluation, tip)? {
             Folded::Paused(input) => return Ok(Some(input)),
             Folded::In { txid, new: true } => self.deferred.wake(&txid),
             Folded::Held | Folded::In { new: false, .. } => {}
@@ -1973,7 +1976,7 @@ impl BeefIndex {
         element: &Element,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        budget: Budget,
+        evaluation: &Evaluation,
         tip: Option<ChainTip>,
     ) -> Result<Folded, Stop> {
         match element {
@@ -2008,7 +2011,7 @@ impl BeefIndex {
                     body,
                     from,
                     spent,
-                    budget,
+                    evaluation,
                     tip,
                 )
             }
@@ -2060,7 +2063,7 @@ impl BeefIndex {
         body: &T,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        budget: Budget,
+        evaluation: &Evaluation,
         tip: Option<ChainTip>,
     ) -> Result<Folded, Stop> {
         // A transaction read before was judged then; its bytes are the same
@@ -2118,7 +2121,7 @@ impl BeefIndex {
                     }
                 }
                 if let Some(next) =
-                    self.check_spends_of(offset, txid, body, from, spent, budget, tip)?
+                    self.check_spends_of(offset, txid, body, from, spent, evaluation, tip)?
                 {
                     return Ok(Folded::Paused(next));
                 }
@@ -2217,169 +2220,6 @@ impl BeefIndex {
         if parent.live == 0 {
             parent.outputs = None;
         }
-    }
-
-    /// The spends of an unproven transaction: each input's script executed
-    /// against the parent output the index kept, and the value rule
-    /// (`Transaction::verify`'s checks, in its order). Nothing is changed.
-    ///
-    /// The scripts run from input `from` on (the inputs before it were run by
-    /// an earlier slice of the same reading, against the same index), and
-    /// `spent` is asked between two inputs: `Ok(Some(i))` is a pause before
-    /// input `i`, at least one input after `from` having run.
-    #[allow(clippy::too_many_arguments)] // One resumed spend and its caller's mining context.
-    #[allow(clippy::expect_used)] // #134: the reader indexed every parent before its spend; a SpendRefusal for a broken invariant is a public enum change
-    fn check_spends_of<T: TxFields>(
-        &self,
-        offset: u64,
-        txid: &Hash32,
-        body: &T,
-        from: u32,
-        spent: &mut dyn FnMut() -> bool,
-        budget: Budget,
-        tip: Option<ChainTip>,
-    ) -> Result<Option<u32>, Stop> {
-        let refuse = |at: u64, input: Option<u32>, why: SpendRefusal| Stop::Spend {
-            offset: at,
-            txid: *txid,
-            input,
-            why,
-        };
-        let n_inputs = body.input_count();
-        let mut sources: Vec<&Retained> = Vec::with_capacity(n_inputs);
-        let mut input_total: u64 = 0;
-        for vin in 0..n_inputs {
-            let input = body.input(vin);
-            let vin = Some(vin as u32);
-            let vout = input.vout;
-            let parent = self
-                .txs
-                .get(&input.prev)
-                .expect("the input names an earlier transaction");
-            if !parent.raw {
-                return Err(refuse(input.at, vin, SpendRefusal::ParentIsTxidOnly));
-            }
-            let slot = parent.outputs.as_ref().and_then(|o| o.get(vout as usize));
-            let source = match slot {
-                Some(Some(source)) => source,
-                _ => {
-                    return Err(refuse(
-                        input.at,
-                        vin,
-                        SpendRefusal::OutputNotAvailable { vout },
-                    ))
-                }
-            };
-            // [SRC] sibling@87f0461 BLOCK-CONSENSUS.md:68,
-            // node@879fc8b42 consensus/consensus.h:75 as cited there.
-            if let Some(height) = parent.coinbase_height {
-                let context = tip.ok_or(Stop::Unverifiable {
-                    offset: input.at,
-                    txid: *txid,
-                    input: vin,
-                    check: MiningCheck::CoinbaseMaturity,
-                })?;
-                if (u64::from(context.height) + 1)
-                    .checked_sub(height)
-                    .is_none_or(|depth| depth < 100)
-                {
-                    return Err(refuse(
-                        input.at,
-                        vin,
-                        SpendRefusal::PrematureCoinbase { height },
-                    ));
-                }
-            }
-            if source.satoshis > MAX_MONEY || source.satoshis > MAX_MONEY - input_total {
-                return Err(refuse(input.at, vin, SpendRefusal::InputValueOutOfRange));
-            }
-            input_total += source.satoshis;
-            sources.push(source);
-        }
-        let mut output_total: u64 = 0;
-        for vout in 0..body.output_count() {
-            // check_transaction bounded every prefix by MAX_MONEY.
-            output_total += body.output(vout).1;
-            debug_assert!(output_total <= MAX_MONEY);
-        }
-
-        // One input list and one output list for the transaction, shared by
-        // every input's spend with the sighash midstates: hashPrevouts,
-        // hashSequence and hashOutputs are computed at most once per scope
-        // class here, never once per input (bsv-low #591). The digest reads
-        // no input's script, so the shared inputs carry none.
-        // A transaction released from the held set (bsv-rs#240) builds the
-        // same lists from the fields it held: the midstates, and the
-        // original digest's serialization, are the ones it would have had.
-        let outputs: Vec<TxOutput> = (0..body.output_count())
-            .map(|vout| {
-                let (_, satoshis, script) = body.output(vout);
-                TxOutput {
-                    satoshis,
-                    script: script.to_vec(),
-                }
-            })
-            .collect();
-        let inputs: Vec<TxInput> = (0..n_inputs)
-            .map(|i| {
-                let input = body.input(i);
-                TxInput {
-                    txid: input.prev,
-                    output_index: input.vout,
-                    script: Vec::new(),
-                    sequence: input.sequence,
-                }
-            })
-            .collect();
-        let shared = Arc::new(TxSighashCache::new(
-            body.version() as i32,
-            inputs,
-            outputs,
-            body.lock_time(),
-        ));
-        for (vin, source) in sources.into_iter().enumerate().skip(from as usize) {
-            let input = body.input(vin);
-            // The clock between inputs (bsv-low #591): one transaction of
-            // many inputs is no longer one uninterruptible step.
-            if vin > from as usize && spent() {
-                return Ok(Some(vin as u32));
-            }
-            let script_error =
-                |message: String| refuse(input.at, Some(vin as u32), SpendRefusal::Script(message));
-            let locking_script = LockingScript::from_binary(&source.script)
-                .map_err(|e| script_error(e.to_string()))?;
-            let unlocking_script = UnlockingScript::from_binary(body.unlocking(vin))
-                .map_err(|e| script_error(e.to_string()))?;
-            let mut spend = Spend::with_transaction(TxSpendParams {
-                transaction: shared.clone(),
-                input_index: vin,
-                source_satoshis: source.satoshis,
-                locking_script,
-                unlocking_script,
-                memory_limit: budget.memory,
-                work_limit: budget.work,
-            })
-            .map_err(|e| script_error(e.to_string()))?;
-            match spend.validate() {
-                Ok(true) => {}
-                Ok(false) => return Err(script_error("the script did not succeed".to_string())),
-                Err(e) => {
-                    return Err(match e.resource_limit {
-                        Some(limit) => {
-                            refuse(input.at, Some(vin as u32), SpendRefusal::Resource(limit))
-                        }
-                        None => script_error(e.message),
-                    })
-                }
-            }
-        }
-        // The reference's value rule: an unmined transaction may not create
-        // satoshis. (A transaction with no inputs never comes this far: it
-        // is `NoInputs` at the fold.)
-        if output_total > input_total {
-            return Err(refuse(offset, None, SpendRefusal::CreatesValue));
-        }
-        Ok(None)
     }
 
     /// The atomic check at the end (the Lean's `finish`), on the subject's
@@ -3156,7 +2996,7 @@ pub enum Timed {
 }
 
 /// The reader over a [`Read`]: one step per element, a cursor between any
-/// two, and, under a budget, between two inputs of a transaction.
+/// two, and, under a evaluation, between two inputs of a transaction.
 pub struct StreamVerifier<R, H> {
     source: BeefStream<R>,
     judge: Judge,
@@ -3166,7 +3006,7 @@ pub struct StreamVerifier<R, H> {
     boundary: Frame,
     /// The transaction a pause left in hand and the input it reached.
     held: Option<(Element, u32)>,
-    budget: Budget,
+    evaluation: Evaluation,
 }
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
@@ -3232,7 +3072,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             headers,
             verdict: None,
             held: None,
-            budget: Budget::NONE,
+            evaluation: Evaluation::NONE,
         }
     }
 
@@ -3278,14 +3118,16 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             return Ok(Timed::Progress(Progress::Verdict(verdict.clone())));
         }
         // A held transaction an earlier step released (bsv-rs#240): one per
-        // step, under the caller's budget, ahead of the next element.
+        // step, under the caller's evaluation, ahead of the next element.
         if self.held.is_none() && self.judge.index.deferred.has_ready() {
             let tip = self.headers.mining_tip();
-            return Ok(match self.judge.release_next(spent, self.budget, tip) {
-                Some(Ok(true)) => Timed::Paused,
-                Some(Err(stop)) => self.latch(stop.into()),
-                Some(Ok(false)) | None => Timed::Progress(Progress::Stepped),
-            });
+            return Ok(
+                match self.judge.release_next(spent, &self.evaluation, tip) {
+                    Some(Ok(true)) => Timed::Paused,
+                    Some(Err(stop)) => self.latch(stop.into()),
+                    Some(Ok(false)) | None => Timed::Progress(Progress::Stepped),
+                },
+            );
         }
         let (element, from) = match self.held.take() {
             Some(held) => held,
@@ -3316,7 +3158,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
                 other,
                 from,
                 spent,
-                self.budget,
+                &self.evaluation,
                 self.headers.mining_tip(),
             ),
         };
@@ -3401,18 +3243,11 @@ pub fn referenced_outpoints<R: Read>(source: R) -> Result<Referenced, StreamErro
 /// large outputs nothing spends is their bytes; two passes keep one entry per
 /// element and one outpoint per input, never a script nothing spends.
 pub fn verify_stream_two_pass<R: Read + Seek, H: Headers>(
-    mut source: R,
+    source: R,
     headers: H,
     subject: Option<Hash32>,
 ) -> std::io::Result<Verdict> {
-    let start = source.stream_position()?;
-    let referenced = match referenced_outpoints(&mut source) {
-        Ok(referenced) => referenced,
-        Err(StreamError::Io(e)) => return Err(e),
-        Err(StreamError::Refused(r)) => return Ok(r.into()),
-    };
-    source.seek(SeekFrom::Start(start))?;
-    StreamVerifier::retaining(source, headers, subject, referenced).run()
+    evaluation::two_pass(source, headers, subject, None)
 }
 
 /// Resumes a reading from a cursor over the rest of the stream (`source`
@@ -3466,7 +3301,7 @@ impl std::error::Error for AsyncVerifyError {}
 pub struct AsyncStreamVerifier {
     decoder: BeefDecoder,
     judge: Judge,
-    budget: Budget,
+    evaluation: Evaluation,
 }
 
 impl AsyncStreamVerifier {
@@ -3475,7 +3310,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::new()),
-            budget: Budget::NONE,
+            evaluation: Evaluation::NONE,
         }
     }
 
@@ -3484,7 +3319,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::structure_only()),
-            budget: Budget::NONE,
+            evaluation: Evaluation::NONE,
         }
     }
 
@@ -3495,7 +3330,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::at(frame),
             judge,
-            budget: Budget::NONE,
+            evaluation: Evaluation::NONE,
         }
     }
 
@@ -3569,7 +3404,7 @@ impl AsyncStreamVerifier {
                         };
                         self.judge
                             .index
-                            .fold_checked_from(&other, from, &mut || false, self.budget, tip)
+                            .fold_checked_from(&other, from, &mut || false, &self.evaluation, tip)
                             .map(|_| ())
                     }
                 };

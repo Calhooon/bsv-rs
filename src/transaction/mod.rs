@@ -99,6 +99,8 @@ pub mod output;
 #[allow(clippy::module_inception)]
 pub mod transaction;
 pub mod tx_json;
+mod verification_flags;
+mod verify;
 mod verify_refusal;
 
 // Re-exports for convenience
@@ -106,9 +108,9 @@ pub use crate::error::TransportFault;
 pub use beef::{Beef, BeefLimits, BeefValidationResult, SortResult};
 pub use beef_stream::{
     referenced_outpoints, resume, verify_stream, verify_stream_async, verify_stream_structure,
-    verify_stream_two_pass, AsyncByteSource, AsyncStreamVerifier, BeefDecoder, BeefIndex,
-    BeefStream, Cursor, Element, Headers, Kind, Progress, Reason, Refusal, StreamVerifier, Timed,
-    Verdict,
+    verify_stream_two_pass, verify_stream_two_pass_with_chain_params, AsyncByteSource,
+    AsyncStreamVerifier, BeefDecoder, BeefIndex, BeefStream, Cursor, Element, Headers, Kind,
+    Progress, Reason, Refusal, StreamVerifier, Timed, Verdict,
 };
 pub use beef_tx::{BeefTx, TxDataFormat, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 pub use broadcaster::{

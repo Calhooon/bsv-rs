@@ -36,6 +36,8 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
+| `verify.rs` | The existing SPV graph walk and `Transaction::verify_with_chain_params`, sharing fee/value/proof/resource behavior and the per-transaction sighash cache |
+| `verification_flags.rs` | Resolves tip + 1 (checked) or the no-tip latest era, then calls the crate's one `script::input_script_flags` function |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |
@@ -46,7 +48,9 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants; `BeefTx::from_reader` reads one entry (no BEEF reader calls it since #86); `tx_mut` makes the transaction the entry's only reading (#171): the bytes and txid it was read with dropped, the BUMP index kept, `input_txids` refreshed (`refresh`) by the BEEF's next whole-BEEF reader, which re-keys the index; `has_txid` checks an index hit, so a renamed entry is not found by its old txid |
 | `beef_stream.rs` | The streaming reader: `BeefDecoder` (and its collect mode, the whole reader's parser), `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`, `SpendRefusal` (its `Display` beside the enum, one sentence per arm, the texts pinned in `tests/beef_stream.rs`'s `a_spend_refusal_prints_*`, #213); the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
 | `beef_stream/reason.rs` | The refusal's names, `Kind` (twenty-six, `Kind::ALL`; `LeftDuplicateBelow` since #167's re-read) and `Reason`, re-exported from `beef_stream`; both `#[non_exhaustive]` (#86, #167): a `match` outside the crate ends in a wildcard arm |
-| `beef_stream/budget.rs` | The caller's two budgets for the scripts (#373): `Budget { work, memory }`, carried through the fold as one value, and the readers' `set_work_limit` and `set_memory_limit` |
+| `beef_stream/budget.rs` | The readers' `set_work_limit` and `set_memory_limit` (#373); budgets remain local and absent from cursors |
+| `beef_stream/evaluation.rs` | Local `Evaluation { work, memory, chain }`, `with_chain_params` on sync/async readers and `verify_stream_two_pass_with_chain_params`; no caller-made word or era resolver |
+| `beef_stream/spends.rs` | In-order/deferred input checks, only referenced source scripts retained, one shared sighash cache; source heights from the verified BUMP index |
 | `beef_stream/deferred.rs` | What the stream holds for a parent not read yet (#240): `HeldTx` (a transaction's index entry, its raw bytes dropped), `TxFields` (one fold for a transaction read in order and one released), `Deferred` (the held entries by offset, the txids each waits on, the ready ones, the bytes held; no bound; `unresolved`, what the end refuses), the index's and the reader's sides of the release (`BeefIndex::held_for_a_parent`, `BeefIndex::release_one`, `Judge::release_next`, one per step; `AsyncStreamVerifier::release_all`, every released one at once), `write_held` and `read_held` (a BSC4 cursor's held entries) |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
@@ -187,6 +191,7 @@ impl Transaction {
 
     // SPV Verification
     pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>, memory_limit: Option<usize>) -> Result<bool>
+    pub async fn verify_with_chain_params(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>, memory_limit: Option<usize>, chain: &ChainParams) -> Result<bool>
     // memory_limit: the reference's third parameter; None uncapped, as its default (#331), Some(n) n bytes per stack
     // an invalid script: Err(TransactionError("Script validation failed for input N: …"));
     // an input stopped at the caller's budget, or by the allocator: Err(ScriptEvaluationDeclined { input_index, limit }) (#38)
@@ -463,3 +468,22 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 - `fee_models/CLAUDE.md` - SatoshisPerKilobyte, LivePolicy
 - `broadcasters/CLAUDE.md` - TeranodeBroadcaster, WhatsOnChainBroadcaster, ArcBroadcaster (deprecated)
 - `chain_trackers/CLAUDE.md` - WhatsOnChainTracker, BlockHeadersServiceTracker
+
+## Live script verification (#440)
+
+Existing callers keep SDK default mode. A live door selects
+`StreamVerifier::new(...).with_chain_params(chain)` (also on the retaining and
+resumed reader), `verify_stream_two_pass_with_chain_params(..., &chain)`, or
+`Transaction::verify_with_chain_params(..., &chain)`. Async readers have the same
+builder. Apply it before stepping; reapply it after any resume, including a
+decoded cursor, exactly as the local budgets. No flag word is serialized.
+
+The verifier obtains source heights only from header-verified BUMPs; unproven
+sources use the spend era. Transaction flags use tip + 1 with checked overflow;
+without a tip they use the latest era in the chain parameters. Pre-Genesis is
+refused explicitly. A proven transaction still stops at its proof: the stream
+runs scripts only for unproven transactions; callers judging mined scripts can
+use `input_script_flags(..., mined = true)` with their block height.
+Structural, atomic, finality/maturity, value, duplicate and deferred-parent rules
+are unchanged. `ChainParams` is authoritative for script activation; the old
+`ChainTip::genesis_height` field remains for the existing mining checks.

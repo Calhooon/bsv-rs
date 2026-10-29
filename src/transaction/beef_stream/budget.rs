@@ -16,31 +16,13 @@ use std::io::Read;
 
 use super::{AsyncStreamVerifier, Headers, StreamVerifier};
 
-/// The budgets every input of the reading runs under.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Budget {
-    /// As `TxSpendParams::work_limit`.
-    pub(super) work: Option<u64>,
-    /// As `TxSpendParams::memory_limit`: `None` uncapped, as the default
-    /// mode's and `Transaction::verify`'s `None` (bsv-rs#331).
-    pub(super) memory: Option<usize>,
-}
-
-impl Budget {
-    /// Neither budget: the readers' default.
-    pub(super) const NONE: Budget = Budget {
-        work: None,
-        memory: None,
-    };
-}
-
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// Sets the LOCAL work bound per input, before its scripts run. A
     /// resource decline is `SpendRefusal::Resource`, naming the input, work
     /// spent and budget. `None` is the default. This configuration is not
     /// cursor state: reapply it after `resume`, including a decoded cursor.
     pub fn set_work_limit(&mut self, limit: Option<u64>) {
-        self.budget.work = limit;
+        self.evaluation.work = limit;
     }
 
     /// Sets the LOCAL memory budget per input, in bytes per stack, as
@@ -51,18 +33,18 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// naming the transaction, the input and the figures, never a verdict on
     /// the script. Not cursor state: reapply it after `resume`.
     pub fn set_memory_limit(&mut self, limit: Option<usize>) {
-        self.budget.memory = limit;
+        self.evaluation.memory = limit;
     }
 }
 
 impl AsyncStreamVerifier {
     /// As [`StreamVerifier::set_memory_limit`].
     pub fn set_memory_limit(&mut self, limit: Option<usize>) {
-        self.budget.memory = limit;
+        self.evaluation.memory = limit;
     }
 
     /// As [`StreamVerifier::set_work_limit`].
     pub fn set_work_limit(&mut self, limit: Option<u64>) {
-        self.budget.work = limit;
+        self.evaluation.work = limit;
     }
 }

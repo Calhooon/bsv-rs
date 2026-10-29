@@ -1742,7 +1742,7 @@ impl Transaction {
     /// links each distinct parent once and hands later inputs a bare stub),
     /// and keeps the work linear even on a graph linked by an older,
     /// duplicating walk.
-    fn reachable_by_txid(&self) -> HashMap<String, &Transaction> {
+    pub(super) fn reachable_by_txid(&self) -> HashMap<String, &Transaction> {
         /// How much ancestry a copy carries: a proof beats every link count.
         fn linkage(tx: &Transaction) -> usize {
             if tx.merkle_path.is_some() {
@@ -1830,179 +1830,14 @@ impl Transaction {
         fee_model: Option<&dyn super::FeeModel>,
         memory_limit: Option<usize>,
     ) -> Result<bool> {
-        use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-        use crate::script::{Spend, TxSpendParams};
-
-        let by_txid = self.reachable_by_txid();
-        let overflow = || crate::Error::TransactionError("Input satoshis overflow".to_string());
-
-        let mut verified_txids: HashSet<String> = HashSet::new();
-        let mut tx_queue: Vec<String> = vec![self.id()];
-
-        while let Some(txid) = tx_queue.pop() {
-            if !verified_txids.insert(txid.clone()) {
-                continue;
-            }
-            let Some(tx) = by_txid.get(&txid).copied() else {
-                continue; // only txids found in the map are ever queued
-            };
-            refuse_no_transaction(tx, &txid)?;
-
-            // If the transaction has a merkle path, verify it
-            if let Some(ref merkle_path) = tx.merkle_path {
-                let root = merkle_path.compute_root(Some(&txid))?;
-                let is_valid = chain_tracker
-                    .is_valid_root_for_height(&root, merkle_path.block_height)
-                    .await
-                    .map_err(crate::Error::from)?;
-
-                if is_valid {
-                    continue;
-                } else {
-                    return Err(crate::Error::TransactionError(format!(
-                        "Invalid merkle path for transaction {}",
-                        txid
-                    )));
-                }
-            }
-
-            // Resolve every input's source output BY TXID, and total the
-            // inputs. The txid is the one the input names, falling back to the
-            // id of whatever source object it holds (TS `Transaction.verify`
-            // fills `sourceTXID` in the same way).
-            let mut sources: Vec<(String, &TransactionOutput)> =
-                Vec::with_capacity(tx.inputs.len());
-            let mut input_total: u64 = 0;
-            for (vin, input) in tx.inputs.iter().enumerate() {
-                let missing = || {
-                    crate::Error::TransactionError(format!(
-                        "Input {} has no source transaction",
-                        vin
-                    ))
-                };
-                let source_txid = input.get_source_txid().map_err(|_| missing())?;
-                let source = by_txid.get(&source_txid).copied().ok_or_else(missing)?;
-                // A source with no output is refused as itself, before the
-                // index into its outputs could only say "out of bounds".
-                refuse_no_transaction(source, &source_txid)?;
-                let source_output = source
-                    .outputs
-                    .get(input.source_output_index as usize)
-                    .ok_or_else(|| {
-                        crate::Error::TransactionError(format!(
-                            "Input {} source output index out of bounds",
-                            vin
-                        ))
-                    })?;
-                input_total = input_total
-                    .checked_add(source_output.satoshis.unwrap_or(0))
-                    .ok_or_else(overflow)?;
-                sources.push((source_txid, source_output));
-            }
-            let mut output_total: u64 = 0;
-            for output in &tx.outputs {
-                output_total = output_total
-                    .checked_add(output.satoshis.unwrap_or(0))
-                    .ok_or_else(overflow)?;
-            }
-
-            // Verify fee if fee model is provided
-            if let Some(fm) = fee_model {
-                let tx_fee = input_total.saturating_sub(output_total);
-                let required_fee = fm.compute_fee(tx)?;
-                if tx_fee < required_fee {
-                    return Err(crate::Error::TransactionError("Fee is too low".to_string()));
-                }
-            }
-
-            // One input list and one output list per transaction, shared by
-            // every input's spend with the sighash midstates (bsv-low #591).
-            // Every input names a source txid: the resolution above refused
-            // the transaction otherwise.
-            let outputs: Vec<TxOutput> = tx
-                .outputs
-                .iter()
-                .map(|o| TxOutput {
-                    satoshis: o.satoshis.unwrap_or(0),
-                    script: o.locking_script.to_binary(),
-                })
-                .collect();
-            let inputs: Vec<TxInput> = tx
-                .inputs
-                .iter()
-                .map(|inp| {
-                    Ok(TxInput {
-                        txid: inp.get_source_txid_bytes()?,
-                        output_index: inp.source_output_index,
-                        script: inp
-                            .unlocking_script
-                            .as_ref()
-                            .map(|s| s.to_binary())
-                            .unwrap_or_default(),
-                        sequence: inp.sequence,
-                    })
-                })
-                .collect::<Result<_>>()?;
-            let shared = std::sync::Arc::new(TxSighashCache::new(
-                tx.version as i32,
-                inputs,
-                outputs,
-                tx.lock_time,
-            ));
-
-            // Verify each input's script
-            for ((vin, input), (source_txid, source_output)) in
-                tx.inputs.iter().enumerate().zip(sources)
-            {
-                let source_satoshis = source_output.satoshis.unwrap_or(0);
-                let locking_script = &source_output.locking_script;
-                let unlocking_script = input.unlocking_script.as_ref().ok_or_else(|| {
-                    crate::Error::TransactionError(format!(
-                        "Input {} is missing unlocking script",
-                        vin
-                    ))
-                })?;
-
-                let mut spend = Spend::with_transaction(TxSpendParams {
-                    transaction: shared.clone(),
-                    input_index: vin,
-                    source_satoshis,
-                    locking_script: LockingScript::from_script(crate::script::Script::from_binary(
-                        &locking_script.to_binary(),
-                    )?),
-                    unlocking_script: UnlockingScript::from_script(
-                        crate::script::Script::from_binary(&unlocking_script.to_binary())?,
-                    ),
-                    memory_limit,
-                    work_limit: None,
-                })?;
-
-                spend
-                    .validate()
-                    .map_err(|e| super::verify_refusal::script_refusal(vin, e))?;
-
-                // Enqueue unverified source transactions, by txid
-                if !verified_txids.contains(&source_txid) {
-                    tx_queue.push(source_txid);
-                }
-            }
-
-            // The reference's value rule: an unmined transaction may not
-            // create satoshis (TS `Transaction.verify`, `outputTotal > inputTotal`).
-            // Every transaction here has an input (`refuse_no_transaction`).
-            if output_total > input_total {
-                return Ok(false);
-            }
-        }
-
-        Ok(true)
+        super::verify::verify(self, chain_tracker, fee_model, memory_limit, None).await
     }
 }
 
 /// A transaction with no input, or with an input and no output, is no
 /// transaction: the streaming reader's refusal (`beef_stream::no_transaction`)
 /// for the whole-transaction path, naming the txid and the kind.
-fn refuse_no_transaction(tx: &Transaction, txid: &str) -> Result<()> {
+pub(super) fn refuse_no_transaction(tx: &Transaction, txid: &str) -> Result<()> {
     match super::beef_stream::no_transaction(tx.inputs.len(), tx.outputs.len()) {
         Some(reason) => Err(crate::Error::TransactionError(format!(
             "invalid transaction {}: {:?}",
