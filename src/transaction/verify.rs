@@ -24,7 +24,7 @@ impl Transaction {
     /// # Errors
     /// Propagates tracker and proof failures, unavailable source data and fee
     /// errors. Script failures are transaction errors; unsupported chain facts
-    /// are [`Error::TransactionNotJudged`], and a local resource limit remains
+    /// are [`Error::TransactionNotJudged`], and a local memory limit remains
     /// [`Error::ScriptEvaluationDeclined`].
     pub async fn verify_with_chain_params(
         &self,
@@ -33,7 +33,76 @@ impl Transaction {
         memory_limit: Option<usize>,
         chain: &ChainParams,
     ) -> Result<bool> {
-        verify(self, chain_tracker, fee_model, memory_limit, Some(chain)).await
+        self.verify_with_chain_params_and_work_budget(
+            chain_tracker,
+            fee_model,
+            memory_limit,
+            None,
+            chain,
+        )
+        .await
+    }
+
+    /// SPV verification with an optional local work budget per input.
+    ///
+    /// Uses SDK default evaluation, as [`Self::verify`], with `work_limit` in
+    /// [`crate::script::SpendParams::work_limit`] units: reached opcodes plus
+    /// bytes hashed, charged before the work. `None` is the default and keeps
+    /// the reference's unbounded behavior; the reference's `verify` has no
+    /// work bound. This is a door's policy, not a clock or consensus rule:
+    /// it cannot interrupt an arithmetic opcode already running.
+    ///
+    /// # Errors
+    /// As [`Self::verify`]. Work exhaustion returns
+    /// [`Error::TransactionNotJudged`] with
+    /// [`crate::script::NotJudgedCause::WorkBudgetExceeded`], naming the input,
+    /// budget and work already charged. Memory declines keep their class.
+    pub async fn verify_with_work_budget(
+        &self,
+        chain_tracker: &dyn ChainTracker,
+        fee_model: Option<&dyn FeeModel>,
+        memory_limit: Option<usize>,
+        work_limit: Option<u64>,
+    ) -> Result<bool> {
+        verify(
+            self,
+            chain_tracker,
+            fee_model,
+            memory_limit,
+            work_limit,
+            None,
+        )
+        .await
+    }
+
+    /// Chain-parameter SPV verification with an optional local work budget per input.
+    ///
+    /// The word selection is [`Self::verify_with_chain_params`]'s; the budget,
+    /// default `None`, accounting and resource refusal are
+    /// [`Self::verify_with_work_budget`]'s. The reference's `verify` has no
+    /// work bound; callers set this local policy at each service door.
+    ///
+    /// # Errors
+    /// As [`Self::verify_with_chain_params`], with work exhaustion returned as
+    /// [`Error::TransactionNotJudged`] carrying
+    /// [`crate::script::NotJudgedCause::WorkBudgetExceeded`].
+    pub async fn verify_with_chain_params_and_work_budget(
+        &self,
+        chain_tracker: &dyn ChainTracker,
+        fee_model: Option<&dyn FeeModel>,
+        memory_limit: Option<usize>,
+        work_limit: Option<u64>,
+        chain: &ChainParams,
+    ) -> Result<bool> {
+        verify(
+            self,
+            chain_tracker,
+            fee_model,
+            memory_limit,
+            work_limit,
+            Some(chain),
+        )
+        .await
     }
 }
 
@@ -41,6 +110,7 @@ struct Evaluation<'a> {
     chain: Option<&'a ChainParams>,
     tip_height: Option<u32>,
     memory_limit: Option<usize>,
+    work_limit: Option<u64>,
     fee_model: Option<&'a dyn FeeModel>,
 }
 
@@ -55,6 +125,7 @@ pub(super) async fn verify(
     tracker: &dyn ChainTracker,
     fee_model: Option<&dyn FeeModel>,
     memory_limit: Option<usize>,
+    work_limit: Option<u64>,
     chain: Option<&ChainParams>,
 ) -> Result<bool> {
     let evaluation = Evaluation {
@@ -65,6 +136,7 @@ pub(super) async fn verify(
             None
         },
         memory_limit,
+        work_limit,
         fee_model,
     };
     let by_txid = root.reachable_by_txid();
@@ -195,14 +267,14 @@ impl Evaluation<'_> {
             locking_script: LockingScript::from_binary(&source.output.locking_script.to_binary())?,
             unlocking_script: UnlockingScript::from_binary(&unlocking.to_binary())?,
             memory_limit: self.memory_limit,
-            work_limit: None,
+            work_limit: self.work_limit,
         })?;
         if let Some(flags) = flags {
             spend.set_flags(flags);
         }
         spend
             .validate()
-            .map_err(|e| super::verify_refusal::script_refusal(vin, e))?;
+            .map_err(|e| super::verify_refusal::script_refusal(&tx.id(), vin, e))?;
         Ok(())
     }
 }

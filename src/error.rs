@@ -535,15 +535,15 @@ pub enum Error {
     #[error("contact not found: {0}")]
     ContactNotFound(String),
 
-    /// The chain facts cannot select a supported word; the input was not judged.
+    /// The input was not judged within the verifier's scope or local work budget.
     #[cfg(feature = "transaction")]
     #[error("transaction {txid} input {input_index} not judged: {cause}")]
     TransactionNotJudged {
         /// The display txid of the unproven transaction being checked.
         txid: String,
-        /// The index of the input outside the verifier's scope.
+        /// The index of the input whose verification stopped.
         input_index: usize,
-        /// The typed scope or configuration refusal.
+        /// The typed scope, configuration or resource refusal.
         cause: crate::script::NotJudgedCause,
     },
 }

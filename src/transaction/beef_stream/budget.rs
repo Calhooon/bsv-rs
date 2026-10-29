@@ -7,22 +7,39 @@
 //! and are set again after `resume`, a decoded cursor's included. Neither
 //! bounds the reader: the reader's own bound per element is the charter's
 //! structural guarantee (a valid BEEF is never refused for its size or its
-//! counts, NL-3), not a cap on a script. A budget spent is a decline,
-//! [`Verdict::SpendRefused`](super::Verdict::SpendRefused) with
-//! [`SpendRefusal::Resource`](super::SpendRefusal::Resource), never an
-//! invalid script; the structure-only reader runs no script and spends none.
+//! counts, NL-3), not a cap on a script. Exhausted work is
+//! [`Verdict::NotJudged`](super::Verdict::NotJudged) with
+//! [`crate::script::NotJudgedCause::WorkBudgetExceeded`]; exhausted memory is
+//! [`SpendRefusal::Resource`](super::SpendRefusal::Resource). Neither judges
+//! the script; the structure-only reader runs no script and spends none.
 
 use std::io::Read;
 
 use super::{AsyncStreamVerifier, Headers, StreamVerifier};
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
-    /// Sets the LOCAL work bound per input, before its scripts run. A
-    /// resource decline is `SpendRefusal::Resource`, naming the input, work
-    /// spent and budget. `None` is the default. This configuration is not
-    /// cursor state: reapply it after `resume`, including a decoded cursor.
+    /// Sets the local work bound per input using `SpendParams::work_limit` accounting.
+    ///
+    /// Exhaustion is `Verdict::NotJudged` with
+    /// `NotJudgedCause::WorkBudgetExceeded`, naming the input, work already
+    /// charged and budget. `None` is the default, matching the reference's
+    /// `verify`, which has no work bound. This is a service door's policy,
+    /// not an elapsed-time bound. This configuration is not cursor state:
+    /// reapply it after `resume`, including a decoded cursor.
     pub fn set_work_limit(&mut self, limit: Option<u64>) {
         self.evaluation.work = limit;
+    }
+
+    /// Configures an optional local work budget per input before verification.
+    ///
+    /// As [`Self::set_work_limit`]: the existing `SpendParams::work_limit`
+    /// accounting, `None` by default, with no work bound in the reference's
+    /// `verify`. Combine with `with_chain_params` for a live service door,
+    /// and reapply after `resume`; no budget is stored in the cursor.
+    #[must_use]
+    pub fn with_work_budget(mut self, limit: Option<u64>) -> Self {
+        self.set_work_limit(limit);
+        self
     }
 
     /// Sets the LOCAL memory budget per input, in bytes per stack, as
@@ -38,6 +55,15 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
 }
 
 impl AsyncStreamVerifier {
+    /// Configures an optional local work budget per input before verification.
+    ///
+    /// As [`StreamVerifier::with_work_budget`]; reapply after `resume` and
+    /// set before feeding any transaction.
+    #[must_use]
+    pub fn with_work_budget(mut self, limit: Option<u64>) -> Self {
+        self.set_work_limit(limit);
+        self
+    }
     /// As [`StreamVerifier::set_memory_limit`].
     pub fn set_memory_limit(&mut self, limit: Option<usize>) {
         self.evaluation.memory = limit;

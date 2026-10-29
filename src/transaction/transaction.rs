@@ -1824,18 +1824,24 @@ impl Transaction {
     /// given, is checked. An invalid script is `Err(TransactionError("Script validation failed
     /// for input N: …"))`; one stopped at the budget or by the allocator is
     /// `Err(ScriptEvaluationDeclined)`, a decline, never to be read as invalid (bsv-rs#38).
-    /// `Transaction::verify` has no work budget; callers can use `SpendParams::work_limit`
-    /// or `StreamVerifier::set_work_limit` to bound charged work, and must bound elapsed
-    /// time externally because those counters cannot interrupt one arithmetic opcode
-    /// (#378 part 1; part 2 adds an additive work budget here under the keeper's word of
-    /// 2026-10-29, `None` the reference's behaviour).
+    /// Work is unbounded by default, as in the reference's `verify`, which has no
+    /// work bound. [`Self::verify_with_work_budget`] and
+    /// [`Self::verify_with_chain_params_and_work_budget`] add an optional local
+    /// budget beside the memory budget, using [`crate::script::SpendParams::work_limit`]
+    /// and [`super::StreamVerifier::set_work_limit`]'s one counter per input.
+    /// Exceeding it is [`crate::script::NotJudgedCause::WorkBudgetExceeded`] on
+    /// [`Error::TransactionNotJudged`], never a script failure. A service door
+    /// sets its own policy value; `None` keeps the reference's behavior.
+    /// This counter cannot interrupt one arithmetic opcode; an elapsed-time
+    /// bound must be external (#378).
     pub async fn verify(
         &self,
         chain_tracker: &dyn super::ChainTracker,
         fee_model: Option<&dyn super::FeeModel>,
         memory_limit: Option<usize>,
     ) -> Result<bool> {
-        super::verify::verify(self, chain_tracker, fee_model, memory_limit, None).await
+        self.verify_with_work_budget(chain_tracker, fee_model, memory_limit, None)
+            .await
     }
 }
 

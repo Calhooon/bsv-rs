@@ -51,8 +51,13 @@
 //! - The scripts run under the caller's two LOCAL budgets per input, set on
 //!   the reader and absent from the cursor ([`StreamVerifier::set_work_limit`],
 //!   [`StreamVerifier::set_memory_limit`], `Transaction::verify`'s `memory_limit`,
-//!   bsv-rs#373): `None` uncapped; one spent is [`SpendRefusal::Resource`], a
-//!   decline, never a verdict. The reader's own bound is the charter's.
+//!   bsv-rs#373): `None` uncapped. Work exhaustion is [`Verdict::NotJudged`]
+//!   with [`crate::script::NotJudgedCause::WorkBudgetExceeded`] (#378); memory
+//!   exhaustion is [`SpendRefusal::Resource`]. The reference's `verify` has
+//!   no work bound; [`StreamVerifier::with_work_budget`] shares the counter
+//!   of `Transaction::verify_with_work_budget` and `SpendParams::work_limit`.
+//!   These are local policies, never invalid-script verdicts. The reader's
+//!   own bound is the charter's.
 //!
 //! # The format, at the pin
 //!
@@ -75,8 +80,8 @@
 //!   node). A spend that fails is [`Verdict::SpendRefused`], never one of the
 //!   twenty-six kinds. [`StreamVerifier::structure_only`] turns the spend
 //!   checks off and leaves exactly the Lean's validity.
-//!   Chain facts outside the live verifier's scope yield [`Verdict::NotJudged`]
-//!   with a typed cause and input index, before script execution.
+//!   Chain facts outside the live verifier's scope, or work beyond the local
+//!   budget, yield [`Verdict::NotJudged`] with a typed cause and input index.
 //! - Next-block mining context: P2SH's Genesis era, finality and coinbase
 //!   maturity are spend checks. Missing finality or maturity context yields
 //!   [`Verdict::Unverifiable`], a decline outside the Lean's byte validity.
@@ -92,7 +97,7 @@
 //!     Verdict::Invalid { offset, kind, .. } => { /* the byte and the kind */ }
 //!     Verdict::SpendRefused { offset, why, .. } => { /* a spend said no */ }
 //!     Verdict::Unverifiable { check, .. } => { /* supply the mining context */ }
-//!     Verdict::NotJudged { input, cause, .. } => { /* unsupported chain facts */ }
+//!     Verdict::NotJudged { input, cause, .. } => { /* scope or local work budget */ }
 //! }
 //! ```
 
@@ -1603,11 +1608,11 @@ pub enum SpendRefusal {
         /// The coinbase's verified block height; named at the spending input.
         height: u64,
     },
-    /// Chain facts cannot select a supported word; the input was not judged.
+    /// The input was not judged within the verifier's scope or local work budget.
     NotJudged {
-        /// The index of the input outside the verifier's scope.
+        /// The index of the input whose verification stopped.
         input: u32,
-        /// The typed scope or configuration refusal.
+        /// The typed scope, configuration or resource refusal.
         cause: crate::script::NotJudgedCause,
     },
 }
@@ -2421,15 +2426,15 @@ pub enum Verdict {
         /// Why.
         why: SpendRefusal,
     },
-    /// The verifier cannot select a supported word; no transaction judgment.
+    /// The verifier stopped at its scope or local work budget; no transaction judgment.
     NotJudged {
         /// The offset of the input.
         offset: u64,
         /// The spending transaction.
         txid: Hash32,
-        /// The index of the input outside the verifier's scope.
+        /// The index of the input whose verification stopped.
         input: u32,
-        /// The typed scope or configuration refusal.
+        /// The typed scope, configuration or resource refusal.
         cause: crate::script::NotJudgedCause,
     },
 }
