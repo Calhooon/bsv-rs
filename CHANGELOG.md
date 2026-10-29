@@ -74,6 +74,13 @@ checks. `go-sdk@2ca481c` has only the local store: wallet lookup by `[key]`
 (`kvstore/local_kv_store.go:174-188`), value in field 0 (`:131-156`), its
 writer's value-only payload (`:265-278`); no public five/six-field reader.
 
+One difference stays stated: the reference's `GlobalKVStore.set` writes a tag
+holding a lone surrogate (`["\ud800"]`, three UTF-8 bytes to its `TextEncoder`)
+and its `decodeAndVerifyKVStoreToken` accepts it, where this crate's reader
+refuses a tag that is not valid UTF-8 (`interpreter.rs:48-50`); a token the
+reference writes with such a tag is unreadable here (no writer of this crate
+produces one).
+
 This closes #326's untagged-token finding. Other existing differences remain:
 this crate's writer uses a raw protocol name and the fixed `kvstore-token`
 key ID, its reader continues to accept that older form, and its public

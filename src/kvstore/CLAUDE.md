@@ -216,8 +216,11 @@ field, distinct from a present, signed `[]`; both read successfully.
 `malformed_reference_token_tags_use_the_reference_words_and_order` replay
 `kvstore_tags_344.json`, recorded by the extended #326 reference writer.
 
-The local store uses a different layout: a value and its signature, with
-`[key]` on the wallet output for lookup. Payload tags belong to the public
+The local store uses a different layout: a single field, the value, in a
+PushDrop with no signature (`local.rs:805-807`), under
+`Protocol(Counterparty, name)` (`:746-747`), with `[key]` on the wallet output
+for lookup; its `list` (`:564`) lists nothing (pre-existing). The reference's
+local store writes a value and its signature. Payload tags belong to the public
 five/six-field token, not to that wallet metadata.
 
 ## Configuration
