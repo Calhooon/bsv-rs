@@ -9,9 +9,9 @@ use crate::error::{Error, Result};
 const MAX_COMPAT_BYTE_PAYLOAD: usize = 16 * 1024 * 1024;
 const MAX_ECIES_ENVELOPE_BYTES: usize = MAX_COMPAT_BYTE_PAYLOAD + 160;
 
-fn bounded(data: &[u8], maximum: usize, label: &str) -> Result<()> {
+fn bounded(data: &[u8], maximum: usize, label: &str, refusal: fn(String) -> Error) -> Result<()> {
     if data.len() > maximum {
-        return Err(Error::EciesDecryptionFailed(format!(
+        return Err(refusal(format!(
             "{label} must be a bounded dense byte array"
         )));
     }
@@ -19,17 +19,37 @@ fn bounded(data: &[u8], maximum: usize, label: &str) -> Result<()> {
 }
 
 pub(super) fn electrum_envelope(data: &[u8]) -> Result<()> {
-    bounded(data, MAX_ECIES_ENVELOPE_BYTES, "Electrum ECIES envelope")
+    bounded(
+        data,
+        MAX_ECIES_ENVELOPE_BYTES,
+        "Electrum ECIES envelope",
+        Error::EciesDecryptionFailed,
+    )
 }
 
 pub(super) fn bitcore_envelope(data: &[u8]) -> Result<()> {
-    bounded(data, MAX_ECIES_ENVELOPE_BYTES, "Bitcore ECIES envelope")
+    bounded(
+        data,
+        MAX_ECIES_ENVELOPE_BYTES,
+        "Bitcore ECIES envelope",
+        Error::EciesDecryptionFailed,
+    )
 }
 
 pub(super) fn electrum_plaintext(data: &[u8]) -> Result<()> {
-    bounded(data, MAX_COMPAT_BYTE_PAYLOAD, "Electrum ECIES plaintext")
+    bounded(
+        data,
+        MAX_COMPAT_BYTE_PAYLOAD,
+        "Electrum ECIES plaintext",
+        Error::EciesInvalidPlaintext,
+    )
 }
 
 pub(super) fn bitcore_plaintext(data: &[u8]) -> Result<()> {
-    bounded(data, MAX_COMPAT_BYTE_PAYLOAD, "Bitcore ECIES plaintext")
+    bounded(
+        data,
+        MAX_COMPAT_BYTE_PAYLOAD,
+        "Bitcore ECIES plaintext",
+        Error::EciesInvalidPlaintext,
+    )
 }

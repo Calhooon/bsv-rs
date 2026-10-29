@@ -11,6 +11,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 |------|---------|
 | `lib.rs` | Crate root with module declarations and re-exports |
 | `error.rs` | Unified `Error` enum and `Result` type alias; `TransactionNotJudged { txid, input_index, cause }` keeps scope refusals separate from script failure (#452) |
+| `error.rs` | Unified `Error` enum and `Result` type alias; `EciesInvalidPlaintext` carries the plaintext validation words alone before encryption (#333) |
 | `error/wallet_fault.rs` | `WalletFaultFamily`, `WalletFault`, `AbortAcceptance`: port extensions beyond the reference; original strings and refusal classes retained (#439) |
 | `error/wallet_refusal.rs` | The reference's twenty `WalletRefusalClass` values and impls, re-exported at `error::WalletRefusalClass` |
 
@@ -71,7 +72,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 | `transaction` | `TransactionError`, `TransactionNotJudged` (typed scope refusal, #452), `ScriptEvaluationDeclined` (`Transaction::verify`'s decline, #38), `MerklePathError`, `BeefError`, `FeeModelError` |
 | `wallet` | `WalletError`, `WalletFault`, `AbortAccepted` (the port extensions of #439), `WalletRefusal`, `WalletReviewActions` (a `WERR_REVIEW_ACTIONS` with its results, #327), `WalletBusy`, `WalletTransport`, `TransportFault` (with the `TransportFault` class of `transaction`, #87), `HmacLegacyKey` (strict refusal, #379), `HmacMinimalLengthKey` (retained, never emitted), `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
 | `messages` | `MessageVersionMismatch`, `MessageError`, `MessageRecipientMismatch` |
-| `compat` | `InvalidMnemonic`, `InvalidEntropyLength`, `InvalidMnemonicWord`, `InvalidExtendedKey`, `HardenedFromPublic`, `InvalidDerivationPath`, `EciesDecryptionFailed`, `EciesHmacMismatch` |
+| `compat` | `InvalidMnemonic`, `InvalidEntropyLength`, `InvalidMnemonicWord`, `InvalidExtendedKey`, `HardenedFromPublic`, `InvalidDerivationPath`, `EciesInvalidPlaintext`, `EciesDecryptionFailed`, `EciesHmacMismatch` |
 | `auth` | `AuthError`, `SessionNotFound`, `CertificateValidationError`, `TransportError` |
 | `overlay` | `OverlayError`, `NoHostsFound`, `OverlayBroadcastFailed` |
 | `registry` | `RegistryError`, `DefinitionNotFound`, `InvalidDefinitionData` |

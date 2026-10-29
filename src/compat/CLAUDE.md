@@ -425,6 +425,7 @@ Error::InvalidChecksum  // Base58Check checksum mismatch
 Error::InvalidSignature(String)
 
 // ECIES errors
+Error::EciesInvalidPlaintext(String)  // Plaintext bound; Display is the words alone (#333)
 Error::EciesDecryptionFailed(String)
 Error::EciesHmacMismatch
 

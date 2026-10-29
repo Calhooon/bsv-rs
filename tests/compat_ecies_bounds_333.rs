@@ -20,8 +20,16 @@ fn key(byte: u8) -> PrivateKey {
     PrivateKey::from_bytes(&[byte; 32]).unwrap()
 }
 
-fn refused(label: &str) -> Error {
+fn envelope_refused(label: &str) -> Error {
     Error::EciesDecryptionFailed(format!("{label} must be a bounded dense byte array"))
+}
+
+fn plaintext_refused(error: Error, label: &str) {
+    let words = format!("{label} must be a bounded dense byte array");
+    assert_eq!(
+        (error.to_string(), error),
+        (words.clone(), Error::EciesInvalidPlaintext(words))
+    );
 }
 
 fn electrum_envelope() -> &'static [u8] {
@@ -56,7 +64,7 @@ fn an_electrum_envelope_one_byte_over_the_reference_bound_is_refused_before_read
     for sender in [None, Some(key(2).public_key())] {
         assert_eq!(
             electrum_decrypt(data, &key(1), sender.as_ref()).err(),
-            Some(refused("Electrum ECIES envelope"))
+            Some(envelope_refused("Electrum ECIES envelope"))
         );
     }
 }
@@ -65,7 +73,7 @@ fn an_electrum_envelope_one_byte_over_the_reference_bound_is_refused_before_read
 fn a_framed_electrum_envelope_over_the_reference_bound_is_refused_before_the_mac() {
     assert_eq!(
         electrum_decrypt(electrum_envelope(), &key(1), None).err(),
-        Some(refused("Electrum ECIES envelope"))
+        Some(envelope_refused("Electrum ECIES envelope"))
     );
 }
 
@@ -90,7 +98,7 @@ fn an_electrum_envelope_at_the_reference_bound_is_read_as_before() {
 fn a_bitcore_envelope_one_byte_over_the_reference_bound_is_refused_before_the_mac() {
     assert_eq!(
         bitcore_decrypt(bitcore_envelope(), &key(1)).err(),
-        Some(refused("Bitcore ECIES envelope"))
+        Some(envelope_refused("Bitcore ECIES envelope"))
     );
 }
 
@@ -109,26 +117,31 @@ fn a_bitcore_envelope_at_the_reference_bound_is_read_as_before() {
 fn electrum_plaintext_one_byte_over_the_reference_bound_is_refused_before_encryption() {
     let from = key(2);
     let to = key(1).public_key();
-    let expected = Some(refused("Electrum ECIES plaintext"));
     for no_key in [false, true] {
-        assert_eq!(
-            electrum_encrypt(plaintext(), &to, &from, no_key).err(),
-            expected
+        plaintext_refused(
+            electrum_encrypt(plaintext(), &to, &from, no_key).unwrap_err(),
+            "Electrum ECIES plaintext",
         );
     }
-    assert_eq!(encrypt_single(plaintext(), &from).err(), expected);
-    assert_eq!(encrypt_single_base64(plaintext(), &from).err(), expected);
-    assert_eq!(
-        encrypt_shared_base64(plaintext(), &to, &from).err(),
-        expected
+    plaintext_refused(
+        encrypt_single(plaintext(), &from).unwrap_err(),
+        "Electrum ECIES plaintext",
+    );
+    plaintext_refused(
+        encrypt_single_base64(plaintext(), &from).unwrap_err(),
+        "Electrum ECIES plaintext",
+    );
+    plaintext_refused(
+        encrypt_shared_base64(plaintext(), &to, &from).unwrap_err(),
+        "Electrum ECIES plaintext",
     );
 }
 
 #[test]
 fn bitcore_plaintext_one_byte_over_the_reference_bound_is_refused_before_encryption() {
-    assert_eq!(
-        bitcore_encrypt(plaintext(), &key(1).public_key(), &key(2), None).err(),
-        Some(refused("Bitcore ECIES plaintext"))
+    plaintext_refused(
+        bitcore_encrypt(plaintext(), &key(1).public_key(), &key(2), None).unwrap_err(),
+        "Bitcore ECIES plaintext",
     );
 }
 
