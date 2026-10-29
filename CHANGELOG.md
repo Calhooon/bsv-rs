@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
+
+`HmacKeyEncoding` and `HmacVerifyPolicy` are now `#[non_exhaustive]`, so
+later key encodings and verification policies can be added without breaking
+callers. Both enums were introduced by #379 after v0.9.0-beta.3 was cut.
+No published release carries either enum, so the change is additive in
+effect.
+
+Migration: a `match` on either enum outside the crate needs a wildcard arm
+(`_ => ...`). The crate and its tests use constructors and equality checks,
+with no matches on either enum needing an added arm. A test that either
+enum is non-exhaustive is not expressible in Rust from inside the crate;
+the pin is the rustdoc contract and the semver reading below.
+
+Against base `1dc611a188f2d8a61cdb2e841e5154ee6cb7d47e`,
+`cargo semver-checks --all-features --baseline-rev <base>` (0.51.0) assumes
+a major release because both versions are `0.9.0-beta.3`, reporting
+`0 checks: 0 pass, 260 skip` and `Summary no semver update required`.
+Adding `--release-type minor` exercises the checks: `202 checks: 201 pass,
+1 fail, 0 warn, 58 skip`. Its sole failure names `HmacKeyEncoding` and
+`HmacVerifyPolicy`, with these verbatim diagnostic excerpts:
+
+```text
+--- failure enum_marked_non_exhaustive: enum marked #[non_exhaustive] ---
+
+Description:
+A public enum has been marked #[non_exhaustive]. Pattern-matching on it outside of its crate must now include a wildcard pattern like `_`, or it will fail to compile.
+```
+
+```text
+     Summary semver requires new major version: 1 major and 0 minor checks failed
+```
+
+That is the expected source-compatibility finding against the unpublished
+base; no other lint fails. The release-history distinction above is why
+this change is additive in effect for published consumers.
+
+### Notes: cross-SDK parity (#443)
+
+This is a Rust API extensibility change. HMAC issuance, verification,
+legacy acceptance counts and the strict nonce path retain #379's behavior
+and its cross-SDK parity reading.
+
 ### Fixed: the wallet wire's originator bound and normalization (#338)
 
 The processor used to pass an originator through without checking its length
@@ -71,156 +114,7 @@ of 255, with no 250-byte check or hostname normalization. Its writer casts the
 length to `byte` and can wrap above 255. Rust follows TypeScript's 250-byte
 bound and refuses before writing. The existing empty-originator difference
 remains: Rust dispatches `None`, TypeScript dispatches `''`.
-### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
 
-`HmacKeyEncoding` and `HmacVerifyPolicy` are now `#[non_exhaustive]`, so
-later key encodings and verification policies can be added without breaking
-callers. Both enums were introduced by #379 after v0.9.0-beta.3 was cut.
-No published release carries either enum, so the change is additive in
-effect.
-
-Migration: a `match` on either enum outside the crate needs a wildcard arm
-(`_ => ...`). The crate and its tests use constructors and equality checks,
-with no matches on either enum needing an added arm. A test that either
-enum is non-exhaustive is not expressible in Rust from inside the crate;
-the pin is the rustdoc contract and the semver reading below.
-
-Against base `1dc611a188f2d8a61cdb2e841e5154ee6cb7d47e`,
-`cargo semver-checks --all-features --baseline-rev <base>` (0.51.0) assumes
-a major release because both versions are `0.9.0-beta.3`, reporting
-`0 checks: 0 pass, 260 skip` and `Summary no semver update required`.
-Adding `--release-type minor` exercises the checks: `202 checks: 201 pass,
-1 fail, 0 warn, 58 skip`. Its sole failure names `HmacKeyEncoding` and
-`HmacVerifyPolicy`, with these verbatim diagnostic excerpts:
-
-```text
---- failure enum_marked_non_exhaustive: enum marked #[non_exhaustive] ---
-
-Description:
-A public enum has been marked #[non_exhaustive]. Pattern-matching on it outside of its crate must now include a wildcard pattern like `_`, or it will fail to compile.
-```
-
-```text
-     Summary semver requires new major version: 1 major and 0 minor checks failed
-```
-
-That is the expected source-compatibility finding against the unpublished
-base; no other lint fails. The release-history distinction above is why
-this change is additive in effect for published consumers.
-
-### Notes: cross-SDK parity (#443)
-
-This is a Rust API extensibility change. HMAC issuance, verification,
-legacy acceptance counts and the strict nonce path retain #379's behavior
-and its cross-SDK parity reading.
-
-### Fixed: required script flag refusals name the word's missing flag (#434)
-
-`ScriptFlags::check` still requires SIGHASH_FORKID, GENESIS and
-UTXO_AFTER_GENESIS in an explicit word. Its refusal text now describes that
-requirement; the old FORKID reason was stale after #429 enabled the original
-digest for a signature without FORKID in default mode. No verdict changes.
-
-| Missing flag | Old text | New text |
-|---|---|---|
-| SIGHASH_FORKID | `SIGHASH_FORKID is not set: this interpreter computes the BIP-143 sighash only` | `SIGHASH_FORKID is not set: this interpreter requires it in a flag word` |
-| GENESIS | `GENESIS is not set: pre-Genesis block rules are not implemented by this interpreter` | `GENESIS is not set: this interpreter requires it in a flag word` |
-| UTXO_AFTER_GENESIS | `UTXO_AFTER_GENESIS is not set: pre-Genesis UTXO rules are not implemented by this interpreter` | `UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word` |
-
-`Spend::validate` retains its `Invalid verification flags: ` prefix and final
-period. `tests/script_signature_words_417.rs` pins all three refusals on the
-three DER-off witnesses. `tests/support/conformance_forkid_gate_429.rs`, run
-by `conformance_scripts`, now pins default refusal messages beside the
-66 recorded verdicts and checks the refusal text for the 86 recorded words
-that lack FORKID. Both tests are RED with the old check text restored in a
-scratch copy. The `flags.rs` documentation no longer claims BIP143 is the
-only digest; the file remains at its 872-line ceiling.
-
-### Notes: cross-SDK parity (#434)
-
-The restriction to words carrying these three flags remains this crate's
-documented limitation. TypeScript and the node accept some words it refuses;
-this change does not alter their handling. Under a supported word the node's
-STRICTENC implication from SIGHASH_FORKID remains in force (bitcoin-sv
-v1.2.2, `879fc8b`, `interpreter.cpp:2315-2318`). Callers matching error text
-must use the new sentences above. The downstream source scan found no old
-text or refusal-prefix matches in bsv-overlay-cloudflare, rust-message-box,
-bsv-wallet-toolbox-rs or bsv-wallet-cli; bsv-middleware-cloudflare-public and
-rust-chaintracks were absent at their specified paths and remain unverified.
-
-Pinning the census messages exposes one existing wording difference:
-`node.tx-valid.shared.0097` returns Rust's `OP_CHECKMULTISIG requires correct
-encoding for the public key and signature.` where the TypeScript recording
-returns `The signature format is invalid.` Both refusals and their distinct
-messages are now pinned; no interpreter behavior is changed for that row.
-### Fixed: spend every current key-value token (#343)
-
-`GlobalKVStore::set` now requests token data for the exact key, controller and
-protocol namespace, merges every authenticated token's BEEF and spends each
-outpoint once when creating its replacement. `remove` uses the same selection
-and spends the whole set. Both paths use a PushDrop unlocker for each outpoint,
-with its own source script and satoshis, mapped to the wallet's returned input
-index. The #341/#342 request and signed-result checks, abort behavior and
-`acceptDelayedBroadcast`, `randomizeOutputs`, `noSend` and `sendWith` options
-remain in place. Previously global set requested no token data, removal used
-one token, and both stores supplied empty unlocking scripts.
-
-The global writer now emits the reference's JSON protocol and derives its
-locking key and signature from that protocol and the stored key, so its new
-tokens can be spent by those unlockers. Global mutation lookups send
-`protocolID: [1, namespace]` and exclude tokens outside that authenticated
-namespace. The local store already selected all listed outputs on update and
-removal; it now signs each, and its same-value shortcut applies only when one
-output remains. Two outputs with the same value are collapsed too.
-
-`tests/kvstore_tokens_343.rs` has eleven recording-wallet regressions: two
-current tokens on both stores' set/remove paths, reversed wallet input order,
-merged BEEF, executable signatures with unequal satoshis and nonzero output
-indexes, a single-token control, same-value collapse, namespace/controller and
-signature filtering, repeated lookup outpoints, and the reference writer and
-query shapes. On a scratch copy of `823a798e` with a separate target directory,
-ten tests fail and the unchanged single-token local value passes. The #326,
-#341/#342 and #344 vectors regenerate byte-identically under Node 22.18.0 at
-`ts-stack@edf6e03`; no recorder or vector was changed.
-
-Migration: no public Rust API changes. A same-value local write now spends
-multiple current outputs. Pre-#343 raw-protocol global tokens remain readable,
-but are outside the reference's authenticated mutation namespace; recovery of
-those old identity-key-locked outputs requires their owner's wallet.
-
-### Notes: cross-SDK parity (#343)
-
-This follows `ts-stack@edf6e03` `GlobalKVStore.ts:343-380` (all update inputs,
-merged BEEF and per-outpoint unlockers), `:431-470` (all removal inputs), and
-`LocalKVStore.ts:377-425,456-537,567-594` (all authenticated outputs, and the
-single-output unchanged-value shortcut). Go at `2ca481c` has only a local
-store: `kvstore/local_kv_store.go:284-345,429-497` iterates all listed outpoints
-for both operations and uses their BEEF and PushDrop signers, but its
-same-value shortcut at `:243-245` accepts multiple outputs too. Go has no
-global store. Rust's existing local lookup authentication/pagination and global
-double-spend retry differences are not addressed by this change.
-
-Seven differences from the reference stand in this change, found by its cold
-review and stated here (CLAUDE.md rule 1): the unlocker signs over the source
-output inside the wallet's signable transaction (`token_spends.rs:108-117`),
-where the reference signs over the token's own satoshis and locking script
-(`GlobalKVStore.ts:359-360`, `LocalKVStore.ts:403-404,505-506`); one input per
-outpoint is sent (`token_spends.rs:54`), where the reference sends every lookup
-token, repeats included (`GlobalKVStore.ts:343-347`); the `protocolId` rewrite
-to `protocolID:[1,name]` (`global_actions.rs:190-199`) applies to every global
-lookup, the public `query()` with `with_protocol_id` included, not the mutation
-lookups alone; the local `remove` now takes the key lock (`local.rs:279`), as
-the reference does (`LocalKVStore.ts:569`); the input description and unlocking
-length are now the reference's (74 bytes, `Previous KVStore token` and `KVStore
-token to remove`) where they were 107 and `KV entry input`; `token_lock` calls
-createSignature before getPublicKey and after the lookup, where the reference
-calls getPublicKey (`PushDrop.ts:155`) then createSignature (`:175`), both
-before the lookup (`GlobalKVStore.ts:298` before `:309`); and the controller
-match is exact, where the reference lower-cases both sides
-(`GlobalKVStore.ts:666-668`). The signature request shape (`hashToDirectlySign`
-here, `data: sha256(preimage)` in the reference's `PushDrop.ts:246-248`) is
-crate-wide and older than this change; it and the local lookup pagination gap
-(`LocalKVStore.ts:332-339,574-590`) are filed as follow-ups.
 ### Verified: handshake refusal words and signed-header order (#366, #369)
 
 Both filings predate fixes already in base `823a798e`: #410 changed the
@@ -300,6 +194,168 @@ That transport calls `authpayload.FromHTTPResponse` at `:195`;
 `auth/authpayload/http.go:324-351` lowercases then byte-sorts included
 headers. Go agrees on letter/digit/dash names and differs on the wider
 token punctuation witness. Go was read, not executed in this lane.
+
+### Fixed: spend every current key-value token (#343)
+
+`GlobalKVStore::set` now requests token data for the exact key, controller and
+protocol namespace, merges every authenticated token's BEEF and spends each
+outpoint once when creating its replacement. `remove` uses the same selection
+and spends the whole set. Both paths use a PushDrop unlocker for each outpoint,
+with its own source script and satoshis, mapped to the wallet's returned input
+index. The #341/#342 request and signed-result checks, abort behavior and
+`acceptDelayedBroadcast`, `randomizeOutputs`, `noSend` and `sendWith` options
+remain in place. Previously global set requested no token data, removal used
+one token, and both stores supplied empty unlocking scripts.
+
+The global writer now emits the reference's JSON protocol and derives its
+locking key and signature from that protocol and the stored key, so its new
+tokens can be spent by those unlockers. Global mutation lookups send
+`protocolID: [1, namespace]` and exclude tokens outside that authenticated
+namespace. The local store already selected all listed outputs on update and
+removal; it now signs each, and its same-value shortcut applies only when one
+output remains. Two outputs with the same value are collapsed too.
+
+`tests/kvstore_tokens_343.rs` has eleven recording-wallet regressions: two
+current tokens on both stores' set/remove paths, reversed wallet input order,
+merged BEEF, executable signatures with unequal satoshis and nonzero output
+indexes, a single-token control, same-value collapse, namespace/controller and
+signature filtering, repeated lookup outpoints, and the reference writer and
+query shapes. On a scratch copy of `823a798e` with a separate target directory,
+ten tests fail and the unchanged single-token local value passes. The #326,
+#341/#342 and #344 vectors regenerate byte-identically under Node 22.18.0 at
+`ts-stack@edf6e03`; no recorder or vector was changed.
+
+Migration: no public Rust API changes. A same-value local write now spends
+multiple current outputs. Pre-#343 raw-protocol global tokens remain readable,
+but are outside the reference's authenticated mutation namespace; recovery of
+those old identity-key-locked outputs requires their owner's wallet.
+
+### Notes: cross-SDK parity (#343)
+
+This follows `ts-stack@edf6e03` `GlobalKVStore.ts:343-380` (all update inputs,
+merged BEEF and per-outpoint unlockers), `:431-470` (all removal inputs), and
+`LocalKVStore.ts:377-425,456-537,567-594` (all authenticated outputs, and the
+single-output unchanged-value shortcut). Go at `2ca481c` has only a local
+store: `kvstore/local_kv_store.go:284-345,429-497` iterates all listed outpoints
+for both operations and uses their BEEF and PushDrop signers, but its
+same-value shortcut at `:243-245` accepts multiple outputs too. Go has no
+global store. Rust's existing local lookup authentication/pagination and global
+double-spend retry differences are not addressed by this change.
+
+Seven differences from the reference stand in this change, found by its cold
+review and stated here (CLAUDE.md rule 1): the unlocker signs over the source
+output inside the wallet's signable transaction (`token_spends.rs:108-117`),
+where the reference signs over the token's own satoshis and locking script
+(`GlobalKVStore.ts:359-360`, `LocalKVStore.ts:403-404,505-506`); one input per
+outpoint is sent (`token_spends.rs:54`), where the reference sends every lookup
+token, repeats included (`GlobalKVStore.ts:343-347`); the `protocolId` rewrite
+to `protocolID:[1,name]` (`global_actions.rs:190-199`) applies to every global
+lookup, the public `query()` with `with_protocol_id` included, not the mutation
+lookups alone; the local `remove` now takes the key lock (`local.rs:279`), as
+the reference does (`LocalKVStore.ts:569`); the input description and unlocking
+length are now the reference's (74 bytes, `Previous KVStore token` and `KVStore
+token to remove`) where they were 107 and `KV entry input`; `token_lock` calls
+createSignature before getPublicKey and after the lookup, where the reference
+calls getPublicKey (`PushDrop.ts:155`) then createSignature (`:175`), both
+before the lookup (`GlobalKVStore.ts:298` before `:309`); and the controller
+match is exact, where the reference lower-cases both sides
+(`GlobalKVStore.ts:666-668`). The signature request shape (`hashToDirectlySign`
+here, `data: sha256(preimage)` in the reference's `PushDrop.ts:246-248`) is
+crate-wide and older than this change; it and the local lookup pagination gap
+(`LocalKVStore.ts:332-339,574-590`) are filed as follow-ups.
+
+### Fixed: required script flag refusals name the word's missing flag (#434)
+
+`ScriptFlags::check` still requires SIGHASH_FORKID, GENESIS and
+UTXO_AFTER_GENESIS in an explicit word. Its refusal text now describes that
+requirement; the old FORKID reason was stale after #429 enabled the original
+digest for a signature without FORKID in default mode. No verdict changes.
+
+| Missing flag | Old text | New text |
+|---|---|---|
+| SIGHASH_FORKID | `SIGHASH_FORKID is not set: this interpreter computes the BIP-143 sighash only` | `SIGHASH_FORKID is not set: this interpreter requires it in a flag word` |
+| GENESIS | `GENESIS is not set: pre-Genesis block rules are not implemented by this interpreter` | `GENESIS is not set: this interpreter requires it in a flag word` |
+| UTXO_AFTER_GENESIS | `UTXO_AFTER_GENESIS is not set: pre-Genesis UTXO rules are not implemented by this interpreter` | `UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word` |
+
+`Spend::validate` retains its `Invalid verification flags: ` prefix and final
+period. `tests/script_signature_words_417.rs` pins all three refusals on the
+three DER-off witnesses. `tests/support/conformance_forkid_gate_429.rs`, run
+by `conformance_scripts`, now pins default refusal messages beside the
+66 recorded verdicts and checks the refusal text for the 86 recorded words
+that lack FORKID. Both tests are RED with the old check text restored in a
+scratch copy. The `flags.rs` documentation no longer claims BIP143 is the
+only digest; the file remains at its 872-line ceiling.
+
+### Notes: cross-SDK parity (#434)
+
+The restriction to words carrying these three flags remains this crate's
+documented limitation. TypeScript and the node accept some words it refuses;
+this change does not alter their handling. Under a supported word the node's
+STRICTENC implication from SIGHASH_FORKID remains in force (bitcoin-sv
+v1.2.2, `879fc8b`, `interpreter.cpp:2315-2318`). Callers matching error text
+must use the new sentences above. The downstream source scan found no old
+text or refusal-prefix matches in bsv-overlay-cloudflare, rust-message-box,
+bsv-wallet-toolbox-rs or bsv-wallet-cli; bsv-middleware-cloudflare-public and
+rust-chaintracks were absent at their specified paths and remain unverified.
+
+Pinning the census messages exposes one existing wording difference:
+`node.tx-valid.shared.0097` returns Rust's `OP_CHECKMULTISIG requires correct
+encoding for the public key and signature.` where the TypeScript recording
+returns `The signature format is invalid.` Both refusals and their distinct
+messages are now pinned; no interpreter behavior is changed for that row.
+
+### Added: typed wallet faults and stored abort acceptance (#439)
+
+Under the owner's 20.4 (a) word of 2026-10-29 through the keeper, add
+`WalletFaultFamily::{Transport, Service, Storage, Internal}`, `WalletFault`
+and `AbortAcceptance`, with `Error::WalletFault` and `Error::AbortAccepted`.
+The types are available under `error` and at the crate root with `wallet`.
+Hosts can classify faults and select the stored-acceptance recovery hint by
+matching typed data instead of parsing messages.
+
+`WalletFault::new(family, message)` retains the original string:
+`Error::WalletFault(f).to_string() == Error::WalletError(f.message.clone()).to_string()`.
+The legacy `WalletError(String)` and its `wallet error: ` prefix are unchanged.
+`AbortAcceptance::new(reference, class, message)` retains the guard's full
+string and reference refusal class. Its presence affirms stored acceptance;
+optional `txid`, `status` and `accepting_word` carry the context the guard
+knows. The toolbox wraps it as
+`Error::AbortAccepted(Box::new(AbortAcceptance::new(reference, class, message)))`,
+or fills the optional fields before boxing the record. Boxing the variant
+keeps `Error` at its pre-change size (56 bytes on 64-bit targets).
+Both the record and `Error::AbortAccepted` display the guard's string
+exactly, as `WalletRefusal { class, message }` does. This distinguishes the
+status guard's `InvalidParameter` from the shared guard's `InvalidOperation`
+without changing either judgement. It describes a refused abort, not a
+successful abort or a chain proof, and does not cover retirement guards.
+
+An accepted-abort refusal travels on the wire as its class's code and words,
+exactly as the corresponding `WalletRefusal`; the typed record is a Rust-side
+reading, with no new wire fields. Classes with an SDK wire code retain it
+and the message (2 to 8, including `InvalidParameter` at 6). Classes without
+one follow the existing `Wallet operation failed`, code 1 rule, including
+`InvalidOperation`. `WalletFault` frames exactly as `WalletError` does.
+
+No existing producer emits either new variant. The toolbox will supply the
+metadata on its own lane; no wallet, refusal, transport or wire verdict
+changes here. `tests/wallet_fault_439.rs` pins the four families and both
+acceptance guards in five tests: display bytes, typed fields, equality and
+cloning. The same tests do not compile on the base because the types and
+variants do not exist. `tests/wallet_fault_wire_439.rs` checks all twenty
+classes against their legacy frames, all four fault families against
+`WalletError`, and the 64-bit enum size. The frame and size regressions fail
+on the unboxed, pre-fold record. The preceding room-making commit moves
+`WalletRefusalClass` and its impls byte for byte with a re-export at the old
+path; its twenty classes are unchanged.
+
+Migration: additive. Existing matches with a fallback keep working; hosts
+may match the new variants when their toolbox supplies them.
+
+These types are the port's extension beyond the reference, not a parity
+item or a divergence: `ts-stack@edf6e03`'s
+`packages/sdk/src/wallet/WalletError.ts` has a string and a code, with no
+fault family or acceptance record. The string remains the reference's,
+byte for byte. The reference's twenty refusal classes remain its own.
 
 ### Added: the node's per-input script word from chain facts (#440)
 
@@ -390,152 +446,7 @@ crate refuses a pre-Genesis coin. Its zero-valued activation fields make the
 rules active from the start (`heights.go:3-16`); this crate instead follows
 the SV node's refusal of zero. Pre-Genesis interpretation remains unsupported
 here, as described above.
-### Added: typed wallet faults and stored abort acceptance (#439)
 
-Under the owner's 20.4 (a) word of 2026-10-29 through the keeper, add
-`WalletFaultFamily::{Transport, Service, Storage, Internal}`, `WalletFault`
-and `AbortAcceptance`, with `Error::WalletFault` and `Error::AbortAccepted`.
-The types are available under `error` and at the crate root with `wallet`.
-Hosts can classify faults and select the stored-acceptance recovery hint by
-matching typed data instead of parsing messages.
-
-`WalletFault::new(family, message)` retains the original string:
-`Error::WalletFault(f).to_string() == Error::WalletError(f.message.clone()).to_string()`.
-The legacy `WalletError(String)` and its `wallet error: ` prefix are unchanged.
-`AbortAcceptance::new(reference, class, message)` retains the guard's full
-string and reference refusal class. Its presence affirms stored acceptance;
-optional `txid`, `status` and `accepting_word` carry the context the guard
-knows. The toolbox wraps it as
-`Error::AbortAccepted(Box::new(AbortAcceptance::new(reference, class, message)))`,
-or fills the optional fields before boxing the record. Boxing the variant
-keeps `Error` at its pre-change size (56 bytes on 64-bit targets).
-Both the record and `Error::AbortAccepted` display the guard's string
-exactly, as `WalletRefusal { class, message }` does. This distinguishes the
-status guard's `InvalidParameter` from the shared guard's `InvalidOperation`
-without changing either judgement. It describes a refused abort, not a
-successful abort or a chain proof, and does not cover retirement guards.
-
-An accepted-abort refusal travels on the wire as its class's code and words,
-exactly as the corresponding `WalletRefusal`; the typed record is a Rust-side
-reading, with no new wire fields. Classes with an SDK wire code retain it
-and the message (2 to 8, including `InvalidParameter` at 6). Classes without
-one follow the existing `Wallet operation failed`, code 1 rule, including
-`InvalidOperation`. `WalletFault` frames exactly as `WalletError` does.
-
-No existing producer emits either new variant. The toolbox will supply the
-metadata on its own lane; no wallet, refusal, transport or wire verdict
-changes here. `tests/wallet_fault_439.rs` pins the four families and both
-acceptance guards in five tests: display bytes, typed fields, equality and
-cloning. The same tests do not compile on the base because the types and
-variants do not exist. `tests/wallet_fault_wire_439.rs` checks all twenty
-classes against their legacy frames, all four fault families against
-`WalletError`, and the 64-bit enum size. The frame and size regressions fail
-on the unboxed, pre-fold record. The preceding room-making commit moves
-`WalletRefusalClass` and its impls byte for byte with a re-export at the old
-path; its twenty classes are unchanged.
-
-Migration: additive. Existing matches with a fallback keep working; hosts
-may match the new variants when their toolbox supplies them.
-
-These types are the port's extension beyond the reference, not a parity
-item or a divergence: `ts-stack@edf6e03`'s
-`packages/sdk/src/wallet/WalletError.ts` has a string and a code, with no
-fault family or acceptance record. The string remains the reference's,
-byte for byte. The reference's twenty refusal classes remain its own.
-
-### Fixed: bind key-value actions before signing and carry their options (#341, #342)
-
-Both stores now use one owned-data create/sign boundary under `kvstore/bound`.
-The wallet's signable transaction is checked before any signAction: version,
-lock time, unique input outpoints, every requested input and its sequence and
-script, the requested outputs in their configured order, and input/output
-values. Signers are matched by requested outpoint to the returned input index;
-a wallet-added funding input has no token signer. The signed result must retain
-the authorized template and unlocking scripts, and any returned txid must name
-that transaction. The stores return the validated signed result, rather than
-ignoring it and reading a txid from the earlier createAction result. A failure
-after accepting a reference aborts the action best-effort, preserving the first
-error. Previously the stores signed whatever transaction the wallet returned,
-used positional empty spends, ignored the completed transaction, and made none
-of these checks.
-
-Both stores expose `with_accept_delayed_broadcast(bool)` for the reference's
-`acceptDelayedBroadcast` option, and `GlobalKVStore` exposes `with_no_send(bool)`
-for its `noSend` option, named `overlayBroadcast` by the reference. Both default
-to `false` and live in private store configuration; `KVStoreConfig` retains its
-existing fields so exhaustive literals continue to compile. createAction
-also sends `signAndProcess: false`, `returnTXIDOnly: false`, and
-`randomizeOutputs: false` except on local removal. signAction carries that
-same createAction's `acceptDelayedBroadcast`, `noSend` and `sendWith`, alongside
-`returnTXIDOnly: false`; it does not reconstitute them from defaults. Previously
-createAction had no options and signAction sent `returnTXIDOnly: false` alone,
-so a configured broadcast policy could not reach either call.
-
-`tests/kvstore_bound_action_341_342.rs` pins the pre-signing refusals and order,
-the unsigned funding input, signed-template checks, the completed txid, and
-both calls' default options. Its original seven tests are RED on base `bf97cc74`
-in a scratch checkout with a separate target directory. Two further tests pin
-the txid-mismatch refusal (`a_signed_result_naming_another_txid_is_refused_in_the_recorded_words_341`)
-and the missing signed transaction's recorded words, one sign and one abort
-(`a_missing_signed_transaction_is_refused_in_the_recorded_words_341`). Each is
-RED with its check removed or its words altered in an isolated scratch copy.
-`tests/kvstore_options_342.rs`
-pins the setters on new, update and removal paths for both stores and an
-exhaustive config literal against the recorded defaults. That six-field
-literal is RED at compile time on `b3654dba` (`E0063`, missing the two newly
-added fields) and compiles here without a source change.
-The unused-signer refusal is pinned separately by the recording-wallet test
-`an_unused_input_signer_is_refused_in_the_recorded_words_341`, which asserts
-createAction then abortAction, with no signAction; it is also RED with only
-the unused-signer guard removed in a separate scratch copy. The #326 recorder
-is extended with `--bound-actions`: Node v22.18.0 runs the actual reference
-stores with a fake wallet, records both calls' options and sixteen boundary
-refusals in `tests/vectors/kvstore_bound_action_341_342.json`; two recordings are
-byte-identical. Existing mock wallets now build their transactions with this
-crate's writer, and the #326 tests retain their reference-text checks.
-The default recording omits both reference constructor options and remains
-byte-identical to the vector; all global-store operation tests inject a
-resolver that cannot reach a live overlay host.
-Recording resolvers use distinct fake-host keys so the process-wide reputation
-tracker cannot make parallel cases back off each other's lookups.
-After rebasing over #344, the merged recorder retains its default mode and both
-`--bound-actions` and `--kvstore-tags`; all three recordings under Node v22.18.0
-match the committed vectors byte for byte.
-
-Public shape: three additive store setters; no fields added to `KVStoreConfig`.
-`cargo semver-checks --release-type minor --baseline-rev bf97cc74` (0.51.0),
-also run with `--all-features`, reports `202 checks: 202 pass, 58 skip` and
-`no semver update required`.
-Migration: none; additive. Stored data and wallet references are unchanged.
-
-### Notes: cross-SDK parity (#341, #342)
-
-Under the owner's ruling (c), this follows `ts-stack@edf6e03`
-`completeBoundAction.ts:1022-1070` (forced create options, owned snapshot,
-reference validation and request binding), `:1076-1108` (outpoint signer matching
-and the unused-signer refusal), `:1111-1150` (carried options, signed-result
-checks and abort), and its binding/template helpers at `:646-883`.
-`GlobalKVStore.ts:46-56,319-389,473-488` defaults both broadcast flags to false
-and maps `overlayBroadcast` to `noSend`; `LocalKVStore.ts:94,413-425,515-537`
-sends only `acceptDelayedBroadcast`, with output randomization disabled on set.
-The older `ts-sdk@9e3ede6b` sends the store options but has no bound-action
-checks (`GlobalKVStore.ts:198-260,318-350`, `LocalKVStore.ts:260-339`). Go at
-`2ca481c` has only a local store, no broadcast config members, and sends empty
-create options and no sign options (`kvstore/interfaces.go:36-48`,
-`local_kv_store.go:301-345,470-497`).
-
-Rust's owned typed arguments/results exclude the reference's JavaScript
-getters, shared byte storage and mutable prototype intrinsics; these have no
-safe-Rust test input. The recorder pins a changed `Array.prototype.push` being
-refused before signing in the reference's words. Base64 text is decoded by the
-wallet types; re-encoding makes it canonical, with its nonempty/4096-character
-bound enforced here. The empty-script signers and global token collection findings are fixed by
-#343 below the same boundary; its entry records the remaining limitations.
-The untagged-token reader is fixed by #344 below. These are not silently represented as
-parity by the new checks. The reference's output-satoshi ranges, additional
-output authorization and trusted-input-amount extension are not exposed by
-either store and are not added here. Rust errors retain the `KvStoreError`
-variant and its display prefix.
 ### Fixed: Peer nonce claims, certificate-session lookup and validation waits (#362, #363, #364)
 
 `Peer` now claims every accepted message nonce in `SessionManager`: an
@@ -671,6 +582,100 @@ the BRC-103 initial response.` (`:676`) after the timeout. The signature
 half predates this change; the certificate cases come with it, pinned by
 the initial-response tests. The empty `certificates` array the initial
 response may carry is not pinned by a test (#445).
+
+### Fixed: bind key-value actions before signing and carry their options (#341, #342)
+
+Both stores now use one owned-data create/sign boundary under `kvstore/bound`.
+The wallet's signable transaction is checked before any signAction: version,
+lock time, unique input outpoints, every requested input and its sequence and
+script, the requested outputs in their configured order, and input/output
+values. Signers are matched by requested outpoint to the returned input index;
+a wallet-added funding input has no token signer. The signed result must retain
+the authorized template and unlocking scripts, and any returned txid must name
+that transaction. The stores return the validated signed result, rather than
+ignoring it and reading a txid from the earlier createAction result. A failure
+after accepting a reference aborts the action best-effort, preserving the first
+error. Previously the stores signed whatever transaction the wallet returned,
+used positional empty spends, ignored the completed transaction, and made none
+of these checks.
+
+Both stores expose `with_accept_delayed_broadcast(bool)` for the reference's
+`acceptDelayedBroadcast` option, and `GlobalKVStore` exposes `with_no_send(bool)`
+for its `noSend` option, named `overlayBroadcast` by the reference. Both default
+to `false` and live in private store configuration; `KVStoreConfig` retains its
+existing fields so exhaustive literals continue to compile. createAction
+also sends `signAndProcess: false`, `returnTXIDOnly: false`, and
+`randomizeOutputs: false` except on local removal. signAction carries that
+same createAction's `acceptDelayedBroadcast`, `noSend` and `sendWith`, alongside
+`returnTXIDOnly: false`; it does not reconstitute them from defaults. Previously
+createAction had no options and signAction sent `returnTXIDOnly: false` alone,
+so a configured broadcast policy could not reach either call.
+
+`tests/kvstore_bound_action_341_342.rs` pins the pre-signing refusals and order,
+the unsigned funding input, signed-template checks, the completed txid, and
+both calls' default options. Its original seven tests are RED on base `bf97cc74`
+in a scratch checkout with a separate target directory. Two further tests pin
+the txid-mismatch refusal (`a_signed_result_naming_another_txid_is_refused_in_the_recorded_words_341`)
+and the missing signed transaction's recorded words, one sign and one abort
+(`a_missing_signed_transaction_is_refused_in_the_recorded_words_341`). Each is
+RED with its check removed or its words altered in an isolated scratch copy.
+`tests/kvstore_options_342.rs`
+pins the setters on new, update and removal paths for both stores and an
+exhaustive config literal against the recorded defaults. That six-field
+literal is RED at compile time on `b3654dba` (`E0063`, missing the two newly
+added fields) and compiles here without a source change.
+The unused-signer refusal is pinned separately by the recording-wallet test
+`an_unused_input_signer_is_refused_in_the_recorded_words_341`, which asserts
+createAction then abortAction, with no signAction; it is also RED with only
+the unused-signer guard removed in a separate scratch copy. The #326 recorder
+is extended with `--bound-actions`: Node v22.18.0 runs the actual reference
+stores with a fake wallet, records both calls' options and sixteen boundary
+refusals in `tests/vectors/kvstore_bound_action_341_342.json`; two recordings are
+byte-identical. Existing mock wallets now build their transactions with this
+crate's writer, and the #326 tests retain their reference-text checks.
+The default recording omits both reference constructor options and remains
+byte-identical to the vector; all global-store operation tests inject a
+resolver that cannot reach a live overlay host.
+Recording resolvers use distinct fake-host keys so the process-wide reputation
+tracker cannot make parallel cases back off each other's lookups.
+After rebasing over #344, the merged recorder retains its default mode and both
+`--bound-actions` and `--kvstore-tags`; all three recordings under Node v22.18.0
+match the committed vectors byte for byte.
+
+Public shape: three additive store setters; no fields added to `KVStoreConfig`.
+`cargo semver-checks --release-type minor --baseline-rev bf97cc74` (0.51.0),
+also run with `--all-features`, reports `202 checks: 202 pass, 58 skip` and
+`no semver update required`.
+Migration: none; additive. Stored data and wallet references are unchanged.
+
+### Notes: cross-SDK parity (#341, #342)
+
+Under the owner's ruling (c), this follows `ts-stack@edf6e03`
+`completeBoundAction.ts:1022-1070` (forced create options, owned snapshot,
+reference validation and request binding), `:1076-1108` (outpoint signer matching
+and the unused-signer refusal), `:1111-1150` (carried options, signed-result
+checks and abort), and its binding/template helpers at `:646-883`.
+`GlobalKVStore.ts:46-56,319-389,473-488` defaults both broadcast flags to false
+and maps `overlayBroadcast` to `noSend`; `LocalKVStore.ts:94,413-425,515-537`
+sends only `acceptDelayedBroadcast`, with output randomization disabled on set.
+The older `ts-sdk@9e3ede6b` sends the store options but has no bound-action
+checks (`GlobalKVStore.ts:198-260,318-350`, `LocalKVStore.ts:260-339`). Go at
+`2ca481c` has only a local store, no broadcast config members, and sends empty
+create options and no sign options (`kvstore/interfaces.go:36-48`,
+`local_kv_store.go:301-345,470-497`).
+
+Rust's owned typed arguments/results exclude the reference's JavaScript
+getters, shared byte storage and mutable prototype intrinsics; these have no
+safe-Rust test input. The recorder pins a changed `Array.prototype.push` being
+refused before signing in the reference's words. Base64 text is decoded by the
+wallet types; re-encoding makes it canonical, with its nonempty/4096-character
+bound enforced here. The empty-script signers and global token collection findings are fixed by
+#343 below the same boundary; its entry records the remaining limitations.
+The untagged-token reader is fixed by #344 below. These are not silently represented as
+parity by the new checks. The reference's output-satoshi ranges, additional
+output authorization and trusted-input-amount extension are not exposed by
+either store and are not added here. Rust errors retain the `KvStoreError`
+variant and its display prefix.
 
 ### Changed: issue the amended BRC-56 minimal-length HMAC key; name and count the 32-byte-key tag as legacy (#379, PR #389)
 
