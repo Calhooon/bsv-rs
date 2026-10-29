@@ -1,92 +1,13 @@
 //! Incoming Peer messages: nonce claims, certificate authorization and callbacks.
 
 use super::{
-    create_nonce, get_verifiable_certificates, validate_certificates, verify_nonce, AuthMessage,
-    Error, MessageType, Peer, PeerSession, Result, Transport, WalletInterface,
+    validate_certificates, verify_nonce, AuthMessage, Error, MessageType, Peer, PeerSession,
+    Result, Transport, WalletInterface,
 };
 
 impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
-    pub(super) async fn process_initial_request(&self, message: AuthMessage) -> Result<()> {
-        let initial_nonce = message
-            .initial_nonce
-            .as_deref()
-            .filter(|n| !n.is_empty())
-            .ok_or_else(|| {
-                Error::AuthError("Missing required fields in initialRequest message.".into())
-            })?;
-        if !self
-            .session_manager
-            .write()
-            .await
-            .claim_initial_request_nonce(&message.identity_key.to_hex(), initial_nonce)?
-        {
-            return Err(Error::AuthError("Replayed initialRequest nonce.".into()));
-        }
-        let my_identity = self.get_identity_key().await?;
-        let session_nonce = create_nonce(&*self.wallet, None, self.originator.as_deref()).await?;
-        let mut session = PeerSession::with_nonce(session_nonce.clone());
-        session.peer_identity_key = Some(message.identity_key.clone());
-        session.peer_nonce = message.initial_nonce.clone();
-        session.is_authenticated = true;
-        self.set_certificate_requirement(&mut session);
-        session.touch();
-        self.session_manager
-            .write()
-            .await
-            .add_session(session.clone())?;
-        let mut response = AuthMessage::new(MessageType::InitialResponse, my_identity);
-        response.nonce = Some(session_nonce.clone());
-        response.initial_nonce = Some(session_nonce);
-        response.your_nonce = message.initial_nonce.clone();
-        self.sign_message(&mut response, &session).await?;
-        self.transport()?.send(&response).await?;
-        self.answer_initial_certificate_request(&message).await
-    }
-
-    async fn answer_initial_certificate_request(&self, message: &AuthMessage) -> Result<()> {
-        if let Some(req) = message
-            .requested_certificates
-            .as_ref()
-            .filter(|r| !r.is_empty())
-        {
-            let certs = get_verifiable_certificates(
-                &*self.wallet,
-                req,
-                &message.identity_key,
-                self.originator.as_deref(),
-            )
-            .await
-            .unwrap_or_default();
-            if !certs.is_empty() {
-                self.send_certificate_response(&message.identity_key.to_hex(), certs)
-                    .await?;
-            }
-        }
-        Ok(())
-    }
-
-    fn set_certificate_requirement(&self, session: &mut PeerSession) {
-        session.certificates_required = self
-            .certificates_to_request
-            .as_ref()
-            .is_some_and(|req| !req.certifiers.is_empty());
-        session.certificates_validated = !session.certificates_required;
-    }
-
-    pub(super) async fn process_initial_response(&self, message: AuthMessage) -> Result<()> {
-        let our_nonce = message.your_nonce.clone().unwrap_or_default();
-        let result = self
-            .authenticate_initial_response(&message, &our_nonce)
-            .await;
-        let mut pending = self.pending_handshakes.write().await;
-        if let Some(tx) = pending.remove(&our_nonce) {
-            let _ = tx.send(result.clone());
-        }
-        result.map(|_| ())
-    }
-
     /// Authenticate, then claim initialNonce before changing the session (Peer.ts:886-956).
-    async fn authenticate_initial_response(
+    pub(super) async fn authenticate_initial_response(
         &self,
         message: &AuthMessage,
         our_nonce: &str,

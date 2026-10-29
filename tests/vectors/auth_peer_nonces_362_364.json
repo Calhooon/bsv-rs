@@ -85,6 +85,72 @@
     {
       "id": "validation_timeout",
       "error": "Timeout waiting for certificate validation from peer 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    {
+      "id": "initial_responder_policy",
+      "response_fields": [
+        "version",
+        "messageType",
+        "identityKey",
+        "initialNonce",
+        "yourNonce",
+        "requestedCertificates",
+        "signature"
+      ],
+      "requested": {
+        "certifiers": [
+          "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+        ],
+        "types": {
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=": [
+            "name"
+          ]
+        }
+      },
+      "answer_type": "certificateResponse",
+      "delivered": 1,
+      "ready": true
+    },
+    {
+      "id": "initial_initiator_policy",
+      "response_fields": [
+        "version",
+        "messageType",
+        "identityKey",
+        "initialNonce",
+        "yourNonce",
+        "certificates",
+        "requestedCertificates",
+        "signature"
+      ],
+      "certificate_count": 1,
+      "ready": true,
+      "delivered": 1
+    },
+    {
+      "id": "initial_response_unrequested_certifier",
+      "error": "Certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= has an unrequested certifier: 03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+    },
+    {
+      "id": "initial_response_unrequested_type",
+      "error": "Certificate with type AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM= was not requested"
+    },
+    {
+      "id": "initial_response_unrequested_field",
+      "error": "Certificate AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= did not reveal a non-empty requested field set"
+    },
+    {
+      "id": "initial_response_listener_order",
+      "events": [
+        "validated",
+        "requested"
+      ],
+      "automatic_answers": 0
+    },
+    {
+      "id": "initial_response_listener_error",
+      "error": "initial certificate listener failed",
+      "automatic_answers": 0
     }
   ],
   "store": {

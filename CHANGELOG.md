@@ -132,7 +132,22 @@ releases the waiters; an unmet requirement fails after the reference's
 30-second deadline in its words (`Peer.ts:286-329,1227-1249,1318-1325`).
 Certificate requirements come from this peer's own policy on either side
 of the handshake, and an empty certificate response cannot authorize it.
-Incoming handlers and the wait live in new files; `peer.rs` shrinks.
+The responder now puts its matching certificates and its own certificate
+request in the initial response (`Peer.ts:832-851,865-874`), instead of
+sending its certificates separately and leaving its policy unannounced.
+The response has `initialNonce` and `yourNonce`, no `nonce`, and signs only
+the two decoded session nonces (`:854-863`). An initial-request listener
+owns certificate selection; otherwise the wallet supplies the proofs
+before the response is signed, and wallet errors propagate.
+
+The initiator authenticates the response, validates its nonempty
+certificates against its own policy, marks that exact session ready and
+releases certificate waiters before notifying certificate listeners
+(`Peer.ts:957-990`). It then releases handshake waiters and answers the
+responder's request, through a listener or matching wallet certificates;
+an empty automatic answer is omitted (`:999-1035`). Unrequested certifiers,
+types and disclosed fields are refused in the reference's words. Incoming
+handlers and the wait live in new files; `peer.rs` shrinks.
 
 `tests/auth_peer_nonces_362_364.rs` pins #362 with five replay tests plus
 concurrent delivery and a rejected signature followed by acceptance;
@@ -143,9 +158,15 @@ held inside real field decryption, and the timeout. Four unit tests in
 `session_nonces_tests.rs` pin capacity, expiry, eviction and removal.
 The integration witnesses are RED on scratch base `1010d4de`, with their
 own target directory. `tests/support/auth_peer_nonces_362_364.mjs` records
-19 Peer cases and eight store results from the clone's unmodified
+26 Peer cases and eight store results from the clone's unmodified
 `edf6e03` source, bundled with Bun and executed by Node v22.18.0; the
-checked-in JSON is the recorder's output. Rust builds its own signed
+checked-in JSON is the recorder's output. The initial-response fold adds
+seven recorded outcomes without changing the original 19 cases or store
+results. Six tests in `auth_peer_initial_response_certificates_362_364.rs`
+are RED on scratch `8bfceae5`: bidirectional delivery with certificates
+in the handshake, unrequested certifier/type/field refusals, validation
+before the request listener, listener-owned selection, and listener errors
+stopping the answer. Rust builds its own signed
 messages and encrypted certificates rather than importing nonces whose
 wallet derivation differs between SDKs. The existing #294 valid-policy
 receiver witness likewise remakes its nonce and signature while retaining
@@ -192,7 +213,9 @@ prior lifetime/admission policy (the 30-minute signed-claim expiry is
 checked at claim time), and the initial responder still marks transport
 authentication immediately. This change does not add the newer reference's
 per-session certificate-policy snapshots or dynamic-request policy matching,
-or its automatic answer to a certificate-request listener's absence.
+or its automatic answer to a post-handshake certificateRequest when no
+listener is registered. Initial requests and responses do perform the
+reference's automatic certificate selection and response.
 The certificate-response raw-text signature preimage remains #280's
 stated difference; #426's parsed certificate-request preimage is preserved.
 The recorder calls the reference's certificate handlers directly because

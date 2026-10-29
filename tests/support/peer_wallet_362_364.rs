@@ -1,6 +1,7 @@
 //! A real ProtoWallet with explicit test-only verification behavior.
 use async_trait::async_trait;
-use bsv_rs::primitives::PrivateKey;
+use bsv_rs::auth::MasterCertificate;
+use bsv_rs::primitives::{PrivateKey, PublicKey};
 use bsv_rs::wallet::*;
 use bsv_rs::{Error, Result};
 
@@ -31,6 +32,7 @@ pub struct TestWallet {
     pub answering: bool,
     pub failure: Option<Error>,
     pub gate: Arc<Gate>,
+    pub certificates: Vec<MasterCertificate>,
 }
 
 impl TestWallet {
@@ -40,6 +42,7 @@ impl TestWallet {
             answering,
             failure: None,
             gate: Arc::default(),
+            certificates: Vec::new(),
         }
     }
 }
@@ -58,6 +61,46 @@ macro_rules! forward {
                     self.gate.release.acquire().await.unwrap().forget();
                 }
                 WalletInterface::decrypt(&self.inner, args, o).await
+            }
+            async fn list_certificates(
+                &self,
+                args: ListCertificatesArgs,
+                _: Option<&str>,
+            ) -> Result<ListCertificatesResult> {
+                let certificates: Vec<_> = self.certificates.iter().filter(|master| {
+                    args.certifiers.contains(&master.certificate.certifier.to_hex())
+                        && args.types.contains(&master.certificate.type_base64())
+                }).map(|master| CertificateResult {
+                    certificate: serde_json::from_value(
+                        serde_json::to_value(&master.certificate).unwrap()
+                    ).unwrap(),
+                    keyring: None,
+                    verifier: None,
+                }).collect();
+                Ok(ListCertificatesResult {
+                    total_certificates: certificates.len() as u32,
+                    certificates,
+                })
+            }
+            async fn prove_certificate(
+                &self,
+                args: ProveCertificateArgs,
+                o: Option<&str>,
+            ) -> Result<ProveCertificateResult> {
+                let master = self.certificates.iter().find(|master| {
+                    master.certificate.serial_number_base64() == args.certificate.serial_number
+                }).unwrap();
+                let keyring = MasterCertificate::create_keyring_for_verifier(
+                    &self.inner, &master.certificate.certifier,
+                    &PublicKey::from_hex(&args.verifier)?, &master.certificate.fields,
+                    &args.fields_to_reveal, &master.master_keyring,
+                    &master.certificate.serial_number, None, None, o,
+                ).await?;
+                Ok(ProveCertificateResult {
+                    keyring_for_verifier: keyring,
+                    certificate: None,
+                    verifier: Some(args.verifier),
+                })
             }
             async fn verify_signature(
                 &self,
@@ -108,8 +151,6 @@ forward! {
     (list_outputs, ListOutputsArgs, ListOutputsResult),
     (relinquish_output, RelinquishOutputArgs, RelinquishOutputResult),
     (acquire_certificate, AcquireCertificateArgs, WalletCertificate),
-    (list_certificates, ListCertificatesArgs, ListCertificatesResult),
-    (prove_certificate, ProveCertificateArgs, ProveCertificateResult),
     (relinquish_certificate, RelinquishCertificateArgs, RelinquishCertificateResult),
     (discover_by_identity_key, DiscoverByIdentityKeyArgs, DiscoverCertificatesResult),
     (discover_by_attributes, DiscoverByAttributesArgs, DiscoverCertificatesResult),

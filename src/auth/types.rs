@@ -115,10 +115,10 @@ pub struct AuthMessage {
     /// Recipient's nonce from previous message.
     pub your_nonce: Option<String>,
 
-    /// Attached certificates (for CertificateResponse).
+    /// Attached certificates (for InitialResponse and CertificateResponse).
     pub certificates: Option<Vec<crate::auth::certificates::VerifiableCertificate>>,
 
-    /// Requested certificate specifications (for InitialRequest, CertificateRequest).
+    /// Requested certificate specifications (for handshakes and CertificateRequest).
     pub requested_certificates: Option<RequestedCertificateSet>,
 
     /// Message payload (for General messages).
