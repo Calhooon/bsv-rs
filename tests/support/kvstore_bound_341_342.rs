@@ -159,6 +159,21 @@ pub fn vector() -> serde_json::Value {
     serde_json::from_str(include_str!("../vectors/kvstore_bound_action_341_342.json")).unwrap()
 }
 
+// #470 adds local action context around the same bound-action refusal.
+pub fn inner_bound_error(error: bsv_rs::Error) -> bsv_rs::Error {
+    match error {
+        bsv_rs::Error::KvStoreLocalError(message) => bsv_rs::Error::KvStoreError(
+            message
+                .strip_prefix(
+                    "There are 1 outputs with tag alpha that cannot be unlocked. Original error: ",
+                )
+                .expect("the local action wrapper")
+                .into(),
+        ),
+        error => error,
+    }
+}
+
 pub fn assert_options(wallet: &Counting, global: bool, operation: &str, mode: &str) {
     let fixture = vector();
     let kind = if global { "global" } else { "local" };

@@ -69,6 +69,8 @@ const {
   Script, Transaction, Beef, Utils, PushDrop, TopicBroadcaster, WERR_REVIEW_ACTIONS, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
 } = await import(pathToFileURL(sdkPath).href)
 
+const emit = text => new Promise(resolve => process.stdout.write(text + '\n', resolve))
+
 const REFERENCE = Utils.toBase64(new Array(8).fill(0x52))
 
 // A transaction paying `outputs` from one made-up input: a token's source.
@@ -91,7 +93,10 @@ const recording = (state) => {
   const wallet = {}
   for (const name of ['getPublicKey', 'createSignature', 'verifySignature', 'createHmac',
     'verifyHmac', 'encrypt', 'decrypt']) {
-    wallet[name] = async (args) => inner[name](args)
+    wallet[name] = async (args) => {
+      if (name === 'createSignature') state.createSignature.push(structuredClone(args))
+      return inner[name](args)
+    }
   }
   wallet.listOutputs = async () => state.listed ?? { totalOutputs: 0, outputs: [] }
   wallet.createAction = async (args) => {
@@ -152,6 +157,7 @@ const record = (state, stopped) => {
   const outputs = (create.outputs ?? []).map((o) => ({ satoshis: o.satoshis, lockingScript: o.lockingScript }))
   return {
     stopped,
+    create_signature_json: state.createSignature.splice(0).map(args => JSON.stringify(args)),
     sign_action: sign,
     sign_action_json: JSON.stringify(sign),
     sign_action_members: Object.keys(sign),
@@ -173,12 +179,22 @@ const stop = async (f) => {
   throw new Error('the client did not stop')
 }
 
-const fresh = () => ({ createAction: [], signAction: [], abortAction: [], sources: {} })
+const fresh = () => ({ createAction: [], signAction: [], abortAction: [], createSignature: [], sources: {} })
+
+if (process.argv.includes('--kvstore-local-454')) {
+  const { recordLocal454 } = await import('./kvstore_local_454.mjs')
+  await emit(JSON.stringify(await recordLocal454({
+    recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
+    LookupResolver, Transaction, Beef, Script, Utils,
+    resetCounter () { counter = 0 }
+  }), null, 2))
+  process.exit(0)
+}
 
 // #340 records the reference retry sequence, and the pinned local store's absence of retry.
 if (process.argv.includes('--double-spend-retry')) {
   const { recordDoubleSpendRetry } = await import('./double_spend_retry_340.mjs')
-  console.log(JSON.stringify(await recordDoubleSpendRetry({
+  await emit(JSON.stringify(await recordDoubleSpendRetry({
     recording, fresh, record, stop, sourceOf, LookupResolver, TopicBroadcaster,
     LocalKVStore, GlobalKVStore, Transaction, Beef, Script, Utils, WERR_REVIEW_ACTIONS,
     resetCounter () { counter = 0 }
@@ -246,7 +262,7 @@ if (process.argv.includes('--kvstore-tags')) {
     )
     await observe(name, script, 'PushDrop.lock')
   }
-  console.log(JSON.stringify({
+  await emit(JSON.stringify({
     description: '#344: public KVStore tag presence, bounds and refusal order; actual SDK writer output',
     reference: 'ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9, built from git archive with bun; Node ' + process.version,
     site: 'kvStoreTokenValidation.ts:58-74,88-118; kvStoreInterpreter.ts:33-50; GlobalKVStore.ts:279-304,627-659',
@@ -267,7 +283,7 @@ const tokenOf = (state, run) => {
 // #341/#342 extend the same recorder, keeping the #326 recording unchanged.
 if (process.argv.includes('--bound-actions')) {
   const { recordBoundActions } = await import('./bound_action_reference_341_342.mjs')
-  console.log(JSON.stringify(await recordBoundActions({
+  await emit(JSON.stringify(await recordBoundActions({
     recording, fresh, record, stop, tokenOf, sourceOf, LookupResolver,
     LocalKVStore, GlobalKVStore, Transaction, Script, Utils, completeBoundAction
   }), null, 2))
@@ -344,7 +360,7 @@ const local = {}
   local.remove = record(state, await stop(() => store.remove('alpha')))
 }
 
-console.log(JSON.stringify({
+await emit(JSON.stringify({
   description: 'the signAction arguments the reference\'s ContactsManager (updating and removing a contact) and its GlobalKVStore and LocalKVStore (through completeBoundAction: a set with no token, an update, a removal) send their wallet: the reference as createAction answered it, its base64 text; the contacts manager no options; the stores { acceptDelayedBroadcast, returnTXIDOnly: false, noSend, sendWith } carried from the createAction (#326)',
   reference: '@bsv/sdk at ts-stack@edf6e03 (bundled with bun build, an entry re-exporting mod.ts and ContactsManager as ContactsManager326), run under Node ' + process.version + ' by tests/support/signaction_reference_326.mjs',
   site: 'ts-stack@edf6e03 packages/sdk/src/identity/ContactsManager.ts:776-834,941-1001; packages/sdk/src/wallet/completeBoundAction.ts:1022-1032,1111-1120; packages/sdk/src/kvstore/GlobalKVStore.ts:319-389,473-488; packages/sdk/src/kvstore/LocalKVStore.ts:413-425,515-537',

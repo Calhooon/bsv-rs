@@ -182,7 +182,9 @@ impl WalletInterface for MockWallet {
         Ok(CreateSignatureResult {
             signature: self
                 .private_key
-                .sign(&args.hash_to_directly_sign.unwrap_or([0; 32]))?
+                .sign(&args.hash_to_directly_sign.unwrap_or_else(|| {
+                    bsv_rs::primitives::sha256(args.data.as_deref().unwrap_or_default())
+                }))?
                 .to_der(),
         })
     }
@@ -273,7 +275,14 @@ impl WalletInterface for MockWallet {
         args: SignActionArgs,
         _originator: Option<&str>,
     ) -> Result<SignActionResult> {
-        Ok(self.actions.sign(args))
+        let previous = self.actions.pending_id();
+        let result = self.actions.sign(args);
+        for output in self.outputs.lock().unwrap().iter_mut() {
+            if output.txid == previous {
+                output.txid = result.txid.unwrap();
+            }
+        }
+        Ok(result)
     }
 
     async fn abort_action(
@@ -330,6 +339,7 @@ impl WalletInterface for MockWallet {
             })
             .collect();
 
+        let total = matching.len() as u32;
         // Apply limit
         let limited: Vec<&MockOutput> = if let Some(limit) = args.limit {
             matching.into_iter().take(limit as usize).collect()
@@ -350,11 +360,11 @@ impl WalletInterface for MockWallet {
             })
             .collect();
 
-        let total = wallet_outputs.len() as u32;
+        let beef = self.actions.beef(limited.iter().map(|o| to_hex(&o.txid)));
         Ok(ListOutputsResult {
             outputs: wallet_outputs,
             total_outputs: total,
-            beef: None,
+            beef: Some(beef),
         })
     }
 
@@ -1148,7 +1158,7 @@ async fn test_local_kvstore_get_wallet_error() {
 
     let result = store.get("key", "default").await;
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    assert!(matches!(result.unwrap_err(), Error::KvStoreLocalError(_)));
 }
 
 #[tokio::test]
@@ -1215,7 +1225,7 @@ async fn test_local_kvstore_set_wallet_error() {
 
     let result = store.set("key", "value", None).await;
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    assert!(matches!(result.unwrap_err(), Error::KvStoreLocalError(_)));
 }
 
 #[tokio::test]
@@ -1595,7 +1605,7 @@ async fn test_local_batch_set_wallet_error() {
     let entries = vec![("key1", "value1"), ("key2", "value2")];
     let result = store.batch_set(&entries).await;
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    assert!(matches!(result.unwrap_err(), Error::KvStoreLocalError(_)));
 }
 
 #[tokio::test]

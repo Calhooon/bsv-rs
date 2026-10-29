@@ -510,63 +510,8 @@ pub(crate) fn decode_value_with_ttl(stored: &str) -> (String, bool) {
 // Internal Types
 // =============================================================================
 
-/// Internal result from looking up a value in LocalKVStore.
-#[derive(Debug, Clone)]
-pub(crate) struct LookupValueResult {
-    /// The decrypted/raw value.
-    pub value: String,
-    /// Outpoints for all outputs holding this key.
-    pub outpoints: Vec<String>,
-    /// Input BEEF data for spending.
-    pub input_beef: Option<Vec<u8>>,
-    /// The list outputs result.
-    pub outputs: Vec<WalletOutput>,
-    /// Whether the value exists.
-    pub value_exists: bool,
-}
-
-impl LookupValueResult {
-    /// Creates a result indicating the value doesn't exist.
-    pub fn not_found(default_value: String) -> Self {
-        Self {
-            value: default_value,
-            outpoints: Vec::new(),
-            input_beef: None,
-            outputs: Vec::new(),
-            value_exists: false,
-        }
-    }
-
-    /// Creates a result with a found value.
-    pub fn found(
-        value: String,
-        outpoints: Vec<String>,
-        input_beef: Option<Vec<u8>>,
-        outputs: Vec<WalletOutput>,
-    ) -> Self {
-        Self {
-            value,
-            outpoints,
-            input_beef,
-            outputs,
-            value_exists: true,
-        }
-    }
-}
-
-/// Simplified wallet output for internal use.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub(crate) struct WalletOutput {
-    /// Outpoint string (txid.vout).
-    pub outpoint: String,
-    /// Satoshi value.
-    pub satoshis: u64,
-    /// Locking script (raw bytes).
-    pub locking_script: Vec<u8>,
-    /// Tags associated with the output.
-    pub tags: Vec<String>,
-}
+#[cfg(test)]
+use super::local::lookup::LookupValueResult;
 
 // =============================================================================
 // PushDrop Token Fields

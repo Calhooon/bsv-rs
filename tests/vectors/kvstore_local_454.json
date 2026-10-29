@@ -1,0 +1,323 @@
+{
+  "reference": "ts-stack@edf6e03; Node v22.18.0",
+  "description": "#454: two live tokens, exact merged BEEF, requests and unlocking scripts",
+  "signable_reference": "UlJSUlJSUlI=",
+  "runs": [
+    {
+      "kind": "local",
+      "operation": "set",
+      "sources": [
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0102000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000"
+      ],
+      "create_action_inputs": [
+        {
+          "outpoint": "627d1f49adc11a7197c84023ac4315d21c73cfc75da82b85cbc31817064b654f.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "Previous key-value token"
+        },
+        {
+          "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "Previous key-value token"
+        }
+      ],
+      "input_beef": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0102000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d00000000",
+      "stopped": "There are 2 outputs with tag alpha that cannot be unlocked. Original error: Wallet signed transaction must be a bounded non-empty byte array",
+      "create_signature_json": [
+        "{\"data\":[116,119,111],\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}",
+        "{\"data\":[107,104,212,152,237,208,66,202,5,71,95,188,84,32,141,101,30,130,232,41,76,64,50,118,133,250,219,118,202,27,210,22],\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}",
+        "{\"data\":[96,119,121,254,48,229,35,87,203,83,239,185,21,30,221,237,191,38,175,215,206,149,202,207,55,241,190,140,152,74,36,147],\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}"
+      ],
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "483045022100e3f4563e963586ea2bbe89a58405805ff7456a40ebaeb170d6aca2614c1cb529022049ef308dc568a2fb4da6913fa02079d613bf8d632ca9da9f8c32ab1f4db2fe1141"
+          },
+          "1": {
+            "unlockingScript": "4730440220365bb57e2373a1c35d2df75709bcb9de22bb4579682c6b621d77eef1e4e51a7602207236fe943d5af93c2be7caaaec3c17114f0a5472815d40ed950cdb4b9523dd4541"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"483045022100e3f4563e963586ea2bbe89a58405805ff7456a40ebaeb170d6aca2614c1cb529022049ef308dc568a2fb4da6913fa02079d613bf8d632ca9da9f8c32ab1f4db2fe1141\"},\"1\":{\"unlockingScript\":\"4730440220365bb57e2373a1c35d2df75709bcb9de22bb4579682c6b621d77eef1e4e51a7602207236fe943d5af93c2be7caaaec3c17114f0a5472815d40ed950cdb4b9523dd4541\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0",
+        "1"
+      ],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "kind": "local",
+      "operation": "remove",
+      "sources": [
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0102000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000"
+      ],
+      "create_action_inputs": [
+        {
+          "outpoint": "627d1f49adc11a7197c84023ac4315d21c73cfc75da82b85cbc31817064b654f.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "Previous key-value token"
+        },
+        {
+          "outpoint": "e9e52fed91f9694c770643b909cb8af86d1777047b15d3a7c56b9da2c5f663ea.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "Previous key-value token"
+        }
+      ],
+      "input_beef": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0102000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0103000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d00000000",
+      "stopped": "There are 2 outputs with tag alpha that cannot be unlocked. Original error: Wallet signed transaction must be a bounded non-empty byte array",
+      "create_signature_json": [
+        "{\"data\":[121,176,71,35,191,71,132,204,194,77,199,90,179,84,51,128,43,188,98,204,72,225,120,30,220,202,236,169,83,118,147,206],\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}",
+        "{\"data\":[202,27,244,44,103,124,136,111,208,155,248,92,232,229,19,80,108,144,113,116,88,11,104,59,11,180,175,123,187,56,246,6],\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}"
+      ],
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "473044022013ceb70cdafed11a48c6387e9239dd98e2d13db0c4d79c9d4a106d3ea81f747e02205e995d418988a97db2b5897476327fdaecfe4fd6dfc329c389eef9ffae128a6b41"
+          },
+          "1": {
+            "unlockingScript": "4730440220160d21a4bb745cd100c59b3d0e115e0e9f3aeaa87f07e7e5d440628f1499a36302207a1cf96eb9967ea47980ea0bdf30e19e084ab035275e18c8bc2a956aa7c0f49e41"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"473044022013ceb70cdafed11a48c6387e9239dd98e2d13db0c4d79c9d4a106d3ea81f747e02205e995d418988a97db2b5897476327fdaecfe4fd6dfc329c389eef9ffae128a6b41\"},\"1\":{\"unlockingScript\":\"4730440220160d21a4bb745cd100c59b3d0e115e0e9f3aeaa87f07e7e5d440628f1499a36302207a1cf96eb9967ea47980ea0bdf30e19e084ab035275e18c8bc2a956aa7c0f49e41\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0",
+        "1"
+      ],
+      "create_action_outputs": [],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "kind": "global",
+      "operation": "set",
+      "sources": [
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010200000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000"
+      ],
+      "create_action_inputs": [
+        {
+          "outpoint": "851a99ff904b288e652357281ea98b4c2124697b67219d485084ebe14b2eee26.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "Previous KVStore token"
+        },
+        {
+          "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "Previous KVStore token"
+        }
+      ],
+      "input_beef": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010200000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+      "stopped": "Wallet signed transaction must be a bounded non-empty byte array",
+      "create_signature_json": [
+        "{\"data\":[91,49,44,34,107,118,115,116,111,114,101,34,93,97,108,112,104,97,116,119,111,3,172,212,132,226,240,199,246,83,9,173,23,138,159,85,154,189,224,151,150,151,76,87,231,20,195,95,17,13,252,39,204,190],\"protocolID\":[1,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"anyone\"}",
+        "{\"data\":[95,71,176,171,168,219,130,213,63,137,220,203,230,131,221,85,240,119,34,181,183,100,192,65,14,254,11,80,253,94,252,251],\"protocolID\":[1,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"anyone\"}",
+        "{\"data\":[226,201,167,223,79,252,55,138,170,224,124,202,28,71,189,220,166,132,189,249,51,20,163,171,175,224,75,27,130,243,47,52],\"protocolID\":[1,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"anyone\"}"
+      ],
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "483045022100c6041ae400d7c8fd4e0093b5ee0fb63ecac44477a92f7040934cd8bc703d19e102207e92adc336f613535ff418a18eef3fba95f2e6fa59f283993926a1980ca92da141"
+          },
+          "1": {
+            "unlockingScript": "47304402203e63c41dec276d7a30f4cfdc2424875665d87b65458bf2f75342e9d90d008f0e02200e59c88bfad587ed8731f4af405272a7a19358ea7deb11e8cf4a86467c4b146041"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false,
+          "noSend": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"483045022100c6041ae400d7c8fd4e0093b5ee0fb63ecac44477a92f7040934cd8bc703d19e102207e92adc336f613535ff418a18eef3fba95f2e6fa59f283993926a1980ca92da141\"},\"1\":{\"unlockingScript\":\"47304402203e63c41dec276d7a30f4cfdc2424875665d87b65458bf2f75342e9d90d008f0e02200e59c88bfad587ed8731f4af405272a7a19358ea7deb11e8cf4a86467c4b146041\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false,\"noSend\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0",
+        "1"
+      ],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "noSend": false,
+        "randomizeOutputs": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "noSend",
+        "randomizeOutputs",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    {
+      "kind": "global",
+      "operation": "remove",
+      "sources": [
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010200000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000",
+        "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d750000000000"
+      ],
+      "create_action_inputs": [
+        {
+          "outpoint": "851a99ff904b288e652357281ea98b4c2124697b67219d485084ebe14b2eee26.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "KVStore token to remove"
+        },
+        {
+          "outpoint": "bdfbe6b81f5795ca9c197295d8ff139da7c22ea24d9f833c12391a430d84d72c.0",
+          "unlockingScriptLength": 74,
+          "inputDescription": "KVStore token to remove"
+        }
+      ],
+      "input_beef": "0200beef00020001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010200000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75000000000001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010300000000000000a721033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d7500000000",
+      "stopped": "Wallet signed transaction must be a bounded non-empty byte array",
+      "create_signature_json": [
+        "{\"data\":[47,225,149,76,55,149,225,215,16,71,232,130,42,184,64,159,58,105,100,101,209,23,101,58,69,135,133,40,38,225,24,142],\"protocolID\":[1,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"anyone\"}",
+        "{\"data\":[22,105,71,253,19,207,50,81,101,94,169,157,69,184,159,215,0,155,67,212,161,30,77,41,239,154,106,167,134,196,8,90],\"protocolID\":[1,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"anyone\"}"
+      ],
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "4730440220273d41f4313350bf643d854b9497687b5f8f662efbe194c02d86f7285395e56e022000dada9b71dd514ad9574b7cbc550e54793ff24a01313f9ffdccd788511debf841"
+          },
+          "1": {
+            "unlockingScript": "47304402206621619df098d1bfa5401d3f81c6f0f26fa1b8cb17470d34452cd2895b62258d02200faed8f00270b421d85befbc4205e0e26867df84b14dcac891f469159d41db1141"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false,
+          "noSend": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"4730440220273d41f4313350bf643d854b9497687b5f8f662efbe194c02d86f7285395e56e022000dada9b71dd514ad9574b7cbc550e54793ff24a01313f9ffdccd788511debf841\"},\"1\":{\"unlockingScript\":\"47304402206621619df098d1bfa5401d3f81c6f0f26fa1b8cb17470d34452cd2895b62258d02200faed8f00270b421d85befbc4205e0e26867df84b14dcac891f469159d41db1141\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false,\"noSend\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0",
+        "1"
+      ],
+      "create_action_outputs": [],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false,
+        "noSend": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs",
+        "noSend",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    }
+  ]
+}

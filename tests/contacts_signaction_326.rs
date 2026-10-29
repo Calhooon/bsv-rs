@@ -22,7 +22,9 @@ mod signaction_reference_326;
 use bsv_rs::identity::{Contact, ContactsManager, ContactsManagerConfig};
 use bsv_rs::wallet::{ListOutputsResult, Outpoint, WalletOutput};
 use identity_reveal_wallet::Counting;
-use signaction_reference_326::{assert_reference_sign, source_of, vector};
+use signaction_reference_326::{
+    assert_reference_sign_metadata as assert_reference_sign, source_of, vector,
+};
 
 fn contact(name: &str) -> Contact {
     Contact {
@@ -70,6 +72,13 @@ async fn the_contact_update_signs_with_the_reference_text_and_no_options() {
     let (manager, wallet) = manager_with_listed_contact().await;
     manager.add_contact(contact("Bob Updated")).await.unwrap();
     let signed = wallet.signed.lock().unwrap().clone().unwrap();
+    let requests = wallet.signature_args.lock().unwrap();
+    assert!(
+        requests.last().unwrap().hash_to_directly_sign.is_none(),
+        "#454: PushDrop sends data"
+    );
+    assert_eq!(requests.last().unwrap().data.as_ref().unwrap().len(), 32);
+    drop(requests);
     let created = wallet.created.lock().unwrap().clone().unwrap();
     assert_reference_sign(
         "contacts update",
@@ -87,6 +96,13 @@ async fn the_contact_removal_signs_with_the_reference_text_and_no_options() {
         .await
         .unwrap_err();
     let signed = wallet.signed.lock().unwrap().clone().unwrap();
+    let requests = wallet.signature_args.lock().unwrap();
+    assert!(
+        requests.last().unwrap().hash_to_directly_sign.is_none(),
+        "#454: PushDrop sends data"
+    );
+    assert_eq!(requests.last().unwrap().data.as_ref().unwrap().len(), 32);
+    drop(requests);
     let created = wallet.created.lock().unwrap().clone().unwrap();
     assert_reference_sign(
         "contacts remove",

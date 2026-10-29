@@ -10,6 +10,19 @@ use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::{CreateActionOptions, SignActionArgs};
 use serde_json::{json, Map, Value};
 
+pub fn signature_requests(args: &[bsv_rs::wallet::CreateSignatureArgs]) -> Value {
+    Value::Array(args.iter().map(|a| {
+        let mut request = json!({
+            "protocolID": [a.protocol_id.security_level as u8, a.protocol_id.protocol_name],
+            "keyID": a.key_id,
+            "counterparty": match a.counterparty.as_ref().unwrap() { bsv_rs::wallet::Counterparty::Self_ => "self".into(), bsv_rs::wallet::Counterparty::Anyone => "anyone".into(), bsv_rs::wallet::Counterparty::Other(key) => key.to_hex() },
+        });
+        if let Some(data) = &a.data { request["data"] = json!(data); }
+        if let Some(hash) = a.hash_to_directly_sign { request["hashToDirectlySign"] = json!(hash); }
+        request
+    }).collect())
+}
+
 pub fn vector() -> Value {
     let text = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -56,7 +69,7 @@ fn sorted_keys(v: &Value) -> Vec<String> {
 /// the text the wallet answered, the members and the spend indexes the
 /// reference's, each spend's unlocking script aside; the options the
 /// reference's rule applied to each side's own createAction.
-pub fn assert_reference_sign(
+pub fn assert_reference_sign_metadata(
     name: &str,
     case: &Value,
     ours: &SignActionArgs,
@@ -136,4 +149,19 @@ pub fn assert_reference_sign(
             assert_eq!(mine, theirs, "{name}: member by member, the options aside");
         }
     }
+}
+
+/// Compare signatures as well when both wallets spend the recorded transaction.
+pub fn assert_reference_sign(
+    name: &str,
+    case: &Value,
+    ours: &SignActionArgs,
+    create: Option<&CreateActionOptions>,
+) {
+    assert_eq!(
+        serde_json::to_value(&ours.spends).unwrap(),
+        case["sign_action"]["spends"],
+        "{name}: unlocking scripts byte for byte"
+    );
+    assert_reference_sign_metadata(name, case, ours, create);
 }

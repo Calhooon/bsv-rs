@@ -25,6 +25,7 @@ async fn the_wallet_answer_is_bound_before_either_store_signs_341() {
             *wallet.create_mode.lock().unwrap() = mode;
             // Both removals request the token and bind it before signing.
             let error = store.remove().await.unwrap_err();
+            let error = support::inner_bound_error(error);
             assert_eq!(
                 error,
                 bsv_rs::Error::KvStoreError(
@@ -49,6 +50,7 @@ async fn the_local_output_is_bound_before_signing_341() {
     let (store, wallet) = setup(false, KVStoreConfig::default()).await;
     *wallet.create_mode.lock().unwrap() = "output";
     let error = store.set("two").await.unwrap_err();
+    let error = support::inner_bound_error(error);
     assert_eq!(
         error,
         bsv_rs::Error::KvStoreError(
@@ -92,6 +94,7 @@ async fn the_signed_result_is_checked_against_the_owned_template_341() {
         let (store, wallet) = setup(false, KVStoreConfig::default()).await;
         *wallet.sign_mode.lock().unwrap() = mode;
         let error = store.set("two").await.unwrap_err();
+        let error = support::inner_bound_error(error);
         assert_eq!(
             error,
             bsv_rs::Error::KvStoreError(
@@ -108,6 +111,7 @@ async fn a_signed_result_naming_another_txid_is_refused_in_the_recorded_words_34
     let (store, wallet) = setup(false, KVStoreConfig::default()).await;
     *wallet.sign_mode.lock().unwrap() = "txid_mismatch";
     let error = store.set("two").await.unwrap_err();
+    let error = support::inner_bound_error(error);
     // completeBoundAction.ts:1140-1145 at the recording's ts-stack@edf6e03 pin.
     assert_eq!(
         error,
@@ -126,6 +130,7 @@ async fn a_missing_signed_transaction_is_refused_in_the_recorded_words_341() {
     for global in [false, true] {
         let (store, wallet) = setup(global, KVStoreConfig::default()).await;
         let error = store.set("two").await.unwrap_err();
+        let error = support::inner_bound_error(error);
         assert_eq!(
             error,
             bsv_rs::Error::KvStoreError(expected["error"].as_str().unwrap().into()),
@@ -160,6 +165,7 @@ async fn a_wallet_cannot_inflate_or_redirect_the_requested_input_value_341() {
             let (store, wallet) = setup(global, KVStoreConfig::default()).await;
             *wallet.create_mode.lock().unwrap() = mode;
             let error = store.remove().await.unwrap_err();
+            let error = support::inner_bound_error(error);
             assert_eq!(
                 error,
                 bsv_rs::Error::KvStoreError(

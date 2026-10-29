@@ -1,14 +1,12 @@
 //! Per-outpoint PushDrop signers for the stores' owned action boundary (#343).
 use super::bound::{complete_action, complete_with_signers};
 use crate::primitives::bsv::sighash::{
-    compute_sighash_dispatched_for_signing, parse_transaction, SighashParams, SIGHASH_ALL,
-    SIGHASH_FORKID,
+    parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
-use crate::primitives::{bsv::TransactionSignature, Signature};
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
-    Counterparty, CreateActionArgs, CreateActionInput, CreateActionResult, CreateSignatureArgs,
-    Outpoint, Protocol, SignActionSpend, WalletInterface,
+    Counterparty, CreateActionArgs, CreateActionInput, CreateActionResult, Outpoint, Protocol,
+    SignActionSpend, WalletInterface,
 };
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
@@ -79,6 +77,8 @@ pub(super) async fn sign_bound_inputs<W: WalletInterface>(
     originator: Option<&str>,
 ) -> Result<HashMap<u32, SignActionSpend>> {
     let mut spends = HashMap::new();
+    let mut bound: Vec<_> = bound.into_iter().collect();
+    bound.sort_unstable_by_key(|(index, _)| *index);
     for (index, signer) in bound {
         let unlocking_script = match signer {
             InputSigner::Bytes(bytes) => bytes.clone(),
@@ -119,32 +119,23 @@ impl SigningProtocol {
             })?;
         let parsed = parse_transaction(&tx.to_binary())?;
         let scope = SIGHASH_ALL | SIGHASH_FORKID;
-        let digest = compute_sighash_dispatched_for_signing(&SighashParams {
-            version: parsed.version,
-            inputs: &parsed.inputs,
-            outputs: &parsed.outputs,
-            locktime: parsed.locktime,
-            input_index: index,
-            subscript: &source.locking_script.to_binary(),
-            satoshis: source.satoshis.unwrap_or_default(),
-            scope,
-        });
-        let signed = wallet
-            .create_signature(
-                CreateSignatureArgs {
-                    hash_to_directly_sign: Some(digest),
-                    protocol_id: self.protocol.clone(),
-                    key_id: self.key_id.clone(),
-                    counterparty: Some(self.counterparty.clone()),
-                    ..Default::default()
-                },
-                originator,
-            )
-            .await?;
-        let signature = Signature::from_der(&signed.signature)?;
-        let bytes = TransactionSignature::new(signature, scope).to_checksig_format();
-        let mut script = vec![bytes.len() as u8];
-        script.extend(bytes);
-        Ok(script)
+        crate::wallet::pushdrop::sign(
+            wallet,
+            &SighashParams {
+                version: parsed.version,
+                inputs: &parsed.inputs,
+                outputs: &parsed.outputs,
+                locktime: parsed.locktime,
+                input_index: index,
+                subscript: &source.locking_script.to_binary(),
+                satoshis: source.satoshis.unwrap_or_default(),
+                scope,
+            },
+            self.protocol.clone(),
+            self.key_id.clone(),
+            self.counterparty.clone(),
+            originator,
+        )
+        .await
     }
 }

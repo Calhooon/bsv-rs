@@ -15,16 +15,19 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 842 |
-| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 733 |
+| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
+| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 534 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
-| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch, with no broadcaster | 128 |
-| `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 150 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch, with no broadcaster | 161 |
+| `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
-| `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 727 |
+| `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
+| `local_lookup.rs` | Local output limit/total checks, exact BEEF and canonical token authentication (#454) | 301 |
+| `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454) | 46 |
+| `local_list.rs` | Existing convenience listing, separated to keep functions below the size limit | 78 |
 
 ## Key Exports
 
@@ -230,12 +233,12 @@ field, distinct from a present, signed `[]`; both read successfully.
 `malformed_reference_token_tags_use_the_reference_words_and_order` replay
 `kvstore_tags_344.json`, recorded by the extended #326 reference writer.
 
-The local store uses a different layout: a single field, the value, in a
-PushDrop with no signature (`local.rs:805-807`), under
-`Protocol(Counterparty, name)` (`:746-747`), with `[key]` on the wallet output
-for lookup; its `list` (`:564`) lists nothing (pre-existing). The reference's
-local store writes a value and its signature. Payload tags belong to the public
-five/six-field token, not to that wallet metadata.
+Since #454 the local store writes the reference's two-field layout: value
+and its signature, in a canonical PushDrop under `Protocol(Counterparty, name)`
+with key ID equal to the key and counterparty self. Wallet metadata carries
+`[key]` for lookup. The convenience `list` still uses the public token
+interpreter and does not list these local tokens, a pre-existing behavior.
+Payload tags belong to the public five/six-field token, not wallet metadata.
 
 ## Configuration
 
@@ -608,8 +611,10 @@ inputs. Global set and remove collect every authenticated token for the exact
 key/controller/JSON protocol namespace and merge their BEEFs. The global
 writer uses that protocol and key for its locking key and field signature.
 Raw-protocol tokens remain readable but are outside that mutation namespace.
-Local set/remove already collect all listed outputs; the same-value shortcut
-now requires one output. Local lookup authentication/pagination remains a separate finding. The untagged-token reader is
+Local set/remove authenticate every listed output against its exact BEEF and wallet key;
+the same-value shortcut requires one output. Since #454 mutation listings request
+10,000 outputs, set rejects incomplete totals and remove follows the reported total.
+Reads reject multiple outputs, including a second output hidden beyond the returned page. The untagged-token reader is
 fixed by #344. Pinned by `tests/kvstore_tokens_343.rs` (eleven tests),
 `tests/kvstore_signaction_326.rs`,
 `tests/kvstore_bound_action_341_342.rs`, `tests/kvstore_options_342.rs` and the
@@ -639,8 +644,10 @@ Go's `kvstore/local_kv_store.go` at `2ca481c` also does not retry a double spend
 `tests/kvstore_double_spend_retry_340.rs` has eleven cases using the #326
 recording wallet: four local single-attempt cases fail on the retrying
 `dd0a4a59` tree, and the global retry and non-retry controls remain pinned.
-The #340 Node 22 recording changes only its description; its eight cases are
-unchanged and all three older modes regenerate byte-identically. Migration:
+The #340 Node 22 recording retains its eight cases and adds three #470 count/key
+witnesses. Local bound-action failures now return `KvStoreLocalError` with the
+reference wrapper: set uses the authenticated count, remove the reported total.
+The wrapper tests and abort checks are in `kvstore_local_error_470.rs`. Migration:
 no published public item moved; the removed local `with_broadcaster` was
 unreleased, the global builder remains additive, and config literals are
 unchanged.
@@ -650,6 +657,27 @@ unchanged.
 Both `LocalKVStore` and `GlobalKVStore` implement per-key atomic locking using `tokio::sync::oneshot` channels
 to prevent concurrent modifications to the same key. Operations acquire a lock before mutating and release
 it after completion.
+
+### Local lookup and wallet signing (#454, #470)
+
+`LocalKVStore.ts:173-370,455,574-590` at edf6e03 is the local lookup rule:
+10,000 outputs for mutations, read ambiguity by both length and total, every
+listed output authenticated against the exact BEEF transaction and index,
+metadata, canonical two-field envelope, the wallet's `[2, context]` key and
+signature over the value. Duplicate outpoints fail. An optional listed script
+may be absent; the authenticated script comes from BEEF. Lookup failures are
+wrapped for get/set, direct for remove. Bound-action failures carry the count/key
+wrapper in `LocalKVStore.ts:427-431,547-551`, distinct from lookup failures.
+
+All wallet PushDrop unlockers call `wallet::pushdrop::sign`, which sends
+`data: SHA256(preimage)` (`PushDrop.ts:234-258`); the wallet hashes once more.
+`kvstore_two_token_454.rs` compares four recorded local/global actions: input
+text, merged BEEF, every unlocking script and each signature request.
+`kvstore_local_454.rs` pins pagination and authentication. Go at `2ca481c`,
+`kvstore/local_kv_store.go:66-171,228,436,518`, keeps last-output decoding,
+10/100 limits and different error wrappers; TypeScript decides this behavior.
+Migration: additive `Error::KvStoreLocalError`; callers matching bare wallet
+errors must handle the wrapped text. Public store/config paths are unchanged.
 
 ### Signature Verification
 

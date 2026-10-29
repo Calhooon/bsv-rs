@@ -77,6 +77,8 @@ pub struct Counting {
     pub create_references: Arc<Mutex<VecDeque<Vec<u8>>>>,
     /// #340: each local lookup can answer a new token generation.
     pub list_answers: Arc<Mutex<VecDeque<ListOutputsResult>>>,
+    pub list_args: Arc<Mutex<Vec<ListOutputsArgs>>>,
+    pub paginate: Arc<Mutex<bool>>,
     pub signed: Arc<Mutex<Option<SignActionArgs>>>,
     /// What listOutputs answers when set; the ProtoWallet's answer otherwise
     /// (#326).
@@ -135,6 +137,8 @@ impl Counting {
             create_from_request: false,
             create_references: Arc::default(),
             list_answers: Arc::default(),
+            list_args: Arc::default(),
+            paginate: Arc::default(),
             signed: Arc::default(),
             listed: Arc::default(),
             spending: Arc::default(),
@@ -277,10 +281,14 @@ macro_rules! counting {
                 o: Option<&str>,
             ) -> bsv_rs::Result<ListOutputsResult> {
                 self.note("list_outputs", o);
+                self.list_args.lock().unwrap().push(args.clone());
                 if let Some(listed) = self.list_answers.lock().unwrap().pop_front() {
                     return Ok(listed);
                 }
-                if let Some(listed) = self.listed.lock().unwrap().clone() {
+                if let Some(mut listed) = self.listed.lock().unwrap().clone() {
+                    if *self.paginate.lock().unwrap() {
+                        listed.outputs.truncate(args.limit.unwrap_or(10) as usize);
+                    }
                     return Ok(listed);
                 }
                 WalletInterface::list_outputs(&*self.inner, args, o).await

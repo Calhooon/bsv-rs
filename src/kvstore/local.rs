@@ -3,23 +3,26 @@
 //! Uses the wallet's basket system to store encrypted key-value pairs.
 //! Only the wallet owner can read/write entries.
 
-use crate::primitives::{to_hex, PublicKey};
-use crate::script::templates::PushDrop;
-use crate::script::LockingScript;
 use crate::wallet::{
     Counterparty, CreateActionInput, DecryptArgs, EncryptArgs, GetPublicKeyArgs, ListOutputsArgs,
-    Protocol, QueryMode, SecurityLevel, WalletInterface,
+    Protocol, SecurityLevel, WalletInterface,
 };
 use crate::{Error, Result};
 
 use super::action_options::ActionOptions;
 #[path = "local_actions.rs"]
 mod actions;
-use super::interpreter::KVStoreInterpreter;
+#[path = "local_list.rs"]
+mod listing;
+#[path = "local_lookup.rs"]
+pub(super) mod lookup;
+#[path = "local_token.rs"]
+mod token;
 use super::types::{
     decode_value_with_ttl, KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery,
-    KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken, LookupValueResult, WalletOutput,
+    KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
+use lookup::LookupValueResult;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -303,101 +306,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     ///
     /// A list of matching entries.
     pub async fn list(&self, query: Option<KVStoreQuery>) -> Result<Vec<KVStoreEntry>> {
-        let query = query.unwrap_or_default();
-
-        // Build list outputs args
-        let tags = query.key.as_ref().map(|k| vec![k.clone()]);
-
-        let list_result = self
-            .wallet
-            .list_outputs(
-                ListOutputsArgs {
-                    basket: self.config.protocol_id.clone(),
-                    tags,
-                    tag_query_mode: Some(QueryMode::All),
-                    include: Some(crate::wallet::OutputInclude::EntireTransactions),
-                    include_custom_instructions: None,
-                    include_tags: Some(true),
-                    include_labels: None,
-                    limit: query.limit,
-                    offset: query.skip.map(|s| s as i32),
-                    seek_permission: None,
-                },
-                self.originator(),
-            )
-            .await?;
-
-        let mut entries = Vec::new();
-
-        // Get identity key for controller
-        let pubkey_result = self
-            .wallet
-            .get_public_key(
-                GetPublicKeyArgs {
-                    identity_key: true,
-                    protocol_id: None,
-                    key_id: None,
-                    counterparty: None,
-                    ..Default::default()
-                },
-                self.originator(),
-            )
-            .await?;
-
-        // public_key is already a hex string
-        let controller = pubkey_result.public_key.clone();
-
-        for output in &list_result.outputs {
-            // Parse the locking script - it's Option<Vec<u8>>
-            let locking_script_bytes = match &output.locking_script {
-                Some(bytes) => bytes,
-                None => continue,
-            };
-            let script = match LockingScript::from_binary(locking_script_bytes) {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-
-            // Extract fields
-            if let Some(fields) = KVStoreInterpreter::extract_fields(&script) {
-                let key = match fields.key_string() {
-                    Some(k) => k,
-                    None => continue,
-                };
-
-                // Decrypt value if encrypted
-                let value_bytes = if self.config.encrypt {
-                    match self.decrypt_value(&key, fields.value_bytes()).await {
-                        Ok(v) => v,
-                        Err(_) => continue,
-                    }
-                } else {
-                    fields.value.clone()
-                };
-
-                let value = String::from_utf8(value_bytes).unwrap_or_default();
-                let tags = fields.tags_vec();
-
-                entries.push(
-                    KVStoreEntry::new(&key, &value, &controller, &self.config.protocol_id)
-                        .with_tags(tags),
-                );
-            }
-        }
-
-        // Apply tag filtering if specified
-        if let Some(filter_tags) = &query.tags {
-            let mode = query.tag_query_mode.as_deref().unwrap_or("all");
-            entries.retain(|e| {
-                if mode == "any" {
-                    filter_tags.iter().any(|t| e.tags.contains(t))
-                } else {
-                    filter_tags.iter().all(|t| e.tags.contains(t))
-                }
-            });
-        }
-
-        Ok(entries)
+        self.list_entries(query.unwrap_or_default()).await
     }
 
     /// Check if a key exists.
@@ -579,114 +488,6 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             .await?;
 
         Ok(result.plaintext)
-    }
-
-    async fn create_locking_script(&self, key: &str, value: &[u8]) -> Result<LockingScript> {
-        // Get public key for locking
-        let pubkey_result = self
-            .wallet
-            .get_public_key(
-                GetPublicKeyArgs {
-                    protocol_id: Some(self.get_protocol(key)),
-                    key_id: Some(key.to_string()),
-                    counterparty: Some(Counterparty::Self_),
-                    for_self: Some(true),
-                    ..Default::default()
-                },
-                self.originator(),
-            )
-            .await?;
-
-        // Parse hex string to PublicKey
-        let pubkey = PublicKey::from_hex(&pubkey_result.public_key)?;
-
-        // Create PushDrop with single value field (LocalKVStore uses simple format)
-        let fields = vec![value.to_vec()];
-        let pushdrop = PushDrop::new(pubkey, fields);
-
-        Ok(pushdrop.lock())
-    }
-
-    async fn lookup_value(&self, key: &str, limit: u32) -> Result<LookupValueResult> {
-        // List outputs with the key tag
-        let list_result = self
-            .wallet
-            .list_outputs(
-                ListOutputsArgs {
-                    basket: self.config.protocol_id.clone(),
-                    tags: Some(vec![key.to_string()]),
-                    tag_query_mode: Some(QueryMode::All),
-                    include: Some(crate::wallet::OutputInclude::EntireTransactions),
-                    include_custom_instructions: None,
-                    include_tags: Some(true),
-                    include_labels: None,
-                    limit: Some(limit),
-                    offset: None,
-                    seek_permission: None,
-                },
-                self.originator(),
-            )
-            .await?;
-
-        // Get the most recent output (last in the list)
-        let Some(last_output) = list_result.outputs.last() else {
-            return Ok(LookupValueResult::not_found(String::new()));
-        };
-
-        // Parse the locking script - it's Option<Vec<u8>>
-        let locking_script_bytes = last_output
-            .locking_script
-            .as_ref()
-            .ok_or_else(|| Error::KvStoreError("No locking script in output".to_string()))?;
-        let script = LockingScript::from_binary(locking_script_bytes)?;
-
-        // Decode PushDrop
-        let pushdrop = PushDrop::decode(&script)?;
-
-        if pushdrop.fields.is_empty() {
-            return Err(Error::KvStoreError(
-                "Invalid KVStore token: no fields".to_string(),
-            ));
-        }
-
-        // Extract and decrypt value
-        let value_bytes = &pushdrop.fields[0];
-        let value = if self.config.encrypt {
-            let decrypted = self.decrypt_value(key, value_bytes).await?;
-            String::from_utf8(decrypted).map_err(|e| Error::KvStoreError(e.to_string()))?
-        } else {
-            String::from_utf8(value_bytes.clone())
-                .map_err(|e| Error::KvStoreError(e.to_string()))?
-        };
-
-        // Collect outpoints
-        let outpoints: Vec<String> = list_result
-            .outputs
-            .iter()
-            .map(|o| format!("{}.{}", to_hex(&o.outpoint.txid), o.outpoint.vout))
-            .collect();
-
-        // Convert to internal wallet output format
-        let outputs: Vec<WalletOutput> = list_result
-            .outputs
-            .iter()
-            .filter_map(|o| {
-                // Only include outputs with locking scripts
-                o.locking_script.as_ref().map(|script| WalletOutput {
-                    outpoint: format!("{}.{}", to_hex(&o.outpoint.txid), o.outpoint.vout),
-                    satoshis: o.satoshis,
-                    locking_script: script.clone(),
-                    tags: o.tags.clone().unwrap_or_default(),
-                })
-            })
-            .collect();
-
-        Ok(LookupValueResult::found(
-            value,
-            outpoints,
-            list_result.beef,
-            outputs,
-        ))
     }
 
     fn build_inputs(&self, lookup_result: &LookupValueResult) -> Result<Vec<CreateActionInput>> {

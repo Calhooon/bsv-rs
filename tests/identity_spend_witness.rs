@@ -3,15 +3,10 @@
 //! `ContactsManager::add_contact`, `ContactsManager::remove_contact`), their
 //! unlocking scripts run through `Spend` under the node's block word.
 //!
-//! Each path builds the BIP143 preimage and asks the wallet to sign a digest
-//! directly (`hash_to_directly_sign`). Until 0.7.0 that digest was ONE
-//! SHA-256 of the preimage, while the node verifies against the double SHA-256
-//! (bitcoin-sv v1.2.3 `SignatureHashBIP143`, `ss.GetHash()`); the reference
-//! hashes twice too (`@bsv/sdk` passes `data: sha256(preimage)` and the wallet
-//! hashes `data` again, ts-stack@4d0ea63 `packages/sdk/src/script/templates/PushDrop.ts:245-248`).
-//! Every signature these paths produced was one the node refuses. The paths
-//! now sign `compute_sighash_dispatched_for_signing`, the dispatcher every
-//! template reaches through `SigningContext`.
+//! Since #454 each path sends `data: SHA256(BIP143 preimage)` as the reference
+//! does (`ts-stack@edf6e03`, `PushDrop.ts:234-258`); the wallet hashes again.
+//! Before 0.7.0 these paths signed only one SHA256 and the node refused them.
+//! The existing signatures still verify under the node's block word.
 //!
 //! Hermetic: the wallet is a `ProtoWallet` for the keys and a mock for the
 //! actions, the overlay lookup is an injected facilitator, and the revocation

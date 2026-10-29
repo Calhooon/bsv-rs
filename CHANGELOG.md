@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
+
+- All four wallet PushDrop spending sites (shared kvstore tokens, contact update,
+  contact removal, identity revocation) now send `data: SHA256(preimage)`, as
+  `ts-stack@edf6e03` `PushDrop.ts:234-258` does. Sending the double hash as
+  `hashToDirectlySign` produced the same signature but a different wallet request.
+  `kvstore_two_token_454` compares recorded request bodies and unlocking bytes;
+  `contacts_signaction_326`, `identity_wallet_calls_318` and
+  `identity_revocation_checks_327` pin the identity requests.
+- Local mutations request `MAX_LOCAL_OUTPUTS` (10,000). Reads reject ambiguous
+  totals; set rejects an incomplete collapse; remove authenticates and consumes
+  each page until its length equals `totalOutputs` (`LocalKVStore.ts:173-203,
+  332-339,455,574-590`). The old ten-output set and hundred-output removal could
+  leave live tokens behind. `kvstore_local_454` covers eleven live tokens, an
+  incomplete response, hidden duplicates, the total bound, and multiple removal
+  pages.
+- Every listed local token now counts only after its exact BEEF transaction,
+  index, metadata, canonical two-field envelope, wallet locking key and field
+  signature pass authentication (`LocalKVStore.ts:231-307`). Previously only the
+  last listed script was decoded, permitting unauthenticated spends. The writer
+  now includes its field signature so its own tokens pass that check. A missing
+  optional listed script is read from BEEF. `kvstore_local_454` checks corrupted
+  non-final outputs, wrong keys/signatures, duplicates and missing BEEF/scripts.
+- The #326 recorder's new `--kvstore-local-454` mode writes two-token local/global
+  set/remove witnesses. `kvstore_two_token_454` compares input descriptions,
+  merged BEEF, signature requests and unlocking scripts. Older metadata-only
+  assertions remain explicitly named for tests using different token bodies.
+- Local bound-action failures now use the reference's exact count/key wrapper
+  (`LocalKVStore.ts:427-431,547-551`), where the wallet's error escaped directly.
+  Set counts authenticated outputs; remove uses the page's reported total.
+  `kvstore_local_error_470` replays the #340 recorder under Node 22.18.0, including
+  zero/two-token set and a two-output removal page whose total is seven. Failures
+  before the bound action retain the reference's separate lookup/authentication
+  behavior. Existing aborts and the absence of a local retry are unchanged.
+
+For the toolbox's caller-visible error table (both set and remove, key `alpha`):
+
+| Before | After |
+|---|---|
+| `Undelayed createAction or signAction results require review.` | `There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review.` |
+
+Migration: `Error::KvStoreLocalError(String)` is an additive variant of the
+non-exhaustive error enum, displaying the reference message without a Rust
+category prefix. Local action callers matching the old wallet variant or
+unwrapped text must match this wrapper. No public method, config field or
+existing type path changes. Existing unsigned local tokens now fail the required
+authentication; use the reference's relinquish/rewrite workflow for such tokens.
+
+### Notes: cross-SDK parity
+
+The deciding reference is TypeScript `ts-stack@edf6e03`, exercised under Node
+22.18.0. Go at `2ca481c`, read by path `kvstore/local_kv_store.go:66-171`, decodes
+only the last BEEF output without these key/signature checks; set uses limit 10
+at `:228`, remove limit 100 at `:436` and stops below 100 at `:518`. Its signing
+failures use `error SignAction: ...` (`:347-362`) and `SignAction (Remove): ...`
+(`:498-513`), with relinquishment attempts. This change follows TypeScript. Go's PushDrop unlocker still sends
+`HashToDirectlySign` (`transaction/template/pushdrop/pushdrop.go:216-222`), so
+the wallet request shape intentionally follows TypeScript here too.
+The shared Rust spender still takes the source script and value from the bound
+signable transaction, the existing #343 finding; global duplicate selection and
+other previously stated global differences remain.
+
+The three older #326 kvstore modes and the identity recorders were rerun.
+`kvstore_tags_344` and identity #307/#310/#315 are byte-identical. The #326,
+#341/#342, identity #318/#327 vectors are re-recorded only to add signature
+request JSON; #340 adds count/key wrapper cases. Every pre-existing payload
+remains identical when those newly recorded members are removed. No vector was
+hand-edited. Contact helpers and local listing were split to keep touched source
+files below 800 lines and production functions at most 60 lines.
+
 ### Fixed: short ECIES envelopes use the reference's bounded words (#463)
 
 The lower and upper envelope limits now share the guard in `ecies_bounds.rs`,
@@ -45,6 +115,7 @@ follows the TypeScript words under the owner's ruling (c).
 Go's `BitcoreDecrypt` (`compat/ecies/ecies.go:191-208` at `2ca481c`) has no length
 check at all: from reading the code, a short envelope would panic when it is
 sliced (not run).
+
 ### Fixed: the wire header refusals use the reference's words (#458)
 
 The processor's bad-UTF-8 originator refusal is now
@@ -182,6 +253,7 @@ Go at `2ca481c` writes the nil sentinel for that entry
 here with the precision words, as the TypeScript reference refuses it.
 The pre-existing getHeight, unbounded satoshis and missing collection-size
 checks are filed separately and unchanged by this fold.
+
 ### Changed: per-input verification work budget (#378, part 2)
 
 `Transaction::verify_with_work_budget` and
@@ -402,6 +474,7 @@ corrects the recorder's comment and output description only; all cases are
 unchanged, and the revised output is byte-identical on rerun. No vector bytes
 were edited by hand. Recording and tests inject all lookup and broadcast
 answers in process; no live host or default port is used.
+
 ### Fixed: the Peer's certificate paths, nonce intake and sending bound (#445)
 
 Both certificate paths call one validator in the reference's words
