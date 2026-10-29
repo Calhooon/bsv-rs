@@ -188,6 +188,72 @@ refusals, not a judgment (`bsv-script-lean/docs/CONFORMANCE-2026-09-27.md:351-35
 which this typed class makes visible to hosts. Go's interpreter supports the
 pre-Genesis eras (`go-sdk@2ca481c spv/verify.go:537-560`); our refusal states our
 scope, never that a coin the node can spend is invalid.
+### Fixed: internalizeAction's unreachable wire fallbacks and JSON null remittances (#393)
+
+The two notes from #384's review are resolved. The transceiver's
+`payment_remittance required for wallet payment` refusal and its empty
+basket-insertion write have been removed. Its public `internalize_action`
+always calls `validate_internalize_action_args` before encoding; the
+`WalletClient` wire dispatch reaches that same method. No entry bypasses the
+validator. `ProtoWallet`, `WalletClient` and `HttpWalletJson` also validate;
+the processor still refuses internalizeAction as needing a full wallet.
+`payment_remittance_guard_precedes_encoding_and_sending` and
+`insertion_remittance_guard_precedes_encoding_and_sending` cover missing,
+wrong-only and crossed remittances, including a payment key that would fail
+hex decoding if encoding ran. Each asserts the validator's exact refusal
+and zero frames sent.
+
+A JSON `null` remittance used to become `None`, erasing its presence.
+`types/internalize_output.rs` now distinguishes a missing member from null
+while reading, sharing the protocol/presence check with the typed validator.
+The public fields, their types and serialization stay unchanged. A null
+beside the other protocol's remittance is refused with that protocol's
+one-remittance words. A matching null alone reaches the object refusal,
+`The paymentRemittance parameter must be a plain object` or
+`The insertionRemittance parameter must be a plain object`. An absent
+other remittance remains accepted; an absent required one remains refused
+by the typed validator.
+
+`tests/support/internalize_null_remittance_393.mjs` measured the actual
+`ts-stack@edf6e03` SDK bundle under Node v22.18.0 and wrote
+`tests/vectors/internalize_null_remittance_393.json`: 12 cases, 10 refusals
+(code 6), two acceptances. No validator was copied into the script.
+`tests/wallet_internalize_remittance_393.rs` pins all cases in 10 tests:
+the four `a_null_*` tests pin each protocol's crossed-null and lone-null
+reading; `two_null_remittances_are_present_and_refused_for_either_protocol`
+and `a_lone_null_of_the_other_protocol_is_present_and_refused` pin the other
+four null cases; the two `an_undefined_*` tests pin absence, and the two
+`*_guard_precedes_encoding_and_sending` tests pin validation before encoding.
+On a scratch copy of the base, the six null tests fail because JSON null
+was accepted by deserialization; the other four pass. With the transceiver's
+validation call removed on that scratch copy, both guard tests fail too.
+`fuzz_wire_protocol` also reads `InternalizeOutput` JSON; a bounded run
+seeded with the 12 measured outputs completed after 24 seconds with no
+crash, timeout or allocation failure.
+
+### Notes: cross-SDK parity (#393)
+
+The measured null verdicts and words match `validateInternalizeOutput`
+(`validationHelpers.ts:966-984`, remittance object checks at `:914-951`).
+`HTTPWalletJSON.ts:291-303` validates the supplied object before serializing
+it, retaining null's presence; `WalletWireProcessor.ts:1085-1136` constructs
+only the selected remittance from the frame, which has no null encoding.
+Rust rejects null at the serde intake, a deserialization error carrying
+those words, rather than the reference's callable validator's code-6 error.
+The other validation gaps documented with #384 remain outside this change.
+Go at `2ca481c` reads both missing and null remittances as nil pointers
+(`wallet/interfaces.go:422-427`, `wallet/encoding_json.go:384-395`). Its
+writer refuses a nil selected remittance in its own words and ignores the
+other (`wallet/serializer/internalize_action.go:29-44`), so its null reading
+differs from this crate and the reference. The two oversized files shrink:
+`transceiver.rs` 1,643 to 1,636 lines; `types.rs` 1,912 to 1,899. The new
+75-line type/reader file keeps every added function below 60 lines.
+
+A word-order residual: a `null` sitting beside a malformed remittance object, or
+beside an `outputIndex` that is not a `u32`, is refused in serde's words before the
+presence check here, where the reference gives its crossed-remittance words there
+(`validationHelpers.ts:971-977` before `:979`); both sides refuse, only the words
+differ, in the existing typed-reading class.
 
 ### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
 

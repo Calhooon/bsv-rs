@@ -1,0 +1,174 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk/src/wallet/validationHelpers.ts:914-984",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "wallet_payment_other_null",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "wallet payment",
+        "paymentRemittance": {
+          "derivationPrefix": "cHJlZml4",
+          "derivationSuffix": "c3VmZml4",
+          "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+        },
+        "insertionRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only paymentRemittance for wallet payment"
+      }
+    },
+    {
+      "name": "wallet_payment_own_null",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "wallet payment",
+        "paymentRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The paymentRemittance parameter must be a plain object"
+      }
+    },
+    {
+      "name": "wallet_payment_other_undefined",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "wallet payment",
+        "paymentRemittance": {
+          "derivationPrefix": "cHJlZml4",
+          "derivationSuffix": "c3VmZml4",
+          "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+        }
+      },
+      "expected": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "wallet_payment_own_undefined",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "wallet payment"
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only paymentRemittance for wallet payment"
+      }
+    },
+    {
+      "name": "wallet_payment_both_null",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "wallet payment",
+        "paymentRemittance": null,
+        "insertionRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only paymentRemittance for wallet payment"
+      }
+    },
+    {
+      "name": "wallet_payment_other_null_alone",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "wallet payment",
+        "insertionRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only paymentRemittance for wallet payment"
+      }
+    },
+    {
+      "name": "basket_insertion_other_null",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "basket insertion",
+        "insertionRemittance": {
+          "basket": "fixtures",
+          "tags": []
+        },
+        "paymentRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only insertionRemittance for basket insertion"
+      }
+    },
+    {
+      "name": "basket_insertion_own_null",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "basket insertion",
+        "insertionRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The insertionRemittance parameter must be a plain object"
+      }
+    },
+    {
+      "name": "basket_insertion_other_undefined",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "basket insertion",
+        "insertionRemittance": {
+          "basket": "fixtures",
+          "tags": []
+        }
+      },
+      "expected": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "basket_insertion_own_undefined",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "basket insertion"
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only insertionRemittance for basket insertion"
+      }
+    },
+    {
+      "name": "basket_insertion_both_null",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "basket insertion",
+        "insertionRemittance": null,
+        "paymentRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only insertionRemittance for basket insertion"
+      }
+    },
+    {
+      "name": "basket_insertion_other_null_alone",
+      "output": {
+        "outputIndex": 0,
+        "protocol": "basket insertion",
+        "paymentRemittance": null
+      },
+      "expected": {
+        "accepted": false,
+        "code": 6,
+        "message": "The output remittance parameter must be only insertionRemittance for basket insertion"
+      }
+    }
+  ]
+}

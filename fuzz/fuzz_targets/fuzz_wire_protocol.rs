@@ -2,6 +2,9 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
+    // The JSON intake must also return on malformed or null remittances (#393).
+    let _ = serde_json::from_slice::<bsv_rs::wallet::InternalizeOutput>(data);
+
     // Fuzz wire protocol deserialization - should never panic
     let mut reader = bsv_rs::wallet::wire::WireReader::new(data);
 
