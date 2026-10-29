@@ -357,9 +357,15 @@ fn bound_sign_answer(
         _ => {}
     }
     tx.invalidate_caches();
-    let id = Outpoint::from_string(&format!("{}.0", tx.id()))
-        .unwrap()
-        .txid;
+    let id = if mode == "txid_mismatch" {
+        let mut other = tx.clone();
+        other.lock_time += 1;
+        other.invalidate_caches();
+        other.id()
+    } else {
+        tx.id()
+    };
+    let id = Outpoint::from_string(&format!("{id}.0")).unwrap().txid;
     SignActionResult {
         tx: Some(tx.to_atomic_beef(true).unwrap()),
         txid: Some(id),

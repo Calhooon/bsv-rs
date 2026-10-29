@@ -104,6 +104,47 @@ async fn the_signed_result_is_checked_against_the_owned_template_341() {
 }
 
 #[tokio::test]
+async fn a_signed_result_naming_another_txid_is_refused_in_the_recorded_words_341() {
+    let (store, wallet) = setup(false, KVStoreConfig::default()).await;
+    *wallet.sign_mode.lock().unwrap() = "txid_mismatch";
+    let error = store.set("two").await.unwrap_err();
+    // completeBoundAction.ts:1140-1145 at the recording's ts-stack@edf6e03 pin.
+    assert_eq!(
+        error,
+        bsv_rs::Error::KvStoreError(
+            "Wallet signed transaction ID does not match its transaction data".into()
+        )
+    );
+    assert_eq!(wallet.signs.lock().unwrap().len(), 1);
+    assert_eq!(wallet.aborts.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_missing_signed_transaction_is_refused_in_the_recorded_words_341() {
+    let fixture = vector();
+    let expected = &fixture["refusals"]["missing_signed_tx"];
+    for global in [false, true] {
+        let (store, wallet) = setup(global, KVStoreConfig::default()).await;
+        let error = store.set("two").await.unwrap_err();
+        assert_eq!(
+            error,
+            bsv_rs::Error::KvStoreError(expected["error"].as_str().unwrap().into()),
+            "{global}: missing signed transaction words"
+        );
+        assert_eq!(
+            wallet.signs.lock().unwrap().len(),
+            expected["sign_calls"].as_u64().unwrap() as usize,
+            "{global}: sign calls"
+        );
+        assert_eq!(
+            wallet.aborts.lock().unwrap().len(),
+            expected["abort_calls"].as_u64().unwrap() as usize,
+            "{global}: abort calls"
+        );
+    }
+}
+
+#[tokio::test]
 async fn a_valid_signed_result_supplies_the_completed_transaction_id_341() {
     let (store, wallet) = setup(false, KVStoreConfig::default()).await;
     *wallet.sign_mode.lock().unwrap() = "valid";

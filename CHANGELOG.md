@@ -37,8 +37,13 @@ so a configured broadcast policy could not reach either call.
 
 `tests/kvstore_bound_action_341_342.rs` pins the pre-signing refusals and order,
 the unsigned funding input, signed-template checks, the completed txid, and
-both calls' default options. Its seven tests are RED on base `bf97cc74` in a
-scratch checkout with a separate target directory. `tests/kvstore_options_342.rs`
+both calls' default options. Its original seven tests are RED on base `bf97cc74`
+in a scratch checkout with a separate target directory. Two further tests pin
+the txid-mismatch refusal (`a_signed_result_naming_another_txid_is_refused_in_the_recorded_words_341`)
+and the missing signed transaction's recorded words, one sign and one abort
+(`a_missing_signed_transaction_is_refused_in_the_recorded_words_341`). Each is
+RED with its check removed or its words altered in an isolated scratch copy.
+`tests/kvstore_options_342.rs`
 pins the setters on new, update and removal paths for both stores and an
 exhaustive config literal against the recorded defaults. That six-field
 literal is RED at compile time on `b3654dba` (`E0063`, missing the two newly
@@ -57,6 +62,9 @@ byte-identical to the vector; all global-store operation tests inject a
 resolver that cannot reach a live overlay host.
 Recording resolvers use distinct fake-host keys so the process-wide reputation
 tracker cannot make parallel cases back off each other's lookups.
+After rebasing over #344, the merged recorder retains its default mode and both
+`--bound-actions` and `--kvstore-tags`; all three recordings under Node v22.18.0
+match the committed vectors byte for byte.
 
 Public shape: three additive store setters; no fields added to `KVStoreConfig`.
 `cargo semver-checks --release-type minor --baseline-rev bf97cc74` (0.51.0),
@@ -87,8 +95,8 @@ refused before signing in the reference's words. Base64 text is decoded by the
 wallet types; re-encoding makes it canonical, with its nonempty/4096-character
 bound enforced here. The stores still supply empty unlocking scripts rather
 than the reference's PushDrop signers, and global set still does not collect
-prior tokens, global removal takes one, and untagged tokens remain unreadable
-(the existing #326 findings, #343/#344). These are not silently represented as
+prior tokens and global removal takes one (the existing #326 findings, #343).
+The untagged-token reader is fixed by #344 below. These are not silently represented as
 parity by the new checks. The reference's output-satoshi ranges, additional
 output authorization and trusted-input-amount extension are not exposed by
 either store and are not added here. Rust errors retain the `KvStoreError`
