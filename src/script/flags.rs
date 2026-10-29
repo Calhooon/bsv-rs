@@ -148,8 +148,8 @@ impl ProtocolEra {
 ///
 /// **What is always on.** Strict DER and public-key encodings and the
 /// `SIGHASH_FORKID` requirement: the reference forces `STRICTENC` whenever
-/// `SIGHASH_FORKID` is set (`interpreter.cpp:2315-2318`) and this interpreter
-/// computes only the BIP-143 sighash, so a word must carry `SIGHASH_FORKID`
+/// `SIGHASH_FORKID` is set (`interpreter.cpp:2315-2318`); this interpreter
+/// requires `SIGHASH_FORKID`, `GENESIS` and `UTXO_AFTER_GENESIS` in a word
 /// ([`ScriptFlags::check`]). `DERSIG` is then redundant (`interpreter.cpp:275-280`).
 ///
 /// **What has no effect, and why that is faithful.** `P2SH`,
@@ -484,7 +484,7 @@ impl ScriptFlags {
     /// asks for rules this interpreter does not implement, or when the
     /// reference itself would refuse it:
     ///
-    /// * without `SIGHASH_FORKID`: the legacy sighash is not computed here;
+    /// * without `SIGHASH_FORKID`: this interpreter requires it in a flag word;
     /// * without `GENESIS` or without `UTXO_AFTER_GENESIS`: pre-Genesis block
     ///   or UTXO rules are not implemented here;
     /// * `CHRONICLE` without `GENESIS`: no node derives it (`IsProtocolActive`,
@@ -500,17 +500,17 @@ impl ScriptFlags {
     pub fn check(self) -> Result<(), ScriptFlagsError> {
         if !self.contains(Self::SIGHASH_FORKID) {
             return Err(ScriptFlagsError::NotApplicable(
-                "SIGHASH_FORKID is not set: this interpreter computes the BIP-143 sighash only",
+                "SIGHASH_FORKID is not set: this interpreter requires it in a flag word",
             ));
         }
         if !self.contains(Self::GENESIS) {
             return Err(ScriptFlagsError::NotApplicable(
-                "GENESIS is not set: pre-Genesis block rules are not implemented by this interpreter",
+                "GENESIS is not set: this interpreter requires it in a flag word",
             ));
         }
         if !self.contains(Self::UTXO_AFTER_GENESIS) {
             return Err(ScriptFlagsError::NotApplicable(
-                "UTXO_AFTER_GENESIS is not set: pre-Genesis UTXO rules are not implemented by this interpreter",
+                "UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word",
             ));
         }
         if self.contains(Self::CHRONICLE) && !self.contains(Self::GENESIS) {

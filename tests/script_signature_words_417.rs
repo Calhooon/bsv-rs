@@ -153,9 +153,15 @@ fn issue_417_der_off_requires_a_word_which_this_crate_refuses() {
         assert_eq!(c.valid, Some(true), "{}", c.name);
         let mut s = spend(c);
         assert_eq!(s.flags(), None);
-        s.set_flags(ScriptFlags::NONE);
-        let error = s.validate().unwrap_err();
-        assert!(!error.is_resource_limit());
-        assert_eq!(error.message, "Invalid verification flags: SIGHASH_FORKID is not set: this interpreter computes the BIP-143 sighash only.", "{}", c.name);
+        for (word, message) in [
+            (ScriptFlags::NONE, "Invalid verification flags: SIGHASH_FORKID is not set: this interpreter requires it in a flag word."),
+            (ScriptFlags::SIGHASH_FORKID, "Invalid verification flags: GENESIS is not set: this interpreter requires it in a flag word."),
+            (ScriptFlags::SIGHASH_FORKID | ScriptFlags::GENESIS, "Invalid verification flags: UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word."),
+        ] {
+            s.set_flags(word);
+            let error = s.validate().unwrap_err();
+            assert!(!error.is_resource_limit());
+            assert_eq!(error.message, message, "{}: {word:?}", c.name);
+        }
     }
 }
