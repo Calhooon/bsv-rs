@@ -3,23 +3,22 @@
 //! Uses the wallet's basket system to store encrypted key-value pairs.
 //! Only the wallet owner can read/write entries.
 
-use crate::primitives::{from_hex, to_hex, PublicKey};
+use crate::primitives::{to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::{
-    Counterparty, CreateActionArgs, CreateActionInput, CreateActionOutput, DecryptArgs,
-    EncryptArgs, GetPublicKeyArgs, ListOutputsArgs, Protocol, QueryMode, SecurityLevel,
-    WalletInterface,
+    Counterparty, CreateActionInput, DecryptArgs, EncryptArgs, GetPublicKeyArgs, ListOutputsArgs,
+    Protocol, QueryMode, SecurityLevel, WalletInterface,
 };
 use crate::{Error, Result};
 
 use super::action_options::ActionOptions;
-use super::bound::complete_action;
+#[path = "local_actions.rs"]
+mod actions;
 use super::interpreter::KVStoreInterpreter;
 use super::types::{
-    decode_value_with_ttl, encode_value_with_ttl, KVStoreConfig, KVStoreEntry, KVStoreGetOptions,
-    KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken, LookupValueResult,
-    WalletOutput,
+    decode_value_with_ttl, KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery,
+    KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken, LookupValueResult, WalletOutput,
 };
 
 use std::collections::HashMap;
@@ -255,93 +254,6 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         result
     }
 
-    async fn set_internal(
-        &self,
-        key: &str,
-        value: &str,
-        _protocol_id: &str,
-        options: &KVStoreSetOptions,
-    ) -> Result<String> {
-        // Encode value with TTL if specified
-        let stored_value = if let Some(ttl) = options.ttl {
-            encode_value_with_ttl(value, ttl)
-        } else {
-            value.to_string()
-        };
-
-        // Look up existing value
-        let lookup_result = self.lookup_value(key, 10).await?;
-
-        // Optimization: if value is the same, return existing outpoint
-        if lookup_result.value_exists && lookup_result.value == stored_value {
-            if let Some(outpoint) = lookup_result.outpoints.last() {
-                return Ok(outpoint.clone());
-            }
-        }
-
-        // Prepare value (encrypt if needed)
-        let value_bytes = if self.config.encrypt {
-            self.encrypt_value(key, stored_value.as_bytes()).await?
-        } else {
-            stored_value.as_bytes().to_vec()
-        };
-
-        // Create PushDrop locking script with encrypted value
-        let locking_script = self.create_locking_script(key, &value_bytes).await?;
-
-        // Build inputs from existing outputs (to collapse them)
-        let inputs = self.build_inputs(&lookup_result)?;
-        let input_beef = lookup_result.input_beef.clone();
-
-        // Build output
-        let token_amount = options.token_amount.unwrap_or(self.config.token_amount);
-        let description = options
-            .description
-            .clone()
-            .unwrap_or_else(|| format!("Update {} in {}", key, self.config.protocol_id));
-
-        let tags = options
-            .tags
-            .clone()
-            .unwrap_or_else(|| vec![key.to_string()]);
-
-        let outputs = vec![CreateActionOutput {
-            locking_script: locking_script.to_binary(),
-            satoshis: token_amount,
-            output_description: format!("KV entry: {}", key),
-            basket: Some(self.config.protocol_id.clone()),
-            custom_instructions: None,
-            tags: Some(tags),
-        }];
-
-        // Create action
-        let create_result = complete_action(
-            &self.wallet,
-            CreateActionArgs {
-                description,
-                inputs: if inputs.is_empty() {
-                    None
-                } else {
-                    Some(inputs.clone())
-                },
-                outputs: Some(outputs),
-                input_beef: input_beef.clone(),
-                lock_time: None,
-                version: None,
-                labels: None,
-                options: Some(self.action_options.for_action(false, false)),
-            },
-            self.originator(),
-        )
-        .await?;
-
-        // Return outpoint of the new output
-        match create_result.txid {
-            Some(txid) => Ok(format!("{}.0", to_hex(&txid))),
-            None => Err(Error::KvStoreError("No txid in result".to_string())),
-        }
-    }
-
     /// Remove a key-value pair.
     ///
     /// Spends the UTXO backing the entry.
@@ -364,55 +276,10 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         }
 
         let options = options.unwrap_or_default();
-        let mut txids = Vec::new();
-
-        loop {
-            let lookup_result = self.lookup_value(key, 100).await?;
-
-            if !lookup_result.value_exists || lookup_result.outputs.is_empty() {
-                break;
-            }
-
-            let inputs = self.build_inputs(&lookup_result)?;
-            let input_beef = lookup_result.input_beef.clone();
-
-            if inputs.is_empty() {
-                break;
-            }
-
-            let description = options
-                .description
-                .clone()
-                .unwrap_or_else(|| format!("Remove {} from {}", key, self.config.protocol_id));
-
-            // Create action with inputs but no outputs (spending only)
-            let create_result = complete_action(
-                &self.wallet,
-                CreateActionArgs {
-                    description,
-                    inputs: Some(inputs.clone()),
-                    outputs: None, // No new outputs
-                    input_beef: input_beef.clone(),
-                    lock_time: None,
-                    version: None,
-                    labels: None,
-                    options: Some(self.action_options.for_action(false, true)),
-                },
-                self.originator(),
-            )
-            .await?;
-
-            if let Some(txid) = create_result.txid {
-                txids.push(to_hex(&txid));
-            }
-
-            // If we got fewer than 100 outputs, we're done
-            if lookup_result.outputs.len() < 100 {
-                break;
-            }
-        }
-
-        Ok(txids)
+        self.acquire_key_lock(key).await;
+        let result = self.remove_internal(key, &options).await;
+        self.release_key_lock(key).await;
+        result
     }
 
     /// List all keys.
@@ -823,51 +690,13 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     }
 
     fn build_inputs(&self, lookup_result: &LookupValueResult) -> Result<Vec<CreateActionInput>> {
-        lookup_result
-            .outputs
-            .iter()
-            .map(|output| {
-                let parts: Vec<&str> = output.outpoint.split('.').collect();
-                let txid_bytes = from_hex(parts[0]).map_err(|_| {
-                    Error::KvStoreCorruptedState(format!(
-                        "invalid txid hex in outpoint: {}",
-                        output.outpoint
-                    ))
-                })?;
-                if txid_bytes.len() != 32 {
-                    return Err(Error::KvStoreCorruptedState(format!(
-                        "txid must be 32 bytes, got {} in outpoint: {}",
-                        txid_bytes.len(),
-                        output.outpoint
-                    )));
-                }
-                let mut txid = [0u8; 32];
-                txid.copy_from_slice(&txid_bytes);
-                let vout: u32 = parts
-                    .get(1)
-                    .ok_or_else(|| {
-                        Error::KvStoreCorruptedState(format!(
-                            "missing vout in outpoint: {}",
-                            output.outpoint
-                        ))
-                    })?
-                    .parse()
-                    .map_err(|_| {
-                        Error::KvStoreCorruptedState(format!(
-                            "invalid vout in outpoint: {}",
-                            output.outpoint
-                        ))
-                    })?;
-
-                Ok(CreateActionInput {
-                    outpoint: crate::wallet::Outpoint::new(txid, vout),
-                    input_description: "KV entry input".to_string(),
-                    unlocking_script: None,
-                    unlocking_script_length: Some(107), // PushDrop unlock estimate
-                    sequence_number: None,
-                })
-            })
-            .collect()
+        super::token_spends::inputs(
+            lookup_result
+                .outputs
+                .iter()
+                .map(|output| output.outpoint.clone()),
+            "Previous key-value token",
+        )
     }
 
     async fn acquire_key_lock(&self, key: &str) {

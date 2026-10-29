@@ -2,6 +2,7 @@
 //! or data-property getters: owned typed arguments/results provide that isolation.
 use super::bound_sign_options;
 use super::checks::{bind_requested, refusal, same_template};
+use crate::kvstore::token_spends::{sign_bound_inputs, InputSigner};
 use crate::primitives::to_base64;
 use crate::transaction::Transaction;
 use crate::wallet::{
@@ -21,15 +22,15 @@ pub(crate) async fn complete_action<W: WalletInterface>(
         .iter()
         .flatten()
         .filter(|input| input.unlocking_script.is_none())
-        .map(|input| (input.outpoint.clone(), Vec::new()))
+        .map(|input| (input.outpoint.clone(), InputSigner::Bytes(Vec::new())))
         .collect();
     complete_with_signers(wallet, args, signers, originator).await
 }
 
-async fn complete_with_signers<W: WalletInterface>(
+pub(in crate::kvstore) async fn complete_with_signers<W: WalletInterface>(
     wallet: &W,
     mut args: CreateActionArgs,
-    signers: HashMap<Outpoint, Vec<u8>>,
+    signers: HashMap<Outpoint, InputSigner>,
     originator: Option<&str>,
 ) -> Result<CreateActionResult> {
     let options = args.options.get_or_insert_with(Default::default);
@@ -64,14 +65,15 @@ async fn complete_with_signers<W: WalletInterface>(
 async fn sign_and_check<W: WalletInterface>(
     wallet: &W,
     args: &CreateActionArgs,
-    signers: &HashMap<Outpoint, Vec<u8>>,
+    signers: &HashMap<Outpoint, InputSigner>,
     bytes: &[u8],
     reference: &str,
     originator: Option<&str>,
 ) -> Result<CreateActionResult> {
     let partial = parse(bytes, "Wallet signable transaction")?;
     let indexes = bind_requested(args, &partial)?;
-    let spends = bind_signers(args, &indexes, signers)?;
+    let bound = bind_signers(args, &indexes, signers)?;
+    let spends = sign_bound_inputs(wallet, &partial, bound, originator).await?;
     let signed = wallet
         .sign_action(
             SignActionArgs {
@@ -103,11 +105,11 @@ fn parse(bytes: &[u8], label: &str) -> Result<Transaction> {
     Transaction::from_atomic_beef(bytes)
 }
 
-fn bind_signers(
+fn bind_signers<'a>(
     args: &CreateActionArgs,
     indexes: &[usize],
-    signers: &HashMap<Outpoint, Vec<u8>>,
-) -> Result<HashMap<u32, SignActionSpend>> {
+    signers: &'a HashMap<Outpoint, InputSigner>,
+) -> Result<HashMap<u32, &'a InputSigner>> {
     let mut spends = HashMap::new();
     for (index, requested) in args.inputs.iter().flatten().enumerate() {
         if requested.unlocking_script.is_some() {
@@ -117,13 +119,7 @@ fn bind_signers(
             .get(&requested.outpoint)
             .filter(|_| requested.unlocking_script_length.is_some())
             .ok_or_else(|| refusal(format!("Requested input {index} has no authorized signer")))?;
-        spends.insert(
-            spend_index(indexes[index])?,
-            SignActionSpend {
-                unlocking_script: script.clone(),
-                sequence_number: None,
-            },
-        );
+        spends.insert(spend_index(indexes[index])?, script);
     }
     if spends.len() != signers.len() {
         return Err(refusal(

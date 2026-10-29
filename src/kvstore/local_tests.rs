@@ -9,12 +9,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 // Import all wallet types needed for mock implementation
 use crate::wallet::{
     AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
-    CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureResult, DecryptResult,
-    DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs, DiscoverCertificatesResult, EncryptResult,
-    GetHeaderArgs, GetHeaderResult, GetHeightResult, GetNetworkResult, GetPublicKeyResult,
-    GetVersionResult, InternalizeActionArgs, InternalizeActionResult, ListActionsArgs,
-    ListActionsResult, ListCertificatesArgs, ListCertificatesResult, ListOutputsResult,
-    ProveCertificateArgs, ProveCertificateResult, RelinquishCertificateArgs,
+    CreateActionArgs, CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureResult,
+    DecryptResult, DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs, DiscoverCertificatesResult,
+    EncryptResult, GetHeaderArgs, GetHeaderResult, GetHeightResult, GetNetworkResult,
+    GetPublicKeyResult, GetVersionResult, InternalizeActionArgs, InternalizeActionResult,
+    ListActionsArgs, ListActionsResult, ListCertificatesArgs, ListCertificatesResult,
+    ListOutputsResult, ProveCertificateArgs, ProveCertificateResult, RelinquishCertificateArgs,
     RelinquishCertificateResult, RelinquishOutputArgs, RelinquishOutputResult,
     RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult, SignActionArgs,
     SignActionResult, VerifyHmacArgs, VerifyHmacResult, WalletCertificate,

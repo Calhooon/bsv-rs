@@ -14,14 +14,17 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports and documentation | ~120 |
+| `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 842 |
-| `local.rs` | LocalKVStore implementation; tests in local_tests.rs | 904 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 807 |
-| `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | — |
-| `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | — |
-| `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | — |
-| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | ~620 |
+| `local.rs` | LocalKVStore implementation; tests in local_tests.rs | 733 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 595 |
+| `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
+| `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer and replacement/removal | 223 |
+| `local_actions.rs` | #343: replace/remove every listed token; unchanged shortcut only for one output | 128 |
+| `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 150 |
+| `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
+| `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 727 |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
 
 ## Key Exports
 
@@ -599,10 +602,17 @@ reference's false defaults for `acceptDelayedBroadcast` (set through
 the same create options into signAction, including `sendWith` if present.
 The reference text is re-encoded as canonical base64 (#326).
 
-The stores' empty unlocking-script signers remain a divergence from PushDrop
-signing. Global set does not collect prior tokens and removal takes one (#343).
-The untagged-token reader is fixed by #344. The request-binding checks do not
-hide the remaining findings. Pinned by `tests/kvstore_signaction_326.rs`,
+Since #343 the stores sign each token's source script and satoshis through its
+wallet protocol, binding signers by outpoint even when the wallet reorders
+inputs. Global set and remove collect every authenticated token for the exact
+key/controller/JSON protocol namespace and merge their BEEFs. The global
+writer uses that protocol and key for its locking key and field signature.
+Raw-protocol tokens remain readable but are outside that mutation namespace.
+Local set/remove already collect all listed outputs; the same-value shortcut
+now requires one output. Local lookup authentication/pagination and global
+double-spend retries remain separate findings. The untagged-token reader is
+fixed by #344. Pinned by `tests/kvstore_tokens_343.rs` (eleven tests),
+`tests/kvstore_signaction_326.rs`,
 `tests/kvstore_bound_action_341_342.rs`, `tests/kvstore_options_342.rs` and the
 unused-signer unit test; the reference's calls and refusals are recorded by
 `tests/support/signaction_reference_326.mjs --bound-actions` under Node 22.

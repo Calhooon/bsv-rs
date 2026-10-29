@@ -23,7 +23,7 @@ async fn the_wallet_answer_is_bound_before_either_store_signs_341() {
         ] {
             let (store, wallet) = setup(global, KVStoreConfig::default()).await;
             *wallet.create_mode.lock().unwrap() = mode;
-            // Both removals request the token; the global update's missing-token issue is #343.
+            // Both removals request the token and bind it before signing.
             let error = store.remove().await.unwrap_err();
             assert_eq!(
                 error,
