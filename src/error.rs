@@ -410,6 +410,11 @@ pub enum Error {
     #[error("invalid derivation path: {0}")]
     InvalidDerivationPath(String),
 
+    /// ECIES plaintext failed input validation before encryption.
+    #[cfg(feature = "compat")]
+    #[error("{0}")]
+    EciesInvalidPlaintext(String),
+
     /// ECIES decryption failed.
     #[cfg(feature = "compat")]
     #[error("ECIES decryption failed: {0}")]
