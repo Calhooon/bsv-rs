@@ -15,9 +15,9 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~833 |
-| `local.rs` | LocalKVStore implementation; tests in local_tests.rs | ~894 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~788 |
+| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 842 |
+| `local.rs` | LocalKVStore implementation; tests in local_tests.rs | 904 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 807 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | — |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | — |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | — |
@@ -600,9 +600,9 @@ the same create options into signAction, including `sendWith` if present.
 The reference text is re-encoded as canonical base64 (#326).
 
 The stores' empty unlocking-script signers remain a divergence from PushDrop
-signing. Global set does not collect prior tokens and removal takes one (#343);
-untagged tokens remain unreadable (#344). The request-binding checks do not
-hide those earlier findings. Pinned by `tests/kvstore_signaction_326.rs`,
+signing. Global set does not collect prior tokens and removal takes one (#343).
+The untagged-token reader is fixed by #344. The request-binding checks do not
+hide the remaining findings. Pinned by `tests/kvstore_signaction_326.rs`,
 `tests/kvstore_bound_action_341_342.rs`, `tests/kvstore_options_342.rs` and the
 unused-signer unit test; the reference's calls and refusals are recorded by
 `tests/support/signaction_reference_326.mjs --bound-actions` under Node 22.

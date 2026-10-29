@@ -10,16 +10,23 @@
 // does not export ContactsManager, so the entry re-exports it under a name of
 // its own (one bundle, so the clients share the SDK's classes):
 //   git -C ~/bsv/ts-stack archive edf6e03 packages/sdk | tar -x -C "$W"
-//   printf "export * from './mod.js'\nimport { ContactsManager as CM326 } from './src/identity/ContactsManager.js'\nexport const ContactsManager326 = CM326\n" \
-//     > "$W/packages/sdk/entry326.ts"
+//   cat > "$W/packages/sdk/entry326.ts" <<'EOF'
+//   export * from './mod.js'
+//   import { ContactsManager as CM326 } from './src/identity/ContactsManager.js'
+//   export const ContactsManager326 = CM326
+//   export { decodeAndVerifyKVStoreToken as decodeAndVerifyKVStoreToken344 } from './src/kvstore/kvStoreTokenValidation.js'
+//   export { kvStoreInterpreter as kvStoreInterpreter344 } from './src/kvstore/kvStoreInterpreter.js'
+//   EOF
 //   (cd "$W/packages/sdk" && bun build entry326.ts --target node --format esm --outfile "$W/sdk326.mjs")
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/signaction_reference_326.mjs \
 //     "$W/sdk326.mjs" > tests/vectors/signaction_reference_326.json
 //
-// #344 extends this recorder with --kvstore-tags. For that mode also export
-// decodeAndVerifyKVStoreToken344 and kvStoreInterpreter344 from the entry's
-// src/kvstore/kvStoreTokenValidation.js and kvStoreInterpreter.js, respectively.
-// Rebuild that entry with the bun command above, then record with:
+// #341/#342 extend this recorder with --bound-actions; the default entry's
+// completeBoundAction export is used alongside the stores:
+//   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/signaction_reference_326.mjs \
+//     "$W/sdk326.mjs" --bound-actions > tests/vectors/kvstore_bound_action_341_342.json
+// #344 extends this recorder with --kvstore-tags, using the entry's two
+// additional exports above. Record that mode with:
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/signaction_reference_326.mjs \
 //     "$W/sdk326.mjs" --kvstore-tags > tests/vectors/kvstore_tags_344.json
 // The store writes the accepted tokens; the SDK's PushDrop writer signs the
