@@ -2,7 +2,8 @@
 //! ECIES (`compat::ecies`, Electrum and Bitcore) on arbitrary input: every
 //! decryptor on the input as a ciphertext (binary and base64). The assertion
 //! is that each returns; the target also checks a round trip: the input as a
-//! plaintext, encrypted by each scheme, decrypts to itself.
+//! plaintext within the reference's bound decrypts to itself, and a plaintext
+//! above that bound is refused (#333).
 use bsv_rs::compat::ecies::{
     bitcore_decrypt, bitcore_encrypt, decrypt_shared_base64, decrypt_single, decrypt_single_base64,
     electrum_decrypt, electrum_encrypt, encrypt_shared_base64, encrypt_single,
@@ -35,6 +36,11 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let to_public = to.public_key();
+    if data.len() > 16 * 1024 * 1024 {
+        assert!(electrum_encrypt(data, &to_public, from, false).is_err());
+        assert!(bitcore_encrypt(data, &to_public, from, None).is_err());
+        return;
+    }
     for no_key in [false, true] {
         let sealed = electrum_encrypt(data, &to_public, from, no_key).expect("electrum seals");
         let sender = no_key.then_some(&from_public);

@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the reference's ECIES byte bounds before work (#333)
+
+A framed envelope over the bound was read and failed on its MAC; it is now
+refused in the reference's words before reading.
+Both `electrum_decrypt` and `bitcore_decrypt` reject more than 16,777,376 bytes
+(16 MiB plus 160) before parsing a key, deriving a secret, hashing or AES,
+with `Electrum ECIES envelope must be a bounded dense byte array` or
+`Bitcore ECIES envelope must be a bounded dense byte array`, respectively.
+The bound is the reference's, not a caller policy: `ts-stack@edf6e03`
+`packages/sdk/src/compat/ECIES.ts:12,589-594,704-709` spells the shared constant
+`MAX_ECIES_ENVELOPE_BYTES` (the filing calls it `MAX_ELECTRUM_ECIES_ENVELOPE_BYTES`).
+`CompatValidation.ts:1,8-15` supplies the 16 MiB base and the refusal suffix.
+
+The encryptors also adopt the reference's 16,777,216-byte plaintext bound
+before work (`ECIES.ts:551,673`, `CompatValidation.ts:1,8-15`), with
+`Electrum ECIES plaintext must be a bounded dense byte array` and
+`Bitcore ECIES plaintext must be a bounded dense byte array`.
+These plaintext refusals use the additive `Error::EciesInvalidPlaintext` variant,
+whose Display is the reference's words alone. They are validation failures before
+encryption, not `EciesDecryptionFailed`; `CryptoError` would add its own prefix.
+Migration: match `EciesInvalidPlaintext` for an oversized encryption input;
+decrypt-side envelope refusals keep their existing variants and Display text.
+The single/shared and base64 helpers inherit the Electrum bounds; the reference
+defines no separate helper or base64-text bound, so none is added.
+The fixed-size Bitcore IV already has the reference's 16-byte size in its Rust type.
+Existing short-input, framing and MAC refusals within the limits are unchanged.
+
+`tests/compat_ecies_bounds_333.rs` pins one byte over each limit, the exact limits,
+and a framed oversized Electrum envelope (the exact cap is not a valid Electrum
+frame size). It builds each large buffer once, retaining a small writer-produced
+header and zero-filling the rest without computing a large envelope's MAC.
+The 16 MiB plaintext round trips with and without an Electrum key and through
+Bitcore. On scratch `455fe780`, five regressions were RED and three controls
+passed; all eight pass with the guards. No hash-count hook exists: the guard's
+length-only code path precedes every key read and hash call.
+The cold-review fold pins the plaintext variant and exact Display in both
+encrypt tests, including the Electrum helpers: both fail on a scratch copy with
+the old `EciesDecryptionFailed` plaintext refusal, and all eight pass after it.
+
+### Notes: cross-SDK parity
+
+Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-153`
+has a minimum length but no upper bound and hashes the prefix at `:143`.
+Its `BitcoreDecrypt` (`:191-214`) and both encryptors (`:62-102,157-188`)
+also have no upper byte bound. Rust follows the TypeScript bounds here.
+At the exact envelope cap Rust retains its existing Electrum framing error
+and Bitcore MAC error; TypeScript rejects Bitcore's unaligned frame before
+the MAC (`ECIES.ts:710-711`). These framing and MAC checks are unchanged.
+Short envelopes remain a recorded difference for a separate lane: below 52
+bytes for Electrum or 97 for Bitcore, Rust keeps `Data too short`
+(`src/compat/ecies.rs:180-181,327-328`), while the same TypeScript `compatBytes`
+calls use `Electrum ECIES envelope must be a bounded dense byte array` and
+`Bitcore ECIES envelope must be a bounded dense byte array`
+(`ECIES.ts:589-594,704-709`, `CompatValidation.ts:14-15`).
+
 ### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
 
 Arithmetic guards keep their one- or two-operand metadata in stack arrays, removing

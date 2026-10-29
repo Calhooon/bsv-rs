@@ -49,7 +49,7 @@
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 
-use super::ecies_envelope::read_frame;
+use super::{ecies_bounds as bounds, ecies_envelope::read_frame};
 use crate::error::{Error, Result};
 use crate::primitives::ec::{PrivateKey, PublicKey};
 use crate::primitives::encoding::fixed_bytes;
@@ -111,7 +111,7 @@ pub fn electrum_encrypt(
     from: &PrivateKey,
     no_key: bool,
 ) -> Result<Vec<u8>> {
-    // Compute ECDH shared secret
+    bounds::electrum_plaintext(message)?;
     let shared_secret = from.derive_shared_secret(to)?;
     let shared_compressed = shared_secret.to_compressed();
 
@@ -176,7 +176,7 @@ pub fn electrum_encrypt(
 /// assert_eq!(decrypted, b"Hello!");
 /// ```
 pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) -> Result<Vec<u8>> {
-    // Minimum length: 4 (magic) + 16 (min cipher block) + 32 (mac)
+    bounds::electrum_envelope(data)?;
     if data.len() < 52 {
         return Err(Error::EciesDecryptionFailed("Data too short".to_string()));
     }
@@ -256,7 +256,7 @@ pub fn bitcore_encrypt(
     from: &PrivateKey,
     iv: Option<&[u8; 16]>,
 ) -> Result<Vec<u8>> {
-    // Use provided IV or zeros (matching Go SDK behavior)
+    bounds::bitcore_plaintext(message)?;
     let iv = iv.copied().unwrap_or([0u8; 16]);
 
     // Compute ECDH shared secret
@@ -323,7 +323,7 @@ pub fn bitcore_encrypt(
 /// assert_eq!(decrypted, b"Hello!");
 /// ```
 pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>> {
-    // Minimum length: 33 (pubkey) + 16 (iv) + 16 (min block) + 32 (mac)
+    bounds::bitcore_envelope(data)?;
     if data.len() < 97 {
         return Err(Error::EciesDecryptionFailed("Data too short".to_string()));
     }
