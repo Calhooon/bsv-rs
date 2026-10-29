@@ -1481,7 +1481,7 @@ pub struct ChainTip {
     /// Default stream path's Genesis height; supplied `ChainParams` supersede it.
     #[deprecated(
         since = "0.9.0-beta.4",
-        note = "Use block::ChainParams::genesis_height; ChainTip's copy still serves the default stream path until its removal at the next api-break."
+        note = "Use block::ChainParams::genesis_height; ChainTip's copy still serves the default stream path until its removal at the next api-break, when the default path judges by mainnet's heights as the reference does: a caller on another chain supplies its ChainParams."
     )]
     pub genesis_height: u32,
     /// This network's CSV activation height.
