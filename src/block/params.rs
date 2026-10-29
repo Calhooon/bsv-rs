@@ -43,12 +43,16 @@ pub struct ChainParams {
     /// Genesis activation, inclusive (`chainparams.cpp:18-21` at `879fc8b`).
     /// Match `-genesisactivationheight` (`init.cpp:2473-2477` at that pin)
     /// with [`Self::with_activation_heights`]. The node refuses zero or
-    /// negative values (`configscriptpolicy.cpp:310-321`); `u32` excludes negatives.
+    /// negative values (`configscriptpolicy.cpp:310-321`) and, reading the
+    /// option as a signed 32-bit integer (`init.cpp:2474`), a height of 2^31
+    /// or more, which this `u32` accepts.
     pub genesis_height: u32,
     /// Chronicle activation, inclusive (`chainparams.cpp:23-26` at `879fc8b`).
     /// Match `-chronicleactivationheight` (`init.cpp:2478-2481` at that pin)
     /// with [`Self::with_activation_heights`]. The node refuses zero or
-    /// negative values (`configscriptpolicy.cpp:353-364`); `u32` excludes negatives.
+    /// negative values (`configscriptpolicy.cpp:353-364`) and, reading the
+    /// option as a signed 32-bit integer (`init.cpp:2478`), a height of 2^31
+    /// or more, which this `u32` accepts.
     pub chronicle_height: u32,
 }
 

@@ -183,7 +183,7 @@ fn version_1_chronicle_signature_spends_a_proven_pre_chronicle_coin() {
         &tx,
         "The signature format is invalid.",
     );
-    // The first Chronicle block is tip + 1, even for a proven parent.
+    // Chronicle's activation block is tip + 1, even for a proven parent.
     assert!(verdict(&tx, Some(CHRONICLE - 1), true).is_valid());
     // A chain context between Genesis and Chronicle rejects that hash type.
     refused(verdict(&tx, Some(CHRONICLE - 2), true), &tx, HASH_GATE);
