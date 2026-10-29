@@ -22,7 +22,11 @@ use super::types::Counterparty;
 use super::{KeyDeriverApi, ProtoWallet};
 
 /// The key encoding a verified HMAC tag was made under.
+///
+/// `#[non_exhaustive]` since 0.9.0-beta.4 (bsv-rs#443), as further key
+/// encodings may be added: a `match` outside the crate ends in a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum HmacKeyEncoding {
     /// The amended BRC-56 key: minimal-length unsigned big-endian X
     /// coordinate. A key with no leading zero octet has this encoding only.
@@ -36,7 +40,11 @@ pub enum HmacKeyEncoding {
 }
 
 /// Which HMAC key encodings [`ProtoWallet::verify_hmac`] accepts.
+///
+/// `#[non_exhaustive]` since 0.9.0-beta.4 (bsv-rs#443), as further verification
+/// policies may be added: a `match` outside the crate ends in a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
 pub enum HmacVerifyPolicy {
     /// The standard minimal-length key's tag, then the legacy 32-byte key's
     /// tag on a miss (the default, the owner's 19.5 (a)).
