@@ -11,7 +11,7 @@ This module provides complete Bitcoin transaction functionality:
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs with iterative ancestry collection (no walk over `source_transaction` recurses: link, sort, serializers, `verify`, `Clone`, `Drop`; 0.3.35, bsv-stack-lean #57)
-- The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (twenty kinds, none a size or a count) or `SpendRefused`; `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
+- The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (twenty kinds, none a size or a count) or `SpendRefused`, with `NotJudged { offset, txid, input, cause }` for a word outside scope (#452); `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
 - The stream's two budgets for its scripts (#373): `StreamVerifier::set_work_limit` and `set_memory_limit` (the same on `AsyncStreamVerifier`), per input, `None` the default and uncapped, `Some(n)` the caller's (the memory budget `n` bytes per stack, `Transaction::verify`'s third parameter, #331); one spent is `Verdict::SpendRefused { txid, input, why: SpendRefusal::Resource(limit) }`, a decline naming the transaction and the input, never a verdict; local configuration, absent from the `Cursor` and set again after `resume`; the structure-only reader spends none; the reader's own bound per element is the charter's (NL-3), not a cap on a script. The `verify_stream*` functions take neither: a caller with a budget builds the reader. Pinned by `tests/beef_stream_memory_budget_373.rs` and `tests/script_work_budget.rs`
 - A raw transaction with no input is invalid bytes (0.4.1, bsv-stack-lean #58): `Kind::NoInputs` at the transaction's offset from the streaming reader, not valid from `Beef::verify_valid`, with or without a BUMP index. The rule is the node's (bsv-script-lean `lean/BsvScript/TxRules.lean`, `checkTransactionCommon_vinEmpty`); a test BEEF's root needs an input and a merkle path
 - A raw transaction with an input and no output is invalid bytes too (0.4.3, bsv-stack-lean #59): `Kind::NoOutputs` at the transaction's offset, after the inputs' check (the sibling's `TxRules.lean:85-86`, `checkTransactionCommon_voutEmpty`); `beef_stream::no_transaction` answers both for every path. `Transaction::verify` refuses a transaction it reaches with either, proven or not (`invalid transaction <txid>: NoInputs`): there is no synthetic root
@@ -37,7 +37,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `verify.rs` | The existing SPV graph walk and `Transaction::verify_with_chain_params`, sharing fee/value/proof/resource behavior and the per-transaction sighash cache |
-| `verification_flags.rs` | Resolves tip + 1 (checked) or the no-tip latest era, then calls the crate's one `script::input_script_flags` function |
+| `verification_flags.rs` | Resolves tip + 1 (checked) or the no-tip latest era, then uses the shared checked input-word composition; returns `NotJudgedCause`, never a script failure (#452) |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |
@@ -50,7 +50,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef_stream/reason.rs` | The refusal's names, `Kind` (twenty-six, `Kind::ALL`; `LeftDuplicateBelow` since #167's re-read) and `Reason`, re-exported from `beef_stream`; both `#[non_exhaustive]` (#86, #167): a `match` outside the crate ends in a wildcard arm |
 | `beef_stream/budget.rs` | The readers' `set_work_limit` and `set_memory_limit` (#373); budgets remain local and absent from cursors |
 | `beef_stream/evaluation.rs` | Local `Evaluation { work, memory, chain }`, `with_chain_params` on sync/async readers and `verify_stream_two_pass_with_chain_params`; no caller-made word or era resolver |
-| `beef_stream/spends.rs` | In-order/deferred input checks, only referenced source scripts retained, one shared sighash cache; source heights from the verified BUMP index |
+| `beef_stream/spends.rs` | In-order/deferred input checks, only referenced source scripts retained, one shared sighash cache; source heights from the verified BUMP index; scope refusals are `SpendRefusal::NotJudged { input, cause }` before script parsing/execution (#452) |
 | `beef_stream/deferred.rs` | What the stream holds for a parent not read yet (#240): `HeldTx` (a transaction's index entry, its raw bytes dropped), `TxFields` (one fold for a transaction read in order and one released), `Deferred` (the held entries by offset, the txids each waits on, the ready ones, the bytes held; no bound; `unresolved`, what the end refuses), the index's and the reader's sides of the release (`BeefIndex::held_for_a_parent`, `BeefIndex::release_one`, `Judge::release_next`, one per step; `AsyncStreamVerifier::release_all`, every released one at once), `write_held` and `read_held` (a BSC4 cursor's held entries) |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
@@ -198,6 +198,7 @@ impl Transaction {
     pub async fn verify_with_chain_params(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>, memory_limit: Option<usize>, chain: &ChainParams) -> Result<bool>
     // memory_limit: the reference's third parameter; None uncapped, as its default (#331), Some(n) n bytes per stack
     // an invalid script: Err(TransactionError("Script validation failed for input N: …"));
+    // outside the selected word's scope: Err(TransactionNotJudged { input_index, cause }) (#452)
     // an input stopped at the caller's budget, or by the allocator: Err(ScriptEvaluationDeclined { input_index, limit }) (#38)
 }
 
@@ -441,6 +442,7 @@ let live = LivePolicy::with_url("https://<host>/v1/policy"); live.refresh().awai
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
 - **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker` implement `Default`
+- **Genesis authority (#451)**: `ChainParams.genesis_height` alone decides; `ChainTip.genesis_height` is deprecated since beta.4, ignored, and removed at the next api-break. The stream uses mainnet `ChainParams` when no chain is supplied.
 - **SPV verify**: `verify()` performs queue-based verification over the whole ancestry (no recursion): checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input (a decline is `Error::ScriptEvaluationDeclined`, never `TransactionError`, #38), enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
 - **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
 
@@ -459,6 +461,7 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 | Error Type | Conditions |
 |------------|------------|
 | `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing, JSON serialization, SPV verification failures (invalid merkle path, fee too low, script validation) |
+| `TransactionNotJudged { input_index, cause }` | Unsupported chain facts: pre-Genesis coin/spend, overflowing tip/source height, zero activation; a verifier refusal, never a transaction judgment (#452) |
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
 | `MerklePathError` | Empty path, tree height over 64, duplicate offset, invalid offset at height, mismatched roots |
@@ -484,8 +487,16 @@ decoded cursor, exactly as the local budgets. No flag word is serialized.
 
 The verifier obtains source heights only from header-verified BUMPs; unproven
 sources use the spend era. Transaction flags use tip + 1 with checked overflow;
-without a tip they use the latest era in the chain parameters. Pre-Genesis is
-refused explicitly. A proven transaction still stops at its proof: the stream
+without a tip they use the latest era in the chain parameters. A pre-Genesis
+coin, overflowing tip or zero activation height is `Verdict::NotJudged` with
+`input` and `NotJudgedCause`; the underlying `SpendRefusal::NotJudged` also
+carries both. The whole path uses `Error::TransactionNotJudged { input_index,
+cause }`. These refuse the verifier's scope and never claim script failure
+(#452). Downstream matches add the `SpendRefusal::NotJudged` arm on beta.4;
+the toolbox's #461 skip and pre-Genesis refusal use this typed class, and the
+CLI reads its fields, never its text. Genesis lives in `ChainParams` alone;
+`ChainTip.genesis_height` is deprecated and ignored until its next-api-break
+removal (#451). A proven transaction still stops at its proof: the stream
 runs scripts only for unproven transactions; callers judging mined scripts can
 use `input_script_flags(..., mined = true)` with their block height.
 Structural, atomic, finality/maturity, value, duplicate and deferred-parent rules

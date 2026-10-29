@@ -64,6 +64,8 @@ pub mod flags;
 #[cfg(feature = "block")]
 mod input_flags;
 pub mod locking_script;
+#[cfg(feature = "block")]
+mod not_judged;
 pub mod op;
 #[allow(clippy::module_inception)]
 pub mod script;
@@ -82,9 +84,13 @@ pub use evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
 pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
+#[cfg(feature = "transaction")]
+pub(crate) use input_flags::checked_input_script_flags;
 #[cfg(feature = "block")]
 pub use input_flags::input_script_flags;
 pub use locking_script::LockingScript;
+#[cfg(feature = "block")]
+pub use not_judged::NotJudgedCause;
 pub use script::Script;
 pub use script_num::ScriptNum;
 pub use spend::{Spend, SpendParams, TxSpendParams};

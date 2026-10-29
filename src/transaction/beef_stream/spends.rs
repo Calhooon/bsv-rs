@@ -129,6 +129,20 @@ impl<T: TxFields> InputCheck<'_, T> {
         let input = self.body.input(vin);
         let refuse = |why| self.refuse(input.at, Some(vin as u32), why);
         let script_error = |e: String| refuse(SpendRefusal::Script(e));
+        let source_height = index
+            .proven
+            .get(&input.prev)
+            .and_then(|i| index.bumps.get(*i as usize))
+            .map(|b| b.0);
+        let flags = self
+            .evaluation
+            .flags(self.tip, source_height)
+            .map_err(|cause| {
+                refuse(SpendRefusal::NotJudged {
+                    input: vin as u32,
+                    cause,
+                })
+            })?;
         let locking_script =
             LockingScript::from_binary(&source.script).map_err(|e| script_error(e.to_string()))?;
         let unlocking_script = UnlockingScript::from_binary(self.body.unlocking(vin))
@@ -143,14 +157,9 @@ impl<T: TxFields> InputCheck<'_, T> {
             work_limit: self.evaluation.work,
         })
         .map_err(|e| script_error(e.to_string()))?;
-        let source_height = index
-            .proven
-            .get(&input.prev)
-            .and_then(|i| index.bumps.get(*i as usize))
-            .map(|b| b.0);
-        self.evaluation
-            .apply_flags(&mut spend, self.tip, source_height)
-            .map_err(|e| script_error(e.to_string()))?;
+        if let Some(flags) = flags {
+            spend.set_flags(flags);
+        }
         match spend.validate() {
             Ok(true) => Ok(()),
             Ok(false) => Err(script_error("the script did not succeed".to_string())),

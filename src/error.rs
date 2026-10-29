@@ -529,6 +529,16 @@ pub enum Error {
     #[cfg(feature = "identity")]
     #[error("contact not found: {0}")]
     ContactNotFound(String),
+
+    /// The chain facts cannot select a supported word; the input was not judged.
+    #[cfg(feature = "transaction")]
+    #[error("input {input_index} not judged: {cause}")]
+    TransactionNotJudged {
+        /// The index of the input outside the verifier's scope.
+        input_index: usize,
+        /// The typed scope or configuration refusal.
+        cause: crate::script::NotJudgedCause,
+    },
 }
 
 /// The class of a transport fault: what a caller may assume about the far

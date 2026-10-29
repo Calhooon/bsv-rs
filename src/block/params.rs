@@ -18,6 +18,12 @@ const TEN_MINUTES: i64 = 10 * 60;
 ///
 /// The fields are public so a host can describe another chain starting from
 /// one of the constructors; new fields may be added in a minor release.
+/// Genesis activation is authoritative here; `ChainTip`'s deprecated copy is ignored.
+///
+/// STN is not modelled. Nothing in the stack runs on STN, and bitcoin-sv
+/// v1.2.2 (`879fc8b`) leaves its BIP65, BIP66 and CSV heights uninitialized
+/// (`bsv-script-lean/docs/PARAMETERS.md:205`, finding #39), so a verdict there
+/// is not reproducible. Support may be added when a consumer names a use.
 /// ```
 /// use bsv_rs::block::ChainParams;
 /// let main = ChainParams::main();

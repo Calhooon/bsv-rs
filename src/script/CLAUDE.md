@@ -33,6 +33,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging; `ScriptResource`, `ScriptResourceLimit` and its `Display`, the one place the resource sentences live (#228) |
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError`; `check` requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS in a word, naming the missing flag in its refusal (#434). Default mode can compute the original digest without FORKID (#429) |
+| `not_judged.rs` | `NotJudgedCause` under `block`: typed height/activation facts, shared by live-verifier refusals; one sentence per cause (#452) |
 | `input_flags.rs` | Under `block`, `input_script_flags` computes spend-era transaction flags plus source-era UTXO bits from `ChainParams` and heights (#440); pre-Genesis explicitly refused |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
@@ -379,7 +380,7 @@ also serves `with_activation_heights`, whose typed `ActivationHeightsError`
 keeps `block` independent of `script`; public field mutations cannot bypass
 the composition check. `configscriptpolicy.cpp:310-321,353-364` at `879fc8b`
 pins the refusal, and the two `a_zero_*_activation_height_is_refused` tests
-exercise both entry points.
+exercise both entry points. The internal checked composition also returns the typed `NotJudgedCause` for live verifiers; the public standalone selector retains `ScriptFlagsError` and its text (#452).
 
 The node sites are `bitcoin-sv@879fc8b policy.h:226-245` and
 `validation.cpp:2973-2982`; sibling `docs/PARAMETERS.md:103,123,125,168`.

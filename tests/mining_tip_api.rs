@@ -19,6 +19,7 @@ impl Headers for Context {
 #[test]
 fn mining_tip_defaults_and_reference_forwarding() {
     assert_eq!(OldHeaders.mining_tip(), None);
+    #[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
     let headers = Context(ChainTip {
         height: 800_000,
         median_time_past: 1_700_000_000,

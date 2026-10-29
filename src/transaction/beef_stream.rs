@@ -123,6 +123,8 @@ pub fn display_hex(hash: &Hash32) -> String {
 mod budget;
 mod deferred;
 mod evaluation;
+#[cfg(test)]
+mod not_judged_tests;
 mod reason;
 mod spends;
 use deferred::{read_held, write_held, Deferred, TxFields};
@@ -1473,7 +1475,11 @@ pub struct ChainTip {
     pub height: u32,
     /// Tip's median time past, in seconds.
     pub median_time_past: u32,
-    /// This network's Genesis activation height.
+    /// Compatibility field, ignored by verification; use `ChainParams`.
+    #[deprecated(
+        since = "0.9.0-beta.4",
+        note = "Use block::ChainParams::genesis_height; ChainTip's copy is ignored and will be removed at the next api-break."
+    )]
     pub genesis_height: u32,
     /// This network's CSV activation height.
     pub csv_height: u32,
@@ -1559,9 +1565,8 @@ fn live_of(outputs: &Option<Box<[Option<Retained>]>>) -> usize {
         .map_or(0, |o| o.iter().filter(|slot| slot.is_some()).count())
 }
 
-/// Why a spend was refused. This is the interpreter's verdict on a
-/// transaction, not a rule about the BEEF's bytes, and it is not one of the
-/// twenty-six [`Kind`]s.
+/// Why a spend was refused: a transaction judgment or a verifier decline,
+/// never a rule about the BEEF's bytes or one of the twenty-six [`Kind`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpendRefusal {
     /// The parent is a txid-only entry: its output is not in the BEEF.
@@ -1595,15 +1600,25 @@ pub enum SpendRefusal {
         /// The coinbase's verified block height; named at the spending input.
         height: u64,
     },
+    /// Chain facts cannot select a supported word; the input was not judged.
+    NotJudged {
+        /// The index of the input outside the verifier's scope.
+        input: u32,
+        /// The typed scope or configuration refusal.
+        cause: crate::script::NotJudgedCause,
+    },
 }
 
 /// The refusal as one sentence (#213): the interpreter's words for a script,
 /// the interpreter's resource sentence for a decline, each other arm its
 /// rule. The texts are pinned (`tests/beef_stream.rs`,
-/// `a_spend_refusal_prints_*`): a host matches on them.
+/// `a_spend_refusal_prints_*`): a host matches typed variants and fields.
 impl fmt::Display for SpendRefusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            SpendRefusal::NotJudged { input, cause } => {
+                write!(f, "input {input} not judged: {cause}")
+            }
             SpendRefusal::ParentIsTxidOnly => write!(
                 f,
                 "the parent is a txid-only entry: its output is not in the BEEF"
@@ -2073,8 +2088,12 @@ impl BeefIndex {
         if self.check_spends && !seen {
             if bump_index.is_none() {
                 // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204.
+                let genesis_height = evaluation.chain.as_ref().map_or_else(
+                    || crate::block::ChainParams::mainnet().genesis_height,
+                    |chain| chain.genesis_height,
+                );
                 let after_genesis =
-                    tip.is_none_or(|t| u64::from(t.height) + 1 >= u64::from(t.genesis_height));
+                    tip.is_none_or(|t| u64::from(t.height) + 1 >= u64::from(genesis_height));
                 if after_genesis {
                     for vout in 0..body.output_count() {
                         let (at, _, script) = body.output(vout);
@@ -2393,6 +2412,17 @@ pub enum Verdict {
         /// Why.
         why: SpendRefusal,
     },
+    /// The verifier cannot select a supported word; no transaction judgment.
+    NotJudged {
+        /// The offset of the input.
+        offset: u64,
+        /// The spending transaction.
+        txid: Hash32,
+        /// The index of the input outside the verifier's scope.
+        input: u32,
+        /// The typed scope or configuration refusal.
+        cause: crate::script::NotJudgedCause,
+    },
 }
 
 impl Verdict {
@@ -2427,6 +2457,17 @@ impl From<Stop> for Verdict {
                 check,
             },
             Stop::Invalid(r) => r.into(),
+            Stop::Spend {
+                offset,
+                txid,
+                why: SpendRefusal::NotJudged { input, cause },
+                ..
+            } => Verdict::NotJudged {
+                offset,
+                txid,
+                input,
+                cause,
+            },
             Stop::Spend {
                 offset,
                 txid,

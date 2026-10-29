@@ -3,7 +3,7 @@
 use std::io::{Read, Seek, SeekFrom};
 
 use crate::block::ChainParams;
-use crate::script::{ScriptFlagsError, Spend};
+use crate::script::{NotJudgedCause, ScriptFlags};
 
 use super::{
     referenced_outpoints, AsyncStreamVerifier, ChainTip, Hash32, Headers, StreamError,
@@ -24,23 +24,26 @@ impl Evaluation {
         chain: None,
     };
 
-    pub(super) fn apply_flags(
+    pub(super) fn flags(
         &self,
-        spend: &mut Spend,
         tip: Option<ChainTip>,
         source_height: Option<u64>,
-    ) -> Result<(), ScriptFlagsError> {
+    ) -> Result<Option<ScriptFlags>, NotJudgedCause> {
         if let Some(chain) = &self.chain {
-            let source_height = source_height.map(u32::try_from).transpose().map_err(|_| {
-                ScriptFlagsError::NotApplicable("The source output's proven height exceeds u32.")
-            })?;
-            spend.set_flags(super::super::verification_flags::verification_flags(
+            let source_height = source_height
+                .map(|height| {
+                    u32::try_from(height)
+                        .map_err(|_| NotJudgedCause::SourceHeightOverflow { height })
+                })
+                .transpose()?;
+            return super::super::verification_flags::verification_flags(
                 chain,
                 tip.map(|t| t.height),
                 source_height,
-            )?);
+            )
+            .map(Some);
         }
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -48,7 +51,8 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// Selects the node's standard script word from these chain parameters,
     /// the headers' mining tip + 1 and each source's verified BUMP height.
     /// With no tip the latest era in the parameters applies; an unproven
-    /// source takes the spend's era. Pre-Genesis scripts are refused explicitly.
+    /// source takes the spend's era. Unsupported chain facts return
+    /// [`Verdict::NotJudged`], with a typed cause, before script execution.
     ///
     /// Proven transactions still rely on their BUMP and run no script.
     /// Existing constructors without this builder keep SDK default evaluation.
