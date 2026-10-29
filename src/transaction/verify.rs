@@ -179,6 +179,7 @@ impl Evaluation<'_> {
             .map(|chain| {
                 super::verification_flags::verification_flags(chain, self.tip_height, source.height)
                     .map_err(|cause| Error::TransactionNotJudged {
+                        txid: tx.id(),
                         input_index: vin,
                         cause,
                     })

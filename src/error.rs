@@ -532,8 +532,10 @@ pub enum Error {
 
     /// The chain facts cannot select a supported word; the input was not judged.
     #[cfg(feature = "transaction")]
-    #[error("input {input_index} not judged: {cause}")]
+    #[error("transaction {txid} input {input_index} not judged: {cause}")]
     TransactionNotJudged {
+        /// The display txid of the unproven transaction being checked.
+        txid: String,
         /// The index of the input outside the verifier's scope.
         input_index: usize,
         /// The typed scope or configuration refusal.

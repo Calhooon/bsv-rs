@@ -75,6 +75,8 @@
 //!   node). A spend that fails is [`Verdict::SpendRefused`], never one of the
 //!   twenty-six kinds. [`StreamVerifier::structure_only`] turns the spend
 //!   checks off and leaves exactly the Lean's validity.
+//!   Chain facts outside the live verifier's scope yield [`Verdict::NotJudged`]
+//!   with a typed cause and input index, before script execution.
 //! - Next-block mining context: P2SH's Genesis era, finality and coinbase
 //!   maturity are spend checks. Missing finality or maturity context yields
 //!   [`Verdict::Unverifiable`], a decline outside the Lean's byte validity.
@@ -90,6 +92,7 @@
 //!     Verdict::Invalid { offset, kind, .. } => { /* the byte and the kind */ }
 //!     Verdict::SpendRefused { offset, why, .. } => { /* a spend said no */ }
 //!     Verdict::Unverifiable { check, .. } => { /* supply the mining context */ }
+//!     Verdict::NotJudged { input, cause, .. } => { /* unsupported chain facts */ }
 //! }
 //! ```
 
@@ -1475,10 +1478,10 @@ pub struct ChainTip {
     pub height: u32,
     /// Tip's median time past, in seconds.
     pub median_time_past: u32,
-    /// Compatibility field, ignored by verification; use `ChainParams`.
+    /// Default stream path's Genesis height; supplied `ChainParams` supersede it.
     #[deprecated(
         since = "0.9.0-beta.4",
-        note = "Use block::ChainParams::genesis_height; ChainTip's copy is ignored and will be removed at the next api-break."
+        note = "Use block::ChainParams::genesis_height; ChainTip's copy still serves the default stream path until its removal at the next api-break."
     )]
     pub genesis_height: u32,
     /// This network's CSV activation height.
@@ -2088,8 +2091,14 @@ impl BeefIndex {
         if self.check_spends && !seen {
             if bump_index.is_none() {
                 // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204.
+                #[allow(deprecated)]
+                // The default path honors the tip's copy until its removal (#451).
                 let genesis_height = evaluation.chain.as_ref().map_or_else(
-                    || crate::block::ChainParams::mainnet().genesis_height,
+                    || {
+                        tip.map_or(crate::block::ChainParams::mainnet().genesis_height, |t| {
+                            t.genesis_height
+                        })
+                    },
                     |chain| chain.genesis_height,
                 );
                 let after_genesis =

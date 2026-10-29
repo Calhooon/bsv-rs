@@ -442,7 +442,7 @@ let live = LivePolicy::with_url("https://<host>/v1/policy"); live.refresh().awai
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
 - **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker` implement `Default`
-- **Genesis authority (#451)**: `ChainParams.genesis_height` alone decides; `ChainTip.genesis_height` is deprecated since beta.4, ignored, and removed at the next api-break. The stream uses mainnet `ChainParams` when no chain is supplied.
+- **Genesis authority (#451)**: supplied `ChainParams.genesis_height` alone decides. Without params, the stream's P2SH check still reads `ChainTip.genesis_height`, deprecated since beta.4, or mainnet's figure when there is no tip. The copy functions until its removal at the next api-break, when params become the only source; no default-path verdict changes.
 - **SPV verify**: `verify()` performs queue-based verification over the whole ancestry (no recursion): checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input (a decline is `Error::ScriptEvaluationDeclined`, never `TransactionError`, #38), enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
 - **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
 
@@ -461,7 +461,7 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 | Error Type | Conditions |
 |------------|------------|
 | `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing, JSON serialization, SPV verification failures (invalid merkle path, fee too low, script validation) |
-| `TransactionNotJudged { input_index, cause }` | Unsupported chain facts: pre-Genesis coin/spend, overflowing tip/source height, zero activation; a verifier refusal, never a transaction judgment (#452) |
+| `TransactionNotJudged { txid, input_index, cause }` | Unsupported chain facts: pre-Genesis coin/spend, overflowing tip, zero activation; names the unproven transaction and input, a verifier refusal, never a transaction judgment (#452) |
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
 | `MerklePathError` | Empty path, tree height over 64, duplicate offset, invalid offset at height, mismatched roots |
@@ -490,15 +490,18 @@ sources use the spend era. Transaction flags use tip + 1 with checked overflow;
 without a tip they use the latest era in the chain parameters. A pre-Genesis
 coin, overflowing tip or zero activation height is `Verdict::NotJudged` with
 `input` and `NotJudgedCause`; the underlying `SpendRefusal::NotJudged` also
-carries both. The whole path uses `Error::TransactionNotJudged { input_index,
-cause }`. These refuse the verifier's scope and never claim script failure
+carries both. The whole path uses `Error::TransactionNotJudged { txid,
+input_index, cause }`, naming the unproven transaction even in an ancestor.
+These refuse the verifier's scope and never claim script failure
 (#452). Downstream matches add the `SpendRefusal::NotJudged` arm on beta.4;
 the toolbox's #461 skip and pre-Genesis refusal use this typed class, and the
-CLI reads its fields, never its text. Genesis lives in `ChainParams` alone;
-`ChainTip.genesis_height` is deprecated and ignored until its next-api-break
-removal (#451). A proven transaction still stops at its proof: the stream
-runs scripts only for unproven transactions; callers judging mined scripts can
+CLI reads its fields, never its text. Supplied `ChainParams` alone decide
+Genesis. Without params, the P2SH check honors the deprecated
+`ChainTip.genesis_height` until its next-api-break removal (#451), using
+mainnet's figure only when no tip is supplied. A proven transaction still stops
+at its proof: the stream runs scripts only for unproven transactions; callers
+judging mined scripts can
 use `input_script_flags(..., mined = true)` with their block height.
 Structural, atomic, finality/maturity, value, duplicate and deferred-parent rules
-are unchanged. `ChainParams` is authoritative for script activation; the old
-`ChainTip::genesis_height` field remains for the existing mining checks.
+are unchanged. `ChainParams` is authoritative on the live path; the deprecated
+`ChainTip::genesis_height` still serves the default path's P2SH check.

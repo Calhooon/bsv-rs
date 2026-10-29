@@ -33,6 +33,10 @@ pub enum NotJudgedCause {
     /// A public activation field was set to zero.
     ZeroActivationHeight(ActivationHeightsError),
     /// A streaming BUMP's height cannot be passed to the word selector.
+    ///
+    /// Reachable through synchronous streaming `Headers`, which accepts
+    /// `u64` heights. The in-memory `MerklePath` conversion and asynchronous
+    /// `ChainTracker` path reject such heights before word selection.
     SourceHeightOverflow {
         /// The coin's verified BUMP height.
         height: u64,
