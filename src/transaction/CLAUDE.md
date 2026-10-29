@@ -59,9 +59,11 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker` (a synthetic mainnet mining tip at its height, `with_mining_tip`; #218), `AlwaysValidChainTracker` |
 | `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, `BlockHeadersServiceConfig` |
 
-## Core Types
+## Budgets
 
-`Transaction::verify` has no work budget; `SpendParams::work_limit` and `StreamVerifier::set_work_limit` bound charged work, while an elapsed-time bound must be external because a work counter cannot interrupt one arithmetic opcode (#378).
+`Transaction::verify` has no work budget; `SpendParams::work_limit` and `StreamVerifier::set_work_limit` bound charged work, while an elapsed-time bound must be external because a work counter cannot interrupt one arithmetic opcode (#378). Part 2 of #378 (the keeper's word of 2026-10-29 19:1xZ) adds an additive work budget to `Transaction::verify`, `None` the reference's behaviour, a spend over it not judged under #452's class with a resource cause.
+
+## Core Types
 
 ### TransactionInput
 
