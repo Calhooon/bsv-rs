@@ -35,7 +35,7 @@ to it, the auth nonce helpers and the private contact identity-tag helper. `deri
 fixed-width key required by BRC-2 AES-GCM. Its callers were traced: encrypt,
 decrypt and specific-linkage encryption, including certificate field-key
 wrapping and verifier keyrings. Certificate fields' random AES keys and
-those keyrings remain 32 bytes, as the amendment explicitly requires.
+those keyrings remain 32 bytes: the amendment does not change AES-GCM (its lines 78-82 limit it to the HMAC key).
 
 Both verification tags are computed and compared with `subtle::ct_eq` on
 every call; the standard wins if both match. The named acceptance is a
@@ -54,16 +54,22 @@ byte stay compatible:
   `BothEncodings` remains the default; neither policy changes issuance.
 
 A tag matching neither key remains `WalletError("HMAC is not valid")`.
-Migration from the earlier #389 proposal: `ThirtyTwoByte` (standard) and
-`MinimalLength { leading_zero_bytes }` (legacy) become `MinimalLength`
-(standard) and `Legacy { leading_zero_bytes }`; the count changes from
-`minimal_length_hmac_acceptances` to `legacy_hmac_acceptances`, and strict
-`ThirtyTwoByteOnly` becomes `MinimalLengthOnly`. The emitted refusal changes
-from `Error::HmacMinimalLengthKey` to `Error::HmacLegacyKey`. The old error
-variant is retained for source compatibility with beta.3, but is no longer
-emitted. Persisted 32-byte-key tags require the compatibility policy until
+Migration: the names of the earlier #389 proposal (`ThirtyTwoByte`,
+`MinimalLength { leading_zero_bytes }`, `minimal_length_hmac_acceptances`,
+`ThirtyTwoByteOnly`) were never released, so the only change a beta.3 caller
+sees is the emitted refusal, `Error::HmacMinimalLengthKey` to
+`Error::HmacLegacyKey`; the old variant is kept for source compatibility and
+is no longer emitted. The released shape is `MinimalLength` (standard),
+`Legacy { leading_zero_bytes }` (the named and counted legacy acceptance,
+`legacy_hmac_acceptances`), and the strict `MinimalLengthOnly` policy for a
+store with no pre-amendment tags. `bsv-wallet-toolbox-rs` hands HMAC to
+`ProtoWallet` (its `src/wallet/wallet.rs:914-943`), so on its re-pin it
+issues minimal-length tags and accepts both forms, where at beta.3 it issued
+32-byte-key tags and accepted the minimal-length form on a miss. Persisted 32-byte-key tags require the compatibility policy until
 migrated; changing issuance does not rewrite stored values. `verify_nonce`
-recomputes through `create_hmac`, so a pre-amendment nonce whose key has
+recomputes through `create_hmac`, so a `Peer` session nonce (the one artefact
+verified that way: `Peer::verify_own_nonce`, in memory, about 1 in 256 of
+those issued before this change) whose key has
 leading zero octets no longer matches; the HMAC verifier's compatibility
 policy does not apply to that recomputation.
 
