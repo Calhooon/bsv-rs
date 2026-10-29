@@ -2996,7 +2996,7 @@ pub enum Timed {
 }
 
 /// The reader over a [`Read`]: one step per element, a cursor between any
-/// two, and, under a evaluation, between two inputs of a transaction.
+/// two, and, under a budget, between two inputs of a transaction.
 pub struct StreamVerifier<R, H> {
     source: BeefStream<R>,
     judge: Judge,
@@ -3118,7 +3118,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             return Ok(Timed::Progress(Progress::Verdict(verdict.clone())));
         }
         // A held transaction an earlier step released (bsv-rs#240): one per
-        // step, under the caller's evaluation, ahead of the next element.
+        // step, under the caller's budget, ahead of the next element.
         if self.held.is_none() && self.judge.index.deferred.has_ready() {
             let tip = self.headers.mining_tip();
             return Ok(
