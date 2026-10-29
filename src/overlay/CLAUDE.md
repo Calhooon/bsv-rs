@@ -23,7 +23,7 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order) |
 | `topic_broadcaster.rs` | SHIP topic broadcasting with acknowledgment requirements |
 | `retry.rs` | Public error-text retry for overlay broadcasts: three retries by default, no synchronization; unchanged by #340 |
-| `wallet_retry.rs`, `wallet_retry_tests.rs` | #340: the reference wallet-evidence rule moved from identity, shared by revocation and both stores; five attempts, competing BEEF synchronization, original wallet error and caller error category preserved; five classification/boundary tests |
+| `wallet_retry.rs`, `wallet_retry_tests.rs` | #340: the reference wallet-evidence rule moved from identity, shared by revocation and the global store; five attempts, competing BEEF synchronization, original wallet error and caller error category preserved; five classification/boundary tests |
 
 ## Key Exports
 
@@ -308,12 +308,12 @@ pub async fn with_double_spend_retry<T, F, Fut>(
 
 Detects double-spend errors by matching: `double spend`, `double-spend`, `txn-mempool-conflict`, `already spent`, `missing inputs`. Non-double-spend errors are returned immediately without retry.
 
-This is not the reference's `withDoubleSpendRetry` (`ts-stack@edf6e03` `overlay-tools/withDoubleSpendRetry.ts`), which retries only a wallet's `WERR_REVIEW_ACTIONS` carrying double-spend evidence, broadcasts each competing transaction before the next attempt and makes five attempts; the identity revocation and both stores now share that rule in `src/overlay/wallet_retry.rs` (#327/#340).
+This is not the reference's `withDoubleSpendRetry` (`ts-stack@edf6e03` `overlay-tools/withDoubleSpendRetry.ts`), which retries only a wallet's `WERR_REVIEW_ACTIONS` carrying double-spend evidence, broadcasts each competing transaction before the next attempt and makes five attempts; the identity revocation and global store now share that rule in `src/overlay/wallet_retry.rs` (#327/#340).
 
-At the reference pin, only the global store wraps its mutations in this helper;
-local calls to `completeBoundAction` contain no retry. Rust's local retry is
-the owner's extension (#340). Go's `kvstore/local_kv_store.go` at `2ca481c`
-also has no double-spend retry.
+The local store does not retry, as the reference's does not (#340). At the
+reference pin, local calls to `completeBoundAction` contain no retry, and the
+Rust local store has no broadcaster. Go's `kvstore/local_kv_store.go` at
+`2ca481c` also has no double-spend retry.
 
 ## Implementation Notes
 

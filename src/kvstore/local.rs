@@ -3,7 +3,6 @@
 //! Uses the wallet's basket system to store encrypted key-value pairs.
 //! Only the wallet owner can read/write entries.
 
-use crate::overlay::{with_wallet_double_spend_retry, TopicBroadcaster, TopicBroadcasterConfig};
 use crate::primitives::{to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
@@ -48,7 +47,6 @@ pub struct LocalKVStore<W: WalletInterface + std::fmt::Debug> {
     wallet: W,
     config: KVStoreConfig,
     action_options: ActionOptions,
-    broadcaster: Option<Arc<TopicBroadcaster>>,
     /// Mutex for atomic operations.
     state: Arc<Mutex<LocalKVStoreState>>,
 }
@@ -93,18 +91,8 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             wallet,
             config,
             action_options: ActionOptions::default(),
-            broadcaster: None,
             state: Arc::new(Mutex::new(LocalKVStoreState::default())),
         })
-    }
-
-    /// Uses a caller-built broadcaster to synchronize competing transactions before retrying.
-    ///
-    /// Its resolver, facilitator, topics and acknowledgment requirements are used as given.
-    #[must_use]
-    pub fn with_broadcaster(mut self, broadcaster: TopicBroadcaster) -> Self {
-        self.broadcaster = Some(Arc::new(broadcaster));
-        self
     }
 
     /// Sets the wallet's `acceptDelayedBroadcast` option (default: false).
@@ -259,12 +247,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         // Queue this operation atomically
         self.acquire_key_lock(key).await;
 
-        let result = with_wallet_double_spend_retry(
-            || self.set_internal(key, value, protocol_id, &options),
-            || self.topic_broadcaster(),
-            Error::KvStoreError,
-        )
-        .await;
+        let result = self.set_internal(key, value, protocol_id, &options).await;
 
         self.release_key_lock(key).await;
 
@@ -553,17 +536,6 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     // =========================================================================
     // Internal Helper Methods
     // =========================================================================
-
-    fn topic_broadcaster(&self) -> Result<Arc<TopicBroadcaster>> {
-        if let Some(broadcaster) = &self.broadcaster {
-            return Ok(broadcaster.clone());
-        }
-        TopicBroadcaster::new(
-            self.config.topics.clone(),
-            TopicBroadcasterConfig::default(),
-        )
-        .map(Arc::new)
-    }
 
     fn originator(&self) -> Option<&str> {
         self.config.originator.as_deref()

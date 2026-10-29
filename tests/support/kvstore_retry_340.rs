@@ -289,8 +289,7 @@ pub fn setup(name: &str) -> Harness {
     } else {
         Store::Local(
             LocalKVStore::new(wallet.clone(), KVStoreConfig::default().with_encrypt(false))
-                .unwrap()
-                .with_broadcaster(broadcaster),
+                .unwrap(),
         )
     };
     Harness {

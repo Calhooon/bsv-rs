@@ -1,4 +1,4 @@
-//! #340: the shared wallet-evidence retry, including a fresh lookup and action reference.
+//! #340: global wallet-evidence retry and local single-attempt mutations.
 #![cfg(feature = "kvstore")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[path = "support/identity_reveal_wallet.rs"]
@@ -19,7 +19,7 @@ async fn accepted(name: &str) {
     assert_attempts(&h, 2, 1);
     let sent = h.sent.lock().unwrap();
     assert_eq!(sent[0], h.case["competing"]["txid"]);
-    assert_eq!(sent.len(), if h.case["kind"] == "global" { 2 } else { 1 });
+    assert_eq!(sent.len(), 2);
 }
 
 async fn exhausted(name: &str) {
@@ -39,6 +39,21 @@ async fn exhausted(name: &str) {
         h.sent.lock().unwrap().as_slice(),
         vec![h.case["competing"]["txid"].as_str().unwrap(); 4]
     );
+}
+
+async fn local_single_attempt(name: &str) {
+    let h = setup(name);
+    let result = h.run().await;
+    assert_attempts(&h, 1, 1);
+    assert_eq!(h.case["create_actions"].as_array().unwrap().len(), 1);
+    assert_eq!(h.case["abort_actions"].as_array().unwrap().len(), 1);
+    assert_eq!(result, Err(review(&h.case)), "keep the wallet error");
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        h.case["review_error"]["message"]
+    );
+    assert!(h.sent.lock().unwrap().is_empty());
+    assert!(h.case["broadcasts"].as_array().unwrap().is_empty());
 }
 
 macro_rules! retry_case {
@@ -61,13 +76,13 @@ retry_case!(
     "global_remove_once"
 );
 retry_case!(
-    local_set_retries_with_fresh_tokens_340,
-    accepted,
+    local_set_does_not_retry_one_double_spend_340,
+    local_single_attempt,
     "local_set_once"
 );
 retry_case!(
-    local_remove_retries_with_fresh_tokens_340,
-    accepted,
+    local_remove_does_not_retry_one_double_spend_340,
+    local_single_attempt,
     "local_remove_once"
 );
 retry_case!(
@@ -81,13 +96,13 @@ retry_case!(
     "global_remove_always"
 );
 retry_case!(
-    local_set_stops_after_five_attempts_340,
-    exhausted,
+    local_set_does_not_retry_repeated_double_spends_340,
+    local_single_attempt,
     "local_set_always"
 );
 retry_case!(
-    local_remove_stops_after_five_attempts_340,
-    exhausted,
+    local_remove_does_not_retry_repeated_double_spends_340,
+    local_single_attempt,
     "local_remove_always"
 );
 
@@ -130,12 +145,7 @@ async fn malformed_review_evidence_is_not_retried_340() {
 
 #[tokio::test]
 async fn an_unacknowledged_competing_transaction_prevents_retry_340() {
-    for name in [
-        "global_set_once",
-        "global_remove_once",
-        "local_set_once",
-        "local_remove_once",
-    ] {
+    for name in ["global_set_once", "global_remove_once"] {
         let h = setup(name);
         h.fail.store(true, Ordering::SeqCst);
         let error = h.run().await.unwrap_err();

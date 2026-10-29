@@ -1,5 +1,5 @@
 {
-  "description": "#340: actual global retry and local non-retry sequences; local retries in Rust are the owner-requested extension",
+  "description": "#340: global retry and local single-attempt sequences, preserved by the Rust stores",
   "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9; Node v22.18.0",
   "runs": [
     {
