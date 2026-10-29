@@ -71,7 +71,10 @@ recomputes through `create_hmac`, so a `Peer` session nonce (the one artefact
 verified that way: `Peer::verify_own_nonce`, in memory, about 1 in 256 of
 those issued before this change) whose key has
 leading zero octets no longer matches; the HMAC verifier's compatibility
-policy does not apply to that recomputation.
+policy does not apply to that recomputation. A session nonce lives in the
+process that issued it, and the change reaches a process at its re-pin,
+which is a restart, so the window is the restart itself: the nonces that
+process issued under a leading-zero key, one key in 256, do not survive it.
 
 Pinned by `wallet_brc56_hmac_tests` (the six keys and ten distinct tags,
 standard-first verdicts, legacy counts including clones and the async
