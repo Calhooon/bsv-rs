@@ -71,6 +71,48 @@ of 255, with no 250-byte check or hostname normalization. Its writer casts the
 length to `byte` and can wrap above 255. Rust follows TypeScript's 250-byte
 bound and refuses before writing. The existing empty-originator difference
 remains: Rust dispatches `None`, TypeScript dispatches `''`.
+### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
+
+`HmacKeyEncoding` and `HmacVerifyPolicy` are now `#[non_exhaustive]`, so
+later key encodings and verification policies can be added without breaking
+callers. Both enums were introduced by #379 after v0.9.0-beta.3 was cut.
+No published prerelease carried the enums exhaustive,
+so the change is additive in effect.
+
+Migration: a `match` on either enum outside the crate needs a wildcard arm
+(`_ => ...`). The crate and its tests use constructors and equality checks,
+with no matches on either enum needing an added arm. A test that either
+enum is non-exhaustive is not expressible in Rust from inside the crate;
+the pin is the rustdoc contract and the semver reading below.
+
+### Notes: cross-SDK parity (#443)
+
+This is a Rust API extensibility change. HMAC issuance, verification,
+legacy acceptance counts and the strict nonce path retain #379's behavior
+and its cross-SDK parity reading.
+
+Against base `1dc611a188f2d8a61cdb2e841e5154ee6cb7d47e`,
+`cargo semver-checks --all-features --baseline-rev <base>` (0.51.0) assumes
+a major release because both versions are `0.9.0-beta.3`, reporting
+`0 checks: 0 pass, 260 skip` and `Summary no semver update required`.
+Adding `--release-type minor` exercises the checks: `202 checks: 201 pass,
+1 fail, 0 warn, 58 skip`. Its sole failure names `HmacKeyEncoding` and
+`HmacVerifyPolicy`, with these verbatim diagnostic excerpts:
+
+```text
+--- failure enum_marked_non_exhaustive: enum marked #[non_exhaustive] ---
+
+Description:
+A public enum has been marked #[non_exhaustive]. Pattern-matching on it outside of its crate must now include a wildcard pattern like `_`, or it will fail to compile.
+```
+
+```text
+     Summary semver requires new major version: 1 major and 0 minor checks failed
+```
+
+That is the expected source-compatibility finding against the unpublished
+base; no other lint fails. The release-history distinction above is why
+this change is additive in effect for published consumers.
 
 ### Fixed: required script flag refusals name the word's missing flag (#434)
 
