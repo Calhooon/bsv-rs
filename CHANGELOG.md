@@ -93,6 +93,28 @@ same-value shortcut at `:243-245` accepts multiple outputs too. Go has no
 global store. Rust's existing local lookup authentication/pagination and global
 double-spend retry differences are not addressed by this change.
 
+Seven differences from the reference stand in this change, found by its cold
+review and stated here (CLAUDE.md rule 1): the unlocker signs over the source
+output inside the wallet's signable transaction (`token_spends.rs:108-117`),
+where the reference signs over the token's own satoshis and locking script
+(`GlobalKVStore.ts:359-360`, `LocalKVStore.ts:403-404,505-506`); one input per
+outpoint is sent (`token_spends.rs:54`), where the reference sends every lookup
+token, repeats included (`GlobalKVStore.ts:343-347`); the `protocolId` rewrite
+to `protocolID:[1,name]` (`global_actions.rs:190-199`) applies to every global
+lookup, the public `query()` with `with_protocol_id` included, not the mutation
+lookups alone; the local `remove` now takes the key lock (`local.rs:279`), as
+the reference does (`LocalKVStore.ts:569`); the input description and unlocking
+length are now the reference's (74 bytes, `Previous KVStore token` and `KVStore
+token to remove`) where they were 107 and `KV entry input`; `token_lock` calls
+createSignature before getPublicKey and after the lookup, where the reference
+calls getPublicKey (`PushDrop.ts:155`) then createSignature (`:175`), both
+before the lookup (`GlobalKVStore.ts:298` before `:309`); and the controller
+match is exact, where the reference lower-cases both sides
+(`GlobalKVStore.ts:666-668`). The signature request shape (`hashToDirectlySign`
+here, `data: sha256(preimage)` in the reference's `PushDrop.ts:246-248`) is
+crate-wide and older than this change; it and the local lookup pagination gap
+(`LocalKVStore.ts:332-339,574-590`) are filed as follow-ups.
+
 ### Added: the node's per-input script word from chain facts (#440)
 
 The keeper's rule (RULINGS-2026-10-12.md, 2026-10-28 16:5xZ, corrected at
