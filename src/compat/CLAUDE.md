@@ -17,6 +17,7 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
 | `bsm.rs` | Bitcoin Signed Message (~713 lines) |
 | `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1164 lines) |
+| `ecies_bounds.rs` | The reference's ECIES bounds before work (#333): 16 MiB plaintext and 16 MiB plus 160-byte envelopes, Electrum and Bitcore, in its refusal words |
 | `ecies_envelope.rs` | The frame of an Electrum envelope read the reference's way (#109): the embedded key found by the byte after the magic and the bytes left over, the expected sender, the ciphertext's 16-byte framing |
 
 ## Submodules
@@ -324,6 +325,8 @@ let hash = bsm::magic_hash(message);
 ## ECIES (Encryption)
 
 Provides ECIES encryption with two variants commonly used in the Bitcoin ecosystem.
+
+Both readers reject envelopes above 16,777,376 bytes before parsing, ECDH, hashing or AES (#333, `ts-stack@edf6e03` `ECIES.ts:12,589-594,704-709`); both writers reject plaintext above 16,777,216 bytes before work (`:551,673`, `CompatValidation.ts:1,8-15`). The words are `{Electrum|Bitcore} ECIES {envelope|plaintext} must be a bounded dense byte array`. A framed envelope over the bound was read and failed on its MAC; it is now refused in the reference's words before reading. Single/shared and base64 helpers inherit these bounds, with no independent helper or encoded-text bound in the reference. Byte slices are already dense bytes; Bitcore's IV is already 16 bytes by type. Go's `ElectrumDecrypt` has no upper bound (`go-sdk@2ca481c`, `compat/ecies/ecies.go:105-153`), nor do its Bitcore reader or writers. At the exact cap the existing framing/MAC behavior stays, including Rust's Bitcore MAC check where TypeScript rejects framing. Pinned by the eight tests in `tests/compat_ecies_bounds_333.rs`.
 
 ### Electrum ECIES
 
