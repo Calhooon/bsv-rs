@@ -9,6 +9,7 @@ use crate::wallet::{CreateActionOptions, SignActionOptions};
 mod action;
 mod checks;
 pub(crate) use action::complete_action;
+pub(super) use action::complete_with_signers;
 
 /// The options `completeBoundAction` signs with, carried from `create`, the
 /// options of the createAction the signAction completes.

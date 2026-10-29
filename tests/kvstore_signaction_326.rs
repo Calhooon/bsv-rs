@@ -10,8 +10,8 @@
 //! four sites sent the hex of the reference's bytes and no options.
 //!
 //! #341/#342 now bind the transaction and carry the reference's options.
-//! Global set still does not request a prior token (#343), so it has the
-//! new-token path's empty signer set, never a signer for wallet funding.
+//! #343 requests every prior token and signs each by outpoint, leaving
+//! wallet funding inputs without a token signer.
 //!
 //! Hermetic: the counting wallet of #318 (`tests/support/identity_reveal_wallet.rs`)
 //! lists the local store's token and answers createAction with a signable
@@ -35,7 +35,12 @@ use bsv_rs::wallet::{ListOutputsResult, Outpoint, WalletOutput};
 use identity_reveal_wallet::Counting;
 use serde_json::Value;
 use signaction_reference_326::{assert_reference_sign, source_of, vector};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
+
+static NEXT_LOOKUP: AtomicUsize = AtomicUsize::new(0);
 
 /// Answers every lookup with the token's BEEF at output 0 once one is set,
 /// an empty list before.
@@ -61,7 +66,7 @@ impl OverlayLookupFacilitator for TokenLookup {
     }
 }
 
-/// The token output of the last createAction's first output, carried by a
+/// The token output at index zero of the last createAction, carried by a
 /// source transaction the wallet's createAction then spends.
 fn token_of(wallet: &Counting) -> Transaction {
     let created = wallet.created.lock().unwrap().take().unwrap();
@@ -72,8 +77,7 @@ fn token_of(wallet: &Counting) -> Transaction {
 }
 
 /// Retain #326's reference and spend-member assertions, now with #342's
-/// exact create/sign options. The global update's missing token is #343;
-/// its signer set is the reference's new-token path's empty set (#341).
+/// exact create/sign options and requested token input (#343).
 fn assert_case(name: &str, case: &Value, wallet: &Counting, spends_token: bool) {
     let signed = wallet.signed.lock().unwrap().take().unwrap();
     let created = wallet.created.lock().unwrap().take().unwrap();
@@ -108,7 +112,10 @@ fn global_store(wallet: &Counting, token: Arc<Mutex<Option<Vec<u8>>>>) -> Global
     let mut host_overrides = std::collections::HashMap::new();
     host_overrides.insert(
         config.service_name.clone(),
-        vec!["https://kvstore.overlay.invalid".to_string()],
+        vec![format!(
+            "https://kvstore-326-{}.invalid",
+            NEXT_LOOKUP.fetch_add(1, Ordering::Relaxed)
+        )],
     );
     let resolver = LookupResolver::new(LookupResolverConfig {
         network_preset: NetworkPreset::Local,
@@ -147,7 +154,7 @@ async fn the_global_update_signs_with_the_reference_text_and_the_bound_options()
         "global set_update",
         &vector()["global"]["set_update"],
         &wallet,
-        false,
+        true,
     );
 }
 

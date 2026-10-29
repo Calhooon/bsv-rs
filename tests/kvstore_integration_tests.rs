@@ -176,11 +176,14 @@ impl WalletInterface for MockWallet {
 
     async fn create_signature(
         &self,
-        _args: CreateSignatureArgs,
+        args: CreateSignatureArgs,
         _originator: Option<&str>,
     ) -> Result<CreateSignatureResult> {
         Ok(CreateSignatureResult {
-            signature: vec![0u8; 64],
+            signature: self
+                .private_key
+                .sign(&args.hash_to_directly_sign.unwrap_or([0; 32]))?
+                .to_der(),
         })
     }
 

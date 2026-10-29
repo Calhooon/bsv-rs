@@ -28,10 +28,22 @@ pub const SIGNABLE_REFERENCE: &str = "UlJSUlJSUlI=";
 
 /// A signable transaction spending output 0 of `source` to `outputs`.
 fn spending_signable(source: &Transaction, outputs: &[CreateActionOutput]) -> SignableTransaction {
+    spending_many(&[(source.clone(), 0)], outputs)
+}
+
+fn spending_many(
+    sources: &[(Transaction, u32)],
+    outputs: &[CreateActionOutput],
+) -> SignableTransaction {
     let mut partial = Transaction::new();
-    partial
-        .add_input(TransactionInput::with_source_transaction(source.clone(), 0))
-        .unwrap();
+    for (source, index) in sources.iter().rev() {
+        partial
+            .add_input(TransactionInput::with_source_transaction(
+                source.clone(),
+                *index,
+            ))
+            .unwrap();
+    }
     if outputs.is_empty() {
         let data = LockingScript::from_binary(&[0x00, 0x6a]).unwrap();
         partial.add_output(TransactionOutput::new(0, data)).unwrap();
@@ -68,6 +80,8 @@ pub struct Counting {
     /// `OP_FALSE OP_RETURN` when none), its reference `SIGNABLE_REFERENCE`
     /// decoded, as a substrate hands the wallet's text over (#326).
     pub spending: Arc<Mutex<Option<Transaction>>>,
+    /// #343: explicit token sources, returned in reverse order to exercise outpoint binding.
+    pub spending_many: Arc<Mutex<Vec<(Transaction, u32)>>>,
     pub keyring: Option<indexmap::IndexMap<String, String>>,
     pub created: Arc<Mutex<Option<CreateActionArgs>>>,
     pub created_originator: Arc<Mutex<Option<String>>>,
@@ -115,6 +129,7 @@ impl Counting {
             signed: Arc::default(),
             listed: Arc::default(),
             spending: Arc::default(),
+            spending_many: Arc::default(),
             keyring: None,
             created: Arc::default(),
             created_originator: Arc::default(),
@@ -188,6 +203,10 @@ macro_rules! counting {
                     }
                     None => self.signable.clone(),
                 };
+                let sources = self.spending_many.lock().unwrap();
+                if !sources.is_empty() {
+                    signable = Some(spending_many(&sources, args.outputs.as_deref().unwrap_or(&[])));
+                }
                 if let Some(answer) = &mut signable {
                     mutate_bound_answer(answer, &self.create_mode.lock().unwrap());
                 }

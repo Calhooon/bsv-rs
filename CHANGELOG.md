@@ -46,6 +46,52 @@ Pinning the census messages exposes one existing wording difference:
 encoding for the public key and signature.` where the TypeScript recording
 returns `The signature format is invalid.` Both refusals and their distinct
 messages are now pinned; no interpreter behavior is changed for that row.
+### Fixed: spend every current key-value token (#343)
+
+`GlobalKVStore::set` now requests token data for the exact key, controller and
+protocol namespace, merges every authenticated token's BEEF and spends each
+outpoint once when creating its replacement. `remove` uses the same selection
+and spends the whole set. Both paths use a PushDrop unlocker for each outpoint,
+with its own source script and satoshis, mapped to the wallet's returned input
+index. The #341/#342 request and signed-result checks, abort behavior and
+`acceptDelayedBroadcast`, `randomizeOutputs`, `noSend` and `sendWith` options
+remain in place. Previously global set requested no token data, removal used
+one token, and both stores supplied empty unlocking scripts.
+
+The global writer now emits the reference's JSON protocol and derives its
+locking key and signature from that protocol and the stored key, so its new
+tokens can be spent by those unlockers. Global mutation lookups send
+`protocolID: [1, namespace]` and exclude tokens outside that authenticated
+namespace. The local store already selected all listed outputs on update and
+removal; it now signs each, and its same-value shortcut applies only when one
+output remains. Two outputs with the same value are collapsed too.
+
+`tests/kvstore_tokens_343.rs` has eleven recording-wallet regressions: two
+current tokens on both stores' set/remove paths, reversed wallet input order,
+merged BEEF, executable signatures with unequal satoshis and nonzero output
+indexes, a single-token control, same-value collapse, namespace/controller and
+signature filtering, repeated lookup outpoints, and the reference writer and
+query shapes. On a scratch copy of `823a798e` with a separate target directory,
+ten tests fail and the unchanged single-token local value passes. The #326,
+#341/#342 and #344 vectors regenerate byte-identically under Node 22.18.0 at
+`ts-stack@edf6e03`; no recorder or vector was changed.
+
+Migration: no public Rust API changes. A same-value local write now spends
+multiple current outputs. Pre-#343 raw-protocol global tokens remain readable,
+but are outside the reference's authenticated mutation namespace; recovery of
+those old identity-key-locked outputs requires their owner's wallet.
+
+### Notes: cross-SDK parity (#343)
+
+This follows `ts-stack@edf6e03` `GlobalKVStore.ts:343-380` (all update inputs,
+merged BEEF and per-outpoint unlockers), `:431-470` (all removal inputs), and
+`LocalKVStore.ts:377-425,456-537,567-594` (all authenticated outputs, and the
+single-output unchanged-value shortcut). Go at `2ca481c` has only a local
+store: `kvstore/local_kv_store.go:284-345,429-497` iterates all listed outpoints
+for both operations and uses their BEEF and PushDrop signers, but its
+same-value shortcut at `:243-245` accepts multiple outputs too. Go has no
+global store. Rust's existing local lookup authentication/pagination and global
+double-spend retry differences are not addressed by this change.
 
 ### Added: the node's per-input script word from chain facts (#440)
 
@@ -276,9 +322,8 @@ getters, shared byte storage and mutable prototype intrinsics; these have no
 safe-Rust test input. The recorder pins a changed `Array.prototype.push` being
 refused before signing in the reference's words. Base64 text is decoded by the
 wallet types; re-encoding makes it canonical, with its nonempty/4096-character
-bound enforced here. The stores still supply empty unlocking scripts rather
-than the reference's PushDrop signers, and global set still does not collect
-prior tokens and global removal takes one (the existing #326 findings, #343).
+bound enforced here. The empty-script signers and global token collection findings are fixed by
+#343 below the same boundary; its entry records the remaining limitations.
 The untagged-token reader is fixed by #344 below. These are not silently represented as
 parity by the new checks. The reference's output-satoshi ranges, additional
 output authorization and trusted-input-amount extension are not exposed by

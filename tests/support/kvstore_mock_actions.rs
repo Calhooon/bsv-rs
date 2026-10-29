@@ -79,6 +79,7 @@ impl Actions {
             tx.inputs[index as usize].unlocking_script =
                 Some(UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
         }
+        tx.invalidate_caches();
         let id = Outpoint::from_string(&format!("{}.0", tx.id()))
             .unwrap()
             .txid;

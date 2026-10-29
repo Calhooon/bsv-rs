@@ -26,7 +26,7 @@ async fn an_unused_input_signer_is_refused_in_the_recorded_words_341() {
         labels: None,
         options: None,
     };
-    let signers = [(Outpoint::new([2; 32], 0), vec![])].into();
+    let signers = [(Outpoint::new([2; 32], 0), InputSigner::Bytes(vec![]))].into();
     assert_eq!(
         complete_with_signers(&wallet, args, signers, None)
             .await
