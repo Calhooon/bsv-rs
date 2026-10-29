@@ -63,7 +63,7 @@ impl<'a> WireReader<'a> {
     // Wire protocol types
     // =========================================================================
 
-    /// Reads a varint byte length ([`Self::wire_length`]).
+    /// Reads an unsigned strict varint byte length ([`Self::wire_length`]).
     pub(crate) fn read_length(&mut self) -> Result<usize, Error> {
         let length = self.read_var_int()?;
         self.wire_length(length)
@@ -103,14 +103,14 @@ impl<'a> WireReader<'a> {
 
     /// Reads a string array (Go-compatible: VarInt(MaxUint64) = null/empty).
     pub fn read_string_array(&mut self) -> Result<Vec<String>, Error> {
-        let count = self.read_var_int()?;
+        let count = self.read_optional_count()?;
         if count == NIL_SENTINEL {
             return Ok(Vec::new());
         }
 
         let mut strings = Vec::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
-            strings.push(self.read_optional_string()?.unwrap_or_default());
+            strings.push(self.read_string()?);
         }
         Ok(strings)
     }
@@ -294,7 +294,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads a string to string map (Go-compatible: VarInt(MaxUint64) = empty).
     pub fn read_string_map(&mut self) -> Result<IndexMap<String, String>, Error> {
-        let count = self.read_var_int()?;
+        let count = self.read_optional_count()?;
         if count == NIL_SENTINEL {
             return Ok(IndexMap::new());
         }
@@ -311,7 +311,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads an optional string map.
     pub fn read_optional_string_map(&mut self) -> Result<Option<IndexMap<String, String>>, Error> {
-        let count = self.read_var_int()?;
+        let count = self.read_optional_count()?;
         if count == NIL_SENTINEL {
             return Ok(None);
         }
@@ -351,7 +351,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads an array of SendWithResults.
     pub fn read_send_with_result_array(&mut self) -> Result<Option<Vec<SendWithResult>>, Error> {
-        let count = self.read_var_int()?;
+        let count = self.read_optional_count()?;
         if count == NIL_SENTINEL {
             return Ok(None);
         }
@@ -376,11 +376,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads a map of u32 to SignActionSpend.
     pub fn read_sign_action_spends(&mut self) -> Result<HashMap<u32, SignActionSpend>, Error> {
-        let count = self.read_var_int()?;
-        if count == NIL_SENTINEL {
-            return Ok(HashMap::new());
-        }
-
+        let count = self.read_var_int_num_strict_u64()?;
         let mut spends =
             HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
@@ -576,7 +572,7 @@ impl<'a> WireReader<'a> {
         let locking_script = self.read_optional_bytes()?;
         let spendable = self.read_optional_bool()?.unwrap_or(false);
         let output_description = self.read_string()?;
-        let basket = self.read_string()?;
+        let basket = self.read_optional_string()?.unwrap_or_default();
         let tags = self.read_string_array()?;
         let custom_instructions = self.read_optional_string()?;
 
@@ -621,7 +617,7 @@ impl<'a> WireReader<'a> {
         let lock_time = self.read_var_int_u32("listActions lockTime")?;
 
         // Read optional inputs array (Go uses VarInt(MaxUint64) for nil)
-        let inputs_count = self.read_var_int()?;
+        let inputs_count = self.read_optional_count()?;
         let inputs = if inputs_count == NIL_SENTINEL {
             None
         } else {
@@ -634,7 +630,7 @@ impl<'a> WireReader<'a> {
         };
 
         // Read optional outputs array (Go uses VarInt(MaxUint64) for nil)
-        let outputs_count = self.read_var_int()?;
+        let outputs_count = self.read_optional_count()?;
         let outputs = if outputs_count == NIL_SENTINEL {
             None
         } else {

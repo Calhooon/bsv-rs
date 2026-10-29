@@ -1,7 +1,7 @@
 {
   "reference": "ts-stack@edf6e03, unmodified packages/sdk, Node v22.18.0",
   "recorder": "tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs",
-  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59",
+  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396,2444-2445; WalletWireTransceiver.ts:95-100,142-148,1533-1542; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59; readVarIntNumStrict.ts:15-36",
   "processor": [
     {
       "name": "length-251",
@@ -107,6 +107,60 @@
       "code": 1,
       "message": "ReaderUint8Array read exceeds available data",
       "observed": []
+    },
+    {
+      "name": "protocol-length-2pow53-minus-1",
+      "originator": "",
+      "request_hex": "0d0000ffffffffffffff1f00616263",
+      "response_hex": "012c52656164657255696e743841727261792072656164206578636565647320617661696c61626c65206461746100",
+      "code": 1,
+      "message": "ReaderUint8Array read exceeds available data",
+      "observed": []
+    },
+    {
+      "name": "protocol-length-2pow53",
+      "originator": "",
+      "request_hex": "0d0000ff0000000000002000616263",
+      "response_hex": "01376e756d62657220746f6f206c6172676520746f2072657461696e20707265636973696f6e202d207573652072656164566172496e74426e00",
+      "code": 1,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "observed": []
+    },
+    {
+      "name": "protocol-length-2pow53-plus-1",
+      "originator": "",
+      "request_hex": "0d0000ff0100000000002000616263",
+      "response_hex": "01376e756d62657220746f6f206c6172676520746f2072657461696e20707265636973696f6e202d207573652072656164566172496e74426e00",
+      "code": 1,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "observed": []
+    },
+    {
+      "name": "protocol-length-u64-max-minus-1",
+      "originator": "",
+      "request_hex": "0d0000fffeffffffffffffff616263",
+      "response_hex": "01376e756d62657220746f6f206c6172676520746f2072657461696e20707265636973696f6e202d207573652072656164566172496e74426e00",
+      "code": 1,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "observed": []
+    },
+    {
+      "name": "protocol-length-u64-max",
+      "originator": "",
+      "request_hex": "0d0000ffffffffffffffffff616263",
+      "response_hex": "01376e756d62657220746f6f206c6172676520746f2072657461696e20707265636973696f6e202d207573652072656164566172496e74426e00",
+      "code": 1,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "observed": []
+    },
+    {
+      "name": "protocol-length-2pow32-plus-3",
+      "originator": "",
+      "request_hex": "0d0000ff0300000001000000616263",
+      "response_hex": "012c52656164657255696e743841727261792072656164206578636565647320617661696c61626c65206461746100",
+      "code": 1,
+      "message": "ReaderUint8Array read exceeds available data",
+      "observed": []
     }
   ],
   "transceiver": [
@@ -208,6 +262,238 @@
         ""
       ],
       "thrown": null
+    }
+  ],
+  "length_reads": [
+    {
+      "name": "2pow53-minus-1",
+      "length": "9007199254740991",
+      "signed": false,
+      "input_hex": "ffffffffffffff1f00616263",
+      "value": 9007199254740991,
+      "stage": "bytes",
+      "message": "ReaderUint8Array read exceeds available data",
+      "position": 9
+    },
+    {
+      "name": "2pow53-minus-1",
+      "length": "9007199254740991",
+      "signed": true,
+      "input_hex": "ffffffffffffff1f00616263",
+      "value": 9007199254740991,
+      "stage": "bytes",
+      "message": "ReaderUint8Array read exceeds available data",
+      "position": 9
+    },
+    {
+      "name": "2pow53",
+      "length": "9007199254740992",
+      "signed": false,
+      "input_hex": "ff0000000000002000616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "2pow53",
+      "length": "9007199254740992",
+      "signed": true,
+      "input_hex": "ff0000000000002000616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "2pow53-plus-1",
+      "length": "9007199254740993",
+      "signed": false,
+      "input_hex": "ff0100000000002000616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "2pow53-plus-1",
+      "length": "9007199254740993",
+      "signed": true,
+      "input_hex": "ff0100000000002000616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "u64-max-minus-1",
+      "length": "18446744073709551614",
+      "signed": false,
+      "input_hex": "fffeffffffffffffff616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "u64-max-minus-1",
+      "length": "18446744073709551614",
+      "signed": true,
+      "input_hex": "fffeffffffffffffff616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "u64-max",
+      "length": "18446744073709551615",
+      "signed": false,
+      "input_hex": "ffffffffffffffffff616263",
+      "value": null,
+      "stage": "varint",
+      "message": "number too large to retain precision - use readVarIntBn",
+      "position": 9
+    },
+    {
+      "name": "u64-max",
+      "length": "18446744073709551615",
+      "signed": true,
+      "input_hex": "ffffffffffffffffff616263",
+      "value": -1,
+      "stage": "bytes",
+      "message": "ReaderUint8Array read exceeds available data",
+      "position": 9
+    },
+    {
+      "name": "2pow32-plus-3",
+      "length": "4294967299",
+      "signed": false,
+      "input_hex": "ff0300000001000000616263",
+      "value": 4294967299,
+      "stage": "bytes",
+      "message": "ReaderUint8Array read exceeds available data",
+      "position": 9
+    },
+    {
+      "name": "2pow32-plus-3",
+      "length": "4294967299",
+      "signed": true,
+      "input_hex": "ff0300000001000000616263",
+      "value": 4294967299,
+      "stage": "bytes",
+      "message": "ReaderUint8Array read exceeds available data",
+      "position": 9
+    }
+  ],
+  "response_lengths": [
+    {
+      "name": "2pow53-minus-1",
+      "site": "error-message",
+      "response_hex": "01ffffffffffffff1f00616263",
+      "message": "ReaderUint8Array read exceeds available data"
+    },
+    {
+      "name": "2pow53-minus-1",
+      "site": "error-stack",
+      "response_hex": "0100ffffffffffffff1f00616263",
+      "message": "ReaderUint8Array read exceeds available data"
+    },
+    {
+      "name": "2pow53-minus-1",
+      "site": "certificate-verifier",
+      "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff1f00616263",
+      "message": "Invalid listCertificates verifier length: expected 33 bytes, received 9007199254740991"
+    },
+    {
+      "name": "2pow53",
+      "site": "error-message",
+      "response_hex": "01ff0000000000002000616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53",
+      "site": "error-stack",
+      "response_hex": "0100ff0000000000002000616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53",
+      "site": "certificate-verifier",
+      "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000ff0000000000002000616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53-plus-1",
+      "site": "error-message",
+      "response_hex": "01ff0100000000002000616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53-plus-1",
+      "site": "error-stack",
+      "response_hex": "0100ff0100000000002000616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53-plus-1",
+      "site": "certificate-verifier",
+      "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000ff0100000000002000616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max-minus-1",
+      "site": "error-message",
+      "response_hex": "01fffeffffffffffffff616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max-minus-1",
+      "site": "error-stack",
+      "response_hex": "0100fffeffffffffffffff616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max-minus-1",
+      "site": "certificate-verifier",
+      "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000fffeffffffffffffff616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max",
+      "site": "error-message",
+      "response_hex": "01ffffffffffffffffff616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max",
+      "site": "error-stack",
+      "response_hex": "0100ffffffffffffffffff616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max",
+      "site": "certificate-verifier",
+      "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffff616263",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow32-plus-3",
+      "site": "error-message",
+      "response_hex": "01ff0300000001000000616263",
+      "message": "ReaderUint8Array read exceeds available data"
+    },
+    {
+      "name": "2pow32-plus-3",
+      "site": "error-stack",
+      "response_hex": "0100ff0300000001000000616263",
+      "message": "ReaderUint8Array read exceeds available data"
+    },
+    {
+      "name": "2pow32-plus-3",
+      "site": "certificate-verifier",
+      "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000ff0300000001000000616263",
+      "message": "Invalid listCertificates verifier length: expected 33 bytes, received 4294967299"
     }
   ]
 }

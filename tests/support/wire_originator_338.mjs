@@ -72,10 +72,63 @@ export async function recordOriginators(sdk) {
   // the error code and words, including the runtime's fatal UTF-8 message.
   processor.push(await processorCase(sdk, 'invalid-utf8', '', [28, 1, 0xff]))
   processor.push(await processorCase(sdk, 'length-250-truncated', 'a', [28, 250, 0x61]))
+  // #458 fold: use the SDK writer for exact u64 lengths and observe both
+  // readVarIntNumStrict modes, followed by the actual byte read. The signed
+  // -1 probe deliberately calls read(-1); optional wire fields skip that read.
+  const lengths = [
+    ['2pow53-minus-1', (1n << 53n) - 1n],
+    ['2pow53', 1n << 53n],
+    ['2pow53-plus-1', (1n << 53n) + 1n],
+    ['u64-max-minus-1', (1n << 64n) - 2n],
+    ['u64-max', (1n << 64n) - 1n],
+    ['2pow32-plus-3', (1n << 32n) + 3n]
+  ]
+  const length_reads = []
+  const response_lengths = []
+  for (const [name, length] of lengths) {
+    const writer = new sdk.Utils.Writer()
+    writer.writeVarIntBn(new sdk.BigNumber(length.toString()))
+    writer.write([0x61, 0x62, 0x63])
+    const bytes = writer.toArray()
+    processor.push(await processorCase(sdk, `protocol-length-${name}`, '', [13, 0, 0, ...bytes]))
+    for (const signed of [false, true]) {
+      const reader = new sdk.Utils.ReaderUint8Array(bytes)
+      let value = null
+      let stage = 'varint'
+      let message = null
+      try {
+        value = reader.readVarIntNumStrict(signed)
+        stage = 'bytes'
+        reader.read(value)
+      } catch (error) {
+        message = error.message
+      }
+      length_reads.push({ name, length: length.toString(), signed,
+        input_hex: sdk.Utils.toHex(bytes), value, stage, message, position: reader.pos })
+    }
+    const key = (n) => sdk.PrivateKey.fromString(String(n).padStart(64, '0'), 'hex').toPublicKey().encode(true)
+    const certificate = [...Array(64).fill(0), ...key(1), ...key(2), ...Array(32).fill(0), 0, 0]
+    const certificateWriter = new sdk.Utils.Writer()
+    certificateWriter.writeUInt8(0).writeVarIntNum(1).writeVarIntNum(certificate.length)
+    certificateWriter.write(certificate).writeUInt8(0).write(bytes)
+    for (const [site, response] of [
+      ['error-message', [1, ...bytes]],
+      ['error-stack', [1, 0, ...bytes]],
+      ['certificate-verifier', certificateWriter.toArray()]
+    ]) {
+      const client = new sdk.WalletWireTransceiver({ async transmitToWallet() { return response } })
+      let message = null
+      try {
+        if (site === 'certificate-verifier') await client.listCertificates({ certifiers: [], types: [] }, 'fixtures.invalid')
+        else await client.getVersion({}, 'fixtures.invalid')
+      } catch (error) { message = error.message }
+      response_lengths.push({ name, site, response_hex: sdk.Utils.toHex(response), message })
+    }
+  }
   return {
     reference: `ts-stack@edf6e03, unmodified packages/sdk, Node ${process.version}`,
     recorder: 'tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs',
-    reference_lines: 'WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59',
-    processor, transceiver
+    reference_lines: 'WalletWireProcessor.ts:286-294,2379-2396,2444-2445; WalletWireTransceiver.ts:95-100,142-148,1533-1542; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59; readVarIntNumStrict.ts:15-36',
+    processor, transceiver, length_reads, response_lengths
   }
 }

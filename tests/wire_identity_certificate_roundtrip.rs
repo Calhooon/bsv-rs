@@ -213,8 +213,8 @@ fn a_keyring_value_whose_bytes_are_not_utf8_round_trips_as_base64() {
 /// A count or a length past the bytes is refused, no panic and no allocation
 /// of the count (CLAUDE.md rule 5): a map's count past `2^53 - 1` in the
 /// strict reader's words, as the transceiver refuses it (bsv-rs#236; until
-/// then `ReaderUnderflow` when the entries ran out), the certificate's length
-/// in `ReaderUint8Array`'s short-read words (#458).
+/// then `ReaderUnderflow` when the entries ran out), as is a certificate length
+/// past the same precision bound (#458).
 #[test]
 fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
     let zero = empty_entry(1);
@@ -239,7 +239,7 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
     assert_eq!(
         reader.read_identity_certificate().map(drop),
         Err(Error::WalletError(
-            "ReaderUint8Array read exceeds available data".into()
+            "number too large to retain precision - use readVarIntBn".into()
         ))
     );
 }
@@ -251,7 +251,7 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
 /// byte as iconUrl's length, and the lengths run past the bytes; with the
 /// certifier absent, the `-1` flag (`0xff`) opens a 9-byte varint that the
 /// keyring's count and the opening bytes of its key complete, a length far past
-/// the bytes left. Other contents can misread rather than refuse; none reads as
+/// the precision bound. Other contents can misread rather than refuse; none reads as
 /// written.
 #[test]
 fn the_layout_before_182_is_refused() {
@@ -288,13 +288,20 @@ fn the_layout_before_182_is_refused() {
         old_map(&mut w, Some(&cert.decrypted_fields));
         w.into_bytes()
     };
-    for bytes in [old(Some(&cert.certifier_info)), old(None)] {
+    for (bytes, words) in [
+        (
+            old(Some(&cert.certifier_info)),
+            "ReaderUint8Array read exceeds available data",
+        ),
+        (
+            old(None),
+            "number too large to retain precision - use readVarIntBn",
+        ),
+    ] {
         let mut reader = WireReader::new(&bytes);
         assert_eq!(
             reader.read_identity_certificate().map(drop),
-            Err(Error::WalletError(
-                "ReaderUint8Array read exceeds available data".into()
-            ))
+            Err(Error::WalletError(words.into()))
         );
     }
 }
@@ -302,7 +309,7 @@ fn the_layout_before_182_is_refused() {
 /// `read_identity_certifier` reads the three strings and the byte, a trust
 /// outside 1 to 10 refused in the transceiver's words (bsv-rs#247); the layout
 /// before #182 is the same bytes when iconUrl and description are present, and
-/// a NIL sentinel for an absent one, which is now a length past the bytes,
+/// a NIL sentinel for an absent one, which is an unsigned length past 2^53 - 1,
 /// refused.
 #[test]
 fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
@@ -329,7 +336,7 @@ fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
             .read_identity_certifier()
             .map(drop),
         Err(Error::WalletError(
-            "ReaderUint8Array read exceeds available data".into()
+            "number too large to retain precision - use readVarIntBn".into()
         ))
     );
 
