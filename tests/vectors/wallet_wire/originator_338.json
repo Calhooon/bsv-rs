@@ -109,6 +109,54 @@
       "observed": []
     },
     {
+      "name": "bom-only",
+      "originator": "﻿",
+      "request_hex": "1c03efbbbf",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        ""
+      ],
+      "decoded_originator": ""
+    },
+    {
+      "name": "bom-before-host",
+      "originator": "﻿a.b",
+      "request_hex": "1c06efbbbf612e62",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        "a.b"
+      ],
+      "decoded_originator": "a.b"
+    },
+    {
+      "name": "two-boms-before-host",
+      "originator": "﻿﻿a.b",
+      "request_hex": "1c09efbbbfefbbbf612e62",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        "a.b"
+      ],
+      "decoded_originator": "﻿a.b"
+    },
+    {
+      "name": "bom-after-host",
+      "originator": "a.b﻿",
+      "request_hex": "1c06612e62efbbbf",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        "a.b"
+      ],
+      "decoded_originator": "a.b﻿"
+    },
+    {
       "name": "protocol-length-2pow53-minus-1",
       "originator": "",
       "request_hex": "0d0000ffffffffffffff1f00616263",

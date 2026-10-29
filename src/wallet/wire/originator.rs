@@ -24,6 +24,8 @@ pub(super) fn read(reader: &mut WireReader<'_>) -> Result<Option<String>, Refusa
     let originator = std::str::from_utf8(reader.read_bytes(length)?).map_err(|_| {
         Error::WalletError("The encoded data was not valid for encoding utf-8".into())
     })?;
+    // TextDecoder's default ignoreBOM=false consumes exactly one leading BOM.
+    let originator = originator.strip_prefix('\u{feff}').unwrap_or(originator);
     Ok(validate_originator(
         (!originator.is_empty()).then_some(originator),
     )?)
