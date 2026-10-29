@@ -112,15 +112,15 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         originator: Option<&str>,
         params: &[u8],
     ) -> Result<Result<Vec<u8>, (u8, String)>, Error> {
+        let (originator_len, originator) = super::originator::encode(originator)?;
         let mut writer = WireWriter::new();
 
         // Write call code
         writer.write_u8(call.as_u8());
 
         // Write originator: `None` is the length-0 originator (#329)
-        let originator_bytes = originator.unwrap_or_default().as_bytes();
-        writer.write_u8(originator_bytes.len() as u8);
-        writer.write_bytes(originator_bytes);
+        writer.write_u8(originator_len);
+        writer.write_bytes(originator.as_bytes());
 
         // Write parameters
         writer.write_bytes(params);

@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the wallet wire's originator bound and normalization (#338)
+
+The processor used to pass an originator through without checking its length
+or hostname. It now refuses a declared length above 250 bytes before reading
+the originator, with code 1 and the reference's exact words:
+`Invalid originator length: expected at most 250 bytes, received N`
+(`ts-stack@edf6e03`, `WalletWireProcessor.ts:286-294`, outer catch `:2379-2396`).
+A named originator passes through `validate_originator` before the wallet call:
+trimmed, lower-cased, and its validated port dropped. An invalid hostname is
+code 6 with the validator's words. Length zero still reaches the wallet as
+`None` (#329).
+
+The transceiver used to cast the byte length to `u8`, so 256 bytes wrapped to
+zero while all 256 originator bytes were sent as a malformed frame. It now
+validates before constructing a frame (`WalletWireTransceiver.ts:95-100`), then
+uses a checked length conversion. A 256-byte originator is refused locally as
+`InvalidParameter`, `The originator parameter must be no more than 250 length.`
+The words come from the shared validator, as the reference's do. No frame is
+sent. Valid names are normalized before their length is written.
+
+`wallet_wire_originator_338.rs` pins both findings:
+`processor_refuses_251_bytes_in_reference_words`,
+`processor_checks_length_before_reading_originator_bytes`,
+`processor_accepts_250_bytes_and_normalizes_before_wallet_call`,
+`processor_rejects_invalid_originator_with_reference_class`,
+`transceiver_refuses_256_bytes_before_writing_any_frame`,
+`transceiver_validates_named_originators_before_writing_any_frame`,
+`transceiver_writes_normalized_originator_with_checked_length`, and
+`empty_originators_remain_absent_on_wire`. The wire recorder
+`tests/support/wire_linkage_calls_406.mjs` now accepts a third output path for
+`wire_originator_338.mjs`: nine processor and nine transceiver cases recorded
+from unmodified `edf6e03` under Node v22.18.0 in
+`tests/vectors/wallet_wire/originator_338.json`. Its existing linkage recording
+is unchanged. On an untouched scratch copy of `455fe780` with its own target
+directory, seven of the eight tests fail and the empty-originator test passes;
+after the fix all eight pass. `fixtures_replay` retains the in-tree wire fixtures; the external
+`~/bsv/bsv-wallet-cli/tests/wire/` directory was absent at the lane's run.
+
+Rows for the toolbox's operator-visible table (wire response codes and words):
+
+| Trigger | Old words / behavior | New words / behavior |
+|---|---|---|
+| Processor receives 251 originator bytes | Passed through to the wallet | Code 1, `Invalid originator length: expected at most 250 bytes, received 251` |
+| `Example.COM:8080` on either wire side | Passed through as given | Wallet receives `example.com`; transceiver writes that normalized hostname |
+| Transceiver given 256 originator bytes | Wrote length 0 and all 256 bytes | `InvalidParameter`, `The originator parameter must be no more than 250 length.`; no frame |
+
+Rows for the CLI's operator-visible table (the CLI also speaks the wire):
+
+| Trigger | Old words / behavior | New words / behavior |
+|---|---|---|
+| Processor receives 251 originator bytes | Passed through to the wallet | Code 1, `Invalid originator length: expected at most 250 bytes, received 251` |
+| `Example.COM:8080` on either wire side | Passed through as given | Wallet receives `example.com`; transceiver writes that normalized hostname |
+| Transceiver given 256 originator bytes | Wrote length 0 and all 256 bytes | `InvalidParameter`, `The originator parameter must be no more than 250 length.`; no frame |
+
+### Notes: cross-SDK parity (#338)
+
+The rule follows the TypeScript reference and #323's hostname validator.
+Go at `2ca481c` (`wallet/substrates/wallet_wire_transceiver.go:23-29`,
+`wallet/substrates/wallet_wire_processor.go:29`, delegating to
+`wallet/serializer/frame.go:20-68`) uses the byte field's representable bound
+of 255, with no 250-byte check or hostname normalization. Its writer casts the
+length to `byte` and can wrap above 255. Rust follows TypeScript's 250-byte
+bound and refuses before writing. The existing empty-originator difference
+remains: Rust dispatches `None`, TypeScript dispatches `''`.
+
 ### Fixed: required script flag refusals name the word's missing flag (#434)
 
 `ScriptFlags::check` still requires SIGHASH_FORKID, GENESIS and
@@ -329,7 +394,6 @@ path; its twenty classes are unchanged.
 
 Migration: additive. Existing matches with a fallback keep working; hosts
 may match the new variants when their toolbox supplies them.
-
 
 These types are the port's extension beyond the reference, not a parity
 item or a divergence: `ts-stack@edf6e03`'s
