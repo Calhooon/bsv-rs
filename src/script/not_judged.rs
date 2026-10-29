@@ -14,7 +14,7 @@ pub enum NotJudgedCause {
     /// The input exhausted the verifier's local work budget before its next charge.
     WorkBudgetExceeded {
         /// The index of the input whose evaluation stopped.
-        input: usize,
+        input: u32,
         /// The local per-input budget in `SpendParams::work_limit` units.
         budget: u64,
         /// Work already charged, at or below the budget; excludes the refused charge.
@@ -76,12 +76,10 @@ impl fmt::Display for NotJudgedCause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::WorkBudgetExceeded {
-                input,
-                budget,
-                work_done,
+                budget, work_done, ..
             } => write!(
                 f,
-                "input {input} exceeded work budget {budget} units after {work_done} units of work."
+                "exceeded work budget {budget} units after {work_done} units of work."
             ),
             Self::PreGenesisCoin {
                 height,

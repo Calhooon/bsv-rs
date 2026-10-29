@@ -64,6 +64,7 @@ impl AsyncStreamVerifier {
         self.set_work_limit(limit);
         self
     }
+
     /// As [`StreamVerifier::set_memory_limit`].
     pub fn set_memory_limit(&mut self, limit: Option<usize>) {
         self.evaluation.memory = limit;

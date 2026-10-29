@@ -130,6 +130,6 @@ fn work_exhaustion_returns_a_not_judged_spend_refusal_378() {
             budget: 0,
             work_done: 0,
         },
-        "input 0 not judged: input 0 exceeded work budget 0 units after 0 units of work.",
+        "input 0 not judged: exceeded work budget 0 units after 0 units of work.",
     );
 }
