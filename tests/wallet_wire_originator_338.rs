@@ -20,7 +20,8 @@ fn case(side: &str, name: &str) -> Value {
     let vector: Value =
         serde_json::from_str(include_str!("vectors/wallet_wire/originator_338.json")).unwrap();
     let cases = vector[side].as_array().unwrap();
-    assert_eq!(cases.len(), 9, "{side}: recorded case census");
+    let count = if side == "processor" { 11 } else { 9 };
+    assert_eq!(cases.len(), count, "{side}: recorded case census");
     cases
         .iter()
         .find(|case| case["name"] == name)

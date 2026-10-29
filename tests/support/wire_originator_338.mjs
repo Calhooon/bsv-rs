@@ -16,7 +16,7 @@ const cases = () => {
   ]
 }
 
-async function processorCase({ WalletWireProcessor, Utils }, name, originator) {
+async function processorCase({ WalletWireProcessor, Utils }, name, originator, rawRequest) {
   const observed = []
   const processor = new WalletWireProcessor({
     async getVersion(_args, originator) {
@@ -25,7 +25,7 @@ async function processorCase({ WalletWireProcessor, Utils }, name, originator) {
     }
   })
   const bytes = Utils.toArray(originator, 'utf8')
-  const request = name === 'length-251-truncated' ? [28, 251] : [28, bytes.length, ...bytes]
+  const request = rawRequest ?? (name === 'length-251-truncated' ? [28, 251] : [28, bytes.length, ...bytes])
   const response = await processor.transmitToWallet(request)
   const reader = new Utils.Reader(response)
   const code = reader.readUInt8()
@@ -67,10 +67,15 @@ export async function recordOriginators(sdk) {
     transceiver.push(await transceiverCase(sdk, name, originator))
   }
   processor.push(await processorCase(sdk, 'length-251-truncated', ''))
+  // #458: bytes that cannot come from encoding an originator string, and a
+  // short read within the accepted length bound. Let the processor supply
+  // the error code and words, including the runtime's fatal UTF-8 message.
+  processor.push(await processorCase(sdk, 'invalid-utf8', '', [28, 1, 0xff]))
+  processor.push(await processorCase(sdk, 'length-250-truncated', 'a', [28, 250, 0x61]))
   return {
     reference: `ts-stack@edf6e03, unmodified packages/sdk, Node ${process.version}`,
     recorder: 'tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs',
-    reference_lines: 'WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037',
+    reference_lines: 'WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59',
     processor, transceiver
   }
 }

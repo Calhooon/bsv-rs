@@ -3865,8 +3865,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 1 bytes, only 0 available",
-          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+          "display": "wallet error: ReaderUint8Array read exceeds available data",
+          "error": "WalletError(\"ReaderUint8Array read exceeds available data\")"
         },
         "response_hex": ""
       },
@@ -3878,8 +3878,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 1 bytes, only 0 available",
-          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+          "display": "wallet error: ReaderUint8Array read exceeds available data",
+          "error": "WalletError(\"ReaderUint8Array read exceeds available data\")"
         },
         "response_hex": "01"
       },
@@ -3891,8 +3891,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 1 bytes, only 0 available",
-          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+          "display": "wallet error: ReaderUint8Array read exceeds available data",
+          "error": "WalletError(\"ReaderUint8Array read exceeds available data\")"
         },
         "response_hex": "0100"
       },
@@ -3917,8 +3917,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 3 bytes, only 1 available",
-          "error": "ReaderUnderflow { needed: 3, available: 1 }"
+          "display": "wallet error: ReaderUint8Array read exceeds available data",
+          "error": "WalletError(\"ReaderUint8Array read exceeds available data\")"
         },
         "response_hex": "010361"
       },
@@ -3943,8 +3943,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 3 bytes, only 1 available",
-          "error": "ReaderUnderflow { needed: 3, available: 1 }"
+          "display": "wallet error: ReaderUint8Array read exceeds available data",
+          "error": "WalletError(\"ReaderUint8Array read exceeds available data\")"
         },
         "response_hex": "01000301"
       },

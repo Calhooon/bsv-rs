@@ -1,7 +1,7 @@
 {
   "reference": "ts-stack@edf6e03, unmodified packages/sdk, Node v22.18.0",
   "recorder": "tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs",
-  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037",
+  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59",
   "processor": [
     {
       "name": "length-251",
@@ -88,6 +88,24 @@
       "response_hex": "0143496e76616c6964206f726967696e61746f72206c656e6774683a206578706563746564206174206d6f7374203235302062797465732c2072656365697665642032353100",
       "code": 1,
       "message": "Invalid originator length: expected at most 250 bytes, received 251",
+      "observed": []
+    },
+    {
+      "name": "invalid-utf8",
+      "originator": "",
+      "request_hex": "1c01ff",
+      "response_hex": "013154686520656e636f646564206461746120776173206e6f742076616c696420666f7220656e636f64696e67207574662d3800",
+      "code": 1,
+      "message": "The encoded data was not valid for encoding utf-8",
+      "observed": []
+    },
+    {
+      "name": "length-250-truncated",
+      "originator": "a",
+      "request_hex": "1cfa61",
+      "response_hex": "012c52656164657255696e743841727261792072656164206578636565647320617661696c61626c65206461746100",
+      "code": 1,
+      "message": "ReaderUint8Array read exceeds available data",
       "observed": []
     }
   ],

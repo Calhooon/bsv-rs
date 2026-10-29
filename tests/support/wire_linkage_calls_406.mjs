@@ -8,7 +8,7 @@
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/wire_linkage_calls_406.mjs \
 //     "$W/sdk.mjs" tests/vectors/wallet_wire/linkage_calls_406.json
 // Append tests/vectors/wallet_wire/originator_338.json as a third argument
-// to record #338's header checks with the same SDK bundle and Node runtime.
+// to record #338 and #458's header checks with the same SDK bundle and runtime.
 //
 // For each case the reference's transceiver is called with the case's args
 // over a transport that captures the request frame and hands it to the

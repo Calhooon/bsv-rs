@@ -16,6 +16,9 @@ use crate::Error;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 
+#[path = "reader.rs"]
+mod reader;
+
 /// Sentinel value for nil/absent optional values in the Go-compatible wire format.
 /// Go uses `VarInt(math.MaxUint64)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil sentinel.
 const NIL_SENTINEL: u64 = u64::MAX;
@@ -23,78 +26,13 @@ const NIL_SENTINEL: u64 = u64::MAX;
 /// Wire protocol reader with signed varint support.
 ///
 /// Wraps the primitives [`Reader`] and adds methods for reading signed varints
-/// and other wire protocol types.
+/// and other wire protocol types. Short reads return [`Error::WalletError`]
+/// with `ReaderUint8Array read exceeds available data`, the reference's words.
 pub struct WireReader<'a> {
     inner: Reader<'a>,
 }
 
 impl<'a> WireReader<'a> {
-    /// Creates a new wire reader over the given bytes.
-    pub fn new(data: &'a [u8]) -> Self {
-        Self {
-            inner: Reader::new(data),
-        }
-    }
-
-    /// Returns the number of bytes remaining.
-    pub fn remaining(&self) -> usize {
-        self.inner.remaining()
-    }
-
-    /// Returns true if no bytes remain.
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    /// Returns the current position.
-    pub fn position(&self) -> usize {
-        self.inner.position()
-    }
-
-    // =========================================================================
-    // Basic types (delegated to inner reader)
-    // =========================================================================
-
-    /// Reads an unsigned byte.
-    pub fn read_u8(&mut self) -> Result<u8, Error> {
-        self.inner.read_u8()
-    }
-
-    /// Reads a signed byte.
-    pub fn read_i8(&mut self) -> Result<i8, Error> {
-        self.inner.read_i8()
-    }
-
-    /// Reads a 16-bit unsigned integer in little-endian.
-    pub fn read_u16_le(&mut self) -> Result<u16, Error> {
-        self.inner.read_u16_le()
-    }
-
-    /// Reads a 32-bit unsigned integer in little-endian.
-    pub fn read_u32_le(&mut self) -> Result<u32, Error> {
-        self.inner.read_u32_le()
-    }
-
-    /// Reads a 64-bit unsigned integer in little-endian.
-    pub fn read_u64_le(&mut self) -> Result<u64, Error> {
-        self.inner.read_u64_le()
-    }
-
-    /// Reads a fixed number of bytes.
-    pub fn read_bytes(&mut self, len: usize) -> Result<&'a [u8], Error> {
-        self.inner.read_bytes(len)
-    }
-
-    /// Reads all remaining bytes.
-    pub fn read_remaining(&mut self) -> &'a [u8] {
-        self.inner.read_remaining()
-    }
-
-    /// Reads an unsigned varint.
-    pub fn read_var_int(&mut self) -> Result<u64, Error> {
-        self.inner.read_var_int()
-    }
-
     // =========================================================================
     // Signed varint (for optional values)
     // =========================================================================
@@ -103,7 +41,7 @@ impl<'a> WireReader<'a> {
     /// absent value, any other the plain varint (TS `readVarIntNum`, Go
     /// `ReadOptionalUint32`; #149). Refused above `i64::MAX`.
     pub fn read_signed_var_int(&mut self) -> Result<i64, Error> {
-        match self.inner.read_var_int()? {
+        match self.read_var_int()? {
             u64::MAX => Ok(-1),
             value => i64::try_from(value).map_err(|_| {
                 Error::WalletError(format!(
@@ -117,29 +55,13 @@ impl<'a> WireReader<'a> {
 
     /// Reads an optional varint: `None` for nine `0xFF` (`-1`), else the value.
     pub fn read_optional_var_int(&mut self) -> Result<Option<u64>, Error> {
-        let value = self.inner.read_var_int()?;
+        let value = self.read_var_int()?;
         Ok((value != u64::MAX).then_some(value))
     }
 
     // =========================================================================
     // Wire protocol types
     // =========================================================================
-
-    /// A varint byte length narrowed to `usize`, refused as `ReaderUnderflow`
-    /// when the bytes remaining cannot hold it, before it is narrowed: on
-    /// wasm32 `as usize` keeps a length's low 32 bits and reads a shorter
-    /// value in silence (CLAUDE.md rule 5; bsv-rs#192). The same error on
-    /// every target, `needed` saturating at `usize::MAX` where it cannot fit.
-    pub(crate) fn wire_length(&self, length: u64) -> Result<usize, Error> {
-        let available = self.remaining();
-        match usize::try_from(length) {
-            Ok(needed) if needed <= available => Ok(needed),
-            needed => Err(Error::ReaderUnderflow {
-                needed: needed.unwrap_or(usize::MAX),
-                available,
-            }),
-        }
-    }
 
     /// Reads a varint byte length ([`Self::wire_length`]).
     pub(crate) fn read_length(&mut self) -> Result<usize, Error> {

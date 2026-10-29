@@ -200,7 +200,7 @@ async fn the_processors_own_refusal_is_framed_with_code_one() {
         hex::encode(&frame),
         hex::encode(reference_frame(
             1,
-            b"reader underflow: need 1 bytes, only 0 available"
+            b"ReaderUint8Array read exceeds available data"
         ))
     );
 }
