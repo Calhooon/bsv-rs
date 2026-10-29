@@ -1200,21 +1200,8 @@ pub struct BasketInsertion {
     pub tags: Option<Vec<String>>,
 }
 
-/// Output specification for internalization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InternalizeOutput {
-    /// Index of the output within the transaction.
-    pub output_index: u32,
-    /// Protocol type: "wallet payment" or "basket insertion".
-    pub protocol: String,
-    /// Remittance data for wallet payment protocol.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payment_remittance: Option<WalletPayment>,
-    /// Remittance data for basket insertion protocol.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub insertion_remittance: Option<BasketInsertion>,
-}
+mod internalize_output;
+pub use internalize_output::InternalizeOutput;
 
 /// Arguments for internalizing a transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]

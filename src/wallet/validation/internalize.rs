@@ -11,10 +11,9 @@
 //! (`:968-970`), then the one remittance its protocol names and no other
 //! (`:971-977`), then the remittances' fields (`:978-983`; bsv-rs#384).
 
-use super::originator::invalid_parameter;
 use super::validate_optional_string_length;
-use crate::error::Result;
-use crate::wallet::types::{InternalizeActionArgs, InternalizeOutput};
+use crate::error::{Error, Result, WalletRefusalClass};
+use crate::wallet::types::InternalizeActionArgs;
 
 /// The most UTF-8 bytes a basket insertion's `customInstructions` may carry.
 const MAX_INSERTION_CUSTOM_INSTRUCTIONS_BYTES: usize = 1000;
@@ -46,7 +45,16 @@ const MAX_INSERTION_CUSTOM_INSTRUCTIONS_BYTES: usize = 1000;
 /// [`WalletRefusalClass::InvalidParameter`]: crate::error::WalletRefusalClass::InvalidParameter
 pub fn validate_internalize_action_args(args: &InternalizeActionArgs) -> Result<()> {
     for (index, output) in args.outputs.iter().enumerate() {
-        validate_one_remittance(output)?;
+        if let Some(message) = remittance_error(
+            &output.protocol,
+            output.payment_remittance.is_some(),
+            output.insertion_remittance.is_some(),
+        ) {
+            return Err(Error::WalletRefusal {
+                class: WalletRefusalClass::InvalidParameter,
+                message: message.into(),
+            });
+        }
         if let Some(insertion) = &output.insertion_remittance {
             validate_optional_string_length(
                 insertion.custom_instructions.as_deref(),
@@ -60,22 +68,19 @@ pub fn validate_internalize_action_args(args: &InternalizeActionArgs) -> Result<
 }
 
 /// The protocol and its one remittance (`validationHelpers.ts:968-977`).
-fn validate_one_remittance(output: &InternalizeOutput) -> Result<()> {
-    let payment = output.payment_remittance.is_some();
-    let insertion = output.insertion_remittance.is_some();
-    match output.protocol.as_str() {
-        "wallet payment" if !payment || insertion => Err(invalid_parameter(
-            "output remittance",
-            "only paymentRemittance for wallet payment",
-        )),
-        "basket insertion" if !insertion || payment => Err(invalid_parameter(
-            "output remittance",
-            "only insertionRemittance for basket insertion",
-        )),
-        "wallet payment" | "basket insertion" => Ok(()),
-        _ => Err(invalid_parameter(
-            "protocol",
-            "'basket insertion' or 'wallet payment'",
-        )),
+pub(crate) fn remittance_error(
+    protocol: &str,
+    payment: bool,
+    insertion: bool,
+) -> Option<&'static str> {
+    match protocol {
+        "wallet payment" if !payment || insertion => Some(
+            "The output remittance parameter must be only paymentRemittance for wallet payment",
+        ),
+        "basket insertion" if !insertion || payment => Some(
+            "The output remittance parameter must be only insertionRemittance for basket insertion",
+        ),
+        "wallet payment" | "basket insertion" => None,
+        _ => Some("The protocol parameter must be 'basket insertion' or 'wallet payment'"),
     }
 }

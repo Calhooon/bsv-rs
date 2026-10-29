@@ -816,6 +816,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         // Outputs
         writer.write_var_int(args.outputs.len() as u64);
+        // Validation above guarantees exactly the protocol's remittance (#393).
         for output in &args.outputs {
             writer.write_var_int(output.output_index as u64);
 
@@ -834,10 +835,6 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                     })?;
                     writer.write_var_int(suffix_bytes.len() as u64);
                     writer.write_bytes(&suffix_bytes);
-                } else {
-                    return Err(Error::WalletError(
-                        "payment_remittance required for wallet payment".to_string(),
-                    ));
                 }
             } else {
                 writer.write_u8(2); // basket insertion
@@ -846,10 +843,6 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                     writer.write_optional_string(insertion.custom_instructions.as_deref());
                     let tags = insertion.tags.as_deref().unwrap_or(&[]);
                     writer.write_string_array(tags);
-                } else {
-                    writer.write_string("");
-                    writer.write_var_int(u64::MAX);
-                    writer.write_var_int(0);
                 }
             }
         }
