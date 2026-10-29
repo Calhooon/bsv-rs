@@ -14,9 +14,11 @@ These utilities are used internally by the `Peer` implementation but are also ex
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | ~16 |
+| `mod.rs` | Module root with re-exports and a runtime-independent certificate continuation turn; preserves Promise await boundaries for Peer validation and wallet decryption (#445) | 38 |
 | `nonce.rs` | Cryptographic nonce creation and verification | ~201 |
-| `validation.rs` | Certificate validation, encoding checks, and retrieval | ~972 |
+| `validation.rs` | Public certificate validation, encoding checks, and retrieval; Peer uses its own shared validator | ~972 |
+| `requested_set.rs` | Requested-policy validation and canonical-base64 text/length checks | - |
+| `received_message.rs` | #445: received certificate bound and every required nonce, checked before handlers | - |
 
 ## Key Exports
 
@@ -49,9 +51,13 @@ pub use validation::{
 
 ### Nonce Format
 
-Nonces are 32 bytes encoded as base64:
-- **First 16 bytes**: Cryptographically secure random data
-- **Last 16 bytes**: HMAC of the random data (truncated from 32-byte HMAC)
+Session nonces are 48 bytes encoded as base64: 16 random bytes and the full
+32-byte HMAC. Since #445, Peer intake requires this exact length, deliberately
+closing the legacy 32-byte acceptance window introduced in 0.3.6. The public
+`verify_nonce` and `validate_nonce_format` helpers still accept the legacy
+16-random/16-HMAC form for direct callers. Later message nonces contain 32
+random bytes. `received_message.rs` checks all required nonce fields, their
+canonical text and decoded lengths in `AuthMessageValidation.ts:355-389` order.
 
 The HMAC is computed using BRC-42 key derivation with:
 - **Protocol**: `"server hmac"` (exported as `NONCE_PROTOCOL`)
@@ -75,7 +81,7 @@ Creates a cryptographic nonce for authentication sessions.
 - `counterparty` - Optional counterparty public key (None = self-authentication)
 - `originator` - Application originator string (e.g., `"myapp.com"`)
 
-**Returns:** Base64-encoded nonce string (44 characters for 32 bytes)
+**Returns:** Base64-encoded nonce string (64 characters for 48 bytes)
 
 **Example:**
 ```rust
@@ -432,7 +438,7 @@ peer.send_certificate_response(&peer_key_hex, certs).await?;
 |----------|-------|-------------|
 | `NONCE_PROTOCOL` | `"server hmac"` | BRC-42 protocol for HMAC |
 | `NONCE_RANDOM_SIZE` | `16` | Random bytes in nonce |
-| `NONCE_TOTAL_SIZE` | `32` | Total nonce size (random + HMAC) |
+| `NONCE_TOTAL_SIZE` | `48` | Total nonce size (random + full HMAC) |
 
 ## Error Handling
 

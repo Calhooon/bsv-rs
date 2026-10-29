@@ -167,7 +167,12 @@ impl VerifiableCertificate {
                 },
                 originator,
             )
-            .await?;
+            .await;
+        // An await of the reference wallet's Promise always defers the
+        // result. Keep that boundary even for an immediately ready wallet,
+        // so a different certificate's earlier-stage error can surface (#445).
+        crate::auth::utils::certificate_continuation().await;
+        let decrypted = decrypted?;
 
         if decrypted.plaintext.len() != 32 {
             return Err(refused(

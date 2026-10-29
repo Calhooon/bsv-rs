@@ -444,7 +444,7 @@ async fn test_handle_initial_request_creates_session() {
     // Create an InitialRequest from Alice
     let alice_pub = alice_key.public_key();
     let mut initial_request = AuthMessage::new(MessageType::InitialRequest, alice_pub.clone());
-    initial_request.initial_nonce = Some(bsv_rs::primitives::to_base64(&[0xAA; 32]));
+    initial_request.initial_nonce = Some(bsv_rs::primitives::to_base64(&[0xAA; 48]));
 
     // Deliver to Bob directly via handle_incoming_message
     bob.handle_incoming_message(initial_request).await.unwrap();
@@ -657,10 +657,10 @@ async fn test_certificate_request_callback_invoked() {
 // Test 11: Certificate response flow
 // =============================================================================
 
-/// After authentication, Bob can send a certificate response to Alice,
-/// and Alice's certificate received callback is invoked.
+/// With no certificate policy, an unsolicited nonempty response is refused
+/// before Alice's listener, as Peer.ts:1239 requires (#445).
 #[tokio::test]
-async fn test_certificate_response_flow() {
+async fn test_certificate_response_without_policy_is_refused() {
     let alice_key = PrivateKey::random();
     let bob_key = PrivateKey::random();
     let certifier_key = PrivateKey::random();
@@ -706,16 +706,10 @@ async fn test_certificate_response_flow() {
 
     settle().await;
 
-    // Verify Alice received the certificate
-    let received = certs_received.read().await;
-    assert_eq!(
-        received.len(),
-        1,
-        "Alice should have received one certificate"
-    );
-    assert_eq!(
-        received[0].certificate.certifier.to_hex(),
-        certifier_key.public_key().to_hex()
+    // The send reaches Alice, whose empty policy cannot match the response.
+    assert!(
+        certs_received.read().await.is_empty(),
+        "an unsolicited certificate must not reach the listener"
     );
 }
 
@@ -909,7 +903,7 @@ async fn test_general_message_without_session_fails() {
     .unwrap();
     let alice_pub = alice_key.public_key();
     let mut msg = AuthMessage::new(MessageType::General, alice_pub);
-    msg.nonce = Some("some-nonce".to_string());
+    msg.nonce = Some(bsv_rs::primitives::to_base64(&[7; 32]));
     msg.your_nonce = Some(your_nonce.clone());
     msg.payload = Some(b"Hello".to_vec());
     msg.signature = Some(vec![0x30, 0x44]); // Fake DER
@@ -948,7 +942,7 @@ async fn test_certificate_request_without_session_fails() {
     // Create a CertificateRequest from Alice without prior handshake
     let alice_pub = alice_key.public_key();
     let mut msg = AuthMessage::new(MessageType::CertificateRequest, alice_pub);
-    msg.nonce = Some("some-nonce".to_string());
+    msg.nonce = Some(bsv_rs::primitives::to_base64(&[7; 32]));
     msg.requested_certificates = Some(RequestedCertificateSet::new());
     msg.signature = Some(vec![0x30, 0x44]); // Fake
 
@@ -1161,7 +1155,7 @@ async fn test_ts_style_server_no_nonce_field() {
 /// the error should be delivered through the oneshot channel so the caller
 /// gets the actual error instead of a generic timeout.
 #[tokio::test]
-async fn test_error_propagation_through_oneshot() {
+async fn test_intake_refusal_leaves_the_handshake_waiter_to_timeout() {
     let alice_key = PrivateKey::random();
     let server_key = PrivateKey::random();
 
@@ -1203,7 +1197,7 @@ async fn test_error_propagation_through_oneshot() {
     let _initial_request = bob_rx.try_recv().expect("Should have InitialRequest");
 
     // Send a malformed InitialResponse: has your_nonce (so we can find the
-    // pending handshake) but NEITHER nonce NOR initial_nonce
+    // pending handshake) but neither nonce nor initial_nonce
     let mut bad_response = AuthMessage::new(MessageType::InitialResponse, server_key.public_key());
     // Read Alice's session nonce from the session manager
     let our_nonce = {
@@ -1212,19 +1206,15 @@ async fn test_error_propagation_through_oneshot() {
         sessions[0].session_nonce.clone().unwrap()
     };
     bad_response.your_nonce = Some(our_nonce);
-    // Neither nonce nor initial_nonce — should cause error
+    // Neither nonce nor initial_nonce: refused before the handler
     bad_response.signature = Some(vec![0x30, 0x44]);
 
     alice_tx.send(bad_response).unwrap();
 
-    // The handshake should fail with the actual error, not a timeout
+    // Intake refuses before the handler releases the waiter (#445).
     let result = handshake.await.unwrap();
-    assert!(result.is_err(), "Handshake should fail");
-    let err_msg = result.unwrap_err().to_string();
-    // Should get the actual error about missing nonce, not "Handshake timeout"
-    assert!(
-        !err_msg.contains("timeout"),
-        "Should get actual error, not timeout. Got: {}",
-        err_msg
+    assert_eq!(
+        result.map(|_| ()),
+        Err(bsv_rs::Error::AuthError("Handshake timeout".into()))
     );
 }

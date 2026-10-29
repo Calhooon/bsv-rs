@@ -15,7 +15,7 @@
 //! calls throw on a miss) and on a wallet answering `{ valid: false }`
 //! (`answering`, the Peer's own words reached). Each case runs here over an
 //! in-process transport whose deliveries go through the callback `start`
-//! installs; the verdicts are the reference's, save the three in `STATED`.
+//! installs; the verdicts are the reference's, save the two in `STATED`.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "auth")]
 
@@ -34,12 +34,9 @@ const VECTOR: &str = include_str!("vectors/auth_peer_client_verifies_353.json");
 /// The verdicts whose words differ from the reference's, each with this
 /// crate's: the reference's nonce check asks its wallet's `verifyHmac`, which
 /// a `ProtoWallet` throws on (`verifyNonce.ts:44-53`), where this crate's
-/// `verify_nonce` recomputes the HMAC (`createHmac`, for the 32-byte legacy
-/// nonces) and reaches the Peer's words; the reference's message snapshot
-/// refuses a general message without a nonce before its `Peer` reads it
-/// (`snapshotAuthMessage`, `Peer.ts:767`), where this crate has no snapshot
-/// and the Peer's own check refuses it. Each is a refusal on both sides.
-const STATED: [(&str, &str, &str); 4] = [
+/// `verify_nonce` recomputes the HMAC (`createHmac`) and reaches the Peer's words. Since #445 an absent message nonce
+/// is refused at intake in the reference's words; it is no longer a difference.
+const STATED: [(&str, &str, &str); 2] = [
     (
         "initial_response_wrong_nonce",
         "proto",
@@ -50,8 +47,6 @@ const STATED: [(&str, &str, &str); 4] = [
         "proto",
         "Unable to verify nonce for general message from: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
     ),
-    ("general_no_nonce", "proto", "General message nonce is required."),
-    ("general_no_nonce", "answering", "General message nonce is required."),
 ];
 
 fn vector() -> Value {

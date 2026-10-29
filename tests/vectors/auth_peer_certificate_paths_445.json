@@ -132,6 +132,764 @@
       "id": "initial_response_nonce",
       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
       "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_missing",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": null,
+      "error": "initialRequest.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_empty",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_noncanonical",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "AB==",
+      "error": "initialRequest.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_bytes_31",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_bytes_32",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_bytes_33",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_bytes_47",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialRequest_initialNonce_bytes_49",
+      "message_type": "initialRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "initialRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_missing",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": null,
+      "error": "initialResponse.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_empty",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_noncanonical",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "AB==",
+      "error": "initialResponse.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_bytes_31",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_bytes_32",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_bytes_33",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_bytes_47",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_initialNonce_bytes_49",
+      "message_type": "initialResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "initialResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_missing",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": null,
+      "error": "initialResponse.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_empty",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "",
+      "error": "initialResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_noncanonical",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "AB==",
+      "error": "initialResponse.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_bytes_31",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "initialResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_bytes_32",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_bytes_33",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "initialResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_bytes_47",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "initialResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_initialResponse_yourNonce_bytes_49",
+      "message_type": "initialResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "initialResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_missing",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": null,
+      "error": "certificateRequest.nonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_empty",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "",
+      "error": "certificateRequest.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_noncanonical",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "AB==",
+      "error": "certificateRequest.nonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_bytes_31",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateRequest.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_bytes_33",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateRequest.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_bytes_47",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateRequest.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_bytes_48",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateRequest.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_nonce_bytes_49",
+      "message_type": "certificateRequest",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateRequest.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_missing",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": null,
+      "error": "certificateRequest.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_empty",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "",
+      "error": "certificateRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_noncanonical",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "AB==",
+      "error": "certificateRequest.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_bytes_31",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_bytes_32",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_bytes_33",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_bytes_47",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_initialNonce_bytes_49",
+      "message_type": "certificateRequest",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateRequest.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_missing",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": null,
+      "error": "certificateRequest.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_empty",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "",
+      "error": "certificateRequest.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_noncanonical",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "AB==",
+      "error": "certificateRequest.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_bytes_31",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateRequest.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_bytes_32",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateRequest.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_bytes_33",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateRequest.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_bytes_47",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateRequest.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateRequest_yourNonce_bytes_49",
+      "message_type": "certificateRequest",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateRequest.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_missing",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": null,
+      "error": "certificateResponse.nonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_empty",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "",
+      "error": "certificateResponse.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_noncanonical",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "AB==",
+      "error": "certificateResponse.nonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_bytes_31",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateResponse.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_bytes_33",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateResponse.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_bytes_47",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateResponse.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_bytes_48",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateResponse.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_nonce_bytes_49",
+      "message_type": "certificateResponse",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateResponse.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_missing",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": null,
+      "error": "certificateResponse.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_empty",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "",
+      "error": "certificateResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_noncanonical",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "AB==",
+      "error": "certificateResponse.initialNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_bytes_31",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_bytes_32",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_bytes_33",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_bytes_47",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_initialNonce_bytes_49",
+      "message_type": "certificateResponse",
+      "field": "initialNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateResponse.initialNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_missing",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": null,
+      "error": "certificateResponse.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_empty",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "",
+      "error": "certificateResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_noncanonical",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "AB==",
+      "error": "certificateResponse.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_bytes_31",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_bytes_32",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_bytes_33",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "certificateResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_bytes_47",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "certificateResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_certificateResponse_yourNonce_bytes_49",
+      "message_type": "certificateResponse",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "certificateResponse.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_general_nonce_missing",
+      "message_type": "general",
+      "field": "nonce",
+      "value": null,
+      "error": "general.nonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_general_nonce_empty",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "",
+      "error": "general.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_general_nonce_noncanonical",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "AB==",
+      "error": "general.nonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_general_nonce_bytes_31",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "general.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_general_nonce_bytes_33",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "general.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_general_nonce_bytes_47",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "general.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_general_nonce_bytes_48",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "general.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_general_nonce_bytes_49",
+      "message_type": "general",
+      "field": "nonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "general.nonce must encode exactly 32 bytes."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_missing",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": null,
+      "error": "general.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_empty",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "",
+      "error": "general.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_noncanonical",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "AB==",
+      "error": "general.yourNonce must be canonical base64."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_bytes_31",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "general.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_bytes_32",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "general.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_bytes_33",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH",
+      "error": "general.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_bytes_47",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+      "error": "general.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "nonce_intake_general_yourNonce_bytes_49",
+      "message_type": "general",
+      "field": "yourNonce",
+      "value": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+      "error": "general.yourNonce must encode exactly 48 bytes."
+    },
+    {
+      "id": "no_policy_response_0",
+      "error": null,
+      "certificates_received_calls": 1
+    },
+    {
+      "id": "no_policy_response_1",
+      "error": "Certificates do not match a locally requested set for this session.",
+      "certificates_received_calls": 0
+    },
+    {
+      "id": "keyring_empty",
+      "error": "Certificates do not match a locally requested set for this session."
+    },
+    {
+      "id": "keyring_subset",
+      "error": null
+    },
+    {
+      "id": "keyring_extra",
+      "error": "Certificates do not match a locally requested set for this session."
+    },
+    {
+      "id": "order_initial_signature_subject_forward",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_response_signature_subject_forward",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_initial_signature_subject_reverse",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_response_signature_subject_reverse",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_initial_signature_certifier_forward",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_initial_signature_certifier_reverse",
+      "error": "Certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= has an unrequested certifier: 03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+    },
+    {
+      "id": "order_initial_signature_keyring_forward",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_response_signature_keyring_forward",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_initial_signature_keyring_reverse",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_response_signature_keyring_reverse",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_initial_subject_subject_forward",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_response_subject_subject_forward",
+      "error": "The subject of one of your certificates (\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_initial_subject_subject_reverse",
+      "error": "The subject of one of your certificates (\"025d045857332d5b9e541514731622af8d60c180165d971a61e06b70a9b3834765\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_response_subject_subject_reverse",
+      "error": "The subject of one of your certificates (\"025d045857332d5b9e541514731622af8d60c180165d971a61e06b70a9b3834765\") is not the same as the request sender (\"02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af\")."
+    },
+    {
+      "id": "order_initial_signature_signature_forward",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_response_signature_signature_forward",
+      "error": "The signature for the certificate with serial number AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= is invalid!"
+    },
+    {
+      "id": "order_initial_signature_signature_reverse",
+      "error": "The signature for the certificate with serial number BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ= is invalid!"
+    },
+    {
+      "id": "order_response_signature_signature_reverse",
+      "error": "The signature for the certificate with serial number BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ= is invalid!"
+    },
+    {
+      "id": "sender_bound_0",
+      "error": null,
+      "sent": 1
+    },
+    {
+      "id": "sender_bound_100",
+      "error": null,
+      "sent": 1
+    },
+    {
+      "id": "sender_bound_101",
+      "error": "certificates must be an array of at most 100 entries",
+      "sent": 0
+    },
+    {
+      "id": "sender_bound_101_without_session",
+      "error": "certificates must be an array of at most 100 entries",
+      "sent": 0
+    },
+    {
+      "id": "certificate_request_missing_nonce_and_policy",
+      "error": "certificateRequest.nonce must be canonical base64."
+    },
+    {
+      "id": "certificate_request_missing_policy",
+      "error": "requestedCertificates must be an object."
+    },
+    {
+      "id": "certificate_request_bound_before_missing_policy",
+      "error": "Authentication certificates exceed their limit."
+    },
+    {
+      "id": "order_initial_decryption_await_forward",
+      "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring field name must use canonical base64 encoding"
+    },
+    {
+      "id": "order_response_decryption_await_forward",
+      "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring field name must use canonical base64 encoding"
+    },
+    {
+      "id": "order_initial_decryption_await_reverse",
+      "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring field name must use canonical base64 encoding"
+    },
+    {
+      "id": "order_response_decryption_await_reverse",
+      "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring field name must use canonical base64 encoding"
     }
   ]
 }

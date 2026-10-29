@@ -19,3 +19,19 @@ pub use validation::{
     certificates_match_request, get_verifiable_certificates, validate_certificate,
     validate_certificate_encoding, validate_certificates, validate_requested_certificate_set,
 };
+
+/// One Promise continuation turn without a runtime or timer. Certificate
+/// checks and wallet decryptions retain the reference's await boundaries,
+/// including when a Rust wallet future completes on its opening poll.
+pub(crate) async fn certificate_continuation() {
+    let mut yielded = false;
+    std::future::poll_fn(|cx| {
+        if std::mem::replace(&mut yielded, true) {
+            std::task::Poll::Ready(())
+        } else {
+            cx.waker().wake_by_ref();
+            std::task::Poll::Pending
+        }
+    })
+    .await;
+}

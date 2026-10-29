@@ -1,7 +1,7 @@
 //! The reference's requested certificate set validator, which `Peer` calls
 //! on its own policy and on a received message (#294).
 
-use crate::auth::types::{AuthMessage, MessageType, RequestedCertificateSet};
+use crate::auth::types::{AuthMessage, RequestedCertificateSet};
 use crate::primitives::PublicKey;
 use crate::{Error, Result};
 
@@ -106,7 +106,7 @@ fn assert_auth_identity_key(value: &str) -> Result<()> {
 /// characters of canonical base64 (padded, no whitespace, zero trailing
 /// bits: the text this crate's encoder writes back for the bytes), decoding
 /// to `decoded_bytes`.
-fn assert_canonical_base64(value: &str, name: &str, decoded_bytes: usize) -> Result<()> {
+pub(super) fn assert_canonical_base64(value: &str, name: &str, decoded_bytes: usize) -> Result<()> {
     let decoded = canonical_base64(value, name)?;
     if decoded.len() != decoded_bytes {
         return Err(Error::AuthError(format!(
@@ -132,15 +132,12 @@ pub(crate) fn canonical_base64(value: &str, name: &str) -> Result<Vec<u8>> {
 
 /// A received message's `requestedCertificates`, refused before any handler
 /// as the reference's `snapshotAuthMessage` refuses it (`ts-stack@edf6e03`
-/// `packages/sdk/src/auth/AuthMessageValidation.ts:345-347` on any message,
-/// `:367` required on a certificateRequest; called at `Peer.ts:767`).
+/// `packages/sdk/src/auth/AuthMessageValidation.ts:345-347` on any message;
+/// called at `Peer.ts:767`). A missing set on a certificateRequest is
+/// refused after its nonces in `check_received_message` (`:367`).
 pub(crate) fn check_received_requested_certificates(message: &AuthMessage) -> Result<()> {
     match message.requested_certificates {
         Some(ref requested) => assert_requested_certificate_set(requested),
-        // `assertRequestedCertificateSet(undefined)` (`:111-113`)
-        None if message.message_type == MessageType::CertificateRequest => Err(Error::AuthError(
-            "requestedCertificates must be an object.".into(),
-        )),
         None => Ok(()),
     }
 }

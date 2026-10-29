@@ -289,7 +289,26 @@ async fn certificate_fault(kind: MessageType, fault: &str) {
         _ => unreachable!(),
     }
     let nonce = m.your_nonce.clone().unwrap();
-    assert_ref(p.a.deliver(m).await, &format!("{kind}_{fault}"), &nonce);
+    let actual = p.a.deliver(m).await;
+    if fault == "missing_nonce" {
+        // #445 closes the earlier handler-only gap; keep the old vector intact.
+        let vector: Value =
+            serde_json::from_str(include_str!("vectors/auth_peer_certificate_paths_445.json"))
+                .unwrap();
+        let id = format!("nonce_intake_{kind}_nonce_missing");
+        let row = vector["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == id)
+            .unwrap();
+        assert_eq!(
+            actual,
+            Err(Error::AuthError(row["error"].as_str().unwrap().into()))
+        );
+    } else {
+        assert_ref(actual, &format!("{kind}_{fault}"), &nonce);
+    }
 }
 #[tokio::test]
 async fn certificate_request_verifies_your_nonce_and_session_363() {

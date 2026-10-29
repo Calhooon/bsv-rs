@@ -436,7 +436,10 @@ async fn a_received_certificate_request_without_requested_certificates_is_refuse
     let v = vector();
     let receiver = &v["absent_requested_certificates"]["receiver"];
     assert_eq!(receiver["signatures_checked"], 0);
-    let message = received_message(receiver);
+    let mut message = received_message(receiver);
+    message.nonce = Some(bsv_rs::primitives::to_base64(&[7; 32]));
+    message.initial_nonce = Some(bsv_rs::primitives::to_base64(&[8; 48]));
+    message.your_nonce = Some(bsv_rs::primitives::to_base64(&[9; 48]));
     assert!(message.requested_certificates.is_none());
     let mut case = case(&v, "type_id_of_32_bytes").clone();
     case["receiver"] = receiver.clone();
