@@ -76,20 +76,14 @@ remains: Rust dispatches `None`, TypeScript dispatches `''`.
 `HmacKeyEncoding` and `HmacVerifyPolicy` are now `#[non_exhaustive]`, so
 later key encodings and verification policies can be added without breaking
 callers. Both enums were introduced by #379 after v0.9.0-beta.3 was cut.
-No published prerelease carried the enums exhaustive,
-so the change is additive in effect.
+No published release carries either enum, so the change is additive in
+effect.
 
 Migration: a `match` on either enum outside the crate needs a wildcard arm
 (`_ => ...`). The crate and its tests use constructors and equality checks,
 with no matches on either enum needing an added arm. A test that either
 enum is non-exhaustive is not expressible in Rust from inside the crate;
 the pin is the rustdoc contract and the semver reading below.
-
-### Notes: cross-SDK parity (#443)
-
-This is a Rust API extensibility change. HMAC issuance, verification,
-legacy acceptance counts and the strict nonce path retain #379's behavior
-and its cross-SDK parity reading.
 
 Against base `1dc611a188f2d8a61cdb2e841e5154ee6cb7d47e`,
 `cargo semver-checks --all-features --baseline-rev <base>` (0.51.0) assumes
@@ -113,6 +107,12 @@ A public enum has been marked #[non_exhaustive]. Pattern-matching on it outside 
 That is the expected source-compatibility finding against the unpublished
 base; no other lint fails. The release-history distinction above is why
 this change is additive in effect for published consumers.
+
+### Notes: cross-SDK parity (#443)
+
+This is a Rust API extensibility change. HMAC issuance, verification,
+legacy acceptance counts and the strict nonce path retain #379's behavior
+and its cross-SDK parity reading.
 
 ### Fixed: required script flag refusals name the word's missing flag (#434)
 
