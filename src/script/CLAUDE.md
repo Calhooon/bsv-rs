@@ -372,6 +372,13 @@ inclusive. `None` for an unproven source uses the spend era; no tip is resolved
 by the verifier to the latest activation height. `mined` selects the block
 word, otherwise standard policy. A pre-Genesis source or spend is an explicit
 `ScriptFlagsError::NotApplicable`, never silently PostGenesis.
+Zero Genesis or Chronicle activation heights are refused with that same class
+before era selection, in the node's words. The shared check in `ChainParams`
+also serves `with_activation_heights`, whose typed `ActivationHeightsError`
+keeps `block` independent of `script`; public field mutations cannot bypass
+the composition check. `configscriptpolicy.cpp:310-321,353-364` at `879fc8b`
+pins the refusal, and the two `a_zero_*_activation_height_is_refused` tests
+exercise both entry points.
 
 The node sites are `bitcoin-sv@879fc8b policy.h:226-245` and
 `validation.cpp:2973-2982`; sibling `docs/PARAMETERS.md:103,123,125,168`.

@@ -21,6 +21,7 @@ pub mod params;
 pub mod target;
 pub mod work;
 
+pub use activation::ActivationHeightsError;
 pub use difficulty::{
     calculate_next_work_required, chain_work_between, median_time_past, next_cash_work_required,
     next_work_required, DifficultyError, HeaderAncestry, HeaderLink,

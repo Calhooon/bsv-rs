@@ -18,6 +18,9 @@ use crate::block::ChainParams;
 /// `docs/PARAMETERS.md:103,123,125,168`.
 ///
 /// # Errors
+/// A zero activation height is refused as [`ScriptFlagsError::NotApplicable`]
+/// in the node's words (`bitcoin-sv@879fc8b
+/// src/configscriptpolicy.cpp:310-321,353-364`), including public field overrides.
 /// A pre-Genesis spend or coin is unsupported by this interpreter, and is
 /// refused explicitly rather than silently assigned a post-Genesis era.
 ///
@@ -34,6 +37,9 @@ pub fn input_script_flags(
     source_proven_height: Option<u32>,
     mined: bool,
 ) -> Result<ScriptFlags, ScriptFlagsError> {
+    chain
+        .check_activation_heights()
+        .map_err(|error| ScriptFlagsError::NotApplicable(error.message()))?;
     let era_at =
         |height| ProtocolEra::at_height(height, chain.genesis_height, chain.chronicle_height);
     let spend_era = era_at(spend_height).ok_or(ScriptFlagsError::NotApplicable(
@@ -113,9 +119,10 @@ mod tests {
 
     #[test]
     fn pre_genesis_is_refused_and_custom_network_heights_are_used() {
-        let mut chain = ChainParams::regtest();
-        chain.genesis_height = 100;
-        chain.chronicle_height = 200;
+        // Teranode regtest: go-chaincfg v1.6.2 params.go:475-476, not SV node defaults.
+        let chain = ChainParams::regtest()
+            .with_activation_heights(100, 200)
+            .unwrap();
         assert!(input_script_flags(&chain, 99, None, false).is_err());
         assert!(input_script_flags(&chain, 200, Some(99), false).is_err());
         assert_eq!(
@@ -123,6 +130,46 @@ mod tests {
                 .unwrap()
                 .bits(),
             0x1d47ff
+        );
+    }
+
+    #[test]
+    fn a_zero_genesis_activation_height_is_refused() {
+        let mut chain = ChainParams::regtest();
+        chain.genesis_height = 0;
+        for mined in [false, true] {
+            for source in [None, Some(0), Some(15_000)] {
+                assert_eq!(
+                    input_script_flags(&chain, 15_000, source, mined),
+                    Err(ScriptFlagsError::NotApplicable(
+                        "Genesis activation height cannot be configured with a zero or negative value."
+                    ))
+                );
+            }
+        }
+        assert_eq!(
+            ChainParams::regtest().with_activation_heights(0, 15_000),
+            Err(crate::block::ActivationHeightsError::ZeroGenesis)
+        );
+    }
+
+    #[test]
+    fn a_zero_chronicle_activation_height_is_refused() {
+        let mut chain = ChainParams::regtest();
+        chain.chronicle_height = 0;
+        for mined in [false, true] {
+            for source in [None, Some(0), Some(15_000)] {
+                assert_eq!(
+                    input_script_flags(&chain, 15_000, source, mined),
+                    Err(ScriptFlagsError::NotApplicable(
+                        "Chronicle activation height cannot be configured with a zero or negative value."
+                    ))
+                );
+            }
+        }
+        assert_eq!(
+            ChainParams::regtest().with_activation_heights(10_000, 0),
+            Err(crate::block::ActivationHeightsError::ZeroChronicle)
         );
     }
 }

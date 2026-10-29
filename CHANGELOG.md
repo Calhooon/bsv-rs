@@ -22,8 +22,19 @@ The existing non-exhaustive `block::ChainParams` now carries `genesis_height`
 and `chronicle_height`: mainnet 620538 / 943816, testnet 1344302 / 1713168,
 regtest 10000 / 15000 (`bitcoin-sv@879fc8b src/chainparams.cpp:18,23;20,25;21,26`).
 `mainnet()` and `testnet()` join the existing `main()`, `test()` and `regtest()`;
-test-network node overrides are expressed in these public fields. Activation
-parameters stand separately from the moving `ChainTip` header facts.
+test-network overrides use `chain.with_activation_heights(genesis, chronicle)`.
+The fields stay public. These match `-genesisactivationheight` and
+`-chronicleactivationheight` (`bitcoin-sv@879fc8b src/init.cpp:2473-2481`).
+Zero is refused for either field by the shared activation check, including
+when `input_script_flags` receives public fields mutated by a caller, as the
+node refuses zero or negative heights (`configscriptpolicy.cpp:310-321,353-364`);
+negative heights are unrepresentable as `u32`. The constructor returns
+`ActivationHeightsError`; the composition function maps the same refusal and
+node sentence to `ScriptFlagsError::NotApplicable`, because an unusable chain
+configuration cannot select a script word. Teranode's regtest uses 100 / 200
+(`go-chaincfg` v1.6.2 `params.go:475-476`), so its fixtures use
+`ChainParams::regtest().with_activation_heights(100, 200)?`. Activation parameters
+stand separately from the moving `ChainTip` header facts.
 
 `script::input_script_flags(&chain, spend_height, source_proven_height, mined)`
 computes the word in one place. It follows the sibling
@@ -49,11 +60,35 @@ as the budgets are. Existing APIs retain default evaluation and their signatures
 This serves the toolbox's #422/#432, the engine's #205 and the storage server's
 `tracker_rule.rs:48-68`, replacing each caller's word composition. Unit tests pin
 network constants and numeric same-era/mixed-era words at Genesis and Chronicle.
+The unit tests `a_zero_genesis_activation_height_is_refused` and
+`a_zero_chronicle_activation_height_is_refused` pin public-field and constructor
+refusals; removing the shared zero checks makes both fail with a post-Chronicle
+word where the refusal belongs.
 `tests/beef_stream_word_440.rs` builds signed BEEFs for the 0x01 FORKID refusal,
 version-1 0x61 acceptance across a mixed-era boundary and refusal before Chronicle,
 OP_SUBSTR, unproven/pre-Genesis/no-tip cases, each input's height, deferred and
 resumed readers and resource declines. The existing four word witness files stay
 unchanged. No fixture recordings were added. Migration: none; additive.
+
+### Notes: cross-SDK parity
+
+`@bsv/sdk` at `ts-stack@edf6e03` has no chain-parameter object or automatic
+per-input word derivation in its default `Transaction.verify` path: it builds
+`Spend` without flags and runs its default mode
+(`packages/sdk/src/transaction/Transaction.ts:1391-1456`). `Spend` can accept
+explicit flags (`packages/sdk/src/script/Spend.ts:275-304`); that does not select
+the caller's network or activation heights. The toolbox's verifier is a caller
+that supplies height context (`packages/wallet/wallet-toolbox/src/signer/methods/verifyUnlockScripts.ts:329-350,384`).
+This crate's chain-parameter path is an additive live-door API; the existing
+verification APIs retain the SDK default mode.
+
+Go likewise supplies activation heights from the verifier's tracker or caller
+(`go-sdk@2ca481c spv/script_flags.go:15-36,51-57`) and passes its per-input word
+to the interpreter (`spv/verify.go:537-549`), using
+`script/interpreter/scriptflag/heights.go:44-90`. Its zero-valued activation
+fields make the rules active from the start (`heights.go:3-16`); this crate
+instead follows the SV node's refusal of zero. Pre-Genesis interpretation
+remains unsupported here, as described above.
 
 ### Fixed: bind key-value actions before signing and carry their options (#341, #342)
 

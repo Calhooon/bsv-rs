@@ -41,10 +41,14 @@ pub struct ChainParams {
     /// above this height (src/pow.cpp:111).
     pub daa_height: u32,
     /// Genesis activation, inclusive (`chainparams.cpp:18-21` at `879fc8b`).
-    /// Test-network node configurations may override this default.
+    /// Match `-genesisactivationheight` (`init.cpp:2473-2477` at that pin)
+    /// with [`Self::with_activation_heights`]. The node refuses zero or
+    /// negative values (`configscriptpolicy.cpp:310-321`); `u32` excludes negatives.
     pub genesis_height: u32,
     /// Chronicle activation, inclusive (`chainparams.cpp:23-26` at `879fc8b`).
-    /// Test-network node configurations may override this default.
+    /// Match `-chronicleactivationheight` (`init.cpp:2478-2481` at that pin)
+    /// with [`Self::with_activation_heights`]. The node refuses zero or
+    /// negative values (`configscriptpolicy.cpp:353-364`); `u32` excludes negatives.
     pub chronicle_height: u32,
 }
 
@@ -86,6 +90,10 @@ impl ChainParams {
 
     /// `CRegTestParams` (src/chainparams.cpp:1471-1477, no retargeting;
     /// `daaHeight` 0 at 1490).
+    /// The SV node uses Genesis 10,000 and Chronicle 15,000
+    /// (`bitcoin-sv@879fc8b src/chainparams.cpp:21,26`). Teranode's regtest uses
+    /// 100 and 200 (`go-chaincfg` v1.6.2 `params.go:475-476`); fixtures against
+    /// it use `Self::regtest().with_activation_heights(100, 200)?`.
     /// ```
     /// let regtest = bsv_rs::block::ChainParams::regtest();
     /// assert!(regtest.no_retargeting);
