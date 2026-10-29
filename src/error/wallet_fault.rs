@@ -66,9 +66,11 @@ impl WalletFault {
 /// stored-acceptance guard uses `InvalidOperation`. No class is inferred.
 ///
 /// Optional fields carry only context the guard knows. An absent field does
-/// not negate stored acceptance. Their text is boxed to keep the unified
-/// error compact. This crate emits no acceptance records and adds no wire
-/// encoding; the toolbox can supply one to an in-process host.
+/// not negate stored acceptance. Their text is boxed, and
+/// [`super::Error::AbortAccepted`] boxes the whole record to keep the unified
+/// error compact. On the wire it follows the same class code and message
+/// rules as [`super::Error::WalletRefusal`]; the typed record stays in Rust.
+/// This crate emits no acceptance records; the toolbox can supply one.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[error("{message}")]
 #[non_exhaustive]
@@ -92,6 +94,7 @@ impl AbortAcceptance {
     ///
     /// The caller has already checked the stored acceptance. Set `txid`,
     /// `status` and `accepting_word` when known; no value is derived from text.
+    /// Wrap the record with `Error::AbortAccepted(Box::new(record))`.
     pub fn new(
         reference: impl Into<String>,
         class: WalletRefusalClass,

@@ -75,15 +75,16 @@ impl From<Error> for Refusal {
 
 /// The code of an explicit wallet error, 2 to 8 (`WalletWireProcessor.ts:2405-2416`:
 /// a `WalletError`, or a `WERR_` error, whose `code` lies in unsupportedAction
-/// to abortRefused): a [`Error::WalletRefusal`]'s class with an SDK code
-/// (`WalletRefusalClass::wire_code`, #137), which keeps its words and its
-/// code on the wire. Every other error has none, a class whose code is its
+/// to abortRefused): a [`Error::WalletRefusal`]'s or [`Error::AbortAccepted`]'s
+/// class with an SDK code (`WalletRefusalClass::wire_code`, #137), which keeps
+/// its words and its code on the wire. Every other error has none, a class whose code is its
 /// name among them (the toolbox's `WERR_*`, whose `code` is no integer).
 /// A `WERR_REVIEW_ACTIONS` with its results is code 5 and its words, its
 /// results not on the wire (#327).
 pub(super) fn explicit_wallet_code(error: &Error) -> Option<u8> {
     match error {
         Error::WalletRefusal { class, .. } => class.wire_code(),
+        Error::AbortAccepted(a) => a.class.wire_code(),
         Error::WalletReviewActions(_) => {
             crate::error::WalletRefusalClass::ReviewActions.wire_code()
         }
@@ -94,12 +95,13 @@ pub(super) fn explicit_wallet_code(error: &Error) -> Option<u8> {
 /// The words an error frame carries: the reference writes `error.message`
 /// (`WalletWireProcessor.ts:2387`), never this crate's `Display` prefix. A
 /// `WalletError` is its own words (the replacement's constant, a stub's
-/// refusal), a `WalletRefusal` its message (#137); every other variant, the
-/// processor's own reading of the request, is this crate's own sentence,
-/// written as its `Display` reads.
+/// refusal), a `WalletRefusal` or `AbortAccepted` its message (#137, #439);
+/// every other variant, the processor's own reading of the request, is this
+/// crate's own sentence, written as its `Display` reads.
 fn wire_message(error: &Error) -> String {
     match error {
         Error::WalletError(words) | Error::WalletRefusal { message: words, .. } => words.clone(),
+        Error::AbortAccepted(a) => a.message.clone(),
         other => other.to_string(),
     }
 }

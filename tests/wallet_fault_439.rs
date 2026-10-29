@@ -110,7 +110,7 @@ fn abort_acceptance_text_and_record_agree_without_changing_the_refusal_class() {
             "Invalid transaction status: cannot abort action: transaction aa has a recorded acceptance (tracker word 'seen'); only a transaction never accepted can be retired",
         ),
     ] {
-        let mut record = AbortAcceptance::new("reference/\0é", class, message);
+        let mut record = Box::new(AbortAcceptance::new("reference/\0é", class, message));
         assert_eq!((&record.txid, &record.status, &record.accepting_word), (&None, &None, &None));
         record.txid = txid.map(Into::into);
         record.status = status.map(Into::into);

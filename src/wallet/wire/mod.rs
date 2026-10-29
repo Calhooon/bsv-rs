@@ -73,6 +73,8 @@
 //! ```
 
 mod calls;
+#[cfg(feature = "tracing")]
+mod diagnostics;
 mod encoding;
 mod linkage;
 mod processor;

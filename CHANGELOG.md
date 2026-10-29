@@ -111,18 +111,32 @@ The legacy `WalletError(String)` and its `wallet error: ` prefix are unchanged.
 `AbortAcceptance::new(reference, class, message)` retains the guard's full
 string and reference refusal class. Its presence affirms stored acceptance;
 optional `txid`, `status` and `accepting_word` carry the context the guard
-knows. Both the record and `Error::AbortAccepted` display the guard's string
+knows. The toolbox wraps it as
+`Error::AbortAccepted(Box::new(AbortAcceptance::new(reference, class, message)))`,
+or fills the optional fields before boxing the record. Boxing the variant
+keeps `Error` at its pre-change size (56 bytes on 64-bit targets).
+Both the record and `Error::AbortAccepted` display the guard's string
 exactly, as `WalletRefusal { class, message }` does. This distinguishes the
 status guard's `InvalidParameter` from the shared guard's `InvalidOperation`
 without changing either judgement. It describes a refused abort, not a
 successful abort or a chain proof, and does not cover retirement guards.
+
+An accepted-abort refusal travels on the wire as its class's code and words,
+exactly as the corresponding `WalletRefusal`; the typed record is a Rust-side
+reading, with no new wire fields. Classes with an SDK wire code retain it
+and the message (2 to 8, including `InvalidParameter` at 6). Classes without
+one follow the existing `Wallet operation failed`, code 1 rule, including
+`InvalidOperation`. `WalletFault` frames exactly as `WalletError` does.
 
 No existing producer emits either new variant. The toolbox will supply the
 metadata on its own lane; no wallet, refusal, transport or wire verdict
 changes here. `tests/wallet_fault_439.rs` pins the four families and both
 acceptance guards in five tests: display bytes, typed fields, equality and
 cloning. The same tests do not compile on the base because the types and
-variants do not exist. The preceding room-making commit moves
+variants do not exist. `tests/wallet_fault_wire_439.rs` checks all twenty
+classes against their legacy frames, all four fault families against
+`WalletError`, and the 64-bit enum size. The frame and size regressions fail
+on the unboxed, pre-fold record. The preceding room-making commit moves
 `WalletRefusalClass` and its impls byte for byte with a re-export at the old
 path; its twenty classes are unchanged.
 
