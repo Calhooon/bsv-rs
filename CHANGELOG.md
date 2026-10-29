@@ -96,6 +96,45 @@ crate refuses a pre-Genesis coin. Its zero-valued activation fields make the
 rules active from the start (`heights.go:3-16`); this crate instead follows
 the SV node's refusal of zero. Pre-Genesis interpretation remains unsupported
 here, as described above.
+### Added: typed wallet faults and stored abort acceptance (#439)
+
+Under the owner's 20.4 (a) word of 2026-10-29 through the keeper, add
+`WalletFaultFamily::{Transport, Service, Storage, Internal}`, `WalletFault`
+and `AbortAcceptance`, with `Error::WalletFault` and `Error::AbortAccepted`.
+The types are available under `error` and at the crate root with `wallet`.
+Hosts can classify faults and select the stored-acceptance recovery hint by
+matching typed data instead of parsing messages.
+
+`WalletFault::new(family, message)` retains the original string:
+`Error::WalletFault(f).to_string() == Error::WalletError(f.message.clone()).to_string()`.
+The legacy `WalletError(String)` and its `wallet error: ` prefix are unchanged.
+`AbortAcceptance::new(reference, class, message)` retains the guard's full
+string and reference refusal class. Its presence affirms stored acceptance;
+optional `txid`, `status` and `accepting_word` carry the context the guard
+knows. Both the record and `Error::AbortAccepted` display the guard's string
+exactly, as `WalletRefusal { class, message }` does. This distinguishes the
+status guard's `InvalidParameter` from the shared guard's `InvalidOperation`
+without changing either judgement. It describes a refused abort, not a
+successful abort or a chain proof, and does not cover retirement guards.
+
+No existing producer emits either new variant. The toolbox will supply the
+metadata on its own lane; no wallet, refusal, transport or wire verdict
+changes here. `tests/wallet_fault_439.rs` pins the four families and both
+acceptance guards in five tests: display bytes, typed fields, equality and
+cloning. The same tests do not compile on the base because the types and
+variants do not exist. The preceding room-making commit moves
+`WalletRefusalClass` and its impls byte for byte with a re-export at the old
+path; its twenty classes are unchanged.
+
+Migration: additive. Existing matches with a fallback keep working; hosts
+may match the new variants when their toolbox supplies them.
+
+
+These types are the port's extension beyond the reference, not a parity
+item or a divergence: `ts-stack@edf6e03`'s
+`packages/sdk/src/wallet/WalletError.ts` has a string and a code, with no
+fault family or acceptance record. The string remains the reference's,
+byte for byte. The reference's twenty refusal classes remain its own.
 
 ### Fixed: bind key-value actions before signing and carry their options (#341, #342)
 
