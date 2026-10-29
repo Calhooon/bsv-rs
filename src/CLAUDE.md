@@ -11,6 +11,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 |------|---------|
 | `lib.rs` | Crate root with module declarations and re-exports |
 | `error.rs` | Unified `Error` enum and `Result` type alias |
+| `error/wallet_refusal.rs` | The reference's twenty `WalletRefusalClass` values and impls, re-exported at `error::WalletRefusalClass` |
 
 ## Subdirectories
 
