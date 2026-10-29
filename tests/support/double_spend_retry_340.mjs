@@ -1,6 +1,6 @@
 // Called only by signaction_reference_326.mjs --double-spend-retry under Node 22.
 // All wallet, lookup and broadcast calls stay in process. The local runs record
-// the absence of retries at edf6e03, an explicit difference from the #340 ruling.
+// the absence of retries at edf6e03, which the Rust local store also preserves.
 export async function recordDoubleSpendRetry (ctx) {
   const {
     recording, fresh, record, stop, sourceOf, LookupResolver, TopicBroadcaster,
@@ -123,7 +123,7 @@ export async function recordDoubleSpendRetry (ctx) {
     }
   }
   return {
-    description: '#340: actual global retry and local non-retry sequences; local retries in Rust are the owner-requested extension',
+    description: '#340: global retry and local single-attempt sequences, preserved by the Rust stores',
     reference: 'ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9; Node ' + process.version,
     runs
   }

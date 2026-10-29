@@ -16,11 +16,11 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 842 |
-| `local.rs` | LocalKVStore with injectable retry broadcaster; tests in local_tests.rs | 761 |
+| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 733 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
-| `local_actions.rs` | #343: replace/remove every listed token; #340: removal batch retries under the shared rule, keeping completed batches | 150 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch, with no broadcaster | 128 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 150 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 727 |
@@ -619,26 +619,31 @@ unused-signer unit test; the reference's calls and refusals are recorded by
 ### Wallet double-spend retry (#340)
 
 `overlay::wallet_retry::with_wallet_double_spend_retry` is the single internal
-rule used by revocation and both stores: five attempts at most for structured
-wallet double-spend evidence, each retry after acknowledgment of the competing
-transactions. Set and remove repeat their lookup and input selection inside
-the key lock; local remove retries each batch. The bound action aborts the
-failed reference before the retry obtains another. `with_broadcaster` on each
-store supplies an injectable broadcaster, used by global completed broadcasts
-too; default construction is lazy, so an ordinary local write does not need
-an overlay host. The global default keeps the configured topics and network;
-the local default uses the configured topics on mainnet.
+rule used by revocation and the global store: five attempts at most for
+structured wallet double-spend evidence, each retry after acknowledgment of
+the competing transactions. Global set and remove repeat lookup and input
+selection inside the key lock, aborting the failed reference before obtaining
+another. `GlobalKVStore::with_broadcaster` supplies an injectable broadcaster
+for synchronization and completed broadcasts; its default uses the configured
+topics and network.
+
+The local store does not retry, as the reference's does not. Local set makes
+one bound action; local removal makes one bound action per batch and stops on
+failure. Neither has a broadcaster. Both retain the per-key lock and the bound
+action's abort on failure.
 
 The helper's TypeScript home is `overlay-tools/withDoubleSpendRetry.ts`, not
 `wallet/completeBoundAction.ts`. At `edf6e03`, global set/remove wrap their
 lookup and bound action; local set/remove call the boundary without retry.
-Local retry here is the owner's #340 extension. Go's `kvstore/local_kv_store.go`
-at `2ca481c` does not retry a double spend. Tests:
-`tests/kvstore_double_spend_retry_340.rs`, eleven cases using the #326 recording
-wallet, with nine RED on the base algorithms and two non-retry controls.
-The #340 Node 22 recorder mode records the actual distinction; all older
-modes regenerate byte-identically. Migration: no public item moved;
-`with_broadcaster` is additive and config literals are unchanged.
+Go's `kvstore/local_kv_store.go` at `2ca481c` also does not retry a double spend.
+`tests/kvstore_double_spend_retry_340.rs` has eleven cases using the #326
+recording wallet: four local single-attempt cases fail on the retrying
+`dd0a4a59` tree, and the global retry and non-retry controls remain pinned.
+The #340 Node 22 recording changes only its description; its eight cases are
+unchanged and all three older modes regenerate byte-identically. Migration:
+no published public item moved; the removed local `with_broadcaster` was
+unreleased, the global builder remains additive, and config literals are
+unchanged.
 
 ### Per-Key Locking
 

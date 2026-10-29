@@ -1,6 +1,6 @@
 //! The reference's `withDoubleSpendRetry` (`ts-stack@edf6e03`
 //! `packages/sdk/src/overlay-tools/withDoubleSpendRetry.ts`; #327), the rule
-//! shared by identity revocation and both key-value stores: an attempt that fails with a
+//! shared by identity revocation and the global key-value store: an attempt that fails with a
 //! wallet's `WERR_REVIEW_ACTIONS` carrying double-spend evidence
 //! ([`Error::WalletReviewActions`]) is repeated, at most five attempts in
 //! all, after every competing transaction it names is read from its BEEF,
