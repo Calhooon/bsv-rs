@@ -22,7 +22,7 @@ pub(super) fn script_refusal(
 ) -> Error {
     if let Some(cause) = error
         .resource_limit
-        .and_then(|limit| work_budget_cause(input_index, limit))
+        .and_then(|limit| work_budget_cause(input_index as u32, limit))
     {
         return Error::TransactionNotJudged {
             txid: txid.to_owned(),
@@ -40,10 +40,7 @@ pub(super) fn script_refusal(
 }
 
 /// Both verification paths translate the same interpreter charge into #452's class.
-pub(super) fn work_budget_cause(
-    input: usize,
-    limit: ScriptResourceLimit,
-) -> Option<NotJudgedCause> {
+pub(super) fn work_budget_cause(input: u32, limit: ScriptResourceLimit) -> Option<NotJudgedCause> {
     match limit {
         ScriptResourceLimit {
             resource: ScriptResource::Work,

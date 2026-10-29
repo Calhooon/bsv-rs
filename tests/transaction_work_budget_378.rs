@@ -15,6 +15,17 @@ use bsv_rs::Error;
 const WORK: u64 = 68; // push + SHA256 + 64 bytes hashed + DROP + final opcode.
 const LOW: u64 = 65; // The hash would take the counter from 2 to 66.
 
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn a_work_budget_cause_keeps_the_unified_error_at_56_bytes_378() {
+    let sizes = (
+        std::mem::size_of::<NotJudgedCause>(),
+        std::mem::size_of::<Error>(),
+    );
+    println!("size_of: NotJudgedCause = {}, Error = {}", sizes.0, sizes.1);
+    assert_eq!(sizes, (24, 56));
+}
+
 struct Fixture {
     tx: Transaction,
     tracker: MockChainTracker,
@@ -131,14 +142,14 @@ impl AsyncByteSource for Chunk {
 
 fn cause(input: usize, budget: u64, work_done: u64) -> NotJudgedCause {
     NotJudgedCause::WorkBudgetExceeded {
-        input,
+        input: input as u32,
         budget,
         work_done,
     }
 }
 
 fn sentence(input: usize, budget: u64, work_done: u64) -> String {
-    format!("input {input} not judged: input {input} exceeded work budget {budget} units after {work_done} units of work.")
+    format!("input {input} not judged: exceeded work budget {budget} units after {work_done} units of work.")
 }
 
 fn assert_stream(f: &Fixture, verdict: Verdict, input: usize, budget: u64, work_done: u64) {
