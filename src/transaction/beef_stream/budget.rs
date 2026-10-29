@@ -26,6 +26,9 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// `verify`, which has no work bound. This is a service door's policy,
     /// not an elapsed-time bound. This configuration is not cursor state:
     /// reapply it after `resume`, including a decoded cursor.
+    ///
+    /// `with_work_budget` and `set_work_limit` write the same per-input work limit:
+    /// whichever is called last wins.
     pub fn set_work_limit(&mut self, limit: Option<u64>) {
         self.evaluation.work = limit;
     }
@@ -36,6 +39,9 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// accounting, `None` by default, with no work bound in the reference's
     /// `verify`. Combine with `with_chain_params` for a live service door,
     /// and reapply after `resume`; no budget is stored in the cursor.
+    ///
+    /// `with_work_budget` and `set_work_limit` write the same per-input work limit:
+    /// whichever is called last wins.
     #[must_use]
     pub fn with_work_budget(mut self, limit: Option<u64>) -> Self {
         self.set_work_limit(limit);
