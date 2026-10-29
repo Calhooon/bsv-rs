@@ -28,7 +28,7 @@ fn recorded(name: &str) -> Value {
     let vector: Value =
         serde_json::from_str(include_str!("vectors/wallet_wire/originator_338.json")).unwrap();
     let cases = vector["processor"].as_array().unwrap();
-    assert_eq!(cases.len(), 17);
+    assert_eq!(cases.len(), 21);
     cases
         .iter()
         .find(|case| case["name"] == name)

@@ -72,6 +72,19 @@ export async function recordOriginators(sdk) {
   // the error code and words, including the runtime's fatal UTF-8 message.
   processor.push(await processorCase(sdk, 'invalid-utf8', '', [28, 1, 0xff]))
   processor.push(await processorCase(sdk, 'length-250-truncated', 'a', [28, 250, 0x61]))
+  // #471: record the strict decoder's output before the processor validates
+  // it, as well as the wallet's normalized originator (or refusal words).
+  for (const [name, originator] of [
+    ['bom-only', '\uFEFF'],
+    ['bom-before-host', '\uFEFFa.b'],
+    ['two-boms-before-host', '\uFEFF\uFEFFa.b'],
+    ['bom-after-host', 'a.b\uFEFF']
+  ]) {
+    processor.push({
+      ...await processorCase(sdk, name, originator),
+      decoded_originator: sdk.Utils.toUTF8Strict(sdk.Utils.toArray(originator, 'utf8'))
+    })
+  }
   // #458 fold: use the SDK writer for exact u64 lengths and observe both
   // readVarIntNumStrict modes, followed by the actual byte read. The signed
   // -1 probe deliberately calls read(-1); optional wire fields skip that read.

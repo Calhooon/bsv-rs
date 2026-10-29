@@ -76,6 +76,62 @@ request JSON; #340 adds count/key wrapper cases. Every pre-existing payload
 remains identical when those newly recorded members are removed. No vector was
 hand-edited. Contact helpers and local listing were split to keep touched source
 files below 800 lines and production functions at most 60 lines.
+### Fixed: the wire originator drops one leading byte-order mark (#471)
+
+The processor now removes one leading U+FEFF (`ef bb bf`) after the strict
+UTF-8 check and before checking for an empty originator or validating its
+hostname. A BOM-only header reaches the wallet as `None`, as an empty header
+does (#329), instead of receiving code 6. This follows the reference's own
+behavior under the owner's ruling (c) of 2026-10-26; no refusal words change.
+
+At `ts-stack@edf6e03`, `packages/sdk/src/primitives/utils.ts:224-228`
+implements `toUTF8Strict` with `new TextDecoder('utf-8', { fatal: true })`.
+Its default `ignoreBOM: false` removes exactly one leading BOM, as specified
+by the [WHATWG serialization rule](https://encoding.spec.whatwg.org/#concept-td-serialize)
+and witnessed under Node v22.18.0. `WalletWireProcessor.ts:286-294` decodes
+before the empty-string check and `validateOriginator` call. A second or
+nonleading BOM survives decoding; the validator then trims edge U+FEFF
+characters (`wallet/validationHelpers.ts:1003-1006`). Consequently all
+three hostname examples below reach the wallet as `a.b` on both versions.
+
+Rows for the toolbox's behavior table (`BOM` means U+FEFF):
+
+| Wire originator | Old decoding and result | New decoding and reference result |
+| --- | --- | --- |
+| `BOM` | BOM kept; code 6, `The originator parameter must be at least 1 length.` | Empty; code 0, wallet originator `None` (reference `''`) |
+| `BOM` + `a.b` | BOM kept; validation trims it; code 0, `a.b` | `a.b`; code 0, `a.b` |
+| `BOM` + `BOM` + `a.b` | Both BOMs kept; validation trims them; code 0, `a.b` | Second BOM kept; validation trims it; code 0, `a.b` |
+| `a.b` + `BOM` | Trailing BOM kept; validation trims it; code 0, `a.b` | Trailing BOM kept; validation trims it; code 0, `a.b` |
+
+Rows for the CLI's operator-visible table:
+
+| Wire originator | Old code and words or wallet value | New code and words or wallet value |
+| --- | --- | --- |
+| `BOM` | 6, `The originator parameter must be at least 1 length.` | 0, absent originator (`None`) |
+| `BOM` + `a.b` | 0, `a.b` (BOM kept until validation) | 0, `a.b` (leading BOM removed before validation) |
+| `BOM` + `BOM` + `a.b` | 0, `a.b` (both BOMs kept until validation) | 0, `a.b` (second BOM kept until validation) |
+| `a.b` + `BOM` | 0, `a.b` (trailing BOM kept until validation) | 0, `a.b` (trailing BOM kept until validation) |
+
+`tests/support/wire_originator_338.mjs`, invoked through the #406 recorder,
+writes all four processor cases to `tests/vectors/wallet_wire/originator_338.json`,
+including their decoded strings, response frames, codes, refusal messages
+(`null` for these four successes) and wallet observations. Two runs are
+byte-identical; all seventeen prior processor cases, nine transceiver cases,
+the length probes and the linkage recording are unchanged.
+`tests/wallet_wire_originator_bom_471.rs` tests each case separately. On a
+scratch copy of base `ad6e350a7407409860e9df481fb8453eab001bfe`, BOM-only is
+RED on the old code-6 refusal; the three hostname cases are passing controls
+because their observable behavior already matches the reference. All four
+are GREEN with the reader change. Four REDs would misstate the reference.
+
+
+Go at `2ca481c` reads the originator bytes with `ReadBytes` and converts them
+directly with `string(originatorBytes)` (`wallet/serializer/frame.go:49-58`);
+it does not strip a BOM. This crate follows the TypeScript decoder. The
+TypeScript transceiver (`WalletWireTransceiver.ts:95-100`) validates the
+caller's string and encodes the normalized result, without decoding it;
+there is no outgoing TextDecoder BOM rule. Its validator already trims edge
+BOMs and still refuses a BOM-only caller string. This change is reader-only.
 
 ### Fixed: short ECIES envelopes use the reference's bounded words (#463)
 
