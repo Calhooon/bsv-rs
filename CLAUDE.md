@@ -1,5 +1,6 @@
 # CLAUDE.md: bsv-rs
 
+- String-array entries use plain lengths, including zero for `""`, on the wallet wire (#458), as `ts-stack@edf6e03` writes them (`WalletWireProcessor.ts:926-929,1033-1036`). Go at `2ca481c` writes `""` as nine `0xFF` (`util/writer.go:212-221`) and reads it back as `""` (`util/reader.go:152`); this crate refuses that sentinel entry with the TypeScript reference's precision words.
 The working rules for this crate. `README.md` is the guide for users (what it is, the examples, the contracts, the numbers); this file is for whoever changes it. Read both, then the module's own `CLAUDE.md` (28 of them under `src/`, 31 with `tests/` and `benches/`) before touching that module.
 
 ## What this crate is, in one paragraph

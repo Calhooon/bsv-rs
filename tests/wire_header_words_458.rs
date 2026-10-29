@@ -459,6 +459,58 @@ async fn wire_certificate_verifier_lengths_use_reference_precision_words() {
     assert_response_length_site("certificate-verifier").await;
 }
 
+async fn assert_page_total_site(site: &str) {
+    let vector = vector();
+    let cases: Vec<_> = vector["page_totals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| case["site"] == site)
+        .collect();
+    assert_eq!(cases.len(), 6);
+    for case in cases {
+        let total = case["total"].as_str().unwrap().parse::<u64>().unwrap();
+        let words = case["message"].as_str().unwrap();
+        if total >= 1 << 53 {
+            assert_eq!(words, PRECISION_WORDS);
+        }
+        let mut response = WireWriter::new();
+        response.write_u8(0).write_var_int(total);
+        assert_eq!(hex::encode(response.as_bytes()), case["response_hex"]);
+        let client = WalletWireTransceiver::new(Reply(response.into_bytes()));
+        let result = if site == "listActions" {
+            client
+                .list_actions(serde_json::from_value(json!({"labels": []})).unwrap(), None)
+                .await
+                .map(drop)
+        } else {
+            client
+                .list_outputs(
+                    serde_json::from_value(json!({"basket": "fixtures"})).unwrap(),
+                    None,
+                )
+                .await
+                .map(drop)
+        };
+        assert_eq!(
+            result,
+            Err(Error::WalletError(words.into())),
+            "{site} {}",
+            case["name"]
+        );
+    }
+}
+
+#[tokio::test]
+async fn list_actions_totals_use_reference_precision_words() {
+    assert_page_total_site("listActions").await;
+}
+
+#[tokio::test]
+async fn list_outputs_totals_use_reference_precision_words() {
+    assert_page_total_site("listOutputs").await;
+}
+
 #[test]
 fn primitive_reader_keeps_underflow_details() {
     assert_eq!(

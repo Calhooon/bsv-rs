@@ -101,11 +101,13 @@ impl WireReader<'_> {
     /// index, a sequence number, a version, a lock time, a height, a total.
     ///
     /// Each is a `u32` by the transaction format or by BRC-100's
-    /// `PositiveIntegerOrZero` (at most `2^32 - 1`), so a value above
-    /// `u32::MAX` is refused, never truncated, in `#requireInteger`'s words
-    /// with the reference's name for the field (bsv-rs#255).
+    /// `PositiveIntegerOrZero` (at most `2^32 - 1`). The reference's strict
+    /// number read checks precision before that bound at every caller
+    /// (bsv-rs#458). Values within that precision but above `u32::MAX` are
+    /// refused in `#requireInteger`'s words with the reference's name for
+    /// the field (bsv-rs#255), never truncated.
     pub(crate) fn read_var_int_u32(&mut self, field: &str) -> Result<u32, Error> {
-        let value = self.read_var_int()?;
+        let value = self.read_var_int_num_strict_u64()?;
         var_int_u32(field, value)
     }
 

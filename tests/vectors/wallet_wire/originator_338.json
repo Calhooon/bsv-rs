@@ -1,7 +1,7 @@
 {
   "reference": "ts-stack@edf6e03, unmodified packages/sdk, Node v22.18.0",
   "recorder": "tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs",
-  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396,2444-2445; WalletWireTransceiver.ts:95-100,142-148,1533-1542; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59; readVarIntNumStrict.ts:15-36",
+  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396,2444-2445; WalletWireTransceiver.ts:95-100,142-148,380-385,651-656,1533-1542; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59; readVarIntNumStrict.ts:15-36",
   "processor": [
     {
       "name": "length-251",
@@ -494,6 +494,92 @@
       "site": "certificate-verifier",
       "response_hex": "0001a4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50000000000000000000000000000000000000000000000000000000000000000000000ff0300000001000000616263",
       "message": "Invalid listCertificates verifier length: expected 33 bytes, received 4294967299"
+    }
+  ],
+  "page_totals": [
+    {
+      "name": "2pow53-minus-1",
+      "site": "listActions",
+      "total": "9007199254740991",
+      "response_hex": "00ffffffffffffff1f00",
+      "message": "Invalid listActions totalActions: expected an integer from 0 to 4294967295, received 9007199254740991"
+    },
+    {
+      "name": "2pow53-minus-1",
+      "site": "listOutputs",
+      "total": "9007199254740991",
+      "response_hex": "00ffffffffffffff1f00",
+      "message": "Invalid listOutputs totalOutputs: expected an integer from 0 to 4294967295, received 9007199254740991"
+    },
+    {
+      "name": "2pow53",
+      "site": "listActions",
+      "total": "9007199254740992",
+      "response_hex": "00ff0000000000002000",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53",
+      "site": "listOutputs",
+      "total": "9007199254740992",
+      "response_hex": "00ff0000000000002000",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53-plus-1",
+      "site": "listActions",
+      "total": "9007199254740993",
+      "response_hex": "00ff0100000000002000",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow53-plus-1",
+      "site": "listOutputs",
+      "total": "9007199254740993",
+      "response_hex": "00ff0100000000002000",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max-minus-1",
+      "site": "listActions",
+      "total": "18446744073709551614",
+      "response_hex": "00fffeffffffffffffff",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max-minus-1",
+      "site": "listOutputs",
+      "total": "18446744073709551614",
+      "response_hex": "00fffeffffffffffffff",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max",
+      "site": "listActions",
+      "total": "18446744073709551615",
+      "response_hex": "00ffffffffffffffffff",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "u64-max",
+      "site": "listOutputs",
+      "total": "18446744073709551615",
+      "response_hex": "00ffffffffffffffffff",
+      "message": "number too large to retain precision - use readVarIntBn"
+    },
+    {
+      "name": "2pow32-plus-3",
+      "site": "listActions",
+      "total": "4294967299",
+      "response_hex": "00ff0300000001000000",
+      "message": "Invalid listActions totalActions: expected an integer from 0 to 4294967295, received 4294967299"
+    },
+    {
+      "name": "2pow32-plus-3",
+      "site": "listOutputs",
+      "total": "4294967299",
+      "response_hex": "00ff0300000001000000",
+      "message": "Invalid listOutputs totalOutputs: expected an integer from 0 to 4294967295, received 4294967299"
     }
   ]
 }
