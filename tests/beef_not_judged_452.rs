@@ -1,14 +1,14 @@
 //! #452: scope refusals carry an input and typed cause, never a script failure.
-//! #451: the sole Genesis authority is ChainParams, including the P2SH check.
+//! #451: supplied ChainParams alone decide Genesis, including the P2SH check.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::io::Cursor;
 
 use bsv_rs::block::{ActivationHeightsError, ChainParams};
-use bsv_rs::primitives::Writer;
+use bsv_rs::primitives::{Reader, Writer};
 use bsv_rs::script::{LockingScript, NotJudgedCause, UnlockingScript};
-use bsv_rs::transaction::beef_stream::{ChainTip, SpendRefusal};
+use bsv_rs::transaction::beef_stream::{ChainTip, Hash32, Headers, SpendRefusal};
 use bsv_rs::transaction::{
     verify_stream_two_pass_with_chain_params, AsyncByteSource, AsyncStreamVerifier, Beef,
     MerklePath, MockChainTracker, StreamVerifier, Transaction, TransactionInput, TransactionOutput,
@@ -22,6 +22,7 @@ const CHRONICLE: u32 = 943_816;
 #[derive(Clone, Copy, Debug)]
 enum Case {
     Coin,
+    Spend,
     Tip,
     ZeroGenesis,
     ZeroChronicle,
@@ -39,9 +40,18 @@ impl Case {
     fn sentence(self) -> &'static str {
         match self {
             Self::Coin => "input 1 not judged: coin height 620537 is before Genesis height 620538.",
+            Self::Spend => "input 0 not judged: spend height 620537 is before Genesis height 620538.",
             Self::Tip => "input 0 not judged: tip height 4294967295 cannot produce a spend height within u32 (maximum 4294967295).",
             Self::ZeroGenesis => "input 0 not judged: Genesis activation height 0 is outside the supported range 1..=4294967295.",
             Self::ZeroChronicle => "input 0 not judged: Chronicle activation height 0 is outside the supported range 1..=4294967295.",
+        }
+    }
+
+    fn tip_height(self) -> u32 {
+        match self {
+            Self::Spend => GENESIS - 2,
+            Self::Tip => u32::MAX,
+            _ => CHRONICLE,
         }
     }
 }
@@ -51,6 +61,15 @@ fn assert_cause(case: Case, cause: NotJudgedCause) {
         (
             Case::Coin,
             NotJudgedCause::PreGenesisCoin {
+                height,
+                genesis_height,
+            },
+        ) => {
+            assert_eq!((height, genesis_height), (GENESIS - 1, GENESIS));
+        }
+        (
+            Case::Spend,
+            NotJudgedCause::PreGenesisSpend {
                 height,
                 genesis_height,
             },
@@ -89,15 +108,24 @@ fn assert_stream(case: Case, verdict: Verdict, tx: &Transaction) {
     }
 }
 
-fn assert_whole(case: Case, error: Error) {
+fn assert_whole(case: Case, error: Error, tx: &Transaction) {
+    assert_eq!(error, error.clone());
     match &error {
-        Error::TransactionNotJudged { input_index, cause } => {
+        Error::TransactionNotJudged {
+            txid,
+            input_index,
+            cause,
+        } => {
+            assert_eq!(txid, &tx.id());
             assert_eq!(*input_index, case.input() as usize);
             assert_cause(case, *cause);
         }
         other => panic!("expected TransactionNotJudged for {case:?}, got {other:?}"),
     }
-    assert_eq!(error.to_string(), case.sentence());
+    assert_eq!(
+        error.to_string(),
+        format!("transaction {} {}", tx.id(), case.sentence())
+    );
     assert!(!error.to_string().contains("Script validation failed"));
 }
 
@@ -120,6 +148,8 @@ fn spending(case: Case) -> Transaction {
     let mut tx = Transaction::new();
     let heights = if matches!(case, Case::Coin) {
         vec![GENESIS, GENESIS - 1]
+    } else if matches!(case, Case::Spend) {
+        vec![GENESIS - 3]
     } else {
         vec![GENESIS]
     };
@@ -136,7 +166,7 @@ fn spending(case: Case) -> Transaction {
     tx
 }
 
-#[allow(deprecated)] // Set the compatibility field deliberately; no verifier may read it (#451).
+#[allow(deprecated)] // Set a disagreeing copy deliberately; supplied ChainParams supersede it (#451).
 fn tip(height: u32, obsolete_genesis: u32) -> ChainTip {
     ChainTip {
         height,
@@ -198,13 +228,8 @@ impl AsyncByteSource for Chunk {
 
 async fn stream_case(case: Case) {
     let tx = spending(case);
-    let height = if matches!(case, Case::Tip) {
-        u32::MAX
-    } else {
-        CHRONICLE
-    };
-    for tip in [Some(tip(height, GENESIS)), None] {
-        if matches!(case, Case::Tip) && tip.is_none() {
+    for tip in [Some(tip(case.tip_height(), GENESIS)), None] {
+        if matches!(case, Case::Tip | Case::Spend) && tip.is_none() {
             continue;
         }
         let tracker = tracker(&tx, tip);
@@ -237,13 +262,8 @@ async fn stream_case(case: Case) {
 
 async fn whole_case(case: Case) {
     let tx = spending(case);
-    let height = if matches!(case, Case::Tip) {
-        u32::MAX
-    } else {
-        CHRONICLE
-    };
-    for tip in [Some(tip(height, GENESIS)), None] {
-        if matches!(case, Case::Tip) && tip.is_none() {
+    for tip in [Some(tip(case.tip_height(), GENESIS)), None] {
+        if matches!(case, Case::Tip | Case::Spend) && tip.is_none() {
             continue;
         }
         let tracker = tracker(&tx, tip);
@@ -252,6 +272,7 @@ async fn whole_case(case: Case) {
             tx.verify_with_chain_params(&tracker, None, None, &chain(case))
                 .await
                 .unwrap_err(),
+            &tx,
         );
     }
 }
@@ -259,6 +280,12 @@ async fn whole_case(case: Case) {
 #[tokio::test]
 async fn a_pre_genesis_coin_is_not_judged_by_the_stream_452() {
     stream_case(Case::Coin).await;
+}
+
+#[tokio::test]
+async fn a_pre_genesis_spend_is_not_judged_452() {
+    stream_case(Case::Spend).await;
+    whole_case(Case::Spend).await;
 }
 
 #[tokio::test]
@@ -332,4 +359,100 @@ async fn chain_params_alone_decide_when_the_tip_disagrees_451() {
 
 fn tracker_for_p2sh(tx: &Transaction, height: u32, obsolete: u32) -> MockChainTracker {
     tracker(tx, Some(tip(height, obsolete)))
+}
+
+#[tokio::test]
+async fn a_not_judged_error_names_the_unproven_ancestor_452() {
+    let ancestor = spending(Case::Coin);
+    let tracker = tracker(&ancestor, Some(tip(CHRONICLE, GENESIS)));
+    let mut root = Transaction::new();
+    let mut input = TransactionInput::with_source_transaction(ancestor.clone(), 0);
+    input.set_unlocking_script(UnlockingScript::new());
+    root.add_input(input).unwrap();
+    root.add_output(TransactionOutput::new(
+        800,
+        LockingScript::from_hex("51").unwrap(),
+    ))
+    .unwrap();
+    assert_ne!(root.id(), ancestor.id());
+    let error = root
+        .verify_with_chain_params(&tracker, None, None, &ChainParams::mainnet())
+        .await
+        .unwrap_err();
+    assert_whole(Case::Coin, error, &ancestor);
+}
+
+#[tokio::test]
+async fn an_out_of_scope_word_precedes_a_missing_unlocking_script_452() {
+    let mut tx = spending(Case::Coin);
+    tx.inputs[1].unlocking_script = None;
+    tx.invalidate_caches();
+    let tracker = tracker(&tx, Some(tip(CHRONICLE, GENESIS)));
+    let error = tx
+        .verify_with_chain_params(&tracker, None, None, &ChainParams::mainnet())
+        .await
+        .unwrap_err();
+    assert_whole(Case::Coin, error, &tx);
+}
+
+struct WideHeightHeaders {
+    height: u64,
+    root: Hash32,
+}
+
+impl Headers for WideHeightHeaders {
+    fn carries(&self, height: u64, root: &Hash32) -> bool {
+        height == self.height && root == &self.root
+    }
+}
+
+#[test]
+fn a_source_height_above_u32_is_reachable_through_streaming_headers_452() {
+    let tx = spending(Case::Tip);
+    let beef = Beef::from_binary(&tx.to_beef(false).unwrap()).unwrap();
+    assert_eq!(beef.bumps.len(), 1);
+    let bump = beef.bumps[0].to_binary();
+    let mut reader = Reader::new(&bump);
+    reader.read_var_int().unwrap();
+    let height = u64::from(u32::MAX) + 1;
+    let mut writer = Writer::new();
+    writer.write_u32_le(BEEF_V1);
+    writer.write_var_int(1);
+    writer.write_var_int(height);
+    writer.write_bytes(reader.read_remaining());
+    writer.write_var_int(beef.txs.len() as u64);
+    for entry in &beef.txs {
+        entry.to_writer(&mut writer, BEEF_V1);
+    }
+    let headers = WideHeightHeaders {
+        height,
+        root: tx.inputs[0].source_transaction.as_ref().unwrap().hash(),
+    };
+    let bytes = writer.into_bytes();
+    for verdict in [
+        StreamVerifier::new(bytes.as_slice(), &headers, None)
+            .with_chain_params(ChainParams::mainnet())
+            .run()
+            .unwrap(),
+        verify_stream_two_pass_with_chain_params(
+            Cursor::new(&bytes),
+            &headers,
+            None,
+            &ChainParams::mainnet(),
+        )
+        .unwrap(),
+    ] {
+        match verdict {
+            Verdict::NotJudged {
+                txid,
+                input: 0,
+                cause: NotJudgedCause::SourceHeightOverflow { height: actual },
+                ..
+            } => {
+                assert_eq!(txid, tx.hash());
+                assert_eq!(actual, height);
+            }
+            other => panic!("expected SourceHeightOverflow, got {other:?}"),
+        }
+    }
 }

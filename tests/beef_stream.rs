@@ -2470,8 +2470,8 @@ fn mining_row3d_p2sh_before_genesis() {
     p2sh.extend([0; 20]);
     p2sh.push(0x87);
     let (parent, _, _) = funded(&[(2_100_000_000_000_000, OP_TRUE)]);
-    let bump = bump_bytes(619_538, 1, &[vec![LeafSpec::Hash(0, txid(&parent), true)]]);
-    let roots = one_header(619_538, txid(&parent));
+    let bump = bump_bytes(9_000, 1, &[vec![LeafSpec::Hash(0, txid(&parent), true)]]);
+    let roots = one_header(9_000, txid(&parent));
     let child = tx_with(&[(txid(&parent), 0, &[])], &[(1, &p2sh)]);
     let (bytes, offsets) = wire(
         V1,
@@ -2479,11 +2479,11 @@ fn mining_row3d_p2sh_before_genesis() {
         &[bump],
         &[Entry::Raw(parent, Some(0)), Entry::Raw(child, None)],
     );
-    let mut headers = mining_headers(roots, 620_536, 1_700_000_000);
+    let mut headers = mining_headers(roots, 9_998, 1_700_000_000);
     assert!(verify_stream(bytes.as_slice(), &headers, None)
         .unwrap()
         .is_valid());
-    headers.tip.height = 620_537;
+    headers.tip.height = 9_999;
     mining_spend(
         verify_stream(bytes.as_slice(), &headers, None).unwrap(),
         offsets[1] + 47,
