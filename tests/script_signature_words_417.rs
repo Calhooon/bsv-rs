@@ -154,9 +154,9 @@ fn issue_417_der_off_requires_a_word_which_this_crate_refuses() {
         let mut s = spend(c);
         assert_eq!(s.flags(), None);
         for (word, message) in [
-            (ScriptFlags::NONE, "Invalid verification flags: SIGHASH_FORKID is not set: this interpreter requires it in a flag word."),
-            (ScriptFlags::SIGHASH_FORKID, "Invalid verification flags: GENESIS is not set: this interpreter requires it in a flag word."),
-            (ScriptFlags::SIGHASH_FORKID | ScriptFlags::GENESIS, "Invalid verification flags: UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word."),
+            (ScriptFlags::NONE, "Invalid verification flags: SIGHASH_FORKID is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)."),
+            (ScriptFlags::SIGHASH_FORKID, "Invalid verification flags: GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)."),
+            (ScriptFlags::SIGHASH_FORKID | ScriptFlags::GENESIS, "Invalid verification flags: UTXO_AFTER_GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)."),
         ] {
             s.set_flags(word);
             let error = s.validate().unwrap_err();

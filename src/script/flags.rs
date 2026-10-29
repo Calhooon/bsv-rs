@@ -484,7 +484,7 @@ impl ScriptFlags {
     /// asks for rules this interpreter does not implement, or when the
     /// reference itself would refuse it:
     ///
-    /// * without `SIGHASH_FORKID`: this interpreter requires it in a flag word;
+    /// * without `SIGHASH_FORKID`: a word's mandatory fork-ID and strict encoding checks would differ from the node;
     /// * without `GENESIS` or without `UTXO_AFTER_GENESIS`: pre-Genesis block
     ///   or UTXO rules are not implemented here;
     /// * `CHRONICLE` without `GENESIS`: no node derives it (`IsProtocolActive`,
@@ -500,17 +500,17 @@ impl ScriptFlags {
     pub fn check(self) -> Result<(), ScriptFlagsError> {
         if !self.contains(Self::SIGHASH_FORKID) {
             return Err(ScriptFlagsError::NotApplicable(
-                "SIGHASH_FORKID is not set: this interpreter requires it in a flag word",
+                "SIGHASH_FORKID is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)",
             ));
         }
         if !self.contains(Self::GENESIS) {
             return Err(ScriptFlagsError::NotApplicable(
-                "GENESIS is not set: this interpreter requires it in a flag word",
+                "GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)",
             ));
         }
         if !self.contains(Self::UTXO_AFTER_GENESIS) {
             return Err(ScriptFlagsError::NotApplicable(
-                "UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word",
+                "UTXO_AFTER_GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)",
             ));
         }
         if self.contains(Self::CHRONICLE) && !self.contains(Self::GENESIS) {

@@ -85,7 +85,7 @@ fn issue_429_former_forkid_mismatches_and_empty_word_rows_match_recorded_default
             assert_eq!(
                 flags.check(),
                 Err(ScriptFlagsError::NotApplicable(
-                    "SIGHASH_FORKID is not set: this interpreter requires it in a flag word"
+                    "SIGHASH_FORKID is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)"
                 )),
                 "{id}: {flags:?} verdict and words"
             );

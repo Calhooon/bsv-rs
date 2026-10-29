@@ -639,71 +639,61 @@ fn record_mismatch(id: &str, ctx: &MismatchContext<'_>, got: bool, summary: &mut
 // sdk.scripts.evaluation — node-sighash fixtures
 // ============================================================================
 
-/// Executes one node-sighash fixture.
+/// Executes both recorded hashes of one node-sighash fixture.
 ///
-/// The fixture's `regular_hash` is the TS `TransactionSignature.format()`
-/// output: BIP-143 (FORKID) preimage when the scope has SIGHASH_FORKID set and
-/// the Chronicle bit is not honored, otherwise the original (legacy/OTDA)
-/// digest algorithm. The fixture's `original_hash` is always OTDA.
-///
-/// bsv-rs implements ONLY the BIP-143/FORKID preimage
-/// (`build_sighash_preimage`); it has no legacy-sighash API. So:
-///   - regular_hash with an effective-FORKID scope → executed and compared.
-///   - regular_hash with an effective-OTDA scope   → unsupported (counted).
-///   - original_hash                                → unsupported (counted via
-///     the same vector: a vector is counted "run" only when its regular hash
-///     is executable; the missing original_hash check is reported once as a
-///     suite-level gap, see `finish_evaluation`).
+/// `regular_hash` uses BIP143 for FORKID without an honored CHRONICLE bit,
+/// otherwise the original digest. Teranode fixtures ignore CHRONICLE.
+/// `original_hash` always uses the original digest, including its `one`
+/// sentinel for an absent input or a SINGLE output beyond the outputs.
 fn eval_node_sighash_vector(
     id: &str,
     input: &Value,
     expected: &Value,
     summary: &mut Summary,
 ) -> Option<String> {
-    const SIGHASH_CHRONICLE: u32 = 0x20;
-    const SIGHASH_FORKID: u32 = 0x40;
+    use bsv_rs::primitives::bsv::sighash::{
+        compute_sighash_original_for_signing, SighashParams, SIGHASH_CHRONICLE, SIGHASH_FORKID,
+    };
 
     let scope = n(input, "hash_type") as u32;
     let ignore_chronicle = input["sources"]
         .as_array()
         .map(|a| a.iter().any(|v| v.as_str() == Some("teranode")))
         .unwrap_or(false);
-    let has_forkid = scope & SIGHASH_FORKID != 0;
-    let has_chronicle = !ignore_chronicle && (scope & SIGHASH_CHRONICLE != 0);
+    let use_original =
+        scope & SIGHASH_FORKID == 0 || (!ignore_chronicle && scope & SIGHASH_CHRONICLE != 0);
 
-    if !has_forkid || has_chronicle {
-        // TS format() falls back to the original transaction digest algorithm
-        // (OTDA) here; bsv-rs has no legacy sighash implementation.
-        summary
-            .unsupported
-            .entry("legacy/OTDA sighash not implemented in bsv-rs")
-            .or_default()
-            .push(id.to_string());
-        return None;
-    }
-
-    let computed = catch(|| -> Result<String, String> {
+    let computed = catch(|| -> Result<[String; 2], String> {
         let raw_tx = from_hex(s(input, "tx_hex"));
         let tx = parse_transaction(&raw_tx).map_err(|e| format!("tx parse failed: {}", e))?;
         let subscript = from_hex(s(input, "script_hex"));
-        // The census sighash path runs through the midstate-reuse cache API —
-        // the same code path `build_sighash_preimage` wraps — so the 5,116
-        // vectors pin the cache implementation directly.
-        let mut sighash_cache = SighashCache::new(&tx);
-        let preimage = sighash_cache
-            .preimage(
-                n(input, "input_index") as usize,
-                &subscript,
-                0, // fixture context: no amount (matches the TS runner)
-                scope,
-            )
-            .map_err(|e| format!("sighash preimage failed: {}", e))?;
-        let mut digest = sha256d(&preimage);
-        digest.reverse(); // display order, as in the fixture
-        Ok(to_hex(&digest))
+        let index = n(input, "input_index") as usize;
+        let original = compute_sighash_original_for_signing(&SighashParams {
+            version: tx.version,
+            inputs: &tx.inputs,
+            outputs: &tx.outputs,
+            locktime: tx.locktime,
+            input_index: index,
+            subscript: &subscript,
+            satoshis: 0, // fixture context: no amount (matches the TS runner)
+            scope,
+        });
+        let regular = if use_original {
+            original
+        } else {
+            // Keep the BIP143 side on the midstate-reuse cache API.
+            let preimage = SighashCache::new(&tx)
+                .preimage(index, &subscript, 0, scope)
+                .map_err(|e| format!("sighash preimage failed: {}", e))?;
+            sha256d(&preimage)
+        };
+        Ok([regular, original].map(|mut digest| {
+            digest.reverse(); // display order, as in the fixture
+            to_hex(&digest)
+        }))
     });
     let got = match computed {
-        Some(Ok(hex)) => hex,
+        Some(Ok(hashes)) => hashes,
         Some(Err(e)) => {
             summary.run += 1;
             summary.failures.push(format!("{}: {}", id, e));
@@ -718,18 +708,19 @@ fn eval_node_sighash_vector(
             return None;
         }
     };
-    let want = s(expected, "regular_hash");
+    let want = [s(expected, "regular_hash"), s(expected, "original_hash")];
 
     summary.run += 1;
     if got == want {
         summary.passed += 1;
         None
     } else {
-        summary.failures.push(format!(
-            "{}: FORKID sighash mismatch: expected {}, got {}",
-            id, want, got
-        ));
-        Some(format!("{}\tsighash expected={} got={}", id, want, got))
+        let detail = format!(
+            "{}: sighash mismatch: regular_hash expected={}, got={}; original_hash expected={}, got={}",
+            id, want[0], got[0], want[1], got[1]
+        );
+        summary.failures.push(detail.clone());
+        Some(detail)
     }
 }
 
