@@ -61,6 +61,8 @@ pub mod bip276;
 pub mod chunk;
 pub mod evaluation_error;
 pub mod flags;
+#[cfg(feature = "block")]
+mod input_flags;
 pub mod locking_script;
 pub mod op;
 #[allow(clippy::module_inception)]
@@ -80,6 +82,8 @@ pub use evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
 pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
+#[cfg(feature = "block")]
+pub use input_flags::input_script_flags;
 pub use locking_script::LockingScript;
 pub use script::Script;
 pub use script_num::ScriptNum;

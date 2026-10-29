@@ -1,7 +1,8 @@
-//! Proof-of-work parameters: bitcoin-sv@6504a3af `src/chainparams.cpp`
+//! Chain parameters: bitcoin-sv@6504a3af `src/chainparams.cpp`
 //! (`CMainParams` 1033-1160, `CTestNetParams` 1329-1428, `CRegTestParams`
 //! 1456-1533) and `src/consensus/params.h:41-49`. Checkpoints, the genesis
-//! hash and every other chain parameter belong to the host.
+//! hash and other unused chain parameters belong to the host. Script activation
+//! heights are the defaults at bitcoin-sv@879fc8b `src/chainparams.cpp:18-26`.
 
 use super::{POW_LIMIT_MAIN, POW_LIMIT_REGTEST, POW_LIMIT_TEST};
 use crate::primitives::U256;
@@ -13,7 +14,7 @@ const TWO_WEEKS: i64 = 14 * 24 * 60 * 60;
 /// (src/chainparams.cpp:1051, 1347, 1475).
 const TEN_MINUTES: i64 = 10 * 60;
 
-/// The consensus parameters `GetNextWorkRequired` reads, per chain.
+/// Consensus parameters for difficulty and script activation, per chain.
 ///
 /// The fields are public so a host can describe another chain starting from
 /// one of the constructors; new fields may be added in a minor release.
@@ -39,6 +40,12 @@ pub struct ChainParams {
     /// `consensus.daaHeight`: the DAA governs a header whose parent is at or
     /// above this height (src/pow.cpp:111).
     pub daa_height: u32,
+    /// Genesis activation, inclusive (`chainparams.cpp:18-21` at `879fc8b`).
+    /// Test-network node configurations may override this default.
+    pub genesis_height: u32,
+    /// Chronicle activation, inclusive (`chainparams.cpp:23-26` at `879fc8b`).
+    /// Test-network node configurations may override this default.
+    pub chronicle_height: u32,
 }
 
 impl ChainParams {
@@ -54,6 +61,8 @@ impl ChainParams {
             allow_min_difficulty_blocks: false,
             no_retargeting: false,
             daa_height: 504_031,
+            genesis_height: 620_538,
+            chronicle_height: 943_816,
         }
     }
 
@@ -70,6 +79,8 @@ impl ChainParams {
             allow_min_difficulty_blocks: true,
             no_retargeting: false,
             daa_height: 1_188_697,
+            genesis_height: 1_344_302,
+            chronicle_height: 1_713_168,
         }
     }
 
@@ -88,6 +99,8 @@ impl ChainParams {
             allow_min_difficulty_blocks: true,
             no_retargeting: true,
             daa_height: 0,
+            genesis_height: 10_000,
+            chronicle_height: 15_000,
         }
     }
 

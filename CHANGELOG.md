@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the node's per-input script word from chain facts (#440)
+
+The keeper's rule (RULINGS-2026-10-12.md, 2026-10-28 16:5xZ, corrected at
+22:0xZ, with the 2026-10-29 10:5xZ no-tip clause and 16:0xZ shape): “a door
+that judges a transaction for a wallet, a topic or a tracker runs the interpreter
+under the node's word”, “two words combined per input”. Transaction flags come
+from the spend height (tip + 1 unmined, containing block height mined); the coin's
+two UTXO bits come from its verified BUMP height, or the spend era if unproven.
+Without a mining tip the latest era the chain constants know applies. SDK default
+mode remains the reference's parity mode, never the live-door selection.
+
+The existing non-exhaustive `block::ChainParams` now carries `genesis_height`
+and `chronicle_height`: mainnet 620538 / 943816, testnet 1344302 / 1713168,
+regtest 10000 / 15000 (`bitcoin-sv@879fc8b src/chainparams.cpp:18,23;20,25;21,26`).
+`mainnet()` and `testnet()` join the existing `main()`, `test()` and `regtest()`;
+test-network node overrides are expressed in these public fields. Activation
+parameters stand separately from the moving `ChainTip` header facts.
+
+`script::input_script_flags(&chain, spend_height, source_proven_height, mined)`
+computes the word in one place. It follows the sibling
+`bsv-script-lean/docs/PARAMETERS.md:103,123,125,168` and the node's
+`policy/policy.h:226-245`, `validation.cpp:2973-2982`,
+`protocol_era.cpp:21-39` at `879fc8b`. Both UTXO bits are replaced with the
+coin's bits; transaction CHRONICLE remains the spend's. A pre-Genesis coin or
+spend is refused with an explicit unsupported-era sentence, never silently
+PostGenesis. The interpreter still does not model pre-Genesis coins; this refusal
+is an API limitation, not a node consensus verdict that such coins are invalid.
+
+`StreamVerifier::with_chain_params` (also async),
+`verify_stream_two_pass_with_chain_params`, and
+`Transaction::verify_with_chain_params` are additive. They apply the computed
+word before each `Spend::validate`; scripts share the existing per-transaction
+sighash cache. The retaining reader still keeps only referenced output scripts.
+Structural, atomic, mining-context, value, resource-decline, duplicate-entry and
+deferred-parent behavior is unchanged. Proven transactions still stop at the
+proof; the standalone function's `mined` argument serves callers judging mined
+scripts. The builder is local configuration, reapplied after any cursor resume,
+as the budgets are. Existing APIs retain default evaluation and their signatures.
+
+This serves the toolbox's #422/#432, the engine's #205 and the storage server's
+`tracker_rule.rs:48-68`, replacing each caller's word composition. Unit tests pin
+network constants and numeric same-era/mixed-era words at Genesis and Chronicle.
+`tests/beef_stream_word_440.rs` builds signed BEEFs for the 0x01 FORKID refusal,
+version-1 0x61 acceptance across a mixed-era boundary and refusal before Chronicle,
+OP_SUBSTR, unproven/pre-Genesis/no-tip cases, each input's height, deferred and
+resumed readers and resource declines. The existing four word witness files stay
+unchanged. No fixture recordings were added. Migration: none; additive.
+
 ### Fixed: bind key-value actions before signing and carry their options (#341, #342)
 
 Both stores now use one owned-data create/sign boundary under `kvstore/bound`.
