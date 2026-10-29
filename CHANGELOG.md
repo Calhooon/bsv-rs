@@ -140,7 +140,9 @@ the lowercased ASCII letter/digit/dash BRC-104 names. Node 22.18.0's ICU 77.1
 (`en-US`, numeric false, punctuation significant) orders dash, digits, then
 letters, exactly as bytes do on that set. The recorder measures all 1,407
 `x-bsv-` suffixes of lengths 0 through 2 over `-0123456789abcdefghijklmnopqrstuvwxyz`:
-zero differing positions, identical SHA-256 of the sorted names. Raw mixed
+zero differing positions, identical SHA-256 of the sorted names; on letters,
+digits and dash the two orders agree at any name length, not only the measured
+suffixes. Raw mixed
 case does differ, but the transport lowercases before collecting. HTTP
 also accepts token punctuation outside that set: `x-bsv-a_` precedes
 `x-bsv-a-` under localeCompare, reversing their byte order. The actual
@@ -160,8 +162,8 @@ other tests still pass. All seven pass with the base's fixes retained.
 Both new vectors and #354's unchanged 22-case vector are byte-identical
 on recorder re-run. No production function or file grew.
 
-Downstream matching table, replacing the historical text (no downstream
-files changed):
+Downstream matching table (the historical text was replaced by #410, whose
+entry carries the change; no downstream files changed):
 
 | Site | Old | New / finding |
 | Handshake refusal | `Auth endpoint returned {status}: {body}` | `Received HTTP {status} {reason} from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)` plus ` - body preview: {preview}` for a nonempty body |
