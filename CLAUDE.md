@@ -158,7 +158,6 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
 
 ## Where the numbers come from
 
-
 `cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result:"` summed (the colon matters: eight test names in `result_frame_tests` start with "test result"): measured 2026-10-26 at `f64388e`: 3,821 passed / 0 failed / 135 ignored (1,587 unit, 1,961 integration across the 119 files, 273 doc tests; the ignored are 129 `rust,ignore` doc illustrations and 6 integration tests run by hand: four vector recorders and two release-only timings; the 5 `memory_profiling` tests sit behind `dhat-profiling`, run alone, and are outside the count). The two conformance files count the same with or without the ts-stack corpus: they skip loudly without it, and with it the evaluation gate's pins must hold (run them with `BSV_CONFORMANCE_DIR` set before a release; CI does not, Calhooon/bsv-rs#31). `find src -name '*.rs' | xargs wc -l` for the line count (97,192 on 2026-10-26 at `f64388e`). The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
 
 ## Downstreams to keep in mind
