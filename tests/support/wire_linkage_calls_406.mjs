@@ -7,6 +7,8 @@
 //   (cd "$W/packages/sdk" && bun build mod.ts --target node --format esm --outfile "$W/sdk.mjs")
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/wire_linkage_calls_406.mjs \
 //     "$W/sdk.mjs" tests/vectors/wallet_wire/linkage_calls_406.json
+// Append tests/vectors/wallet_wire/originator_338.json as a third argument
+// to record #338's header checks with the same SDK bundle and Node runtime.
 //
 // For each case the reference's transceiver is called with the case's args
 // over a transport that captures the request frame and hands it to the
@@ -24,7 +26,7 @@
 import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
-const [sdkPath, outPath] = process.argv.slice(2)
+const [sdkPath, outPath, originatorOutPath] = process.argv.slice(2)
 const sdk = await import(pathToFileURL(sdkPath).href)
 const { WalletWireTransceiver, WalletWireProcessor, PrivateKey, Utils } = sdk
 
@@ -164,3 +166,11 @@ const out = {
 const text = JSON.stringify(out, null, 2) + '\n'
 if (outPath) writeFileSync(outPath, text)
 else process.stdout.write(text)
+
+// An optional third path extends this wire recorder with #338's header
+// checks, using the same reference bundle and runtime as the linkage cases.
+if (originatorOutPath) {
+  const { recordOriginators } = await import('./wire_originator_338.mjs')
+  const originators = await recordOriginators(sdk)
+  writeFileSync(originatorOutPath, JSON.stringify(originators, null, 2) + '\n')
+}

@@ -1,0 +1,195 @@
+{
+  "reference": "ts-stack@edf6e03, unmodified packages/sdk, Node v22.18.0",
+  "recorder": "tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs",
+  "reference_lines": "WalletWireProcessor.ts:286-294,2379-2396; WalletWireTransceiver.ts:95-100; validationHelpers.ts:996-1037",
+  "processor": [
+    {
+      "name": "length-251",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:655350",
+      "request_hex": "1cfb4141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141412e4242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242422e4343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343432e444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444443a363535333530",
+      "response_hex": "0143496e76616c6964206f726967696e61746f72206c656e6774683a206578706563746564206174206d6f7374203235302062797465732c2072656365697665642032353100",
+      "code": 1,
+      "message": "Invalid originator length: expected at most 250 bytes, received 251",
+      "observed": []
+    },
+    {
+      "name": "length-255",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:6553500000",
+      "request_hex": "1cff4141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141412e4242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242422e4343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343432e444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444443a36353533353030303030",
+      "response_hex": "0143496e76616c6964206f726967696e61746f72206c656e6774683a206578706563746564206174206d6f7374203235302062797465732c2072656365697665642032353500",
+      "code": 1,
+      "message": "Invalid originator length: expected at most 250 bytes, received 255",
+      "observed": []
+    },
+    {
+      "name": "length-250-with-port",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:65535",
+      "request_hex": "1cfa4141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141412e4242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242422e4343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343432e444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444443a3635353335",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.dddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      ]
+    },
+    {
+      "name": "padded-host-with-port",
+      "originator": " ﻿Example.COM:0080\t",
+      "request_hex": "1c1520efbbbf4578616d706c652e434f4d3a3030383009",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        "example.com"
+      ]
+    },
+    {
+      "name": "invalid-host",
+      "originator": "bad_host.example",
+      "request_hex": "1c106261645f686f73742e6578616d706c65",
+      "response_hex": "064f546865206f726967696e61746f7220706172616d65746572206d75737420626520612063616e6f6e6963616c20444e5320686f73746e616d65207769746820616e206f7074696f6e616c20706f727400",
+      "code": 6,
+      "message": "The originator parameter must be a canonical DNS hostname with an optional port",
+      "observed": []
+    },
+    {
+      "name": "blank",
+      "originator": "   ",
+      "request_hex": "1c03202020",
+      "response_hex": "0633546865206f726967696e61746f7220706172616d65746572206d757374206265206174206c656173742031206c656e6774682e00",
+      "code": 6,
+      "message": "The originator parameter must be at least 1 length.",
+      "observed": []
+    },
+    {
+      "name": "multibyte-length-251",
+      "originator": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééa",
+      "request_hex": "1cfbc3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a961",
+      "response_hex": "0143496e76616c6964206f726967696e61746f72206c656e6774683a206578706563746564206174206d6f7374203235302062797465732c2072656365697665642032353100",
+      "code": 1,
+      "message": "Invalid originator length: expected at most 250 bytes, received 251",
+      "observed": []
+    },
+    {
+      "name": "empty",
+      "originator": "",
+      "request_hex": "1c00",
+      "response_hex": "00762d312e302e30",
+      "code": 0,
+      "message": null,
+      "observed": [
+        ""
+      ]
+    },
+    {
+      "name": "length-251-truncated",
+      "originator": "",
+      "request_hex": "1cfb",
+      "response_hex": "0143496e76616c6964206f726967696e61746f72206c656e6774683a206578706563746564206174206d6f7374203235302062797465732c2072656365697665642032353100",
+      "code": 1,
+      "message": "Invalid originator length: expected at most 250 bytes, received 251",
+      "observed": []
+    }
+  ],
+  "transceiver": [
+    {
+      "name": "length-251",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:655350",
+      "frames": [],
+      "observed": [],
+      "thrown": {
+        "name": "WERR_INVALID_PARAMETER",
+        "code": 6,
+        "message": "The originator parameter must be no more than 250 length."
+      }
+    },
+    {
+      "name": "length-255",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:6553500000",
+      "frames": [],
+      "observed": [],
+      "thrown": {
+        "name": "WERR_INVALID_PARAMETER",
+        "code": 6,
+        "message": "The originator parameter must be no more than 250 length."
+      }
+    },
+    {
+      "name": "length-256",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:65535000000",
+      "frames": [],
+      "observed": [],
+      "thrown": {
+        "name": "WERR_INVALID_PARAMETER",
+        "code": 6,
+        "message": "The originator parameter must be no more than 250 length."
+      }
+    },
+    {
+      "name": "length-250-with-port",
+      "originator": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD:65535",
+      "frames": [
+        "1cf46161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161612e6262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262622e6363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363632e64646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464"
+      ],
+      "observed": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.dddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      ],
+      "thrown": null
+    },
+    {
+      "name": "padded-host-with-port",
+      "originator": " ﻿Example.COM:0080\t",
+      "frames": [
+        "1c0b6578616d706c652e636f6d"
+      ],
+      "observed": [
+        "example.com"
+      ],
+      "thrown": null
+    },
+    {
+      "name": "invalid-host",
+      "originator": "bad_host.example",
+      "frames": [],
+      "observed": [],
+      "thrown": {
+        "name": "WERR_INVALID_PARAMETER",
+        "code": 6,
+        "message": "The originator parameter must be a canonical DNS hostname with an optional port"
+      }
+    },
+    {
+      "name": "blank",
+      "originator": "   ",
+      "frames": [],
+      "observed": [],
+      "thrown": {
+        "name": "WERR_INVALID_PARAMETER",
+        "code": 6,
+        "message": "The originator parameter must be at least 1 length."
+      }
+    },
+    {
+      "name": "multibyte-length-251",
+      "originator": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééa",
+      "frames": [],
+      "observed": [],
+      "thrown": {
+        "name": "WERR_INVALID_PARAMETER",
+        "code": 6,
+        "message": "The originator parameter must be no more than 250 length."
+      }
+    },
+    {
+      "name": "empty",
+      "originator": "",
+      "frames": [
+        "1c00"
+      ],
+      "observed": [
+        ""
+      ],
+      "thrown": null
+    }
+  ]
+}

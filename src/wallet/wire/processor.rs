@@ -121,11 +121,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let call_code = reader.read_u8()?;
         let call = WalletCall::try_from(call_code)?;
 
-        // Read originator: length 0 is an absent one, `None` (#329)
-        let originator_len = reader.read_u8()? as usize;
-        let originator = std::str::from_utf8(reader.read_bytes(originator_len)?)
-            .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?;
-        let originator = (!originator.is_empty()).then_some(originator);
+        let originator = super::originator::read(&mut reader)?;
+        let originator = originator.as_deref();
 
         // The calls with no parameters read none (`#assertRequestConsumed`,
         // `WalletWireProcessor.ts:1610-1719`); every other call this
