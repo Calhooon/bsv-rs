@@ -95,7 +95,8 @@ reference's `memoryLimit`: `None` runs uncapped, as the reference does, and
 `Some(n)` is `n` bytes per stack, the figure a door judging untrusted
 transactions passes. `SpendParams::memory_limit: None` is uncapped in the
 default mode too (the reference's `Spend`); a memory budget bounds memory,
-never time: `SpendParams::work_limit` and the stream's `set_work_limit` do. On the block path
+while `SpendParams::work_limit` and the stream's `set_work_limit` bound charged
+work. Neither can interrupt an arithmetic opcode or bound its elapsed time. On the block path
 `Spend::set_stack_memory_consensus` is a node's
 `-maxstackmemoryusageconsensus`, a verdict; `memory_limit` only declines. The flag and resource witnesses live in [tests](./tests).
 

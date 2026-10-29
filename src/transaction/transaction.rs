@@ -1824,6 +1824,9 @@ impl Transaction {
     /// given, is checked. An invalid script is `Err(TransactionError("Script validation failed
     /// for input N: …"))`; one stopped at the budget or by the allocator is
     /// `Err(ScriptEvaluationDeclined)`, a decline, never to be read as invalid (bsv-rs#38).
+    /// `Transaction::verify` has no work budget; callers can use `SpendParams::work_limit`
+    /// or `StreamVerifier::set_work_limit` to bound charged work, and must bound elapsed
+    /// time externally because those counters cannot interrupt one arithmetic opcode.
     pub async fn verify(
         &self,
         chain_tracker: &dyn super::ChainTracker,

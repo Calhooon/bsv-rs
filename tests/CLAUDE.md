@@ -108,6 +108,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `overlay_mock_tests.rs` | 20 | `full` | Mock facilitator tests for LookupResolver/TopicBroadcaster |
 | `readme_examples.rs` | 1 | default | Every ```rust block of `README.md` that names an `examples/<name>.rs` file equals that file byte for byte, and every example appears in the README |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
+| `script_arithmetic_allocations_378.rs` | 1 | default | A single-digit OP_MUL allocates only its two decode buffers and result, with no heap allocation for arithmetic guard metadata (#378) |
 | `script_vectors_tests.rs` | 14 | default | Script interpreter with 1,488 vectors (458+598+432) |
 | `script_flags_witnesses.rs` | 9 | default | The flag words (`ScriptFlags::block` / `standard`, the default mode) on seven witness transactions: policy-as-consensus at version 1 (five), the NULLDUMMY version gate, NULLFAIL (Calhooon/bsv-rs#10) |
 | `script_low_s_order_witness.rs` | 3 | default | A signature with `s` at the curve order is the zero signature for the low-S check and NULLFAIL under version 1, as on the reference (0.3.28, Calhooon/bsv-rs#14) |
