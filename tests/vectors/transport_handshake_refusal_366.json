@@ -1,0 +1,179 @@
+{
+  "description": "The reference's SimplifiedFetchTransport on handshake status classes (#366), recorded by tests/support/transport_unsigned_response_354.mjs --handshake; {url} is the server's origin",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "success_without_auth_headers",
+      "status": 200,
+      "reason": null,
+      "headers": {},
+      "body_hex": "7b2276657273696f6e223a22302e31222c226d65737361676554797065223a22696e697469616c526573706f6e7365222c226964656e746974794b6579223a22303266653864316562316263623334333262316462353833336666356632323236643963623565363563656534333035353863313865643361336338366365316166227d",
+      "refusal": null,
+      "reached_on_data": true
+    },
+    {
+      "name": "created_with_partial_auth_headers",
+      "status": 201,
+      "reason": null,
+      "headers": {
+        "x-bsv-auth-version": "0.1"
+      },
+      "body_hex": "7b2276657273696f6e223a22302e31222c226d65737361676554797065223a22696e697469616c526573706f6e7365222c226964656e746974794b6579223a22303266653864316562316263623334333262316462353833336666356632323236643963623565363563656534333035353863313865643361336338366365316166227d",
+      "refusal": null,
+      "reached_on_data": true
+    },
+    {
+      "name": "multiple_choices",
+      "status": 300,
+      "reason": null,
+      "headers": {
+        "content-type": "text/plain"
+      },
+      "body_hex": "63686f6f7365",
+      "refusal": "Received HTTP 300 Multiple Choices from {url}/multiple_choices/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: choose",
+      "reached_on_data": false
+    },
+    {
+      "name": "not_modified_empty",
+      "status": 304,
+      "reason": null,
+      "headers": {},
+      "body_hex": "",
+      "refusal": "Received HTTP 304 Not Modified from {url}/not_modified_empty/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)",
+      "reached_on_data": false
+    },
+    {
+      "name": "redirect_not_followed",
+      "status": 307,
+      "reason": null,
+      "headers": {
+        "location": "/never-replayed"
+      },
+      "body_hex": "",
+      "refusal": "Network error while sending authenticated request to {url}/redirect_not_followed/.well-known/auth: fetch failed",
+      "reached_on_data": false
+    },
+    {
+      "name": "unauthorized",
+      "status": 401,
+      "reason": null,
+      "headers": {
+        "content-type": "text/plain"
+      },
+      "body_hex": "6e6f",
+      "refusal": "Received HTTP 401 Unauthorized from {url}/unauthorized/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: no",
+      "reached_on_data": false
+    },
+    {
+      "name": "not_found_all_auth_headers",
+      "status": 404,
+      "reason": null,
+      "headers": {
+        "x-bsv-auth-version": "0.1",
+        "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+        "x-bsv-auth-signature": "3006020101020101",
+        "content-type": "text/plain"
+      },
+      "body_hex": "6e6f7420666f756e64",
+      "refusal": "Received HTTP 404 Not Found from {url}/not_found_all_auth_headers/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found",
+      "reached_on_data": false
+    },
+    {
+      "name": "rate_limited_without_retry_after",
+      "status": 429,
+      "reason": null,
+      "headers": {},
+      "body_hex": "736c6f7720646f776e",
+      "refusal": "Received HTTP 429 Too Many Requests from {url}/rate_limited_without_retry_after/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: slow down",
+      "reached_on_data": false
+    },
+    {
+      "name": "rate_limited_retry_after",
+      "status": 429,
+      "reason": null,
+      "headers": {
+        "retry-after": "7"
+      },
+      "body_hex": "736c6f7720646f776e",
+      "refusal": "Received HTTP 429 Too Many Requests from {url}/rate_limited_retry_after/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: slow down",
+      "reached_on_data": false
+    },
+    {
+      "name": "server_error_partial_auth_headers",
+      "status": 500,
+      "reason": null,
+      "headers": {
+        "x-bsv-auth-signature": "3006020101020101"
+      },
+      "body_hex": "6661696c6564",
+      "refusal": "Received HTTP 500 Internal Server Error from {url}/server_error_partial_auth_headers/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: failed",
+      "reached_on_data": false
+    },
+    {
+      "name": "bad_gateway",
+      "status": 502,
+      "reason": null,
+      "headers": {},
+      "body_hex": "",
+      "refusal": "Received HTTP 502 Bad Gateway from {url}/bad_gateway/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)",
+      "reached_on_data": false
+    },
+    {
+      "name": "unavailable_without_retry_after",
+      "status": 503,
+      "reason": null,
+      "headers": {},
+      "body_hex": "62757379",
+      "refusal": "Received HTTP 503 Service Unavailable from {url}/unavailable_without_retry_after/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: busy",
+      "reached_on_data": false
+    },
+    {
+      "name": "unavailable_retry_after",
+      "status": 503,
+      "reason": null,
+      "headers": {
+        "retry-after": "3"
+      },
+      "body_hex": "62757379",
+      "refusal": "Received HTTP 503 Service Unavailable from {url}/unavailable_retry_after/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: busy",
+      "reached_on_data": false
+    },
+    {
+      "name": "gateway_timeout_all_auth_headers",
+      "status": 504,
+      "reason": null,
+      "headers": {
+        "x-bsv-auth-version": "0.1",
+        "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+        "x-bsv-auth-signature": "3006020101020101",
+        "content-type": "text/html"
+      },
+      "body_hex": "3c68746d6c3e74696d656f75743c2f68746d6c3e",
+      "refusal": "Received HTTP 504 Gateway Timeout from {url}/gateway_timeout_all_auth_headers/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: <html>timeout</html>",
+      "reached_on_data": false
+    },
+    {
+      "name": "binary_preview",
+      "status": 401,
+      "reason": null,
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "body_hex": "000102ff",
+      "refusal": "Received HTTP 401 Unauthorized from {url}/binary_preview/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: 0x000102ff",
+      "reached_on_data": false
+    },
+    {
+      "name": "truncated_preview",
+      "status": 500,
+      "reason": null,
+      "headers": {
+        "content-type": "text/plain"
+      },
+      "body_hex": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+      "refusal": "Received HTTP 500 Internal Server Error from {url}/truncated_preview/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa… (truncated)",
+      "reached_on_data": false
+    }
+  ]
+}

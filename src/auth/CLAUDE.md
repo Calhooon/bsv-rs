@@ -538,6 +538,11 @@ The auth module uses:
 
 ## Testing
 
+| Witness | Tests | Contract |
+|---|---|---|
+| `transport_handshake_refusal_366.rs` | 4 | #354's recorder on 16 handshake answers: #410's reference status/URL/preview words, #87's 429/502/503/504 fault classes, no auth-header validation on success, redirects never replayed |
+| `transport_header_collation_369.rs` | 3 | #416's signed-header collation: lowercase letter/digit/dash names equal byte order (1,407 Node 22.18.0 / ICU 77.1 probes); wider HTTP token punctuation needs locale order; three reference payloads byte for byte |
+
 Run auth module tests:
 
 ```bash
