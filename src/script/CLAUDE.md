@@ -32,6 +32,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding (one buffer per encoding, exactly one byte reserved for the sign; the decode reads the sign with the magnitude, no negated copy: #348) |
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging; `ScriptResource`, `ScriptResourceLimit` and its `Display`, the one place the resource sentences live (#228) |
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
+| `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError`; `check` requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS in a word, naming the missing flag in its refusal (#434). Default mode can compute the original digest without FORKID (#429) |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError` |
 | `input_flags.rs` | Under `block`, `input_script_flags` computes spend-era transaction flags plus source-era UTXO bits from `ChainParams` and heights (#440); pre-Genesis explicitly refused |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |

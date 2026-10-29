@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: required script flag refusals name the word's missing flag (#434)
+
+`ScriptFlags::check` still requires SIGHASH_FORKID, GENESIS and
+UTXO_AFTER_GENESIS in an explicit word. Its refusal text now describes that
+requirement; the old FORKID reason was stale after #429 enabled the original
+digest for a signature without FORKID in default mode. No verdict changes.
+
+| Missing flag | Old text | New text |
+|---|---|---|
+| SIGHASH_FORKID | `SIGHASH_FORKID is not set: this interpreter computes the BIP-143 sighash only` | `SIGHASH_FORKID is not set: this interpreter requires it in a flag word` |
+| GENESIS | `GENESIS is not set: pre-Genesis block rules are not implemented by this interpreter` | `GENESIS is not set: this interpreter requires it in a flag word` |
+| UTXO_AFTER_GENESIS | `UTXO_AFTER_GENESIS is not set: pre-Genesis UTXO rules are not implemented by this interpreter` | `UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word` |
+
+`Spend::validate` retains its `Invalid verification flags: ` prefix and final
+period. `tests/script_signature_words_417.rs` pins all three refusals on the
+three DER-off witnesses. `tests/support/conformance_forkid_gate_429.rs`, run
+by `conformance_scripts`, now pins default refusal messages beside the
+66 recorded verdicts and checks the refusal text for the 86 recorded words
+that lack FORKID. Both tests are RED with the old check text restored in a
+scratch copy. The `flags.rs` documentation no longer claims BIP143 is the
+only digest; the file remains at its 872-line ceiling.
+
+### Notes: cross-SDK parity (#434)
+
+The restriction to words carrying these three flags remains this crate's
+documented limitation. TypeScript and the node accept some words it refuses;
+this change does not alter their handling. Under a supported word the node's
+STRICTENC implication from SIGHASH_FORKID remains in force (bitcoin-sv
+v1.2.2, `879fc8b`, `interpreter.cpp:2315-2318`). Callers matching error text
+must use the new sentences above. The downstream source scan found no old
+text or refusal-prefix matches in bsv-overlay-cloudflare, rust-message-box,
+bsv-wallet-toolbox-rs or bsv-wallet-cli; bsv-middleware-cloudflare-public and
+rust-chaintracks were absent at their specified paths and remain unverified.
+
+Pinning the census messages exposes one existing wording difference:
+`node.tx-valid.shared.0097` returns Rust's `OP_CHECKMULTISIG requires correct
+encoding for the public key and signature.` where the TypeScript recording
+returns `The signature format is invalid.` Both refusals and their distinct
+messages are now pinned; no interpreter behavior is changed for that row.
+
 ### Added: the node's per-input script word from chain facts (#440)
 
 The keeper's rule (RULINGS-2026-10-12.md, 2026-10-28 16:5xZ, corrected at
