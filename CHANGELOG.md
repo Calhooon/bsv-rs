@@ -193,6 +193,10 @@ this Peer, with no certificate policy by default). The existing
 | Certificate listener fails | Discarded; message succeeds | Listener's error returned |
 | Valid certificate response | Ready flag never set | Exact session becomes ready |
 | General message before certificate authorization | Delivered immediately | Waits; `Timeout waiting for certificate validation from peer <identityKey>` after 30 seconds |
+| Responder with a certificate policy | Initial response carried no certificate request; the initiator's general messages timed out | Initial response carries `requestedCertificates` (the responder's policy, an empty set included) and no `nonce` field |
+| Responder asked for certificates whose wallet cannot list them (`ProtoWallet` is one) | Handshake proceeded | Whole handshake refused, as the reference refuses it (`Peer.ts:845-850`) |
+| Responder's certificates | Sent after the handshake | Travel inside the initial response; an initiator on 0.9.0-beta.3 with a policy ignores them, so its general messages time out |
+| Unrequested certifier, type or field in a responder's certificate | Refused at certificate-response time | Refused during the handshake, in the reference's words (`Peer.ts:957-990`) |
 
 ### Notes: cross-SDK parity
 
@@ -222,6 +226,16 @@ The recorder calls the reference's certificate handlers directly because
 its full intake requires `initialNonce` even on the certificateRequest its
 own writer emits without that field (#416). The nonce-wallet and intake
 word differences recorded by #353 remain.
+
+When the initiator refuses an initial response (a failed signature check,
+a refused certificate, a certificate-listener error), Rust hands the refusal
+to the code waiting on the handshake (`src/auth/peer_initial.rs:133-135`)
+and the handshake fails at once; the reference stops before it releases
+that waiter (`Peer.ts:1029-1035`), so its caller sees `Timeout waiting for
+the BRC-103 initial response.` (`:676`) after the timeout. The signature
+half predates this change; the certificate cases come with it, pinned by
+the initial-response tests. The empty `certificates` array the initial
+response may carry is not pinned by a test (#445).
 
 ### Changed: issue the amended BRC-56 minimal-length HMAC key; name and count the 32-byte-key tag as legacy (#379, PR #389)
 
