@@ -41,8 +41,10 @@ impl ChainParams {
     ///
     /// # Errors
     /// Refuses zero for either height, as bitcoin-sv@879fc8b does in
-    /// `src/configscriptpolicy.cpp:310-321,353-364`. Negative heights cannot
-    /// be represented by `u32`. Other network parameters are preserved.
+    /// `src/configscriptpolicy.cpp:310-321,353-364`. The node reads each option
+    /// as a signed 32-bit integer (`init.cpp:2474,2478`), so it also refuses a
+    /// height of 2^31 or more, which this `u32` accepts; no chain nears it.
+    /// Other network parameters are preserved.
     /// ```
     /// use bsv_rs::block::{ActivationHeightsError, ChainParams};
     /// let teranode = ChainParams::regtest().with_activation_heights(100, 200)?;

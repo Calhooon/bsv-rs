@@ -82,13 +82,20 @@ that supplies height context (`packages/wallet/wallet-toolbox/src/signer/methods
 This crate's chain-parameter path is an additive live-door API; the existing
 verification APIs retain the SDK default mode.
 
-Go likewise supplies activation heights from the verifier's tracker or caller
+Go supplies activation heights from the verifier's tracker or caller
 (`go-sdk@2ca481c spv/script_flags.go:15-36,51-57`) and passes its per-input word
 to the interpreter (`spv/verify.go:537-549`), using
-`script/interpreter/scriptflag/heights.go:44-90`. Its zero-valued activation
-fields make the rules active from the start (`heights.go:3-16`); this crate
-instead follows the SV node's refusal of zero. Pre-Genesis interpretation
-remains unsupported here, as described above.
+`script/interpreter/scriptflag/heights.go:44-90`, and differs in three ways:
+its `spv.Verify` works the word out itself, with mainnet heights when the
+tracker names no network (`spv/script_flags.go:53-57`); it judges an unmined
+transaction under the block word with the heights at `MaxUint32`
+(`spv/verify.go:537-549`, `heights.go:52`), where this crate uses the standard
+word at tip plus one as the node does (`validation.cpp:1032`); and it treats
+an unproven P2SH-shaped coin as pre-Genesis (`verify.go:563-575`), where this
+crate refuses a pre-Genesis coin. Its zero-valued activation fields make the
+rules active from the start (`heights.go:3-16`); this crate instead follows
+the SV node's refusal of zero. Pre-Genesis interpretation remains unsupported
+here, as described above.
 
 ### Fixed: bind key-value actions before signing and carry their options (#341, #342)
 
