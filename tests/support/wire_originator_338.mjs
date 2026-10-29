@@ -85,6 +85,8 @@ export async function recordOriginators(sdk) {
   ]
   const length_reads = []
   const response_lengths = []
+  // #458 second fold: unsigned page totals are strict numbers before their u32 bounds.
+  const page_totals = []
   for (const [name, length] of lengths) {
     const writer = new sdk.Utils.Writer()
     writer.writeVarIntBn(new sdk.BigNumber(length.toString()))
@@ -124,11 +126,23 @@ export async function recordOriginators(sdk) {
       } catch (error) { message = error.message }
       response_lengths.push({ name, site, response_hex: sdk.Utils.toHex(response), message })
     }
+    const totalWriter = new sdk.Utils.Writer()
+    totalWriter.writeUInt8(0).writeVarIntBn(new sdk.BigNumber(length.toString()))
+    const totalResponse = totalWriter.toArray()
+    for (const [site, args] of [
+      ['listActions', { labels: [] }],
+      ['listOutputs', { basket: 'fixtures' }]
+    ]) {
+      const client = new sdk.WalletWireTransceiver({ async transmitToWallet() { return totalResponse } })
+      let message = null
+      try { await client[site](args, 'fixtures.invalid') } catch (error) { message = error.message }
+      page_totals.push({ name, site, total: length.toString(), response_hex: sdk.Utils.toHex(totalResponse), message })
+    }
   }
   return {
     reference: `ts-stack@edf6e03, unmodified packages/sdk, Node ${process.version}`,
     recorder: 'tests/support/wire_linkage_calls_406.mjs with wire_originator_338.mjs',
-    reference_lines: 'WalletWireProcessor.ts:286-294,2379-2396,2444-2445; WalletWireTransceiver.ts:95-100,142-148,1533-1542; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59; readVarIntNumStrict.ts:15-36',
-    processor, transceiver, length_reads, response_lengths
+    reference_lines: 'WalletWireProcessor.ts:286-294,2379-2396,2444-2445; WalletWireTransceiver.ts:95-100,142-148,380-385,651-656,1533-1542; validationHelpers.ts:996-1037; utils.ts:224-228; ReaderUint8Array.ts:38-59; readVarIntNumStrict.ts:15-36',
+    processor, transceiver, length_reads, response_lengths, page_totals
   }
 }

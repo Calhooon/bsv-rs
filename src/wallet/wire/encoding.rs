@@ -101,7 +101,7 @@ impl<'a> WireReader<'a> {
         }
     }
 
-    /// Reads a string array (Go-compatible: VarInt(MaxUint64) = null/empty).
+    /// Reads a string array: optional count, then plain length-prefixed entries.
     pub fn read_string_array(&mut self) -> Result<Vec<String>, Error> {
         let count = self.read_optional_count()?;
         if count == NIL_SENTINEL {
@@ -846,11 +846,11 @@ impl WireWriter {
         }
     }
 
-    /// Writes a string array (Go-compatible: VarInt count, each element via write_optional_string).
+    /// Writes a string array: count, then plain length-prefixed entries.
     pub fn write_string_array(&mut self, strings: &[String]) -> &mut Self {
         self.write_var_int(strings.len() as u64);
         for s in strings {
-            self.write_optional_string(Some(s));
+            self.write_string(s);
         }
         self
     }
@@ -1534,6 +1534,18 @@ mod tests {
 
         let mut reader = WireReader::new(writer.as_bytes());
         assert_eq!(reader.read_string_array().unwrap(), strings);
+    }
+
+    #[test]
+    fn string_array_with_an_empty_entry_roundtrips() {
+        let strings = vec![String::new(), "a".to_string()];
+        let mut writer = WireWriter::new();
+        writer.write_string_array(&strings);
+
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string_array(), Ok(strings));
+        assert!(reader.is_empty());
+        assert_eq!(writer.as_bytes(), b"\x02\x00\x01a");
     }
 
     // =========================================================================
