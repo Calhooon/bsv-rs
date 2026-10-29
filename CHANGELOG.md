@@ -45,6 +45,143 @@ follows the TypeScript words under the owner's ruling (c).
 Go's `BitcoreDecrypt` (`compat/ecies/ecies.go:191-208` at `2ca481c`) has no length
 check at all: from reading the code, a short envelope would panic when it is
 sliced (not run).
+### Fixed: the wire header refusals use the reference's words (#458)
+
+The processor's bad-UTF-8 originator refusal is now
+`The encoded data was not valid for encoding utf-8`, replacing
+`invalid originator UTF-8`. A truncated originator of at most 250 declared
+bytes is now `ReaderUint8Array read exceeds available data`, replacing
+`reader underflow: need N bytes, only M available`. Both still carry code 1.
+These are the errors from `WalletWireProcessor.ts:292-293`,
+`utils.ts:224-228` (`toUTF8Strict`, Node v22.18.0), and
+`ReaderUint8Array.ts:38-59` at `ts-stack@edf6e03`; the processor frames them
+at `WalletWireProcessor.ts:2379-2396`.
+
+The latter sentence belongs to the reader, not only the originator.
+`wire/reader.rs` now holds the basic `WireReader` methods and translates
+short reads of bytes, `u8`, `i8`, little-endian `u16`/`u32`/`u64`, and
+varints to `WalletError` with those words. Signed and optional varints use
+the same path. For varint byte lengths, `wire_length` checks the reference's
+`2^53 - 1` precision bound before the available bytes or platform width:
+`2^53` through `u64::MAX` at an unsigned site is
+`number too large to retain precision - use readVarIntBn`, code 1 in a
+processor response. Optional lengths retain `u64::MAX` as absence; a signed
+`-1` passed to a byte read has the reader's refusal. This applies to request
+headers and parameters, response payloads, and error-frame message and stack
+reads. The primitives `Reader`
+retains its typed `ReaderUnderflow { needed, available }`; other errors
+are unchanged. The processor stays at 929 lines.
+
+Migration: replace `Error::ReaderUnderflow { .. }` matches on `WireReader` short reads with `Error::WalletError(message)` matching `ReaderUint8Array read exceeds available data`; the primitives `Reader` keeps `ReaderUnderflow`.
+
+The checked `u8::try_from` in `wire/originator.rs` is retained with a comment:
+its error arm cannot run because `validate_originator` has already capped
+the normalized hostname at 250 bytes. There is no behavior change there.
+
+Rows for the toolbox's operator-visible table:
+
+| Trigger | Old code and words | New code and words |
+|---|---|---|
+| Bad-UTF-8 originator | 1, `invalid originator UTF-8` | 1, `The encoded data was not valid for encoding utf-8` |
+| Truncated originator, declared length at most 250; any other short request read | 1, `reader underflow: need N bytes, only M available` | 1, `ReaderUint8Array read exceeds available data` |
+| `listActions totalActions` or `listOutputs totalOutputs` is `2^53` | Local `WalletError`: `Invalid <field>: expected an integer from 0 to 4294967295, received 9007199254740992` | Local `WalletError`: `number too large to retain precision - use readVarIntBn` |
+| This crate writes a string-array entry `""` | Nine `0xFF`, refused by the earlier fold's reader | `00`, read back as `""` |
+| Go string-array entry encoded as nine `0xFF` | Read as `""` before #458 | Local `WalletError`: `number too large to retain precision - use readVarIntBn` |
+
+Rows for the CLI's operator-visible table:
+
+| Trigger | Old code and words | New code and words |
+|---|---|---|
+| Bad-UTF-8 originator | 1, `invalid originator UTF-8` | 1, `The encoded data was not valid for encoding utf-8` |
+| Truncated originator, declared length at most 250; any other short request read | 1, `reader underflow: need N bytes, only M available` | 1, `ReaderUint8Array read exceeds available data` |
+| `listActions totalActions` or `listOutputs totalOutputs` is `2^53` | Local `WalletError`: `Invalid <field>: expected an integer from 0 to 4294967295, received 9007199254740992` | Local `WalletError`: `number too large to retain precision - use readVarIntBn` |
+| This crate writes a string-array entry `""` | Nine `0xFF`, refused by the earlier fold's reader | `00`, read back as `""` |
+| Go string-array entry encoded as nine `0xFF` | Read as `""` before #458 | Local `WalletError`: `number too large to retain precision - use readVarIntBn` |
+
+`wire_header_words_458.rs` pins each refusal through the processor, including
+every truncated originator length from 1 to 250, plus missing header bytes,
+truncated parameter varints, every basic reader, signed/optional/strict
+varints, and lengths past the remaining bytes or `u32::MAX`. Controls keep
+the primitive reader's details and non-underflow errors unchanged.
+For the original change, on an untouched scratch copy of `ed1093cf` with its own target directory,
+the five behavior tests fail on the old words and the two controls pass;
+all seven pass after the change. The eight #338 tests also pass.
+The #338 recorder's processor mode adds `invalid-utf8` and
+`length-250-truncated`: eleven processor and nine transceiver cases in
+`wallet_wire/originator_338.json`, generated under Node v22.18.0 from an
+unmodified bundle built outside the worktree. All eighteen existing cases
+and the linkage recording are byte-identical; the extended recording is
+byte-identical on re-run. No vector was hand-edited.
+
+The review fold adds the precision boundary at every byte-length path,
+including the error-frame stack and certificate verifier, and at collection
+lengths before their entries. The second review fold also covers the eleven
+`read_var_int_u32` callers, checking precision before the `u32` bound:
+the four page totals, action version and lockTime, input sequenceNumber,
+output outputIndex, outpoint index, signAction spend index and internalize
+output index. Each reference site reads `readVarIntNumStrict(false)`:
+`WalletWireTransceiver.ts:381,438,444,492,518,652,734,1502,1677`,
+`WalletWireProcessor.ts:662,1082`, and the certificate outpoint at
+`Certificate.ts:353`. None needs a raw-read exception. Values above
+`2^53 - 1` use the precision refusal; smaller values above `u32::MAX` keep
+the existing field-specific integer refusal.
+String-array entries use unsigned lengths on both read and write.
+`write_string_array` now uses `write_string`, so `["", "a"]` writes
+`02000161` and round-trips; the earlier writer emitted
+`02ffffffffffffffffff0161`, which the folded reader refused.
+The listActions output basket retains its signed absence sentinel, read as
+the existing Rust field's empty-string default.
+It re-pins `u64::MAX - 1` to the precision text. The #338 processor mode now
+records six protocol-length frames, twelve signed/unsigned reader probes,
+and eighteen error-message, error-stack and certificate-verifier responses
+from the same Node 22 bundle. The earlier eleven processor and nine
+transceiver cases and the linkage recording remain byte-identical.
+The boundary controls include `2^53 - 1`, `2^32 + 3`, and signed `-1`;
+the precision refusals include `2^53`, `2^53 + 1`, `u64::MAX - 1` and unsigned
+`u64::MAX`. The new regression tests are RED on a scratch `308bbbb3` with its
+own target directory and GREEN after the fold.
+
+The second review fold adds twelve recorded page-total responses: listActions
+and listOutputs at each of those six boundaries. The two total tests in
+`wire_header_words_458.rs` fail on the old field-specific words at `2^53`;
+the unit test `string_array_with_an_empty_entry_roundtrips` fails on the
+old writer's sentinel. The recorder remains byte-identical on re-run,
+including all earlier cases and the unchanged linkage recording.
+
+`fixtures_replay` still replays 29 wire files and 323 cases. Its existing
+fixture recorder regenerates the five short-read expectations in
+`wire/error_frames.json`; the other cases and wire frames are unchanged.
+The fold regenerates that file's `nil_stack` expectation too: the unsigned
+`u64::MAX` stack length now receives the precision refusal. Its frame and
+the other fixture cases remain unchanged.
+`wire_error_frames`, `wire_reader_strictness`,
+`wire_identity_certificate_roundtrip`, and `wire_u32_field_bounds_tests`
+now assert the shared reader's words at their existing short-read sites.
+The fold re-pins three identity-certificate tests whose lengths exceed
+`2^53 - 1` to the precision words, retaining the reader words below it.
+
+### Notes: cross-SDK parity (#458)
+
+These two wording differences from the TypeScript reference are closed.
+The reader's shared bounds check also covers its integer reads
+(`ReaderUint8Array.ts:94-124,151-179,194-245`). Short reads and byte lengths
+below `2^53` use its reader words. Lengths from `2^53` use the precision
+words from `readVarIntNumStrict.ts:30-36` before any byte read; signed
+`u64::MAX` is `-1`, with the reader words if read and absence where the
+optional field skips the read. Go at `2ca481c` uses `read past end of data`
+(`util/reader.go:27-45`) and wraps the header failure as
+`error reading originator: ...` (`wallet/serializer/frame.go:55-57`);
+it converts originator bytes to a string without a UTF-8 check (`:58`).
+Rust follows the pinned TypeScript and Node 22 behavior. The empty-originator
+and Go validation differences documented for #338 remain.
+The reference writes an empty string-array entry as length zero
+(`WalletWireProcessor.ts:926-929,1033-1036`), as this crate now does.
+Go at `2ca481c` writes the nil sentinel for that entry
+(`util/writer.go:91-99,212-221`) and reads it back as `""`
+(`util/reader.go:152,263-284`); an incoming Go sentinel entry is refused
+here with the precision words, as the TypeScript reference refuses it.
+The pre-existing getHeight, unbounded satoshis and missing collection-size
+checks are filed separately and unchanged by this fold.
 
 ### Fixed: the reference's ECIES byte bounds before work (#333)
 
@@ -101,6 +238,10 @@ At the exact envelope cap Rust retains its existing Electrum framing error
 and Bitcore MAC error; TypeScript rejects Bitcore's unaligned frame before
 the MAC (`ECIES.ts:710-711`). These framing and MAC checks are unchanged.
 The short-envelope words left unchanged by #333 are corrected by #463 above.
+
+The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
+`:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
+`:704-709`) are filed as #463 for a lane.
 
 ### Fixed: required flag reasons and the original sighash census (#453)
 

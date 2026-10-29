@@ -1179,10 +1179,9 @@ fn a_wire_length_past_u32_is_refused_on_every_target_not_cut_to_its_low_bits() {
     let mut bytes = Vec::new();
     var_int(&mut bytes, length);
     bytes.extend_from_slice(b"abc");
-    let refused = Err(Error::ReaderUnderflow {
-        needed: usize::try_from(length).unwrap_or(usize::MAX),
-        available: 3,
-    });
+    let refused = Err(Error::WalletError(
+        "ReaderUint8Array read exceeds available data".into(),
+    ));
     assert_eq!(WireReader::new(&bytes).read_string(), refused);
     assert_eq!(
         WireReader::new(&bytes).read_optional_string(),
@@ -1297,13 +1296,7 @@ async fn a_byte_after_the_last_certificates_entry_is_refused() {
     for read in every_page_reader(listed, discovered, None).await {
         assert_eq!(
             read,
-            Err(format!(
-                "{:?}",
-                Error::ReaderUnderflow {
-                    needed: 32,
-                    available: 0
-                }
-            ))
+            Err("ReaderUint8Array read exceeds available data".into())
         );
     }
 }

@@ -291,8 +291,9 @@ fn canned(total: u64, rest: &[u8]) -> WalletWireTransceiver<CannedWire> {
 /// A reader that reads as many entries as the total names: `u32::MAX` with no
 /// entry after it passes the bound and stops at the read of the entry after it.
 fn assert_read_past_total(err: Error) {
-    assert!(
-        matches!(err, Error::ReaderUnderflow { .. }),
+    assert_eq!(
+        err,
+        Error::WalletError("ReaderUint8Array read exceeds available data".into()),
         "the total accepted, the entry after it short: {err:?}"
     );
 }

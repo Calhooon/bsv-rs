@@ -214,7 +214,7 @@ fn a_keyring_value_whose_bytes_are_not_utf8_round_trips_as_base64() {
 /// of the count (CLAUDE.md rule 5): a map's count past `2^53 - 1` in the
 /// strict reader's words, as the transceiver refuses it (bsv-rs#236; until
 /// then `ReaderUnderflow` when the entries ran out), the certificate's length
-/// `ReaderUnderflow`.
+/// in `ReaderUint8Array`'s short-read words (#458).
 #[test]
 fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
     let zero = empty_entry(1);
@@ -236,15 +236,17 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
     }
     // The certificate's length.
     let mut reader = WireReader::new(&huge);
-    assert!(matches!(
-        reader.read_identity_certificate(),
-        Err(Error::ReaderUnderflow { .. })
-    ));
+    assert_eq!(
+        reader.read_identity_certificate().map(drop),
+        Err(Error::WalletError(
+            "ReaderUint8Array read exceeds available data".into()
+        ))
+    );
 }
 
 /// The layout this crate wrote before #182 (a present-flag byte, NIL-sentinel
 /// strings and maps, keyring values as base64 text) is refused, here as
-/// `ReaderUnderflow`: with a certifier present, the flag `1` is read as the
+/// a short read: with a certifier present, the flag `1` is read as the
 /// name's length, the name's own length byte as the name, the name's opening
 /// byte as iconUrl's length, and the lengths run past the bytes; with the
 /// certifier absent, the `-1` flag (`0xff`) opens a 9-byte varint that the
@@ -288,10 +290,12 @@ fn the_layout_before_182_is_refused() {
     };
     for bytes in [old(Some(&cert.certifier_info)), old(None)] {
         let mut reader = WireReader::new(&bytes);
-        assert!(matches!(
-            reader.read_identity_certificate(),
-            Err(Error::ReaderUnderflow { .. })
-        ));
+        assert_eq!(
+            reader.read_identity_certificate().map(drop),
+            Err(Error::WalletError(
+                "ReaderUint8Array read exceeds available data".into()
+            ))
+        );
     }
 }
 
@@ -320,10 +324,14 @@ fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
     nil.write_var_int(u64::MAX);
     nil.write_string(&info.description);
     nil.write_u8(info.trust);
-    assert!(matches!(
-        WireReader::new(nil.as_bytes()).read_identity_certifier(),
-        Err(Error::ReaderUnderflow { .. })
-    ));
+    assert_eq!(
+        WireReader::new(nil.as_bytes())
+            .read_identity_certifier()
+            .map(drop),
+        Err(Error::WalletError(
+            "ReaderUint8Array read exceeds available data".into()
+        ))
+    );
 
     for trust in [0u8, 11] {
         let mut w = WireWriter::new();

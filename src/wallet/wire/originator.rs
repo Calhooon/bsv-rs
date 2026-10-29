@@ -21,8 +21,9 @@ pub(super) fn read(reader: &mut WireReader<'_>) -> Result<Option<String>, Refusa
     if length > MAX_ORIGINATOR_BYTES {
         return Err(Refusal::plain(length_refusal(length)));
     }
-    let originator = std::str::from_utf8(reader.read_bytes(length)?)
-        .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?;
+    let originator = std::str::from_utf8(reader.read_bytes(length)?).map_err(|_| {
+        Error::WalletError("The encoded data was not valid for encoding utf-8".into())
+    })?;
     Ok(validate_originator(
         (!originator.is_empty()).then_some(originator),
     )?)
@@ -34,6 +35,8 @@ pub(super) fn read(reader: &mut WireReader<'_>) -> Result<Option<String>, Refusa
 pub(super) fn encode(originator: Option<&str>) -> Result<(u8, String), Error> {
     let originator =
         validate_originator(originator.filter(|value| !value.is_empty()))?.unwrap_or_default();
+    // The validator caps the normalized hostname at 250 bytes, so this error
+    // arm cannot run. Keep the conversion checked if that bound ever changes.
     let length = u8::try_from(originator.len())
         .map_err(|_| Error::WalletError(length_refusal(originator.len())))?;
     Ok((length, originator))
