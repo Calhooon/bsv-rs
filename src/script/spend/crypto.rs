@@ -289,8 +289,8 @@ impl Spend {
 
         // CleanupScriptCode (interpreter.cpp:255-263, applied per signature at
         // 1573-1578): a signature's push is deleted from the scriptCode only when
-        // it does not carry SIGHASH_FORKID; FORKID is always enabled here, so
-        // only an empty signature (no hash type) is deleted, as an OP_0 push.
+        // it does not carry SIGHASH_FORKID, in either mode. This includes
+        // default-mode legacy signatures and empty signatures (an OP_0 push).
         for sig in &sigs {
             if !has_forkid_bit(sig) {
                 let mut sig_script = Script::new();
@@ -443,8 +443,8 @@ impl Spend {
 
         // CleanupScriptCode (interpreter.cpp:255-263, applied at 1484): the
         // signature's push is deleted from the scriptCode only when the
-        // signature does not carry SIGHASH_FORKID (FORKID is always enabled
-        // here). A signature that does is hashed with its own push in place, so
+        // signature does not carry SIGHASH_FORKID, in either mode.
+        // A signature that does is hashed with its own push in place, so
         // a signature whose push appears in the scriptCode cannot verify, as on
         // the reference. An empty signature carries no hash type and is deleted
         // as an OP_0 push, as on the reference.
@@ -475,7 +475,7 @@ impl Spend {
         };
 
         // The digest, dispatched as the reference's `SignatureHash` does
-        // (`interpreter.cpp:2112-2124`; FORKID is always enabled here): BIP143
+        // (`interpreter.cpp:2112-2124`), in either mode: BIP143
         // for a FORKID type without the CHRONICLE bit, the original digest
         // otherwise (Calhooon/bsv-rs#22). The BIP143 midstates are the
         // transaction's, shared by every input's spend (bsv-low #591).

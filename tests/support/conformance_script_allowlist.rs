@@ -3,6 +3,8 @@
 //! is undefined hash types; see the changelog and the recorded 66-row audit.
 //! #397 moves teranode.1388 (scope 0x21) from the legacy-FORKID class (36 to
 //! 35) to the version-1 Chronicle hash gate (1); totals are unchanged.
+//! #453 removes the 1,244-vector sighash exclusion: both recorded hashes
+//! now run through the existing BIP143 and original-digest APIs.
 
 use super::MismatchContext;
 
@@ -77,13 +79,6 @@ pub(super) const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
         "pre-genesis multiple OP_ELSE (bsv-rs runs the post-genesis single-ELSE rule)",
         26,
     ),
-    // NOTE: this is HALF the sighash corpus. The fixture's `regular_hash`
-    // uses the original (legacy) digest algorithm whenever the FORKID bit is
-    // absent (or the Chronicle bit applies), and `original_hash` is ALWAYS
-    // legacy. bsv-rs has no legacy-sighash API at all
-    // (`build_sighash_preimage` is BIP-143-only), so the 756 executed
-    // sighash vectors cover the FORKID `regular_hash` side only.
-    ("legacy/OTDA sighash not implemented in bsv-rs", 1244),
     ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 8),
     ("DISCOURAGE_UPGRADABLE_NOPS is not in the default mode (only under a word)", 20),
     ("MINIMALIF is not in the default mode (only under a word)", 6),

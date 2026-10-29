@@ -70,6 +70,68 @@ calls use `Electrum ECIES envelope must be a bounded dense byte array` and
 The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
 `:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
 `:704-709`) are filed as #463 for a lane.
+### Fixed: required flag reasons and the original sighash census (#453)
+
+`ScriptFlags::check` now explains why an unsupported word is refused and
+names all three required flags in each sentence. Under any supported word,
+`spend/signature_encoding.rs` requires a signature's fork-ID bit and strict
+encodings remain enabled; a word without these rules would be judged
+differently from the node. Pre-Genesis block and UTXO rules are not implemented.
+The restriction and the `Spend::validate` prefix and final period are unchanged.
+
+| Missing flag | Old text | New text |
+|---|---|---|
+| SIGHASH_FORKID | `SIGHASH_FORKID is not set: this interpreter requires it in a flag word` | `SIGHASH_FORKID is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
+| GENESIS | `GENESIS is not set: this interpreter requires it in a flag word` | `GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
+| UTXO_AFTER_GENESIS | `UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word` | `UTXO_AFTER_GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
+
+The three DER-off witnesses in `tests/script_signature_words_417.rs` and
+the 86 recorded words in `tests/support/conformance_forkid_gate_429.rs` pin
+the new sentences. Both tests fail with #434's old sentences in an isolated
+scratch copy of `ed1093cf` with its own `CARGO_TARGET_DIR`. The documentation
+now states the reason too, and `flags.rs` remains at its 872-line ceiling.
+The three stale `FORKID is always enabled here` comments in
+`spend/crypto.rs` now describe both modes: a signature without the bit is
+deleted from the scriptCode, including a default-mode legacy signature or
+an empty signature; BIP143 applies to FORKID without CHRONICLE, and the
+original digest applies otherwise. No interpreter verdict changes.
+
+The allowlist's `legacy/OTDA sighash not implemented in bsv-rs` reason was
+wrong: #22 supplied the original digest and #429 enabled signatures without
+the fork-ID bit in default mode. The census only called the BIP143 preimage
+API. With that class removed on a scratch copy and the existing original
+digest API used, all 1,244 excluded vectors pass, zero fail and zero panic;
+there are no refusal groups. They now run in the census. All 2,000 sighash
+vectors compare both `regular_hash` and `original_hash`, preserving the
+Teranode fixtures' CHRONICLE-bit convention and the original digest's `one`
+sentinels. No vector is edited or copied. The revised allowlist is RED with
+the old harness, which still excludes those 1,244 vectors.
+
+The measured evaluation counts before and after, with
+`BSV_CONFORMANCE_DIR=~/bsv/ts-stack/conformance`:
+
+| Count | Before | After |
+|---|---:|---:|
+| Total | 5,116 | 5,116 |
+| Run | 2,876 | 4,120 |
+| Passed | 2,865 | 4,109 |
+| Unsupported | 2,203 | 959 |
+| Original-digest exclusion | 1,244 | 0 |
+| Corpus-skipped | 37 | 37 |
+| Known failures | 11 | 11 |
+| Unexplained failures / panics | 0 / 0 | 0 / 0 |
+
+Every other class keeps its count and stated reason in
+`tests/support/conformance_script_allowlist.rs`; no new exclusion is added.
+The remaining 11 known failures are the recorded multiple-ELSE difference
+and ten eager CHECKMULTISIG encoding checks, as before.
+
+The downstream scan checked the old sentences, missing-flag prefixes and
+`Invalid verification flags:` in `~/bsv/bsv-overlay-cloudflare`,
+`~/bsv/rust-message-box`, `~/bsv/bsv-wallet-toolbox-rs` and
+`~/bsv/bsv-wallet-cli`: no matches. `~/bsv/bsv-middleware-cloudflare-public`
+and `~/bsv/rust-chaintracks` were absent at those paths and remain unverified.
+A downstream matching these errors must use the new sentences above.
 
 ### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
 
