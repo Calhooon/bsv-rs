@@ -13,9 +13,18 @@ const key = n => new PrivateKey(n)
 const hex = n => key(n).toPublicKey().toString()
 const policy = { certifiers: [hex(42)], types: { [Utils.toBase64(Array(32).fill(1))]: ['name'] } }
 class Wallet extends ProtoWallet {
+  certificates = []
   async verifyHmac (args, o) { try { return await super.verifyHmac(args, o) } catch { return { valid: false } } }
   async verifySignature (args, o) { try { return await super.verifySignature(args, o) } catch { return { valid: false } } }
   async decrypt (args, o) { if (this.gate != null) { this.entered?.(); await this.gate }; return await super.decrypt(args, o) }
+  async listCertificates (args) {
+    const certificates = this.certificates.filter(({ certificate: c }) => args.certifiers.includes(c.certifier) && args.types.includes(c.type)).map(({ certificate }) => certificate)
+    return { totalCertificates: certificates.length, certificates }
+  }
+  async proveCertificate (args) {
+    const { certificate: c, masterKeyring } = this.certificates.find(({ certificate }) => certificate.serialNumber === args.certificate.serialNumber)
+    return { keyringForVerifier: await MasterCertificate.createKeyringForVerifier(this, c.certifier, args.verifier, c.fields, args.fieldsToReveal, masterKeyring, c.serialNumber) }
+  }
 }
 class Wire {
   sent = []
@@ -112,6 +121,73 @@ for (const kind of ['certificateRequest', 'certificateResponse']) {
   const keepalive = setInterval(() => {}, 1000)
   rows.push({ id: 'validation_timeout', error: await verdict(() => p.a.deliver(general)) })
   clearInterval(keepalive)
+}
+async function heldCertificate (subject, certifier = 42, type = 1, field = 'name') {
+  const w = new Wallet(key(certifier))
+  const { certificateFields, masterKeyring } = await MasterCertificate.createCertificateFields(w, hex(subject), { [field]: 'Alice' })
+  const certificate = new Certificate(Utils.toBase64(Array(32).fill(type)), Utils.toBase64(Array(32).fill(2)), hex(subject), hex(certifier), '0'.repeat(64) + '.0', certificateFields)
+  await certificate.sign(w)
+  return { certificate, masterKeyring }
+}
+async function initialPair ({ aPolicy = false, bPolicy = false, aHolds = false, bHolds = false, listeners, replace } = {}) {
+  const a = new Wire(); const b = new Wire()
+  const aw = new Wallet(key(41)); const bw = new Wallet(key(42))
+  if (aHolds) aw.certificates.push(await heldCertificate(41))
+  if (bHolds) bw.certificates.push(await heldCertificate(42))
+  a.peer = new Peer(aw, a, aPolicy ? policy : undefined, undefined, false)
+  b.peer = new Peer(bw, b, bPolicy ? policy : undefined, undefined, false)
+  await Promise.all([a.peer.ready, b.peer.ready])
+  listeners?.(a.peer, b.peer)
+  const pending = a.peer.getAuthenticatedSession(hex(42)); pending.catch(() => {})
+  const request = await a.next(); await b.deliver(request)
+  const response = await b.next()
+  if (replace != null) response.certificates = [replace]
+  const error = await verdict(() => a.deliver(response))
+  if (error == null) await pending
+  else a.peer.stopListeningForInitialResponsesByNonce(request.initialNonce)
+  return { a, b, aw, bw, request, response, error }
+}
+{
+  const p = await initialPair({ bPolicy: true, aHolds: true })
+  if (p.error != null) throw new Error(p.error)
+  const answer = await p.a.next(); await p.b.deliver(answer)
+  let delivered = 0; p.b.peer.listenForGeneralMessages(() => { delivered++ })
+  await p.a.peer.toPeer([1, 2, 3], hex(42)); await p.b.deliver(await p.a.next())
+  rows.push({ id: 'initial_responder_policy', response_fields: Object.keys(JSON.parse(JSON.stringify(p.response))), requested: p.response.requestedCertificates, answer_type: answer.messageType, delivered, ready: p.b.peer.sessionManager.getSession(hex(41)).certificatesValidated })
+}
+{
+  const p = await initialPair({ aPolicy: true, bHolds: true })
+  if (p.error != null) throw new Error(p.error)
+  const ready = p.a.peer.sessionManager.getSession(hex(42)).certificatesValidated
+  await p.a.peer.toPeer([0], hex(42)); await p.b.deliver(await p.a.next())
+  let delivered = 0; p.a.peer.listenForGeneralMessages(() => { delivered++ })
+  await p.b.peer.toPeer([1, 2, 3], hex(41)); await p.a.deliver(await p.b.next())
+  rows.push({ id: 'initial_initiator_policy', response_fields: Object.keys(JSON.parse(JSON.stringify(p.response))), certificate_count: p.response.certificates.length, ready, delivered })
+}
+for (const fault of ['certifier', 'type', 'field']) {
+  const { certificate: c, masterKeyring } = await heldCertificate(42, fault === 'certifier' ? 43 : 42, fault === 'type' ? 3 : 1, fault === 'field' ? 'email' : 'name')
+  const keyring = await MasterCertificate.createKeyringForVerifier(new Wallet(key(42)), c.certifier, hex(41), c.fields, Object.keys(c.fields), masterKeyring, c.serialNumber)
+  const replacement = new VerifiableCertificate(c.type, c.serialNumber, c.subject, c.certifier, c.revocationOutpoint, c.fields, keyring, c.signature)
+  const p = await initialPair({ aPolicy: true, bPolicy: true, aHolds: true, replace: replacement })
+  rows.push({ id: 'initial_response_unrequested_' + fault, error: p.error })
+}
+{
+  const events = []
+  const p = await initialPair({ aPolicy: true, bPolicy: true, aHolds: true, bHolds: true, listeners: a => {
+    a.listenForCertificatesReceived(() => {
+      if (!a.sessionManager.getSession(hex(42)).certificatesValidated) throw new Error('listener ran before validation')
+      events.push('validated')
+    })
+    a.listenForCertificatesRequested(() => { events.push('requested') })
+  } })
+  if (p.error != null) throw new Error(p.error)
+  rows.push({ id: 'initial_response_listener_order', events, automatic_answers: p.a.sent.length })
+}
+{
+  const p = await initialPair({ aPolicy: true, bPolicy: true, aHolds: true, bHolds: true, listeners: a => {
+    a.listenForCertificatesReceived(() => { throw new Error('initial certificate listener failed') })
+  } })
+  rows.push({ id: 'initial_response_listener_error', error: p.error, automatic_answers: p.a.sent.length })
 }
 const manager = new SessionManager({ now: () => 1000 })
 manager.addSession({ sessionNonce: 'session', lastUpdate: 1000, isAuthenticated: true })

@@ -15,8 +15,9 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `session_manager.rs` | Session management with dual indexing and nonce-claim API | 452 |
 | `session_nonces.rs` | #362: atomic signed claims (100,000 per session), initial-request window (100,000 total / 256 per identity / 30 minutes), expiry and removal | 156 |
 | `session_nonces_tests.rs` | Four #362 store-capacity, eviction and lifetime witnesses against the Node recorder | 116 |
-| `peer.rs` | Peer API, transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 672 |
-| `peer_incoming.rs` | #362-364: five nonce claims; certificate yourNonce, exact session and identity checks; listener errors; ready flag on the response session | 313 |
+| `peer.rs` | Peer API, transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 675 |
+| `peer_incoming.rs` | #362-364: signed nonce claims and authentication; certificate yourNonce, exact session and identity checks; listener errors; ready flag on the response session | 234 |
+| `peer_initial.rs` | #362-364 fold: responder policy and matching proofs in the initial response; initiator validation, exact-session readiness, listeners and automatic answer (`Peer.ts:832-874,957-1035`) | 231 |
 | `peer_certificate_wait.rs` | #364: shared per-session certificate wait and 30-second deadline, resolved after validation | 83 |
 | `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
 | `certificates/` | Certificate submodule | - |
@@ -267,9 +268,9 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 - `sign_message()` - Signs an AuthMessage using BRC-42 key derivation with the session's peer identity key
 - `verify_message_signature()` - Verifies an incoming AuthMessage signature
 - `initiate_handshake()` - Creates the session pinned to the identity key given (a string that is not one refused), sends InitialRequest, waits for InitialResponse via oneshot channel with timeout; a failed handshake's session removed (`Peer.ts:658-664`)
-- `process_initial_request()` - Server-side: creates session, sends InitialResponse, optionally sends certificates
-- `process_initial_response()` - Client-side: delegates to `authenticate_initial_response()`, sends errors through oneshot channel
-- `authenticate_initial_response()` - The reference's `authenticateInitialResponse` (`Peer.ts:886-956`): own `your_nonce`, its session, pinned identity, signature, initial nonce, replay claim; updates the session and resolves the pending handshake (#353, #362)
+- `process_initial_request()` - Creates the session, lets request listeners select certificates or queries the wallet, then sends matching proofs and its own policy in InitialResponse; signs only the decoded nonces (`Peer.ts:832-874`)
+- `process_initial_response()` - Authenticates, validates nonempty certificates under its own policy, marks the exact session ready and releases certificate waiters before listeners, then releases handshake waiters and answers the responder's request; errors before handshake release go through its oneshot (`Peer.ts:957-1035`)
+- `authenticate_initial_response()` - The reference's `authenticateInitialResponse` (`Peer.ts:886-956`): own `your_nonce`, its session, pinned identity, signature, initial nonce, replay claim; updates the session before certificate validation (#353, #362)
 - `process_certificate_request()` - Own `yourNonce`, exact session and matching identity, signature, nonce claim, authentication; returns a listener's error (#362, #363)
 - `process_certificate_response()` - Same checks, validates nonempty certificates, marks the response's session ready and releases its waiters, then returns any listener error (#362-364)
 - `process_general_message()` - The reference's `processGeneralMessage` (`Peer.ts:1270-1314`) in its order and words: `your_nonce` made by this wallet, its session, the session's peer the sender, the signature, the nonce and the session's nonce present; claims the nonce, marks the session authenticated, waits for required certificate validation, notifies callbacks (a listener's error the message's) (#353, #362, #364)
@@ -426,20 +427,20 @@ peer.start();
 ### Authentication Flow
 
 1. **InitialRequest**: Initiator sends `initial_nonce` (session nonce) + optional certificate request
-2. **InitialResponse**: Responder sends `nonce` and `initial_nonce` (both set to responder's session nonce), `your_nonce` (initiator's nonce echoed back), and signature over `your_nonce || initial_nonce`
-3. **CertificateExchange** (optional): Peers exchange verifiable certificates
+2. **InitialResponse**: Responder sends `initial_nonce` (its session nonce), `your_nonce` (initiator's nonce echoed back), matching certificates and its own requested certificate set; the signature covers only decoded `your_nonce || initial_nonce` (`Peer.ts:854-874`)
+3. **CertificateExchange** (optional): Initiator validates the initial response's certificates, marks its session ready, notifies listeners, releases handshake waiters, then answers the responder's request (`Peer.ts:957-1035`)
 4. **General**: Authenticated messages with payload, signed with per-message random nonce
 
 ### InitialResponse Field Mapping (Cross-SDK)
 
-The InitialResponse field mapping matches Go and TS SDKs:
+The InitialResponse field mapping follows the TypeScript SDK:
 - `initial_nonce` = responder's session nonce (Go: `InitialNonce = session.SessionNonce`)
-- `nonce` = responder's session nonce (same value, Go: `Nonce = ourNonce`)
+- `nonce` is omitted, as in TypeScript (`Peer.ts:865-874`); Go sends it as `Nonce = ourNonce`
 - `your_nonce` = initiator's nonce echoed back (for session lookup by initiator)
 
 On the initiator side, the responder's session nonce (`initial_nonce`) is stored as `peer_nonce`.
 
-**TS SDK compatibility**: The TS SDK's InitialResponse has NO `nonce` field (only `initialNonce`, `yourNonce`). The Go SDK sends both `Nonce` and `InitialNonce`. The Rust SDK reads `initial_nonce`, as the reference does, and requires it (`Initial response message nonce is required.`, #353).
+**TS SDK compatibility**: Rust and TypeScript send `initialNonce` and `yourNonce` without `nonce`. The Go SDK sends both `Nonce` and `InitialNonce`. Rust reads and requires `initial_nonce` (`Initial response message nonce is required.`, #353). The initial response carries `certificates` when automatic selection ran (including an empty array), followed by `requestedCertificates` (the responder's own policy, including an empty set), then `signature` (`Peer.ts:865-874`).
 
 ### Error Propagation
 
@@ -465,7 +466,7 @@ verdict: an unavailable wallet must keep its own error.
 
 Message nonces for General/CertificateRequest/CertificateResponse use simple 32-byte random values (base64-encoded), matching TypeScript's `Utils.toBase64(Random(32))`. Session nonces use HMAC-based `create_nonce()` with counterparty=Self (None); `ProtoWallet::create_hmac` now issues the amended BRC-56 minimal-length key, with the 32-byte-key tag only a named and counted legacy verification acceptance (#379, owner 19.5 (a)).
 
-An InitialResponse's, certificate request's, certificate response's and General message's `your_nonce` is verified against this peer's own wallet (counterparty self), a failure a refusal, as the reference and Go refuse it (#353; until then the responder's nonce was checked against the responder's key, which no wallet but the responder's can match, and the failure passed). Every accepted nonce is claimed since #362 (`Peer.ts:258-283,808,935,1085,1220,1314`), the initial request before wallet work, the four signed kinds after verification. A replay is `Replayed initialRequest nonce.` or `Replayed <messageType> message nonce.`. Signed claims fail closed at 100,000 per session and expire with session removal or 30 minutes idle (checked at claim time); initial claims survive session removal, expire at 30 minutes and evict oldest-first at 256 per identity or 100,000 total. General messages wait on one shared per-session validation result for up to 30 seconds (`Peer.ts:286-329,1318-1325`); only a nonempty validated response releases it, before notifying certificate listeners. See the #362-364 changelog parity paragraph for the retained session-policy and certificate-policy differences.
+An InitialResponse's, certificate request's, certificate response's and General message's `your_nonce` is verified against this peer's own wallet (counterparty self), a failure a refusal, as the reference and Go refuse it (#353; until then the responder's nonce was checked against the responder's key, which no wallet but the responder's can match, and the failure passed). Every accepted nonce is claimed since #362 (`Peer.ts:258-283,808,935,1085,1220,1314`), the initial request before wallet work, the four signed kinds after verification. A replay is `Replayed initialRequest nonce.` or `Replayed <messageType> message nonce.`. Signed claims fail closed at 100,000 per session and expire with session removal or 30 minutes idle (checked at claim time); initial claims survive session removal, expire at 30 minutes and evict oldest-first at 256 per identity or 100,000 total. General messages wait on one shared per-session validation result for up to 30 seconds (`Peer.ts:286-329,1318-1325`); a nonempty validated initial response or certificate response releases it, before notifying certificate listeners. See the #362-364 changelog parity paragraph for the retained session-policy and certificate-policy differences.
 
 ### Cryptographic Details
 
@@ -555,7 +556,7 @@ Run with WebSocket transport tests:
 cargo test --features auth,websocket
 ```
 
-**Test pattern note**: `auth_peer_nonces_362_364` and #353 use in-process transports whose deliveries invoke the callback installed by `start()`. The older `auth_peer_e2e_tests` channel routers call `handle_incoming_message` directly. Neither needs a network port.
+**Test pattern note**: `auth_peer_nonces_362_364`, `auth_peer_initial_response_certificates_362_364` and #353 use in-process transports whose deliveries invoke the callback installed by `start()`. The older `auth_peer_e2e_tests` channel routers call `handle_incoming_message` directly. Neither needs a network port.
 
 ## Related Documentation
 
