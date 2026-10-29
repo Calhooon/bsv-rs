@@ -1135,7 +1135,7 @@ that waiter (`Peer.ts:1029-1035`), so its caller sees `Timeout waiting for
 the BRC-103 initial response.` (`:676`) after the timeout. The signature
 half predates this change; the certificate cases come with it, pinned by
 the initial-response tests. The empty `certificates` array the initial
-response may carry is not pinned by a test (#445).
+response may carry is pinned since #445.
 
 ### Fixed: bind key-value actions before signing and carry their options (#341, #342)
 
