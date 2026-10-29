@@ -1826,7 +1826,9 @@ impl Transaction {
     /// `Err(ScriptEvaluationDeclined)`, a decline, never to be read as invalid (bsv-rs#38).
     /// `Transaction::verify` has no work budget; callers can use `SpendParams::work_limit`
     /// or `StreamVerifier::set_work_limit` to bound charged work, and must bound elapsed
-    /// time externally because those counters cannot interrupt one arithmetic opcode.
+    /// time externally because those counters cannot interrupt one arithmetic opcode
+    /// (#378 part 1; part 2 adds an additive work budget here under the keeper's word of
+    /// 2026-10-29, `None` the reference's behaviour).
     pub async fn verify(
         &self,
         chain_tracker: &dyn super::ChainTracker,
