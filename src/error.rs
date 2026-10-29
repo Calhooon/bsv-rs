@@ -216,7 +216,7 @@ pub enum Error {
     /// Preserves the guard's class and complete string; see [`AbortAcceptance`].
     #[cfg(feature = "wallet")]
     #[error("{0}")]
-    AbortAccepted(AbortAcceptance),
+    AbortAccepted(Box<AbortAcceptance>),
 
     /// A wallet's refusal with its class: the reference's classed wallet error.
     ///

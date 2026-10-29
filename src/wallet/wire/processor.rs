@@ -23,6 +23,8 @@
 //! let response = processor.process_message(&request_bytes).await?;
 //! ```
 
+#[cfg(feature = "tracing")]
+use super::diagnostics;
 use super::encoding::{WireReader, WireWriter};
 use super::requests::{
     assert_request_consumed, read_create_hmac_args, read_create_signature_args, read_decrypt_args,
@@ -244,29 +246,25 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             .map_err(|error| match explicit_wallet_code(&error) {
                 Some(_) => {
                     #[cfg(feature = "tracing")]
-                    if let Error::WalletRefusal { class, .. } = &error {
-                        tracing::warn!(
-                            call = call.method_name(),
-                            class = class.name(),
-                            "wallet refusal framed with its code"
-                        );
+                    if let Some(class) = match &error {
+                        Error::WalletRefusal { class, .. } => Some(class),
+                        Error::AbortAccepted(a) => Some(&a.class),
+                        _ => None,
+                    } {
+                        diagnostics::kept(call, *class);
                     }
                     error
                 }
                 None => {
                     #[cfg(feature = "tracing")]
                     match &error {
-                        Error::WalletRefusal { class, message } => tracing::warn!(
-                            call = call.method_name(),
-                            class = class.name(),
-                            error = %message,
-                            "wallet error framed as Wallet operation failed"
-                        ),
-                        _ => tracing::warn!(
-                            call = call.method_name(),
-                            error = %error,
-                            "wallet error framed as Wallet operation failed"
-                        ),
+                        Error::WalletRefusal { class, message } => {
+                            diagnostics::replaced(call, Some(class), message);
+                        }
+                        Error::AbortAccepted(a) => {
+                            diagnostics::replaced(call, Some(&a.class), &a.message);
+                        }
+                        _ => diagnostics::replaced(call, None, &error),
                     }
                     Error::WalletError(WALLET_OPERATION_FAILED.to_string())
                 }
