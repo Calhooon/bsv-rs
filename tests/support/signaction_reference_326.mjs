@@ -66,7 +66,7 @@ Object.defineProperty(globalThis, 'crypto', {
 const [sdkPath] = process.argv.slice(2)
 const {
   ContactsManager326: ContactsManager, GlobalKVStore, LocalKVStore, LookupResolver, ProtoWallet, PrivateKey,
-  Script, Transaction, Utils, PushDrop, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
+  Script, Transaction, Beef, Utils, PushDrop, TopicBroadcaster, WERR_REVIEW_ACTIONS, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
 } = await import(pathToFileURL(sdkPath).href)
 
 const REFERENCE = Utils.toBase64(new Array(8).fill(0x52))
@@ -174,6 +174,17 @@ const stop = async (f) => {
 }
 
 const fresh = () => ({ createAction: [], signAction: [], abortAction: [], sources: {} })
+
+// #340 records the reference retry sequence, and the pinned local store's absence of retry.
+if (process.argv.includes('--double-spend-retry')) {
+  const { recordDoubleSpendRetry } = await import('./double_spend_retry_340.mjs')
+  console.log(JSON.stringify(await recordDoubleSpendRetry({
+    recording, fresh, record, stop, sourceOf, LookupResolver, TopicBroadcaster,
+    LocalKVStore, GlobalKVStore, Transaction, Beef, Script, Utils, WERR_REVIEW_ACTIONS,
+    resetCounter () { counter = 0 }
+  }), null, 2))
+  process.exit(0)
+}
 
 if (process.argv.includes('--kvstore-tags')) {
   counter = 0

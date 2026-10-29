@@ -132,6 +132,71 @@ The downstream scan checked the old sentences, missing-flag prefixes and
 `~/bsv/bsv-wallet-cli`: no matches. `~/bsv/bsv-middleware-cloudflare-public`
 and `~/bsv/rust-chaintracks` were absent at those paths and remain unverified.
 A downstream matching these errors must use the new sentences above.
+### Fixed: one wallet double-spend retry for revocation and the global key-value store (#340)
+
+The global store now retries `set` and `remove` after a wallet's structured
+`WERR_REVIEW_ACTIONS` with valid double-spend evidence. Every retry follows
+successful synchronization of the competing transactions and repeats the
+lookup, input selection, BEEF merge and bound action. An action that failed
+at signAction is aborted with its own reference before synchronization; the
+next createAction supplies a new reference. The per-key lock covers every
+attempt. Global set prepares its replacement script once, outside the retry,
+as the reference does.
+
+The local store does not retry, as the reference's does not. Local set makes
+one bound action; local removal makes one bound action per batch and stops on
+failure. The local retry and broadcaster added in the unreleased #340 change
+are removed, including `LocalKVStore::with_broadcaster`. Local failures still
+abort the action before returning the wallet error.
+
+The reference rule moved from identity's private `double_spend.rs` to
+`src/overlay/wallet_retry.rs`, beside the port of `overlay-tools`, where
+`ts-stack@edf6e03` defines `withDoubleSpendRetry` (`:140-165`, default at `:8`).
+It makes at most five attempts, synchronizes only between attempts, and returns
+the final wallet error unchanged. Other errors, missing or malformed evidence,
+and failed synchronization stop immediately. Identity revocation uses the
+same rule with its existing error category and verdicts. The public
+`overlay::with_double_spend_retry` in `retry.rs` remains a different rule:
+error-text matching, three retries (four attempts) by default, and no
+competing-transaction synchronization.
+
+`tests/kvstore_double_spend_retry_340.rs` pins global set/remove recovery,
+the fresh lookup's exact inputs and merged BEEF, distinct action references,
+abort-before-sync order, five-attempt exhaustion in the wallet's words, and
+no retry for unstructured or malformed evidence or failed synchronization.
+The four local once/always set/remove cases pin one createAction, one abort,
+no broadcast and the unchanged wallet error; all four fail on a scratch copy
+of the retrying `dd0a4a59` tree and pass after the removal. The shared rule's
+five unit tests and all nine existing `identity_revocation_checks_327`
+verdict tests remain unchanged.
+
+Migration: no published public item moved. The old identity helper was private
+and the removed local `with_broadcaster` was never published.
+`GlobalKVStore::with_broadcaster(TopicBroadcaster)` remains additive for
+caller-owned synchronization and completed-transaction broadcasts. Existing
+config struct literals are unchanged.
+
+### Notes: cross-SDK parity (#340)
+
+The global paths follow `GlobalKVStore.ts:307-393,434-491`: the lookup is
+inside `withDoubleSpendRetry`. The reference's `completeBoundAction.ts:1148-1150`
+aborts the failed reference and rethrows; it contains no retry. At this pin,
+`LocalKVStore.ts:413-425,515-550,567-594` calls that boundary without a retry
+wrapper. The local store does not retry, as the reference's does not. Go at
+`2ca481c` likewise has no double-spend retry in `kvstore/local_kv_store.go`
+(`Set`:217-366; `Remove`:429-524); its removal loop is pagination, and its
+signAction failures relinquish the selected outputs then return the error.
+
+Filed as #470: local bound-action failures still return the wallet error unwrapped; the reference adds `There are N outputs with tag K that cannot be unlocked. Original error: ...` (`LocalKVStore.ts:427-431,551-555`).
+
+The three older #326, #341/#342 and #344 recorder outputs regenerate
+byte-identically under Node 22.18.0 from `ts-stack@edf6e03`. The
+`--double-spend-retry` mode records eight actual global/local sequences in
+`kvstore_retry_340.json`, including the local single-attempt verdicts. The fold
+corrects the recorder's comment and output description only; all cases are
+unchanged, and the revised output is byte-identical on rerun. No vector bytes
+were edited by hand. Recording and tests inject all lookup and broadcast
+answers in process; no live host or default port is used.
 
 ### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
 
@@ -228,6 +293,7 @@ retain their expected verdicts and bytes. Measurements, raw samples, source
 probes and gate/fuzz logs are under
 `/Volumes/Lanes/out/bsv-rs/fix-378-op-mul-time/`; the table is the performance pin,
 with no wall-clock assertion or 16 MiB bench in the crate.
+
 ### Fixed: out-of-scope words are not judged; live Genesis authority (#452, #451)
 
 A pre-Genesis coin, a tip at `u32::MAX`, or a zero Genesis/Chronicle

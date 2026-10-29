@@ -71,6 +71,12 @@ pub struct Counting {
     /// The signable transaction createAction answers (its atomic BEEF and
     /// reference), none by default (#318).
     pub signable: Option<SignableTransaction>,
+    /// #340: build the answer from each attempt's requested input BEEF.
+    pub create_from_request: bool,
+    /// #340: distinct references expose an abort/sign using a stale action.
+    pub create_references: Arc<Mutex<VecDeque<Vec<u8>>>>,
+    /// #340: each local lookup can answer a new token generation.
+    pub list_answers: Arc<Mutex<VecDeque<ListOutputsResult>>>,
     pub signed: Arc<Mutex<Option<SignActionArgs>>>,
     /// What listOutputs answers when set; the ProtoWallet's answer otherwise
     /// (#326).
@@ -126,6 +132,9 @@ impl Counting {
             calls: Arc::default(),
             originators: Arc::default(),
             signable: None,
+            create_from_request: false,
+            create_references: Arc::default(),
+            list_answers: Arc::default(),
             signed: Arc::default(),
             listed: Arc::default(),
             spending: Arc::default(),
@@ -207,7 +216,18 @@ macro_rules! counting {
                 if !sources.is_empty() {
                     signable = Some(spending_many(&sources, args.outputs.as_deref().unwrap_or(&[])));
                 }
+                if self.create_from_request {
+                    let beef = args.input_beef.as_deref().unwrap();
+                    let sources: Vec<_> = args.inputs.iter().flatten().map(|input| {
+                        let txid = bsv_rs::primitives::to_hex(&input.outpoint.txid);
+                        (Transaction::from_beef(beef, Some(&txid)).unwrap(), input.outpoint.vout)
+                    }).collect();
+                    signable = Some(spending_many(&sources, args.outputs.as_deref().unwrap_or(&[])));
+                }
                 if let Some(answer) = &mut signable {
+                    if let Some(reference) = self.create_references.lock().unwrap().pop_front() {
+                        answer.reference = reference;
+                    }
                     mutate_bound_answer(answer, &self.create_mode.lock().unwrap());
                 }
                 *self.pending.lock().unwrap() = signable.clone();
@@ -226,6 +246,9 @@ macro_rules! counting {
                 self.note("sign_action", o);
                 self.signs.lock().unwrap().push(args.clone());
                 *self.signed.lock().unwrap() = Some(args.clone());
+                if let Some(answer) = self.sign_answers.lock().unwrap().pop_front() {
+                    return answer;
+                }
                 let mode = *self.sign_mode.lock().unwrap();
                 if !mode.is_empty() {
                     return Ok(bound_sign_answer(self.pending.lock().unwrap().as_ref().unwrap(), &args, mode));
@@ -233,11 +256,11 @@ macro_rules! counting {
                 if let Some(via) = &self.sign_via {
                     return via.sign_action(args, o).await;
                 }
-                self.sign_answers.lock().unwrap().pop_front().unwrap_or(Ok(SignActionResult {
+                Ok(SignActionResult {
                     txid: None,
                     tx: None,
                     send_with_results: None,
-                }))
+                })
             }
             async fn abort_action(
                 &self,
@@ -254,6 +277,9 @@ macro_rules! counting {
                 o: Option<&str>,
             ) -> bsv_rs::Result<ListOutputsResult> {
                 self.note("list_outputs", o);
+                if let Some(listed) = self.list_answers.lock().unwrap().pop_front() {
+                    return Ok(listed);
+                }
                 if let Some(listed) = self.listed.lock().unwrap().clone() {
                     return Ok(listed);
                 }

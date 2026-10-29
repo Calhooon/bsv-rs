@@ -59,6 +59,10 @@ pub mod overlay_admin_token_template;
 pub mod retry;
 pub mod topic_broadcaster;
 pub mod types;
+#[cfg(any(feature = "kvstore", feature = "identity", test))]
+mod wallet_retry;
+#[cfg(any(feature = "kvstore", feature = "identity", test))]
+pub(crate) use wallet_retry::with_wallet_double_spend_retry;
 
 // Re-exports from facilitators
 pub use facilitators::{

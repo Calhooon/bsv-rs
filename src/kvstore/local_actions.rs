@@ -3,6 +3,7 @@ use super::LocalKVStore;
 use crate::kvstore::token_spends::{complete_token_action, SigningProtocol};
 use crate::kvstore::types::{encode_value_with_ttl, LookupValueResult};
 use crate::kvstore::{KVStoreRemoveOptions, KVStoreSetOptions};
+use crate::overlay::with_wallet_double_spend_retry;
 use crate::primitives::to_hex;
 use crate::script::LockingScript;
 use crate::wallet::{Counterparty, CreateActionArgs, CreateActionOutput, WalletInterface};
@@ -82,40 +83,61 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     ) -> Result<Vec<String>> {
         let mut txids = Vec::new();
         loop {
-            let current = self.lookup_value(key, 100).await?;
-            if !current.value_exists || current.outputs.is_empty() {
-                break;
-            }
-            let inputs = self.build_inputs(&current)?;
-            if inputs.is_empty() {
-                break;
-            }
-            let result = complete_token_action(
-                &self.wallet,
-                CreateActionArgs {
-                    description: options.description.clone().unwrap_or_else(|| {
-                        format!("Remove {key} from {}", self.config.protocol_id)
-                    }),
-                    inputs: Some(inputs),
-                    input_beef: current.input_beef,
-                    outputs: None,
-                    lock_time: None,
-                    version: None,
-                    labels: None,
-                    options: Some(self.action_options.for_action(false, true)),
-                },
-                self.signing_protocol(key),
-                self.originator(),
+            let batch = with_wallet_double_spend_retry(
+                || self.remove_batch(key, options),
+                || self.topic_broadcaster(),
+                Error::KvStoreError,
             )
             .await?;
-            if let Some(txid) = result.txid {
-                txids.push(to_hex(&txid));
+            let Some((txid, count)) = batch else {
+                break;
+            };
+            if let Some(txid) = txid {
+                txids.push(txid);
             }
-            if current.outputs.len() < 100 {
+            if count < 100 {
                 break;
             }
         }
         Ok(txids)
+    }
+
+    async fn remove_batch(
+        &self,
+        key: &str,
+        options: &KVStoreRemoveOptions,
+    ) -> Result<Option<(Option<String>, usize)>> {
+        let current = self.lookup_value(key, 100).await?;
+        if !current.value_exists || current.outputs.is_empty() {
+            return Ok(None);
+        }
+        let inputs = self.build_inputs(&current)?;
+        if inputs.is_empty() {
+            return Ok(None);
+        }
+        let result = complete_token_action(
+            &self.wallet,
+            CreateActionArgs {
+                description: options
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| format!("Remove {key} from {}", self.config.protocol_id)),
+                inputs: Some(inputs),
+                input_beef: current.input_beef,
+                outputs: None,
+                lock_time: None,
+                version: None,
+                labels: None,
+                options: Some(self.action_options.for_action(false, true)),
+            },
+            self.signing_protocol(key),
+            self.originator(),
+        )
+        .await?;
+        Ok(Some((
+            result.txid.map(|id| to_hex(&id)),
+            current.outputs.len(),
+        )))
     }
 
     fn signing_protocol(&self, key: &str) -> SigningProtocol {
