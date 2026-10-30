@@ -44,7 +44,7 @@ use tokio::sync::{oneshot, RwLock};
 /// A timeout is reported as `Error::AuthError("Handshake timeout".into())` so
 /// the existing call-site error semantics are preserved.
 #[cfg(not(all(target_arch = "wasm32", feature = "wasm")))]
-async fn wait_with_timeout<F>(future: F, timeout_ms: u64) -> Result<F::Output>
+pub(crate) async fn wait_with_timeout<F>(future: F, timeout_ms: u64) -> Result<F::Output>
 where
     F: Future,
 {
@@ -54,7 +54,7 @@ where
 }
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-async fn wait_with_timeout<F>(future: F, timeout_ms: u64) -> Result<F::Output>
+pub(crate) async fn wait_with_timeout<F>(future: F, timeout_ms: u64) -> Result<F::Output>
 where
     F: Future,
 {
@@ -200,6 +200,11 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             originator: options.originator,
             identity_key: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Shares the client-wide manager across per-origin peers.
+    pub(crate) fn share_session_manager(&mut self, manager: Arc<RwLock<SessionManager>>) {
+        self.session_manager = manager;
     }
 
     /// Sets up the transport callback: every incoming message goes through

@@ -62,6 +62,7 @@
 //! - **BRC-104**: HTTP headers for authenticated requests
 
 pub mod certificates;
+pub mod clients;
 pub mod peer;
 mod requested_certificates_json;
 pub mod session_manager;
@@ -71,6 +72,7 @@ pub mod utils;
 
 // Re-exports
 pub use certificates::{Certificate, MasterCertificate, VerifiableCertificate};
+pub use clients::{AuthFetch, AuthFetchOptions, Response};
 pub use peer::{Peer, PeerOptions};
 pub use session_manager::SessionManager;
 #[cfg(feature = "socketio")]

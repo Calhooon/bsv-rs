@@ -75,6 +75,7 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
 
 ## Known cross-SDK divergences (keep this list honest)
 
+
 - Local key parsing is stricter than the reference's (#489): no odd-length padding, no hybrid keys, no x reduced mod p. At `ts-stack@edf6e03`, `PublicKey.ts:49-51`, `Point.ts:303-325,345-347,365-384` and `hex.ts:28-30` accept odd-length keys (`2`+Gx, `3`+Gx, `4`+Gx+Gy, `6`+Gx+Gy), hybrid keys with the matching parity (`06`+Gx+Gy) and any x reduced mod p (`02`+(p+1), `04`+(p+1)+y, the hybrid form), where this crate refuses them all; the words here are the parser's own. Tokens with the hybrid or reduced-x key decode there, then fail the canonical envelope, while this crate refuses the key first. The local key parse is `LocalKVStore.ts:246` (not `:248`), the canonical decode `:278-282`, and the catch `:340-345`. The six key/token pins in `tests/kvstore_local_parser_words_489.rs` replay recorded acceptance and full wrapper words; the #489 changelog parity table gives each exact suffix. This fold changes no accepted forms. Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
 - Local token decode also tries lock-after (#489), where the reference decodes lock-before only at this site (`ts-stack@edf6e03` `LocalKVStore.ts:278-282`, `PushDropValidation.ts:59`, `PushDrop.ts:74-75`; wrapper `LocalKVStore.ts:340-345`). `51 75 <G> ac` reaches `Unexpected PushDrop token field count` here, and `51 52 6d <G> ac` reaches `PushDrop token must use the canonical PushDrop envelope`; there the lock-before key parse of the first chunk decides the words: `script.chunks[0].data must have value` for a first chunk without data (`51`), `Unknown point format` for a data push that is no key (`00 75 <G> ac`). Both get/set wrappers and the decoder's lock-after acceptance are pinned in `tests/kvstore_local_parser_words_489.rs`. Restricting this site to lock-before is a separate behavior decision. Ours: the general PushDrop decoder tries both lock positions, but the local canonical-envelope check still refuses these tokens; BRC-48 scripts/0048.md:13-18 and LocalKVStore.ts:278-282 at edf6e03 distinguish the template from this site.
 
@@ -173,6 +174,23 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
 
 - A null internalizeAction remittance is present (#393): Rust refuses it during JSON deserialization with the reference's protocol/presence/object-check words, where `ts-stack@edf6e03` refuses it in `validateInternalizeOutput` with code 6 (`validationHelpers.ts:966-984`). The public optional fields cannot retain null; missing still reads as `None`. Go's pointer fields read both null and missing as nil (`go-sdk@2ca481c`, `wallet/interfaces.go:422-427`, `encoding_json.go:384-395`); its writer refuses a nil selected remittance and ignores the other (`wallet/serializer/internalize_action.go:29-44`). Ours: the typed null/presence boundary and code-free deserialization error are native choices; validationHelpers.ts:966-984 at edf6e03 refuses the same selected null remittance before wallet dispatch.
 - The wire client validates returned wallet facts at nine sites (#487), as the reference's own client does. Go at `2ca481c` returns its deserialized answers without a result-validation pass (`wallet/substrates/wallet_wire_transceiver.go:49,63,119,155,167,227,251,263,275`), leaving request bindings and BEEF commitments/conservation unchecked; it also sends the R35/R49/R88 arguments unchecked (`:38-50`). Ours: the reference's own wire client at the nine sites (WalletWireTransceiver.ts:227,320,665,837,910,1093,1438,1551,1618 at edf6e03) is the authority; the keeper's #467 ruling retains u32 page totals. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_result_validation_487.rs).
+- AuthFetch (#423) follows `ts-stack@edf6e03` `AuthFetch.ts:1-1300` over the
+  existing Peer/BRC-104 transport. Ours: an owned Response with sorted headers,
+  typed byte bodies and the existing Error prefix; the 401 stale-session check
+  matches text because AuthError has no status field (`:400-406`), and the server
+  key is parsed before the typed wallet call (`:873-880`). The response-timeout
+  builder is a Rust addition (`:90,298-300`); fallback buffering has our own cap,
+  where the reference's plain fetch returns its stream unbounded (`:680-705`).
+  The native transport, fallback, parser and general-payload bound share the
+  configured response limit (`:206-211,355-364,567`); custom factories own their
+  transport I/O caps. Identity is committed on ID match before parsing, and
+  Content-Type uses ECMAScript trim (`:428-452,582-602`). Native options exclude
+  JS body coercions and cause/stack/console diagnostics. Certificate callbacks
+  release the queue after 500 ms without an automatic replay (`:376-395`), and
+  the #416 missing-initialNonce intake refusal remains. Theirs: Go's
+  `auth/clients/authhttp` at `2ca481c` has context/goroutine semantics and different
+  payment options/texts. The six reviewed sites and the fallback safeguard are
+  stated in #423's CHANGELOG parity note; tests/auth_fetch_423*.rs are the witnesses.
 
 ## Where the numbers come from
 

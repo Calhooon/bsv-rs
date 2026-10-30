@@ -9,6 +9,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 
 | File | Purpose | Lines |
 |------|---------|-------|
+| `clients/` | #423 AuthFetch, owned Response, request/response framing, certificate queue and BRC-105 payments; core `auth`, native transport `http` | see below |
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 671 |
 | `requested_certificates_json.rs` | #426/#400: parsed certificate member preimages; ordered maps, JavaScript integer keys, UTF-16 escapes and ECMAScript numbers; no recursive parser stack | 258 |
@@ -24,6 +25,34 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
 | `utils/` | Utility functions | - |
+
+## Client files (#423)
+
+| File | Purpose |
+|---|---|
+| `clients/auth_fetch.rs` | Public constructors/options/fetch, origin peers, retry counter, correlation and response deadline |
+| `clients/state.rs` | Shared session manager, certificate queue, 500 ms timer, requests and bounded drainable buffer |
+| `clients/request.rs` | Exact method/path/search/header/body payload and reference header collation |
+| `clients/response.rs` | Owned response and strict bounded answer parser; a mismatched ID is ignored |
+| `clients/transport.rs` | Reference Content-Type/UTF-8 checks and configured general-payload bounds at the Peer boundary |
+| `clients/labels.rs` | Reference base64 label conversion and ECMAScript whitespace; AuthFetchOptions::payment_labels |
+| `clients/retry.rs` | One counter across nested fetch/payment backoff attempts |
+| `clients/payment.rs` | BRC-105 action, labels, known-txids, payment reuse and bounded retries |
+| `clients/fallback.rs` | Fallback auth-header and status validation; native HTTP only |
+| `transports/fetch_client.rs` | Native fallback I/O and NativeFetchClient alias, keeping network clients at the transport boundary |
+| `clients/shared_wallet.rs` | Internal Arc adapter forwarding the same wallet without requiring Clone |
+
+Read AuthFetch.ts:1-1300 at ts-stack@edf6e03 before changing these files. BRC-104
+is the transport; the queue, ID match, deadlines and paid retries are the client.
+The #423 changelog documents native Response/body/error boundaries and the pin's
+lack of automatic certificate replay. HTTP certificateRequest intake still
+refuses missing initialNonce (#416); do not invent a header to bypass it.
+`with_max_response_bytes` reaches both native transport constructors, fallback
+buffering and the general-payload bound at the Peer boundary. Custom factories
+own their I/O caps. The fallback cap is Rust's own safeguard: the reference's
+plain `fetch` path has none. On wasm `AuthFetch::new` compiles but every fetch is
+refused with `HTTP transport requires the 'http' feature`; use
+`with_transport_factory` to supply the host transport.
 
 ## Submodules
 
@@ -73,6 +102,7 @@ pub const AUTH_PROTOCOL_ID: &str = "auth message signature";
 Re-exports from `mod.rs`:
 - `Certificate`, `MasterCertificate`, `VerifiableCertificate` (certificates)
 - `Peer`, `PeerOptions` (peer)
+- `AuthFetch`, `AuthFetchOptions`, `Response` (clients; also `parse_known_txids_header` under `clients`)
 - `SessionManager` (session_manager)
 - `MockTransport`, `SimplifiedFetchTransport`, `Transport` (transports)
 - `headers`, `TransportCallback`, `HttpRequest`, `HttpResponse` (transports)

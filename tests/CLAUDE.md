@@ -13,6 +13,12 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Tests | Feature Gate | Description |
 |------|------:|-------------|-------------|
+| `auth_fetch_423.rs` | 7 | `auth,http` | Node-recorded request bytes, correlation, timeout, retry counter, header and body rules; RED is the absent API on base |
+| `auth_fetch_423_certificates.rs` | 4 | `auth,http` | Handshake certificate queue/grace, #416 intake refusal, handler/explicit retry, receipt/drain |
+| `auth_fetch_423_payment.rs` | 5 | `auth,http,wallet` | BRC-105 action, labels, known-txids, reused transaction and both exhausted budgets |
+| `auth_fetch_423_response.rs` | 5 | `auth` | 54 strict parser recordings, seven known-txids inputs and eight label conversions; ID match before parsing; sorted Fetch header iteration (RED before the fold) |
+| `auth_fetch_423_fallback.rs` | 4 | `auth,http` | Three direct fallback helper cases, fixed-length/chunked limits at eight/nine bytes (RED before the fold), and the recorded 404 handshake refusal with its empty reason phrase; all 24 client vector cases now exercised |
+| `auth_fetch_423_limits.rs` | 5 | `auth,http` | Both native constructors apply lower/raised body limits, including a signed body above 16 MiB; Peer send/intake payload bounds; identity committed on matching ID before a status refusal. All five RED before the fold |
 | `kvstore_local_parser_words_489.rs` | 13 | `kvstore` | #489: 52 recorded Node 22 get/set cases. Original five malformed-parser tests RED on `bcea54a1`; six accepted-reference key/token cases RED on `9bcbe433` and now carry native parser words; two lock-after pins green on that tip, recording the later local checks beside the reference's refusal. Acceptance and standalone diagnostics unchanged. |
 | `wallet_wire_discovery_validation_495.rs` | 9 | `wallet` | Seven shared discovery-row regressions RED on #487 base, accepting frames for both calls green on base and tip; SDK writer frames and uncoded refusal words recorded twice byte-identically |
 | `wallet_wire_result_validation_487.rs` | 43 | `wallet` | 36 result-row tests plus group 0's 48 accepting frames and six matching refusals, two named #183 off-curve certificate pins, four independent code-6 argument refusals before transmission; Node 22.18.0 recordings are written by the reference client |

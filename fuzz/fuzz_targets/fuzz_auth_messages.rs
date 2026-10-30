@@ -13,6 +13,7 @@
 //! auth headers; a nonce's format. The assertion is that each returns; the
 //! target also checks round trips: a payload, a certificate and a frame that
 //! parse encode to bytes that parse back to the same encoding.
+use bsv_rs::auth::clients::{parse_known_txids_header, AuthFetchOptions, Response};
 use bsv_rs::auth::transports::socketio::codec::{
     decode_event_args_text, decode_polling_batch, EngineIoPacket, SocketIoPacket,
 };
@@ -80,6 +81,13 @@ fn certificate(certificate: &Certificate) {
 }
 
 fuzz_target!(|data: &[u8]| {
+    // Match the nonce to reach all of the new bounded response parser, rather
+    // than returning at the correlation check for every random input (#423).
+    let mut request_id = [0; 32];
+    if let Some(id) = data.get(..32) {
+        request_id.copy_from_slice(id);
+    }
+    let _ = Response::from_authenticated_payload(data, &request_id, "sender", 16 * 1024 * 1024);
     // Bytes: the General message's HTTP payloads and a certificate.
     if let Ok(request) = HttpRequest::from_payload(data) {
         let bytes = request.to_payload();
@@ -125,6 +133,8 @@ fuzz_target!(|data: &[u8]| {
     let Ok(text) = std::str::from_utf8(data) else {
         return;
     };
+    let _ = parse_known_txids_header(Some(text));
+    let _ = AuthFetchOptions::default().payment_labels(text, text);
     // Text: the frames, the headers and a nonce.
     if let Ok(packet) = EngineIoPacket::decode(text) {
         let encoded = packet.encode();

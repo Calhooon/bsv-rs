@@ -39,6 +39,11 @@
 
 pub mod http;
 
+#[cfg(feature = "http")]
+pub(crate) mod fetch_client;
+#[cfg(feature = "http")]
+pub use fetch_client::NativeFetchClient;
+
 #[cfg(feature = "websocket")]
 pub mod websocket_transport;
 
