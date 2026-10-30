@@ -16,7 +16,7 @@ pub(crate) async fn complete_action<W: WalletInterface>(
     wallet: &W,
     args: CreateActionArgs,
     originator: Option<&str>,
-) -> Result<CreateActionResult> {
+) -> Result<(CreateActionResult, Transaction)> {
     let signers = args
         .inputs
         .iter()
@@ -32,7 +32,7 @@ pub(in crate::kvstore) async fn complete_with_signers<W: WalletInterface>(
     mut args: CreateActionArgs,
     signers: HashMap<Outpoint, InputSigner>,
     originator: Option<&str>,
-) -> Result<CreateActionResult> {
+) -> Result<(CreateActionResult, Transaction)> {
     let options = args.options.get_or_insert_with(Default::default);
     options.sign_and_process = Some(false);
     options.return_txid_only = Some(false);
@@ -69,7 +69,7 @@ async fn sign_and_check<W: WalletInterface>(
     bytes: &[u8],
     reference: &str,
     originator: Option<&str>,
-) -> Result<CreateActionResult> {
+) -> Result<(CreateActionResult, Transaction)> {
     let partial = parse(bytes, "Wallet signable transaction")?;
     let indexes = bind_requested(args, &partial)?;
     let bound = bind_signers(args, &indexes, signers)?;
@@ -86,11 +86,14 @@ async fn sign_and_check<W: WalletInterface>(
         .await?;
     let tx = validate_signed(&partial, args, &indexes, &spends, &signed)?;
     let id = Outpoint::from_string(&format!("{}.0", tx.id()))?.txid;
-    Ok(CreateActionResult {
-        txid: Some(id),
-        tx: signed.tx,
-        ..Default::default()
-    })
+    Ok((
+        CreateActionResult {
+            txid: Some(id),
+            tx: signed.tx,
+            ..Default::default()
+        },
+        tx,
+    ))
 }
 
 fn parse(bytes: &[u8], label: &str) -> Result<Transaction> {
