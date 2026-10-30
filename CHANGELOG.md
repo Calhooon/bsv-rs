@@ -129,6 +129,7 @@ on an archived `9bcbe433`, the six accepted-key/token tests are RED because
 the tip incorrectly reports `Invalid point`; the two lock-after pins and
 the original five tests are already green. All 13 tests pass after the
 fold. The RED scratch copy uses its own target directory and is removed.
+
 Census (#375; current reading, historical account above retained):
 
 - Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
