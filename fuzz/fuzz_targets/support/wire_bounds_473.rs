@@ -58,5 +58,6 @@ pub fn exercise(data: &[u8]) {
         for call in [0, 1, 16] {
             crate::support::call_shared!(&client, call, None);
         }
+        crate::results_487::exercise(&client).await;
     });
 }

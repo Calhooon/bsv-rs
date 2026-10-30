@@ -2,7 +2,7 @@
 //! on the ordinary array path. The historical object path is #365's reader.
 
 use super::{invalid, Result};
-use crate::wallet::substrates::http_json::byte_fields;
+use crate::wallet::substrates::byte_fields;
 use num_traits::ToPrimitive;
 use serde::de::{DeserializeSeed, SeqAccess, Visitor};
 use serde_json::value::RawValue;

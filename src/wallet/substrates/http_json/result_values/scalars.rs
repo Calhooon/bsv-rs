@@ -250,17 +250,7 @@ fn specific_scalars(result: &Object<'_>, call: &str) -> Result<()> {
 
 fn timestamp(raw: Option<&RawValue>, call: &str) -> Result<()> {
     let text = string(raw, call, "revelationTime", 1, Some(64))?;
-    if !super::identity::timestamp_shape(&text) {
-        return Err(invalid(
-            call,
-            "revelationTime",
-            "an ISO timestamp with a timezone",
-        ));
-    }
-    if !super::identity::timestamp_valid(&text) {
-        return Err(invalid(call, "revelationTime", "a valid ISO timestamp"));
-    }
-    Ok(())
+    super::timestamp::validate(&text, call, "revelationTime")
 }
 
 pub(super) fn string_record<'a>(

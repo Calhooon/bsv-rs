@@ -393,6 +393,7 @@ impl<'a> WireReader<'a> {
     /// outpoint, the fields (a strict count, bounded, unique 1-50 byte names),
     /// then the bytes remaining as a DER signature, kept as `toDER` writes it.
     pub fn read_wallet_certificate(&mut self) -> Result<WalletCertificate, Error> {
+        super::result_validation::certificate_size(self.remaining())?;
         let certificate_type = to_base64(self.read_bytes(32)?);
         let serial_number = to_base64(self.read_bytes(32)?);
         let subject = self.read_compressed_key("certificate subject")?;

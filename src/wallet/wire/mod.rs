@@ -81,6 +81,7 @@ mod linkage;
 mod originator;
 mod processor;
 mod requests;
+mod result_validation;
 mod results;
 mod transceiver;
 mod validation;
@@ -328,9 +329,6 @@ impl WireReader<'_> {
 
     /// The certificate's fields (`Certificate.ts:356-387`).
     pub(crate) fn read_certificate_fields(&mut self) -> Result<IndexMap<String, String>, Error> {
-        if self.remaining() > MAX_CERTIFICATE_BINARY_BYTES {
-            return Err(refused(certificate_binary_read_refusal()));
-        }
         let count = self.read_var_int_num_strict()?;
         if count > MAX_CERTIFICATE_FIELDS {
             return Err(refused(format!(

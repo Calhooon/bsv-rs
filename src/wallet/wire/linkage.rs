@@ -8,6 +8,7 @@
 
 use super::encoding::{WireReader, WireWriter};
 use super::requests::{RevealCounterpartyRequest, RevealSpecificRequest};
+use super::result_validation::Binding;
 use super::validation::{self, Refusal};
 use super::{WalletCall, WalletWire, WalletWireTransceiver};
 use crate::primitives::PublicKey;
@@ -114,6 +115,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         })
         .map_err(thrown)?;
 
+        let binding = Binding::counterparty(&args)?;
         let mut writer = WireWriter::new();
         super::write_privileged_params(
             &mut writer,
@@ -140,8 +142,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             linkage,
             revelation_time,
         };
-        validation::reveal_counterparty_result(&args, &result).map_err(thrown)?;
-        Ok(result)
+        binding.check(result)
     }
 
     /// Reveals the linkage of one derived key to a verifier (call 10): the
@@ -165,6 +166,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         })
         .map_err(thrown)?;
 
+        let binding = Binding::specific(&args)?;
         let mut writer = WireWriter::new();
         super::write_key_related_params(
             &mut writer,
@@ -198,7 +200,6 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             key_id,
             proof_type,
         };
-        validation::reveal_specific_result(&args, &result).map_err(thrown)?;
-        Ok(result)
+        binding.check(result)
     }
 }

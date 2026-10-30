@@ -10,6 +10,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) and its unique-key rule for both discovery readers (`set_unique_record_entry`, #192), the signature calls' data-type flag writer (#199), the key-related parameters' and privileged pair's writers (#193), the certificate pages' limit and total checks (`require_page_capacity`, `assert_page_count`, #190), the discovery maps' one reading for both readers (`read_discovery_maps`, `read_counted_wire_record`: strict count, key 1 to 50 bytes and safe, unique) and listActions' satoshis in the reference's bound (`read_action_satoshis`, #236), the certificate checks the readers and the writer share (`require_compressed_key`, the field-name and DER checks, #189); the u32 field readers and `integer_refusal` (`#requireInteger`'s words, `WalletWireTransceiver.ts:2018-2025`, every integer bound's; #255) | ~600 |
+| `result_validation.rs` | #487 request snapshots and JSON views into the shared result rows; response and whole-certificate bounds | ~83 |
 | `bounds.rs` | #473 pre-entry collection checks (maximum before available bytes), unsigned satoshi range/precision, getHeight precision/trailing/range, and listActions/listOutputs page readers; generic string-array/map codecs keep their existing behavior | ~144 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
 | `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support; basic reads and `wire_length` in `reader.rs` (#458), every byte length through `wire_length`/`read_length`, compared with the bytes remaining before it is narrowed to `usize` (#192); `certificate_bytes`, the certificate writers' one body: the reference's checks and three bounds, the fields in the signed order (#189, #246) | ~2412 |
@@ -349,6 +350,45 @@ Go `2ca481c` reads the three satoshis as raw varints and height via a narrowing
 u32 cast (`serializer/list_actions.go:255,282`, `list_outputs.go:149`,
 `get_height.go:18`; `util/reader.go:123-125`). Its string-slice guard is
 `math.MaxInt`, not these collection limits (`util/reader.go:263-275`).
+
+### Shared client result validation (#487)
+
+At the nine enumerated `ts-stack@edf6e03 WalletWireTransceiver.ts` sites,
+`result_validation.rs` snapshots request bindings before the await and calls
+`substrates::result_values` on the answer's existing BRC-100 JSON form. It
+returns the original typed result. Refusals are `Error::WalletError`, no SDK
+code, with the reference's `Invalid <call> result <field>: expected …` text.
+The existing wire frame/reader refusals retain their own reference words.
+
+| Call / reference line | Before | After / incremental cost |
+|---|---|---|
+| createAction :227 | Typed fields and #473 collection bounds | Shared action rows, request inputBEEF once when needed, each returned tx/signable BEEF once |
+| signAction :320 | Typed fields and #473 collection bounds | Shared action rows, one optional returned BEEF parse |
+| listOutputs :665 | Typed fields, #473 values/page/count bounds | Shared output bindings and filters, one optional BEEF parse reused for every output |
+| revealCounterpartyKeyLinkage :837 | #406 key/time/byte/request checks | Same checks now shared; no BEEF; three point checks plus ISO predicate |
+| revealSpecificKeyLinkage :910 | #406 key/scalar/byte/request checks | Same checks now shared; no BEEF; three point checks and scalar/binding checks |
+| createSignature :1093 | Raw bytes | Shared ≤72/canonical-DER/scalar checks; no BEEF |
+| acquireCertificate :1438 | Certificate reader | Shared signed-certificate and partial-request rows; no BEEF |
+| listCertificates :1551 | Certificate/page/keyring readers | Shared certificate/filter/keyring rows per entry; no BEEF |
+| proveCertificate :1618 | Counted map, no key/value/set checks | Shared keyring/field-set rows; reference safe unique key reader; no BEEF |
+
+Every site pays one result JSON serialization and global snapshot scan;
+no returned BEEF is parsed in the typed reader, no shared row parses one a
+second time, and no result is decoded or re-encoded after validation. The
+whole-response limit is checked before decoding (`T:110–123`); the 16 MiB
+certificate limit now includes the prefix (`Certificate.ts:86–92,329–330`).
+`tests/wallet_wire_result_validation_487.rs` embeds only recorder-produced
+frames and expansion recipes: 36 new-row tests. The complete R01–R88 census,
+including the typed / #473 / newly enforced distinctions and gaps outside
+these nine calls, is the Wire column of `../substrates/CLAUDE.md`.
+
+The pin has two additional discovery result calls at :1796/:1842; they are
+outside the nine specified for #487 and their remaining validation gaps are
+listed in the census. All four totals remain `u32`; the keeper's #467 ruling
+is unchanged. The Go client at `2ca481c` calls result deserializers directly
+(`wallet/substrates/wallet_wire_transceiver.go:49,63,119,155,167,227,251,263,275`),
+without this request-bound result pass. Its signature deserializer does parse
+DER (`wallet/serializer/create_signature.go:90–107`).
 
 ## Cross-SDK Compatibility
 

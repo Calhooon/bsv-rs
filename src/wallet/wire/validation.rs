@@ -21,7 +21,6 @@ use super::encoding::WireReader;
 use super::requests::{RevealCounterpartyRequest, RevealSpecificRequest};
 use crate::primitives::PublicKey;
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
-use crate::wallet::types::Counterparty;
 use crate::wallet::validation::crypto;
 use crate::wallet::{
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
@@ -29,7 +28,6 @@ use crate::wallet::{
     VerifySignatureArgs,
 };
 use crate::Error;
-pub(super) use crypto::is_canonical_der_signature;
 use std::fmt::Display;
 
 /// `walletErrors.invalidParameter` (`WalletError.ts:78`), the code
@@ -40,11 +38,6 @@ const UNKNOWN_ERROR: u8 = 1;
 /// `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletWire.ts:9`), `validateByteArray`'s
 /// and the result's `bytes` default bound.
 const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
-/// The DER signature's bound (`validationHelpers.ts:1801`, `WalletResultValidation.ts:2220`).
-const MAX_SIGNATURE_BYTES: usize = 72;
-/// The canonical anyone key, `PrivateKey(1)`'s (`WalletResultValidation.ts:221`).
-const ANYONE_PUBLIC_KEY: &str =
-    "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 /// A refusal the processor frames with its own code and words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Refusal {
@@ -300,22 +293,7 @@ pub(super) fn public_key_result(public_key: &str) -> Checked<Vec<u8>> {
 
 /// createSignature's signature (`:2219-2225`): at most 72 bytes, canonical DER.
 pub(super) fn signature_result(signature: &[u8]) -> Checked {
-    const CALL: &str = "createSignature";
-    if signature.len() > MAX_SIGNATURE_BYTES {
-        return Err(invalid_result(
-            CALL,
-            "signature",
-            format!("at most {MAX_SIGNATURE_BYTES} bytes"),
-        ));
-    }
-    if !is_canonical_der_signature(signature) {
-        return Err(invalid_result(
-            CALL,
-            "signature",
-            "a canonical DER-encoded ECDSA signature",
-        ));
-    }
-    Ok(())
+    super::result_validation::signature(signature).map_err(Into::into)
 }
 
 /// getHeight's height (`:2293-2295`, `rangedInteger` `:946-961`): 1 to 2^32 - 1.
@@ -351,189 +329,28 @@ pub(super) fn version_result(version: &str) -> Checked {
     result_string(version, "getVersion", "version", 7, 30)
 }
 
-/// The two linkages' bytes (`validateKeyLinkage`, `:2165-2177`; the three
-/// keys are `PublicKey`s by their type).
-fn linkage_bytes(linkage: &crate::wallet::KeyLinkageResult, call: &str) -> Checked {
-    result_bytes(linkage.encrypted_linkage.len(), call, "encryptedLinkage")?;
-    result_bytes(
-        linkage.encrypted_linkage_proof.len(),
-        call,
-        "encryptedLinkageProof",
-    )
-}
-
-/// revealCounterpartyKeyLinkage's result (`:2226-2241`): the linkage, the
-/// revelation time, then the requested verifier and counterparty.
+/// The shared result rows also validate processor linkages before encoding.
 pub(super) fn reveal_counterparty_result(
     args: &RevealCounterpartyKeyLinkageArgs,
     result: &RevealCounterpartyKeyLinkageResult,
 ) -> Checked {
-    const CALL: &str = "revealCounterpartyKeyLinkage";
-    linkage_bytes(&result.linkage, CALL)?;
-    iso_timestamp(&result.revelation_time, CALL, "revelationTime")?;
-    if result.linkage.verifier != args.verifier {
-        return Err(invalid_result(CALL, "verifier", "the requested verifier"));
-    }
-    if result.linkage.counterparty != args.counterparty {
-        return Err(invalid_result(
-            CALL,
-            "counterparty",
-            "the requested counterparty",
-        ));
-    }
+    super::result_validation::Binding::counterparty(args)?.check(result)?;
     Ok(())
 }
 
-/// revealSpecificKeyLinkage's result (`:2242-2281`): the linkage, the
-/// protocol name 5 to 400 bytes, the key ID 1 to 800 (the level and
-/// proofType by their types), then the requested verifier, counterparty
-/// (the prover for self, the anyone key for anyone), protocol and key ID.
+/// Specific linkage uses the same field order and request bindings as HTTP.
 pub(super) fn reveal_specific_result(
     args: &RevealSpecificKeyLinkageArgs,
     result: &RevealSpecificKeyLinkageResult,
 ) -> Checked {
-    const CALL: &str = "revealSpecificKeyLinkage";
-    let linkage = &result.linkage;
-    linkage_bytes(linkage, CALL)?;
-    result_string(
-        &result.protocol.protocol_name,
-        CALL,
-        "protocolID[1]",
-        5,
-        400,
-    )?;
-    result_string(&result.key_id, CALL, "keyID", 1, 800)?;
-    if linkage.verifier != args.verifier {
-        return Err(invalid_result(CALL, "verifier", "the requested verifier"));
-    }
-    match &args.counterparty {
-        Counterparty::Self_ if linkage.counterparty != linkage.prover => {
-            return Err(invalid_result(
-                CALL,
-                "counterparty",
-                "the prover's identity key for counterparty self",
-            ));
-        }
-        Counterparty::Anyone if linkage.counterparty.to_hex() != ANYONE_PUBLIC_KEY => {
-            return Err(invalid_result(
-                CALL,
-                "counterparty",
-                "the canonical anyone public key",
-            ));
-        }
-        Counterparty::Other(key) if linkage.counterparty != *key => {
-            return Err(invalid_result(
-                CALL,
-                "counterparty",
-                "the requested counterparty",
-            ));
-        }
-        _ => {}
-    }
-    if result.protocol != args.protocol_id {
-        return Err(invalid_result(CALL, "protocolID", "the requested protocol"));
-    }
-    if result.key_id != args.key_id {
-        return Err(invalid_result(CALL, "keyID", "the requested key ID"));
-    }
+    super::result_validation::Binding::specific(args)?.check(result)?;
     Ok(())
 }
 
-/// `isoTimestamp` (`:992-999`): 1 to 64 bytes, the pattern
-/// `^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$`, then a time `Date.parse`
-/// reads, which for a string of that pattern is the ECMAScript date-time
-/// format: `HH:mm`, `:ss` and a fraction optional, the fields in range
-/// (24:00 alone at the end of a day), an offset's hours to 23.
+#[cfg(test)]
 fn iso_timestamp(value: &str, call: &str, field: &str) -> Checked {
-    result_string(value, call, field, 1, 64)?;
-    let bytes = value.as_bytes();
-    let digits = |range: std::ops::Range<usize>| {
-        bytes
-            .get(range)
-            .filter(|d| d.iter().all(u8::is_ascii_digit))
-    };
-    let zone_ok = match bytes.last() {
-        Some(b'Z') => true,
-        _ => {
-            let n = bytes.len();
-            n >= 6
-                && matches!(bytes[n - 6], b'+' | b'-')
-                && digits(n - 5..n - 3).is_some()
-                && bytes[n - 3] == b':'
-                && digits(n - 2..n).is_some()
-        }
-    };
-    let pattern = digits(0..4).is_some()
-        && bytes.get(4) == Some(&b'-')
-        && digits(5..7).is_some()
-        && bytes.get(7) == Some(&b'-')
-        && digits(8..10).is_some()
-        && bytes.get(10) == Some(&b'T')
-        && bytes.len() >= 12
-        && zone_ok
-        && !value[11..].contains(['\n', '\r', '\u{2028}', '\u{2029}']);
-    if !pattern {
-        return Err(invalid_result(
-            call,
-            field,
-            "an ISO timestamp with a timezone",
-        ));
-    }
-    if !date_time_parses(value) {
-        return Err(invalid_result(call, field, "a valid ISO timestamp"));
-    }
-    Ok(())
-}
-
-/// The ECMAScript date-time string format after a `YYYY-MM-DDT` prefix,
-/// as V8's `Date.parse` ranges it.
-fn date_time_parses(value: &str) -> bool {
-    let number = |s: &str| -> Option<u32> {
-        (s.len() == 2 && s.bytes().all(|b| b.is_ascii_digit()))
-            .then(|| s.parse().ok())
-            .flatten()
-    };
-    let (month, day) = (number(&value[5..7]), number(&value[8..10]));
-    if !matches!(month, Some(1..=12)) || !matches!(day, Some(1..=31)) {
-        return false;
-    }
-    let time = &value[11..];
-    let (clock, zone) = match time.strip_suffix('Z') {
-        Some(clock) => (clock, None),
-        None => {
-            let (clock, zone) = time.split_at(time.len() - 6);
-            (clock, Some(zone))
-        }
-    };
-    if let Some(zone) = zone {
-        if !matches!(number(&zone[1..3]), Some(0..=23))
-            || !matches!(number(&zone[4..6]), Some(0..=59))
-        {
-            return false;
-        }
-    }
-    let (clock, fraction) = match clock.split_once('.') {
-        Some((clock, fraction)) => (clock, Some(fraction)),
-        None => (clock, None),
-    };
-    if let Some(fraction) = fraction {
-        if fraction.is_empty() || !fraction.bytes().all(|b| b.is_ascii_digit()) {
-            return false;
-        }
-    }
-    let parts: Vec<&str> = clock.split(':').collect();
-    let fields: Option<Vec<u32>> = parts.iter().map(|p| number(p)).collect();
-    let Some(fields) = fields else {
-        return false;
-    };
-    let (hour, minute, second) = match fields[..] {
-        [hour, minute] if fraction.is_none() => (hour, minute, 0),
-        [hour, minute, second] => (hour, minute, second),
-        _ => return false,
-    };
-    let fraction_zero = fraction.is_none_or(|f| f.bytes().all(|b| b == b'0'));
-    let end_of_day = hour == 24 && minute == 0 && second == 0 && fraction_zero;
-    (hour <= 23 || end_of_day) && minute <= 59 && second <= 59
+    crate::wallet::substrates::result_values::timestamp::validate(value, call, field)
+        .map_err(Into::into)
 }
 
 #[cfg(test)]

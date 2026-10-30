@@ -4,8 +4,10 @@
 
 use super::{boundary::unsafe_key, invalid, key_order, Result};
 use indexmap::IndexMap;
+#[cfg(feature = "http")]
 use num_traits::ToPrimitive;
 use serde_json::value::RawValue;
+#[cfg(feature = "http")]
 use std::ops::Range;
 
 const MAX_BYTES: usize = 256 * 1024 * 1024;
@@ -26,6 +28,7 @@ enum Kind<'a> {
 }
 
 struct Node<'a> {
+    #[cfg(feature = "http")]
     range: Range<usize>,
     kind: Kind<'a>,
     keys_valid: bool,
@@ -39,6 +42,7 @@ struct Walk {
 }
 
 struct Frame<'a> {
+    #[cfg(feature = "http")]
     start: usize,
     kind: Kind<'a>,
     key: Option<String>,
@@ -46,9 +50,10 @@ struct Frame<'a> {
 }
 
 impl<'a> Frame<'a> {
-    fn new(start: usize, opener: u8) -> Self {
+    fn new(_start: usize, opener: u8) -> Self {
         Self {
-            start,
+            #[cfg(feature = "http")]
+            start: _start,
             kind: if opener == b'{' {
                 Kind::Object(IndexMap::new())
             } else {
@@ -63,12 +68,13 @@ impl<'a> Frame<'a> {
         }
     }
 
-    fn finish(mut self, end: usize) -> Node<'a> {
+    fn finish(mut self, _end: usize) -> Node<'a> {
         if let Kind::Object(fields) = &mut self.kind {
             fields.sort_by(|a, _, b, _| key_order(a).cmp(&key_order(b)));
         }
         Node {
-            range: self.start..end,
+            #[cfg(feature = "http")]
+            range: self.start.._end,
             kind: self.kind,
             keys_valid: self.keys_valid,
         }
@@ -108,6 +114,7 @@ impl<'a> Frame<'a> {
     }
 }
 
+#[cfg(feature = "http")]
 enum Part<'a> {
     Node(usize, bool),
     Raw(&'a str),
@@ -115,7 +122,8 @@ enum Part<'a> {
     Text(&'static str),
 }
 
-pub(in crate::wallet::substrates::http_json) struct Snapshot<'a> {
+pub(in crate::wallet::substrates) struct Snapshot<'a> {
+    #[cfg(feature = "http")]
     text: &'a str,
     // Children are indices, so even destruction has no recursive stack use.
     nodes: Vec<Node<'a>>,
@@ -188,7 +196,11 @@ impl<'a> Snapshot<'a> {
                 frame.push(member);
             }
         }
-        let snapshot = Self { text, nodes };
+        let snapshot = Self {
+            #[cfg(feature = "http")]
+            text,
+            nodes,
+        };
         snapshot.check(call)?;
         Ok(snapshot)
     }
@@ -279,7 +291,8 @@ impl<'a> Snapshot<'a> {
 
     /// Normalize only token spellings and historical bytes. Ignored values stay
     /// raw: Infinity and arbitrary JSON depth need no serde Value representation.
-    pub(in crate::wallet::substrates::http_json) fn normalized(&self) -> String {
+    #[cfg(feature = "http")]
+    pub(in crate::wallet::substrates) fn normalized(&self) -> String {
         let Some(root) = self.nodes.len().checked_sub(1) else {
             return self.text.to_owned();
         };
@@ -300,6 +313,7 @@ impl<'a> Snapshot<'a> {
         output
     }
 
+    #[cfg(feature = "http")]
     fn enqueue<'b>(
         &'b self,
         index: usize,
@@ -338,6 +352,7 @@ impl<'a> Snapshot<'a> {
         }
     }
 
+    #[cfg(feature = "http")]
     fn object_parts<'b>(fields: &'b IndexMap<String, Member<'a>>, pending: &mut Vec<Part<'b>>) {
         pending.push(Part::Text("}"));
         // The final value stays in the original key slot, as in JSON.parse.
@@ -354,6 +369,7 @@ impl<'a> Snapshot<'a> {
         }
     }
 
+    #[cfg(feature = "http")]
     fn write_raw(&self, text: &str, reference: &[(Range<usize>, String)], output: &mut String) {
         let start = text.as_ptr() as usize - self.text.as_ptr() as usize;
         if let Some((_, value)) = reference
@@ -381,6 +397,7 @@ impl<'a> Snapshot<'a> {
         }
     }
 
+    #[cfg(feature = "http")]
     fn reference_edit(&self, edits: &mut Vec<(Range<usize>, String)>) {
         use base64::{engine::general_purpose, Engine};
         let Some(Node {
@@ -447,6 +464,7 @@ fn historical_field(name: &str) -> bool {
     )
 }
 
+#[cfg(feature = "http")]
 fn integer_token(token: &str) -> Option<String> {
     if token != "-0" && !token.contains(['.', 'e', 'E']) {
         return None;

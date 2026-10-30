@@ -129,6 +129,111 @@ on an archived `9bcbe433`, the six accepted-key/token tests are RED because
 the tip incorrectly reports `Invalid point`; the two lock-after pins and
 the original five tests are already green. All 13 tests pass after the
 fold. The RED scratch copy uses its own target directory and is removed.
+### Fixed: wire client validates returned wallet facts (#487)
+
+A wire wallet answer could be decoded successfully while violating the
+reference's result contract. The nine client validation sites now share the
+HTTP JSON substrate's `result_values` rows. The reference is
+`ts-stack@edf6e03 WalletWireTransceiver.ts:227,320,665,837,910,1093,1438,1551,1618`;
+`WalletResultValidation.ts:2179–2363` dispatches to the action checks at
+:1013–1374, output checks at :2080–2162, linkage checks at :2165–2173,
+certificate checks at :1477–1537/:1800–1916, and the global snapshot at
+:623–821. The old and new consumer verdicts below apply to answers that
+violate the named row, with otherwise sufficient framing. The wire bytes
+and returned values of a conforming wallet are unchanged.
+
+The toolbox's result table (every new refusal is an uncoded client
+`Error::WalletError`; a wallet's own error-frame codes are unchanged):
+
+| Row / answer constraint | Old verdict | New verdict / recorded words |
+| R03 03 global graph budget | Accepted | Refused: `Invalid listOutputs result object graph: expected a bounded result` |
+| R04 04 response byte budget | Accepted | Refused: `Wallet Wire response exceeds the maximum permitted size` |
+| R14 14 canonical signature | Accepted | Refused: `Invalid createSignature result signature: expected a canonical DER-encoded ECDSA signature` |
+| R28 28 action beef | Accepted | Refused: `Invalid signAction result tx: expected a complete, exactly framed BEEF transaction` |
+| R31 31 exclusive signable | Accepted | Refused: `Invalid createAction result signableTransaction: expected exclusive of txid and tx` |
+| R32 32 nonempty reference | Accepted | Refused: `Invalid createAction result signableTransaction.reference: expected 1+ UTF-8 bytes` |
+| R33 33 deferred or completed | Accepted | Refused: `Invalid createAction result signableTransaction: expected the requested deferred-signing transaction` |
+| R34 34 signed txid | Accepted | Refused: `Invalid signAction result txid: expected the completed signed transaction` |
+| R35 35 request source evidence | Accepted | Refused: `Invalid createAction result request.inputBEEF: expected an exactly framed BEEF envelope` |
+| R36 36 requested version lock time | Accepted | Refused: `Invalid createAction result tx.version: expected the requested transaction version` |
+| R37 37 unique inputs | Accepted | Refused: `Invalid createAction result tx.inputs[1]: expected a unique transaction input outpoint` |
+| R38 38 requested inputs | Accepted | Refused: `Invalid createAction result tx.inputs: expected every requested input exactly once` |
+| R39 39 requested outputs | Accepted | Refused: `Invalid createAction result tx.outputs: expected every requested output with its requested amount and script` |
+| R40 40 source values | Accepted | Refused: `Invalid signAction result tx.inputs[0].sourceSatoshis: expected source transaction evidence for every completed transaction input` |
+| R41 41 value conservation | Accepted | Refused: `Invalid createAction result tx.outputs: expected a total value no greater than the transaction inputs` |
+| R42 42 requested spends | Accepted | Refused: `Invalid signAction result tx.inputs[1]: expected the requested input index` |
+| R43 43 change subject | Accepted | Refused: `Invalid createAction result noSendChange[0]: expected an outpoint of the returned transaction` |
+| R44 44 submitted batch | Accepted | Refused: `Invalid signAction result sendWithResults[1].txid: expected a unique transaction` |
+| R45 45 transaction evidence | Accepted | Refused: `Invalid createAction result txid: expected present with tx` |
+| R46 46 action outcome | Accepted | Refused: `Invalid createAction result outcome: expected a transaction, signable transaction, or batch-send result` |
+| R49 49 requested page limit | Accepted | Refused: `Invalid listOutputs result limit: expected an integer from 0 to 10000` |
+| R62 62 output beef | Accepted | Refused: `Invalid listOutputs result BEEF: expected a complete, exactly framed BEEF envelope` |
+| R63 63 requested output beef | Accepted | Refused: `Invalid listOutputs result BEEF: expected the requested complete output transactions` |
+| R64 64 unique outputs | Accepted | Refused: `Invalid listOutputs result outputs[1].outpoint: expected a unique output in the result page` |
+| R66 66 output commitments | Accepted | Refused: `Invalid listOutputs result outputs[0].satoshis: expected the amount committed by BEEF` |
+| R67 67 output metadata | Accepted | Refused: `Invalid listOutputs result outputs[0].tags[0]: expected 1–300 UTF-8 bytes` |
+| R68 68 output filters | Accepted | Refused: `Invalid listOutputs result outputs[0].tags: expected the explicitly requested output tags` |
+| R74 74 signed certificate | Accepted | Refused: `Invalid acquireCertificate result certificate: expected a canonical signed wallet certificate` |
+| R75 75 entire certificate bound | Accepted | Refused: `Certificate binary must be a byte array of at most 16777216 bytes` |
+| R76 76 certificate filters | Accepted | Refused: `Invalid listCertificates result certificates[0].certifier: expected one of the requested certifiers` |
+| R77 77 keyring values | Accepted | Refused: `Invalid listCertificates result certificates[0].keyring.name: expected 1+ UTF-8 bytes` |
+| R83 83 acquired certificate | Accepted | Refused: `Invalid acquireCertificate result certificate.type: expected the requested certificate type` |
+| R84 84 partial certificate binding | Accepted | Refused: `Invalid acquireCertificate result certificate.fields: expected the requested certificate fields` |
+| R85 85 proof keyring | Accepted | Refused: `Invalid proveCertificate result keyringForVerifier.name: expected 1+ UTF-8 bytes` |
+| R86 86 revealed fields | Accepted | Refused: `Invalid proveCertificate result keyringForVerifier: expected exactly the requested certificate fields` |
+| R88 88 request snapshot | Accepted | Refused: `Wallet result request records must contain only safe string keys` |
+
+The CLI's result table (the same local error payload; it is not a new wallet
+error code and does not mean the wallet refused before acting):
+
+| Result facts | Old client behavior | New client behavior |
+| Action R28/R31–46 | Returned decoded action | Refuses invalid BEEF, outcome/evidence coupling, input/output/spend bindings, change/batch membership, source values or conservation |
+| Output R49/R62–68 | Returned decoded page | Refuses overlarge requested limit, malformed/missing BEEF, duplicate outputs, missing metadata, mismatched committed values/scripts or requested tag query |
+| Crypto R14 | Returned arbitrary signature bytes | Refuses >72 bytes or noncanonical DER/scalars; permits high S |
+| Certificate R74–77/R83–86 | Returned decoded certificate/map | Refuses unsigned/out-of-range signatures, oversized whole certificates, wrong certifier/type/partial fields, empty keyring values or incorrect revealed field set |
+| Boundary R03/R04/R88 | Returned decoded answer | Refuses aggregate graph/byte budgets, >256 MiB response frames and malformed binding snapshots |
+| Linkage R15–21 | #406 checks | Identical words and verdicts, shared implementation |
+| Numeric/page rows | #473 checks | Identical reader words; all four totals remain u32 |
+
+Migration: a wire wallet's answer that broke one of these rows was accepted
+before; callers now receive the recorded client error. Fix the wallet's
+answer or handle that error. Validation does not establish broadcast success,
+chain proof, or cryptographic verification of a certificate signature.
+
+The JSON view costs one serialization and snapshot scan per site. Action
+results parse each present BEEF once; listOutputs parses BEEF once and reuses
+its output index; createAction parses request inputBEEF once when capturing
+source values. All other sites do zero BEEF parses. The typed wire reader
+has not already parsed any of these BEEFs, and the original result is returned
+without a second serde decode or wire write. Existing HTTP tests and rows
+stay in place. ISO checks and the processor's linkage/signature checks now
+share these rows as well. No new dependency or public type change.
+
+The full typed / #473 / new census is in `src/wallet/substrates/CLAUDE.md`.
+The pin also validates discovery at :1796/:1842, outside the nine sites
+specified for this issue; those gaps, and rows for calls with no such
+reference return-site validation, remain explicit there. The 36 new-row tests
+in `tests/wallet_wire_result_validation_487.rs` consume #408's recorder mode
+`http_json_result_values_408.mjs --wire-487`. Complete recordings, expanded
+frame SHA-256 identities and RED/green evidence accompany the lane REPORT.
+Request-only R35/R49/R88 witnesses use the reference snapshot/result pipeline
+because argument validation would otherwise mask the result predicate.
+The whole-response and certificate-reader caps keep their reader words.
+
+### Notes: cross-SDK parity
+
+Go `2ca481c` has no equivalent client result-validation pass: its wire client
+returns `serializer.Deserialize*Result` directly
+(`wallet/substrates/wallet_wire_transceiver.go:49,63,119,155,167,227,251,263,275`).
+The deserializers read fields and check parsing/completeness
+(`wallet/serializer/create_action_result.go:50–106`,
+`sign_action_result.go:25–51`, `list_outputs.go:130–191`), without binding
+those facts to the request or checking BEEF commitments/conservation.
+Go does parse signature DER at `serializer/create_signature.go:90–107`;
+this is a typed-read check, not the shared result pass. Rust follows the
+TypeScript client at the enumerated sites. The keeper's 2026-10-26 ruling
+on #467 keeps all four totals `u32` at every layer; reference safe integers
+above that range remain a stated representation difference.
 
 ### Fixed: four older LocalKVStore request/result differences (#478)
 
