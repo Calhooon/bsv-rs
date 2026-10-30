@@ -40,11 +40,21 @@ fuzz_target!(|data: &[u8]| {
     };
     if mode & 1 == 0 {
         let response = futures::executor::block_on(processor().process_message(rest));
-        // The processor encodes every failure into its response frame.
-        assert!(
-            response.is_ok(),
-            "the processor returned an Err: {response:?}"
-        );
+        if rest.len() > 256 * 1024 * 1024 {
+            // #505: the transport's size refusal precedes error framing.
+            assert_eq!(
+                response,
+                Err(Error::WalletError(
+                    "Wallet Wire request exceeds the maximum permitted size".into()
+                ))
+            );
+        } else {
+            // In-bound failures still use the processor's response frame.
+            assert!(
+                response.is_ok(),
+                "the processor returned an Err: {response:?}"
+            );
+        }
     } else {
         let Some((&call, answer)) = rest.split_first() else {
             return;
