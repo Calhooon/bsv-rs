@@ -36,7 +36,8 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
-| `verify.rs` | The existing SPV graph walk and `Transaction::verify_with_chain_params`, sharing fee/value/proof/resource behavior and the per-transaction sighash cache |
+| `verify.rs` | The existing SPV graph walk and chain-parameter variants, sharing fee/value/proof/resource behavior and the per-transaction sighash cache; singular work-budget methods keep their signatures, plural `verify_with_work_budgets` / `verify_with_chain_params_and_work_budgets` accept `WorkBudget` and charge each transaction's inputs in order (#519) |
+| `work_budget.rs` | `WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`, both `None` by default, adjacent `with_work_budget` / `with_transaction_work_budget` builders; common input accounting and transaction-total charge (#519) |
 | `verification_flags.rs` | Checks tip + 1, then calls `ChainParams::word_for_input(Word::Standard, ...)`; the public resolver owns the no-tip latest-era rule and returns `NotJudgedCause`, never a script failure (#452, #520) |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
@@ -48,7 +49,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants; `BeefTx::from_reader` reads one entry (no BEEF reader calls it since #86); `tx_mut` makes the transaction the entry's only reading (#171): the bytes and txid it was read with dropped, the BUMP index kept, `input_txids` refreshed (`refresh`) by the BEEF's next whole-BEEF reader, which re-keys the index; `has_txid` checks an index hit, so a renamed entry is not found by its old txid |
 | `beef_stream.rs` | The streaming reader: `BeefDecoder` (and its collect mode, the whole reader's parser), `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`, `SpendRefusal` (its `Display` beside the enum, one sentence per arm, the texts pinned in `tests/beef_stream.rs`'s `a_spend_refusal_prints_*`, #213); the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
 | `beef_stream/reason.rs` | The refusal's names, `Kind` (twenty-six, `Kind::ALL`; `LeftDuplicateBelow` since #167's re-read) and `Reason`, re-exported from `beef_stream`; both `#[non_exhaustive]` (#86, #167): a `match` outside the crate ends in a wildcard arm |
-| `beef_stream/budget.rs` | The readers' `set_work_limit`, `with_work_budget` and `set_memory_limit` (#373, #378); budgets remain local and absent from cursors |
+| `beef_stream/budget.rs` | The readers' `set_work_limit`, adjacent `with_work_budget` / `with_transaction_work_budget`, `work_spent` total and `set_memory_limit` (#373, #378, #519); limits remain local and absent from cursors; BSC5 carries charged work across input pauses; `Verdict::work_spent` exposes the total from a transaction-budget cause |
 | `beef_stream/evaluation.rs` | Local `Evaluation { work, memory, chain }`, `with_chain_params` on sync/async readers and `verify_stream_two_pass_with_chain_params`; no caller-made word or era resolver |
 | `beef_stream/spends.rs` | In-order/deferred input checks, only referenced source scripts retained, one shared sighash cache; source heights from the verified BUMP index; scope refusals are `SpendRefusal::NotJudged { input, cause }` before script parsing/execution (#452) |
 | `beef_stream/deferred.rs` | What the stream holds for a parent not read yet (#240): `HeldTx` (a transaction's index entry, its raw bytes dropped), `TxFields` (one fold for a transaction read in order and one released), `Deferred` (the held entries by offset, the txids each waits on, the ready ones, the bytes held; no bound; `unresolved`, what the end refuses), the index's and the reader's sides of the release (`BeefIndex::held_for_a_parent`, `BeefIndex::release_one`, `Judge::release_next`, one per step; `AsyncStreamVerifier::release_all`, every released one at once), `write_held` and `read_held` (a BSC4 cursor's held entries) |
@@ -70,7 +71,7 @@ Existing `verify` and `verify_with_chain_params` default to `None`. The referenc
 The bound lives in `SpendParams::work_limit` (also `TxSpendParams`), passed anew
 for each input by the whole-transaction evaluator and by
 `StreamVerifier::set_work_limit` / `with_work_budget` (the async reader too).
-There is one counter: `Spend::charge_work` in `src/script/spend/limits.rs`, one
+The interpreter counter is `Spend::charge_work` in `src/script/spend/limits.rs`, one
 unit per reached opcode plus bytes hashed, including double-hash intermediates
 and uncached sighash midstates. Charges precede the work; `work_done` is work
 already charged, not the next refused charge. Each input gets the entire budget;
@@ -84,7 +85,24 @@ The bound is a service door's policy, never a consensus rule. Each captain names
 its value in the door's brief beside the sibling's memory policy rows. A work
 counter cannot interrupt one arithmetic opcode, so elapsed time needs an
 external bound. Stream budgets are local configuration, absent from cursors and
-reapplied after every resume. See `tests/transaction_work_budget_378.rs`.
+reapplied after every resume. `WorkBudget` adds `per_transaction` beside
+`per_input` (both `Option<u64>`), with `with_work_budget` and
+`with_transaction_work_budget` builders. The plural whole-transaction methods
+accept this type. Stream readers add the same transaction builder and expose
+`work_spent()` for the current or most recently evaluated transaction. Each
+input's spent work is charged after evaluation, in input order, and the total
+resets per transaction. A total strictly above its bound yields
+`TransactionWorkBudgetExceeded { input, limit, total }`; the cause and
+`Verdict::work_spent()` expose the crossing total. Other verdicts return `None`
+from that accessor; successful totals are available on the reader. A per-input
+refusal keeps its class even if its charged work also passes the total bound.
+The total is checked after an input, never inside one: the crossing input runs
+under `per_input` alone (unbounded without it), so a door passes both bounds.
+BSC5 cursors preserve charged totals; limits are still reapplied. Old unmetered
+cursors replay their prefix when a budget is introduced. The toolbox deletes
+its door-side sum and passes the transaction limit; the CLI adds the new
+not-judged row. See `tests/transaction_work_budget_378.rs` and
+`tests/transaction_work_budget_519.rs`.
 
 ## Core Types
 

@@ -8,8 +8,12 @@ The work budget is the same per-input counter on `SpendParams::work_limit`,
 `Spend::charge_work` reserves each reached opcode and hash-byte charge before
 execution. The verifier maps its `ScriptResource::Work` decline to
 `NotJudgedCause::WorkBudgetExceeded { input, budget, work_done }`; `work_done` is
-`Spend::work_spent()`, excluding the refused charge. No second counter or
-consensus work rule is introduced. Each live door chooses and documents its
+`Spend::work_spent()`, excluding the refused charge. The transaction verifier
+adds each input's charged work to a running total in input order (#519), under
+`WorkBudget { per_input, per_transaction }`, both `Option<u64>`. Crossing the
+transaction bound is `TransactionWorkBudgetExceeded { input, limit, total }`,
+including the crossing input's work. The per-input refusal stays unchanged;
+there is no consensus work rule. Each live door chooses and documents its
 policy value beside the memory row; an arithmetic opcode still needs an
 external elapsed-time bound.
 ## Overview
@@ -43,7 +47,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding (one buffer per encoding, exactly one byte reserved for the sign; fixed chunks written without per-limb Vec growth checks, #378; the decode reads the sign with the magnitude, no negated copy: #348) |
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging; `ScriptResource`, `ScriptResourceLimit` and its `Display`, the one place the resource sentences live (#228) |
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
-| `not_judged.rs` | `NotJudgedCause` under `block`: typed height/activation facts and `WorkBudgetExceeded { input: u32, budget: u64, work_done: u64 }`, shared by verifier refusals; one sentence per cause (#452, #378). The cause stays 24 bytes and `Error` 56 on 64-bit targets. |
+| `not_judged.rs` | `NotJudgedCause` under `block`: typed height/activation facts, `WorkBudgetExceeded { input: u32, budget: u64, work_done: u64 }` and `TransactionWorkBudgetExceeded { input: u32, limit: u64, total: u64 }`, shared by verifier refusals; one sentence per cause (#452, #378, #519). The latter prints `exceeded transaction work budget {limit} units after {total} units of work.` The non-exhaustive cause stays 24 bytes and `Error` 56 on 64-bit targets. |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError`; `check` names the missing flag, explains that a word without it is not implemented and lists all three required flags: SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS (#453). A word's mandatory fork-ID and strict encoding checks would otherwise differ from the node; default mode can compute the original digest without FORKID (#429). The file remains 872 lines |
 | `input_flags.rs` | Under `block`, `Word::{Standard, Block}` and `ChainParams::word_for_input` expose typed refusals and own the no-tip latest-era rule (#520); the private `checked_input_script_flags` composes spend-era flags plus source-era UTXO bits, shared with the unchanged `input_script_flags` API (#440) |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |

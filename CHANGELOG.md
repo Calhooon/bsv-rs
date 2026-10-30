@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: per-transaction work budgets (#519)
+
+`transaction::WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`
+is one local policy type for both bounds. Its adjacent `with_work_budget` and
+`with_transaction_work_budget` builders set each bound independently; both
+default to `None`. `StreamVerifier` and `AsyncStreamVerifier` retain their
+existing `with_work_budget(Option<u64>)` and add the adjacent
+`with_transaction_work_budget(Option<u64>)`. Whole-transaction callers pass the
+type to `Transaction::verify_with_work_budgets` or
+`verify_with_chain_params_and_work_budgets`; the existing singular methods and
+their `Option<u64>` signatures remain available.
+
+Each evaluated input's `Spend::work_spent()` is added after its evaluation, in
+input order, to that transaction's running total. A total strictly above the
+transaction bound stops verification before the next input with
+`NotJudgedCause::TransactionWorkBudgetExceeded { input: u32, limit: u64, total: u64 }`:
+the crossing input, the transaction limit, and the charged total including that
+input. The crossing input runs under its per-input bound alone, so a refused
+transaction's work is at most the limit plus one input's charge; with no
+per-input bound that input is unbounded, and a door passes both. This is additive under `NotJudgedCause`'s existing `#[non_exhaustive]`.
+The cause's Display is
+`exceeded transaction work budget {limit} units after {total} units of work.`;
+the existing wrappers still prefix the transaction and/or input once. `Error`
+remains `Clone + PartialEq + Eq`, measured at 56 bytes on 64-bit targets;
+`NotJudgedCause` remains 24 bytes.
+
+`StreamVerifier::work_spent()` and `AsyncStreamVerifier::work_spent()` expose
+the current or most recently evaluated transaction's running total, including
+work before a refusal. A transaction-budget `Verdict::NotJudged` exposes the
+total in its cause and through `Verdict::work_spent() -> Option<u64>`; other
+verdicts have no stored total and return `None`. Accepted totals remain available
+on the stream verifier. The existing whole-transaction `Result<bool>` and
+verdict variant fields are unchanged. Totals reset for each unproven
+transaction, including ancestors and deferred transactions. A proof or
+structure-only read spends no work. A transaction-only bound enables the same
+interpreter accounting; existing per-input, memory and script refusals keep
+their classes. Counters saturate at `u64::MAX`; overflow also exceeds a
+configured transaction bound, so wrapping cannot admit work.
+
+Local limits remain absent from cursors and must be reapplied after resume.
+Metered cursors use BSC5 to retain the transaction and total already charged,
+including pauses in deferred transactions. BSC2/BSC3/BSC4 remain readable and
+unmetered cursors retain their bytes. Applying a budget to an old or unmetered
+cursor replays the transaction prefix so prior work cannot evade its bound.
+
+Migration for the toolbox: **delete the door-side sum and pass the transaction
+limit** alongside the per-input limit, both `Some(1 << 31)` under its current
+policy. The sum described in toolbox #487 and bsv-rs #519 is now owned by this
+verifier. The keeper's [2026-10-30 18:12Z ruling](https://github.com/Calhooon/bsv-rs/issues/519#issuecomment-6530114206)
+sets the two-bound type, the cause's fields and the minor-release classification.
+
+| Consumer table | Before | New not-judged cause and migration |
+|---|---|---|
+| Toolbox doors and signer | `WorkBudgetExceeded { input, budget, work_done }` per input; doors sum input work themselves | Keep the per-input row; add `TransactionWorkBudgetExceeded { input, limit, total }`, delete the sum, and pass the transaction limit. No invalid-transaction verdict is implied. |
+| CLI verification/error table | Existing scope and per-input work causes, wildcard for future causes | Add the transaction-work row, showing the crossing input, limit and total. Its Display uses the sentence above, through the existing `TransactionNotJudged`/`NotJudged` wrappers. |
+
+`tests/transaction_work_budget_519.rs` pins the 68/6/8-unit inputs crossing 70
+at input 1 with total 74, exact/ample bounds, independent limits, refusal
+precedence, accounting without a per-input bound, cursor round trips, ancestors,
+deferred ordering and unchanged error sizes. The beta.4 reproduction returned
+`Ok(true)` and `Valid` with every input green. The existing #378 witnesses also
+remain unchanged.
+
+The transaction-parser fuzz target also parses and rewrites cursors, covering
+the BSC5 accounting state with the required parser run.
+
+### Notes: cross-SDK parity (#519)
+
+This is the keeper's local evaluator policy, not a new consensus rule or an
+elapsed-time bound. The reference's `Transaction.verify` has only the optional
+memory limit at `ts-stack@edf6e03`, `Transaction.ts:1685-1697`, and evaluates
+inputs in their existing order at `:1441-1458`; Go at `2ca481c` adds no matching
+work-budget API. Unconfigured callers retain that unbounded behavior.
+
 ### Added: a public typed input-word resolver (#520)
 
 `script::Word::{Standard, Block}` and

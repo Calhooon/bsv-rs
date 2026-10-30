@@ -13,7 +13,7 @@ Each target's assertion is "returns, never panics"; the column says where a targ
 |---|---|---|---|
 | `fuzz_base58` | Base58, Base58Check, hex, Base64 decoding | encode then decode is the input | a WIF, an address, hex, Base64 |
 | `fuzz_script_parser` | `Script::from_binary`, `from_hex`; the type detectors, `to_asm` | | `script_valid.json`'s locking scripts |
-| `fuzz_transaction_parser` | `Transaction::from_binary`, sighash `parse_transaction`, `MerklePath::from_binary` | | `tx_valid.rs`, `bigtx.rs` |
+| `fuzz_transaction_parser` | `Transaction::from_binary`, sighash `parse_transaction`, `MerklePath::from_binary`, `Cursor::from_binary` (including BSC5 work totals, #519) | transaction, merkle path and cursor serialization/reparse | `tx_valid.rs`, `bigtx.rs` |
 | `fuzz_beef_parser` | the two entry points, `Beef::from_binary` then `verify_structure` and `verify_stream_structure` under the leading roots, which must agree (accepted with the same roots, or refused with the same kind and offset), an input written ahead of its parent refused by both (bsv-rs#86); `Beef::from_binary` against the hinted parse; the streaming reader under no headers (no root accepted), then under headers that carry every root (`verify_stream_structure` and `verify_stream`, so the reader walks past the BUMPs to the later doors); `find_atomic_transaction` on every subject, `verify_valid`, `from_beef`, `from_atomic_beef` | the hinted and the plain parse agree | the Lean's 47 rows (`tests/vectors/beef_of_any_size/`), the cross-SDK BEEFs, `atomic-beef.json`, and one seed per refusal this crate's `Kind` names (the Lean's `Reason` in `BeefOfAnySize.lean`, and `DuplicateOffset` and `LeftDuplicateBelow` ahead of their constructors there, bsv-rs#86, #167; `LeftDuplicateBelow` by a written door, no byte mutation reaching it: all 26 reached, `corpus-gen` prints the census) |
 | `fuzz_chain_primitives` | `BlockHeader`, CompactSize, `ChainWork`, `CompactTarget`, `merkle_root` | header and work round trips | the genesis header |
 | `fuzz_wire_protocol` | `WireReader`'s field readers and `InternalizeOutput`'s JSON intake, including null remittances (#393); #473 adds action/output/spend/insertion/result-array readers and in-memory height/page/create/sign/prove response reads via `support/wire_bounds_473.rs`; #487 adds signature/certificate/list and both linkage calls through `support/wire_results_487.rs`; #495 adds both discovery answers, completing all eleven result-validation paths | | the wallet-wire vectors' parameters; #393's null-remittance vector can seed the JSON intake |
@@ -56,6 +56,7 @@ Tests transaction-level parsing:
 - `bsv_rs::primitives::bsv::sighash::parse_transaction`: low-level sighash transaction parser
 - `bsv_rs::transaction::Transaction::from_binary`: full transaction parsing with roundtrip via `to_binary`, `id()`, and `to_hex()`
 - `bsv_rs::transaction::MerklePath::from_binary`: Merkle path parsing with roundtrip via `to_binary()`
+- `bsv_rs::transaction::Cursor::from_binary`: cursor parsing and serialization/reparse, including BSC5 charged work (#519)
 
 ### fuzz_wire_protocol
 

@@ -4,6 +4,7 @@ use std::io::{Read, Seek, SeekFrom};
 
 use crate::block::ChainParams;
 use crate::script::{NotJudgedCause, ScriptFlags};
+use crate::transaction::WorkBudget;
 
 use super::{
     referenced_outpoints, AsyncStreamVerifier, ChainTip, Hash32, Headers, StreamError,
@@ -12,14 +13,14 @@ use super::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Evaluation {
-    pub(super) work: Option<u64>,
+    pub(super) work: WorkBudget,
     pub(super) memory: Option<usize>,
     pub(super) chain: Option<ChainParams>,
 }
 
 impl Evaluation {
     pub(super) const NONE: Self = Self {
-        work: None,
+        work: WorkBudget::NONE,
         memory: None,
         chain: None,
     };
