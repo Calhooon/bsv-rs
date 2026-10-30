@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: discovery wire answers receive the reference's result validation (#495)
+
+Both discovery calls now apply the shared `result_values` rows after their
+typed wire read, in the reference's order. The deciding sites are
+`ts-stack@edf6e03 WalletWireTransceiver.ts:1796-1800,1842-1846`;
+`WalletResultValidation.ts:2288-2292` dispatches to `:1844-1916`, with
+certificate validation at `:1477-1536`, page checks at `:1919-1938`, and
+attribute matching at `:1577-1755`. This completes the two sites outside
+#487's nine. The calls and discovery reader live in `wire/discovery.rs` to
+keep `transceiver.rs` below its line ceiling. The shared implementation
+validates metadata without a JSON round trip of byte fields or another
+BEEF parse; it returns the original typed answer. The wire bytes, public
+types, and all four `u32` totals are unchanged (the keeper's #467 ruling).
+
+For the toolbox's and the CLI's verdict tables, every new refusal below is
+an uncoded `Error::WalletError`. Let `C` be the discovery call name and `i`
+the certificate index. The table gives the exact new words; the old verdict
+is for a frame whose other rows pass.
+
+| Row / discovery answer | Old verdict | New verdict / words |
+|---|---|---|
+| R03, either call: aggregate object graph exceeds the shared snapshot budget | Accepted | `Invalid C result object graph: expected a bounded result` |
+| R74, either call: empty signature or DER scalar outside 1..n−1 | Accepted | `Invalid C result certificates[i]: expected a canonical signed wallet certificate` |
+| R76, identity call: certificate subject differs from the requested identity key | Accepted | `Invalid discoverByIdentityKey result certificates[i].subject: expected the requested identity key` |
+| R79, either call: certifier name outside 1–100 UTF-8 bytes | Accepted | `Invalid C result certificates[i].certifierInfo.name: expected 1–100 UTF-8 bytes` |
+| R79, either call: icon URL outside 1–500 UTF-8 bytes, or not absolute HTTP(S) | Accepted | `Invalid C result certificates[i].certifierInfo.iconUrl: expected 1–500 UTF-8 bytes` or `Invalid C result certificates[i].certifierInfo.iconUrl: expected an absolute HTTP(S) URL` |
+| R79, either call: certifier description outside 5–50 UTF-8 bytes | Accepted | `Invalid C result certificates[i].certifierInfo.description: expected 5–50 UTF-8 bytes` |
+| R80, either call: empty publicly revealed keyring value | Accepted | `Invalid C result certificates[i].publiclyRevealedKeyring.name: expected 1+ UTF-8 bytes` (`name` is the actual field key) |
+| R81, attributes call: `any` fails the reference's public-text search | Accepted | `Invalid discoverByAttributes result certificates[i].decryptedFields: expected a match for the requested any attribute` |
+| R82, attributes call: named attribute absent or mismatched; no usable requested attribute | Accepted | `Invalid discoverByAttributes result certificates[i].decryptedFields.name: expected the requested public attribute` (`name` is the requested key), or `Invalid discoverByAttributes result certificates[i].decryptedFields: expected a usable requested attribute` |
+
+Certificate identifier/key/outpoint forms, safe map keys and string values,
+certificate size, trust 1–10, and page/count bounds already have typed or
+wire-reader checks. Optional certificate `keyring` and `verifier` are absent
+from discovery frames. List-only certifier/type filters do not apply to
+these calls. Attribute search uses the same shared predicate as HTTP:
+`any` excludes `profilePhoto`/`icon`, uses fuzzy matching for two characters
+and English token/phrase/negative-term matching otherwise; named searches
+ignore blank values, normalize `userName` for exact matching, and match
+other fields' literal tokens in order within a line.
+
+`tests/wallet_wire_discovery_validation_495.rs` adds one regression test per
+newly enforced inventory row (39 recorded refusals), plus accepting tests
+for both calls (14 identity frames and 28 attribute frames). The
+extended #487 recorder (`http_json_result_values_408.mjs --wire-495`) writes
+the requests, response frames, hashes, values and reference refusals under
+Node 22.18.0; two runs are byte-identical. All seven regression tests fail
+on base `c32f7e235b3e53c2b66328453692ac23147d12c6` because those frames are
+accepted; both accepting tests pass there. The substrate's tests are
+unchanged. Existing wire tests now distinguish a reader accepting empty
+metadata from the transceiver rejecting it, and bind their requests and writer-built page fixtures to each other.
+The shared vector files are unchanged. The fuzz harness also exercises both discovery
+result paths.
+The per-row typed / bounds / formerly-unchecked census is in the Wire
+column of `src/wallet/substrates/CLAUDE.md`.
+
+Go at `2ca481c` calls `DeserializeDiscoverCertificatesResult` directly
+(`wallet/substrates/wallet_wire_transceiver.go:290-313`), without this
+request-bound result-validation pass. The reference client's behavior is
+the deciding rule (owner's ruling (c), 2026-10-26).
+
+Migration: a wire wallet's discovery answer that broke one of the nine rows was
+accepted before and is now refused with the reference's words as an uncoded
+`WalletError`; no public type or method changes. A `wallet` build without
+`http` now compiles the three crates named under Notes, with no code change.
+
+### Notes
+
+Dependencies (#495): `wallet` now enables the optional `url`, `regex` and
+`unicode-normalization` dependencies. `url` retains its default features and
+uses WHATWG parsing followed by a scheme check, as the reference's
+`WalletResultValidation.ts:1001-1011` does. `regex` disables default features
+and enables only `std` (runtime synchronization), `unicode-bool` (the grammar's
+Dash, Pattern_Syntax, Quotation_Mark, Terminal_Punctuation and White_Space
+properties) and `unicode-gencat` (`Mn`); no other Unicode tables or optional
+performance engines are needed by these fixed patterns.
+
+The sorted normal-dependency tree for wasm32 with
+`--no-default-features --features "wallet,transaction,wasm"`, measured against
+archived base `c32f7e23`, adds 33 crates and removes none: `displaydoc`,
+`form_urlencoded`, `icu_collections`, `icu_locale_core`, `icu_normalizer`,
+`icu_normalizer_data`, `icu_properties`, `icu_properties_data`, `icu_provider`,
+`idna`, `idna_adapter`, `litemap`, `percent-encoding`, `potential_utf`, `regex`,
+`regex-automata`, `regex-syntax`, `smallvec`, `stable_deref_trait`,
+`synstructure`, `tinystr`, `tinyvec`, `unicode-normalization`, `url`,
+`utf8_iter`, `writeable`, `yoke`, `yoke-derive`, `zerofrom`, `zerofrom-derive`,
+`zerotrie`, `zerovec`, and `zerovec-derive`. A wasm downstream building
+`wallet` without `http` now compiles these crates; it needs no code change.
+The ratchet's pinned library lock adds only the same direct `url` edge;
+all locked dependency versions are unchanged.
+
 ### Fixed: refuse oversized wallet wire requests before transmission (#496)
 
 `WalletWireTransceiver` now refuses a complete request frame above 256 MiB

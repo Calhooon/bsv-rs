@@ -10,7 +10,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) and its unique-key rule for both discovery readers (`set_unique_record_entry`, #192), the signature calls' data-type flag writer (#199), the key-related parameters' and privileged pair's writers (#193), the certificate pages' limit and total checks (`require_page_capacity`, `assert_page_count`, #190), the discovery maps' one reading for both readers (`read_discovery_maps`, `read_counted_wire_record`: strict count, key 1 to 50 bytes and safe, unique) and listActions' satoshis in the reference's bound (`read_action_satoshis`, #236), the certificate checks the readers and the writer share (`require_compressed_key`, the field-name and DER checks, #189); the u32 field readers and `integer_refusal` (`#requireInteger`'s words, `WalletWireTransceiver.ts:2018-2025`, every integer bound's; #255) | ~600 |
-| `result_validation.rs` | #487 metadata snapshots and borrowed typed byte fields into the shared result rows; request (#496), response and whole-certificate bounds | ~105 |
+| `result_validation.rs` | #487/#495 metadata snapshots and borrowed typed byte fields into the shared result rows; request (#496), response and whole-certificate bounds | 105 |
 | `bounds.rs` | #473 pre-entry collection checks (maximum before available bytes), unsigned satoshi range/precision, getHeight precision/trailing/range, and listActions/listOutputs page readers; generic string-array/map codecs keep their existing behavior | ~144 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
 | `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support; basic reads and `wire_length` in `reader.rs` (#458), every byte length through `wire_length`/`read_length`, compared with the bytes remaining before it is narrowed to `usize` (#192); `certificate_bytes`, the certificate writers' one body: the reference's checks and three bounds, the fields in the signed order (#189, #246) | ~2412 |
@@ -21,7 +21,8 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | `validation.rs` | The processor's `validateWalletArgs` and `validateWalletResult` (`ts-stack@edf6e03` `validationHelpers.ts`, `WalletResultValidation.ts`) for the wired calls, in the reference's words: an argument refused code 6 (`WERR_INVALID_PARAMETER`), a result refused code 1; `Refusal` (the code and the words a frame carries); getHeaderForHeight's height in `#requireInteger`'s words (#216); the two linkage calls' raw keys judged as points and their args built, revealSpecificKeyLinkage's absent counterparty refused (#226); the error-to-frame conversion (`From<Error> for Refusal`, `explicit_wallet_code`: a `WalletRefusal`'s or `AbortAccepted`'s class's `wire_code`; `wire_message` keeps its message, #137, #439); all nine cryptographic argument validators and canonical DER predicate shared with `../validation/crypto.rs` (#415, #420); the five remaining validators moved there, the wire wrappers preserving their existing refusal texts; specific linkage takes its required counterparty from the shared validator, removing the unreachable second refusal (#427) | ~599 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191), the keys 33 raw bytes in a private request type for validation to judge (#226); for verifyHmac, the 32 raw HMAC bytes ahead of the data, and for createSignature and verifySignature, the data-type flag (`1` the data, `2` the hash, another refused), verifySignature's signature ahead of it (#199); the seven key-related calls' requests whole, the privileged pair inside the key-related parameters and seekPermission last, getPublicKey's identityKey byte ahead, and `assert_request_consumed`, a byte after the last field refused (#193) | ~308 |
 | `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194); for encrypt, decrypt, createHmac and createSignature, the bytes alone, and for verifyHmac, verifySignature and waitForAuthentication, nothing after the error byte, a false verdict an error frame (#197); abortAction's, the error byte alone or a refusal framed code 8 (#206) | ~148 |
-| `transceiver.rs` | Client-side message serialization: the complete request frame above 256 MiB refused after building and before any transport allocation or send, uncoded `WalletError("Wallet Wire request exceeds the maximum permitted size")`, at-cap sent (`WalletWireTransceiver.ts:95-133`, `WalletWire.ts:9` at `ts-stack@edf6e03`; #496); getHeight and the two action/output pages delegate to `bounds.rs` (#473); noSendChange and proveCertificate keyrings checked before entries; 26 of the 28 methods (the two linkage calls in `linkage.rs`); an error frame coded 2 to 8 read as `WalletRefusal` with its class (`frame_error`, #137); originator validated before constructing a frame, normalized length checked without a truncating cast (#338); internalizeAction always validates before encoding, so the unreachable missing-payment refusal and empty-insertion fallback are removed (#393; the two `*_guard_precedes_encoding_and_sending` tests) | 1604 |
+| `transceiver.rs` | Client-side message serialization: the complete request frame above 256 MiB refused after building and before any transport allocation or send, uncoded `WalletError("Wallet Wire request exceeds the maximum permitted size")`, at-cap sent (`WalletWireTransceiver.ts:95-133`, `WalletWire.ts:9` at `ts-stack@edf6e03`; #496); getHeight and the two action/output pages delegate to `bounds.rs` (#473); noSendChange and proveCertificate keyrings checked before entries; 24 of the 28 methods (linkage in `linkage.rs`, discovery in `discovery.rs`); an error frame coded 2 to 8 read as `WalletRefusal` with its class (`frame_error`, #137); originator validated before constructing a frame, normalized length checked without a truncating cast (#338); internalizeAction always validates before encoding, so the unreachable missing-payment refusal and empty-insertion fallback are removed (#393; the two `*_guard_precedes_encoding_and_sending` tests) | 1495 |
+| `discovery.rs` | Both discovery calls, the existing typed/page reader, and the #495 shared result pass at reference :1796/:1842, enabled by `wallet` on native and wasm without `http`; no byte-field JSON round trip or BEEF parse | 117 |
 | `linkage.rs` | The transceiver's revealCounterpartyKeyLinkage and revealSpecificKeyLinkage (#406), the reference's request and answer (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790-924`): the arguments judged before a byte is sent and the answer after it is read (each key a point, the level 0 to 2, no trailing byte, then the result bound to the request), the processor's `validation.rs` checks reused | ~205 |
 
 ## Architecture
@@ -351,9 +352,9 @@ u32 cast (`serializer/list_actions.go:255,282`, `list_outputs.go:149`,
 `get_height.go:18`; `util/reader.go:123-125`). Its string-slice guard is
 `math.MaxInt`, not these collection limits (`util/reader.go:263-275`).
 
-### Shared client result validation (#487)
+### Shared client result validation (#487, #495)
 
-At the nine enumerated `ts-stack@edf6e03 WalletWireTransceiver.ts` sites,
+At the eleven `ts-stack@edf6e03 WalletWireTransceiver.ts` sites,
 `result_validation.rs` snapshots request bindings before the await and calls
 `substrates::result_values` on the typed answer: the byte fields as slices
 (`result_values/wire.rs`), the metadata alone serialized for the shared JSON
@@ -372,6 +373,8 @@ The existing wire frame/reader refusals retain their own reference words.
 | acquireCertificate :1438 | Certificate reader | Shared signed-certificate and partial-request rows; no BEEF |
 | listCertificates :1551 | Certificate/page/keyring readers | Shared certificate/filter/keyring rows per entry; no BEEF |
 | proveCertificate :1618 | Counted map, no key/value/set checks | Shared keyring/field-set rows; reference safe unique key reader; no BEEF |
+| discoverByIdentityKey :1796 | Typed certificate/metadata/maps, trust and page bounds | #495 shared signed certificate, subject binding, certifier metadata, public keyring and graph rows; no BEEF |
+| discoverByAttributes :1842 | Same typed readers | #495 shared certificate/metadata/map/graph rows, then any/named attribute binding; no BEEF |
 
 Every site serializes the metadata alone (byte fields as `[]` stand-ins) for
 the shared predicates and reads the byte fields on the slice; the request's
@@ -382,16 +385,22 @@ whole-response limit is checked before decoding (`T:110–123`); the 16 MiB
 certificate limit now includes the prefix (`Certificate.ts:86–92,329–330`).
 `tests/wallet_wire_result_validation_487.rs` embeds only recorder-produced
 frames and expansion recipes: 43 tests (the 36 new-row tests, group 0's 48
-accepting frames, the three argument refusals before sending, the two #183
+accepting frames, the four argument refusals before sending, the two #183
 pins); the heap pin is in `tests/memory_profiling.rs`. The complete R01–R88 census,
 including the typed / #473 / newly enforced distinctions and gaps outside
-these nine calls, is the Wire column of `../substrates/CLAUDE.md`.
+these eleven calls, is the Wire column of `../substrates/CLAUDE.md`.
 
-The pin has two additional discovery result calls at :1796/:1842; they are
-outside the nine specified for #487 and their remaining validation gaps are
-listed in the census. All four totals remain `u32`; the keeper's #467 ruling
+The two discovery result calls at :1796/:1842 now share that pass (#495),
+with nine tests in `tests/wallet_wire_discovery_validation_495.rs`: seven
+new-row regressions RED on the base, and accepting frames for each call green
+on both base and tip (14 identity and 28 attribute accepting frames). The #487 recorder has a `--wire-495` mode; two runs
+produce identical bytes, hashes, values and refusal words. The shared
+certificate rows run before identity binding, metadata, maps and attribute
+matching, as at `WalletResultValidation.ts:1844-1916`. Existing reader
+refusals retain their order and words. The source metadata has no byte-array
+fields to round-trip and the returned object is unchanged. All four totals remain `u32`; the keeper's #467 ruling
 is unchanged. The Go client at `2ca481c` calls result deserializers directly
-(`wallet/substrates/wallet_wire_transceiver.go:49,63,119,155,167,227,251,263,275`),
+(`wallet/substrates/wallet_wire_transceiver.go:49,63,119,155,167,227,251,263,275,299,311`),
 without this request-bound result pass, and sends the R35, R49 and R88
 arguments without checking them (`wallet_wire_transceiver.go:38-50`), where
 this crate refuses them before sending as the TypeScript client does. Its

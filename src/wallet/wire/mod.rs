@@ -76,6 +76,7 @@ mod bounds;
 mod calls;
 #[cfg(feature = "tracing")]
 mod diagnostics;
+mod discovery;
 mod encoding;
 mod linkage;
 mod originator;

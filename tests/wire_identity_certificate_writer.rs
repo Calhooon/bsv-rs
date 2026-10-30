@@ -92,7 +92,7 @@ fn discovery_frame(cert: &IdentityCertificate) -> Vec<u8> {
     frame
 }
 
-async fn discovered(frame: Vec<u8>) -> DiscoverCertificatesResult {
+async fn discovered(frame: Vec<u8>) -> Result<DiscoverCertificatesResult, Error> {
     let args = DiscoverByIdentityKeyArgs {
         identity_key: G.to_string(),
         limit: None,
@@ -102,7 +102,6 @@ async fn discovered(frame: Vec<u8>) -> DiscoverCertificatesResult {
     WalletWireTransceiver::new(CannedWire { body: frame })
         .discover_by_identity_key(args, Some("fixtures.invalid"))
         .await
-        .unwrap()
 }
 
 fn var_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
@@ -114,7 +113,7 @@ fn var_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
 #[tokio::test]
 async fn an_identity_certificate_the_writer_writes_reads_through_the_transceiver() {
     let cert = identity_certificate();
-    let read = discovered(discovery_frame(&cert)).await;
+    let read = discovered(discovery_frame(&cert)).await.unwrap();
     assert_eq!(read.total_certificates, 1);
     assert_eq!(json(&read.certificates[0]), json(&cert));
 }
@@ -185,7 +184,8 @@ fn the_shared_discovery_vector_entry_is_the_writers_bytes() {
 /// Every member of an entry is required by the type, as the reference's
 /// `IdentityCertificate` has it (#105): the certifier info always written,
 /// an empty iconUrl or description the empty string, an empty map a count
-/// of 0, and the transceiver reads them back as it reads the reference's.
+/// of 0. The reader decodes these members; since #495 the transceiver then
+/// refuses the empty name in the shared result validation.
 #[tokio::test]
 async fn an_identity_certificate_with_empty_members_writes_empty_strings_and_counts() {
     let certifier = IdentityCertifier {
@@ -210,11 +210,15 @@ async fn an_identity_certificate_with_empty_members_writes_empty_strings_and_cou
     reference.extend_from_slice(&[0, 0, 0, 1, 0, 0]);
     assert_eq!(bytes, reference);
 
-    let read = discovered(discovery_frame(&cert)).await;
-    let entry = &read.certificates[0];
+    let entry = bsv_rs::wallet::wire::WireReader::new(&bytes)
+        .read_identity_certificate()
+        .unwrap();
     assert_eq!(json(&entry.certifier_info), json(&certifier));
     assert!(entry.publicly_revealed_keyring.is_empty());
     assert!(entry.decrypted_fields.is_empty());
+    assert_eq!(discovered(discovery_frame(&cert)).await.unwrap_err(), Error::WalletError(
+        "Invalid discoverByIdentityKey result certificates[0].certifierInfo.name: expected 1–100 UTF-8 bytes".into()
+    ));
 }
 
 /// A keyring value crosses as its raw bytes, so one that is not base64 is

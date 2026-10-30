@@ -20,7 +20,6 @@ mod bytes;
 mod certificate;
 #[path = "result_values/certificates.rs"]
 mod certificates;
-#[cfg(feature = "http")]
 #[path = "result_values/identity.rs"]
 mod identity;
 #[path = "result_values/lists.rs"]

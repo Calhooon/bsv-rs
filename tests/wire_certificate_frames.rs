@@ -293,10 +293,17 @@ async fn a_certificate_discovered_by_identity_key_reads_as_the_reference_writes_
         (reference_certificate(), "https://certifier.invalid/icon"),
         (reference_certificate(), ""),
     ] {
-        let read = client(discovery_frame(&cert, icon_url))
+        let result = client(discovery_frame(&cert, icon_url))
             .discover_by_identity_key(args.clone(), Some("fixtures.invalid"))
-            .await
-            .unwrap();
+            .await;
+        if icon_url.is_empty() {
+            // #495: the reader accepts an empty string, then the shared row refuses it.
+            assert_eq!(result.unwrap_err(), Error::WalletError(
+                "Invalid discoverByIdentityKey result certificates[0].certifierInfo.iconUrl: expected 1–500 UTF-8 bytes".into()
+            ));
+            continue;
+        }
+        let read = result.unwrap();
         assert_discovered(&read, icon_url);
         assert_codec_reads(&cert, &read.certificates[0].certificate);
     }
@@ -305,7 +312,8 @@ async fn a_certificate_discovered_by_identity_key_reads_as_the_reference_writes_
 #[tokio::test]
 async fn a_certificate_discovered_by_attributes_reads_as_the_reference_writes_it() {
     let args = DiscoverByAttributesArgs {
-        attributes: map(&[("name", "Fixture")]),
+        // #495 binds the request to the decrypted fields carried by this frame.
+        attributes: map(&[("role", "reader")]),
         limit: None,
         offset: None,
         seek_permission: None,
@@ -315,10 +323,16 @@ async fn a_certificate_discovered_by_attributes_reads_as_the_reference_writes_it
         (reference_certificate(), "https://certifier.invalid/icon"),
         (reference_certificate(), ""),
     ] {
-        let read = client(discovery_frame(&cert, icon_url))
+        let result = client(discovery_frame(&cert, icon_url))
             .discover_by_attributes(args.clone(), Some("fixtures.invalid"))
-            .await
-            .unwrap();
+            .await;
+        if icon_url.is_empty() {
+            assert_eq!(result.unwrap_err(), Error::WalletError(
+                "Invalid discoverByAttributes result certificates[0].certifierInfo.iconUrl: expected 1–500 UTF-8 bytes".into()
+            ));
+            continue;
+        }
+        let read = result.unwrap();
         assert_discovered(&read, icon_url);
         assert_codec_reads(&cert, &read.certificates[0].certificate);
     }
@@ -330,7 +344,7 @@ async fn a_certificate_discovered_by_attributes_reads_as_the_reference_writes_it
 async fn the_shared_discovery_vector_reads_through_the_transceiver() {
     let (json, wire) = vector("discoverByIdentityKey-simple-result.json");
     let args = DiscoverByIdentityKeyArgs {
-        identity_key: G.to_string(),
+        identity_key: json["certificates"][0]["subject"].as_str().unwrap().into(),
         limit: None,
         offset: None,
         seek_permission: None,

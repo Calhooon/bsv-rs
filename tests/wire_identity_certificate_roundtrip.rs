@@ -131,8 +131,8 @@ fn an_identity_certificate_the_writer_writes_reads_back_through_the_reader() {
 /// this crate's refuses to, #183) is refused by the reader as the transceiver
 /// refuses it, in the same words: trust 0 is outside the reference's 1 to 10
 /// (`WalletWireTransceiver.ts:1710`, `:2018-2025`; bsv-rs#247). The same
-/// bytes at trust 1 read as the transceiver reads them: empty strings and
-/// empty maps, the members being required (bsv-rs#105).
+/// bytes at trust 1 decode to empty strings and maps (bsv-rs#105); the
+/// transceiver then refuses the empty name in its shared result pass (#495).
 #[tokio::test]
 async fn the_zero_value_entry_is_refused_as_the_transceiver_refuses_it() {
     let words = "Invalid discovery trust: expected an integer from 1 to 10, received 0";
@@ -159,7 +159,12 @@ async fn the_zero_value_entry_is_refused_as_the_transceiver_refuses_it() {
     assert_eq!(json(&entry.certifier_info), json(&empty));
     assert!(entry.publicly_revealed_keyring.is_empty());
     assert!(entry.decrypted_fields.is_empty());
-    assert_eq!(json(&discovered(&bytes).await.unwrap()), json(&entry));
+    assert_eq!(
+        discovered(&bytes).await.map(drop),
+        Err(Error::WalletError(
+            "Invalid discoverByIdentityKey result certificates[0].certifierInfo.name: expected 1–100 UTF-8 bytes".into()
+        ))
+    );
 }
 
 /// The shared vector's entry (the bytes TS and Go exchange) reads to the
