@@ -82,6 +82,14 @@
         {
           "reference": "UlJSUlJSUlI="
         }
+      ],
+      "get_public_key_json": [
+        "{\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}",
+        "{\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\",\"forSelf\":false}"
+      ],
+      "create_action_description": "Update alpha in kvstore",
+      "create_action_output_descriptions": [
+        "Key-value token"
       ]
     },
     {
@@ -155,7 +163,12 @@
         {
           "reference": "UlJSUlJSUlI="
         }
-      ]
+      ],
+      "get_public_key_json": [
+        "{\"protocolID\":[2,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"self\"}"
+      ],
+      "create_action_description": "Remove alpha in kvstore",
+      "create_action_output_descriptions": []
     },
     {
       "kind": "global",
@@ -239,6 +252,13 @@
         {
           "reference": "UlJSUlJSUlI="
         }
+      ],
+      "get_public_key_json": [
+        "{\"protocolID\":[1,\"kvstore\"],\"keyID\":\"alpha\",\"counterparty\":\"anyone\",\"forSelf\":true}"
+      ],
+      "create_action_description": "Update KVStore value for alpha",
+      "create_action_output_descriptions": [
+        "KVStore token"
       ]
     },
     {
@@ -317,7 +337,10 @@
         {
           "reference": "UlJSUlJSUlI="
         }
-      ]
+      ],
+      "get_public_key_json": [],
+      "create_action_description": "Remove KVStore value for alpha",
+      "create_action_output_descriptions": []
     }
   ],
   "original_errors_477": {
@@ -794,6 +817,32 @@
         "stage": "createAction",
         "bytes": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
         "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      }
+    ]
+  },
+  "token_search": {
+    "site": "LocalKVStore.ts:538-551 (verbatim search and error wrapper)",
+    "cases": [
+      {
+        "name": "nonzero",
+        "transaction": "01010101c9955b6687e5d9bba973264d9ab307ca519aa6e44603785ba465e220dcc29e550100beef000201000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010a000000000000000151000000000001000000013ac29411c5029a2c64db52da6c169dcf4ae5ad5027e521307e485126840754620000000000ffffffff0302000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d01000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d010000000000000001510000000000",
+        "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d",
+        "outpoint": "559ec2dc20e265a45b780346e4a69a51ca07b39a4d2673a9bbd9e587665b95c9.1",
+        "error": null
+      },
+      {
+        "name": "none",
+        "transaction": "0101010107ce300a59691eeb0d5ae6494aa67a041cde28075dba6fbe2699fbb4b0990adb0100beef000201000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010a000000000000000151000000000001000000013ac29411c5029a2c64db52da6c169dcf4ae5ad5027e521307e485126840754620000000000ffffffff0202000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d010000000000000001510000000000",
+        "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d",
+        "outpoint": null,
+        "error": "There are 0 outputs with tag alpha that cannot be unlocked. Original error: Final transaction does not contain one unique KVStore token"
+      },
+      {
+        "name": "two",
+        "transaction": "010101011eee08112292ae2d4386aa1d7208c355ddd4ed31e3cff270832d6659c294646e0100beef000201000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010a000000000000000151000000000001000000013ac29411c5029a2c64db52da6c169dcf4ae5ad5027e521307e485126840754620000000000ffffffff0402000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d01000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d01000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d010000000000000001510000000000",
+        "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac0374776f46304402204de29162bfcbe59ce3db1da5f61824f83ae22c0d2b50c8c30b8a2ca57ef191470220492fb7ba6cbf7230bb9ef6922542a947c2947118cb3cf8dd15a951931249dd1c6d",
+        "outpoint": null,
+        "error": "There are 0 outputs with tag alpha that cannot be unlocked. Original error: Final transaction does not contain one unique KVStore token"
       }
     ]
   }

@@ -1230,18 +1230,28 @@ async fn test_local_kvstore_set_wallet_error() {
 
 #[tokio::test]
 async fn test_local_kvstore_set_with_options() {
-    let wallet = MockWallet::new();
-    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
-
-    let opts = KVStoreSetOptions::new()
-        .with_description("Test set operation")
-        .with_token_amount(50)
-        .with_tags(vec!["test".to_string()]);
-
-    let result = store
-        .set("key_with_opts", "value_with_opts", Some(opts))
-        .await;
-    assert!(result.is_ok());
+    for amount in [1, 50] {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+        let opts = KVStoreSetOptions::new()
+            .with_description("Test set operation")
+            .with_token_amount(amount)
+            .with_tags(vec!["test".to_string()]);
+        let result = store
+            .set("key_with_opts", "value_with_opts", Some(opts))
+            .await;
+        if amount == 1 {
+            assert!(result.is_ok());
+        } else {
+            // #478: the reference's completed-token search requires one satoshi.
+            assert_eq!(
+                result.unwrap_err(),
+                Error::KvStoreLocalError(
+                    "There are 0 outputs with tag key_with_opts that cannot be unlocked. Original error: Final transaction does not contain one unique KVStore token".into()
+                )
+            );
+        }
+    }
 }
 
 // =============================================================================

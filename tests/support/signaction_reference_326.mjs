@@ -32,6 +32,9 @@
 // The store writes the accepted tokens; the SDK's PushDrop writer signs the
 // malformed tag witnesses (which GlobalKVStore.set itself refuses to write).
 // No token bytes or signatures are constructed by hand.
+// #478 extends --kvstore-local-454 with key requests, descriptions and the
+// exact local token-search block. Also pass --local-source followed by the
+// archived packages/sdk/src/kvstore/LocalKVStore.ts used to build the bundle.
 //
 // The randomness is #310's SHA-256 counter stream, installed before the SDK
 // loads, so two runs print the same file. The wallet is the ProtoWallet of the
@@ -185,7 +188,8 @@ if (process.argv.includes('--kvstore-local-454')) {
   const { recordLocal454 } = await import('./kvstore_local_454.mjs')
   await emit(JSON.stringify(await recordLocal454({
     recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
-    LookupResolver, Transaction, Beef, Script, Utils, WalletError,
+    LookupResolver, Transaction, Beef, Script, Utils, WalletError, PushDrop,
+    localSource: process.argv[process.argv.indexOf('--local-source') + 1],
     resetCounter () { counter = 0 }
   }), null, 2))
   process.exit(0)

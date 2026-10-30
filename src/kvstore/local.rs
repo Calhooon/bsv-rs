@@ -16,6 +16,8 @@ mod actions;
 mod listing;
 #[path = "local_lookup.rs"]
 pub(super) mod lookup;
+#[path = "local_outpoint.rs"]
+mod outpoint;
 #[path = "local_token.rs"]
 mod token;
 use super::types::{

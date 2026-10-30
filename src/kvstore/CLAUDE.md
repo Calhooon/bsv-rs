@@ -16,17 +16,18 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
-| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 534 |
+| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 536 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
-| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath (one current token per key plus one written during the first round); #479 and #483 both stated reference divergences | 197 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #478: reference descriptions and unique-token result; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath (one current token per key plus one written during the first round); #479 and #483 both stated reference divergences | 194 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
 | `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction for lookup and action wrappers (#477) | 305 |
-| `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454) | 46 |
+| `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478) | 46 |
+| `local_outpoint.rs` | Exactly one completed output with 1 satoshi and the new script; reference refusal words (#478) | 19 |
 | `local_list.rs` | Existing convenience listing, separated to keep functions below the size limit | 78 |
 
 ## Key Exports
@@ -688,6 +689,26 @@ including four fault families and real malformed BEEF/action replies. The
 #326 `--kvstore-local-454` recorder adds 60 injected and six malformed cases;
 the original four action records are unchanged. The parsers' pre-existing word
 differences are stated in the #477 changelog parity note.
+
+### Local request words and token index (#478)
+
+At `ts-stack@edf6e03`, `LocalKVStore.ts:487-492` uses the `PushDrop.ts:151-163`
+default `forSelf: false`. Removal says `Remove {key} in {context}` (`:416`)
+and the output says `Key-value token` (`:527`). After the bound action, set
+searches the completed outputs for exactly one with 1 satoshi and the new
+locking script, returning its actual index (`:538-546`). Zero or multiple
+matches fail with `Final transaction does not contain one unique KVStore token`
+inside the existing authenticated-count/key wrapper (`:547-551`). Basket
+metadata does not participate in this transaction search. The optional
+non-default amount does not change the reference's one-satoshi predicate.
+`tests/kvstore_local_divergences_478.rs` pins all four behaviors, including
+nonzero/zero/two matches after a bound two-satoshi request at index zero.
+The #326 recorder's `--kvstore-local-454 --local-source <archived LocalKVStore.ts>`
+mode adds the previously unrecorded requests/descriptions and isolates the
+reference's verbatim search/wrapper on SDK-written transactions. No earlier
+recorded request or script changes. No public shape changes or remaining
+difference for these four items; callers update text matches and use the
+returned index, handling the existing wrapped search refusal.
 
 ### Empty removal page (#479)
 
