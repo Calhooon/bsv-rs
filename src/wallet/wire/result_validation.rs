@@ -1,4 +1,4 @@
-//! The nine client result-validation sites in WalletWireTransceiver.ts (#487).
+//! The eleven client result-validation sites in WalletWireTransceiver.ts (#487, #495).
 //! The existing BRC-100 serde forms borrow the typed answer for the shared
 //! validator; returning the original value preserves every public field.
 

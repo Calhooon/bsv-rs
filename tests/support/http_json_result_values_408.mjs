@@ -11,17 +11,19 @@ import { pathToFileURL } from 'node:url'
 import { extend432 } from './http_json_pending_432.mjs'
 
 if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
-if (process.argv[2] === '--wire-487') {
+if (['--wire-487', '--wire-495'].includes(process.argv[2])) {
+  const issue = process.argv[2] === '--wire-495' ? '495' : '487'
   const { recordWire487 } = await import('./wire_result_validation_487.mjs')
   const sdk = await import(pathToFileURL(process.argv[3]).href)
-  const recording = await recordWire487(sdk)
+  const recording = await recordWire487(sdk, issue === '495')
   writeFileSync(process.argv[4], JSON.stringify(recording, null, 2) + '\n')
   if (process.argv[5]) {
     const path = process.argv[5]
-    const source = readFileSync(path, 'utf8').split('// BEGIN RECORDED #487')[0]
+    const source = readFileSync(path, 'utf8').split(`// BEGIN RECORDED #${issue}`)[0]
     const rows = new Set(Array.from(source.matchAll(/row!\([^,]+, (\d+)\)/g), m => Number(m[1])))
+    if (issue === '495') rows.add(0)
     const embedded = { source: recording.source, node: recording.node, rows: recording.rows.filter(c => rows.has(c.row)) }
-    writeFileSync(path, source + '// BEGIN RECORDED #487\nconst RECORDING: &str = r####"' + JSON.stringify(embedded) + '"####;\n')
+    writeFileSync(path, source + `// BEGIN RECORDED #${issue}\nconst RECORDING: &str = r####"` + JSON.stringify(embedded) + '"####;\n')
   }
   process.exit(0)
 }

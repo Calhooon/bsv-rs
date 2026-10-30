@@ -1219,7 +1219,10 @@ fn list_page(total: u64, entries: usize) -> Vec<u8> {
 }
 
 fn discovery_page(total: u64, entries: usize) -> Vec<u8> {
-    let one = discovery_frame(&Parts::valid().bytes(), 5, &[0], &[0]);
+    // #495: keep these page-bound witnesses conforming to their attribute request.
+    let mut decrypted = WireWriter::new();
+    decrypted.write_string_map(&IndexMap::from([("name".to_string(), "x".to_string())]));
+    let one = discovery_frame(&Parts::valid().bytes(), 5, &[0], decrypted.as_bytes());
     page(&one, total, entries)
 }
 

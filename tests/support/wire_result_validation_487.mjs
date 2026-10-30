@@ -6,35 +6,60 @@
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
-export async function recordWire487(sdk) {
+export async function recordWire487(sdk, discovery = false) {
   const { Utils, Certificate, WalletWireTransceiver } = sdk
   const source = JSON.parse(readFileSync(new URL('../vectors/http_json_result_values_408.json', import.meta.url)))
-  const calls = new Set(['createAction', 'signAction', 'listOutputs', 'createSignature',
+  const calls = new Set(discovery ? ['discoverByIdentityKey', 'discoverByAttributes'] : ['createAction', 'signAction', 'listOutputs', 'createSignature',
     'revealCounterpartyKeyLinkage', 'revealSpecificKeyLinkage', 'acquireCertificate',
     'listCertificates', 'proveCertificate'])
   const status = { unproven: 0, sending: 1, failed: 2 }
-  const candidates = source.cases.filter(c => calls.has(c.call) && !c.expansion && (!c.mode || c.group === 'row_35') && !c.headers && !c.status)
-  // A result with >1M graph entries but every individual collection within
-  // the wire's 100,000-entry limit. The stored frame is a repetition recipe.
-  candidates.push({ name: 'row_3_listOutputs_graph', group: 'row_3', call: 'listOutputs',
-    args: { basket: 'fixtures' }, bodyText: JSON.stringify({ totalOutputs: 6,
-      outputs: Array.from({ length: 6 }, (_, i) => ({ outpoint: `${'33'.repeat(32)}.${i}`,
-        satoshis: 1, spendable: true, tags: Array(100000).fill('a'), labels: Array(100000).fill('a') })) }) })
+  const candidates = source.cases.filter(c => calls.has(c.call) && !c.expansion && (!c.mode || c.group === 'row_35' || (discovery && c.mode === 'result')) && !c.headers && !c.status)
   const acquired = source.cases.find(c => c.name === 'acquireCertificate_valid')
-  for (const signature of [undefined, Utils.toHex(JSON.parse(source.cases.find(c => c.name === 'createSignature_r_at_order').bodyText).signature)]) {
-    const value = JSON.parse(acquired.bodyText)
-    value.signature = signature
-    candidates.push({ ...acquired, name: 'row_74_acquireCertificate_' + signature, group: 'row_74', bodyText: JSON.stringify(value) })
-  }
-  const proof = source.cases.find(c => c.name === 'proveCertificate_valid')
-  const unsafeArgs = structuredClone(proof.args)
-  unsafeArgs.certificate.fields = JSON.parse('{"constructor":"AQ=="}')
-  candidates.push({ ...proof, name: 'row_88_proveCertificate_unsafe_request', group: 'row_88', args: unsafeArgs, mode: 'snapshot' })
-  for (const call of ['listOutputs', 'listCertificates']) {
-    const seed = source.cases.find(c => c.call === call && c.name === call + '_valid')
-    const field = call === 'listOutputs' ? 'outputs' : 'certificates'
-    candidates.push({ ...seed, name: `row_49_${call}_request_limit`, group: 'row_49', mode: 'result',
-      args: { ...seed.args, limit: 10001 }, bodyText: JSON.stringify({ [field]: [], [call === 'listOutputs' ? 'totalOutputs' : 'totalCertificates']: 0 }) })
+  if (!discovery) {
+    // A result with >1M graph entries but every individual collection within
+    // the wire's 100,000-entry limit. The stored frame is a repetition recipe.
+    candidates.push({ name: 'row_3_listOutputs_graph', group: 'row_3', call: 'listOutputs',
+      args: { basket: 'fixtures' }, bodyText: JSON.stringify({ totalOutputs: 6,
+        outputs: Array.from({ length: 6 }, (_, i) => ({ outpoint: `${'33'.repeat(32)}.${i}`,
+          satoshis: 1, spendable: true, tags: Array(100000).fill('a'), labels: Array(100000).fill('a') })) }) })
+    for (const signature of [undefined, Utils.toHex(JSON.parse(source.cases.find(c => c.name === 'createSignature_r_at_order').bodyText).signature)]) {
+      const value = JSON.parse(acquired.bodyText)
+      value.signature = signature
+      candidates.push({ ...acquired, name: 'row_74_acquireCertificate_' + signature, group: 'row_74', bodyText: JSON.stringify(value) })
+    }
+    const proof = source.cases.find(c => c.name === 'proveCertificate_valid')
+    const unsafeArgs = structuredClone(proof.args)
+    unsafeArgs.certificate.fields = JSON.parse('{"constructor":"AQ=="}')
+    candidates.push({ ...proof, name: 'row_88_proveCertificate_unsafe_request', group: 'row_88', args: unsafeArgs, mode: 'snapshot' })
+    for (const call of ['listOutputs', 'listCertificates']) {
+      const seed = source.cases.find(c => c.call === call && c.name === call + '_valid')
+      const field = call === 'listOutputs' ? 'outputs' : 'certificates'
+      candidates.push({ ...seed, name: `row_49_${call}_request_limit`, group: 'row_49', mode: 'result',
+        args: { ...seed.args, limit: 10001 }, bodyText: JSON.stringify({ [field]: [], [call === 'listOutputs' ? 'totalOutputs' : 'totalCertificates']: 0 }) })
+    }
+  } else {
+    // Exercise each discovery call's signed-certificate row and the same
+    // metadata/map predicates. Values are encoded only by the SDK writers.
+    for (const call of calls) {
+      const seed = source.cases.find(c => c.name === call + '_valid')
+      for (const signature of [undefined, Utils.toHex(JSON.parse(source.cases.find(c => c.name === 'createSignature_r_at_order').bodyText).signature)]) {
+        const value = JSON.parse(seed.bodyText)
+        value.certificates[0].signature = signature
+        candidates.push({ ...seed, name: `row_74_${call}_${signature}`, group: 'row_74', bodyText: JSON.stringify(value) })
+      }
+      if (call === 'discoverByAttributes') {
+        for (const candidate of source.cases.filter(c => c.call === 'discoverByIdentityKey' && ['row_79', 'row_80'].includes(c.group))) {
+          candidates.push({ ...candidate, name: candidate.name.replace('discoverByIdentityKey', call), call, args: seed.args })
+        }
+      }
+      const entry = JSON.parse(seed.bodyText).certificates[0]
+      entry.publiclyRevealedKeyring = Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`f${i}`, 'AQ==']))
+      entry.decryptedFields = Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`f${i}`, 'a']))
+      candidates.push({ ...seed, name: `row_3_${call}_graph`, group: 'row_3',
+        args: { ...seed.args, limit: 10000 },
+        bodyText: JSON.stringify({ totalCertificates: 10000, certificates: Array(10000).fill(entry) }),
+        repeatedCertificates: 10000 })
+    }
   }
   const rows = [], excluded = []
   const bytes = (value, encoding) => {
@@ -131,6 +156,21 @@ export async function recordWire487(sdk) {
         if (entry.keyring != null) record(w, entry.keyring)
         blob(w, entry.verifier ?? '', 'hex')
       }
+    } else if (call.startsWith('discoverBy')) {
+      if (!Number.isInteger(value.totalCertificates) || value.totalCertificates < 0 || value.totalCertificates > 0xffffffff) throw new Error('not a wire total')
+      if (!Array.isArray(value.certificates)) throw new Error('not certificates')
+      w.writeVarIntNum(value.totalCertificates)
+      for (const entry of value.certificates) {
+        const certificate = cert(entry); w.writeVarIntNum(certificate.length).write(certificate)
+        for (const name of ['name', 'iconUrl', 'description']) string(w, entry.certifierInfo[name])
+        if (!Number.isInteger(entry.certifierInfo.trust) || entry.certifierInfo.trust < 0 || entry.certifierInfo.trust > 255) throw new Error('not a trust byte')
+        w.writeUInt8(entry.certifierInfo.trust)
+        record(w, entry.publiclyRevealedKeyring)
+        const fields = entry.decryptedFields
+        if (fields == null || typeof fields !== 'object' || Array.isArray(fields)) throw new Error('not decrypted fields')
+        w.writeVarIntNum(Object.keys(fields).length)
+        for (const [key, value] of Object.entries(fields)) { string(w, key); string(w, value) }
+      }
     } else record(w, value.keyringForVerifier)
     return w.toArray()
   }
@@ -159,8 +199,15 @@ export async function recordWire487(sdk) {
       : c.group === 'signature' ? 14 : c.name === 'createAction_exclusive_signable' ? 31 : c.group === 'certificates' ? 74 : 0
     rows.push({ name: c.name, row, call: c.call, args: c.args,
       ...(!request ? { argument_side: true } : {}),
-      request_hex: request ?? null, frame_sha256: hash(response), ...compress(response), reference: error ?? { accepted: true } })
+      request_hex: request ?? null, frame_sha256: hash(response),
+      ...(c.repeatedCertificates ? { response_parts: [
+        { hex: Utils.toHex(response.slice(0, 4)), repeat: 1 },
+        { hex: Utils.toHex(response.slice(4, 4 + (response.length - 4) / c.repeatedCertificates)), repeat: c.repeatedCertificates }
+      ] } : compress(response)), reference: error ?? { accepted: true },
+      ...(discovery && value ? { value } : {}) })
   }
+  if (discovery) return { source: 'ts-stack@edf6e03', node: process.version,
+    recorder: 'http_json_result_values_408.mjs --wire-495', rows, excluded }
   // A complete WriterUint8Array frame one byte above the raw response cap.
   // Keep its repeated payload as a recipe, never a 512 MiB hex file.
   const cap = 256 * 1024 * 1024

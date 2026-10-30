@@ -1,9 +1,9 @@
-//! Complete the nine result-validation paths exercised by fuzz_wire_protocol.
+//! Complete the eleven result-validation paths exercised by fuzz_wire_protocol.
 use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver};
 
 pub async fn exercise<T: WalletWire>(client: &WalletWireTransceiver<T>) {
     // #473 already exercises createAction, signAction, listOutputs and proof.
-    for call in [12, 14, 15] {
+    for call in [12, 14, 15, 18, 19] {
         crate::support::call_shared!(client, call, None);
     }
     let _ = client

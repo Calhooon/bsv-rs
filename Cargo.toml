@@ -77,8 +77,11 @@ lazy_static = "1.4"
 
 # BIP-39's NFKD form of a mnemonic, a passphrase and a wordlist (optional, for compat)
 unicode-normalization = { version = "0.1", optional = true }
-# The HTTP wallet's identity query grammar and NFD folding (#432).
-regex = { version = "1", optional = true }
+# The shared wallet result identity grammar and NFD folding (#432, #495).
+regex = { version = "1", default-features = false, features = ["std", "unicode-bool", "unicode-gencat"], optional = true }
+# The HTTP(S) URL predicate shared by native and wasm wallet results (#495).
+# Already transitive through reqwest; direct so wallet does not need native HTTP.
+url = { version = "2", optional = true }
 
 # Insertion-ordered map (optional, for wallet): a requested certificate set's `types`, the
 # reference's `Record` order on the wire and in the signed text (bsv-rs#288), and the wallet
@@ -157,7 +160,7 @@ primitives = []
 script = ["primitives"]
 block = ["primitives"]
 transaction = ["script", "block"]
-wallet = ["transaction", "dep:indexmap"]
+wallet = ["transaction", "dep:indexmap", "dep:regex", "dep:unicode-normalization", "dep:url"]
 messages = ["wallet"]
 compat = ["primitives", "dep:unicode-normalization"]
 totp = ["primitives"]

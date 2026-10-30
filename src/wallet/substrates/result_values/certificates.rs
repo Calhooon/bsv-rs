@@ -1,6 +1,5 @@
 //! Certificate filters and proofs, WalletResultValidation.ts:1800-1916,2307-2363.
 
-#[cfg(feature = "http")]
 use super::identity;
 use super::{certificate, invalid, lists, member, record, scalars as s, Object, Result};
 use serde_json::{value::RawValue, Value};
@@ -141,7 +140,6 @@ pub(super) fn list(result: &Object<'_>, call: &str, request: &Value) -> Result<(
             s::key(Some(raw), call, &format!("{field}.verifier"))?;
         }
         if call != "listCertificates" {
-            #[cfg(feature = "http")]
             discovery(&cert, call, &field, request)?;
         }
     }
@@ -183,7 +181,6 @@ fn filters(cert: &Object<'_>, call: &str, field: &str, request: &Value) -> Resul
     Ok(())
 }
 
-#[cfg(feature = "http")]
 fn discovery(cert: &Object<'_>, call: &str, field: &str, request: &Value) -> Result<()> {
     let info_field = format!("{field}.certifierInfo");
     let info = record(member(cert, "certifierInfo"), call, &info_field)?;
@@ -201,7 +198,7 @@ fn discovery(cert: &Object<'_>, call: &str, field: &str, request: &Value) -> Res
         1,
         Some(500),
     )?;
-    if !reqwest::Url::parse(&icon).is_ok_and(|u| matches!(u.scheme(), "http" | "https")) {
+    if !url::Url::parse(&icon).is_ok_and(|u| matches!(u.scheme(), "http" | "https")) {
         return Err(invalid(
             call,
             &format!("{info_field}.iconUrl"),

@@ -4,9 +4,10 @@
 
 use super::{bytes::Fields, validate_with_bytes, Result};
 use crate::wallet::{
-    CreateActionResult, ListCertificatesResult, ListOutputsResult, Outpoint,
-    ProveCertificateResult, RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult,
-    SendWithResult, SignActionResult, WalletCertificate, WalletOutput,
+    CreateActionResult, DiscoverCertificatesResult, ListCertificatesResult, ListOutputsResult,
+    Outpoint, ProveCertificateResult, RevealCounterpartyKeyLinkageResult,
+    RevealSpecificKeyLinkageResult, SendWithResult, SignActionResult, WalletCertificate,
+    WalletOutput,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -252,6 +253,7 @@ macro_rules! metadata_only {
 metadata_only!(
     WalletCertificate,
     ListCertificatesResult,
+    DiscoverCertificatesResult,
     ProveCertificateResult
 );
 
