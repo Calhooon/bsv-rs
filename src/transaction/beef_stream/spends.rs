@@ -4,8 +4,11 @@
 use std::sync::Arc;
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
+use crate::script::{
+    LockingScript, NotJudgedCause, ScriptEvaluationError, Spend, TxSpendParams, UnlockingScript,
+};
 
+use super::budget::WorkSpent;
 use super::deferred::HeldInput;
 use super::{
     BeefIndex, ChainTip, Evaluation, Hash32, MiningCheck, Retained, SpendRefusal, Stop, TxFields,
@@ -22,7 +25,7 @@ struct InputCheck<'a, T> {
 impl BeefIndex {
     #[allow(clippy::too_many_arguments)] // The existing fold's resumption and mining context.
     pub(super) fn check_spends_of<T: TxFields>(
-        &self,
+        &mut self,
         offset: u64,
         txid: &Hash32,
         body: &T,
@@ -37,19 +40,41 @@ impl BeefIndex {
             evaluation,
             tip,
         };
-        let (sources, input_total) = check.sources(self)?;
+        let mut work = self.script_work;
+        let result = check.check(self, offset, from, spent, &mut work);
+        self.script_work = work;
+        result
+    }
+}
+
+impl<T: TxFields> InputCheck<'_, T> {
+    fn check(
+        &self,
+        index: &BeefIndex,
+        offset: u64,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+        work: &mut WorkSpent,
+    ) -> Result<Option<u32>, Stop> {
+        let (sources, input_total) = self.sources(index)?;
+        let body = self.body;
         let output_total: u64 = (0..body.output_count()).map(|v| body.output(v).1).sum();
         // check_transaction bounded every output prefix before this check.
         debug_assert!(output_total <= MAX_MONEY);
         let shared = shared_sighash(body);
+        let from = work.start(
+            *self.txid,
+            from,
+            self.evaluation.work.input_limit().is_some(),
+        );
         for (vin, source) in sources.into_iter().enumerate().skip(from as usize) {
             if vin > from as usize && spent() {
                 return Ok(Some(vin as u32));
             }
-            check.execute(self, vin, source, shared.clone())?;
+            self.execute(index, vin, source, shared.clone(), work)?;
         }
         if output_total > input_total {
-            return Err(check.refuse(offset, None, SpendRefusal::CreatesValue));
+            return Err(self.refuse(offset, None, SpendRefusal::CreatesValue));
         }
         Ok(None)
     }
@@ -125,6 +150,7 @@ impl<T: TxFields> InputCheck<'_, T> {
         vin: usize,
         source: &Retained,
         shared: Arc<TxSighashCache>,
+        work: &mut WorkSpent,
     ) -> Result<(), Stop> {
         let input = self.body.input(vin);
         let refuse = |why| self.refuse(input.at, Some(vin as u32), why);
@@ -154,24 +180,41 @@ impl<T: TxFields> InputCheck<'_, T> {
             locking_script,
             unlocking_script,
             memory_limit: self.evaluation.memory,
-            work_limit: self.evaluation.work,
+            work_limit: self.evaluation.work.input_limit(),
         })
         .map_err(|e| script_error(e.to_string()))?;
         if let Some(flags) = flags {
             spend.set_flags(flags);
         }
-        match spend.validate() {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(script_error("the script did not succeed".to_string())),
+        let result = spend.validate();
+        let charged = self
+            .evaluation
+            .work
+            .charge(&mut work.total, vin as u32, spend.work_spent());
+        self.execution_result(vin, result, charged)
+    }
+
+    fn execution_result(
+        &self,
+        vin: usize,
+        result: Result<bool, ScriptEvaluationError>,
+        charged: Result<(), NotJudgedCause>,
+    ) -> Result<(), Stop> {
+        let input = vin as u32;
+        let refuse = |why| self.refuse(self.body.input(vin).at, Some(input), why);
+        match result {
+            Ok(true) => charged.map_err(|cause| refuse(SpendRefusal::NotJudged { input, cause })),
+            Ok(false) => Err(refuse(SpendRefusal::Script(
+                "the script did not succeed".to_string(),
+            ))),
             Err(e) => {
-                let input = vin as u32;
                 let cause = e.resource_limit.and_then(|limit| {
                     super::super::verify_refusal::work_budget_cause(input, limit)
                 });
                 Err(match (cause, e.resource_limit) {
                     (Some(cause), _) => refuse(SpendRefusal::NotJudged { input, cause }),
                     (_, Some(limit)) => refuse(SpendRefusal::Resource(limit)),
-                    (_, None) => script_error(e.message),
+                    (_, None) => refuse(SpendRefusal::Script(e.message)),
                 })
             }
         }

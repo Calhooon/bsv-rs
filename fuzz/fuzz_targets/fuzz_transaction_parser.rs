@@ -26,4 +26,9 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(mp) = bsv_rs::transaction::MerklePath::from_binary(data) {
         let _ = mp.to_binary();
     }
+
+    // Metered cursors carry the transaction work total across a resume (#519).
+    if let Ok(cursor) = bsv_rs::transaction::Cursor::from_binary(data) {
+        let _ = bsv_rs::transaction::Cursor::from_binary(&cursor.to_binary());
+    }
 });

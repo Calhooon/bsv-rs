@@ -9,7 +9,7 @@ use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
 use crate::{Error, Result};
 
 use super::transaction::refuse_no_transaction;
-use super::{ChainTracker, FeeModel, Transaction, TransactionOutput};
+use super::{ChainTracker, FeeModel, Transaction, TransactionOutput, WorkBudget};
 
 impl Transaction {
     /// SPV verification with the node's standard word derived per input from
@@ -69,7 +69,7 @@ impl Transaction {
             chain_tracker,
             fee_model,
             memory_limit,
-            work_limit,
+            WorkBudget::NONE.with_work_budget(work_limit),
             None,
         )
         .await
@@ -99,7 +99,56 @@ impl Transaction {
             chain_tracker,
             fee_model,
             memory_limit,
-            work_limit,
+            WorkBudget::NONE.with_work_budget(work_limit),
+            Some(chain),
+        )
+        .await
+    }
+
+    /// SPV verification with per-input and per-transaction local work bounds.
+    ///
+    /// The defaults and accounting are [`Self::verify_with_work_budget`]'s.
+    /// Each unproven transaction gets a fresh total, charged after each input
+    /// in verification order. A proof does not execute or charge its scripts.
+    ///
+    /// # Errors
+    /// As [`Self::verify_with_work_budget`]. Crossing `work.per_transaction`
+    /// returns [`Error::TransactionNotJudged`] with
+    /// [`crate::script::NotJudgedCause::TransactionWorkBudgetExceeded`], naming
+    /// the crossing input, the limit and the total including that input.
+    pub async fn verify_with_work_budgets(
+        &self,
+        chain_tracker: &dyn ChainTracker,
+        fee_model: Option<&dyn FeeModel>,
+        memory_limit: Option<usize>,
+        work: WorkBudget,
+    ) -> Result<bool> {
+        verify(self, chain_tracker, fee_model, memory_limit, work, None).await
+    }
+
+    /// Chain-parameter verification with both local work bounds.
+    ///
+    /// The word selection is [`Self::verify_with_chain_params`]'s; accounting
+    /// and per-transaction totals are [`Self::verify_with_work_budgets`]'s.
+    ///
+    /// # Errors
+    /// As [`Self::verify_with_chain_params_and_work_budget`], with
+    /// [`crate::script::NotJudgedCause::TransactionWorkBudgetExceeded`] when
+    /// the transaction total crosses its bound.
+    pub async fn verify_with_chain_params_and_work_budgets(
+        &self,
+        chain_tracker: &dyn ChainTracker,
+        fee_model: Option<&dyn FeeModel>,
+        memory_limit: Option<usize>,
+        work: WorkBudget,
+        chain: &ChainParams,
+    ) -> Result<bool> {
+        verify(
+            self,
+            chain_tracker,
+            fee_model,
+            memory_limit,
+            work,
             Some(chain),
         )
         .await
@@ -110,7 +159,7 @@ struct Evaluation<'a> {
     chain: Option<&'a ChainParams>,
     tip_height: Option<u32>,
     memory_limit: Option<usize>,
-    work_limit: Option<u64>,
+    work: WorkBudget,
     fee_model: Option<&'a dyn FeeModel>,
 }
 
@@ -125,7 +174,7 @@ pub(super) async fn verify(
     tracker: &dyn ChainTracker,
     fee_model: Option<&dyn FeeModel>,
     memory_limit: Option<usize>,
-    work_limit: Option<u64>,
+    work: WorkBudget,
     chain: Option<&ChainParams>,
 ) -> Result<bool> {
     let evaluation = Evaluation {
@@ -136,7 +185,7 @@ pub(super) async fn verify(
             None
         },
         memory_limit,
-        work_limit,
+        work,
         fee_model,
     };
     let by_txid = root.reachable_by_txid();
@@ -230,8 +279,16 @@ impl Evaluation<'_> {
             }
         }
         let shared = shared_sighash(tx)?;
+        let mut work_spent = 0;
         for (vin, source) in sources.into_iter().enumerate() {
-            self.input(tx, vin, &source, shared.clone())?;
+            let work = self.input(tx, vin, &source, shared.clone())?;
+            self.work
+                .charge(&mut work_spent, vin as u32, work)
+                .map_err(|cause| Error::TransactionNotJudged {
+                    txid: tx.id(),
+                    input_index: vin,
+                    cause,
+                })?;
             if !verified.contains(&source.txid) {
                 queue.push(source.txid);
             }
@@ -245,7 +302,7 @@ impl Evaluation<'_> {
         vin: usize,
         source: &Source<'_>,
         shared: Arc<TxSighashCache>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
         let flags = self
             .chain
             .map(|chain| {
@@ -267,7 +324,7 @@ impl Evaluation<'_> {
             locking_script: LockingScript::from_binary(&source.output.locking_script.to_binary())?,
             unlocking_script: UnlockingScript::from_binary(&unlocking.to_binary())?,
             memory_limit: self.memory_limit,
-            work_limit: self.work_limit,
+            work_limit: self.work.input_limit(),
         })?;
         if let Some(flags) = flags {
             spend.set_flags(flags);
@@ -275,7 +332,7 @@ impl Evaluation<'_> {
         spend
             .validate()
             .map_err(|e| super::verify_refusal::script_refusal(&tx.id(), vin, e))?;
-        Ok(())
+        Ok(spend.work_spent())
     }
 }
 

@@ -96,6 +96,19 @@ wall-clock or total computation bound.
 [tests/transaction_work_budget_378.rs](tests/transaction_work_budget_378.rs)
 pins the verification paths.
 
+For a transaction-wide work bound, `transaction::WorkBudget` carries
+`per_input` and `per_transaction`, both optional. Its `with_work_budget` and
+`with_transaction_work_budget` builders configure the policy passed to
+`Transaction::verify_with_work_budgets` or the chain-parameter counterpart.
+Stream verifiers add `with_transaction_work_budget` beside `with_work_budget`.
+Inputs are charged in verification order; a total above the bound returns
+`NotJudgedCause::TransactionWorkBudgetExceeded { input, limit, total }`.
+The crossing input runs under its per-input bound alone: the work done is at
+most the limit plus one input's charge, so a door passes both bounds.
+`work_spent()` on either stream verifier reports the running transaction total;
+on a transaction-budget refusal verdict it returns `Some(total)`.
+The toolbox can delete its input-work sum and pass that limit directly.
+
 The streaming BEEF reader verifies element by element, checks proof roots
 through supplied headers and executes unproven inputs. It holds an ancestry
 index and needed outputs, so streaming does not mean constant memory.

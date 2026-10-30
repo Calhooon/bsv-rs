@@ -20,6 +20,16 @@ pub enum NotJudgedCause {
         /// Work already charged, at or below the budget; excludes the refused charge.
         work_done: u64,
     },
+    /// The total charged after this input exceeded the transaction's local budget.
+    TransactionWorkBudgetExceeded {
+        /// The input where the running total crossed the bound, in verification order.
+        input: u32,
+        /// The local per-transaction bound in `SpendParams::work_limit` units.
+        limit: u64,
+        /// Work charged across this transaction's evaluated inputs, including this one.
+        /// Saturates at `u64::MAX` if the counter overflows; overflow also declines.
+        total: u64,
+    },
     /// The proven coin predates the interpreter's supported eras.
     PreGenesisCoin {
         /// The coin's verified BUMP height.
@@ -59,6 +69,9 @@ impl NotJudgedCause {
             Self::WorkBudgetExceeded { .. } => {
                 "The input exceeded the verifier's local work budget."
             }
+            Self::TransactionWorkBudgetExceeded { .. } => {
+                "The transaction exceeded the verifier's local work budget."
+            }
             Self::PreGenesisCoin { .. } => {
                 "The source output was created before Genesis; its script era is unsupported."
             }
@@ -80,6 +93,10 @@ impl fmt::Display for NotJudgedCause {
             } => write!(
                 f,
                 "exceeded work budget {budget} units after {work_done} units of work."
+            ),
+            Self::TransactionWorkBudgetExceeded { limit, total, .. } => write!(
+                f,
+                "exceeded transaction work budget {limit} units after {total} units of work."
             ),
             Self::PreGenesisCoin {
                 height,

@@ -135,6 +135,7 @@ mod evaluation;
 mod not_judged_tests;
 mod reason;
 mod spends;
+use budget::WorkSpent;
 use deferred::{read_held, write_held, Deferred, TxFields};
 pub use evaluation::verify_stream_two_pass_with_chain_params;
 use evaluation::Evaluation;
@@ -1753,6 +1754,7 @@ pub struct BeefIndex {
     inputs: u64,
     steps: u64,
     work: u64,
+    script_work: WorkSpent,
     check_spends: bool,
     /// The outputs worth keeping, when a first pass named them: the outpoints
     /// the unproven inputs of the BEEF spend, less the ones spent so far.
@@ -1803,6 +1805,7 @@ impl BeefIndex {
             inputs: 0,
             steps: 0,
             work: 0,
+            script_work: WorkSpent::default(),
             check_spends,
             wanted: None,
             deferred: Deferred::default(),
@@ -2535,6 +2538,9 @@ const CURSOR_MAGIC: &[u8; 4] = b"BSC3";
 /// (bsv-rs#240): written only when one is held, so a cursor of a BEEF in
 /// BRC-62's order keeps BSC3's bytes.
 const CURSOR_MAGIC_BSC4: &[u8; 4] = b"BSC4";
+/// BSC3, a held-set presence byte and optional BSC4 entries, then the current
+/// transaction's charged work before its optional pause.
+const CURSOR_MAGIC_BSC5: &[u8; 4] = b"BSC5";
 /// 0.5.0 to 0.8.0's layout: BSC3 without the input count and the edges,
 /// and a transaction's flags byte carrying a spent bit (ignored).
 const CURSOR_MAGIC_BSC2: &[u8; 4] = b"BSC2";
@@ -2572,6 +2578,9 @@ impl Cursor {
     /// then after the outputs named the held transactions by offset, each
     /// its index entry (`deferred.rs`, `write_held`), never its raw bytes; a
     /// cursor that holds nothing keeps BSC3's bytes.
+    /// Metered cursors use BSC5: BSC3 followed by a held-set presence byte,
+    /// any held entries, then the transaction hash and its `u64` charged total.
+    /// Work limits remain local configuration and are never serialized.
     /// [`from_binary`](Self::from_binary) reads a BSC2 cursor as BSC3 with no
     /// edge for a transaction read before it: the walk reaches less, so it
     /// only refuses more, never accepts wrongly. BSC1 is refused: restart
@@ -2591,7 +2600,10 @@ impl Cursor {
         }
         let mut w = Writer::new();
         let held = &self.index.deferred.held;
-        w.write_bytes(if held.is_empty() {
+        let metered = self.index.script_work.txid.is_some();
+        w.write_bytes(if metered {
+            CURSOR_MAGIC_BSC5
+        } else if held.is_empty() {
             CURSOR_MAGIC
         } else {
             CURSOR_MAGIC_BSC4
@@ -2711,9 +2723,17 @@ impl Cursor {
                 }
             }
         }
+        // BSC5 can carry work without any held transactions.
+        if metered {
+            w.write_u8(u8::from(!held.is_empty()));
+        }
         // The transactions held (BSC4): by offset, each its index entry.
         if !held.is_empty() {
             write_held(&mut w, &self.index.deferred);
+        }
+        if let Some(txid) = self.index.script_work.txid {
+            w.write_bytes(&txid);
+            w.write_u64_le(self.index.script_work.total);
         }
         if let Some(pending) = &self.pending {
             w.write_u8(1);
@@ -2742,10 +2762,11 @@ impl Cursor {
             }
         }
         let mut r = Reader::new(bin);
-        let (bsc3, bsc4) = match r.read_bytes(4)? {
-            magic if magic == CURSOR_MAGIC_BSC4 => (true, true),
-            magic if magic == CURSOR_MAGIC => (true, false),
-            magic if magic == CURSOR_MAGIC_BSC2 => (false, false),
+        let (bsc3, bsc4, metered) = match r.read_bytes(4)? {
+            magic if magic == CURSOR_MAGIC_BSC5 => (true, true, true),
+            magic if magic == CURSOR_MAGIC_BSC4 => (true, true, false),
+            magic if magic == CURSOR_MAGIC => (true, false, false),
+            magic if magic == CURSOR_MAGIC_BSC2 => (false, false, false),
             _ => return Err(bad("the leading word")),
         };
         let check_spends = match r.read_u8()? {
@@ -2884,12 +2905,27 @@ impl Cursor {
             }
             _ => return Err(bad("a presence byte")),
         };
-        if bsc4 {
+        let has_held = if metered {
+            match r.read_u8()? {
+                0 => false,
+                1 => true,
+                _ => return Err(bad("a held transaction presence byte")),
+            }
+        } else {
+            bsc4
+        };
+        if has_held {
             let BeefIndex { deferred, txs, .. } = &mut index;
             read_held(&mut r, deferred, check_spends, frame.pos, |txid| {
                 txs.contains_key(txid)
             })
             .map_err(bad)?;
+        }
+        if metered {
+            index.script_work = WorkSpent {
+                txid: Some(hash(&mut r)?),
+                total: r.read_u64_le()?,
+            };
         }
         let pending = if r.is_empty() {
             None
@@ -3111,7 +3147,8 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     ///
     /// A cursor paused inside a transaction is positioned at that
     /// transaction: it is read again and its scripts run from the input
-    /// reached, the inputs before it never again. One paused inside a
+    /// reached. Applying a work budget to an old or unmetered cursor replays
+    /// its prefix to recover charges; metered cursors retain them. One paused inside a
     /// transaction held for a parent (bsv-rs#240) carries it: the source
     /// continues after the last element read.
     pub fn resume(cursor: Cursor, source: R, headers: H) -> Self {

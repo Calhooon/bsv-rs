@@ -102,6 +102,7 @@ pub mod tx_json;
 mod verification_flags;
 mod verify;
 mod verify_refusal;
+mod work_budget;
 
 // Re-exports for convenience
 pub use crate::error::TransportFault;
@@ -139,6 +140,7 @@ pub use input::{TransactionInput, Utxo};
 pub use merkle_path::{MerklePath, MerklePathLeaf};
 pub use output::TransactionOutput;
 pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};
+pub use work_budget::WorkBudget;
 
 // Sighash constants re-exported for convenience
 pub use crate::primitives::bsv::sighash::{
