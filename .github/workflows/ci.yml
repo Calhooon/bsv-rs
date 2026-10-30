@@ -25,10 +25,12 @@ permissions:
 # pull request (`semver`, `beta-born`). A dispatch (the nightly's on each line, the sync's on its
 # branch) and a tag's call from release.yml add the five other test cells and run `dependents` on
 # any line. Every job that judges something other than the commit is in a workflow of its own,
-# run on dispatch and called by release.yml before a tag: bench.yml (the benchmark regression
-# check and the scoreboard), msrv.yml, features.yml (each feature alone, the other five wasm32
-# slices), machete.yml, docs.yml (rustdoc and actionlint). Each condition is on the event and
-# the refs, so the one file serves both lines; tests/arch_ci_pr_runs_the_required_set.rs pins
+# run on dispatch and called by release.yml before a tag: bench.yml (benchmark builds and the
+# scoreboard; comparisons only on a branch), msrv.yml, features.yml (each feature alone, the
+# other five wasm32 slices), machete.yml, docs.yml (actionlint). Documentation judges the commit
+# and joins the required set on both lines (#515, the keeper's word of 2026-10-30).
+# Each condition is on the event and the refs, so the one file serves both lines;
+# tests/arch_ci_pr_runs_the_required_set.rs pins
 # the exact set for every event.
 #
 # a newer push to the same branch or PR cancels the run it supersedes; a tag's run is never
@@ -315,6 +317,33 @@ jobs:
             cargo clippy --no-default-features --features "$slice" -- -D warnings
             echo "::endgroup::"
           done
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-docs-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ubuntu-docs-
+
+      - name: Build docs
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -Dwarnings
 
   ratchet:
     name: ratchet

@@ -1,9 +1,8 @@
 name: Docs
 
-# The checks of the text (the owner's word of 2026-10-27, the keeper's ruling): rustdoc with
-# warnings denied, and the workflows linted. Off the push run (ci.yml runs the required set,
-# nothing more); on demand (`gh workflow run docs.yml --ref <line>`) and called by release.yml
-# on every version tag before it publishes.
+# Workflow lint on demand (`gh workflow run docs.yml --ref <line>`) and called by release.yml
+# on every version tag before it publishes. Rustdoc with warnings denied is now a required
+# job in ci.yml on pull requests and pushes too (#515, the keeper's word of 2026-10-30).
 on:
   workflow_dispatch:
   workflow_call:
@@ -21,33 +20,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ubuntu-docs-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ubuntu-docs-
-
-      - name: Build docs
-        run: cargo doc --no-deps --all-features
-        env:
-          RUSTDOCFLAGS: -Dwarnings
-
   # the workflows linted (bsv-stack-lean #145), shellcheck on every run script: actionlint is built
   # from its release source, the tarball pinned by sha256. Every `uses:` in every workflow
   # is pinned by a commit sha with its version beside it (#144)

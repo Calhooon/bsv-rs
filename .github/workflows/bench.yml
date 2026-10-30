@@ -5,7 +5,7 @@ name: Bench
 # push run (ci.yml runs the required set, nothing more; the owner's word of 2026-10-27, the
 # keeper's ruling). On demand (`gh workflow run bench.yml --ref <line>`, a baseline record with
 # `-f bench_baseline_record=true`; benches/README.md) and called by release.yml on every version
-# tag before it publishes.
+# tag before it publishes (build and scoreboard only; comparisons skip tag refs).
 on:
   workflow_dispatch:
     inputs:
@@ -65,9 +65,11 @@ jobs:
 
   benchmarks:
     name: Benchmark Regression Check
+    # A reusable workflow sees its caller's ref: release.yml supplies refs/tags/v* (#515).
+    # Keep comparisons on branch dispatches and permit PR callers, never a tag (even dispatched).
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-24.04
-    # every run of this workflow: a dispatch on any ref (a baseline record with
-    # bench_baseline_record) and a tag's call (which never records)
+    # A branch dispatch may explicitly propose a baseline with bench_baseline_record.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

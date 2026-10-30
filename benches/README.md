@@ -147,11 +147,13 @@ job lands on needs its own reviewed entry.
 The `benchmarks` job (Benchmark Regression Check) lives in
 [`.github/workflows/bench.yml`](../.github/workflows/bench.yml) with
 `benchmarks-build` (every bench compiled with all features) and the
-scoreboard. No push and no pull request runs it: it judges the runner's load
+scoreboard. No branch push and no pull request runs it: it judges the runner's load
 as much as the commit (beta's push run went red on it alone, and the owner's
 word of 2026-10-27 took it off the push run). It runs on a dispatch
-(`gh workflow run bench.yml --ref <line>`) and on every version tag, called by
-`release.yml` beside the publish, which it does not hold.
+(`gh workflow run bench.yml --ref <line>`). Every version tag's `release.yml`
+calls the workflow beside the publish, which it does not hold, but only builds
+the benchmarks and collects the scoreboard: comparisons reject tag refs,
+including a tag selected for manual dispatch (#515).
 The seed repository `Calgooon/bsv-script-lean` is private. The captain must
 provision `BSV_SCRIPT_CORPUS_TOKEN` with read access; CI downloads only
 `corpus/seed/seed.jsonl` at the named commit. No wallet or network request is
