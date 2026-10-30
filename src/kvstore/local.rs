@@ -352,7 +352,8 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             )
             .await?;
 
-        Ok(list_result.total_outputs as usize)
+        usize::try_from(list_result.total_outputs)
+            .map_err(|_| lookup::refused("Wallet KVStore output total exceeds the platform"))
     }
 
     /// Get multiple values by key.

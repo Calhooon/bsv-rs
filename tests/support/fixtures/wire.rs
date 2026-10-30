@@ -90,14 +90,14 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
         InternalizeAction | RelinquishOutput | RelinquishCertificate => {}
         ListActions => {
             let r = ListActionsResult::from_fixture(value.clone());
-            w.write_var_int(r.total_actions.into());
+            w.write_var_int(r.total_actions);
             for action in r.actions {
                 w.write_wallet_action(&action);
             }
         }
         ListOutputs => {
             let r = ListOutputsResult::from_fixture(value.clone());
-            w.write_var_int(r.total_outputs.into())
+            w.write_var_int(r.total_outputs)
                 .write_optional_bytes(r.beef.as_deref());
             for output in r.outputs {
                 w.write_wallet_output(&output);
@@ -109,7 +109,7 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
         }
         ListCertificates => {
             let r = ListCertificatesResult::from_fixture(value.clone());
-            w.write_var_int(r.total_certificates.into());
+            w.write_var_int(r.total_certificates);
             for entry in r.certificates {
                 let mut certificate = WireWriter::new();
                 certificate
@@ -137,7 +137,7 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
         }
         DiscoverByIdentityKey | DiscoverByAttributes => {
             let r = DiscoverCertificatesResult::from_fixture(value.clone());
-            w.write_var_int(r.total_certificates.into());
+            w.write_var_int(r.total_certificates);
             for entry in r.certificates {
                 w.write_identity_certificate(&entry).unwrap();
             }

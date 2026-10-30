@@ -1237,7 +1237,7 @@ async fn every_page_reader(
     list_frame: Vec<u8>,
     discovery_frame: Vec<u8>,
     limit: Option<u32>,
-) -> [Result<(u32, usize), String>; 3] {
+) -> [Result<(u64, usize), String>; 3] {
     let listed = client(list_frame)
         .list_certificates(
             ListCertificatesArgs {

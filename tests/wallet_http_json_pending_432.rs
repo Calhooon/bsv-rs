@@ -122,7 +122,7 @@ row!(row_43_change_subject, 43);
 row!(row_44_submitted_batch, 44);
 row!(row_45_evidence_required, 45);
 row!(row_46_action_outcome, 46);
-row!(row_47_safe_totals_and_u32_residue, 47);
+row!(row_47_safe_totals, 47);
 row!(row_49_page_limits, 49);
 row!(row_50_action_scalars, 50);
 row!(row_51_history_descriptions, 51);

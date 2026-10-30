@@ -16,7 +16,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
-| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 534 |
+| `local.rs` | LocalKVStore with single-attempt mutations; `count` checks `u64` to `usize` (#467); tests in local_tests.rs | 535 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
@@ -25,7 +25,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
-| `local_lookup.rs` | Local output limit/total checks, exact BEEF and canonical token authentication (#454) | 301 |
+| `local_lookup.rs` | Local output limit/total checks and comparisons in `u64` (#467), exact BEEF and canonical token authentication (#454) | 301 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454) | 46 |
 | `local_list.rs` | Existing convenience listing, separated to keep functions below the size limit | 78 |
 
@@ -47,6 +47,8 @@ pub use interpreter::{KVStoreContext, KVStoreFields, KVStoreInterpreter};
 ```
 
 ## LocalKVStore
+
+The wallet's `total_outputs` and private lookup totals are `u64` (#467). Count conversion to `usize` is checked; removal/collapse comparisons use `u64`, preserving the reference's local 10,000-output policy. Convenience listing honors the requested page even when the wallet reports a total above `u32::MAX`. GlobalKVStore uses overlay arrays and has no total to widen.
 
 Private key-value store using wallet transactions and baskets.
 

@@ -110,7 +110,7 @@ pub async fn setup(global: bool, count: usize) -> Harness {
         });
     }
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
-        total_outputs: count as u32,
+        total_outputs: count as u64,
         beef: Some(beef.to_binary()),
         outputs: sources
             .iter()

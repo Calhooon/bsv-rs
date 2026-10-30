@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: result totals retain the safe-integer range (#467, api-break)
+
+The four result totals now use `u64`, carrying zero through 2^53−1 without a
+feature flag on the 0.9.0 line (owner's ruling (c), 2026-10-26).
+`ts-stack@edf6e03` declares the fields as `PositiveIntegerOrZero` (`number`)
+in `Wallet.interfaces.ts:35,555,643,906,999`; its shared JSON list validator
+explicitly passes `Number.MAX_SAFE_INTEGER` at `WalletResultValidation.ts:1926`
+to the safe-integer check at `:935-943`. The typedef's older comment at `:31-33`
+still says uint32. The JSON runtime bound is the contract followed here.
+
+| Public field | Before | Now |
+|---|---|---|
+| `ListActionsResult::total_actions` | `u32` | `u64` |
+| `ListOutputsResult::total_outputs` | `u32` | `u64` |
+| `ListCertificatesResult::total_certificates` | `u32` | `u64` |
+| `DiscoverCertificatesResult::total_certificates` | `u32` | `u64` |
+
+| Total | Wire before | Wire now | HTTP JSON before | HTTP JSON now |
+|---|---|---|---|---|
+| 2^32 | Refused: field's uint32 range | Accepted, exact | Refused: serde expected `u32` | Accepted, exact |
+| 2^53−1 | Refused: field's uint32 range | Accepted, exact | Refused: serde expected `u32` | Accepted, exact |
+| 2^53 | Refused: precision | Refused: same precision words | Refused: safe-integer range | Refused: same range words |
+
+The old wire range words were `Invalid <field>: expected an integer from 0
+to 4294967295, received <value>`. Above 2^53−1, including nine `0xFF`, the
+unsigned strict reader retains `number too large to retain precision - use
+readVarIntBn`. The JSON refusal remains `Invalid <call> result <field>:
+expected an integer from 0 to 9007199254740991`, before typed decoding.
+`WireWriter::write_var_int` writes the full value; page allocations use checked
+conversion and available bytes, and page comparisons stay in `u64`.
+KVStore reads and comparisons preserve the total; `LocalKVStore::count` keeps
+its `usize` return with checked conversion (`Wallet KVStore output total
+exceeds the platform` if it cannot fit). Local lookup/removal's 10,000-output
+policy is unchanged. GlobalKVStore reads overlay output arrays, not totals.
+No index, sequence number, version, lock time or offset type changes here.
+
+Migration: readers of the four fields now receive `u64` (convert existing
+`u32` construction values with `u64::from`); matchers on the old uint32/serde
+refusal must accept totals through 2^53−1 and retain the precision/range
+refusals above it.
+
+`tests/wallet_result_totals_u64_467.rs` checks all four wire sites (both
+discovery calls), the public types' writer bytes, and the unsigned sentinel.
+`tests/wallet_http_json_result_totals_u64_467.rs` replays 25 Node 22 R47 cases
+from the #408/#432 recorder's `--r47` mode; its second run is byte-identical.
+`tests/kvstore_result_totals_u64_467.rs` checks count conversion and two
+caller-selected pages under a total above `u32::MAX`. All eleven new tests
+fail on base `7e7b42c6f291f822ebd6da5561c88803ea510ef2` and pass after the fix.
+R47's five old representation residues are removed by rerunning the recorder.
+
+### Notes: cross-SDK parity (#467)
+
+All four pinned TypeScript wire sites call `readVarIntNumStrict(false)`:
+`WalletWireTransceiver.ts:381,652,1502,1677`. Each then still imposes uint32
+at `:384,655,1505,1680`, unlike its JSON validator. Its processor writes at
+`WalletWireProcessor.ts:895,1286,2053,2487` after the same uint32 page-total
+check at `:170-182`. The wider Rust wire follows the requested JSON total
+contract; it deliberately differs from those pinned wire field guards.
+The existing full-wallet processor stubs are unchanged.
+
+Go at `2ca481c` reads totals as uint32: `wallet/serializer/list_actions.go:199`
+and `list_outputs.go:134` call `ReadVarInt32`; `list_certificates.go:132` and
+`discover_certificates_result.go:37` cast `ReadVarInt()` to `uint32`. Rust
+preserves totals Go narrows; Go also treats totals as the entry-loop count.
+
 ### Fixed: local removal refuses an empty page under a positive total (#479)
 
 `LocalKVStore::remove` now ends on the first empty page whose `totalOutputs` is

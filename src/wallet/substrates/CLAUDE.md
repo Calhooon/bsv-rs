@@ -209,7 +209,7 @@ The before column is `3eb965cb`; #408's Done rows landed in `8ac5e999`, and
 #432's base is `455fe780`. **Done** means the recorded reference check runs in
 its order and words. **Residue** names a representation the public types cannot
 carry without an API change. There are 85 fully Done rows and three rows with
-stated residues (R02, R03, R47); no Pending row remains. Related predicates are
+stated residues (R02, R03); no Pending row remains. Related predicates are
 grouped on a row; their fields and bounds are enumerated below.
 
 | Check / reference site | Before | After |
@@ -266,7 +266,7 @@ grouped on a row; their fields and bounds are enumerated below.
 
 | List check / reference site | Before | After |
 |---|---|---|
-| R47: totalActions/totalOutputs/totalCertificates safe integer 0–2^53−1; :1926 | u32 (too narrow), serde words | **Done with residue** (#432): safe-integer bound and reference words before decoding; `row_47_safe_totals_and_u32_residue`. The public `u32` totals still refuse 2^32 through 2^53−1 with serde words; keeping `u32` here is a scoping choice; the separately filed R47 lane widens them to carry the reference range. |
+| R47: totalActions/totalOutputs/totalCertificates safe integer 0–2^53−1; :1926 | u32 (too narrow), serde words | **Done** (#432, #467): the four public totals are `u64`; the full safe-integer range survives typed decoding, above it the reference range words remain. `row_47_safe_totals` and `wallet_http_json_result_totals_u64_467`; the recorder removes all five prior residues. |
 | R48: actions/outputs/certificates required array, ≤100,000; each visited item an object; :1927–1928/:1960/:2098/:1870 | Typed Vec/struct; wrong types serde words; positional structs possible | **Done** |
 | R49: Total at least page length; page ≤request.limit (default 10, limit integer ≤10000); :1929–1936 | Not checked | **Done** (#432): reference order and words; `row_49_page_limits`. |
 | R50: actions[i].txid hex32; satoshis integer −21e14..21e14; status completed/unprocessed/sending/unproven/unsigned/nosend/nonfinal/failed; isOutgoing boolean; :1961–1968 | Typed hex/i64/enum/bool, amount wider | **Done** (#432): reference order and words; `row_50_action_scalars`. |
@@ -342,11 +342,11 @@ refused here with `Invalid getVersion result version: expected a string`.
 That is R03's sole stated representation residue.
 Record iteration follows ECMAScript index-key order followed by string-key
 insertion order; request attribute and spend key order is captured before
-serde Value conversion. R47 validates the full reference range, then retains
-public `u32` totals as a scoping choice: the reference's PositiveIntegerOrZero
-permits 0 through 2^53-1 and a u64 can carry it. The separately filed R47 lane
-widens those fields. Each of the five list/discovery calls has a recorded,
-asserted wide-total residue here; no narrowing, wrapping or clamping is used.
+serde Value conversion. R47 validates the full reference range before decoding into `u64` (#467).
+The #408/#432 recorder's `--r47` mode records 0, 2^32−1, 2^32, 2^53−1 and
+2^53 for all five list/discovery calls. The four totals preserve the first
+four values and refuse the last with the reference's safe-integer words;
+there is no longer a representation residue.
 R88 owns the serialized
 request before awaiting, bounds captured request arrays and checks unsafe request keys; native types already
 exclude sparse arrays, accessors and noncanonical spend indexes.

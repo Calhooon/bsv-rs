@@ -81,6 +81,7 @@ mod linkage;
 mod originator;
 mod processor;
 mod requests;
+mod result_totals;
 mod results;
 mod transceiver;
 mod validation;
@@ -88,6 +89,7 @@ mod validation;
 pub use calls::WalletCall;
 pub use encoding::{WireReader, WireWriter};
 pub use processor::WalletWireProcessor;
+pub(crate) use result_totals::assert_page_count;
 pub use transceiver::WalletWireTransceiver;
 
 use crate::primitives::PublicKey;
@@ -99,7 +101,7 @@ use indexmap::IndexMap;
 // its recorded line limit by the ratchet (docs/RATCHETS.md).
 impl WireReader<'_> {
     /// Reads an unsigned varint carrying a `u32` field: an output or input
-    /// index, a sequence number, a version, a lock time, a height, a total.
+    /// index, a sequence number, a version, a lock time or a height.
     ///
     /// Each is a `u32` by the transaction format or by BRC-100's
     /// `PositiveIntegerOrZero` (at most `2^32 - 1`). The reference's strict
@@ -110,6 +112,12 @@ impl WireReader<'_> {
     pub(crate) fn read_var_int_u32(&mut self, field: &str) -> Result<u32, Error> {
         let value = self.read_var_int_num_strict_u64()?;
         var_int_u32(field, value)
+    }
+
+    /// Reads a result total through `2^53 - 1`, with unsigned strict precision
+    /// checking before any page allocation (#467). Nine FF is refused too.
+    pub(crate) fn read_result_total(&mut self) -> Result<u64, Error> {
+        self.read_var_int_num_strict_u64()
     }
 
     /// Reads an optional signed varint (`-1` for absent) carrying a `u32`
@@ -529,18 +537,6 @@ pub(crate) fn require_page_capacity(
     if returned >= maximum as usize {
         return Err(refused(format!(
             "Wallet Wire {call} response exceeds the requested page limit of {maximum}"
-        )));
-    }
-    Ok(())
-}
-
-/// `#assertPageCount` (`WalletWireTransceiver.ts:1940-1946`), after the page
-/// is read (`:1550`, `:1759`): no more entries than the declared total, the
-/// total of every page (bsv-rs#190).
-pub(crate) fn assert_page_count(returned: usize, total: u32, call: &str) -> Result<(), Error> {
-    if returned > total as usize {
-        return Err(refused(format!(
-            "Wallet Wire {call} response returned {returned} records but declared a total of {total}"
         )));
     }
     Ok(())

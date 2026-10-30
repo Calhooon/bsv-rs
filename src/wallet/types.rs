@@ -1164,8 +1164,8 @@ pub struct ListActionsArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListActionsResult {
-    /// Total number of matching actions.
-    pub total_actions: u32,
+    /// Total number of matching actions, from zero through `2^53 - 1`.
+    pub total_actions: u64,
     /// The matching actions.
     pub actions: Vec<WalletAction>,
 }
@@ -1272,8 +1272,8 @@ pub struct ListOutputsArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListOutputsResult {
-    /// Total number of matching outputs.
-    pub total_outputs: u32,
+    /// Total number of matching outputs, from zero through `2^53 - 1`.
+    pub total_outputs: u64,
     /// Optional aggregated BEEF data; `BEEF`, an array of byte numbers, in
     /// JSON (#105).
     #[serde(rename = "BEEF", skip_serializing_if = "Option::is_none", default)]
@@ -1409,8 +1409,8 @@ pub struct CertificateResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListCertificatesResult {
-    /// Total number of matching certificates.
-    pub total_certificates: u32,
+    /// Total number of matching certificates, from zero through `2^53 - 1`.
+    pub total_certificates: u64,
     /// The matching certificates.
     pub certificates: Vec<CertificateResult>,
 }
@@ -1540,8 +1540,8 @@ pub struct DiscoverByAttributesArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoverCertificatesResult {
-    /// Total number of matching certificates.
-    pub total_certificates: u32,
+    /// Total number of matching certificates, from zero through `2^53 - 1`.
+    pub total_certificates: u64,
     /// The matching certificates.
     pub certificates: Vec<IdentityCertificate>,
 }

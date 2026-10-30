@@ -1088,12 +1088,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         // The total of every page, then this page's entries to the end of
         // the frame (`WalletWireTransceiver.ts:1501-1550`; bsv-rs#190)
-        let total_certificates = reader.read_var_int_u32("listCertificates totalCertificates")?;
-        let mut certificates = Vec::with_capacity(bounded_capacity(
-            total_certificates as usize,
-            reader.remaining(),
-            1,
-        ));
+        let total_certificates = reader.read_result_total()?;
+        let mut certificates = Vec::with_capacity(reader.result_page_capacity(total_certificates));
 
         while !reader.is_empty() {
             super::require_page_capacity(certificates.len(), args.limit, "listCertificates")?;
@@ -1365,12 +1361,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<DiscoverCertificatesResult, Error> {
         let mut reader = WireReader::new(data);
 
-        let total_certificates = reader.read_var_int_u32("discovery totalCertificates")?;
-        let mut certificates = Vec::with_capacity(bounded_capacity(
-            total_certificates as usize,
-            reader.remaining(),
-            1,
-        ));
+        let total_certificates = reader.read_result_total()?;
+        let mut certificates = Vec::with_capacity(reader.result_page_capacity(total_certificates));
 
         while !reader.is_empty() {
             super::require_page_capacity(certificates.len(), requested_limit, "discover")?;

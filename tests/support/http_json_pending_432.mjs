@@ -167,7 +167,7 @@ export function extend432(cases, seeds, sdk) {
 
   for (const [call, total, entries] of [['listActions', 'totalActions', 'actions'], ['listOutputs', 'totalOutputs', 'outputs'], ['listCertificates', 'totalCertificates', 'certificates'], ['discoverByIdentityKey', 'totalCertificates', 'certificates'], ['discoverByAttributes', 'totalCertificates', 'certificates']]) {
     variations(47, call, total, [-1, null, 1.5, 9007199254740992])
-    add(47, call, 'wide_total', edit(call, total, 4294967296), undefined, { residue: 'public u32 total cannot represent the reference safe-integer range' })
+    add(47, call, 'wide_total', edit(call, total, 4294967296))
     add(47, call, 'integral_total', edit(call, total, 1), undefined, { bodyText: JSON.stringify(edit(call, total, 1)).replace(`"${total}":1`, `"${total}":1.0`) })
     add(49, call, 'total_below_page', edit(call, total, 0))
     const page = clone(seeds.get(call).result)

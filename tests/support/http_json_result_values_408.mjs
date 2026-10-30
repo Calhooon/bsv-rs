@@ -2,6 +2,7 @@
 // Build the unmodified SDK: git archive edf6e03 packages/sdk | tar -x -C "$W"
 // (cd "$W/packages/sdk" && bun build mod.ts --target node --format esm --outfile "$W/sdk.mjs")
 // Node 22: node tests/support/http_json_result_values_408.mjs "$W/sdk.mjs" <output.json>
+// Append --r47 for the 25 total-boundary cases of #467 alone.
 // The fetch is injected: no URL is contacted and no listener is started.
 // Large certificate witnesses store an expansion recipe. Each marker occurs
 // once, so JS's first-match replacement and Rust's all-match replacement expand
@@ -9,9 +10,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { extend432 } from './http_json_pending_432.mjs'
+import { resultTotals467 } from './result_totals_467.mjs'
 
 if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
-const [sdkPath, outPath] = process.argv.slice(2)
+const [sdkPath, outPath, mode] = process.argv.slice(2)
+if (mode !== undefined && mode !== '--r47') throw new Error('Unknown recorder mode')
 const sdk = await import(pathToFileURL(sdkPath).href)
 const { HTTPWalletJSON } = sdk
 const shapes = JSON.parse(readFileSync(new URL('../vectors/wallet_http_json_shapes_105.json', import.meta.url)))
@@ -166,6 +169,7 @@ for (const extra of [-1, 0, 1]) {
 }
 
 extend432(cases, seeds, sdk)
+if (mode === '--r47') cases.splice(0, cases.length, ...resultTotals467(seeds))
 
 for (const c of cases) {
   const expansion = c.expansion?.array

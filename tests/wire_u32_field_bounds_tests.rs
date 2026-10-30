@@ -308,17 +308,14 @@ async fn list_actions(total: u64) -> bsv_rs::Result<ListActionsResult> {
 /// listActions' result: `totalActions`, VarInt
 /// (`wallet/0100.md:1819`, `PositiveIntegerOrZero` at `:814`).
 #[tokio::test]
-async fn a_list_actions_total_above_u32_max_is_refused_not_truncated() {
+async fn a_list_actions_total_above_u32_max_is_carried_467() {
     let read = list_actions(0).await.unwrap();
     assert_eq!(read.total_actions, 0);
     // #473: the reference reads the page to EOF, independently of its total.
     let read = list_actions(u32::MAX as u64).await.unwrap();
-    assert_eq!(read.total_actions, u32::MAX);
+    assert_eq!(read.total_actions, u64::from(u32::MAX));
     assert!(read.actions.is_empty());
-    assert_eq!(
-        list_actions(OVER).await.unwrap_err(),
-        refusal("listActions totalActions")
-    );
+    assert_eq!(list_actions(OVER).await.unwrap().total_actions, OVER);
 }
 
 async fn list_outputs(total: u64) -> bsv_rs::Result<ListOutputsResult> {
@@ -344,16 +341,13 @@ async fn list_outputs(total: u64) -> bsv_rs::Result<ListOutputsResult> {
 /// `PositiveIntegerOrZero | ExactModuleBalance` at `:932`; the decimal string
 /// is a BRC-112 balance query's, #105, and this test reads the count).
 #[tokio::test]
-async fn a_list_outputs_total_above_u32_max_is_refused_not_truncated() {
+async fn a_list_outputs_total_above_u32_max_is_carried_467() {
     let read = list_outputs(0).await.unwrap();
     assert_eq!((read.total_outputs, read.beef), (0, None));
     let read = list_outputs(u32::MAX as u64).await.unwrap();
-    assert_eq!(read.total_outputs, u32::MAX);
+    assert_eq!(read.total_outputs, u64::from(u32::MAX));
     assert!(read.outputs.is_empty());
-    assert_eq!(
-        list_outputs(OVER).await.unwrap_err(),
-        refusal("listOutputs totalOutputs")
-    );
+    assert_eq!(list_outputs(OVER).await.unwrap().total_outputs, OVER);
 }
 
 async fn list_certificates(total: u64) -> bsv_rs::Result<ListCertificatesResult> {
@@ -371,7 +365,7 @@ async fn list_certificates(total: u64) -> bsv_rs::Result<ListCertificatesResult>
 /// listCertificates' result: `totalCertificates`, VarInt
 /// (`wallet/0100.md:2294`, `PositiveIntegerOrZero` at `:1298`).
 #[tokio::test]
-async fn a_list_certificates_total_above_u32_max_is_refused_not_truncated() {
+async fn a_list_certificates_total_above_u32_max_is_carried_467() {
     let read = list_certificates(0).await.unwrap();
     assert_eq!(read.total_certificates, 0);
     // The page is read to the end of the frame, not to the total (#190;
@@ -380,11 +374,11 @@ async fn a_list_certificates_total_above_u32_max_is_refused_not_truncated() {
     let read = list_certificates(u32::MAX as u64).await.unwrap();
     assert_eq!(
         (read.total_certificates, read.certificates.len()),
-        (u32::MAX, 0)
+        (u64::from(u32::MAX), 0)
     );
     assert_eq!(
-        list_certificates(OVER).await.unwrap_err(),
-        refusal("listCertificates totalCertificates")
+        list_certificates(OVER).await.unwrap().total_certificates,
+        OVER
     );
 }
 
@@ -403,7 +397,7 @@ async fn discover_by_identity_key(total: u64) -> bsv_rs::Result<DiscoverCertific
 /// discoverByIdentityKey's result: `totalCertificates`, VarInt
 /// (`wallet/0100.md:2378`, `PositiveIntegerOrZero` at `:1392`).
 #[tokio::test]
-async fn a_discovered_certificates_total_above_u32_max_is_refused_not_truncated() {
+async fn a_discovered_certificates_total_above_u32_max_is_carried_467() {
     let read = discover_by_identity_key(0).await.unwrap();
     assert_eq!(read.total_certificates, 0);
     // The page is read to the end of the frame, not to the total (#190;
@@ -411,10 +405,13 @@ async fn a_discovered_certificates_total_above_u32_max_is_refused_not_truncated(
     let read = discover_by_identity_key(u32::MAX as u64).await.unwrap();
     assert_eq!(
         (read.total_certificates, read.certificates.len()),
-        (u32::MAX, 0)
+        (u64::from(u32::MAX), 0)
     );
     assert_eq!(
-        discover_by_identity_key(OVER).await.unwrap_err(),
-        refusal("discovery totalCertificates")
+        discover_by_identity_key(OVER)
+            .await
+            .unwrap()
+            .total_certificates,
+        OVER
     );
 }

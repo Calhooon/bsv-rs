@@ -78,7 +78,7 @@ macro_rules! forward {
                     verifier: None,
                 }).collect();
                 Ok(ListCertificatesResult {
-                    total_certificates: certificates.len() as u32,
+                    total_certificates: certificates.len() as u64,
                     certificates,
                 })
             }

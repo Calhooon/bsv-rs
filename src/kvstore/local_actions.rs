@@ -35,7 +35,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         let lock = self.create_locking_script(key, &bytes).await?;
         self.replace_outputs(key, options, &current, lock)
             .await
-            .map_err(|error| unlock_error(current.outputs.len() as u32, key, error))
+            .map_err(|error| unlock_error(current.outputs.len() as u64, key, error))
     }
 
     async fn replace_outputs(
@@ -113,7 +113,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     txids.push(to_hex(&txid));
                 }
             }
-            if count == listed.total_outputs as usize {
+            if count as u64 == listed.total_outputs {
                 break;
             }
         }
@@ -161,7 +161,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     }
 }
 
-fn unlock_error(total: u32, key: &str, error: Error) -> Error {
+fn unlock_error(total: u64, key: &str, error: Error) -> Error {
     super::lookup::refused(format!(
         "There are {total} outputs with tag {key} that cannot be unlocked. Original error: {}",
         super::lookup::message(&error)

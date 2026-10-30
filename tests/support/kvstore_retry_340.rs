@@ -74,7 +74,7 @@ fn listing(tokens: &Value) -> ListOutputsResult {
         })
         .collect();
     ListOutputsResult {
-        total_outputs: outputs.len() as u32,
+        total_outputs: outputs.len() as u64,
         outputs,
         beef: Some(beef.to_binary()),
     }

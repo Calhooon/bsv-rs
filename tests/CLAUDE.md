@@ -330,6 +330,8 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`wire_method_roundtrip_tests.rs`**: All 28 WalletInterface methods via loopback transport (106 tests): get_public_key, encrypt/decrypt, HMAC, signatures, key linkage, status (auth/height/network/version), actions (create/sign/abort/list/internalize), outputs (list/relinquish), certificates (acquire/list/prove/relinquish/discover). Also tests complex type roundtrips, response roundtrips, call codes, request frames, and Counterparty variant encoding.
 - **`wallet_wire_cross_sdk_tests.rs`**: Cross-SDK wire protocol compatibility with Go SDK (55 tests; 13 need `http`, the recording wallet of `support/fixtures`). Loads 54 JSON vector files from Go SDK testdata. Tests request decoding (params extraction after call_code + originator) and response decoding (result extraction after error byte) for all 28 WalletInterface methods. Validates byte-level interoperability between Rust and Go wire encoders.
 
+- **`wallet_result_totals_u64_467.rs` / `wallet_http_json_result_totals_u64_467.rs`**: all four safe-integer total fields, five wire/HTTP calls, precise overflow and unsigned sentinel refusals; HTTP boundaries recorded under Node 22.
+
 ### Messages (`messages` feature)
 - **`messages_tests.rs`** — BRC-77 signed messages (8 tests: specific/anyone recipient, empty/large, tampering), BRC-78 encrypted messages (9 tests: roundtrip, wrong key, GCM auth), cross-SDK vectors (8 tests: error format compatibility), unicode/binary data, multi-party, the `_with` forms (4 tests: the plain forms' bytes given their drawn key id and IV, fixed values reproducible)
 
@@ -363,6 +365,8 @@ Transaction test vectors in `tests/transaction/vectors/`:
 ### KVStore (`kvstore` feature)
 - **`kvstore_integration_tests.rs`** — LocalKVStore: config/entry/token/query/options types, KVStoreInterpreter (PushDrop script extraction), signature verification, constructor/get/set/remove/has/keys/list/count/clear operations, batch ops, cross-SDK compatibility (field names, PushDrop order), edge cases (unicode, large values)
 - **`kvstore_global_tests.rs`** — GlobalKVStore: construction with default/custom config, network presets, input validation (empty key/value), wallet error propagation, overlay error propagation, interpreter tests (19 tests: basic tokens, context filtering, unicode, large values, old/new format), signature verification, data model tests, cross-SDK compatibility, edge cases (special chars, JSON values, multiple tags)
+
+- **`kvstore_result_totals_u64_467.rs`**: a count above `u32::MAX`, checked platform conversion and two caller-selected pages under a wide total.
 
 ### Registry (`registry` feature)
 - **`registry_integration_tests.rs`** — DefinitionType (string conversion, lookup services, topics, baskets, field counts), BasketDefinitionData (builder, PushDrop encode/decode), ProtocolDefinitionData (security levels), CertificateDefinitionData (field descriptors), DefinitionData enum, TokenData, RegistryRecord, query builders, result types, RegistryClientConfig, cross-SDK PushDrop field order, constants

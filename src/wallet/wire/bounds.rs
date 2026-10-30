@@ -110,7 +110,7 @@ impl WireReader<'_> {
         &mut self,
         limit: Option<u32>,
     ) -> Result<ListActionsResult, Error> {
-        let total_actions = self.read_var_int_u32("listActions totalActions")?;
+        let total_actions = self.read_result_total()?;
         let mut actions = Vec::new();
         while !self.is_empty() {
             super::require_page_capacity(actions.len(), limit, "listActions")?;
@@ -127,7 +127,7 @@ impl WireReader<'_> {
         &mut self,
         limit: Option<u32>,
     ) -> Result<ListOutputsResult, Error> {
-        let total_outputs = self.read_var_int_u32("listOutputs totalOutputs")?;
+        let total_outputs = self.read_result_total()?;
         let beef = self.read_optional_bytes()?;
         let mut outputs = Vec::new();
         while !self.is_empty() {

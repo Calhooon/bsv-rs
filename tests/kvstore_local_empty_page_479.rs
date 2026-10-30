@@ -76,7 +76,7 @@ paged_wallet! {
     (get_version, GetVersionResult),
 }
 
-fn empty_page(total_outputs: u32) -> ListOutputsResult {
+fn empty_page(total_outputs: u64) -> ListOutputsResult {
     ListOutputsResult {
         total_outputs,
         outputs: Vec::new(),

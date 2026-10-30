@@ -363,7 +363,7 @@ impl WalletInterface for MockWallet {
         let beef = self.actions.beef(limited.iter().map(|o| to_hex(&o.txid)));
         Ok(ListOutputsResult {
             outputs: wallet_outputs,
-            total_outputs: total,
+            total_outputs: u64::from(total),
             beef: Some(beef),
         })
     }

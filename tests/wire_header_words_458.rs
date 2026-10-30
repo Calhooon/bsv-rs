@@ -492,12 +492,20 @@ async fn assert_page_total_site(site: &str) {
                 .await
                 .map(drop)
         };
-        assert_eq!(
-            result,
-            Err(Error::WalletError(words.into())),
-            "{site} {}",
-            case["name"]
-        );
+        // #467 accepts safe totals, unlike the pinned TypeScript field guard.
+        // Keep its recording intact. This old frame has no BEEF length, so
+        // listOutputs reaches the short-read guard; the complete wide frames
+        // round-trip in wallet_result_totals_u64_467.
+        let expected = if total < 1 << 53 {
+            if site == "listActions" {
+                Ok(())
+            } else {
+                Err(short_read())
+            }
+        } else {
+            Err(Error::WalletError(words.into()))
+        };
+        assert_eq!(result, expected, "{site} {}", case["name"]);
     }
 }
 

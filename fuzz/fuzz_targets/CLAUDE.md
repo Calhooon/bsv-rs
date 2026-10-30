@@ -70,6 +70,8 @@ Tests `bsv_rs::wallet::wire::WireReader` deserialization:
 
 Each method is tested with a fresh `WireReader` instance to independently fuzz each code path.
 
+`support/result_totals_467.rs` also writes arbitrary `u64` totals with `WireWriter` and checks all five list/discovery calls: exact values through 2^53−1, the precision refusal above it (#467).
+
 ## Usage
 
 Requires [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) (which uses `libfuzzer-sys`):

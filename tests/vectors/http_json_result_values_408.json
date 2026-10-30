@@ -22017,7 +22017,6 @@
         "labels": []
       },
       "bodyText": "{\"totalActions\":4294967296,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":1,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a history entry\",\"version\":1,\"lockTime\":0}]}",
-      "residue": "public u32 total cannot represent the reference safe-integer range",
       "reference": {
         "accepted": true
       }
@@ -22132,7 +22131,6 @@
         "include": "entire transactions"
       },
       "bodyText": "{\"totalOutputs\":4294967296,\"BEEF\":[2,0,190,239,1,254,0,53,12,0,1,1,0,2,182,10,153,93,247,33,9,25,30,73,131,150,246,127,24,16,177,31,160,229,224,144,137,186,12,159,178,73,253,243,24,220,1,1,0,1,0,0,0,1,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,0,0,0,0,1,81,255,255,255,255,1,232,3,0,0,0,0,0,0,1,81,0,0,0,0],\"outputs\":[{\"outpoint\":\"dc18f3fd49b29f0cba8990e0e5a01fb110187ff69683491e190921f75d990ab6.0\",\"satoshis\":1000,\"spendable\":true}]}",
-      "residue": "public u32 total cannot represent the reference safe-integer range",
       "reference": {
         "accepted": true
       }
@@ -22281,7 +22279,6 @@
         "offset": 0
       },
       "bodyText": "{\"totalCertificates\":4294967296,\"certificates\":[{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"},\"keyring\":{\"name\":\"a2V5cmluZw==\"},\"verifier\":\"02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9\"}]}",
-      "residue": "public u32 total cannot represent the reference safe-integer range",
       "reference": {
         "accepted": true
       }
@@ -22428,7 +22425,6 @@
         "offset": 0
       },
       "bodyText": "{\"totalCertificates\":4294967296,\"certificates\":[{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"},\"certifierInfo\":{\"name\":\"Fixture Certifier\",\"iconUrl\":\"https://certifier.invalid/icon\",\"description\":\"fixture only\",\"trust\":5},\"publiclyRevealedKeyring\":{\"name\":\"a2V5cmluZw==\"},\"decryptedFields\":{\"name\":\"Fixture\"}}]}",
-      "residue": "public u32 total cannot represent the reference safe-integer range",
       "reference": {
         "accepted": true
       }
@@ -22555,7 +22551,6 @@
         }
       },
       "bodyText": "{\"totalCertificates\":4294967296,\"certificates\":[{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"},\"certifierInfo\":{\"name\":\"Fixture Certifier\",\"iconUrl\":\"https://certifier.invalid/icon\",\"description\":\"fixture only\",\"trust\":5},\"publiclyRevealedKeyring\":{\"name\":\"a2V5cmluZw==\"},\"decryptedFields\":{\"name\":\"Fixture\"}}]}",
-      "residue": "public u32 total cannot represent the reference safe-integer range",
       "reference": {
         "accepted": true
       }

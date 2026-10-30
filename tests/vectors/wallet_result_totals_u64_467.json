@@ -1,0 +1,366 @@
+{
+  "source": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "listActions_total_0_467",
+      "group": "row_47",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":0,\"actions\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listActions_total_4294967295_467",
+      "group": "row_47",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":4294967295,\"actions\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listActions_total_4294967296_467",
+      "group": "row_47",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":4294967296,\"actions\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listActions_total_9007199254740991_467",
+      "group": "row_47",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":9007199254740991,\"actions\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listActions_total_9007199254740992_467",
+      "group": "row_47",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":9007199254740992,\"actions\":[]}",
+      "reference": {
+        "error": "Invalid listActions result totalActions: expected an integer from 0 to 9007199254740991"
+      }
+    },
+    {
+      "name": "listOutputs_total_0_467",
+      "group": "row_47",
+      "call": "listOutputs",
+      "args": {
+        "basket": "default",
+        "include": "entire transactions"
+      },
+      "bodyText": "{\"totalOutputs\":0,\"outputs\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listOutputs_total_4294967295_467",
+      "group": "row_47",
+      "call": "listOutputs",
+      "args": {
+        "basket": "default",
+        "include": "entire transactions"
+      },
+      "bodyText": "{\"totalOutputs\":4294967295,\"outputs\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listOutputs_total_4294967296_467",
+      "group": "row_47",
+      "call": "listOutputs",
+      "args": {
+        "basket": "default",
+        "include": "entire transactions"
+      },
+      "bodyText": "{\"totalOutputs\":4294967296,\"outputs\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listOutputs_total_9007199254740991_467",
+      "group": "row_47",
+      "call": "listOutputs",
+      "args": {
+        "basket": "default",
+        "include": "entire transactions"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740991,\"outputs\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listOutputs_total_9007199254740992_467",
+      "group": "row_47",
+      "call": "listOutputs",
+      "args": {
+        "basket": "default",
+        "include": "entire transactions"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740992,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected an integer from 0 to 9007199254740991"
+      }
+    },
+    {
+      "name": "listCertificates_total_0_467",
+      "group": "row_47",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        ],
+        "types": [
+          "ERERERERERERERERERERERERERERERERERERERERERE="
+        ],
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":0,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listCertificates_total_4294967295_467",
+      "group": "row_47",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        ],
+        "types": [
+          "ERERERERERERERERERERERERERERERERERERERERERE="
+        ],
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":4294967295,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listCertificates_total_4294967296_467",
+      "group": "row_47",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        ],
+        "types": [
+          "ERERERERERERERERERERERERERERERERERERERERERE="
+        ],
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":4294967296,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listCertificates_total_9007199254740991_467",
+      "group": "row_47",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        ],
+        "types": [
+          "ERERERERERERERERERERERERERERERERERERERERERE="
+        ],
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":9007199254740991,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listCertificates_total_9007199254740992_467",
+      "group": "row_47",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        ],
+        "types": [
+          "ERERERERERERERERERERERERERERERERERERERERERE="
+        ],
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":9007199254740992,\"certificates\":[]}",
+      "reference": {
+        "error": "Invalid listCertificates result totalCertificates: expected an integer from 0 to 9007199254740991"
+      }
+    },
+    {
+      "name": "discoverByIdentityKey_total_0_467",
+      "group": "row_47",
+      "call": "discoverByIdentityKey",
+      "args": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":0,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByIdentityKey_total_4294967295_467",
+      "group": "row_47",
+      "call": "discoverByIdentityKey",
+      "args": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":4294967295,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByIdentityKey_total_4294967296_467",
+      "group": "row_47",
+      "call": "discoverByIdentityKey",
+      "args": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":4294967296,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByIdentityKey_total_9007199254740991_467",
+      "group": "row_47",
+      "call": "discoverByIdentityKey",
+      "args": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":9007199254740991,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByIdentityKey_total_9007199254740992_467",
+      "group": "row_47",
+      "call": "discoverByIdentityKey",
+      "args": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 0
+      },
+      "bodyText": "{\"totalCertificates\":9007199254740992,\"certificates\":[]}",
+      "reference": {
+        "error": "Invalid discoverByIdentityKey result totalCertificates: expected an integer from 0 to 9007199254740991"
+      }
+    },
+    {
+      "name": "discoverByAttributes_total_0_467",
+      "group": "row_47",
+      "call": "discoverByAttributes",
+      "args": {
+        "attributes": {
+          "name": "Fixture"
+        }
+      },
+      "bodyText": "{\"totalCertificates\":0,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByAttributes_total_4294967295_467",
+      "group": "row_47",
+      "call": "discoverByAttributes",
+      "args": {
+        "attributes": {
+          "name": "Fixture"
+        }
+      },
+      "bodyText": "{\"totalCertificates\":4294967295,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByAttributes_total_4294967296_467",
+      "group": "row_47",
+      "call": "discoverByAttributes",
+      "args": {
+        "attributes": {
+          "name": "Fixture"
+        }
+      },
+      "bodyText": "{\"totalCertificates\":4294967296,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByAttributes_total_9007199254740991_467",
+      "group": "row_47",
+      "call": "discoverByAttributes",
+      "args": {
+        "attributes": {
+          "name": "Fixture"
+        }
+      },
+      "bodyText": "{\"totalCertificates\":9007199254740991,\"certificates\":[]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "discoverByAttributes_total_9007199254740992_467",
+      "group": "row_47",
+      "call": "discoverByAttributes",
+      "args": {
+        "attributes": {
+          "name": "Fixture"
+        }
+      },
+      "bodyText": "{\"totalCertificates\":9007199254740992,\"certificates\":[]}",
+      "reference": {
+        "error": "Invalid discoverByAttributes result totalCertificates: expected an integer from 0 to 9007199254740991"
+      }
+    }
+  ]
+}
