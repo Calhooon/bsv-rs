@@ -1,6 +1,6 @@
 //! List totals, fields and request echoes, WalletResultValidation.ts:1919-2162.
 
-use super::{array, beef, invalid, member, record, scalars as s, Object, Result};
+use super::{array, beef, bytes, invalid, member, record, scalars as s, Object, Result};
 use serde_json::{value::RawValue, Value};
 use std::collections::HashSet;
 
@@ -281,10 +281,15 @@ fn history_output(output: &Object<'_>, call: &str, field: &str, request: &Value)
     Ok(())
 }
 
-pub(super) fn outputs(result: &Object<'_>, call: &str, request: &Value) -> Result<()> {
+pub(super) fn outputs(
+    result: &Object<'_>,
+    call: &str,
+    request: &Value,
+    bytes: &bytes::Fields<'_>,
+) -> Result<()> {
     let outputs = page(result, call, "totalOutputs", "outputs", request)?;
     let beef = member(result, "BEEF")
-        .map(|raw| beef::read(Some(raw), call, "BEEF"))
+        .map(|raw| beef::read(Some(raw), call, "BEEF", bytes))
         .transpose()?;
     if !outputs.is_empty() && request["include"] == "entire transactions" && beef.is_none() {
         return Err(invalid(
@@ -309,7 +314,19 @@ pub(super) fn outputs(result: &Object<'_>, call: &str, request: &Value) -> Resul
                 "a unique output in the result page",
             ));
         }
-        output_value(&output, call, &field, request, beef.as_ref(), &point)?;
+        let script = bytes
+            .outputs
+            .and_then(|o| o.get(i))
+            .and_then(|o| o.locking_script.as_deref());
+        output_value(
+            &output,
+            call,
+            &field,
+            request,
+            beef.as_ref(),
+            &point,
+            script,
+        )?;
         output_metadata(&output, call, &field, request)?;
     }
     Ok(())
@@ -322,6 +339,7 @@ fn output_value(
     request: &Value,
     beef: Option<&beef::Envelope>,
     point: &(String, u32),
+    typed_script: Option<&[u8]>,
 ) -> Result<()> {
     let satoshis = s::uint(
         member(output, "satoshis"),
@@ -363,7 +381,12 @@ fn output_value(
                 "the amount committed by BEEF",
             ));
         }
-        if locking.is_some_and(|s| !s.eq_ignore_ascii_case(&hex::encode(&committed.script))) {
+        if locking.is_some_and(|s| {
+            typed_script.map_or_else(
+                || !s.eq_ignore_ascii_case(&hex::encode(&committed.script)),
+                |script| script != committed.script,
+            )
+        }) {
             return Err(invalid(
                 call,
                 &format!("{field}.lockingScript"),

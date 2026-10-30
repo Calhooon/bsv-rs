@@ -38,9 +38,7 @@
 //! let version = wallet.get_version("myapp.example.com").await?;
 //! ```
 
-#[path = "http_json/byte_fields.rs"]
 pub(crate) mod byte_fields;
-#[path = "http_json/result_values.rs"]
 pub(crate) mod result_values;
 
 #[cfg(feature = "http")]

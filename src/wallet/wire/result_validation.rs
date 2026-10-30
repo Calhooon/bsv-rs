@@ -4,22 +4,54 @@
 
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
 use crate::wallet::substrates::result_values;
+use crate::wallet::CreateActionArgs;
 use crate::{Error, Result};
 use serde::Serialize;
 use serde_json::{json, Value};
 
-pub(super) struct Binding {
+pub(super) struct Binding<'a> {
     call: &'static str,
     request: Value,
+    action: Option<&'a CreateActionArgs>,
 }
 
-impl Binding {
+impl<'a> Binding<'a> {
+    pub(super) fn create_action(args: &'a CreateActionArgs) -> Result<Self> {
+        let sources = crate::wallet::validation::client::create_action_sources(args)?;
+        // Capture the binding fields without ever serializing inputBEEF.
+        let mut request = result_values::request("createAction", &serde_json::to_vec(&json!({
+            "inputs": args.inputs.as_ref().map(|inputs| inputs.iter().map(|input| {
+                let mut value = json!({"outpoint": input.outpoint});
+                if input.unlocking_script.is_some() { value["unlockingScript"] = json!(""); }
+                if let Some(sequence) = input.sequence_number { value["sequenceNumber"] = json!(sequence); }
+                value
+            }).collect::<Vec<_>>()),
+            "outputs": args.outputs.as_ref().map(|outputs| outputs.iter().map(|output| {
+                json!({"satoshis": output.satoshis, "lockingScript": ""})
+            }).collect::<Vec<_>>()),
+            "version": args.version,
+            "lockTime": args.lock_time, "options": args.options,
+        })).map_err(|e| Error::WalletError(e.to_string()))?)?;
+        // Absent optional arguments must remain absent, as in their serde form.
+        if let Some(object) = request.as_object_mut() {
+            object.retain(|_, value| !value.is_null());
+        }
+        request["$sourceValues"] =
+            serde_json::to_value(sources).map_err(|e| Error::WalletError(e.to_string()))?;
+        Ok(Self {
+            call: "createAction",
+            request,
+            action: Some(args),
+        })
+    }
+
     /// Capture only the reference's binding fields before crossing the wire.
     pub(super) fn new(call: &'static str, args: &impl Serialize) -> Result<Self> {
         let bytes = serde_json::to_vec(args).map_err(|e| Error::WalletError(e.to_string()))?;
         Ok(Self {
             call,
             request: result_values::request(call, &bytes)?,
+            action: None,
         })
     }
 
@@ -45,19 +77,15 @@ impl Binding {
         )
     }
 
-    pub(super) fn check<R: Serialize>(&self, result: R) -> Result<R> {
-        result_values::wire(self.call, &result, &self.request)?;
+    pub(super) fn check<R: result_values::WireResult>(&self, result: R) -> Result<R> {
+        result.check(self.call, &self.request, self.action)?;
         Ok(result)
     }
 }
 
 /// Signature bytes have no serde impl on their public result record.
 pub(super) fn signature(signature: &[u8]) -> Result<()> {
-    #[derive(Serialize)]
-    struct Signature<'a> {
-        signature: &'a [u8],
-    }
-    result_values::wire("createSignature", &Signature { signature }, &Value::Null)
+    result_values::wire_signature(signature)
 }
 
 pub(super) fn response_length(length: usize) -> Result<()> {

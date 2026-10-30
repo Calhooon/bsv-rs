@@ -1,6 +1,6 @@
 //! Action-result order and member bindings, WalletResultValidation.ts:1242-1374.
 
-use super::{action_binding, array, beef, invalid, member, record, scalars, Object, Result};
+use super::{action_binding, array, beef, bytes, invalid, member, record, scalars, Object, Result};
 use serde_json::{value::RawValue, Value};
 use std::collections::HashSet;
 
@@ -12,16 +12,21 @@ struct Action {
     sends: Option<Vec<String>>,
 }
 
-pub(super) fn validate(result: &Object<'_>, call: &str, request: &Value) -> Result<()> {
+pub(super) fn validate(
+    result: &Object<'_>,
+    call: &str,
+    request: &Value,
+    bytes: &bytes::Fields<'_>,
+) -> Result<()> {
     let evidence = action_binding::sources(call, request)?;
-    let action = read(result, call)?;
+    let action = read(result, call, bytes)?;
     request_shape(&action, call, request)?;
     if call == "createAction" {
         if let Some(tx) = &action.tx {
-            action_binding::create(tx, call, request, &evidence, false)?;
+            action_binding::create(tx, call, request, &evidence, false, bytes.action)?;
         }
         if let Some(tx) = &action.signable {
-            action_binding::create(tx, call, request, &evidence, true)?;
+            action_binding::create(tx, call, request, &evidence, true, bytes.action)?;
         }
     } else if let Some(tx) = &action.tx {
         action_binding::sign(tx, call, request)?;
@@ -30,12 +35,12 @@ pub(super) fn validate(result: &Object<'_>, call: &str, request: &Value) -> Resu
     bind(&action, result, call, request)
 }
 
-fn read(result: &Object<'_>, call: &str) -> Result<Action> {
+fn read(result: &Object<'_>, call: &str, bytes: &bytes::Fields<'_>) -> Result<Action> {
     let txid = member(result, "txid")
         .map(|raw| scalars::hex(Some(raw), call, "txid", Some(32)))
         .transpose()?;
     let tx = member(result, "tx")
-        .map(|raw| beef::transaction(Some(raw), call, "tx", txid.as_deref()))
+        .map(|raw| beef::transaction(Some(raw), call, "tx", txid.as_deref(), bytes))
         .transpose()?;
     if txid
         .as_ref()
@@ -67,8 +72,13 @@ fn read(result: &Object<'_>, call: &str) -> Result<Action> {
                 ));
             }
             let object = record(Some(raw), call, "signableTransaction")?;
-            let tx =
-                beef::transaction(member(&object, "tx"), call, "signableTransaction.tx", None)?;
+            let tx = beef::transaction(
+                member(&object, "tx"),
+                call,
+                "signableTransaction.tx",
+                None,
+                bytes,
+            )?;
             scalars::base64(
                 member(&object, "reference"),
                 call,

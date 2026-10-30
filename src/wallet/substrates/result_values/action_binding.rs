@@ -7,6 +7,28 @@ use std::collections::{HashMap, HashSet};
 const MAX_MONEY: u64 = 2_100_000_000_000_000;
 type Sources = HashMap<String, u64>;
 
+/// The client validates inputBEEF before sending, and retains only the
+/// requested source amounts for the result check. Parse the typed bytes once.
+pub(crate) fn input_sources(
+    bytes: &[u8],
+    inputs: &[crate::wallet::CreateActionInput],
+) -> Result<Sources> {
+    let envelope = beef::parse(bytes)?;
+    let mut sources = HashMap::new();
+    for input in inputs {
+        let point = &input.outpoint;
+        if let Some(output) = envelope
+            .transactions
+            .get(&hex::encode(point.txid))
+            .and_then(Option::as_ref)
+            .and_then(|tx| tx.outputs.get(point.vout as usize))
+        {
+            sources.insert(point.to_string(), output.satoshis);
+        }
+    }
+    Ok(sources)
+}
+
 pub(super) fn sources(call: &str, request: &Value) -> Result<Sources> {
     if matches!(call, "createAction") {
         return request
@@ -87,6 +109,7 @@ pub(super) fn create(
     request: &Value,
     sources: &Sources,
     deferred: bool,
+    typed: Option<&crate::wallet::CreateActionArgs>,
 ) -> Result<()> {
     if request.is_object() {
         let version = requested_uint(
@@ -117,13 +140,18 @@ pub(super) fn create(
                 "the requested transaction lock time",
             ));
         }
-        inputs(tx, call, request)?;
-        outputs(tx, call, request)?;
+        inputs(tx, call, request, typed)?;
+        outputs(tx, call, request, typed)?;
     }
     conservation(tx, call, sources, deferred)
 }
 
-fn inputs(tx: &beef::Transaction, call: &str, request: &Value) -> Result<()> {
+fn inputs(
+    tx: &beef::Transaction,
+    call: &str,
+    request: &Value,
+    typed: Option<&crate::wallet::CreateActionArgs>,
+) -> Result<()> {
     let mut candidates = HashMap::new();
     for (i, input) in tx.inputs.iter().enumerate() {
         if candidates.insert(input.outpoint(), i).is_some() {
@@ -160,10 +188,21 @@ fn inputs(tx: &beef::Transaction, call: &str, request: &Value) -> Result<()> {
                 "a unique requested input",
             ));
         }
-        let i = *candidates
+        let candidate_index = *candidates
             .get(&outpoint)
             .ok_or_else(|| invalid(call, "tx.inputs", "every requested input exactly once"))?;
-        match_input(&tx.inputs[i], input, i, &field, call)?;
+        let script = typed
+            .and_then(|a| a.inputs.as_ref())
+            .and_then(|a| a.get(i))
+            .and_then(|input| input.unlocking_script.as_deref());
+        match_input(
+            &tx.inputs[candidate_index],
+            input,
+            candidate_index,
+            &field,
+            call,
+            script,
+        )?;
     }
     Ok(())
 }
@@ -174,6 +213,7 @@ fn match_input(
     i: usize,
     field: &str,
     call: &str,
+    typed_script: Option<&[u8]>,
 ) -> Result<()> {
     let sequence = requested_uint(
         input.get("sequenceNumber"),
@@ -190,9 +230,25 @@ fn match_input(
         ));
     }
     if let Some(script) = input.get("unlockingScript") {
-        if hex::encode(&candidate.script)
-            != requested_hex(Some(script), call, &format!("{field}.unlockingScript"))?
-        {
+        let decoded;
+        let expected = if let Some(script) = typed_script {
+            script
+        } else {
+            decoded = hex::decode(requested_hex(
+                Some(script),
+                call,
+                &format!("{field}.unlockingScript"),
+            )?)
+            .map_err(|_| {
+                invalid(
+                    call,
+                    &format!("{field}.unlockingScript"),
+                    "an even-length hex string",
+                )
+            })?;
+            &decoded
+        };
+        if candidate.script != expected {
             return Err(invalid(
                 call,
                 &format!("tx.inputs[{i}].unlockingScript"),
@@ -203,13 +259,25 @@ fn match_input(
     Ok(())
 }
 
-fn outputs(tx: &beef::Transaction, call: &str, request: &Value) -> Result<()> {
+fn outputs(
+    tx: &beef::Transaction,
+    call: &str,
+    request: &Value,
+    typed: Option<&crate::wallet::CreateActionArgs>,
+) -> Result<()> {
+    let requested_count = request["outputs"].as_array().map_or(0, Vec::len);
     let mut available = HashMap::new();
     for (i, output) in tx.outputs.iter().enumerate() {
         amount(output.satoshis, call, &format!("tx.outputs[{i}].satoshis"))?;
-        *available
-            .entry((output.satoshis, hex::encode(&output.script)))
-            .or_insert(0usize) += 1;
+        // Zero requested outputs need no index; one needs only a slice match.
+        // Avoid hashing a large script twice for a single requested output.
+        if requested_count > 1 {
+            *available
+                .entry(output.satoshis)
+                .or_insert_with(HashMap::new)
+                .entry(output.script.as_slice())
+                .or_insert(0usize) += 1;
+        }
     }
     for (i, output) in request["outputs"]
         .as_array()
@@ -225,16 +293,32 @@ fn outputs(tx: &beef::Transaction, call: &str, request: &Value) -> Result<()> {
             &format!("{field}.satoshis"),
             MAX_MONEY,
         )?;
-        let script = requested_hex(
-            output.get("lockingScript"),
-            call,
-            &format!("{field}.lockingScript"),
-        )?;
+        let decoded;
+        let script = if let Some(output) = typed
+            .and_then(|a| a.outputs.as_ref())
+            .and_then(|a| a.get(i))
+        {
+            output.locking_script.as_slice()
+        } else {
+            decoded = hex::decode(requested_hex(
+                output.get("lockingScript"),
+                call,
+                &format!("{field}.lockingScript"),
+            )?)
+            .map_err(|_| {
+                invalid(
+                    call,
+                    &format!("{field}.lockingScript"),
+                    "an even-length hex string",
+                )
+            })?;
+            &decoded
+        };
         if request["options"]["randomizeOutputs"] == false {
             if tx
                 .outputs
                 .get(i)
-                .is_none_or(|o| o.satoshis != amount || hex::encode(&o.script) != script)
+                .is_none_or(|o| o.satoshis != amount || o.script != script)
             {
                 return Err(invalid(
                     call,
@@ -243,14 +327,25 @@ fn outputs(tx: &beef::Transaction, call: &str, request: &Value) -> Result<()> {
                 ));
             }
         } else {
-            let count = available.entry((amount, script)).or_default();
-            if *count == 0 {
+            if requested_count == 1
+                && tx
+                    .outputs
+                    .iter()
+                    .any(|o| o.satoshis == amount && o.script == script)
+            {
+                continue;
+            }
+            let count = available
+                .get_mut(&amount)
+                .and_then(|scripts| scripts.get_mut(script))
+                .filter(|count| **count > 0);
+            let Some(count) = count else {
                 return Err(invalid(
                     call,
                     "tx.outputs",
                     "every requested output with its requested amount and script",
                 ));
-            }
+            };
             *count -= 1;
         }
     }

@@ -34,12 +34,15 @@ mod review_projection;
 mod scalars;
 #[path = "result_values/timestamp.rs"]
 pub(crate) mod timestamp;
+mod wire;
 
+pub(crate) use action_binding::input_sources;
 #[cfg(feature = "http")]
 pub(super) use boundary::{normalize_numbers, response_bytes};
 pub(crate) use boundary::{request, wire_response_length};
 #[cfg(feature = "http")]
 pub(super) use review_projection::body as review_body;
+pub(crate) use wire::{signature as wire_signature, WireResult};
 
 type Object<'a> = IndexMap<String, &'a RawValue>;
 type Result<T> = std::result::Result<T, Error>;
@@ -108,22 +111,22 @@ pub(super) fn validate<'a>(
     )
 }
 
-/// The wire reader has already established types and framing. BEEF remains
-/// bytes there: the shared action/output validator parses each envelope once.
-pub(crate) fn wire(
-    call: &str,
-    result: &impl serde::Serialize,
-    request: &serde_json::Value,
-) -> Result<()> {
-    let text = serde_json::to_vec(result).map_err(|e| Error::WalletError(e.to_string()))?;
-    validate_context(call, &text, request, call).map(|_| ())
-}
-
+#[cfg(feature = "http")]
 fn validate_context<'a>(
     call: &str,
     text: &'a [u8],
     request: &serde_json::Value,
     context: &str,
+) -> Result<Option<raw_tree::Snapshot<'a>>> {
+    validate_with_bytes(call, text, request, context, &bytes::Fields::default())
+}
+
+fn validate_with_bytes<'a>(
+    call: &str,
+    text: &'a [u8],
+    request: &serde_json::Value,
+    context: &str,
+    bytes: &bytes::Fields<'_>,
 ) -> Result<Option<raw_tree::Snapshot<'a>>> {
     let Ok(raw) = serde_json::from_slice::<&RawValue>(text) else {
         return Ok(None);
@@ -135,7 +138,7 @@ fn validate_context<'a>(
         ))
     })?;
     match call {
-        "createAction" | "signAction" => actions::validate(&result, call, request),
+        "createAction" | "signAction" => actions::validate(&result, call, request, bytes),
         "encrypt" => bytes::read(
             member(&result, "ciphertext"),
             call,
@@ -150,12 +153,12 @@ fn validate_context<'a>(
         "createHmac" => {
             bytes::read(member(&result, "hmac"), call, "hmac", Some(32), None).map(|_| ())
         }
-        "createSignature" => signature(&result, call),
+        "createSignature" => signature(&result, call, bytes),
         "revealCounterpartyKeyLinkage" | "revealSpecificKeyLinkage" => {
-            scalars::linkage(&result, call, request)
+            scalars::linkage(&result, call, request, bytes)
         }
         "listActions" => lists::actions(&result, call, request),
-        "listOutputs" => lists::outputs(&result, call, request),
+        "listOutputs" => lists::outputs(&result, call, request, bytes),
         "acquireCertificate" => certificates::acquire(raw, call, request),
         "listCertificates" | "discoverByIdentityKey" | "discoverByAttributes" => {
             certificates::list(&result, call, request)
@@ -174,8 +177,8 @@ pub(super) fn snapshot(call: &str, text: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn signature(result: &Object<'_>, call: &str) -> Result<()> {
-    let encoded = bytes::read(
+fn signature(result: &Object<'_>, call: &str, bytes: &bytes::Fields<'_>) -> Result<()> {
+    let encoded = bytes.read(
         member(result, "signature"),
         call,
         "signature",

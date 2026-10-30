@@ -458,7 +458,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: CreateActionArgs,
         originator: Option<&str>,
     ) -> Result<CreateActionResult, Error> {
-        let binding = Binding::new("createAction", &args)?;
+        let binding = Binding::create_action(&args)?;
         let mut writer = WireWriter::new();
 
         // Description
@@ -862,6 +862,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: ListOutputsArgs,
         originator: Option<&str>,
     ) -> Result<ListOutputsResult, Error> {
+        crate::wallet::validation::client::limit(args.limit)?;
         let binding = Binding::new("listOutputs", &args)?;
         let mut writer = WireWriter::new();
 
@@ -1055,6 +1056,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: ListCertificatesArgs,
         originator: Option<&str>,
     ) -> Result<ListCertificatesResult, Error> {
+        crate::wallet::validation::client::limit(args.limit)?;
         let binding = Binding::new("listCertificates", &args)?;
         let mut writer = WireWriter::new();
 
@@ -1151,6 +1153,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: ProveCertificateArgs,
         originator: Option<&str>,
     ) -> Result<ProveCertificateResult, Error> {
+        crate::wallet::validation::client::prove_certificate(&args)?;
         let binding = Binding::new("proveCertificate", &args)?;
         let mut writer = WireWriter::new();
 

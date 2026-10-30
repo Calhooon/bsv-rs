@@ -1,8 +1,7 @@
 //! Validation Helpers for Wallet Operations.
 //!
 //! This module provides comprehensive validation functions for wallet API inputs.
-//! All validation functions follow a consistent pattern of returning
-//! descriptive errors that include the parameter name and requirement.
+//! Errors name the parameter and its requirement.
 //!
 //! # Overview
 //!
@@ -30,6 +29,7 @@
 
 use crate::error::{Error, Result};
 use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TxId, MAX_SATOSHIS};
+pub(crate) mod client;
 mod create_action_input;
 pub(crate) mod crypto;
 mod internalize;

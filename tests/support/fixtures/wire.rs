@@ -320,7 +320,7 @@ pub async fn record(suite: &mut Suite) {
     for call in calls() {
         let mut entries = Vec::new();
         for case in cases::cases(call) {
-            entries.push(run_case(call, case).await);
+            entries.push(run_case(call, cases::accepting_wire_action(call, case)).await);
         }
         assert_eq!(entries.len(), 2, "{call}: case count");
         suite.add(

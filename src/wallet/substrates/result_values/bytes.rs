@@ -6,7 +6,52 @@ use crate::wallet::substrates::byte_fields;
 use num_traits::ToPrimitive;
 use serde::de::{DeserializeSeed, SeqAccess, Visitor};
 use serde_json::value::RawValue;
+use std::borrow::Cow;
 use std::fmt;
+
+/// Wire fields already checked for byte elements by their typed reader.
+/// JSON callers leave this empty and use the same predicates on decoded bytes.
+#[derive(Default)]
+pub(super) struct Fields<'a> {
+    pub(super) binary: Vec<(&'static str, &'a [u8])>,
+    pub(super) action: Option<&'a crate::wallet::CreateActionArgs>,
+    pub(super) outputs: Option<&'a [crate::wallet::WalletOutput]>,
+}
+
+impl Fields<'_> {
+    pub(super) fn read<'a>(
+        &'a self,
+        raw: Option<&RawValue>,
+        call: &str,
+        field: &str,
+        exact: Option<usize>,
+        maximum: Option<usize>,
+    ) -> Result<Cow<'a, [u8]>> {
+        if let Some((_, bytes)) = self.binary.iter().find(|(name, _)| *name == field) {
+            bounds(bytes.len(), call, field, exact, maximum)?;
+            Ok(Cow::Borrowed(bytes))
+        } else {
+            read(raw, call, field, exact, maximum).map(Cow::Owned)
+        }
+    }
+}
+
+fn bounds(
+    length: usize,
+    call: &str,
+    field: &str,
+    exact: Option<usize>,
+    maximum: Option<usize>,
+) -> Result<()> {
+    let maximum = maximum.unwrap_or(byte_fields::MAX_BYTES);
+    if length > maximum {
+        return Err(invalid(call, field, &format!("at most {maximum} bytes")));
+    }
+    if let Some(exact) = exact.filter(|n| length != *n) {
+        return Err(invalid(call, field, &format!("{exact} bytes")));
+    }
+    Ok(())
+}
 
 pub(super) fn read(
     raw: Option<&RawValue>,
@@ -29,16 +74,7 @@ pub(super) fn read(
             .and_then(|value| byte_fields::byte_array(&value)),
     }
     .ok_or_else(|| invalid(call, field, "an array of bytes"))?;
-    if bytes.len() > maximum {
-        return Err(invalid(call, field, &format!("at most {maximum} bytes")));
-    }
-    if exact.is_some_and(|length| bytes.len() != length) {
-        return Err(invalid(
-            call,
-            field,
-            &format!("{} bytes", exact.unwrap_or(0)),
-        ));
-    }
+    bounds(bytes.len(), call, field, exact, Some(maximum))?;
     Ok(bytes)
 }
 

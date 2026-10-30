@@ -271,25 +271,35 @@ impl Envelope {
         (seen.len() == self.transactions.len()).then_some(tx)
     }
 
-    pub fn subject(&self, expected: Option<&str>) -> Option<Transaction> {
-        if let Some(tx) = self.partial_atomic_subject() {
-            return Some(tx.clone());
-        }
-        let requested = expected
-            .and_then(|id| self.transactions.get(&id.to_ascii_lowercase()))
-            .and_then(Option::as_ref);
-        if let Some(tx) = requested {
-            return Some(tx.clone());
-        }
-        if let Some(id) = &self.atomic {
-            return self.transactions.get(id).and_then(Clone::clone);
-        }
-        self.transactions.values().rev().find_map(Clone::clone)
+    pub fn subject(mut self, expected: Option<&str>) -> Option<Transaction> {
+        let id = if let Some(tx) = self.partial_atomic_subject() {
+            tx.txid.clone()
+        } else if let Some(id) = expected
+            .map(str::to_ascii_lowercase)
+            .filter(|id| self.transactions.get(id).is_some_and(Option::is_some))
+        {
+            id
+        } else if let Some(id) = &self.atomic {
+            id.clone()
+        } else {
+            self.transactions
+                .iter()
+                .rev()
+                .find(|(_, tx)| tx.is_some())?
+                .0
+                .clone()
+        };
+        self.transactions.swap_remove(&id).flatten()
     }
 }
 
-pub(super) fn read(raw: Option<&RawValue>, call: &str, field: &str) -> Result<Envelope> {
-    let encoded = bytes::read(raw, call, field, None, None)?;
+pub(super) fn read(
+    raw: Option<&RawValue>,
+    call: &str,
+    field: &str,
+    bytes: &bytes::Fields<'_>,
+) -> Result<Envelope> {
+    let encoded = bytes.read(raw, call, field, None, None)?;
     parse(&encoded).map_err(|_| invalid(call, field, "a complete, exactly framed BEEF envelope"))
 }
 
@@ -298,8 +308,9 @@ pub(super) fn transaction(
     call: &str,
     field: &str,
     expected: Option<&str>,
+    bytes: &bytes::Fields<'_>,
 ) -> Result<Transaction> {
-    let encoded = bytes::read(raw, call, field, None, None)?;
+    let encoded = bytes.read(raw, call, field, None, None)?;
     parse(&encoded)
         .ok()
         .and_then(|beef| beef.subject(expected))

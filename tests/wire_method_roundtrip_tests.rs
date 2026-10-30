@@ -1211,14 +1211,31 @@ mod action_tests {
     /// Tests createAction request serialization with all fields populated.
     #[tokio::test]
     async fn test_roundtrip_create_action_populated() {
+        use bsv_rs::script::{LockingScript, UnlockingScript};
+        use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
+
+        // #487: use a framed source so this remains a serialization test,
+        // rather than an inputBEEF argument refusal before transmission.
+        let mut source = Transaction::new();
+        let mut funding = TransactionInput::new(hex::encode(sample_txid()), 0);
+        funding.unlocking_script = Some(UnlockingScript::new());
+        source.add_input(funding).unwrap();
+        source
+            .add_output(TransactionOutput::new(
+                50_000,
+                LockingScript::from_binary(&[0x51]).unwrap(),
+            ))
+            .unwrap();
+        source.merkle_path = Some(MerklePath::from_coinbase_txid(&source.id(), 800_000));
+        let source_id: [u8; 32] = hex::decode(source.id()).unwrap().try_into().unwrap();
         let transceiver = create_loopback();
         let result = transceiver
             .create_action(
                 CreateActionArgs {
                     description: "test action description".to_string(),
-                    input_beef: Some(vec![0xDE, 0xAD, 0xBE, 0xEF]),
+                    input_beef: Some(source.to_atomic_beef(true).unwrap()),
                     inputs: Some(vec![CreateActionInput {
-                        outpoint: Outpoint::new(sample_txid(), 0),
+                        outpoint: Outpoint::new(source_id, 0),
                         input_description: "test input description".to_string(),
                         unlocking_script: Some(vec![0x00, 0x14, 0xab]),
                         unlocking_script_length: None,
@@ -1252,7 +1269,11 @@ mod action_tests {
             .await;
 
         // ProtoWallet returns error for createAction, but the request serialized OK
-        assert!(matches!(result, Err(Error::WalletError(_))));
+        assert!(
+            matches!(result, Err(Error::WalletError(ref words))
+            if words == "wallet error (code 1): createAction requires a full wallet implementation"),
+            "the valid request must reach the processor: {result:?}"
+        );
     }
 
     /// Tests createAction with minimal args (only description, no inputs/outputs/options).

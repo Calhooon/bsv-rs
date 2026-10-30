@@ -152,14 +152,13 @@ export async function recordWire487(sdk) {
     let request, value, error
     const client = new WalletWireTransceiver({ async transmitToWallet(frame) { request = Utils.toHex(frame); return response } })
     try {
-      if (c.mode === 'snapshot') sdk.snapshotWalletResultRequest(c.call, structuredClone(c.args))
-      else if (c.mode === 'result') sdk.validateWalletResult(c.call, JSON.parse(c.bodyText), sdk.snapshotWalletResultRequest(c.call, structuredClone(c.args)))
-      else value = await client[c.call](structuredClone(c.args), 'fixtures.invalid')
+      value = await client[c.call](structuredClone(c.args), 'fixtures.invalid')
     } catch (e) { error = { message: e.message, code: e.code ?? null } }
     if (!request && !['row_35', 'row_49', 'row_88'].includes(c.group)) { excluded.push({ name: c.name, reason: 'request: ' + error?.message }); continue }
     const row = c.group.startsWith('row_') ? Number(c.group.slice(4))
       : c.group === 'signature' ? 14 : c.name === 'createAction_exclusive_signable' ? 31 : c.group === 'certificates' ? 74 : 0
     rows.push({ name: c.name, row, call: c.call, args: c.args,
+      ...(!request ? { argument_side: true } : {}),
       request_hex: request ?? null, frame_sha256: hash(response), ...compress(response), reference: error ?? { accepted: true } })
   }
   // A complete WriterUint8Array frame one byte above the raw response cap.

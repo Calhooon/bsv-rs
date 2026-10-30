@@ -176,12 +176,17 @@ pub(super) fn validate(result: &Object<'_>, call: &str) -> Result<()> {
     }
 }
 
-pub(super) fn linkage(result: &Object<'_>, call: &str, request: &Value) -> Result<()> {
+pub(super) fn linkage(
+    result: &Object<'_>,
+    call: &str,
+    request: &Value,
+    bytes: &bytes::Fields<'_>,
+) -> Result<()> {
     let prover = key(member(result, "prover"), call, "prover")?;
     let verifier = key(member(result, "verifier"), call, "verifier")?;
     let counterparty = key(member(result, "counterparty"), call, "counterparty")?;
     for field in ["encryptedLinkage", "encryptedLinkageProof"] {
-        bytes::read(member(result, field), call, field, None, None)?;
+        bytes.read(member(result, field), call, field, None, None)?;
     }
     if call == "revealCounterpartyKeyLinkage" {
         timestamp(member(result, "revelationTime"), call)?;
