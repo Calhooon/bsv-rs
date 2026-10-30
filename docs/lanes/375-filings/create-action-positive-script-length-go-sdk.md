@@ -1,12 +1,12 @@
 keeper's word first
 
-# Refuse zero unlockingScriptLength as BRC-100 specifies
+# Validate positive createAction unlockingScriptLength
 
-Repository: bsv-blockchain/ts-stack, bsv-blockchain/go-sdk
+Repository: bsv-blockchain/go-sdk
 
 Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 57: A createAction input's unlockingScriptLength of 0 is refused (Unreleased, bsv-rs#282)…
 
-With unlockingScript omitted and unlockingScriptLength 0, TypeScript validateCreateActionInput uses a zero minimum and Go has no equivalent validation. The linked witness expects WERR_INVALID_PARAMETER. An actual empty unlockingScript is already refused by the reference; keep those two cases distinct.
+With unlockingScript omitted and unlockingScriptLength 0, Go writes the value without checking BRC-100's positive-integer range. The linked witness expects WERR_INVALID_PARAMETER. Validate the supplied length before serialization, with the BRC-100 range 1 through 4294967295. The TypeScript zero-minimum validator has its own draft.
 
 Witness:
 
@@ -15,7 +15,6 @@ Witness:
 
 Pinned reference reading:
 
-- [ts-stack@edf6e03da packages/sdk/src/wallet/validationHelpers.ts:574-603](https://github.com/bsv-blockchain/ts-stack/blob/edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9/packages/sdk/src/wallet/validationHelpers.ts#L574)
 - [go-sdk@2ca481c59 wallet/serializer/create_action_args.go:56](https://github.com/bsv-blockchain/go-sdk/blob/2ca481c5931b987a0c8f48bb341c70b7477b6b07/wallet/serializer/create_action_args.go#L56)
 
 BRC reading: [BRCs@5119a9b51 wallet/0100.md:649](https://github.com/bsv-blockchain/BRCs/blob/5119a9b5148e9ec90eb4865b16f9f732a29703df/wallet/0100.md#L649).

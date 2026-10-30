@@ -1,5 +1,3 @@
-keeper's word first
-
 # Carry local KVStore action options and authenticate selected outputs before signing
 
 Repository: bsv-blockchain/go-sdk
@@ -22,3 +20,5 @@ Pinned reference reading:
 BRC reading: [BRCs@5119a9b51 wallet/0100.md:302-309](https://github.com/bsv-blockchain/BRCs/blob/5119a9b5148e9ec90eb4865b16f9f732a29703df/wallet/0100.md#L302). The requested BEEF must correspond to the requested inputs before signing.
 
 Evidence status: source-read at the pins in this lane; the linked Rust tests/recorded fixtures are the reproducible witness, not a claim that Go or TypeScript was rerun here. Any new upstream regression test should construct its keys using a deterministic fixture helper; this draft contains no private-key literal.
+
+Filing route: The request concerns local wallet-call behavior, not BRC-100 integer widths or the charter's BEEF validity rules; it follows the captain's filing path.

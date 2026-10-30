@@ -1,10 +1,10 @@
-# Bound authenticated HTTP responses and reconcile certificateRequest intake
+# Reconcile HTTP certificateRequest mapping with full Peer intake
 
-Repository: bsv-blockchain/go-sdk, bsv-blockchain/ts-stack
+Repository: bsv-blockchain/ts-stack
 
 Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 75: SimplifiedFetchTransport follows the newer reference's six response bounds and mappings…
 
-Go reads bodies and signed headers without the six reference caps, does not bind the returned request ID and rejects certificateRequest as nongeneral. For TypeScript, its own HTTP certificateRequest mapping omits initialNonce while full Peer intake requires it; the linked fixture records the exact intake refusal before invoking the handler. Resolve that producer/consumer disagreement. The #426 whitespace/preimage difference is already closed and is not being refiled.
+The HTTP certificateRequest mapping omits initialNonce, while the same SDK's full Peer intake requires it. The linked fixture records the exact intake refusal before the certificate handler is invoked. Reconcile the producer and consumer so a mapped certificateRequest reaches its handler. The #426 whitespace/preimage difference is already closed and is not being refiled; Go response limits have their own draft.
 
 Witness:
 
@@ -15,8 +15,6 @@ Pinned reference reading:
 
 - [ts-stack@edf6e03da packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:234-428](https://github.com/bsv-blockchain/ts-stack/blob/edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9/packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts#L234)
 - [ts-stack@edf6e03da packages/sdk/src/auth/AuthMessageValidation.ts:363-367](https://github.com/bsv-blockchain/ts-stack/blob/edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9/packages/sdk/src/auth/AuthMessageValidation.ts#L363)
-- [go-sdk@2ca481c59 auth/transports/simplified_http_transport.go:125-237](https://github.com/bsv-blockchain/go-sdk/blob/2ca481c5931b987a0c8f48bb341c70b7477b6b07/auth/transports/simplified_http_transport.go#L125)
-- [go-sdk@2ca481c59 auth/authpayload/http.go:165-178,226-251,381-395](https://github.com/bsv-blockchain/go-sdk/blob/2ca481c5931b987a0c8f48bb341c70b7477b6b07/auth/authpayload/http.go#L165)
 
 BRC reading: [BRCs@5119a9b51 peer-to-peer/0103.md:145-172](https://github.com/bsv-blockchain/BRCs/blob/5119a9b5148e9ec90eb4865b16f9f732a29703df/peer-to-peer/0103.md#L145). The BRC message shape and the SDK intake must agree; the concrete byte caps are reference safeguards.
 
