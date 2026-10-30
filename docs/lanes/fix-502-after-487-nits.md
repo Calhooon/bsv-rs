@@ -1,0 +1,19 @@
+Every gate and every test runs in the foreground, in your turn: no background job, no subagent; the REPORT is the last thing you write, and a turn that ends with a command still running is a stopped lane.
+
+# #502: three nits after #487 (the redundant `#[path]` attributes, the literal 256 MiB beside `boundary::MAX_BYTES`, the dhat pin's fixture)
+
+Branch `lane/fix-502-after-487-nits` from `origin/beta`'s tip (name the base sha in your REPORT). No behaviour change; the issue's three notes come from PR #493's second review (`cca runs --show review-487-2` holds the REPORT; the issue quotes them).
+
+## What to do
+
+1. `src/wallet/substrates/result_values.rs:9-36`: the 13 `#[path = "result_values/<file>.rs"]` attributes are redundant since the files sit beside the module at the paths Rust resolves by default: remove them, keep the `mod` lines and their order; `cargo build --all-features` identical in behaviour (no file moves).
+2. `src/wallet/substrates/result_values/wire.rs:43-47`: the literal `256 * 1024 * 1024` and the words `at most 268435456 total bytes` sit beside `boundary.rs`'s `MAX_BYTES` (`:9`) and #496's `MAX_WIRE_REQUEST_BYTES` (`:11`): name the bound through the shared constant (a `pub(crate)` re-export or a `boundary::` path, the words formatted from it), so one definition carries the number; the wire bytes and the refusal words unchanged (the recorded frames and words of #487 and #496 pin them: run their tests).
+3. `tests/memory_profiling.rs:47`: the dhat pin's `wire_result_cost_487::fixture(64, false)` skips the overlay path the review named (read the issue's third note for the exact words and the fixture's two parameters in `tests/support/wire_result_cost_487.rs`): make the pin exercise the path the review asked for, re-run the pin under CI's command `cargo test --test memory_profiling --all-features -- --test-threads=1` (the whole file, about 14 minutes), and re-read the pin's budget: if the measured peak moves, the pin's number moves with its reason in the entry; the pin stays exact where it was exact.
+4. The entry under `[Unreleased]`: three lines, what and why, the pin's numbers before and after; `src/wallet/substrates/CLAUDE.md`'s rows if a count or a path changes.
+5. The gate, every command in the foreground: `cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings` and with `cargo +1.99.0`; `cargo test --features "full,http"` with one `--test` per file matching `wallet_*`, `wire_*`, `arch_*`, `fixtures_replay*`; `cargo test --lib --features full wallet`; `cargo test --doc --all-features`; `cargo test --test memory_profiling --all-features -- --test-threads=1`; `cargo build --target wasm32-unknown-unknown --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm"`; `cargo semver-checks --baseline-rev <base> --release-type patch`; `tools/ratchet/run` on the built target; `gitleaks git --redact --no-banner --exit-code 1 --log-opts="origin/beta..HEAD" .` from the repo root. One commit, no push.
+
+Rules: never end your turn with a command running in the background; commit on the branch, never push; no test or probe on a default URL or port (a MetaNet Client listens on 3301, 3321 and 2121 on this machine; another session's process on 3390); do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole (the reference and the downstreams are read by their named paths); vectors are written by recorders, never by hand; scratch copies under `$TMPDIR` with their own `CARGO_TARGET_DIR`, removed at the end; never `rustup default` or `rustup override` (use `cargo +1.99.0`); a new dependency needs the captain's word first.
+
+## Report
+
+The base sha and the tip; the three changes by file:line; the pin's peaks before and after under CI's command; the gate table; anything unverified; nothing else.
