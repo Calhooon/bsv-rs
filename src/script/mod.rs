@@ -84,10 +84,8 @@ pub use evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
 pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
-#[cfg(feature = "transaction")]
-pub(crate) use input_flags::checked_input_script_flags;
 #[cfg(feature = "block")]
-pub use input_flags::input_script_flags;
+pub use input_flags::{input_script_flags, Word};
 pub use locking_script::LockingScript;
 #[cfg(feature = "block")]
 pub use not_judged::NotJudgedCause;

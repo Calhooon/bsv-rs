@@ -13,6 +13,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Tests | Feature Gate | Description |
 |------|------:|-------------|-------------|
+| `script_word_for_input_520.rs` | 2 (+3 streaming) | `script,block` (`transaction` for streaming) | Public typed signature compile-RED on the base; 102 rows under both words match the legacy flags/texts, 97 rows through each synchronous stream path, four conversion-priority cases and seven independent spend/coin execution witnesses; no-tip fallback stays in the resolver |
 | `auth_fetch_423.rs` | 7 | `auth,http` | Node-recorded request bytes, correlation, timeout, retry counter, header and body rules; RED is the absent API on base |
 | `auth_fetch_423_certificates.rs` | 4 | `auth,http` | Handshake certificate queue/grace, #416 intake refusal, handler/explicit retry, receipt/drain |
 | `auth_fetch_423_payment.rs` | 5 | `auth,http,wallet` | BRC-105 action, labels, known-txids, reused transaction and both exhausted budgets |

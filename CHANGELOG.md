@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: a public typed input-word resolver (#520)
+
+`script::Word::{Standard, Block}` and
+`ChainParams::word_for_input(word: Word, spend_height: Option<u32>, source_height: Option<u32>) -> Result<ScriptFlags, NotJudgedCause>`
+expose the existing private composition under the `script` and `block` features,
+on the [keeper's 2026-10-30 18:12Z ruling](https://github.com/Calhooon/bsv-rs/issues/520#issuecomment-6530114599).
+This is a semver-minor addition of public items (`cargo semver-checks --release-type minor`).
+`Standard` is the live door's policy word; `Block` is the consensus word for a
+mined transaction. `checked_input_script_flags` stays `pub(crate)`;
+`input_script_flags` retains its signature, flags and error texts.
+
+The no-tip rule is now inside the crate: a `None` spend height uses the latest
+era the parameters know, `max(genesis_height, chronicle_height)`; an activation
+is held back only for a named spend height that has not reached it. A `None`
+source height is an unmined parent taking the spend's era. Transaction flags
+follow the spend; only the two UTXO-era bits follow the source. The method's
+docs cite the live door (`bsv-wallet-toolbox-rs@819dbcef`,
+`src/storage/sqlx/beef_verification/live_word.rs:55-70`) and the inclusive era
+table (`src/script/flags.rs:102-110`). The existing transaction and stream
+verifiers now call the method for their standard word.
+
+Migration for the toolbox: check tip + 1 and convert the proven source height
+to `u32`, then call `chain.word_for_input(Word::Standard, spend_height, source_height)`;
+delete `refusal_cause` and the mirrored activation/era order and no-tip fallback.
+The resolver checks zero Genesis, zero Chronicle, pre-Genesis spend, then
+pre-Genesis coin. Conversion refusals remain at the adapters. One existing
+stream edge case differs from the issue's shorthand tip-first order: when both
+the source and tip overflow, `SourceHeightOverflow` wins because the stream
+converts its `u64` source first. That behavior is preserved and pinned.
+
+`tests/script_word_for_input_520.rs` pins the public signature (compile-RED on
+the base), 102 height/activation rows under both words against the legacy
+selector, 97 rows expressible through each synchronous stream path, four
+conversion-priority cases, and seven execution witnesses for independent
+spend/coin era bits. Synthetic BEEF and BUMPs use the crate's writers.
+
 ### Added: certificate-response preimage witness across three SDKs (#375)
 
 `tests/auth_certificate_preimage_375.rs` builds and signs two certificates
