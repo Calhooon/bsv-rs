@@ -21,7 +21,7 @@ pub(crate) fn create_action_sources(args: &CreateActionArgs) -> Result<HashMap<S
     .map_err(|_| invalid_parameter("inputBEEF", "a complete, exactly framed BEEF envelope"))
 }
 
-/// `validationHelpers.ts:1202,1653`: validateInteger(limit, 'limit', 10, 1, 10000).
+/// `validationHelpers.ts:1199,1647`: validateInteger(limit, 'limit', 10, 1, 10000).
 pub(crate) fn limit(limit: Option<u32>) -> Result<()> {
     match limit {
         Some(0) => Err(invalid_parameter("limit", "at least 1 length.")),
@@ -30,7 +30,7 @@ pub(crate) fn limit(limit: Option<u32>) -> Result<()> {
     }
 }
 
-/// `validationHelpers.ts:1476-1480,87-96`: validateCertificateFields first
+/// `validationHelpers.ts:1476-1480,93-96`: validateCertificateFields first
 /// validates its record's safe own keys, ahead of checking individual names.
 pub(crate) fn prove_certificate(args: &ProveCertificateArgs) -> Result<()> {
     if args
