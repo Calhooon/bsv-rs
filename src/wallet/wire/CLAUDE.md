@@ -355,8 +355,9 @@ u32 cast (`serializer/list_actions.go:255,282`, `list_outputs.go:149`,
 
 At the nine enumerated `ts-stack@edf6e03 WalletWireTransceiver.ts` sites,
 `result_validation.rs` snapshots request bindings before the await and calls
-`substrates::result_values` on the answer's existing BRC-100 JSON form. It
-returns the original typed result. Refusals are `Error::WalletError`, no SDK
+`substrates::result_values` on the typed answer: the byte fields as slices
+(`result_values/wire.rs`), the metadata alone serialized for the shared JSON
+predicates. It returns the original typed result. Refusals are `Error::WalletError`, no SDK
 code, with the reference's `Invalid <call> result <field>: expected …` text.
 The existing wire frame/reader refusals retain their own reference words.
 
@@ -372,13 +373,17 @@ The existing wire frame/reader refusals retain their own reference words.
 | listCertificates :1551 | Certificate/page/keyring readers | Shared certificate/filter/keyring rows per entry; no BEEF |
 | proveCertificate :1618 | Counted map, no key/value/set checks | Shared keyring/field-set rows; reference safe unique key reader; no BEEF |
 
-Every site pays one result JSON serialization and global snapshot scan;
-no returned BEEF is parsed in the typed reader, no shared row parses one a
-second time, and no result is decoded or re-encoded after validation. The
+Every site serializes the metadata alone (byte fields as `[]` stand-ins) for
+the shared predicates and reads the byte fields on the slice; the request's
+inputBEEF is parsed once before sending and each returned BEEF once; no
+result is decoded or re-encoded after validation (a 64 MiB createAction
+answer costs about 2.2 times the base's call time at the same peak memory). The
 whole-response limit is checked before decoding (`T:110–123`); the 16 MiB
 certificate limit now includes the prefix (`Certificate.ts:86–92,329–330`).
 `tests/wallet_wire_result_validation_487.rs` embeds only recorder-produced
-frames and expansion recipes: 36 new-row tests. The complete R01–R88 census,
+frames and expansion recipes: 43 tests (the 36 new-row tests, group 0's 48
+accepting frames, the three argument refusals before sending, the two #183
+pins); the heap pin is in `tests/memory_profiling.rs`. The complete R01–R88 census,
 including the typed / #473 / newly enforced distinctions and gaps outside
 these nine calls, is the Wire column of `../substrates/CLAUDE.md`.
 
@@ -387,8 +392,10 @@ outside the nine specified for #487 and their remaining validation gaps are
 listed in the census. All four totals remain `u32`; the keeper's #467 ruling
 is unchanged. The Go client at `2ca481c` calls result deserializers directly
 (`wallet/substrates/wallet_wire_transceiver.go:49,63,119,155,167,227,251,263,275`),
-without this request-bound result pass. Its signature deserializer does parse
-DER (`wallet/serializer/create_signature.go:90–107`).
+without this request-bound result pass, and sends the R35, R49 and R88
+arguments without checking them (`wallet_wire_transceiver.go:38-50`), where
+this crate refuses them before sending as the TypeScript client does. Its
+signature deserializer does parse DER (`wallet/serializer/create_signature.go:90–107`).
 
 ## Cross-SDK Compatibility
 

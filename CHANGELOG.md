@@ -264,7 +264,10 @@ The deserializers read fields and check parsing/completeness
 `sign_action_result.go:25–51`, `list_outputs.go:130–191`), without binding
 those facts to the request or checking BEEF commitments/conservation.
 Go does parse signature DER at `serializer/create_signature.go:90–107`;
-this is a typed-read check, not the shared result pass. Rust follows the
+this is a typed-read check, not the shared result pass. Go's client also
+sends the R35, R49 and R88 arguments without checking them
+(`wallet/substrates/wallet_wire_transceiver.go:38-50`), where this crate
+refuses them before sending as the TypeScript client does. Rust follows the
 TypeScript client at the enumerated sites. The keeper's 2026-10-26 ruling
 on #467 keeps all four totals `u32` at every layer; reference safe integers
 above that range remain a stated representation difference.
