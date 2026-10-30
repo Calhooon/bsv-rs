@@ -83,7 +83,10 @@ TypeScript reference decides this change.
 ### Fixed: local removal stops after two rounds (#483)
 
 `LocalKVStore::remove` counts completed page spends and refuses a third spend,
-even when every reported total shrinks. The keeper's policy (02:1xZ on #483)
+even when every reported total shrinks. Before this change the loop had no
+bound: a wallet that kept answering fresh, authenticated outputs under a total
+that did not shrink kept the removal spending forever, page after page, as the
+reference's `LocalKVStore.ts:574-590` still does. The keeper's policy (02:1xZ on #483)
 is two rounds: the reference keeps one current token per key, and a second
 round covers a token written during the first. One token per page under a
 larger total is an inconsistent wallet answer; ten thousand spends for one

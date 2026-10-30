@@ -20,7 +20,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
-| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath; one current token plus one written during the first round, both stated reference divergences | 197 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath (one current token per key plus one written during the first round); #479 and #483 both stated reference divergences | 197 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
