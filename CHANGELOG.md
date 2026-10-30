@@ -69,8 +69,9 @@ suffixes as the toolbox table):
 | Off-curve locking key `02` plus 32 zero bytes | `invalid public key: Point not on curve` | `Invalid point` |
 | Non-PushDrop token script `51` | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
 
-`tests/kvstore_local_parser_words_489.rs` has one regression per required
-failure class plus a hybrid-parity regression, all five RED on scratch base
+`tests/kvstore_local_parser_words_489.rs` holds thirteen tests: the first
+commit's five (one regression per required failure class plus a hybrid-parity
+regression, all five RED on scratch base
 `bcea54a1fb065e39039ce9f38e70eb316084a604` with the old whole wrapped text,
 then green. They compare the full message and `KvStoreLocalError` variant
 against 36 recorded cases (18 corruptions, both get and set), and pin the
@@ -87,7 +88,9 @@ padding, no hybrid keys, no x reduced mod p. At `ts-stack@edf6e03`,
 `hex.ts:28-30` pads odd hex, `Point.ts:303-325` accepts on-curve hybrid keys
 with matching parity, and `Point.ts:365-384` reduces x modulo p. Thus
 `PublicKey.fromString` (`PublicKey.ts:49-51`, `Point.ts:345-347`) accepts the
-four keys below that `PublicKey::from_hex` refuses here. A token with either
+key classes the table below samples (odd-length keys such as `3`+Gx and
+`4`+Gx+Gy, hybrid keys with the matching parity, and any x reduced mod p in
+compressed, uncompressed or hybrid form) that `PublicKey::from_hex` refuses here. A token with either
 accepted noncanonical key push decodes there, then fails the canonical
 envelope check (`LocalKVStore.ts:278-282`, `PushDropValidation.ts:73-74`).
 Here it fails key parsing earlier. The words here are the parser's own,
@@ -112,6 +115,11 @@ site to lock-before is a separate behavior decision.
 | Token key `02` + (p+1) | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Point not on curve` | `reference_decodes_reduced_x_token_but_local_keeps_native_words_489` |
 | `51 75 <G> ac` | `script.chunks[0].data must have value` | `Unexpected PushDrop token field count` | `lock_after_one_field_reaches_local_field_count_not_reference_decode_489` |
 | `51 52 6d <G> ac` | `script.chunks[0].data must have value` | `PushDrop token must use the canonical PushDrop envelope` | `lock_after_two_fields_reaches_local_envelope_not_reference_decode_489` |
+
+The reference's words in the two lock-after rows come from its lock-before
+parse of the first chunk, so they vary with it: a first chunk that is a data
+push but no key (`00 75 <G> ac`) gets `Unknown point format` there; here the
+field count or the envelope check speaks, as in the rows.
 
 The recorder now writes 52 cases (26 inputs, each for get and set), including
 an explicit `parser_accepted` verdict for these eight inputs. Two Node
