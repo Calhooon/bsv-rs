@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 64: Transaction::verify takes the caller's memory budget as the reference's third…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 65: Transaction::verify takes the caller's memory budget as the reference's third…
 
 The increment and sum witnesses at 536870888 bits plus one, and the numeric-left-shift BigInt limit, escape the reference verify call as RangeError instead of a script verdict or local-budget refusal. Wrap engine failure at the correct phase and retain the distinction between invalid input and a caller resource decline. Do not impose node limits on the SDK default: the explicit node word remains separate.
 

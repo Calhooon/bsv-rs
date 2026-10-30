@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 70: The contacts manager and the key-value stores send signAction the…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 71: The contacts manager and the key-value stores send signAction the…
 
 Compare the linked two-token wallet-call traces with LocalKVStore.ts and completeBoundAction.ts. Go sends only Reference and Spends to SignAction, and its older lookup decodes the last output without the exact BEEF/key/signature checks. The reference forces bound-action options, authenticates each selected token, and refuses an invalid template before signing. Rust ownership and absent Go global-store/contact helpers are not defects requested here.
 

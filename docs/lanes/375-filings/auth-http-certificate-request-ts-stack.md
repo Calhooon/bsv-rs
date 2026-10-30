@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 75: SimplifiedFetchTransport follows the newer reference's six response bounds and mappings…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 76: SimplifiedFetchTransport follows the newer reference's six response bounds and mappings…
 
 The HTTP certificateRequest mapping omits initialNonce, while the same SDK's full Peer intake requires it. The linked fixture records the exact intake refusal before the certificate handler is invoked. Reconcile the producer and consumer so a mapped certificateRequest reaches its handler. The #426 whitespace/preimage difference is already closed and is not being refiled; Go response limits have their own draft.
 

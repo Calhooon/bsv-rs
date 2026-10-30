@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 67: SimplifiedFetchTransport takes a caller's reqwest::Client (with_client, the reference's fetchClient, ts-stack@edf6e03…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 68: SimplifiedFetchTransport takes a caller's reqwest::Client (with_client, the reference's fetchClient, ts-stack@edf6e03…
 
 Exercise both handshake and general-message paths using an injected 307 response and an ephemeral second endpoint. Go constructs http.Client without CheckRedirect and follows the redirect. The reference sets redirect:error per request. Set a rejecting default and document the contract for caller-supplied clients without contacting public/default endpoints.
 

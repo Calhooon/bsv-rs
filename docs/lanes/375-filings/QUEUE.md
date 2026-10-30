@@ -7,7 +7,7 @@ The review briefs under `docs/lanes/` are not filings.
 
 The keeper read the seventeen keeper-first drafts at `859116f1` and gave
 [the per-draft word](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425) at 07:14Z on 2026-10-30.
-These sixteen are FILE in that order of consequence, pending the owner's
+The sixteen approved drafts are FILE in that relative order of consequence, pending the owner's
 cadence word; the keeper recommends a few a day per repository, with later
 threads following answers to the earlier ones.
 
@@ -22,13 +22,20 @@ threads following answers to the earlier ones.
 | 7 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/beef-reserved-flags-ts-stack.md](./beef-reserved-flags-ts-stack.md) | Reject reserved BEEF discriminators |
 | 8 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/canonical-varint-reader.md](./canonical-varint-reader.md) | Provide a canonical CompactSize reader for protocol parsing |
 | 9 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-bounds-der.md](./certificate-bounds-der.md) | Certificate wallet conversion rewrites valid high-S signature bytes |
-| 10 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/certificate-outpoint-bound.md](./certificate-outpoint-bound.md) | Reject certificate outpoint indexes that the writer cannot serialize |
-| 11 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/wire-input-index-width.md](./wire-input-index-width.md) | Bound internalizeAction outputIndex consistently with PositiveIntegerOrZero |
-| 12 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md](./create-action-positive-script-length-ts-stack.md) | Refuse zero unlockingScriptLength as BRC-100 specifies |
-| 13 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md](./create-action-positive-script-length-go-sdk.md) | Validate positive createAction unlockingScriptLength |
-| 14 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/discovery-trust-range.md](./discovery-trust-range.md) | Validate discovery certificate trust on read and write |
-| 15 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/linkage-reason-and-result-validation.md](./linkage-reason-and-result-validation.md) | Use the linkage reason width and validate returned linkage context |
-| 16 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/http-json-result-validation.md](./http-json-result-validation.md) | Validate HTTP wallet results against their requests and BRC-100 shapes |
+| 10 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-response-preimage-go-sdk.md](./certificate-response-preimage-go-sdk.md) | Preserve certificate-response property order when signing and verifying |
+| 11 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/certificate-outpoint-bound.md](./certificate-outpoint-bound.md) | Reject certificate outpoint indexes that the writer cannot serialize |
+| 12 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/wire-input-index-width.md](./wire-input-index-width.md) | Bound internalizeAction outputIndex consistently with PositiveIntegerOrZero |
+| 13 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md](./create-action-positive-script-length-ts-stack.md) | Refuse zero unlockingScriptLength as BRC-100 specifies |
+| 14 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md](./create-action-positive-script-length-go-sdk.md) | Validate positive createAction unlockingScriptLength |
+| 15 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/discovery-trust-range.md](./discovery-trust-range.md) | Validate discovery certificate trust on read and write |
+| 16 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/linkage-reason-and-result-validation.md](./linkage-reason-and-result-validation.md) | Use the linkage reason width and validate returned linkage context |
+| 17 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/http-json-result-validation.md](./http-json-result-validation.md) | Validate HTTP wallet results against their requests and BRC-100 shapes |
+
+The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
+preimage witness tenth, after the DER witness. The queue now has seventeen
+entries; the new draft starts with `keeper's word first` and awaits its own
+per-draft word, then the owner's cadence. The sixteen earlier FILE decisions
+stand in their shifted positions. Nothing has been filed.
 
 ## HOLD
 

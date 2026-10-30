@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 66: An Electrum ECIES envelope's embedded key is found by the…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 67: An Electrum ECIES envelope's embedded key is found by the…
 
 A no-key envelope of 32 plaintext bytes or more with the expected sender is valid. Go cuts ciphertext at byte 37 solely because the envelope exceeds 69 bytes, corrupting that case; it also fails the uncompressed embedded-key case and does not compare an embedded key with the expected sender. Use the reference prefix/framing decision and mismatch refusal.
 
