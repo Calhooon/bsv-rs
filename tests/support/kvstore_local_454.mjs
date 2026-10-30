@@ -1,6 +1,7 @@
 // #454: actual SDK-written tokens, complete action inputs/BEEF, request text
 // and unlocking scripts, plus pagination/authentication verdicts. No network.
 import { recordOriginalErrors477 } from './kvstore_original_error_477.mjs'
+import { recordTokenSearch478 } from './kvstore_local_divergences_478.mjs'
 
 export async function recordLocal454 (c) {
   const { recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
@@ -11,12 +12,19 @@ export async function recordLocal454 (c) {
       c.resetCounter()
       const state = fresh()
       const wallet = recording(state)
+      const publicKeys = []
+      const getPublicKey = wallet.getPublicKey
+      wallet.getPublicKey = async args => {
+        publicKeys.push(JSON.stringify(args))
+        return getPublicKey(args)
+      }
       let answer = { type: 'output-list', outputs: [] }
       LookupResolver.prototype.query = async () => answer
       const store = kind === 'local'
         ? new LocalKVStore(wallet, 'kvstore', false)
         : new GlobalKVStore({ wallet })
       const seed = record(state, await stop(() => store.set('alpha', 'one')))
+      publicKeys.length = 0
       const lock = seed.create_action_outputs[0].lockingScript
       const sources = [2, 3].map(satoshis => sourceOf([{ satoshis, lockingScript: lock }]))
       const beef = new Beef()
@@ -47,11 +55,15 @@ export async function recordLocal454 (c) {
       const args = state.createAction.at(-1)
       runs.push({ kind, operation, sources: sources.map(tx => Utils.toHex(tx.toBEEF())),
         create_action_inputs: args.inputs,
-        input_beef: Utils.toHex(args.inputBEEF), ...record(state, stopped) })
+        input_beef: Utils.toHex(args.inputBEEF), ...record(state, stopped),
+        get_public_key_json: publicKeys,
+        create_action_description: args.description,
+        create_action_output_descriptions: (args.outputs ?? []).map(o => o.outputDescription) })
     }
   }
   return { reference: 'ts-stack@edf6e03; Node ' + process.version,
     description: '#454: two live tokens, exact merged BEEF, requests and unlocking scripts',
     signable_reference: 'UlJSUlJSUlI=', runs,
-    original_errors_477: await recordOriginalErrors477(c) }
+    original_errors_477: await recordOriginalErrors477(c),
+    token_search: await recordTokenSearch478(c) }
 }

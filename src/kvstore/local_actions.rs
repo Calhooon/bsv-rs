@@ -66,7 +66,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 outputs: Some(vec![CreateActionOutput {
                     locking_script: lock.to_binary(),
                     satoshis: options.token_amount.unwrap_or(self.config.token_amount),
-                    output_description: format!("KV entry: {key}"),
+                    output_description: "Key-value token".into(),
                     basket: Some(self.config.protocol_id.clone()),
                     custom_instructions: None,
                     tags: Some(options.tags.clone().unwrap_or_else(|| vec![key.into()])),
@@ -80,10 +80,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             self.originator(),
         )
         .await?;
-        result
-            .txid
-            .map(|id| format!("{}.0", to_hex(&id)))
-            .ok_or_else(|| Error::KvStoreError("No txid in result".into()))
+        super::outpoint::token_outpoint(&result, &lock)
     }
 
     pub(super) async fn remove_internal(
@@ -165,7 +162,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 description: options
                     .description
                     .clone()
-                    .unwrap_or_else(|| format!("Remove {key} from {}", self.config.protocol_id)),
+                    .unwrap_or_else(|| format!("Remove {key} in {}", self.config.protocol_id)),
                 inputs: Some(inputs),
                 input_beef,
                 outputs: None,

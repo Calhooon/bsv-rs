@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: four older LocalKVStore request/result differences (#478)
+
+Local token creation now sends the reference's `forSelf: false`, uses its
+description text, and locates the unique token in the completed transaction.
+These differences predate #475. The owner's ruling (c), 2026-10-26, selects
+the reference's shape and words: `ts-stack@edf6e03` `LocalKVStore.ts:487-492`
+calls `PushDrop.lock`, whose default and wallet request are at
+`PushDrop.ts:151-163`; the removal description is at `LocalKVStore.ts:416`,
+the output description at `:527`, and the token search/return at `:538-546`.
+
+For the toolbox's and CLI's request/result tables (default context `kvstore`,
+key `alpha`):
+
+| Request or result | Before | After |
+|---|---|---|
+| `getPublicKey.forSelf` when creating the local token | `true` | `false` |
+| Removal `createAction.description` | `Remove alpha from kvstore` | `Remove alpha in kvstore` |
+| Token `createAction.outputs[0].outputDescription` | `KV entry: alpha` | `Key-value token` |
+| `set` outpoint | `{txid}.0` without a token search | `{txid}.{index}` for exactly one output with 1 satoshi and the new locking script; zero or multiple matches are refused |
+
+The search matches script bytes and amount, not a basket (transactions carry
+no basket). Its refusal is `Final transaction does not contain one unique
+KVStore token`, inside the existing `There are N outputs with tag K that
+cannot be unlocked. Original error: ...` wrapper (`LocalKVStore.ts:543-551`).
+The wrapper's count is the authenticated inputs, not the number of matches.
+The same self-derived key and token bytes result from the corrected flag.
+
+`tests/kvstore_local_divergences_478.rs` has four regressions, each RED on
+`5981e285a6594ff1e3f7b67b21137c2ce3bc08e5`: the complete key-request JSON,
+both description byte strings, and nonzero/zero/two token matches. The last
+test uses the existing two-satoshi amount option at output zero so the bound
+action can succeed before the one-satoshi search. The existing integration
+options test now covers one-satoshi success and the 50-satoshi refusal;
+it previously expected the latter to succeed. The #326 recorder's
+`--kvstore-local-454` mode now records the missing request fields and runs
+the pinned reference's search and wrapper verbatim on three SDK-written
+transactions. This isolates that rule from the boundary's earlier checks;
+it does not imply the default reference request permits reordered outputs.
+Two recorder runs are byte-identical. All previous fields of the four
+local/global recordings, including signature requests, input BEEF, token
+scripts and unlocking scripts, are unchanged; the vector diff adds fields
+and the three search witnesses only.
+
+Migration: no public type or method changes. Update request-policy and
+description matches in the toolbox and CLI, and use the returned outpoint's
+index. A non-default token amount now fails when the completed transaction
+has no unique one-satoshi token. Handle the existing `KvStoreLocalError`
+wrapper for a failed search. No difference remains for these four items;
+the root divergence list is unchanged.
+
 ### Fixed: local KVStore original-error messages omit family prefixes (#477)
 
 The shared `original_error_message` helper now reads `WalletFault.message`

@@ -18,7 +18,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     protocol_id: Some(self.get_protocol(key)),
                     key_id: Some(key.into()),
                     counterparty: Some(Counterparty::Self_),
-                    for_self: Some(true),
+                    for_self: Some(false),
                     ..Default::default()
                 },
                 self.originator(),
