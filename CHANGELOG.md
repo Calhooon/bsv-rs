@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: certificate DER round-trip witness and census split (#375)
+
+`tests/auth_certificate_der_roundtrip_375.rs` and
+`tests/vectors/auth_certificate_der_roundtrip_375.json` pin a certificate
+built and signed by this crate, its valid high-S variant, and a refused
+BER long-form sequence length. JSON preserves all input signature bytes;
+accepted low-S and high-S DER also survive binary read/write unchanged.
+The refused encoding stays refused on the wire, with the reference's
+verification verdict. No library behavior changes.
+
+`tests/support/certificate_der_roundtrip_375/` records the actual
+`ToWalletCertificate` / `FromWalletCertificate` round trip at go-sdk v1.7.2
+(`2ca481c`) under Go 1.27.0. Two runs are byte-identical. TypeScript's
+verdicts and byte preservation were also measured from unmodified
+`ts-stack@edf6e03` under Node v22.18.0. The draft
+`docs/lanes/375-filings/certificate-bounds-der.md` now makes the single
+DER-preservation claim. Row 60 and its four historical census annotations
+classify the byte bounds as Ours: the reference's safeguards at its cited
+sites, not BRC numbers; DER preservation is Theirs: go-sdk, filing pending.
+
+### Notes: cross-SDK parity (#375)
+
+Go verifies the low-S and high-S inputs and both converted certificates,
+but its adapter rewrites high S to low S (`certificate.go:274-280,319-322`,
+`signature.go:77-102,297-299`). TypeScript and this crate preserve both
+accepted signatures. TypeScript `Certificate.ts:309-311,395-397,425-439`
+parses and writes/re-encodes DER; `Signature.ts:201-247` preserves S, and
+`ECDSA.ts:236-239` accepts either S form. The BER length probe is refused
+by both parsers (`signature.go:199-207`, `Signature.ts:45-51`); Go's adapter
+drops its signature and returns an unsigned certificate. This refusal
+control is not the draft's claim. BRC-52 at `5119a9b`,
+`peer-to-peer/0052.md:93,103`, specifies DER and recommends retaining
+signature bytes without requiring low S; BRC-53 `wallet/0053.md:13-15`
+defers current certificate behavior to BRC-52/100. Nothing has been filed.
+
+### Added: a default-mode fuzz target for the script interpreter (#398)
+
+`fuzz_script_spend` picks a node word from its first byte, so every input ran
+under `ScriptFlags::block` or `standard` and the default mode (no `set_flags`,
+the TypeScript reference's verdicts) was never fuzzed: over its 678 seeds the
+word target makes 681 evaluations, 0 of them in the default mode, on the base
+`faa2c97e` and on this tip. `fuzz_script_spend_default`, a sibling `[[bin]]`,
+evaluates `Spend` without a word under the same work budget, counting allocator
+and bounds, now one module both targets include (`fuzz/fuzz_targets/spend/`):
+687 default-mode evaluations over its seeds. A sibling and not a first-byte
+value of the word target: the word target's corpus keeps every entry's meaning,
+and the default mode has its own hour in the nightly rather than a share of
+the word target's.
+
+The input is the word target's layout (byte 0's bit 2 the version, bytes 1-2
+the unlocking length), so its seeds are the word target's 678, copied, and six
+written for the verdicts the mode was missing, each reaching the reference's
+refusal: `OP_LSHIFTNUM` and `OP_RSHIFTNUM` by 2^31 (`shift count exceeds
+INT_MAX.`, #383), a 9-byte `OP_LEFT` length read in two's complement
+(`OP_LEFT length (-2) must be in range [0, 3]`) and an `OP_NUM2BIN` size of
+2^31 (`OP_NUM2BIN size exceeds the node int32 push limit.`, #382), and
+`1 <536,870,888> OP_LSHIFTNUM` and a 67,108,863-byte operand read by
+`OP_1ADD` (`Invalid string length`, #331). Bit 3 of byte 0 selects a budget
+of 128 MiB instead of 1 MiB: under 1 MiB the two #331 inputs are the budget's
+declines (`Script element allocation has exceeded 1048576 bytes`), never the
+read figure's verdict; 128 MiB holds one operand past the figure (V8's
+`BigInt` cap, 2^30 bits, stays a decline here). Every copied seed has bit 3
+clear. Measured on an 8 MiB squaring chain under the 128 MiB budget
+(`0x7fffffff` and 21 `OP_DUP OP_MUL`), a build without a sanitizer peaks at a
+resident set of 133 MB and `cargo fuzz`'s default AddressSanitizer build at
+2,247 MB, where libFuzzer stops it as `out-of-memory (used: 2067Mb; limit:
+2048Mb)` (3,394 MB with the limit off): the resident set is the sanitizer's
+shadow and quarantine, not the interpreter's, and an `oom` artifact of that
+accounting would hide a real one. So the nightly builds and runs this one
+target with `-s none` (a matrix `sanitizer`, every other target keeping
+AddressSanitizer): its subject is the interpreter's budget arithmetic and
+refusals, panics and aborts libFuzzer catches without a sanitizer. A raised
+`-rss_limit_mb` would mask the next real excess as well.
+
+The nightly's fuzz matrix runs the new target (`.github/workflows/nightly.yml`),
+and `tests/arch_fuzz_targets_dispatched.rs` pins the matrix to
+`fuzz/Cargo.toml`'s `[[bin]]`s both ways, every target to a seed corpus, and
+this target's `sanitizer: none` with the build and run commands' `-s`.
+On the tip, 90 seconds each from the seed corpus: `fuzz_script_spend` 1,398
+executions, `fuzz_script_spend_default` 4,014, no crash. No public change.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-request-frame-cap-go-sdk](./docs/lanes/375-filings/wire-request-frame-cap-go-sdk.md).
+
 ### Fixed: discovery wire answers receive the reference's result validation (#495)
 
 Both discovery calls now apply the shared `result_values` rows after their
@@ -97,40 +182,49 @@ archived base `c32f7e23`, adds 33 crates and removes none: `displaydoc`,
 `wallet` without `http` now compiles these crates; it needs no code change.
 The ratchet's pinned library lock adds only the same direct `url` edge;
 all locked dependency versions are unchanged.
-### Added: certificate DER round-trip witness and census split (#375)
 
-`tests/auth_certificate_der_roundtrip_375.rs` and
-`tests/vectors/auth_certificate_der_roundtrip_375.json` pin a certificate
-built and signed by this crate, its valid high-S variant, and a refused
-BER long-form sequence length. JSON preserves all input signature bytes;
-accepted low-S and high-S DER also survive binary read/write unchanged.
-The refused encoding stays refused on the wire, with the reference's
-verification verdict. No library behavior changes.
+### Fixed: streaming BEEF heap pin keeps exact equality under CI's harness (#372)
 
-`tests/support/certificate_der_roundtrip_375/` records the actual
-`ToWalletCertificate` / `FromWalletCertificate` round trip at go-sdk v1.7.2
-(`2ca481c`) under Go 1.27.0. Two runs are byte-identical. TypeScript's
-verdicts and byte preservation were also measured from unmodified
-`ts-stack@edf6e03` under Node v22.18.0. The draft
-`docs/lanes/375-filings/certificate-bounds-der.md` now makes the single
-DER-preservation claim. Row 60 and its four historical census annotations
-classify the byte bounds as Ours: the reference's safeguards at its cited
-sites, not BRC numbers; DER preservation is Theirs: go-sdk, filing pending.
+The streaming reader's heap pin checks one chunk and one element at 1,000,
+10,000 and 100,000 links with exact equality across depths. The chain sources
+and headers stay outside the measured region; the observed stream-alone
+peak is 17,004 bytes at every depth. No tolerance is added: one sized to the warning would have
+to grow with the number of tests that time out together. The
+32 KiB ceiling, verifier index's per-element bounds and NL-3 meaning stay.
 
-### Notes: cross-SDK parity (#375)
+The pin is judged under `--test-threads=1`, using CI's command,
+`cargo test --test memory_profiling --all-features -- --test-threads=1`
+(`.github/workflows/ci.yml:236`, with `--verbose` in CI). Libtest 1.95.0's
+single-threaded path waits on `rx.recv()` and never warns
+([`library/test/src/lib.rs:415-436`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L415-L436)).
+Only the concurrent path issues the 60-second timeout warning
+([`:437-460`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L437-L460)).
+A default-harness run that lets several tests reach that warning is outside
+the pin's condition, even though their bodies wait on `serial()`.
 
-Go verifies the low-S and high-S inputs and both converted certificates,
-but its adapter rewrites high S to low S (`certificate.go:274-280,319-322`,
-`signature.go:77-102,297-299`). TypeScript and this crate preserve both
-accepted signatures. TypeScript `Certificate.ts:309-311,395-397,425-439`
-parses and writes/re-encodes DER; `Signature.ts:201-247` preserves S, and
-`ECDSA.ts:236-239` accepts either S form. The BER length probe is refused
-by both parsers (`signature.go:199-207`, `Signature.ts:45-51`); Go's adapter
-drops its signature and returns an unsigned certificate. This refusal
-control is not the draft's claim. BRC-52 at `5119a9b`,
-`peer-to-peer/0052.md:93,103`, specifies DER and recommends retaining
-signature bytes without requiring low S; BRC-53 `wallet/0053.md:13-15`
-defers current certificate behavior to BRC-52/100. Nothing has been filed.
+Dhat counts harness allocations too. `get_timed_out_tests` builds a
+`Vec<TestDesc>` containing every test whose timer has expired when the
+harness wakes
+([`library/test/src/lib.rs:390-406`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L390-L406));
+`PrettyFormatter::write_timeout` formats one message `String` per test
+([`formatters/pretty.rs:258-264`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/formatters/pretty.rs#L258-L264)).
+A one-test warning at an element boundary caused the observed 56-byte delta
+before setup moved out of the profile (17,152 versus 17,096 bytes).
+The first attempt's 676-byte allowance fitted one timed-out test; the vector
+grows with the batch, so no fixed allowance covers the whole diagnostic. On this branch
+11 other tests can wait on `serial()` while the pin runs (12 with #493).
+No reader or wire code changes.
+
+On an archived `a962ef49`, the first attempt, which carried a 676-byte
+allowance, a control with ten extra sleeping tests holds the boundary after dropping the first element at 100,000 links until 61 seconds
+from the test's start. The allowance and exact-equality variants both fail
+under the default harness: stream-alone peaks of 18,596 and 29,771 bytes,
+respectively, versus 17,004 bytes at the smaller depths. These runs are
+outside the pin's condition, not REDs to make green.
+The single-test control with the same delay and `--test-threads=1` passes at
+17,004 bytes at every depth, without a timeout warning.
+Five unforced runs of the pin with `--test-threads=1` also pass at 17,004
+bytes at all three depths.
 
 ### Fixed: refuse oversized wallet wire requests before transmission (#496)
 
@@ -186,221 +280,6 @@ under Node 22.18.0 `Array.from` of the 268,435,414-byte plaintext
 `Invalid array length` and no wallet call, so the at-cap test's answer comes from
 the reference's transceiver over a stub transport and this crate's processor
 (the cold review's measurement). The processor's own cap is bsv-rs#505.
-### Fixed: streaming BEEF heap pin keeps exact equality under CI's harness (#372)
-
-The streaming reader's heap pin checks one chunk and one element at 1,000,
-10,000 and 100,000 links with exact equality across depths. The chain sources
-and headers stay outside the measured region; the observed stream-alone
-peak is 17,004 bytes at every depth. No tolerance is added: one sized to the warning would have
-to grow with the number of tests that time out together. The
-32 KiB ceiling, verifier index's per-element bounds and NL-3 meaning stay.
-
-The pin is judged under `--test-threads=1`, using CI's command,
-`cargo test --test memory_profiling --all-features -- --test-threads=1`
-(`.github/workflows/ci.yml:236`, with `--verbose` in CI). Libtest 1.95.0's
-single-threaded path waits on `rx.recv()` and never warns
-([`library/test/src/lib.rs:415-436`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L415-L436)).
-Only the concurrent path issues the 60-second timeout warning
-([`:437-460`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L437-L460)).
-A default-harness run that lets several tests reach that warning is outside
-the pin's condition, even though their bodies wait on `serial()`.
-
-Dhat counts harness allocations too. `get_timed_out_tests` builds a
-`Vec<TestDesc>` containing every test whose timer has expired when the
-harness wakes
-([`library/test/src/lib.rs:390-406`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L390-L406));
-`PrettyFormatter::write_timeout` formats one message `String` per test
-([`formatters/pretty.rs:258-264`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/formatters/pretty.rs#L258-L264)).
-A one-test warning at an element boundary caused the observed 56-byte delta
-before setup moved out of the profile (17,152 versus 17,096 bytes).
-The first attempt's 676-byte allowance fitted one timed-out test; the vector
-grows with the batch, so no fixed allowance covers the whole diagnostic. On this branch
-11 other tests can wait on `serial()` while the pin runs (12 with #493).
-No reader or wire code changes.
-
-On an archived `a962ef49`, the first attempt, which carried a 676-byte
-allowance, a control with ten extra sleeping tests holds the boundary after dropping the first element at 100,000 links until 61 seconds
-from the test's start. The allowance and exact-equality variants both fail
-under the default harness: stream-alone peaks of 18,596 and 29,771 bytes,
-respectively, versus 17,004 bytes at the smaller depths. These runs are
-outside the pin's condition, not REDs to make green.
-The single-test control with the same delay and `--test-threads=1` passes at
-17,004 bytes at every depth, without a timeout warning.
-Five unforced runs of the pin with `--test-threads=1` also pass at 17,004
-bytes at all three depths.
-### Added: a default-mode fuzz target for the script interpreter (#398)
-
-`fuzz_script_spend` picks a node word from its first byte, so every input ran
-under `ScriptFlags::block` or `standard` and the default mode (no `set_flags`,
-the TypeScript reference's verdicts) was never fuzzed: over its 678 seeds the
-word target makes 681 evaluations, 0 of them in the default mode, on the base
-`faa2c97e` and on this tip. `fuzz_script_spend_default`, a sibling `[[bin]]`,
-evaluates `Spend` without a word under the same work budget, counting allocator
-and bounds, now one module both targets include (`fuzz/fuzz_targets/spend/`):
-687 default-mode evaluations over its seeds. A sibling and not a first-byte
-value of the word target: the word target's corpus keeps every entry's meaning,
-and the default mode has its own hour in the nightly rather than a share of
-the word target's.
-
-The input is the word target's layout (byte 0's bit 2 the version, bytes 1-2
-the unlocking length), so its seeds are the word target's 678, copied, and six
-written for the verdicts the mode was missing, each reaching the reference's
-refusal: `OP_LSHIFTNUM` and `OP_RSHIFTNUM` by 2^31 (`shift count exceeds
-INT_MAX.`, #383), a 9-byte `OP_LEFT` length read in two's complement
-(`OP_LEFT length (-2) must be in range [0, 3]`) and an `OP_NUM2BIN` size of
-2^31 (`OP_NUM2BIN size exceeds the node int32 push limit.`, #382), and
-`1 <536,870,888> OP_LSHIFTNUM` and a 67,108,863-byte operand read by
-`OP_1ADD` (`Invalid string length`, #331). Bit 3 of byte 0 selects a budget
-of 128 MiB instead of 1 MiB: under 1 MiB the two #331 inputs are the budget's
-declines (`Script element allocation has exceeded 1048576 bytes`), never the
-read figure's verdict; 128 MiB holds one operand past the figure (V8's
-`BigInt` cap, 2^30 bits, stays a decline here). Every copied seed has bit 3
-clear. Measured on an 8 MiB squaring chain under the 128 MiB budget
-(`0x7fffffff` and 21 `OP_DUP OP_MUL`), a build without a sanitizer peaks at a
-resident set of 133 MB and `cargo fuzz`'s default AddressSanitizer build at
-2,247 MB, where libFuzzer stops it as `out-of-memory (used: 2067Mb; limit:
-2048Mb)` (3,394 MB with the limit off): the resident set is the sanitizer's
-shadow and quarantine, not the interpreter's, and an `oom` artifact of that
-accounting would hide a real one. So the nightly builds and runs this one
-target with `-s none` (a matrix `sanitizer`, every other target keeping
-AddressSanitizer): its subject is the interpreter's budget arithmetic and
-refusals, panics and aborts libFuzzer catches without a sanitizer. A raised
-`-rss_limit_mb` would mask the next real excess as well.
-
-The nightly's fuzz matrix runs the new target (`.github/workflows/nightly.yml`),
-and `tests/arch_fuzz_targets_dispatched.rs` pins the matrix to
-`fuzz/Cargo.toml`'s `[[bin]]`s both ways, every target to a seed corpus, and
-this target's `sanitizer: none` with the build and run commands' `-s`.
-On the tip, 90 seconds each from the seed corpus: `fuzz_script_spend` 1,398
-executions, `fuzz_script_spend_default` 4,014, no crash. No public change.
-
-### Fixed: local KVStore parser words inside Original error (#489)
-
-Local authentication now uses the reference's parser messages for inputs
-that the reference also refuses with those messages, inside the
-`Invalid value found. Relinquish the corrupted output from the {context}
-basket before using this key again. Original error: {message}` wrapper.
-Previously, a malformed locking key or token exposed this crate's native
-hex, public-key or script-parser diagnostic. The local parser catches select
-the reference text by error variant, input shape and the reference's point
-acceptance rules; if the reference accepts the key, the native parser error
-is retained. They do not compare diagnostic strings or change acceptance
-or the primitives' own errors. Wallet-supplied
-errors still follow #477's extraction rule, including an injected
-`InvalidPublicKey` error. No public shape changes; update matches on the
-wrapped parser suffixes below. Local parser failures use `KvStoreLocalError`,
-including authentication during remove, where there is no lookup wrapper.
-
-The deciding reference is `ts-stack@edf6e03`, under Node 22.18.0:
-`LocalKVStore.ts:239-246` derives and parses the locking key, `:278-282`
-calls `decodeCanonicalPushDrop`, and `:340-345` wraps `error.message`.
-`PublicKey.ts:49-51` delegates to `Point.fromString` (`Point.ts:345-347`);
-`utils.ts:126-128` and `hex.ts:6-15` reject non-hex text. `Point.ts:303-325`
-distinguishes an unknown length/prefix from a point off the curve
-(`:280-283,365-372`); hybrid `06`/`07` keys with the wrong Y parity throw
-`Point string value is wrong length` before the curve check (`:309-317`).
-`PushDropValidation.ts:54-74` calls
-`PushDrop.decode` at `:59`: its default lock-before path reads the initial
-chunk's key at `PushDrop.ts:73-77`, then the fields at `:96-115`, before
-the canonical decoder checks field count and envelope. These are the actual
-lines at the pin: the key parse is `LocalKVStore.ts:246`, not `:248`, the
-canonical decode is `:278-282`, and the authentication catch is `:340-345`.
-Go at `2ca481c`, `kvstore/local_kv_store.go:66-111`, uses operation wrappers
-and has no equivalent `Original error:` contract.
-
-For the toolbox's error table, the exact suffixes after `Original error:`
-are below.
-
-| Recorded corruption | Old suffix | New suffix |
-|---|---|---|
-| Key `zz` | `invalid hex string: Invalid character 'z' at position 0` | `Invalid hex string` |
-| Key `not-hex` | `invalid hex string: Odd number of digits` | `Invalid hex string` |
-| Key `02`, key `05` plus 32 zero bytes, empty key, token key with the same `05` prefix | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Unknown point format` |
-| Key `2` (odd hex, padded by the reference) | `invalid hex string: Odd number of digits` | `Unknown point format` |
-| Key `02` plus 32 zero bytes, key `04` plus 64 zero bytes, token with the same `02` key | `invalid public key: Point not on curve` | `Invalid point` |
-| Hybrid `06` key with odd Y; hybrid `07` key/token with even Y | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Point string value is wrong length` |
-| Token with one-byte key `02` | `script parse error: Expected OP_CHECKSIG at end` | `Unknown point format` |
-| Token script `51` (`OP_TRUE`) | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
-| Empty token script | `script parse error: Script too short for PushDrop` | `Cannot read properties of undefined (reading 'data')` |
-| Token with `OP_TRUE` replacing `OP_CHECKSIG` | `script parse error: Expected OP_CHECKSIG after pubkey` | `PushDrop token must use the canonical PushDrop envelope` |
-| Token containing only the valid key push | `script parse error: Script too short for PushDrop` | `Unexpected PushDrop token field count` |
-
-For the CLI's operator-visible table, the lookup wrapper remains as quoted
-above, with these changed suffixes (the other corruption rows use the same
-suffixes as the toolbox table):
-
-| Failure | Old suffix | New suffix |
-|---|---|---|
-| Non-hex locking key `zz` | `invalid hex string: Invalid character 'z' at position 0` | `Invalid hex string` |
-| Locking key `02` with the wrong length | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Unknown point format` |
-| Off-curve locking key `02` plus 32 zero bytes | `invalid public key: Point not on curve` | `Invalid point` |
-| Non-PushDrop token script `51` | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
-
-`tests/kvstore_local_parser_words_489.rs` holds thirteen tests: the first
-commit's five (one regression per required failure class plus a hybrid-parity
-regression, all five RED on scratch base
-`bcea54a1fb065e39039ce9f38e70eb316084a604` with the old whole wrapped text,
-then green. They compare the full message and `KvStoreLocalError` variant
-against 36 recorded cases (18 corruptions, both get and set), and pin the
-standalone hex, public-key and PushDrop errors as unchanged. The #326
-recorder's extended `--kvstore-local-454` mode writes every source BEEF and
-every expected message; two Node 22 runs are byte-identical. All fields
-predating #489 and its original 36 recorded rows are unchanged. The #477
-parity note still applies to the BEEF and transaction parser diagnostics it names.
-
-### Notes: cross-SDK parity (#489)
-
-This crate's key parsing is stricter than the reference's: no odd-length
-padding, no hybrid keys, no x reduced mod p. At `ts-stack@edf6e03`,
-`hex.ts:28-30` pads odd hex, `Point.ts:303-325` accepts on-curve hybrid keys
-with matching parity, and `Point.ts:365-384` reduces x modulo p. Thus
-`PublicKey.fromString` (`PublicKey.ts:49-51`, `Point.ts:345-347`) accepts the
-key classes the table below samples (odd-length keys such as `3`+Gx and
-`4`+Gx+Gy, hybrid keys with the matching parity, and any x reduced mod p in
-compressed, uncompressed or hybrid form) that `PublicKey::from_hex` refuses here. A token with either
-accepted noncanonical key push decodes there, then fails the canonical
-envelope check (`LocalKVStore.ts:278-282`, `PushDropValidation.ts:73-74`).
-Here it fails key parsing earlier. The words here are the parser's own,
-including its error-category prefix, never a reference refusal invented
-for an accepted input. Gx/Gy below are the secp256k1 generator coordinates;
-p is the field prime. Key acceptance is unchanged by this fold.
-
-The reference's local-store site decodes lock-before only
-(`LocalKVStore.ts:278-282`, `PushDropValidation.ts:59`, `PushDrop.ts:74-75`).
-This crate's general decoder also tries lock-after and reaches a later
-field-count or canonical-envelope check. The two existing differences are
-pinned below, including both SDKs' full wrapped messages. Restricting this
-site to lock-before is a separate behavior decision.
-
-| Input | Recorded reference verdict | This crate after `Original error:` | Pin in `kvstore_local_parser_words_489.rs` |
-|---|---|---|---|
-| `2` + Gx | Key accepted; later wallet-key mismatch | `invalid hex string: Odd number of digits` | `reference_accepts_odd_valid_key_but_local_keeps_native_words_489` |
-| `06` + Gx + Gy | Key accepted; later wallet-key mismatch | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `reference_accepts_hybrid_key_but_local_keeps_native_words_489` |
-| `6` + Gx + Gy | Key accepted; later wallet-key mismatch | `invalid hex string: Odd number of digits` | `reference_accepts_odd_hybrid_key_but_local_keeps_native_words_489` |
-| `02` + (p+1) | Key accepted; later wallet-key mismatch | `invalid public key: Point not on curve` | `reference_accepts_reduced_x_key_but_local_keeps_native_words_489` |
-| Token key `06` + Gx + Gy | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `reference_decodes_hybrid_token_but_local_keeps_native_words_489` |
-| Token key `02` + (p+1) | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Point not on curve` | `reference_decodes_reduced_x_token_but_local_keeps_native_words_489` |
-| `51 75 <G> ac` | `script.chunks[0].data must have value` | `Unexpected PushDrop token field count` | `lock_after_one_field_reaches_local_field_count_not_reference_decode_489` |
-| `51 52 6d <G> ac` | `script.chunks[0].data must have value` | `PushDrop token must use the canonical PushDrop envelope` | `lock_after_two_fields_reaches_local_envelope_not_reference_decode_489` |
-
-The reference's words in the two lock-after rows come from its lock-before
-parse of the first chunk, so they vary with it: a first chunk that is a data
-push but no key (`00 75 <G> ac`) gets `Unknown point format` there; here the
-field count or the envelope check speaks, as in the rows.
-
-The recorder now writes 52 cases (26 inputs, each for get and set), including
-an explicit `parser_accepted` verdict for these eight inputs. Two Node
-22.18.0 runs are byte-identical; all earlier fields and the 36 original
-cases are unchanged. With the new test file and recorded vector overlaid
-on an archived `9bcbe433`, the six accepted-key/token tests are RED because
-the tip incorrectly reports `Invalid point`; the two lock-after pins and
-the original five tests are already green. All 13 tests pass after the
-fold. The RED scratch copy uses its own target directory and is removed.
-
-Census (#375; current reading, historical account above retained):
-
-- Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
-- Row 2: Ours: the general PushDrop decoder tries both lock positions, but the local canonical-envelope check still refuses these tokens; BRC-48 scripts/0048.md:13-18 and LocalKVStore.ts:278-282 at edf6e03 distinguish the template from this site.
 
 ### Fixed: wire client validates returned wallet facts (#487)
 
@@ -548,6 +427,134 @@ above that range remain a stated representation difference.
 Census (#375; current reading, historical account above retained):
 
 - Row 80: Ours: the reference's own wire client at the nine sites (WalletWireTransceiver.ts:227,320,665,837,910,1093,1438,1551,1618 at edf6e03) is the authority; the keeper's #467 ruling retains u32 page totals. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_result_validation_487.rs).
+
+### Fixed: local KVStore parser words inside Original error (#489)
+
+Local authentication now uses the reference's parser messages for inputs
+that the reference also refuses with those messages, inside the
+`Invalid value found. Relinquish the corrupted output from the {context}
+basket before using this key again. Original error: {message}` wrapper.
+Previously, a malformed locking key or token exposed this crate's native
+hex, public-key or script-parser diagnostic. The local parser catches select
+the reference text by error variant, input shape and the reference's point
+acceptance rules; if the reference accepts the key, the native parser error
+is retained. They do not compare diagnostic strings or change acceptance
+or the primitives' own errors. Wallet-supplied
+errors still follow #477's extraction rule, including an injected
+`InvalidPublicKey` error. No public shape changes; update matches on the
+wrapped parser suffixes below. Local parser failures use `KvStoreLocalError`,
+including authentication during remove, where there is no lookup wrapper.
+
+The deciding reference is `ts-stack@edf6e03`, under Node 22.18.0:
+`LocalKVStore.ts:239-246` derives and parses the locking key, `:278-282`
+calls `decodeCanonicalPushDrop`, and `:340-345` wraps `error.message`.
+`PublicKey.ts:49-51` delegates to `Point.fromString` (`Point.ts:345-347`);
+`utils.ts:126-128` and `hex.ts:6-15` reject non-hex text. `Point.ts:303-325`
+distinguishes an unknown length/prefix from a point off the curve
+(`:280-283,365-372`); hybrid `06`/`07` keys with the wrong Y parity throw
+`Point string value is wrong length` before the curve check (`:309-317`).
+`PushDropValidation.ts:54-74` calls
+`PushDrop.decode` at `:59`: its default lock-before path reads the initial
+chunk's key at `PushDrop.ts:73-77`, then the fields at `:96-115`, before
+the canonical decoder checks field count and envelope. These are the actual
+lines at the pin: the key parse is `LocalKVStore.ts:246`, not `:248`, the
+canonical decode is `:278-282`, and the authentication catch is `:340-345`.
+Go at `2ca481c`, `kvstore/local_kv_store.go:66-111`, uses operation wrappers
+and has no equivalent `Original error:` contract.
+
+For the toolbox's error table, the exact suffixes after `Original error:`
+are below.
+
+| Recorded corruption | Old suffix | New suffix |
+|---|---|---|
+| Key `zz` | `invalid hex string: Invalid character 'z' at position 0` | `Invalid hex string` |
+| Key `not-hex` | `invalid hex string: Odd number of digits` | `Invalid hex string` |
+| Key `02`, key `05` plus 32 zero bytes, empty key, token key with the same `05` prefix | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Unknown point format` |
+| Key `2` (odd hex, padded by the reference) | `invalid hex string: Odd number of digits` | `Unknown point format` |
+| Key `02` plus 32 zero bytes, key `04` plus 64 zero bytes, token with the same `02` key | `invalid public key: Point not on curve` | `Invalid point` |
+| Hybrid `06` key with odd Y; hybrid `07` key/token with even Y | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Point string value is wrong length` |
+| Token with one-byte key `02` | `script parse error: Expected OP_CHECKSIG at end` | `Unknown point format` |
+| Token script `51` (`OP_TRUE`) | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
+| Empty token script | `script parse error: Script too short for PushDrop` | `Cannot read properties of undefined (reading 'data')` |
+| Token with `OP_TRUE` replacing `OP_CHECKSIG` | `script parse error: Expected OP_CHECKSIG after pubkey` | `PushDrop token must use the canonical PushDrop envelope` |
+| Token containing only the valid key push | `script parse error: Script too short for PushDrop` | `Unexpected PushDrop token field count` |
+
+For the CLI's operator-visible table, the lookup wrapper remains as quoted
+above, with these changed suffixes (the other corruption rows use the same
+suffixes as the toolbox table):
+
+| Failure | Old suffix | New suffix |
+|---|---|---|
+| Non-hex locking key `zz` | `invalid hex string: Invalid character 'z' at position 0` | `Invalid hex string` |
+| Locking key `02` with the wrong length | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Unknown point format` |
+| Off-curve locking key `02` plus 32 zero bytes | `invalid public key: Point not on curve` | `Invalid point` |
+| Non-PushDrop token script `51` | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
+
+`tests/kvstore_local_parser_words_489.rs` holds thirteen tests: the first
+commit's five (one regression per required failure class plus a hybrid-parity
+regression, all five RED on scratch base
+`bcea54a1fb065e39039ce9f38e70eb316084a604` with the old whole wrapped text,
+then green. They compare the full message and `KvStoreLocalError` variant
+against 36 recorded cases (18 corruptions, both get and set), and pin the
+standalone hex, public-key and PushDrop errors as unchanged. The #326
+recorder's extended `--kvstore-local-454` mode writes every source BEEF and
+every expected message; two Node 22 runs are byte-identical. All fields
+predating #489 and its original 36 recorded rows are unchanged. The #477
+parity note still applies to the BEEF and transaction parser diagnostics it names.
+
+### Notes: cross-SDK parity (#489)
+
+This crate's key parsing is stricter than the reference's: no odd-length
+padding, no hybrid keys, no x reduced mod p. At `ts-stack@edf6e03`,
+`hex.ts:28-30` pads odd hex, `Point.ts:303-325` accepts on-curve hybrid keys
+with matching parity, and `Point.ts:365-384` reduces x modulo p. Thus
+`PublicKey.fromString` (`PublicKey.ts:49-51`, `Point.ts:345-347`) accepts the
+key classes the table below samples (odd-length keys such as `3`+Gx and
+`4`+Gx+Gy, hybrid keys with the matching parity, and any x reduced mod p in
+compressed, uncompressed or hybrid form) that `PublicKey::from_hex` refuses here. A token with either
+accepted noncanonical key push decodes there, then fails the canonical
+envelope check (`LocalKVStore.ts:278-282`, `PushDropValidation.ts:73-74`).
+Here it fails key parsing earlier. The words here are the parser's own,
+including its error-category prefix, never a reference refusal invented
+for an accepted input. Gx/Gy below are the secp256k1 generator coordinates;
+p is the field prime. Key acceptance is unchanged by this fold.
+
+The reference's local-store site decodes lock-before only
+(`LocalKVStore.ts:278-282`, `PushDropValidation.ts:59`, `PushDrop.ts:74-75`).
+This crate's general decoder also tries lock-after and reaches a later
+field-count or canonical-envelope check. The two existing differences are
+pinned below, including both SDKs' full wrapped messages. Restricting this
+site to lock-before is a separate behavior decision.
+
+| Input | Recorded reference verdict | This crate after `Original error:` | Pin in `kvstore_local_parser_words_489.rs` |
+|---|---|---|---|
+| `2` + Gx | Key accepted; later wallet-key mismatch | `invalid hex string: Odd number of digits` | `reference_accepts_odd_valid_key_but_local_keeps_native_words_489` |
+| `06` + Gx + Gy | Key accepted; later wallet-key mismatch | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `reference_accepts_hybrid_key_but_local_keeps_native_words_489` |
+| `6` + Gx + Gy | Key accepted; later wallet-key mismatch | `invalid hex string: Odd number of digits` | `reference_accepts_odd_hybrid_key_but_local_keeps_native_words_489` |
+| `02` + (p+1) | Key accepted; later wallet-key mismatch | `invalid public key: Point not on curve` | `reference_accepts_reduced_x_key_but_local_keeps_native_words_489` |
+| Token key `06` + Gx + Gy | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `reference_decodes_hybrid_token_but_local_keeps_native_words_489` |
+| Token key `02` + (p+1) | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Point not on curve` | `reference_decodes_reduced_x_token_but_local_keeps_native_words_489` |
+| `51 75 <G> ac` | `script.chunks[0].data must have value` | `Unexpected PushDrop token field count` | `lock_after_one_field_reaches_local_field_count_not_reference_decode_489` |
+| `51 52 6d <G> ac` | `script.chunks[0].data must have value` | `PushDrop token must use the canonical PushDrop envelope` | `lock_after_two_fields_reaches_local_envelope_not_reference_decode_489` |
+
+The reference's words in the two lock-after rows come from its lock-before
+parse of the first chunk, so they vary with it: a first chunk that is a data
+push but no key (`00 75 <G> ac`) gets `Unknown point format` there; here the
+field count or the envelope check speaks, as in the rows.
+
+The recorder now writes 52 cases (26 inputs, each for get and set), including
+an explicit `parser_accepted` verdict for these eight inputs. Two Node
+22.18.0 runs are byte-identical; all earlier fields and the 36 original
+cases are unchanged. With the new test file and recorded vector overlaid
+on an archived `9bcbe433`, the six accepted-key/token tests are RED because
+the tip incorrectly reports `Invalid point`; the two lock-after pins and
+the original five tests are already green. All 13 tests pass after the
+fold. The RED scratch copy uses its own target directory and is removed.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
+- Row 2: Ours: the general PushDrop decoder tries both lock positions, but the local canonical-envelope check still refuses these tokens; BRC-48 scripts/0048.md:13-18 and LocalKVStore.ts:278-282 at edf6e03 distinguish the template from this site.
 
 ### Fixed: four older LocalKVStore request/result differences (#478)
 
@@ -984,7 +991,7 @@ including Go's absent-string convention and full-wallet processor stubs, remain.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 10: Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
 
 ### Fixed: HTTP JSON result scalars, bindings and global bounds (#432)
 
@@ -1530,7 +1537,7 @@ checks are filed separately and unchanged by this fold.
 Census (#375; current reading, historical account above retained):
 
 - Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
-- Row 10: Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
 
 ### Fixed: short ECIES envelopes use the reference's bounded words (#463)
 
@@ -2190,7 +2197,7 @@ and its cross-SDK parity reading.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: ts-stack #1369. Theirs: go-sdk, filing pending (the witness: tests/vectors/wallet_hmac_key_379.json; tests/wallet_hmac_issuance_379.rs). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
+- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: go-sdk, fixed on master at a8159c77 (PR #389, the maintainers' own, merged 2026-10-28) after the 2ca481c pin, in no release through v1.7.3; the divergence stands at the pin and for every released go-sdk until a release carries it (the keeper's word of 2026-10-30 08:1xZ: held, re-read at the monthly recon, closed when a release names it). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
 
 ### Fixed: the wallet wire's originator bound and normalization (#338)
 
@@ -2950,7 +2957,7 @@ reading for #375; the main-merge gate is not changed.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: ts-stack #1369. Theirs: go-sdk, filing pending (the witness: tests/vectors/wallet_hmac_key_379.json; tests/wallet_hmac_issuance_379.rs). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
+- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: go-sdk, fixed on master at a8159c77 (PR #389, the maintainers' own, merged 2026-10-28) after the 2ca481c pin, in no release through v1.7.3; the divergence stands at the pin and for every released go-sdk until a release carries it (the keeper's word of 2026-10-30 08:1xZ: held, re-read at the monthly recon, closed when a release names it). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
 
 ### Fixed: the KVStore reader accepts the reference writer's untagged token (#344)
 
@@ -3138,6 +3145,11 @@ is read through `[]uint8` (`wallet/encoding.go:24–31`), which also accepts
 base64 and reads null as a nil slice (the HMAC length check then refuses it).
 The outstanding differences are enumerated in the module inventory; this
 change makes no claim of complete JSON result parity.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 18: Ours: R02/R03 are native JSON representation residues (WalletResultValidation.ts:623-645,664-667 at edf6e03); R47 keeps u32 by the keeper's #467 word (BRC-100 wallet/0100.md:274; Wallet.interfaces.ts:31-35 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/wallet_http_json_pending_432.rs; tests/wallet_http_json_result_values_408.rs). Draft: [http-json-result-validation](./docs/lanes/375-filings/http-json-result-validation.md).
+
 ### Fixed: certificate requests verify the parsed object's JSON.stringify preimage (#426)
 
 A received certificate request now verifies the complete `requestedCertificates`
@@ -6830,6 +6842,10 @@ under `<nonce> <sessionNonce>`, the nonce required and claimed (`:1041`).
 The comment this fix removes, that Go and TS let a failed nonce pass, was
 wrong of both: each refuses it, and the nonce it checked here was the
 responder's, which neither checks.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 24: Ours: nonce-refusal words follow the local create_hmac comparison; the reference calls verifyHmac first (verifyNonce.ts:44-57 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/auth_peer_client_verifies_353.rs; tests/vectors/auth_peer_client_verifies_353.json). Draft: [peer-pinned-identity](./docs/lanes/375-filings/peer-pinned-identity.md).
 
 ### Changed: the fuzz_http_json_responses harness names an originator (#356)
 
@@ -11721,6 +11737,10 @@ processor reads every call's arguments and hands it to its wallet. (The
 second this note named, the processor's missing argument validation, is
 withdrawn by #216.)
 
+Census (#375; current reading, historical account above retained):
+
+- Row 41: Ours: full-wallet-only refusals use native words inside the reference's frame contract (WalletWireProcessor.ts:2387-2418 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/wire_error_frames.rs; tests/wire_wallet_refusal_class.rs). Draft: [wire-error-frames](./docs/lanes/375-filings/wire-error-frames.md).
+
 ### Fixed: verifyHmac's request carries the raw hmac ahead of the data; the signature calls carry the reference's data-type flag (#199)
 
 `WalletWireTransceiver` wrote, and `WalletWireProcessor` read, verifyHmac's
@@ -12934,7 +12954,7 @@ refusal names that gap rather than accept it.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: ts-stack #1369. Theirs: go-sdk, filing pending (the witness: tests/vectors/wallet_hmac_key_379.json; tests/wallet_hmac_issuance_379.rs). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
+- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: go-sdk, fixed on master at a8159c77 (PR #389, the maintainers' own, merged 2026-10-28) after the 2ca481c pin, in no release through v1.7.3; the divergence stands at the pin and for every released go-sdk until a release carries it (the keeper's word of 2026-10-30 08:1xZ: held, re-read at the monthly recon, closed when a release names it). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
 
 ### Fixed: the wallet wire's optional varints in the reference's plain form (#149)
 

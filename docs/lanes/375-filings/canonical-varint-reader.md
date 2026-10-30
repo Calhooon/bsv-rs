@@ -1,4 +1,4 @@
-keeper's word first
+FILE — eighth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
 
 # Provide a canonical CompactSize reader for protocol parsing
 

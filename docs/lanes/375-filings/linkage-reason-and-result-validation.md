@@ -1,4 +1,4 @@
-keeper's word first
+FILE — fifteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
 
 # Use the linkage reason width and validate returned linkage context
 

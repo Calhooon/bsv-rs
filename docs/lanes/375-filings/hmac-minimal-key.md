@@ -1,4 +1,8 @@
-keeper's word first
+HOLD — [the keeper's 2026-10-30 07:14Z word](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425):
+go-sdk PR #389 is the maintainers' own change, described as in flight; a new
+filing would duplicate it. Reviews 2 and 3 read this as outside the charter.
+The live PR state below differs from that recorded reason; keep the HOLD.
+The keeper's word of 2026-10-30 08:1xZ ([recorded](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6518218558)): the hold holds, a filing would ask go-sdk for what its master already carries; the row reads fixed on master at `a8159c77` after the pin, in no release through v1.7.3, re-read at the monthly recon and closed when a release names it.
 
 # Use the amended BRC-56 minimal-length ECDH X coordinate for HMAC
 
@@ -23,4 +27,12 @@ BRC reading: [BRCs@d4ce8119f wallet/0056.md:56-89](https://github.com/bsv-blockc
 
 Evidence status: source-read at the pins in this lane; the linked Rust tests/recorded fixtures are the reproducible witness, not a claim that Go or TypeScript was rerun here. Any new upstream regression test should construct its keys using a deterministic fixture helper; this draft contains no private-key literal.
 
-Existing related filing(s): ts-stack #1369. Keep these numbers; confirm their scope before opening a duplicate.
+Existing related filing(s): [go-sdk PR #389](https://github.com/bsv-blockchain/go-sdk/pull/389),
+“fix(wallet): key HMAC with minimal-length X coordinate per BRC-56”,
+by **deggen (@sirdeggen)**, state **MERGED** (2026-10-28 20:39:45Z).
+This is GitHub's state when checked for this record; the keeper's later word
+calls it “in flight”. The verdict preserves that word as the historical HOLD
+reason, pending reconciliation; the source reading above remains at `2ca481c`.
+The merge commit `a8159c77` is not an ancestor of `2ca481c` (v1.7.2) and no
+go-sdk tag contains it (the latest release is v1.7.3, 2026-10-20): go-sdk
+diverges at the pin and in every release, and conforms on `master` only.

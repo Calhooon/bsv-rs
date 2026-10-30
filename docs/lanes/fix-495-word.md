@@ -1,0 +1,18 @@
+# #495, continued: the captain's word on the dependency; finish the checks, commit, no push
+
+Same worktree and branch (`lane/fix-495-discovery-result-validation`, base `c32f7e23`): your uncommitted changes from the first run are in place (sixteen modified files; `src/wallet/wire/discovery.rs` and `tests/wallet_wire_discovery_validation_495.rs` new); your evidence and the prepared patch are under `/Volumes/Lanes/out/bsv-rs/fix-495-discovery-result-validation/`. The original brief is `/private/tmp/claude-501/-Users-johncalhoun-bsv-bsv-rs/c300881a-6191-471b-892e-9ec2735c8425/scratchpad/brief-fix-495-discovery-result-validation.md`; every requirement in it stands. Every gate and every test runs in the foreground, in your turn; never end your turn with a command running in the background; the REPORT is the last thing you write.
+
+## The word
+
+Apply `pending-wallet-dependencies.patch`: `url` becomes a direct optional dependency enabled by `wallet` (the reference's predicate is WHATWG URL parsing with the scheme read back, `WalletResultValidation.ts:1001-1011` at edf6e03; the `url` crate is that parser and is already in the lockfile through reqwest), and `regex` and `unicode-normalization` are enabled by `wallet` with the identity rows the wire's discovery answers need. Four conditions:
+
+1. `regex` with the smallest feature set the identity grammar's patterns need (`default-features = false` plus the named features, or the default set if the patterns need the Unicode tables): say which, and why, in the entry. `url` as the patch has it. No other dependency changes.
+2. Both wasm builds pass, in the foreground: rule 6's `cargo build --target wasm32-unknown-unknown --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm"` and the watchtower's shape, `cargo build --target wasm32-unknown-unknown --no-default-features --features "wallet,transaction,wasm"`.
+3. The dependency delta measured and stated: `cargo tree --target wasm32-unknown-unknown --no-default-features --features "wallet,transaction,wasm" -e normal --prefix none | sort -u` on the base (a `git archive` copy of c32f7e23 with its own `CARGO_TARGET_DIR` under `$TMPDIR`, removed afterwards) and on the tip; the crates added, by name and count, go in the CHANGELOG entry's `### Notes` as a dependency line with the one-line downstream note (a wasm downstream building `wallet` without `http` now compiles these crates; no code change for it), and in your REPORT.
+4. Then the rest of the original brief: the semver check against the base, the 90-second fuzz run on a `git archive` copy with its own target dir, the full gate table in the REPORT, one commit on the branch carrying the entry and the docs rows, no push. The entry names the nine refusing rows with their reference words and the two accepting frame sets, as your evidence has them.
+
+Rules: never end your turn with a command running in the background; commit on the branch, never push; no test or probe on a default URL or port (a MetaNet Client listens on 3301, 3321 and 2121 on this machine; another session's process on 3390); do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole (the reference and the downstreams are read by their named paths); vectors are written by recorders, never by hand; scratch copies under `$TMPDIR` with their own `CARGO_TARGET_DIR`, removed at the end; never `rustup default` or `rustup override` (use `cargo +1.99.0`); a new dependency needs the captain's word first.
+
+## Report
+
+The REPORT as the original brief asks, plus the dependency delta (the crates added on the wasm32 `wallet,transaction,wasm` tree, by name) and the regex feature set chosen.

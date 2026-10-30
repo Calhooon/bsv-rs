@@ -1,4 +1,4 @@
-keeper's word first
+FILE — tenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
 
 # Reject certificate outpoint indexes that the writer cannot serialize
 

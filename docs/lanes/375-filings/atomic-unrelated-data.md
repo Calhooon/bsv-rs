@@ -1,4 +1,4 @@
-keeper's word first
+FILE — fifth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
 
 # Enforce the subject dependency graph when validating parsed Atomic BEEF
 
