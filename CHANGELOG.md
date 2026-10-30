@@ -97,6 +97,40 @@ archived base `c32f7e23`, adds 33 crates and removes none: `displaydoc`,
 `wallet` without `http` now compiles these crates; it needs no code change.
 The ratchet's pinned library lock adds only the same direct `url` edge;
 all locked dependency versions are unchanged.
+### Added: certificate DER round-trip witness and census split (#375)
+
+`tests/auth_certificate_der_roundtrip_375.rs` and
+`tests/vectors/auth_certificate_der_roundtrip_375.json` pin a certificate
+built and signed by this crate, its valid high-S variant, and a refused
+BER long-form sequence length. JSON preserves all input signature bytes;
+accepted low-S and high-S DER also survive binary read/write unchanged.
+The refused encoding stays refused on the wire, with the reference's
+verification verdict. No library behavior changes.
+
+`tests/support/certificate_der_roundtrip_375/` records the actual
+`ToWalletCertificate` / `FromWalletCertificate` round trip at go-sdk v1.7.2
+(`2ca481c`) under Go 1.27.0. Two runs are byte-identical. TypeScript's
+verdicts and byte preservation were also measured from unmodified
+`ts-stack@edf6e03` under Node v22.18.0. The draft
+`docs/lanes/375-filings/certificate-bounds-der.md` now makes the single
+DER-preservation claim. Row 60 and its four historical census annotations
+classify the byte bounds as Ours: the reference's safeguards at its cited
+sites, not BRC numbers; DER preservation is Theirs: go-sdk, filing pending.
+
+### Notes: cross-SDK parity (#375)
+
+Go verifies the low-S and high-S inputs and both converted certificates,
+but its adapter rewrites high S to low S (`certificate.go:274-280,319-322`,
+`signature.go:77-102,297-299`). TypeScript and this crate preserve both
+accepted signatures. TypeScript `Certificate.ts:309-311,395-397,425-439`
+parses and writes/re-encodes DER; `Signature.ts:201-247` preserves S, and
+`ECDSA.ts:236-239` accepts either S form. The BER length probe is refused
+by both parsers (`signature.go:199-207`, `Signature.ts:45-51`); Go's adapter
+drops its signature and returns an unsigned certificate. This refusal
+control is not the draft's claim. BRC-52 at `5119a9b`,
+`peer-to-peer/0052.md:93,103`, specifies DER and recommends retaining
+signature bytes without requiring low S; BRC-53 `wallet/0053.md:13-15`
+defers current certificate behavior to BRC-52/100. Nothing has been filed.
 
 ### Fixed: refuse oversized wallet wire requests before transmission (#496)
 
@@ -8017,7 +8051,7 @@ This crate follows the reference.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: the identity token `publicly_reveal_attributes` publishes is the reference's, signed by the subject, and createAction's empty answer is refused (#310)
 
@@ -8401,7 +8435,7 @@ parse the DER (#183, #189).
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
@@ -8545,7 +8579,7 @@ parse and re-encoding remain the wire's alone.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 
@@ -8613,7 +8647,7 @@ revealed certificate fields using keyring: <words>`,
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: `Peer` refuses a malformed requested certificate set where the reference does, on its own policy and on receipt (#294)
 
