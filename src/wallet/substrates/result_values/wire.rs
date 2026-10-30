@@ -2,7 +2,7 @@
 //! Empty arrays stand in for those fields in the graph walk (a byte array is
 //! one node). Row predicates read the original slices through `Fields`.
 
-use super::{bytes::Fields, validate_with_bytes, Result};
+use super::{boundary::MAX_BYTES, bytes::Fields, validate_with_bytes, Result};
 use crate::wallet::{
     CreateActionResult, DiscoverCertificatesResult, ListCertificatesResult, ListOutputsResult,
     Outpoint, ProveCertificateResult, RevealCounterpartyKeyLinkageResult,
@@ -40,11 +40,11 @@ fn check<'a>(
     action: Option<&'a crate::wallet::CreateActionArgs>,
 ) -> Result<()> {
     bytes.action = action;
-    if bytes.binary.iter().map(|(_, b)| b.len()).sum::<usize>() > 256 * 1024 * 1024 {
+    if bytes.binary.iter().map(|(_, b)| b.len()).sum::<usize>() > MAX_BYTES {
         return Err(super::invalid(
             call,
             "byte arrays",
-            "at most 268435456 total bytes",
+            &format!("at most {MAX_BYTES} total bytes"),
         ));
     }
     let text =

@@ -38,14 +38,15 @@ fn serial() -> std::sync::MutexGuard<'static, ()> {
     PROFILER.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// #487, following #339: construct the answer before profiling, then bound
-/// the client's peak to four frame copies, including the transport's copy.
+/// #487, following #339: construct the request and answer before profiling.
+/// Six frame lengths allow the typed read, transport copy, and encoded request
+/// buffers exercised by output-script binding (#502).
 #[cfg(feature = "wallet")]
 #[test]
 fn wire_64_mib_create_action_costs_the_typed_reading_487() {
     let _serial = serial();
-    let (args, frame) = wire_result_cost_487::fixture(64, false);
-    let budget = 4 * frame.len();
+    let (args, frame) = wire_result_cost_487::fixture(64, true);
+    let budget = 6 * frame.len();
     let wallet =
         bsv_rs::wallet::wire::WalletWireTransceiver::new(wire_result_cost_487::Fixed(frame));
     let runtime = tokio::runtime::Builder::new_current_thread()
