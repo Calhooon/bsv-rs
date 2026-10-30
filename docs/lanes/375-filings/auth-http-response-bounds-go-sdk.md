@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 75: SimplifiedFetchTransport follows the newer reference's six response bounds and mappings…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 76: SimplifiedFetchTransport follows the newer reference's six response bounds and mappings…
 
 Go reads bodies and signed headers without the six TypeScript reference caps, does not bind the returned request ID and rejects certificateRequest as nongeneral. Apply the reference's certificate-header, signature, body, request-ID and signed-header checks before accepting a response, and support the authenticated certificateRequest response type. The TypeScript producer/intake disagreement has its own draft; it is not part of this Go request.
 

@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/BRCs
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 78: On HTTP token punctuation in a header name (_, !…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 79: On HTTP token punctuation in a header name (_, !…
 
 BRC-104 requires lexicographic lowercase-header ordering at lines 105, 196 and 209. TypeScript localeCompare and Go byte sorting give different orders for legal ASCII token punctuation; Rust currently follows TypeScript. The linked vector records that disagreement. Please define the exact comparator and migration behavior so both sides derive one signature preimage. This is a BRC clarification request, not an allegation that Go byte ordering violates a settled profile.
 

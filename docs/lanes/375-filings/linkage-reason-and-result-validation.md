@@ -1,10 +1,10 @@
-FILE — fifteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — sixteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; pending the owner's cadence word.
 
 # Use the linkage reason width and validate returned linkage context
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 72: The wire transceiver's two linkage calls (Unreleased, bsv-rs#406) write the…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 73: The wire transceiver's two linkage calls (Unreleased, bsv-rs#406) write the…
 
 A reason of 253 bytes exposes the varint-string versus i8 length divergence; a level outside 0..2 and a result key different from the request expose missing result validation. The six normal fixture frames already match. Align the valid reason domain and bind returned prover/verifier/counterparty/protocol/keyID to the request.
 

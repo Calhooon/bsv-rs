@@ -1,4 +1,4 @@
-FILE — twelfth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — thirteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; pending the owner's cadence word.
 
 # Refuse zero unlockingScriptLength as BRC-100 specifies
 

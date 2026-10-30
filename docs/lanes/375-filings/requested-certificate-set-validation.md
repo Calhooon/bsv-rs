@@ -2,7 +2,7 @@
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 62: Peer refuses a malformed requested certificate set where the reference…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 63: Peer refuses a malformed requested certificate set where the reference…
 
 Pass duplicate certifiers, more than 100 certifiers/types/fields or unsafe/repeated field names through the Peer doors. The reference snapshots and bounds the policy before signing and checks incoming sets; Go defines ValidateRequestedCertificateSet but its Peer does not call it. Keep typed 32-byte type-ID rejection distinct from validating the full set.
 
