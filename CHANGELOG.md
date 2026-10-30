@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed: local KVStore parser words inside Original error (#489)
 
-Local authentication now uses the reference's parser messages inside the
+Local authentication now uses the reference's parser messages for inputs
+that the reference also refuses with those messages, inside the
 `Invalid value found. Relinquish the corrupted output from the {context}
 basket before using this key again. Original error: {message}` wrapper.
 Previously, a malformed locking key or token exposed this crate's native
 hex, public-key or script-parser diagnostic. The local parser catches select
-the reference text by error variant and input shape; they do not compare
-diagnostic strings or change the primitives' own errors. Wallet-supplied
+the reference text by error variant, input shape and the reference's point
+acceptance rules; if the reference accepts the key, the native parser error
+is retained. They do not compare diagnostic strings or change acceptance
+or the primitives' own errors. Wallet-supplied
 errors still follow #477's extraction rule, including an injected
 `InvalidPublicKey` error. No public shape changes; update matches on the
 wrapped parser suffixes below. Local parser failures use `KvStoreLocalError`,
@@ -33,7 +36,8 @@ distinguishes an unknown length/prefix from a point off the curve
 `PushDrop.decode` at `:59`: its default lock-before path reads the initial
 chunk's key at `PushDrop.ts:73-77`, then the fields at `:96-115`, before
 the canonical decoder checks field count and envelope. These are the actual
-lines at the pin; the finding's `LocalKVStore.ts:248,250-260` is offset.
+lines at the pin: the key parse is `LocalKVStore.ts:246`, not `:248`, the
+canonical decode is `:278-282`, and the authentication catch is `:340-345`.
 Go at `2ca481c`, `kvstore/local_kv_store.go:66-111`, uses operation wrappers
 and has no equivalent `Original error:` contract.
 
@@ -72,9 +76,51 @@ then green. They compare the full message and `KvStoreLocalError` variant
 against 36 recorded cases (18 corruptions, both get and set), and pin the
 standalone hex, public-key and PushDrop errors as unchanged. The #326
 recorder's extended `--kvstore-local-454` mode writes every source BEEF and
-every expected message; two Node 22 runs are byte-identical. All previous
-`kvstore_local_454.json` fields are unchanged. The #477 parity note still
-applies to the BEEF and transaction parser diagnostics it names.
+every expected message; two Node 22 runs are byte-identical. All fields
+predating #489 and its original 36 recorded rows are unchanged. The #477
+parity note still applies to the BEEF and transaction parser diagnostics it names.
+
+### Notes: cross-SDK parity (#489)
+
+This crate's key parsing is stricter than the reference's: no odd-length
+padding, no hybrid keys, no x reduced mod p. At `ts-stack@edf6e03`,
+`hex.ts:28-30` pads odd hex, `Point.ts:303-325` accepts on-curve hybrid keys
+with matching parity, and `Point.ts:365-384` reduces x modulo p. Thus
+`PublicKey.fromString` (`PublicKey.ts:49-51`, `Point.ts:345-347`) accepts the
+four keys below that `PublicKey::from_hex` refuses here. A token with either
+accepted noncanonical key push decodes there, then fails the canonical
+envelope check (`LocalKVStore.ts:278-282`, `PushDropValidation.ts:73-74`).
+Here it fails key parsing earlier. The words here are the parser's own,
+including its error-category prefix, never a reference refusal invented
+for an accepted input. Gx/Gy below are the secp256k1 generator coordinates;
+p is the field prime. Key acceptance is unchanged by this fold.
+
+The reference's local-store site decodes lock-before only
+(`LocalKVStore.ts:278-282`, `PushDropValidation.ts:59`, `PushDrop.ts:74-75`).
+This crate's general decoder also tries lock-after and reaches a later
+field-count or canonical-envelope check. The two existing differences are
+pinned below, including both SDKs' full wrapped messages. Restricting this
+site to lock-before is a separate behavior decision.
+
+| Input | Recorded reference verdict | This crate after `Original error:` | Pin in `kvstore_local_parser_words_489.rs` |
+|---|---|---|---|
+| `2` + Gx | Key accepted; later wallet-key mismatch | `invalid hex string: Odd number of digits` | `reference_accepts_odd_valid_key_but_local_keeps_native_words_489` |
+| `06` + Gx + Gy | Key accepted; later wallet-key mismatch | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `reference_accepts_hybrid_key_but_local_keeps_native_words_489` |
+| `6` + Gx + Gy | Key accepted; later wallet-key mismatch | `invalid hex string: Odd number of digits` | `reference_accepts_odd_hybrid_key_but_local_keeps_native_words_489` |
+| `02` + (p+1) | Key accepted; later wallet-key mismatch | `invalid public key: Point not on curve` | `reference_accepts_reduced_x_key_but_local_keeps_native_words_489` |
+| Token key `06` + Gx + Gy | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `reference_decodes_hybrid_token_but_local_keeps_native_words_489` |
+| Token key `02` + (p+1) | Decodes; `PushDrop token must use the canonical PushDrop envelope` | `invalid public key: Point not on curve` | `reference_decodes_reduced_x_token_but_local_keeps_native_words_489` |
+| `51 75 <G> ac` | `script.chunks[0].data must have value` | `Unexpected PushDrop token field count` | `lock_after_one_field_reaches_local_field_count_not_reference_decode_489` |
+| `51 52 6d <G> ac` | `script.chunks[0].data must have value` | `PushDrop token must use the canonical PushDrop envelope` | `lock_after_two_fields_reaches_local_envelope_not_reference_decode_489` |
+
+The recorder now writes 52 cases (26 inputs, each for get and set), including
+an explicit `parser_accepted` verdict for these eight inputs. Two Node
+22.18.0 runs are byte-identical; all earlier fields and the 36 original
+cases are unchanged. With the new test file and recorded vector overlaid
+on an archived `9bcbe433`, the six accepted-key/token tests are RED because
+the tip incorrectly reports `Invalid point`; the two lock-after pins and
+the original five tests are already green. All 13 tests pass after the
+fold. The RED scratch copy uses its own target directory and is removed.
 
 ### Fixed: four older LocalKVStore request/result differences (#478)
 

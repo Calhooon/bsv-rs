@@ -1206,6 +1206,182 @@
       "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002221034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b730000000000",
       "parser_error": null,
       "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unexpected PushDrop token field count"
+    },
+    {
+      "name": "key_odd_valid",
+      "kind": "key_odd_valid",
+      "operation": "get",
+      "public_key": "279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_odd_valid",
+      "kind": "key_odd_valid",
+      "operation": "set",
+      "public_key": "279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_hybrid_valid",
+      "kind": "key_hybrid_valid",
+      "operation": "get",
+      "public_key": "0679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_hybrid_valid",
+      "kind": "key_hybrid_valid",
+      "operation": "set",
+      "public_key": "0679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_odd_hybrid_valid",
+      "kind": "key_odd_hybrid_valid",
+      "operation": "get",
+      "public_key": "679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_odd_hybrid_valid",
+      "kind": "key_odd_hybrid_valid",
+      "operation": "set",
+      "public_key": "679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_reduced_x",
+      "kind": "key_reduced_x",
+      "operation": "get",
+      "public_key": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "key_reduced_x",
+      "kind": "key_reduced_x",
+      "operation": "set",
+      "public_key": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: KVStore token locking key does not belong to the wallet"
+    },
+    {
+      "name": "token_hybrid_valid",
+      "kind": "token_hybrid_valid",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000008f410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "token_hybrid_valid",
+      "kind": "token_hybrid_valid",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000008f410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "token_reduced_x",
+      "kind": "token_reduced_x",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "2102fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f2102fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "token_reduced_x",
+      "kind": "token_reduced_x",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "2102fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f2102fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "parser_accepted": true,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "token_lock_after_one_field",
+      "kind": "token_lock_after_one_field",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "5175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000255175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "parser_accepted": false,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_one_field",
+      "kind": "token_lock_after_one_field",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "5175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000255175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "parser_accepted": false,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_two_fields",
+      "kind": "token_lock_after_two_fields",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "51526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002651526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "parser_accepted": false,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_two_fields",
+      "kind": "token_lock_after_two_fields",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "51526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002651526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "parser_accepted": false,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
     }
   ]
 }
