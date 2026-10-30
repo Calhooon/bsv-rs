@@ -61,6 +61,48 @@ under Node 22.18.0 `Array.from` of the 268,435,414-byte plaintext
 `Invalid array length` and no wallet call, so the at-cap test's answer comes from
 the reference's transceiver over a stub transport and this crate's processor
 (the cold review's measurement). The processor's own cap is bsv-rs#505.
+### Fixed: streaming BEEF heap pin keeps exact equality under CI's harness (#372)
+
+The streaming reader's heap pin checks one chunk and one element at 1,000,
+10,000 and 100,000 links with exact equality across depths. The chain sources
+and headers stay outside the measured region; the observed stream-alone
+peak is 17,004 bytes at every depth. No tolerance is added: one sized to the warning would have
+to grow with the number of tests that time out together. The
+32 KiB ceiling, verifier index's per-element bounds and NL-3 meaning stay.
+
+The pin is judged under `--test-threads=1`, using CI's command,
+`cargo test --test memory_profiling --all-features -- --test-threads=1`
+(`.github/workflows/ci.yml:236`, with `--verbose` in CI). Libtest 1.95.0's
+single-threaded path waits on `rx.recv()` and never warns
+([`library/test/src/lib.rs:415-436`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L415-L436)).
+Only the concurrent path issues the 60-second timeout warning
+([`:437-460`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L437-L460)).
+A default-harness run that lets several tests reach that warning is outside
+the pin's condition, even though their bodies wait on `serial()`.
+
+Dhat counts harness allocations too. `get_timed_out_tests` builds a
+`Vec<TestDesc>` containing every test whose timer has expired when the
+harness wakes
+([`library/test/src/lib.rs:390-406`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/lib.rs#L390-L406));
+`PrettyFormatter::write_timeout` formats one message `String` per test
+([`formatters/pretty.rs:258-264`](https://github.com/rust-lang/rust/blob/1.95.0/library/test/src/formatters/pretty.rs#L258-L264)).
+A one-test warning at an element boundary caused the observed 56-byte delta
+before setup moved out of the profile (17,152 versus 17,096 bytes).
+The first attempt's 676-byte allowance fitted one timed-out test; the vector
+grows with the batch, so no fixed allowance covers the whole diagnostic. On this branch
+11 other tests can wait on `serial()` while the pin runs (12 with #493).
+No reader or wire code changes.
+
+On an archived `a962ef49`, the first attempt, which carried a 676-byte
+allowance, a control with ten extra sleeping tests holds the boundary after dropping the first element at 100,000 links until 61 seconds
+from the test's start. The allowance and exact-equality variants both fail
+under the default harness: stream-alone peaks of 18,596 and 29,771 bytes,
+respectively, versus 17,004 bytes at the smaller depths. These runs are
+outside the pin's condition, not REDs to make green.
+The single-test control with the same delay and `--test-threads=1` passes at
+17,004 bytes at every depth, without a timeout warning.
+Five unforced runs of the pin with `--test-threads=1` also pass at 17,004
+bytes at all three depths.
 
 ### Fixed: local KVStore parser words inside Original error (#489)
 

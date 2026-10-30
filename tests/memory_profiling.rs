@@ -1,6 +1,6 @@
 //! Detailed heap analysis tests using dhat profiler.
 //!
-//! Run with: cargo test --features dhat-profiling memory_profiling -- --nocapture
+//! Run with: cargo test --test memory_profiling --all-features -- --test-threads=1
 //!
 //! These tests provide detailed heap allocation tracking:
 //! - Total allocations per operation
@@ -8,7 +8,8 @@
 //! - Allocation hotspot identification
 //!
 //! Note: Only one dhat profiler can be active at a time (a second one panics), so every test
-//! here holds `PROFILER` for its whole body: the target is serial under any `--test-threads`.
+//! here holds `PROFILER` for its whole body. The harness can still allocate concurrently;
+//! the streaming BEEF heap pin is judged under `--test-threads=1`, as in CI.
 
 #![cfg(feature = "dhat-profiling")]
 
@@ -344,12 +345,17 @@ fn test_hashing_allocations() {
 /// source that writes itself link by link, so the heap holds no BEEF and the
 /// peak is the reader's own. Three readings at each depth:
 ///
-/// - the stream alone, each element dropped as it is yielded: the peak does
-///   not move with the depth at all (one chunk of the source and one
-///   element);
+/// - the stream alone, each element dropped as it is yielded: one chunk and
+///   one element, with exactly the same peak at every depth under
+///   `--test-threads=1`, as in CI (#372);
 /// - the structure verdict and the full verdict (scripts executed, each
 ///   parent output kept until it is spent): the peak over the stream's is
 ///   the index, a bounded number of bytes per element at every depth.
+///
+/// Judge this pin with `cargo test --test memory_profiling --all-features --
+/// --test-threads=1`. Libtest 1.95.0's timeout warning allocates only on the
+/// concurrent path (`library/test/src/lib.rs:437-460`); a default-harness run
+/// with tests reaching the 60-second warning is outside this pin's condition.
 #[cfg(feature = "transaction")]
 #[test]
 fn test_beef_stream_memory_is_flat_per_element() {
@@ -370,22 +376,24 @@ fn test_beef_stream_memory_is_flat_per_element() {
     let mut rows = Vec::new();
     for n in [1_000usize, 10_000, 100_000] {
         let tip = subject(n);
+        let headers = HashMap::from([(HEIGHT, funding_root())]);
+        let source = ChainSource::new(n);
         let stream_only = peak(|| {
             let mut elements = 0usize;
-            for element in BeefStream::new(ChainSource::new(n)) {
+            for element in BeefStream::new(source) {
                 element.expect("the chain reads");
                 elements += 1;
             }
             assert_eq!(elements, n + 1);
         });
+        let source = ChainSource::new(n);
         let structure = peak(|| {
-            let headers = HashMap::from([(HEIGHT, funding_root())]);
-            let verdict = verify_stream_structure(ChainSource::new(n), &headers, Some(tip));
+            let verdict = verify_stream_structure(source, &headers, Some(tip));
             assert!(verdict.expect("the source does not fail").is_valid());
         });
+        let source = ChainSource::new(n);
         let full = peak(|| {
-            let headers = HashMap::from([(HEIGHT, funding_root())]);
-            let verdict = verify_stream(ChainSource::new(n), &headers, Some(tip));
+            let verdict = verify_stream(source, &headers, Some(tip));
             assert!(verdict.expect("the source does not fail").is_valid());
         });
         let per = |total: u64| (total - stream_only.min(total)) as f64 / n as f64;
@@ -398,12 +406,14 @@ fn test_beef_stream_memory_is_flat_per_element() {
         rows.push((n, stream_only, per(structure), per(full)));
     }
 
-    // The stream alone: one chunk and one element, at any depth.
+    // One chunk and one element at any depth under the single-threaded harness.
     let (_, first, ..) = rows[0];
     for (n, stream_only, ..) in &rows {
         assert_eq!(
             *stream_only, first,
-            "the stream's peak moved with the depth at N={n}"
+            "the stream's peak differs at N={n}: {stream_only} vs {first} B; \
+             this pin is judged under --test-threads=1, as in CI; libtest's concurrent \
+             60-second warning allocates in the process-wide profile (#372)"
         );
         assert!(
             *stream_only < 32 * 1024,
