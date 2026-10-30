@@ -78,6 +78,50 @@ messages agree and separately pin the Rust parsers' unchanged words.
 Go at `2ca481c`, `kvstore/local_kv_store.go:70-111,347-363,498-516`, wraps errors
 with operation names and has no equivalent `Original error:` contract; the
 TypeScript reference decides this change.
+### Fixed: local removal refuses unshrinking totals after two rounds (#483)
+
+`LocalKVStore::remove` counts completed removal rounds: one `listOutputs` page
+spent is one round. Previously fresh, distinct, authenticated outputs under
+an unchanging `totalOutputs` kept the loop spending forever. After two rounds,
+a further page whose total has not shrunk below the first total is refused
+before another authentication or spend. The error is the existing
+`Error::KvStoreLocalError`, displayed without a category prefix:
+`Wallet returned an inconsistent KVStore output list: after 2 removal rounds, totalOutputs first seen was 7 and last seen is 7 for key alpha`.
+The completed-round count, first and last totals, and key come from the
+operation. Earlier spends are not rolled back; no partial txid list is
+reported as a complete removal. #479's empty-page check and words take
+precedence, including on a third page. A smaller total can still finish.
+
+| Policy | Bound and reason | Reference | Change rule |
+| --- | --- | --- | --- |
+| Local removal with a total that has not shrunk below its first value | Two completed rounds: a key has one current token, and a second round covers a token written during the first. The next such page is refused. `MAX_LOCAL_REMOVE_ROUNDS` is the sole production constant. | `ts-stack@edf6e03` `LocalKVStore.ts:574-590` has no round bound. `set` spends the previous tokens (`:373-382,455,496,515-528`). | This is policy; change it by a measurement, never silently. |
+
+`tests/kvstore_local_rounds_483.rs` uses writer-built signed tokens in fresh
+transactions on every page. The constant-total and growing-total witnesses
+time out after one second on base `5981e285a6594ff1e3f7b67b21137c2ce3bc08e5`;
+the wallet yields so the timeout can interrupt that loop. Four controls pass
+on base and tip: two rounds for a token written during the first, smaller
+totals finishing after more rounds, #479's initial/third empty-page refusals,
+and one-round removal. The six tests count list, create and sign calls;
+the refusal tests stop at two spends and three listings. Existing #479 tests
+and the #454 recorded request/unlocking vectors remain unchanged.
+
+Migration: callers must handle this refusal in the existing local-store
+error variant instead of waiting forever or assuming earlier spends completed
+the removal. Consistent one- and two-round wallet requests and their bytes
+are unchanged; there is no new public API.
+
+### Notes: cross-SDK parity (#483)
+
+At `ts-stack@edf6e03`, `LocalKVStore.ts:574-590` repeats the same listing
+request, authenticates and spends one page per round (`:585`), and exits only
+when the page length equals the reported total (`:587`). Distinct outputs
+bypass its consumed-output check. Its `set` gathers the previous token inputs
+at `:373-382,455,496` and spends them while writing one replacement at
+`:515-528`. By the keeper's word (01:1xZ on #483), this crate adds the stated
+two-round policy and its typed, counted inconsistency refusal. The reference
+has no such bound or refusal text. This is a deliberate divergence, changed
+only by a measurement and never silently.
 
 ### Fixed: local removal refuses an empty page under a positive total (#479)
 
