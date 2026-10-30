@@ -1830,7 +1830,7 @@ impl Transaction {
     /// budget beside the memory budget, using [`crate::script::SpendParams::work_limit`]
     /// and [`super::StreamVerifier::set_work_limit`]'s one counter per input.
     /// Exceeding it is [`crate::script::NotJudgedCause::WorkBudgetExceeded`] on
-    /// [`Error::TransactionNotJudged`], never a script failure. A service door
+    /// [`crate::Error::TransactionNotJudged`], never a script failure. A service door
     /// sets its own policy value; `None` keeps the reference's behavior.
     /// This counter cannot interrupt one arithmetic opcode; an elapsed-time
     /// bound must be external (#378).
