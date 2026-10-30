@@ -4,7 +4,7 @@ Repository: bsv-blockchain/BRCs
 
 Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 58: BRC-103's signed certificate texts (Unreleased, bsv-rs#280): a certificateRequest is signed…
 
-Please specify whether a certificateResponse authenticates the transmitted certificates text or a reserialization, and if reserialized, define its ordering and escaping. A compact certificate with unsorted field names or reordered class members is signed over different bytes by TypeScript JSON.stringify, Go json.Marshal and the Rust received-text path. The same ambiguity for certificateRequest was resolved locally by #426 following TypeScript; it remains important to specify the cross-language contract. This asks for a BRC clarification, not an assertion that the current BRC mandates the Rust choice.
+Please specify whether a certificateResponse authenticates the transmitted certificates text or a reserialization, and if reserialized, define its ordering and escaping. The Rust certificate response now follows TypeScript JSON.stringify at its signing site through #426's ordered-node parser; Go json.Marshal sorts map keys, and serde_json's default is unchanged. The same ambiguity for certificateRequest was resolved locally by #426 following TypeScript; it remains important to specify the cross-language contract. This asks for a BRC clarification, not an assertion that the current BRC mandates the reference's choice.
 
 Witness:
 

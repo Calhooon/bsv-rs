@@ -531,7 +531,7 @@ executions, `fuzz_script_spend_default` 4,014, no crash. No public change.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-request-frame-cap-go-sdk](./docs/lanes/375-filings/wire-request-frame-cap-go-sdk.md).
+- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
 
 ### Fixed: discovery wire answers receive the reference's result validation (#495)
 
