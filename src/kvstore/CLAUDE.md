@@ -20,7 +20,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
-| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch, with no broadcaster | 161 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #479: refuse an empty page under a positive total, a stated reference divergence | 169 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
@@ -678,6 +678,23 @@ text, merged BEEF, every unlocking script and each signature request.
 10/100 limits and different error wrappers; TypeScript decides this behavior.
 Migration: additive `Error::KvStoreLocalError`; callers matching bare wallet
 errors must handle the wrapped text. Public store/config paths are unchanged.
+
+### Empty removal page (#479)
+
+By the keeper's word (00:1xZ), removal ends on the first empty page under a
+positive total, where `ts-stack@edf6e03` `LocalKVStore.ts:574-590` loops. It uses
+the local store's `Error::KvStoreLocalError` with its own words:
+`Wallet returned an inconsistent KVStore output list: totalOutputs is 7, but
+page at offset 0 is empty for key alpha`. The total and key vary; the offset is
+the requested page's zero (omitted on every request), not a consumed count.
+Earlier spends remain spent, but the operation returns an error, not partial
+success. The Node 22 witness is `{ totalOutputs: 7, outputs: [] }`.
+Local set (`:173-203,329-339,455`) reads once and cannot loop this way; global
+lookup (`GlobalKVStore.ts:583-604`) reads no total and makes one query. Both stay
+unchanged, as do consistent-wallet requests and #454 vectors. The four tests in
+`tests/kvstore_local_empty_page_479.rs` pin first-empty and post-spend refusals
+(one-second timeouts on the base), two-page removal and zero-total success.
+Migration: handle the new refusal in the existing variant; no API additions.
 
 ### Signature Verification
 

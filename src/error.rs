@@ -492,7 +492,7 @@ pub enum Error {
     #[error("kvstore error: {0}")]
     KvStoreError(String),
 
-    /// Local KVStore failure in the reference's words, including action context.
+    /// Local KVStore failure, including action context and inconsistent page refusals.
     #[cfg(feature = "kvstore")]
     #[error("{0}")]
     KvStoreLocalError(String),

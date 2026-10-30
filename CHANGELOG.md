@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: local removal refuses an empty page under a positive total (#479)
+
+`LocalKVStore::remove` now ends on the first empty page whose `totalOutputs` is
+positive. Previously it repeated the same request forever. The refusal is
+`Error::KvStoreLocalError`, with the local store's own words, displayed without
+a category prefix: `Wallet returned an inconsistent KVStore output list:
+totalOutputs is 7, but page at offset 0 is empty for key alpha` for the reported
+witness. The total and key come from that operation. Each removal request omits
+the offset (zero), even after a preceding page has been spent; the diagnostic
+reports that request offset, not the number already consumed. A later empty
+page returns an error even if earlier pages were spent, never a partial txid
+list as a successful complete removal. Earlier spends are not rolled back.
+
+`tests/kvstore_local_empty_page_479.rs` bounds each removal with a one-second
+timeout and a yielding stub wallet. The initial-empty and post-spend-empty
+tests time out on base `cc17b9cbb86923ac31df869d002eca43af414f51`; the consistent
+two-page and zero-total controls pass there. All four pass with the guard.
+Consistent wallet requests and the recorded #454 vectors remain unchanged.
+
+Migration: no new variant or public shape; callers must handle this new
+`KvStoreLocalError` refusal instead of waiting indefinitely or assuming a
+partial removal completed. Its message is local-store text, not reference text.
+
+### Notes: cross-SDK parity (#479)
+
+The reference at `ts-stack@edf6e03` loops at `LocalKVStore.ts:574-590` when the
+wallet answers `{ totalOutputs: 7, outputs: [] }`. This crate ends that loop by
+the keeper's word (00:1xZ on #479): a caller's cost is bounded by the caller,
+never by the answer. Under Node 22.18.0 the unmodified reference remained
+pending through a one-second worker timeout, repeatedly asking for offset zero.
+This is a stated divergence; the witness is prepared for the captain to file
+in the reference tracker under the owner's name.
+
+The reference's `set` reads one page at `LocalKVStore.ts:455`, checked at
+`:173-203`; `:329-339` returns immediately for an empty page and refuses an
+incomplete nonempty collapse. It cannot loop this way, so it is unchanged.
+`GlobalKVStore.ts:583-604` makes one overlay query and iterates its output array,
+without reading a total or paging in a loop; it is unchanged too.
+
 ### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
 
 - All four wallet PushDrop spending sites (shared kvstore tokens, contact update,
