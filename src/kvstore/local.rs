@@ -18,6 +18,8 @@ mod listing;
 pub(super) mod lookup;
 #[path = "local_outpoint.rs"]
 mod outpoint;
+#[path = "local_parser_words.rs"]
+mod parser_words;
 #[path = "local_token.rs"]
 mod token;
 use super::types::{

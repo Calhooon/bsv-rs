@@ -1,6 +1,6 @@
 //! Local output enumeration and authentication (TS LocalKVStore.ts:173-370).
+use super::parser_words::{decode_pushdrop, parse_public_key};
 use super::LocalKVStore;
-use crate::primitives::PublicKey;
 use crate::script::templates::{LockPosition, PushDrop};
 use crate::script::LockingScript;
 use crate::transaction::{Beef, TransactionOutput};
@@ -135,7 +135,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         let selected = outputs
             .last()
             .ok_or_else(|| refused("Wallet returned an invalid KVStore output list"))?;
-        let token = PushDrop::decode(&LockingScript::from_binary(&selected.locking_script)?)?;
+        let token = decode_pushdrop(&LockingScript::from_binary(&selected.locking_script)?)?;
         let value = if self.config.encrypt {
             self.decrypt_value(key, &token.fields[0]).await?
         } else {
@@ -176,7 +176,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 self.originator(),
             )
             .await?;
-        let expected = PublicKey::from_hex(&public_key.public_key)?;
+        let expected = parse_public_key(&public_key.public_key)?;
         let mut seen = HashSet::new();
         let mut outputs = Vec::with_capacity(listed.outputs.len());
         for output in &listed.outputs {
@@ -262,7 +262,7 @@ fn source_output<'a>(
 }
 
 fn decode_token(script: &LockingScript) -> Result<PushDrop> {
-    let token = PushDrop::decode(script)?;
+    let token = decode_pushdrop(script)?;
     if token.fields.len() != 2 {
         return Err(refused("Unexpected PushDrop token field count"));
     }

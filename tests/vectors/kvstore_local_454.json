@@ -845,5 +845,367 @@
         "error": "There are 0 outputs with tag alpha that cannot be unlocked. Original error: Final transaction does not contain one unique KVStore token"
       }
     ]
-  }
+  },
+  "parser_words_489": [
+    {
+      "name": "key_non_hex",
+      "kind": "invalid_hex",
+      "operation": "get",
+      "public_key": "zz",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid hex string",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid hex string"
+    },
+    {
+      "name": "key_non_hex",
+      "kind": "invalid_hex",
+      "operation": "set",
+      "public_key": "zz",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid hex string",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid hex string"
+    },
+    {
+      "name": "key_non_hex_odd",
+      "kind": "invalid_hex",
+      "operation": "get",
+      "public_key": "not-hex",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid hex string",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid hex string"
+    },
+    {
+      "name": "key_non_hex_odd",
+      "kind": "invalid_hex",
+      "operation": "set",
+      "public_key": "not-hex",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid hex string",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid hex string"
+    },
+    {
+      "name": "key_wrong_length",
+      "kind": "unknown_point",
+      "operation": "get",
+      "public_key": "02",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_wrong_length",
+      "kind": "unknown_point",
+      "operation": "set",
+      "public_key": "02",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_wrong_prefix",
+      "kind": "unknown_point",
+      "operation": "get",
+      "public_key": "050000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_wrong_prefix",
+      "kind": "unknown_point",
+      "operation": "set",
+      "public_key": "050000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_empty",
+      "kind": "unknown_point",
+      "operation": "get",
+      "public_key": "",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_empty",
+      "kind": "unknown_point",
+      "operation": "set",
+      "public_key": "",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_odd_hex",
+      "kind": "unknown_point",
+      "operation": "get",
+      "public_key": "2",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_odd_hex",
+      "kind": "unknown_point",
+      "operation": "set",
+      "public_key": "2",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "key_off_curve",
+      "kind": "invalid_point",
+      "operation": "get",
+      "public_key": "020000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid point",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid point"
+    },
+    {
+      "name": "key_off_curve",
+      "kind": "invalid_point",
+      "operation": "set",
+      "public_key": "020000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid point",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid point"
+    },
+    {
+      "name": "key_uncompressed_off_curve",
+      "kind": "invalid_point",
+      "operation": "get",
+      "public_key": "0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid point",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid point"
+    },
+    {
+      "name": "key_uncompressed_off_curve",
+      "kind": "invalid_point",
+      "operation": "set",
+      "public_key": "0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid point",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid point"
+    },
+    {
+      "name": "key_hybrid_odd_y",
+      "kind": "hybrid_length",
+      "operation": "get",
+      "public_key": "0600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Point string value is wrong length",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Point string value is wrong length"
+    },
+    {
+      "name": "key_hybrid_odd_y",
+      "kind": "hybrid_length",
+      "operation": "set",
+      "public_key": "0600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Point string value is wrong length",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Point string value is wrong length"
+    },
+    {
+      "name": "key_hybrid_even_y",
+      "kind": "hybrid_length",
+      "operation": "get",
+      "public_key": "0700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Point string value is wrong length",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Point string value is wrong length"
+    },
+    {
+      "name": "key_hybrid_even_y",
+      "kind": "hybrid_length",
+      "operation": "set",
+      "public_key": "0700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Point string value is wrong length",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Point string value is wrong length"
+    },
+    {
+      "name": "token_hybrid_even_y",
+      "kind": "hybrid_length",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "410700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000008f410700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Point string value is wrong length",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Point string value is wrong length"
+    },
+    {
+      "name": "token_hybrid_even_y",
+      "kind": "hybrid_length",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "410700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000008f410700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Point string value is wrong length",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Point string value is wrong length"
+    },
+    {
+      "name": "token_off_curve",
+      "kind": "invalid_point",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "21020000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21020000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid point",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid point"
+    },
+    {
+      "name": "token_off_curve",
+      "kind": "invalid_point",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "21020000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21020000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Invalid point",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Invalid point"
+    },
+    {
+      "name": "token_wrong_length",
+      "kind": "unknown_point",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "0102ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000004f0102ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_wrong_length",
+      "kind": "unknown_point",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "0102ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000004f0102ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_wrong_prefix",
+      "kind": "unknown_point",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "21050000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21050000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_wrong_prefix",
+      "kind": "unknown_point",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "21050000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21050000000000000000000000000000000000000000000000000000000000000000ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_not_pushdrop",
+      "kind": "token",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "51",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff01010000000000000001510000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_not_pushdrop",
+      "kind": "token",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "51",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff01010000000000000001510000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_empty",
+      "kind": "token",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000000000000000",
+      "parser_error": "Cannot read properties of undefined (reading 'data')",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Cannot read properties of undefined (reading 'data')"
+    },
+    {
+      "name": "token_empty",
+      "kind": "token",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000000000000000",
+      "parser_error": "Cannot read properties of undefined (reading 'data')",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Cannot read properties of undefined (reading 'data')"
+    },
+    {
+      "name": "token_no_checksig",
+      "kind": "token",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b7351036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b7351036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "token_no_checksig",
+      "kind": "token",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b7351036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b7351036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+      "parser_error": null,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "token_key_only",
+      "kind": "token",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002221034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b730000000000",
+      "parser_error": null,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unexpected PushDrop token field count"
+    },
+    {
+      "name": "token_key_only",
+      "kind": "token",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002221034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b730000000000",
+      "parser_error": null,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unexpected PushDrop token field count"
+    }
+  ]
 }
