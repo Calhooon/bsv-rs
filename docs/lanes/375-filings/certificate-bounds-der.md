@@ -1,3 +1,5 @@
+FILE — ninth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6518218558); pending the owner's cadence word.
+
 # Certificate wallet conversion rewrites valid high-S signature bytes
 
 Repository: bsv-blockchain/go-sdk

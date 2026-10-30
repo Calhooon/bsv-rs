@@ -1,12 +1,12 @@
-keeper's word first
+FILE — sixteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
 
 # Validate HTTP wallet results against their requests and BRC-100 shapes
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 18: The HTTP JSON result validator is partially ported (Unreleased, #408):…
+Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 18: the HTTP JSON result-check inventory was closed by #432; Go still lacks the reference result-validator pass.
 
-The JSON substrate unmarshals successful responses but does not run the reference result validator. Replay the linked R01-R88 inventory cases: out-of-range totals, mismatched action outputs/values, invalid BEEF bindings, malformed scalar/container fields and unsafe records. Typed JSON decoding alone cannot bind the returned transaction to the request. The Rust partially-ported statement in this row is stale after #432; the Go gap remains.
+The JSON substrate unmarshals successful responses but does not run the reference result validator. Replay the linked R01-R88 inventory cases: out-of-range totals, mismatched action outputs/values, invalid BEEF bindings, malformed scalar/container fields and unsafe records. Typed JSON decoding alone cannot bind the returned transaction to the request. The Rust inventory was closed by #432; the Go gap remains at the pin.
 
 Witness:
 
@@ -23,4 +23,4 @@ BRC reading: [BRCs@5119a9b51 wallet/0100.md:274-278,302-309](https://github.com/
 
 Evidence status: source-read at the pins in this lane; the linked Rust tests/recorded fixtures are the reproducible witness, not a claim that Go or TypeScript was rerun here. Any new upstream regression test should construct its keys using a deterministic fixture helper; this draft contains no private-key literal.
 
-The source row stays unchanged because part of it is stale: The claimed pending HTTP result scalar/binding/BEEF/global work was completed by #432; CHANGELOG.md:710 and the substrate inventory record 85 Done rows and three explicit residues. The Go validator gap remains; row 10 and this report do not claim it closed.
+Census row 18 now records #432 (landed at `d81def2f`, PR #461): 85 fully Done rows and three stated residues, R02/R03 for native JSON representation and R47 for the public u32 totals kept by the keeper's #467 word (the wider JSON-validator total is ts-stack #1449). The earlier assignment to a second lane is resolved; this draft concerns Go at the pinned source only.
