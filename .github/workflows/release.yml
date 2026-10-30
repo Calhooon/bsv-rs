@@ -66,9 +66,10 @@ jobs:
 
   # Every job that left the push run (ci.yml runs the required set, nothing more; the owner's word
   # of 2026-10-27) runs once here, on every version tag, a prerelease's included. The checks of the
-  # commit (docs, msrv, features, machete) hold the publish as they did inside ci.yml; the bench
-  # measures the runner's load as much as the commit, so it runs beside the publish and does not
-  # hold it (its red shows on this run and on its badge). nightly.yml's oracles (mutants, fuzz)
+  # commit (rustdoc in ci.yml, actionlint in docs.yml, msrv, features, machete) hold the publish.
+  # Bench builds and the scoreboard run beside the publish; runner-sensitive regression
+  # comparisons skip tag refs (#515) and remain available on branch dispatches.
+  # nightly.yml's oracles (mutants, fuzz)
   # are dispatch-only, not callable: RELEASING.md names their dispatch as a step before a minor tag.
   docs:
     name: Docs

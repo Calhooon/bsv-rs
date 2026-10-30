@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: require documentation before landing and skip tag benchmark comparisons (#515)
+
+The first beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41058300024)
+failed rustdoc on an unresolved intra-doc link that had passed two reviewed PRs:
+`Documentation` was absent from their required set. On the keeper's 2026-10-30
+13:2xZ word, the job moves from `docs.yml` back into `ci.yml`, whose triggers
+include pull requests and pushes to both lines. Its command stays
+`cargo doc --no-deps --all-features` under `RUSTDOCFLAGS: -Dwarnings`.
+`Documentation` joins `REQUIRED_ON_BETA` and `REQUIRED_ON_MAIN`;
+`docs.yml` retains actionlint. The constants describe the intended protection
+after landing, not the current settings: the captain must add `Documentation`
+to `beta`'s protection when this lands on `beta`, and to `main`'s only when
+`main`'s `ci.yml` carries the job (its cherry-pick; before that no run into
+`main` reports the context and every pull request there would wait on it),
+reading each back, then update the sequencer's required-check list.
+
+The third beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41076363406)
+published successfully but concluded failure on benchmark comparisons, reporting
+`FAIL (9 of 9 benches measured)` against the +5% p99 threshold, including
+nanosecond-scale wire-codec measurements.
+Its job list names `Bench / Benchmark Regression Check`: the job had moved to
+`bench.yml` and had no event guard there. The PR-only guard reported for
+`ci.yml` was not the running job. A reusable workflow reads its caller's
+event and ref ([GitHub's caller context](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#github-context)),
+so the Release call is a tag push, with empty PR refs.
+The comparison job now rejects `refs/tags/` through `github.ref`, including
+manual dispatches of a tag; branch dispatches and PR callers remain allowed
+by the guard. Beta's existing dispatch/call-only benchmark triggers remain,
+as do tag benchmark builds and the scoreboard. No baselines or thresholds
+change. Architecture tests prove the docs job runs for PRs and pushes and
+that tag callers skip comparisons without disabling branch dispatches.
+
 ### Added: per-transaction work budgets (#519)
 
 `transaction::WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`

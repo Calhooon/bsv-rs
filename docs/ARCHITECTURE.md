@@ -137,9 +137,13 @@ stable patch, `beta` into `main` at a phase exit as the next minor. A tag
 `vX.Y.Z` on `main` is a release of record; `vX.Y.Z-beta.N` on `beta` a
 prerelease; either runs `release.yml`, which re-runs CI, runs the measurement
 workflows (`bench.yml`, `msrv.yml`, `features.yml`, `machete.yml`,
-`docs.yml`, off the push run since 2026-10-27) and publishes through
+`docs.yml` for actionlint, off the push run since 2026-10-27) and publishes through
 crates.io trusted publishing, nothing from a laptop. A beta tag is never
 admitted to the stack's line. [RELEASING.md](../RELEASING.md), [NORTH-STAR.md](NORTH-STAR.md).
+`Documentation` returns to `ci.yml` as a required PR and push check on both
+lines after #515's protection update; tag calls run it through CI too.
+Benchmark regression comparisons skip tag refs and remain on branch dispatches;
+the tag still builds the benchmarks and collects the scoreboard.
 
 **The ratchet.** The `ratchet` job measures the library (files over 800
 lines, `unwrap`/`expect` calls, functions over 60 lines, cognitive complexity,
