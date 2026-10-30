@@ -7,6 +7,222 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the reference AuthFetch client (#423)
+
+`auth::clients::{AuthFetch, AuthFetchOptions, Response, parse_known_txids_header}`
+adds the authenticated fetch client from `ts-stack@edf6e03`,
+`packages/sdk/src/auth/clients/AuthFetch.ts` (all 1,300 lines read).
+`AuthFetch::new(wallet, requested_certificates, session_manager)` shares one
+wallet and session manager among per-origin Peers. `fetch(url, options)` returns
+an owned `Response { status, headers, body }`; `send_certificate_request` requests
+proofs and `consume_received_certificates` drains the most recent 1,000 proofs.
+`AuthFetch`, its options and response are also re-exported from `auth`.
+`AuthFetchOptions::payment_labels` exposes the reference label conversion.
+
+The client is under `auth`; the existing `SimplifiedFetchTransport` needs native
+`http`. An embedder can supply a transport factory under `auth` alone, including
+the root's wasm slice. No runtime, thread or background task is started. Timers
+use the Peer's existing native/wasm timeout helper; the 500 ms certificate grace
+is a timer, not a thread sleep. Constructor builders configure an originator,
+response deadline and body limit; `with_client` supplies a native HTTP client
+(`auth::transports::NativeFetchClient` aliases that existing client type).
+`with_max_response_bytes` configures the parser, the native transport from both
+`new` and `with_client`, and fallback buffering. It also bounds the Peer's general
+payload before the outgoing copy or incoming intake, to the greater of 16 MiB
+and the response limit plus 512 KiB (clamped to the maximum safe integer), as
+`:355-364` does. Changing the limit resets existing per-origin Peers. A custom
+transport factory owns its I/O cap; the client still bounds its payload intake,
+parser and native fallback. An injected HTTP client's redirect policy remains
+the caller's. On wasm, `AuthFetch::new` compiles but every fetch is refused with
+`HTTP transport requires the 'http' feature`; use `with_transport_factory`.
+
+The reference sites and the corresponding behavior are:
+
+- `:191-211`: wallet, optional requested certificates and sessions; `:342-398`
+  creates one Peer per origin and registers certificate listeners. `:502-565`
+  requests certificates with a 30-second deadline and keeps the latest 1,000.
+- `:228-340`: decrement an explicitly supplied retry counter before any request,
+  refuse zero, install the response listener before sending, and enforce the
+  30-second default deadline. `:302-331,1066-1076` waits for the certificate queue;
+  `:376-395` sends nonempty certificate responses and releases the queue only
+  after the 500 ms grace, even when certificate work fails.
+- `:400-426`: bounded stale-session recovery and unauthenticated fallback;
+  `:680-705` rejects fallback responses claiming any `x-bsv*` header and rejects
+  non-2xx statuses. The pinned transport's current handshake failure wording no
+  longer triggers the legacy `HTTP server failed to authenticate` fallback arm;
+  the recorder distinguishes this from the directly exercised fallback helper.
+- `:572-674`: random 32-byte request ID, method, path, search, headers, body in
+  that order. Header names are lowercased and sorted with the reference collation;
+  authorization and `x-bsv-*` are supported, `x-bsv-auth*` is forbidden, and
+  content-type parameters are stripped. POST/PUT/PATCH/DELETE with no body use
+  `{}` for application/json, otherwise the absent-body marker. Native options
+  accept owned bytes: `None` is undefined, `Some(empty)` an empty typed array.
+  JS FormData/Blob/ReadableStream and arbitrary object coercion have no Rust
+  counterpart; callers serialize them first (`:1187-1243`). The transport body
+  boundary requires Content-Type for nonempty bodies and validates text UTF-8.
+- `:428-495,1246-1300`: bounded canonical CompactSize parsing; status 200–599,
+  at most 512 headers, 1,024-byte names, 32,768-byte values, 262,144 total header
+  bytes, configured body limit (16 MiB default), and 512 KiB frame overhead.
+  The ID comparison at **`:439` ignores a nonmatching ID**, leaving the request
+  pending until its matching response or deadline; it has no immediate mismatch
+  refusal text. The successful response adds `x-bsv-auth-identity-key`.
+- `:711-961`: BRC-105 version/amount/identity/prefix checks, wallet nonce suffix,
+  protocol `[2, "3241645161d8"]`, key ID `prefix suffix`, P2PKH output, description
+  `Payment for request to <origin>`, output description `HTTP request payment`,
+  JSON custom instructions `derivationPrefix, derivationSuffix, payee`, and
+  `randomizeOutputs: false`. The action includes
+  `brc105 <hexPrefix> <hexSuffix>` followed by caller labels. The payment header
+  JSON has `derivationPrefix, derivationSuffix, transaction` in that order.
+  Compatible retries reuse the same payment; changed requirements recreate it.
+  `:804-843,963-970,1134-1177` defaults retryCounter/payment attempts to three,
+  waits `250 * min(attempt, 5)` ms after a paid failure, and bounds retries.
+- `:131-150,745,905-910`: the optional `x-bsv-payment-known-txids` extension
+  lowercases, filters to 64 hex digits, deduplicates in first-seen order, and
+  takes at most 256 IDs for `createAction.options.knownTxids`. Invalid-only and
+  absent headers leave the option absent. This is an SDK extension, not BRC-105.
+
+The client creates `x-bsv-payment` on paid retries and adds the authenticated
+identity to its returned headers. BRC-104 is the existing transport's HTTP
+mapping: `x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-nonce`,
+`x-bsv-auth-your-nonce`, `x-bsv-auth-signature`, `x-bsv-auth-request-id`, and JSON
+POSTs to `/.well-known/auth` with `Content-Type: application/json`. Incoming
+`x-bsv-auth-message-type` / `x-bsv-auth-requested-certificates` select certificate
+handling. BRC-103 supplies Peer authentication. Correlation, queueing, deadlines,
+fallback and payment retries are the client's own behavior, not new BRC-104 wire
+fields. The payment response headers are `x-bsv-payment-version`,
+`x-bsv-payment-satoshis-required`, `x-bsv-payment-derivation-prefix`, plus the
+optional known-txids extension above.
+
+Refusal strings are retained inside `Error::AuthError` (its established Display
+prefix remains). The client's fixed texts are:
+
+- `Request failed after maximum number of retries.`
+- `Authentication request capacity exceeded.`
+- `Timed out waiting for authenticated response.`
+- `Timeout waiting for certificate request to complete`
+- `sendCertificateRequest timed out after 30000ms waiting for certificate response from <origin>`
+- `Certificate response exceeds the per-message limit`
+- `No BSV auth headers allowed here!`
+- `Unsupported header in the simplified fetch implementation. Only content-type, authorization, and x-bsv-* headers are supported.`
+- `The server is trying to claim it has been authenticated when it has not!`
+- `Request failed with status: <status>`
+- `Unsupported x-bsv-payment-version response header. Client version: 1.0, Server version: <version-or-null>`
+- `Missing x-bsv-payment-satoshis-required response header.`
+- `Invalid x-bsv-payment-satoshis-required response header value.`
+- `Missing x-bsv-auth-identity-key response header.`
+- `Missing x-bsv-payment-derivation-prefix response header.`
+- `BRC-105 payment transaction must be a dense byte array of at most 16777216 bytes.`
+- `Paid request to <origin> failed after <used>/<max> attempts. Sent <amount> satoshis to <identity>.`
+
+The private payment cause `Maximum payment attempts exceeded before retrying`
+and JavaScript error cause/stack/payment diagnostic objects (`:972-1185`) have
+no fields in the crate's existing string error. This port emits no console log.
+Body conversion's `ReadableStream cannot be directly converted to number[].`
+and `Unsupported body type in this SimplifiedFetch implementation.` are excluded
+by the typed byte-body API. The existing transport contributes
+`Content-Type header is required for requests with a body.` and
+`The encoded data was not valid for encoding utf-8`.
+
+The new parser retains `Authenticated response frame exceeds the configured limit.`,
+`Authenticated response contains an invalid HTTP status code.`,
+`Authenticated response headers exceed the configured limit.`,
+`Authenticated response body exceeds the configured limit.`,
+`Authenticated response contains trailing bytes.`,
+`Authenticated response truncated while reading <field>.`,
+`Authenticated response contains an invalid <field>.`,
+`non-canonical varInt`, `number too large to retain precision - use readVarIntBn`,
+and `maxResponseBytes must be a positive safe integer`. Fields are `response nonce`,
+`status code`, `response header count`, `response header name length`,
+`response header name`, `response header value length`, `response header value`,
+`response body length`, and `response body`. Fetch's header-name/value and
+ByteString refusals and null-body status refusal are also recorded.
+
+### Notes: cross-SDK parity (#423)
+
+The cold-review fold conforms at three more reference sites:
+
+- **Identity on ID match, conformed:** `AuthFetch.ts:428-452` commits the sender
+  identity and mutual-auth flag after the frame bound and ID match, before
+  parsing status, headers or body. Rust now does the same even if parsing refuses.
+- **Content-Type trim, conformed:** `AuthFetch.ts:582-602` uses JavaScript trim.
+  Rust now uses this crate's ECMAScript-trim helper, including U+FEFF and excluding
+  U+0085, instead of `str::trim`.
+- **Response header order, conformed:** the `Headers` constructed at
+  `AuthFetch.ts:459-494` iterates names in sorted order. Both native response
+  paths now expose that order through `Response.headers`.
+
+The remaining departures are explicit:
+
+- **STATED FINDING — 401 status:** `AuthFetch.ts:400-406` reads
+  `error.details.status === 401`. This crate's existing `AuthError(String)` has
+  no status field, so stale-session recovery matches `HTTP 401 ` together with
+  `without valid BSV authentication` and an already-known peer identity.
+- **STATED FINDING — native server-key parse:** `AuthFetch.ts:873-880` passes the
+  server's key string to `wallet.getPublicKey`. Rust's typed `Counterparty::Other`
+  requires a native `PublicKey` parse before that call; malformed keys therefore
+  fail at this boundary, with native key-parser words, without calling the wallet.
+- **STATED FINDING — timeout builder:** `AuthFetch.ts:90,298-300` fixes the
+  response deadline at 30 seconds. `with_response_timeout_ms` is a Rust addition;
+  its default remains 30 seconds, and it does not change certificate deadlines.
+- **STATED FINDING — fallback cap:** `AuthFetch.ts:680-705` returns the plain
+  `fetch` response after header/status validation without bounding its body.
+  Rust buffers an owned body, so its own safeguard checks Content-Length and
+  every streamed chunk against `max_response_bytes` before extending the buffer.
+  It refuses with `Unauthenticated response from <url> exceeds <limit> bytes`.
+
+`tests/auth_fetch_423_limits.rs` pins native limits below and above 16 MiB through
+both constructors, the incoming/outgoing payload bounds and identity-on-match.
+`tests/auth_fetch_423_fallback.rs` reads the recorded `fallback` handshake refusal
+(an empty reason phrase) as well as the three direct helper cases: all 24 client
+cases are exercised. Its fixed-length and chunked bodies read at eight bytes and
+refuse at nine. The response-order and trim regressions are in
+`tests/auth_fetch_423_response.rs` and `clients/request.rs`. Each changed behavior
+was observed RED before this fold. The vector is unchanged; its one-file gitleaks
+allowlist names the recorder's fixed test entropy and the cold review's two
+byte-identical Node 22.18.0 runs.
+
+The pin does **not** automatically replay an HTTP request after sending
+certificates. Its `:392-394` only releases the queue. The HTTP fold also omits
+`initialNonce`, which its Peer requires for a certificateRequest (#416):
+`certificateRequest.initialNonce must be canonical base64.` The recorder and
+Rust tests keep that full-intake refusal separate from the handler-only witness
+and its **explicit** caller retry. No invented header or automatic replay is
+added. Handshake-time certificate exchange is exercised without a bypass.
+
+`Response` is a buffered native value, not a browser Fetch object: no stream,
+statusText, URL, redirect metadata, JS body conversions or JS diagnostic objects.
+The crate's collation profile and `Error` prefix remain the existing native
+boundaries. Payment labels use the reference's permissive base64 conversion and its
+padding/character refusal texts (`Invalid base64 padding` and
+`Invalid base64 character at index <index>`), without altering nonce values on the wire.
+The fetch retry counter is shared across nested paid attempts, including
+backoff after a transport fault; cloning options cannot replenish it.
+
+Go at `go-sdk@2ca481c`, `auth/clients/authhttp/authhttp.go`, has AuthFetch/New,
+functional options (`:56-191`), context-based Fetch (`:194-548`), matching request
+IDs before removing its listener (`:393-455`), certificate methods (`:550-652`),
+and payment creation (`:703-827`). Its goroutines/context cancellation differ
+from this port's awaited futures/timers; it updates peer identity before the ID
+match, sends even empty certificate lists, releases the queue in a goroutine,
+and returns a native `*http.Response`. Its payment action uses `auth-payment`
+as originator, a full request URL description, and network lookup; it has no
+caller labels, known-txids optimization, reused payment context or TS payment
+backoff. Its errors are lowercase and often omit the TS punctuation. The
+TypeScript client at the pin, rather than Go's surface or texts, is the authority.
+
+`tests/support/auth_fetch_423.mjs` records the actual client, Peer and transport
+under Node 22.18.0 with a fake fetch, fixed entropy, and accelerated deadlines;
+only the explicitly labeled certificate-handler and fallback-helper witnesses
+bypass their outer dispatch. `tests/vectors/auth_fetch_423.json` is recorder output
+(two byte-identical runs). The six new `tests/auth_fetch_423*.rs` files cover
+plain/correlated and mismatched answers, body defaults/bytes/refusals, timeout,
+certificate queue/grace/intake/explicit retry/receive/drain, payment/reuse/labels/
+known-txids/both exhausted budgets/header refusals, fallback, native limits and parser bounds.
+Each file is RED on the base archive because the client module/API is absent;
+request payloads are compared byte-for-byte after normalizing only request-ID
+and payment-suffix entropy. `fuzz_auth_messages` now exercises the new response
+parser (matching the ID to reach the rest) and known-txids parser.
+
 ### Fixed: signed certificate-response JSON order, with a crate-wide body census (#400)
 
 The #400 census was made at beta base `8e57ee462aee6cc5e4888fee7edc02ee2b61d4aa`

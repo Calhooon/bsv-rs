@@ -16,6 +16,14 @@ useDefault = true
 description = "golden fixtures recorded with fixed test keys (#76)"
 paths = ['''^tests/fixtures/''']
 
+# tests/vectors/auth_fetch_423.json: the nonces, signatures and request IDs from
+# tests/support/auth_fetch_423.mjs, the recorder's fixed test entropy under Node 22.18.0.
+# The cold review re-recorded two byte-identical runs; a reviewer reads this file
+# as a vector. Only this one file is let through, never tests/vectors/ as a whole.
+[[allowlists]]
+description = "the AuthFetch vector's nonces, signatures and request IDs from the recorder's fixed test entropy (#423)"
+paths = ['''^tests/vectors/auth_fetch_423\.json$''']
+
 # fuzz/corpus/: the fuzz seed corpora of #82, the vectors' bytes, including identity-key hex.
 [[allowlists]]
 description = "fuzz seed corpora written from the vectors (#82)"

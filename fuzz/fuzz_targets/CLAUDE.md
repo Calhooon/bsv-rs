@@ -71,6 +71,11 @@ Tests `bsv_rs::wallet::wire::WireReader` deserialization:
 
 Each method is tested with a fresh `WireReader` instance to independently fuzz each code path.
 
+#423 extends `fuzz_auth_messages` with `Response::from_authenticated_payload`
+(the ID copied from the input so status/headers/body are reached) and
+`parse_known_txids_header` and payment label decoding. The new seeds come directly from the Node 22 recorder's
+parser cases in `tests/vectors/auth_fetch_423.json`.
+
 ## Usage
 
 Requires [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) (which uses `libfuzzer-sys`):

@@ -10,6 +10,7 @@ This module provides transport layer implementations for sending and receiving a
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~49 |
+| `fetch_client.rs` | #423 native fallback I/O adapter and NativeFetchClient alias; Content-Length and streamed chunks bounded by the client's response limit before buffering | 91 |
 | `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | 1061 |
 | `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | 85 |
 | `http/handshake.rs` | Handshake send/status/JSON words (#410), bounded body and certificate-header text retained before its typed parse (#416) and the Peer's ordered re-serialization (#426) | 86 |

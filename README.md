@@ -41,6 +41,17 @@ only `wallet`: `WalletClient::with_substrate` wraps an in-process wallet,
 including another client. The named HTTP substrates and automatic discovery
 require `http`. The declared minimum Rust is 1.88 (`rust-version`).
 
+## Authenticated HTTP
+
+With `auth` and native `http`, `auth::AuthFetch` wraps a `Peer` and the BRC-104
+transport, correlates responses, exchanges certificates, and handles bounded
+BRC-105 payments using the supplied wallet. `AuthFetchOptions` carries method,
+headers, body bytes, retry limits and payment labels; the returned `Response`
+owns its status, headers and body. The wallet's `create_action` policy authorizes
+payments. Wasm embedders use `auth` with their own transport factory and `wasm`.
+The [#423 entry in the changelog](CHANGELOG.md) records the exact reference
+behavior, including the certificate-request intake limitation.
+
 ## The signing digest (0.7.0)
 
 `SigningContext::compute_sighash`, the digest every template's `unlock` and
