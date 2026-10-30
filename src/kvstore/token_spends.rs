@@ -29,6 +29,17 @@ pub(super) async fn complete_token_action<W: WalletInterface>(
     protocol: SigningProtocol,
     originator: Option<&str>,
 ) -> Result<CreateActionResult> {
+    complete_token_action_with_transaction(wallet, args, protocol, originator)
+        .await
+        .map(|(result, _)| result)
+}
+
+pub(super) async fn complete_token_action_with_transaction<W: WalletInterface>(
+    wallet: &W,
+    args: CreateActionArgs,
+    protocol: SigningProtocol,
+    originator: Option<&str>,
+) -> Result<(CreateActionResult, Transaction)> {
     if args.inputs.iter().flatten().next().is_none() {
         return complete_action(wallet, args, originator).await;
     }

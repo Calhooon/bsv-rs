@@ -6,8 +6,9 @@ mod identity_reveal_wallet;
 #[path = "support/kvstore_tokens_343.rs"]
 mod tokens;
 
-use bsv_rs::kvstore::{KVStoreConfig, KVStoreSetOptions, LocalKVStore};
+use bsv_rs::kvstore::{KVStoreConfig, LocalKVStore};
 use bsv_rs::primitives::from_hex;
+use bsv_rs::transaction::Transaction;
 use bsv_rs::wallet::{Counterparty, ListOutputsResult, SignableTransaction};
 use identity_reveal_wallet::Counting;
 use serde_json::Value;
@@ -110,13 +111,24 @@ async fn local_output_description_is_key_value_token_478() {
 
 #[tokio::test]
 async fn local_outpoint_requires_one_matching_token_at_its_actual_index_478() {
-    let cases = vector()["token_search"]["cases"]
-        .as_array()
-        .unwrap()
-        .clone();
-    let mut actual = Vec::new();
-    let mut expected = Vec::new();
-    for case in cases {
+    for outcome in ["unique", "two", "none"] {
+        let recorded = vector();
+        let bytes = from_hex(
+            recorded["token_search"]["cases"][0]["transaction"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        let mut tx = Transaction::from_atomic_beef(&bytes).unwrap();
+        // The ordered boundary binds a one-satoshi request at zero. A later
+        // copy of that token must still cause the completed search to refuse.
+        tx.outputs.swap(0, 1);
+        match outcome {
+            "two" => tx.add_output(tx.outputs[0].clone()).unwrap(),
+            "none" => tx.outputs[0].satoshis = Some(2),
+            _ => {}
+        }
+        tx.invalidate_caches();
         let mut wallet = Counting::of_scalar(9);
         *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
             total_outputs: 0,
@@ -124,38 +136,30 @@ async fn local_outpoint_requires_one_matching_token_at_its_actual_index_478() {
             beef: None,
         });
         wallet.signable = Some(SignableTransaction {
-            tx: from_hex(case["transaction"].as_str().unwrap()).unwrap(),
+            tx: tx.to_atomic_beef(true).unwrap(),
             reference: vec![0x52; 8],
         });
         *wallet.sign_mode.lock().unwrap() = "valid";
-        let store =
-            LocalKVStore::new(wallet, KVStoreConfig::default().with_encrypt(false)).unwrap();
-        // The bound action preserves the requested two-satoshi output at zero.
-        // Only one-satoshi copies of its script qualify for the reference search.
-        let result = store
-            .set(
-                "alpha",
-                "two",
-                Some(KVStoreSetOptions {
-                    token_amount: Some(2),
-                    ..Default::default()
-                }),
-            )
-            .await;
-        actual.push((
-            case["name"].clone(),
-            result.map_err(|error| error.to_string()),
-        ));
-        let outcome = if let Some(outpoint) = case["outpoint"].as_str() {
-            Ok(outpoint.to_owned())
-        } else {
-            Err(case["error"].as_str().unwrap().to_owned())
+        let store = LocalKVStore::new(wallet.clone(), KVStoreConfig::default().with_encrypt(false))
+            .unwrap();
+        let result = store.set("alpha", "two", None).await;
+        let expected = match outcome {
+            "unique" => Ok(format!("{}.0", tx.id())),
+            "two" => Err("There are 0 outputs with tag alpha that cannot be unlocked. Original error: Final transaction does not contain one unique KVStore token".to_owned()),
+            _ => Err("There are 0 outputs with tag alpha that cannot be unlocked. Original error: Wallet transaction substituted a requested output position".to_owned()),
         };
-        expected.push((case["name"].clone(), outcome));
+        assert_eq!(
+            result.map_err(|error| error.to_string()),
+            expected,
+            "{outcome}"
+        );
+        assert_eq!(
+            wallet.signs.lock().unwrap().len(),
+            usize::from(outcome != "none")
+        );
+        assert_eq!(
+            wallet.aborts.lock().unwrap().len(),
+            usize::from(outcome == "none")
+        );
     }
-    // Accumulate all three outcomes so the base run records every wrong answer.
-    assert_eq!(
-        actual, expected,
-        "nonzero, absent and duplicate token outcomes"
-    );
 }

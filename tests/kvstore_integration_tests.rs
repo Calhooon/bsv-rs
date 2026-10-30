@@ -35,7 +35,7 @@ use bsv_rs::wallet::{
 use bsv_rs::wallet::{Outpoint, WalletOutput};
 use bsv_rs::{Error, Result};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 // =============================================================================
 // Mock Wallet Implementation
@@ -78,7 +78,8 @@ struct MockWallet {
     #[allow(dead_code)]
     list_outputs_count: AtomicU32,
     /// Stored outputs from create_action calls.
-    outputs: Mutex<Vec<MockOutput>>,
+    outputs: Arc<Mutex<Vec<MockOutput>>>,
+    sign_action_count: Arc<AtomicU32>,
     actions: mock_actions::Actions,
 }
 
@@ -115,7 +116,8 @@ impl MockWallet {
             private_key: privkey,
             create_action_count: AtomicU32::new(0),
             list_outputs_count: AtomicU32::new(0),
-            outputs: Mutex::new(Vec::new()),
+            outputs: Arc::default(),
+            sign_action_count: Arc::default(),
             actions: Default::default(),
         }
     }
@@ -275,6 +277,7 @@ impl WalletInterface for MockWallet {
         args: SignActionArgs,
         _originator: Option<&str>,
     ) -> Result<SignActionResult> {
+        self.sign_action_count.fetch_add(1, Ordering::SeqCst);
         let previous = self.actions.pending_id();
         let result = self.actions.sign(args);
         for output in self.outputs.lock().unwrap().iter_mut() {
@@ -1230,27 +1233,32 @@ async fn test_local_kvstore_set_wallet_error() {
 
 #[tokio::test]
 async fn test_local_kvstore_set_with_options() {
-    for amount in [1, 50] {
+    for (configured, requested) in [(1, Some(1)), (73, Some(50)), (50, None)] {
         let wallet = MockWallet::new();
-        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
-        let opts = KVStoreSetOptions::new()
+        let outputs = Arc::clone(&wallet.outputs);
+        let signs = Arc::clone(&wallet.sign_action_count);
+        let store = LocalKVStore::new(
+            wallet,
+            KVStoreConfig::default().with_token_amount(configured),
+        )
+        .unwrap();
+        let mut opts = KVStoreSetOptions::new()
             .with_description("Test set operation")
-            .with_token_amount(amount)
             .with_tags(vec!["test".to_string()]);
+        opts.token_amount = requested;
         let result = store
             .set("key_with_opts", "value_with_opts", Some(opts))
             .await;
-        if amount == 1 {
-            assert!(result.is_ok());
-        } else {
-            // #478: the reference's completed-token search requires one satoshi.
-            assert_eq!(
-                result.unwrap_err(),
-                Error::KvStoreLocalError(
-                    "There are 0 outputs with tag key_with_opts that cannot be unlocked. Original error: Final transaction does not contain one unique KVStore token".into()
-                )
-            );
-        }
+        // #478: the wallet has processed the requested amount, so return its outpoint.
+        assert_eq!(signs.load(Ordering::SeqCst), 1);
+        let outputs = outputs.lock().unwrap();
+        assert_eq!(outputs.len(), 1);
+        let token = &outputs[0];
+        assert_eq!(token.satoshis, requested.unwrap_or(configured));
+        assert_eq!(
+            result,
+            Ok(format!("{}.{}", to_hex(&token.txid), token.vout))
+        );
     }
 }
 

@@ -1,7 +1,9 @@
 //! Local replacement/removal with a signer for every existing token (#343).
 use super::lookup::{LookupValueResult, MAX_LOCAL_OUTPUTS};
 use super::LocalKVStore;
-use crate::kvstore::token_spends::{complete_token_action, SigningProtocol};
+use crate::kvstore::token_spends::{
+    complete_token_action, complete_token_action_with_transaction, SigningProtocol,
+};
 use crate::kvstore::types::encode_value_with_ttl;
 use crate::kvstore::{KVStoreRemoveOptions, KVStoreSetOptions};
 use crate::primitives::to_hex;
@@ -54,7 +56,8 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         lock: LockingScript,
     ) -> Result<String> {
         let inputs = self.build_inputs(current)?;
-        let result = complete_token_action(
+        let amount = options.token_amount.unwrap_or(self.config.token_amount);
+        let (_, tx) = complete_token_action_with_transaction(
             &self.wallet,
             CreateActionArgs {
                 description: options
@@ -65,7 +68,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 input_beef: current.input_beef.clone(),
                 outputs: Some(vec![CreateActionOutput {
                     locking_script: lock.to_binary(),
-                    satoshis: options.token_amount.unwrap_or(self.config.token_amount),
+                    satoshis: amount,
                     output_description: "Key-value token".into(),
                     basket: Some(self.config.protocol_id.clone()),
                     custom_instructions: None,
@@ -80,7 +83,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             self.originator(),
         )
         .await?;
-        super::outpoint::token_outpoint(&result, &lock)
+        super::outpoint::token_outpoint(&tx, &lock, amount)
     }
 
     pub(super) async fn remove_internal(
