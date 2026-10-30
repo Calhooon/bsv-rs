@@ -1,5 +1,3 @@
-keeper's word first
-
 # Specify an unambiguous signed-header comparator for HTTP token punctuation
 
 Repository: bsv-blockchain/BRCs
@@ -21,3 +19,5 @@ Pinned reference reading:
 BRC reading: [BRCs@5119a9b51 peer-to-peer/0104.md:105,196-210](https://github.com/bsv-blockchain/BRCs/blob/5119a9b5148e9ec90eb4865b16f9f732a29703df/peer-to-peer/0104.md#L105). The protocol needs identical signature preimages; the exact collation profile is the implementation question.
 
 Evidence status: source-read at the pins in this lane; the linked Rust tests/recorded fixtures are the reproducible witness, not a claim that Go or TypeScript was rerun here. Any new upstream regression test should construct its keys using a deterministic fixture helper; this draft contains no private-key literal.
+
+Filing route: This BRC-104 comparator clarification touches none of BRC-95, the BEEF rules or BRC-100 widths; it follows the captain's filing path.

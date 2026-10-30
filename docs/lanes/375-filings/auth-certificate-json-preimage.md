@@ -1,5 +1,3 @@
-keeper's word first
-
 # Specify certificate-message JSON signature preimages across SDKs
 
 Repository: bsv-blockchain/BRCs
@@ -21,3 +19,5 @@ Pinned reference reading:
 BRC reading: [BRCs@5119a9b51 peer-to-peer/0103.md:133-137,172](https://github.com/bsv-blockchain/BRCs/blob/5119a9b5148e9ec90eb4865b16f9f732a29703df/peer-to-peer/0103.md#L133).
 
 Evidence status: source-read at the pins in this lane; the linked Rust tests/recorded fixtures are the reproducible witness, not a claim that Go or TypeScript was rerun here. Any new upstream regression test should construct its keys using a deterministic fixture helper; this draft contains no private-key literal.
+
+Filing route: This BRC-103 JSON-preimage clarification touches none of BRC-95, the BEEF rules or BRC-100 widths; it follows the captain's filing path.
