@@ -158,6 +158,7 @@ impl HttpWalletJson {
         let origin = super::origin::to_origin_header(originator)?;
         let body = serde_json::to_vec(args)
             .map_err(|e| Error::WalletError(format!("failed to serialize request: {e}")))?;
+        let binding = result_values::request(method, &body)?;
         if body.len() > MAX_WALLET_JSON_REQUEST_BYTES {
             return Err(Error::WalletError(REQUEST_TOO_LARGE.to_string()));
         }
@@ -168,7 +169,6 @@ impl HttpWalletJson {
             .header("Originator", &origin)
             .body(body);
 
-        // Send request
         let response = request
             .send()
             .await
@@ -178,9 +178,9 @@ impl HttpWalletJson {
             return Err(super::origin::redirect_refused(response.status(), method));
         }
         if !response.status().is_success() {
-            return Err(answer::refusal(response, method, review).await);
+            return Err(answer::refusal(response, method, review, &binding).await);
         }
-        answer::success(response, method).await
+        answer::success(response, method, &binding).await
     }
 
     // =========================================================================

@@ -16,16 +16,92 @@ const HOMES: &[&str] = &[
 // (docs/ARCH-RULES.md section 3): every line a protocol comparison, no
 // error-message allowance.
 const ALLOWED: &[(&str, &str, usize)] = &[
-    // #408: dispatch on the requested wallet method and on the schema's
-    // member name. Neither comparison inspects an error message.
+    // #432: the result decoder's ECMAScript array-index key order.
     (
         "src/wallet/substrates/http_json/result_values.rs",
-        "if call == \"revealSpecificKeyLinkage\"",
+        ".filter(|n| *n != u32::MAX && n.to_string() == key);",
+        1,
+    ),
+    // #432: method dispatch, schema-field names, filter modes and canonical
+    // JSON index spellings. These predicates never inspect error messages.
+    (
+        "src/wallet/substrates/http_json/result_values/actions.rs",
+        "if call == \"createAction\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/shapes.rs",
-        "if name == \"outputs\" {",
+        "src/wallet/substrates/http_json/result_values/actions.rs",
+        "if call == \"signAction\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/actions.rs",
+        "if call == \"signAction\" && result.contains_key(\"noSendChange\") {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/boundary.rs",
+        "if call == \"createAction\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/raw_tree.rs",
+        "key == &i.to_string() && matches!(value, Member::Scalar(text) if is_byte(text))",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "if call == \"listCertificates\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "if key == \"certifier\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "if call == \"discoverByIdentityKey\"",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "if call == \"discoverByAttributes\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/identity.rs",
+        "Some(actual) if key == \"userName\" => *actual == normalized,",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/lists.rs",
+        "if !outputs.is_empty() && request[\"include\"] == \"entire transactions\" && beef.is_none() {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/lists.rs",
+        "if request[\"include\"] == \"locking scripts\" && locking.is_none() {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/lists.rs",
+        "let matches = if request[mode] == \"all\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/scalars.rs",
+        "if call == \"revealCounterpartyKeyLinkage\" {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/scalars.rs",
+        "(_, Some(\"self\" | \"anyone\")) if call == \"revealSpecificKeyLinkage\" => None,",
+        1,
+    ),
+    (
+        "src/wallet/substrates/http_json/result_values/scalars.rs",
+        "if call == \"revealSpecificKeyLinkage\" {",
         1,
     ),
     // The constructors' base URL and originator (#323): the caller's own
@@ -186,10 +262,7 @@ fn transport_code_adds_no_text_classification() {
         }
     }
     arch_support::check_sites("text classification in a transport", &sites, ALLOWED);
-    println!(
-        "text comparison exceptions: {} sites in 9 files",
-        sites.len()
-    );
+    println!("text comparison exceptions: {} sites", sites.len());
 }
 
 #[test]

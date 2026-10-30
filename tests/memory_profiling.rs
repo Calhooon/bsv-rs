@@ -651,8 +651,43 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         .enable_all()
         .build()
         .unwrap();
-    let tx: Vec<u8> = (0..1usize << 20).map(|i| (i % 256) as u8).collect();
-    let txid = "11".repeat(32);
+    // Row R28 (#432) refuses a `tx` that is not a complete, exactly framed
+    // BEEF transaction, and the evidence row asks every input of a completed
+    // transaction for its source: the answer is a real transaction of 1 MiB
+    // framed as the reference's atomic BEEF with its own txid, spending one
+    // output of a proven funding transaction (the one transaction of its
+    // block, as `examples/transaction.rs` builds it) into one OP_FALSE
+    // OP_RETURN output pushing 1 MiB of `i % 256`.
+    let (txid, tx) = {
+        use bsv_rs::script::{LockingScript, UnlockingScript};
+        use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
+        let mut funding = Transaction::new();
+        let mut mined = TransactionInput::new("11".repeat(32), 0);
+        mined.unlocking_script = Some(UnlockingScript::new());
+        funding.add_input(mined).unwrap();
+        funding
+            .add_output(TransactionOutput::new(
+                1_000,
+                LockingScript::from_binary(&[0x51]).unwrap(),
+            ))
+            .unwrap();
+        let funding_txid = funding.id();
+        funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
+        let mut spend = Transaction::new();
+        let mut input = TransactionInput::with_source_transaction(funding, 0);
+        input.unlocking_script = Some(UnlockingScript::new());
+        spend.add_input(input).unwrap();
+        let mut script = vec![0x00, 0x6a, 0x4e];
+        script.extend_from_slice(&(1u32 << 20).to_le_bytes());
+        script.extend((0..1usize << 20).map(|i| (i % 256) as u8));
+        spend
+            .add_output(TransactionOutput::new(
+                0,
+                LockingScript::from_binary(&script).unwrap(),
+            ))
+            .unwrap();
+        (spend.id(), spend.to_atomic_beef(true).unwrap())
+    };
     let answer = |tx: serde_json::Value| {
         serde_json::to_vec(&serde_json::json!({ "txid": txid, "tx": tx })).unwrap()
     };

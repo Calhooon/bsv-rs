@@ -3,9 +3,8 @@
     {
       "expected": {
         "client_result": {
-          "ok": {
-            "authenticated": false
-          }
+          "display": "wallet error: Invalid isAuthenticated result authenticated: expected true",
+          "error": "WalletError(\"Invalid isAuthenticated result authenticated: expected true\")"
         },
         "request": {
           "headers": {

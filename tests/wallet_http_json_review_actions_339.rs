@@ -99,12 +99,7 @@ fn with_beef(body: &Value, beef: &[u8]) -> Value {
 
 /// The cases where this crate reads otherwise, each with its reason; the
 /// count is pinned.
-const DIVERGENT: [(&str, &str); 3] = [
-    (
-        "create_tx_outputs_not_requested",
-        "the reference's checks of a returned tx against the request \
-         (validateCreateActionTransaction) are not ported; the success path makes none either",
-    ),
+const DIVERGENT: [(&str, &str); 2] = [
     (
         "review_at_status_500",
         "a class's body is WalletRefusal at any status (#137); the reference types a 400 alone",
@@ -466,7 +461,7 @@ async fn the_revocation_retries_a_double_spend_answered_over_the_json_substrate(
     let signed = hex_of(&r["signed_tx"]);
     let spend = Transaction::from_beef(&signed, None).unwrap().id();
 
-    // signAction answered first by the wallet's code-5 body with the
+    // signAction answered by the wallet's code-5 body with the
     // competing transaction, then by the signed transaction
     let server = MockServer::start().await;
     let review = json!({
@@ -492,7 +487,9 @@ async fn the_revocation_retries_a_double_spend_answered_over_the_json_substrate(
         .await;
     Mock::given(method("POST"))
         .and(path("/signAction"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "tx": signed })))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "txid": spend, "tx": signed })),
+        )
         .with_priority(2)
         .mount(&server)
         .await;

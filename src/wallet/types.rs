@@ -191,7 +191,6 @@ impl Network {
         }
     }
 }
-
 // =============================================================================
 // Security Level
 // =============================================================================
@@ -833,6 +832,7 @@ pub struct WalletActionOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_instructions: Option<String>,
     /// Tags for the output.
+    #[serde(default)]
     pub tags: Vec<String>,
     /// The output index.
     pub output_index: u32,

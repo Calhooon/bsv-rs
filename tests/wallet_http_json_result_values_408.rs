@@ -34,13 +34,13 @@ struct Expansion {
     length: usize,
     #[serde(default)]
     array: bool,
-    item: Option<String>,
+    item: Option<Value>,
 }
 
 impl Expansion {
     fn text(&self) -> String {
         if self.array {
-            serde_json::to_string(&vec![self.item.as_deref().unwrap(); self.length]).unwrap()
+            serde_json::to_string(&vec![self.item.clone().unwrap(); self.length]).unwrap()
         } else {
             "x".repeat(self.length)
         }

@@ -85,3 +85,12 @@ regexes = [
   '''^1829e1dd58fc2c45b6edcbb277eecdecbab1c884b42fd779e131fea5881b45$''',
   '''^a52a35523175d6c181e90f463a27cdbf70f4ecf055e912d6fc24ac7d0e3c$''',
 ]
+
+# tests/support/http_json_pending_432.mjs: the recorder's row `variations(76, 'discoverByIdentityKey',
+# 'certificates.0.subject', [other])` (#432). The generic-api-key rule reads the method name
+# `discoverByIdentityKey` as a key name, the comma as its assignment and the JSON path
+# `certificates.0.subject` as its value (entropy 3.54 on 8.30.1): a path into the reference's result
+# shape, not a key of any kind. Only that path string is let through, never the file.
+[[allowlists]]
+description = "the #432 recorder's JSON path read as a key value by the generic-api-key rule"
+regexes = ['''^certificates\.0\.subject$''']
