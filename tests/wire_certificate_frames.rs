@@ -121,7 +121,8 @@ fn acquire_args() -> AcquireCertificateArgs {
         certificate_type: to_base64(&[0x11; 32]),
         certifier: TWO_G.to_string(),
         acquisition_protocol: AcquisitionProtocol::Issuance,
-        fields: IndexMap::new(),
+        // #487 binds an issuance result to the requested field names.
+        fields: certificate().fields,
         serial_number: None,
         revocation_outpoint: None,
         signature: None,

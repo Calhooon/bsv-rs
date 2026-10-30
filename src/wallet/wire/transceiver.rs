@@ -4,9 +4,10 @@
 //! and deserializes the responses.
 
 use super::encoding::{WireReader, WireWriter};
+use super::result_validation::Binding;
 use super::{WalletCall, WalletWire};
 use crate::primitives::bounded_capacity;
-use crate::primitives::{from_base64, from_hex, to_base64, to_hex};
+use crate::primitives::{from_base64, from_hex, to_hex};
 use crate::wallet::key_args::default_protocol;
 use crate::wallet::types::Network;
 use crate::wallet::{
@@ -127,6 +128,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         // Transmit
         let response = self.wire.transmit_to_wallet(writer.as_bytes()).await?;
+        super::result_validation::response_length(response.len())?;
 
         // Parse response
         let mut reader = WireReader::new(&response);
@@ -345,6 +347,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .await?;
 
         // The rest of the frame, the DER signature (`WalletWireTransceiver.ts:1093-1101`; #197)
+        super::result_validation::signature(&response)?;
         Ok(CreateSignatureResult {
             signature: response,
         })
@@ -455,6 +458,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: CreateActionArgs,
         originator: Option<&str>,
     ) -> Result<CreateActionResult, Error> {
+        let binding = Binding::new("createAction", &args)?;
         let mut writer = WireWriter::new();
 
         // Description
@@ -638,7 +642,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             None
         };
 
-        Ok(CreateActionResult {
+        binding.check(CreateActionResult {
             txid,
             tx,
             no_send_change,
@@ -657,6 +661,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: SignActionArgs,
         originator: Option<&str>,
     ) -> Result<SignActionResult, Error> {
+        let binding = Binding::new("signAction", &args)?;
         let mut writer = WireWriter::new();
 
         // Spends map
@@ -716,7 +721,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse send_with_results
         let send_with_results = reader.read_send_with_result_array()?;
 
-        Ok(SignActionResult {
+        binding.check(SignActionResult {
             txid,
             tx,
             send_with_results,
@@ -857,6 +862,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: ListOutputsArgs,
         originator: Option<&str>,
     ) -> Result<ListOutputsResult, Error> {
+        let binding = Binding::new("listOutputs", &args)?;
         let mut writer = WireWriter::new();
 
         // Basket
@@ -898,7 +904,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        reader.read_outputs_page(args.limit)
+        binding.check(reader.read_outputs_page(args.limit)?)
     }
 
     /// Relinquishes an output from a basket.
@@ -928,6 +934,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: AcquireCertificateArgs,
         originator: Option<&str>,
     ) -> Result<WalletCertificate, Error> {
+        let binding = Binding::new("acquireCertificate", &args)?;
         let mut writer = WireWriter::new();
 
         // Type (base64 -> bytes)
@@ -1039,7 +1046,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .await?;
 
         // Parse certificate from binary
-        self.parse_certificate_from_binary(&response)
+        binding.check(self.parse_certificate_from_binary(&response)?)
     }
 
     /// Lists certificates.
@@ -1048,6 +1055,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: ListCertificatesArgs,
         originator: Option<&str>,
     ) -> Result<ListCertificatesResult, Error> {
+        let binding = Binding::new("listCertificates", &args)?;
         let mut writer = WireWriter::new();
 
         // Certifiers
@@ -1131,7 +1139,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         }
         super::assert_page_count(certificates.len(), total_certificates, "listCertificates")?;
 
-        Ok(ListCertificatesResult {
+        binding.check(ListCertificatesResult {
             total_certificates,
             certificates,
         })
@@ -1143,6 +1151,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: ProveCertificateArgs,
         originator: Option<&str>,
     ) -> Result<ProveCertificateResult, Error> {
+        let binding = Binding::new("proveCertificate", &args)?;
         let mut writer = WireWriter::new();
 
         // Certificate type
@@ -1197,17 +1206,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let num_fields = reader.read_collection_count("proveCertificate keyring")?;
-        let mut keyring_for_verifier =
-            indexmap::IndexMap::with_capacity(bounded_capacity(num_fields, reader.remaining(), 1));
-        for _ in 0..num_fields {
-            let key = reader.read_string()?;
-            let value_len = reader.read_length()?;
-            let value_bytes = reader.read_bytes(value_len)?;
-            keyring_for_verifier.insert(key, to_base64(value_bytes));
-        }
+        let keyring_for_verifier = reader
+            .read_counted_wire_record("proveCertificate keyring", WireReader::read_base64_value)?;
 
-        Ok(ProveCertificateResult {
+        binding.check(ProveCertificateResult {
             keyring_for_verifier,
             certificate: None,
             verifier: None,

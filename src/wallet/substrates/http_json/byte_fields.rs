@@ -7,6 +7,7 @@
 //! `bytes`' words when it is no array of bytes
 //! (`WalletResultValidation.ts:868-906`, `:2179-2300`).
 
+#[cfg(feature = "http")]
 use crate::Error;
 use serde_json::Value;
 
@@ -14,6 +15,7 @@ use serde_json::Value;
 pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
 
 /// `walletByteFieldNames` (`BRC100ByteEncoding.ts:5-23`).
+#[cfg(feature = "http")]
 const WALLET_BYTE_FIELD_NAMES: [&str; 17] = [
     "BEEF",
     "atomicBEEF",
@@ -36,6 +38,7 @@ const WALLET_BYTE_FIELD_NAMES: [&str; 17] = [
 
 /// A call, a field's path in its result, and whether its absence is refused
 /// where its holder is present.
+#[cfg(feature = "http")]
 type ResultByteField = (&'static str, &'static [&'static str], bool);
 
 /// The byte fields `validateWalletResult` reads from a call's result, in
@@ -46,6 +49,7 @@ type ResultByteField = (&'static str, &'static [&'static str], bool);
 /// skipped when it is absent), the four key calls'
 /// (`:2210-2225`), the linkages' (`validateKeyLinkage`, `:2163-2173`) and
 /// listOutputs' `BEEF` (`:2082`).
+#[cfg(feature = "http")]
 const RESULT_BYTE_FIELDS: [ResultByteField; 10] = [
     ("createAction", &["tx"], false),
     ("createAction", &["signableTransaction", "tx"], true),
@@ -64,6 +68,7 @@ const RESULT_BYTE_FIELDS: [ResultByteField; 10] = [
 ];
 
 /// `revealSpecificKeyLinkage` reads the linkage as its sibling does.
+#[cfg(feature = "http")]
 fn byte_fields_of(call: &str) -> impl Iterator<Item = &'static ResultByteField> + '_ {
     let call = match call {
         "revealSpecificKeyLinkage" => "revealCounterpartyKeyLinkage",
@@ -76,6 +81,7 @@ fn byte_fields_of(call: &str) -> impl Iterator<Item = &'static ResultByteField> 
 /// each member of a wallet byte field's name that [`byte_array`] reads is
 /// replaced by its array of bytes; every other value is walked, a byte
 /// field it does not read included.
+#[cfg(feature = "http")]
 pub(super) fn normalize(body: &mut Value) {
     let mut pending = vec![body];
     while let Some(candidate) = pending.pop() {
@@ -100,6 +106,7 @@ pub(super) fn normalize(body: &mut Value) {
 /// The first byte field of `call`'s normalized answer that is no array of
 /// bytes, refused in `bytes`' words (`invalid(call, field, 'an array of
 /// bytes')`, `WalletResultValidation.ts:510-512`, `:897`).
+#[cfg(feature = "http")]
 pub(super) fn refusal(call: &str, body: &Value) -> Option<Error> {
     byte_fields_of(call).find_map(|&(_, path, required)| {
         let (last, members) = path.split_last()?;
@@ -153,7 +160,7 @@ fn byte(value: &Value) -> Option<u8> {
     (0..=u8::MAX).find(|&b| f64::from(b) >= n)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "http"))]
 mod tests {
     use super::*;
     use serde_json::json;

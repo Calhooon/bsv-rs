@@ -6,20 +6,39 @@ use crate::Error;
 use indexmap::IndexMap;
 use serde_json::value::RawValue;
 
+#[path = "result_values/action_binding.rs"]
 mod action_binding;
+#[path = "result_values/actions.rs"]
 mod actions;
+#[path = "result_values/beef.rs"]
 mod beef;
+#[path = "result_values/boundary.rs"]
 mod boundary;
+#[path = "result_values/bytes.rs"]
 mod bytes;
+#[path = "result_values/certificate.rs"]
 mod certificate;
+#[path = "result_values/certificates.rs"]
 mod certificates;
+#[cfg(feature = "http")]
+#[path = "result_values/identity.rs"]
 mod identity;
+#[path = "result_values/lists.rs"]
 mod lists;
+#[path = "result_values/raw_tree.rs"]
 mod raw_tree;
+#[cfg(feature = "http")]
+#[path = "result_values/review_projection.rs"]
 mod review_projection;
+#[path = "result_values/scalars.rs"]
 mod scalars;
+#[path = "result_values/timestamp.rs"]
+pub(crate) mod timestamp;
 
-pub(super) use boundary::{normalize_numbers, request, response_bytes};
+#[cfg(feature = "http")]
+pub(super) use boundary::{normalize_numbers, response_bytes};
+pub(crate) use boundary::{request, wire_response_length};
+#[cfg(feature = "http")]
 pub(super) use review_projection::body as review_body;
 
 type Object<'a> = IndexMap<String, &'a RawValue>;
@@ -75,15 +94,41 @@ fn member<'a>(object: &Object<'a>, key: &str) -> Option<&'a RawValue> {
 }
 
 /// Keep syntax errors in serde's words; all result checks precede typed decoding.
+#[cfg(feature = "http")]
 pub(super) fn validate<'a>(
     call: &str,
     text: &'a [u8],
     request: &serde_json::Value,
 ) -> Result<Option<raw_tree::Snapshot<'a>>> {
+    validate_context(
+        call,
+        text,
+        request,
+        &format!("HTTPWalletJSON {call} raw response"),
+    )
+}
+
+/// The wire reader has already established types and framing. BEEF remains
+/// bytes there: the shared action/output validator parses each envelope once.
+pub(crate) fn wire(
+    call: &str,
+    result: &impl serde::Serialize,
+    request: &serde_json::Value,
+) -> Result<()> {
+    let text = serde_json::to_vec(result).map_err(|e| Error::WalletError(e.to_string()))?;
+    validate_context(call, &text, request, call).map(|_| ())
+}
+
+fn validate_context<'a>(
+    call: &str,
+    text: &'a [u8],
+    request: &serde_json::Value,
+    context: &str,
+) -> Result<Option<raw_tree::Snapshot<'a>>> {
     let Ok(raw) = serde_json::from_slice::<&RawValue>(text) else {
         return Ok(None);
     };
-    let snapshot = raw_tree::Snapshot::read(raw, &format!("HTTPWalletJSON {call} raw response"))?;
+    let snapshot = raw_tree::Snapshot::read(raw, context)?;
     let result = record(Some(raw), call, "value").map_err(|_| {
         Error::WalletError(format!(
             "Invalid HTTPWalletJSON {call} response: expected an object"
@@ -121,6 +166,7 @@ pub(super) fn validate<'a>(
     Ok(Some(snapshot))
 }
 
+#[cfg(feature = "http")]
 pub(super) fn snapshot(call: &str, text: &[u8]) -> Result<()> {
     if let Ok(raw) = serde_json::from_slice::<&RawValue>(text) {
         raw_tree::Snapshot::read(raw, &format!("HTTPWalletJSON {call} raw response"))?;
@@ -147,6 +193,7 @@ fn signature(result: &Object<'_>, call: &str) -> Result<()> {
 }
 
 /// Code-5 replies carry the same action facts under an explicit txid-only request.
+#[cfg(feature = "http")]
 pub(super) fn review(
     data: &serde_json::Map<String, serde_json::Value>,
     call: &str,

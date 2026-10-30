@@ -5,7 +5,7 @@
 use super::Object;
 use serde_json::{value::RawValue, Value};
 
-pub(in crate::wallet::substrates::http_json) fn body(text: &str) -> Option<Value> {
+pub(in crate::wallet::substrates) fn body(text: &str) -> Option<Value> {
     let raw = serde_json::from_str(text).ok()?;
     project(raw, Shape::Envelope)
 }

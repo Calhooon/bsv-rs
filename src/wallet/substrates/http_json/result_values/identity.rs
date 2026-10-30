@@ -26,15 +26,6 @@ static TOKENS: LazyLock<Result<Regex>> = LazyLock::new(|| {
     )
 });
 static PARTS: LazyLock<Result<Regex>> = LazyLock::new(|| compile(r#"-?"([^"]*)"|[^ "]+"#));
-static TIME_SHAPE: LazyLock<Result<Regex>> = LazyLock::new(|| {
-    compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[^\r\n\u{2028}\u{2029}]*(?:Z|[+-][0-9]{2}:[0-9]{2})$")
-});
-static TIME: LazyLock<Result<Regex>> = LazyLock::new(|| {
-    compile(
-        r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2})(?::([0-9]{2})(?:\.([0-9]+))?)?(Z|[+-]([0-9]{2}):([0-9]{2}))$",
-    )
-});
-
 fn expression(pattern: &'static LazyLock<Result<Regex>>) -> Result<&'static Regex> {
     pattern.as_ref().map_err(Clone::clone)
 }
@@ -210,34 +201,4 @@ fn any_matches(fields: &indexmap::IndexMap<String, String>, expected: &Value) ->
     } else {
         text_matches(&searchable, &normalized)
     }
-}
-
-pub(super) fn timestamp_shape(text: &str) -> bool {
-    expression(&TIME_SHAPE).is_ok_and(|p| p.is_match(text))
-}
-
-pub(super) fn timestamp_valid(text: &str) -> bool {
-    let Ok(pattern) = expression(&TIME) else {
-        return false;
-    };
-    let Some(c) = pattern.captures(text) else {
-        return false;
-    };
-    let n = |i| {
-        c.get(i)
-            .and_then(|v| v.as_str().parse::<u32>().ok())
-            .unwrap_or(0)
-    };
-    (1..=12).contains(&n(2))
-        && (1..=31).contains(&n(3))
-        && n(4) <= 24
-        && n(5) < 60
-        && n(6) < 60
-        && n(9) < 24
-        && n(10) < 60
-        && (n(4) < 24
-            || (n(5) == 0
-                && n(6) == 0
-                && c.get(7)
-                    .is_none_or(|v| v.as_str().bytes().all(|b| b == b'0'))))
 }

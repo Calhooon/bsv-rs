@@ -1,6 +1,8 @@
 //! Certificate filters and proofs, WalletResultValidation.ts:1800-1916,2307-2363.
 
-use super::{certificate, identity, invalid, lists, member, record, scalars as s, Object, Result};
+#[cfg(feature = "http")]
+use super::identity;
+use super::{certificate, invalid, lists, member, record, scalars as s, Object, Result};
 use serde_json::{value::RawValue, Value};
 use std::collections::HashSet;
 
@@ -139,6 +141,7 @@ pub(super) fn list(result: &Object<'_>, call: &str, request: &Value) -> Result<(
             s::key(Some(raw), call, &format!("{field}.verifier"))?;
         }
         if call != "listCertificates" {
+            #[cfg(feature = "http")]
             discovery(&cert, call, &field, request)?;
         }
     }
@@ -180,6 +183,7 @@ fn filters(cert: &Object<'_>, call: &str, field: &str, request: &Value) -> Resul
     Ok(())
 }
 
+#[cfg(feature = "http")]
 fn discovery(cert: &Object<'_>, call: &str, field: &str, request: &Value) -> Result<()> {
     let info_field = format!("{field}.certifierInfo");
     let info = record(member(cert, "certifierInfo"), call, &info_field)?;

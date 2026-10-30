@@ -2,6 +2,7 @@
 
 use super::{record, Result};
 use crate::Error;
+#[cfg(feature = "http")]
 use num_traits::ToPrimitive;
 use serde_json::{value::RawValue, Value};
 
@@ -12,7 +13,7 @@ pub(super) fn unsafe_key(key: &str) -> bool {
     matches!(key, "__proto__" | "constructor" | "prototype")
 }
 
-pub(in crate::wallet::substrates::http_json) fn request(call: &str, body: &[u8]) -> Result<Value> {
+pub(crate) fn request(call: &str, body: &[u8]) -> Result<Value> {
     let raw: &RawValue = serde_json::from_slice(body)
         .map_err(|e| Error::WalletError(format!("failed to serialize request: {e}")))?;
     let fields = record(Some(raw), call, "request")?;
@@ -123,7 +124,8 @@ fn bounded_request_array(value: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(in crate::wallet::substrates::http_json) async fn response_bytes(
+#[cfg(feature = "http")]
+pub(in crate::wallet::substrates) async fn response_bytes(
     mut response: reqwest::Response,
 ) -> Result<Vec<u8>> {
     if let Some(length) = response.headers().get("content-length") {
@@ -142,7 +144,7 @@ pub(in crate::wallet::substrates::http_json) async fn response_bytes(
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| super::super::request_error(e, "failed to parse JSON response"))?
+        .map_err(|e| super::super::http_json::request_error(e, "failed to parse JSON response"))?
     {
         if chunk.len() > MAX_BYTES - bytes.len() {
             return Err(too_large());
@@ -152,12 +154,14 @@ pub(in crate::wallet::substrates::http_json) async fn response_bytes(
     Ok(bytes)
 }
 
+#[cfg(feature = "http")]
 fn too_large() -> Error {
     Error::WalletError("HTTPWalletJSON response exceeds the maximum permitted size".into())
 }
 
 /// The checked JSON integer `1.0` (and `-0`) must also decode into integer Rust fields.
-pub(in crate::wallet::substrates::http_json) fn normalize_numbers(value: &mut Value) {
+#[cfg(feature = "http")]
+pub(in crate::wallet::substrates) fn normalize_numbers(value: &mut Value) {
     // base64() checks the reference's grammar, which permits nonzero unused
     // pad bits. The public reference is bytes, so decode those bits here.
     use base64::{engine::general_purpose, Engine};
@@ -190,4 +194,14 @@ pub(in crate::wallet::substrates::http_json) fn normalize_numbers(value: &mut Va
             _ => {}
         }
     }
+}
+
+/// The wire frame limit also bounds every individual result byte field.
+pub(crate) fn wire_response_length(length: usize) -> Result<()> {
+    if length > MAX_BYTES {
+        return Err(Error::WalletError(
+            "Wallet Wire response exceeds the maximum permitted size".into(),
+        ));
+    }
+    Ok(())
 }

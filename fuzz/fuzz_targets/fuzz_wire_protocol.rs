@@ -3,6 +3,8 @@ use libfuzzer_sys::fuzz_target;
 
 #[path = "support/wire_bounds_473.rs"]
 mod bounds_473;
+#[path = "support/wire_results_487.rs"]
+mod results_487;
 mod support;
 
 fuzz_target!(|data: &[u8]| {

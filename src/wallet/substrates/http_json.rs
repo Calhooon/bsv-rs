@@ -30,9 +30,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 mod answer;
-mod byte_fields;
+use super::byte_fields;
 mod key_requests;
-mod result_values;
+use super::result_values;
 mod review_actions;
 use key_requests::{
     key_params, permission, JsonCreateHmacRequest, JsonCreateHmacResponse,
@@ -923,7 +923,7 @@ fn counterparty_to_string(counterparty: &Counterparty) -> String {
 /// [`Error::WalletTransport`] with no status; a request that could not be
 /// built, a redirect refused and a success body that is not the expected
 /// JSON stay [`Error::WalletError`].
-fn request_error(e: reqwest::Error, context: &str) -> Error {
+pub(super) fn request_error(e: reqwest::Error, context: &str) -> Error {
     fault::wallet_error(&e, format!("{}: {}", context, e))
 }
 

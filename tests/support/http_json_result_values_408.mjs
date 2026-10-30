@@ -11,6 +11,20 @@ import { pathToFileURL } from 'node:url'
 import { extend432 } from './http_json_pending_432.mjs'
 
 if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
+if (process.argv[2] === '--wire-487') {
+  const { recordWire487 } = await import('./wire_result_validation_487.mjs')
+  const sdk = await import(pathToFileURL(process.argv[3]).href)
+  const recording = await recordWire487(sdk)
+  writeFileSync(process.argv[4], JSON.stringify(recording, null, 2) + '\n')
+  if (process.argv[5]) {
+    const path = process.argv[5]
+    const source = readFileSync(path, 'utf8').split('// BEGIN RECORDED #487')[0]
+    const rows = new Set(Array.from(source.matchAll(/row!\([^,]+, (\d+)\)/g), m => Number(m[1])))
+    const embedded = { source: recording.source, node: recording.node, rows: recording.rows.filter(c => rows.has(c.row)) }
+    writeFileSync(path, source + '// BEGIN RECORDED #487\nconst RECORDING: &str = r####"' + JSON.stringify(embedded) + '"####;\n')
+  }
+  process.exit(0)
+}
 const [sdkPath, outPath] = process.argv.slice(2)
 const sdk = await import(pathToFileURL(sdkPath).href)
 const { HTTPWalletJSON } = sdk
