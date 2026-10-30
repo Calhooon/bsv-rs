@@ -250,11 +250,13 @@ async fn local_removal_refuses_a_previously_consumed_page_454() {
     let h = setup(false, 2).await;
     let mut page = h.wallet.listed.lock().unwrap().clone().unwrap();
     page.total_outputs = 3;
+    let mut repeated = page.clone();
+    repeated.total_outputs = 2; // Pass #483's shrinking guard to test duplicate authentication.
     h.wallet
         .list_answers
         .lock()
         .unwrap()
-        .extend([page.clone(), page]);
+        .extend([page, repeated]);
     let mut wallet = h.wallet.clone();
     wallet.create_from_request = true;
     *wallet.sign_mode.lock().unwrap() = "valid";

@@ -20,7 +20,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
-| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #479: refuse an empty page under a positive total; #483: two-round policy for totals that have not shrunk, both stated reference divergences | 188 |
+| `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath; one current token plus one written during the first round, both stated reference divergences | 197 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
@@ -710,18 +710,20 @@ Migration: handle the new refusal in the existing variant; no API additions.
 
 | Policy | Reason and reference | Refusal |
 | --- | --- | --- |
-| `MAX_LOCAL_REMOVE_ROUNDS`: two completed page spends before refusing another page whose total has not shrunk below the previous total | One current token per key; a second round covers one written during the first. `set` spends the previous tokens and writes one (`ts-stack@edf6e03` `LocalKVStore.ts:373-382,455,496,515-528`). The reference has no bound (`:574-590`). Change this policy by a measurement, never silently. | `Error::KvStoreLocalError`: `Wallet returned an inconsistent KVStore output list: after 2 removal rounds, previous totalOutputs was 6 and current totalOutputs is 6 for key alpha`, with the actual completed count, previous/current totals and key. |
+| `MAX_LOCAL_REMOVE_ROUNDS`: cap at two completed page spends; beneath it, the second listing's total must fall below the first | At most three listings and two spends for any wallet. One current token per key; a second round covers one written during the first. `set` spends previous tokens and writes one (`ts-stack@edf6e03` `LocalKVStore.ts:373-382,455,496,515-528`). One token per page under a larger total is inconsistent and must not expose a key to 10,000 spends. The reference has no bound (`:574-590`). Change this policy by a measurement, never silently. | `Error::KvStoreLocalError`: the cap says `Wallet returned an inconsistent KVStore output list: after 2 removal rounds, first totalOutputs was 7, previous totalOutputs was 6 and current totalOutputs is 5 for key alpha`; the shrinking guard says `Wallet returned an inconsistent KVStore output list: after 1 removal round, previous totalOutputs was 7 and current totalOutputs is 7 for key alpha`. The actual completed count, totals and key are included. |
 
-The check follows #479's unchanged empty-page refusal and precedes the next
-authentication or spend. Earlier rounds remain spent, never reported as whole
-success. After two rounds, each further page must have a total below the
-previous total to finish normally; the 10,000-total limit allows at most
-10,002 listing rounds. One- and two-round removals keep their wallet bytes.
-`tests/kvstore_local_rounds_483.rs` retains the six original tests and adds a
-7-then-6 plateau witness that times out on `f98d9175`, plus a 4, 3, 2, 1 control
-that passes on both. All eight pass with the previous-total rule. The #454
-vectors and #479 tests remain unchanged. This is the keeper's policy (01:1xZ
-on #483), not a limit present in the reference.
+Both guards follow #479's unchanged empty-page refusal and precede the next
+authentication or spend. The cap comes first; even a nonempty third page equal
+to its total cannot start another spend. An empty page with total zero still
+completes. Earlier rounds remain spent, never reported as whole success.
+One- and two-round removals keep their wallet bytes.
+`tests/kvstore_local_rounds_483.rs` has eight tests. On archived `33fd45b5`,
+7, 6, 5, ... incorrectly completes with seven spends; 7, 7 and 7, 8 defer their
+refusal until the third listing. The 7, 6, 6 plateau now asserts the cap's
+words. All eight pass with both guards; one-round, two-round and third-listing
+zero-total controls pass on both trees. The #454 vectors and all four #479
+tests remain unchanged. This is the keeper's policy (02:1xZ on #483), not a
+limit present in the reference.
 
 ### Signature Verification
 

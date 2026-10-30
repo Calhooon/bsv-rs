@@ -1,4 +1,4 @@
-//! #483: after two removal rounds, every page's total must fall below the previous total.
+//! #483: cap removal at two rounds, with shrinking totals required beneath that cap.
 #![cfg(feature = "kvstore")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[path = "support/identity_reveal_wallet.rs"]
@@ -125,49 +125,66 @@ async fn store(totals: &[u32], empty_from: Option<usize>) -> (LocalKVStore<Fresh
 async fn remove(store: &LocalKVStore<FreshWallet>) -> bsv_rs::Result<Vec<String>> {
     tokio::time::timeout(Duration::from_secs(1), store.remove("alpha", None))
         .await
-        .expect("RED #483: remove timed out after 1 s on fresh authenticated outputs under a totalOutputs that has not shrunk")
+        .expect("RED #483: remove timed out after 1 s on fresh authenticated outputs")
 }
 
-fn assert_round_refusal(error: Error, previous_total: u32, current_total: u32, wallet: &Counting) {
-    let message = format!(
-        "Wallet returned an inconsistent KVStore output list: after 2 removal rounds, previous totalOutputs was {previous_total} and current totalOutputs is {current_total} for key alpha"
-    );
+fn assert_refusal(error: Error, message: String, rounds: usize, wallet: &Counting) {
     assert_eq!(error, Error::KvStoreLocalError(message.clone()));
     assert_eq!(error.to_string(), message);
-    assert_eq!(wallet.list_args.lock().unwrap().len(), 3);
-    assert_eq!(wallet.creates.lock().unwrap().len(), 2);
-    assert_eq!(wallet.signs.lock().unwrap().len(), 2);
-    assert_eq!(wallet.signature_args.lock().unwrap().len(), 2);
+    assert_eq!(wallet.list_args.lock().unwrap().len(), rounds + 1);
+    assert_eq!(wallet.creates.lock().unwrap().len(), rounds);
+    assert_eq!(wallet.signs.lock().unwrap().len(), rounds);
+    assert_eq!(wallet.signature_args.lock().unwrap().len(), rounds);
     let creates = wallet.creates.lock().unwrap();
-    assert_ne!(
-        creates[0].inputs.as_ref().unwrap()[0].outpoint,
-        creates[1].inputs.as_ref().unwrap()[0].outpoint
+    let outpoints: std::collections::HashSet<_> = creates
+        .iter()
+        .map(|action| &action.inputs.as_ref().unwrap()[0].outpoint)
+        .collect();
+    assert_eq!(outpoints.len(), rounds);
+}
+
+fn assert_cap_refusal(error: Error, current_total: u32, wallet: &Counting) {
+    assert_refusal(
+        error,
+        format!("Wallet returned an inconsistent KVStore output list: after 2 removal rounds, first totalOutputs was 7, previous totalOutputs was 6 and current totalOutputs is {current_total} for key alpha"),
+        2,
+        wallet,
+    );
+}
+
+fn assert_shrinking_refusal(error: Error, current_total: u32, wallet: &Counting) {
+    assert_refusal(
+        error,
+        format!("Wallet returned an inconsistent KVStore output list: after 1 removal round, previous totalOutputs was 7 and current totalOutputs is {current_total} for key alpha"),
+        1,
+        wallet,
     );
 }
 
 #[tokio::test]
 async fn remove_refuses_fresh_outputs_under_unchanged_total_483() {
-    let (store, wallet) = store(&[7], None).await;
-    assert_round_refusal(remove(&store).await.unwrap_err(), 7, 7, &wallet);
+    let (store, wallet) = store(&[7, 7], None).await;
+    assert_shrinking_refusal(remove(&store).await.unwrap_err(), 7, &wallet);
 
     // The refusal releases the per-key lock for a subsequent operation.
     wallet.list_args.lock().unwrap().clear();
     wallet.creates.lock().unwrap().clear();
     wallet.signs.lock().unwrap().clear();
     wallet.signature_args.lock().unwrap().clear();
-    assert_round_refusal(remove(&store).await.unwrap_err(), 7, 7, &wallet);
+    assert_shrinking_refusal(remove(&store).await.unwrap_err(), 7, &wallet);
 }
 
 #[tokio::test]
 async fn remove_refuses_fresh_outputs_under_growing_total_483() {
     let (store, wallet) = store(&[7, 8, 9], None).await;
-    assert_round_refusal(remove(&store).await.unwrap_err(), 8, 9, &wallet);
+    assert_shrinking_refusal(remove(&store).await.unwrap_err(), 8, &wallet);
 }
 
 #[tokio::test]
 async fn remove_refuses_fresh_outputs_when_total_drops_once_then_holds_483() {
-    let (store, wallet) = store(&[7, 6], None).await;
-    assert_round_refusal(remove(&store).await.unwrap_err(), 6, 6, &wallet);
+    let (store, wallet) = store(&[7, 6, 6], None).await;
+    // The cap refuses this third listing before the shrinking guard.
+    assert_cap_refusal(remove(&store).await.unwrap_err(), 6, &wallet);
 }
 
 #[tokio::test]
@@ -191,34 +208,38 @@ async fn remove_two_rounds_for_token_written_during_first_483() {
 }
 
 #[tokio::test]
-async fn remove_smaller_totals_can_finish_after_two_rounds_483() {
-    let (store, wallet) = store(&[7, 6, 5, 1], None).await;
-    assert_eq!(remove(&store).await.unwrap().len(), 4);
-    assert_eq!(wallet.signs.lock().unwrap().len(), 4);
+async fn remove_refuses_third_round_even_when_totals_shrink_by_one_483() {
+    let (store, wallet) = store(&[7, 6, 5, 4, 3, 2, 1], None).await;
+    // On 33fd45b5 this succeeds after seven listings and seven spends.
+    let result = remove(&store).await;
+    assert_eq!(wallet.list_args.lock().unwrap().len(), 3);
+    assert_eq!(wallet.signs.lock().unwrap().len(), 2);
+    assert_cap_refusal(result.unwrap_err(), 5, &wallet);
 }
 
 #[tokio::test]
-async fn remove_totals_shrinking_by_one_each_round_complete_483() {
-    let (store, wallet) = store(&[4, 3, 2, 1], None).await;
+async fn remove_two_rounds_complete_on_third_zero_total_listing_483() {
+    let (store, wallet) = store(&[3, 2, 0], Some(3)).await;
     let txids = remove(&store).await.unwrap();
-    assert_eq!(txids.len(), 4);
+    assert_eq!(txids.len(), 2);
     assert_eq!(
         txids.iter().collect::<std::collections::HashSet<_>>().len(),
-        4
+        2
     );
-    assert_eq!(wallet.list_args.lock().unwrap().len(), 4);
-    assert_eq!(wallet.creates.lock().unwrap().len(), 4);
-    assert_eq!(wallet.signs.lock().unwrap().len(), 4);
-    assert_eq!(wallet.signature_args.lock().unwrap().len(), 4);
+    assert_eq!(wallet.list_args.lock().unwrap().len(), 3);
+    assert_eq!(wallet.creates.lock().unwrap().len(), 2);
+    assert_eq!(wallet.signs.lock().unwrap().len(), 2);
+    assert_eq!(wallet.signature_args.lock().unwrap().len(), 2);
 }
 
 #[tokio::test]
 async fn remove_empty_page_keeps_the_479_refusal() {
     for empty_from in [1, 3] {
-        let (store, wallet) = store(&[7], Some(empty_from)).await;
-        let message = "Wallet returned an inconsistent KVStore output list: totalOutputs is 7, but page at offset 0 is empty for key alpha";
+        let (store, wallet) = store(&[7, 6, 5], Some(empty_from)).await;
+        let total = [7, 6, 5][empty_from - 1];
+        let message = format!("Wallet returned an inconsistent KVStore output list: totalOutputs is {total}, but page at offset 0 is empty for key alpha");
         let error = remove(&store).await.unwrap_err();
-        assert_eq!(error, Error::KvStoreLocalError(message.into()));
+        assert_eq!(error, Error::KvStoreLocalError(message.clone()));
         assert_eq!(error.to_string(), message);
         assert_eq!(wallet.list_args.lock().unwrap().len(), empty_from);
         assert_eq!(wallet.signs.lock().unwrap().len(), empty_from - 1);
