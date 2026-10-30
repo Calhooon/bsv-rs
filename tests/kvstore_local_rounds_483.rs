@@ -1,4 +1,4 @@
-//! #483: fresh authenticated pages cannot keep removal spending forever.
+//! #483: after two removal rounds, every page's total must fall below the previous total.
 #![cfg(feature = "kvstore")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[path = "support/identity_reveal_wallet.rs"]
@@ -128,9 +128,9 @@ async fn remove(store: &LocalKVStore<FreshWallet>) -> bsv_rs::Result<Vec<String>
         .expect("RED #483: remove timed out after 1 s on fresh authenticated outputs under a totalOutputs that has not shrunk")
 }
 
-fn assert_round_refusal(error: Error, last_total: u32, wallet: &Counting) {
+fn assert_round_refusal(error: Error, previous_total: u32, current_total: u32, wallet: &Counting) {
     let message = format!(
-        "Wallet returned an inconsistent KVStore output list: after 2 removal rounds, totalOutputs first seen was 7 and last seen is {last_total} for key alpha"
+        "Wallet returned an inconsistent KVStore output list: after 2 removal rounds, previous totalOutputs was {previous_total} and current totalOutputs is {current_total} for key alpha"
     );
     assert_eq!(error, Error::KvStoreLocalError(message.clone()));
     assert_eq!(error.to_string(), message);
@@ -148,20 +148,26 @@ fn assert_round_refusal(error: Error, last_total: u32, wallet: &Counting) {
 #[tokio::test]
 async fn remove_refuses_fresh_outputs_under_unchanged_total_483() {
     let (store, wallet) = store(&[7], None).await;
-    assert_round_refusal(remove(&store).await.unwrap_err(), 7, &wallet);
+    assert_round_refusal(remove(&store).await.unwrap_err(), 7, 7, &wallet);
 
     // The refusal releases the per-key lock for a subsequent operation.
     wallet.list_args.lock().unwrap().clear();
     wallet.creates.lock().unwrap().clear();
     wallet.signs.lock().unwrap().clear();
     wallet.signature_args.lock().unwrap().clear();
-    assert_round_refusal(remove(&store).await.unwrap_err(), 7, &wallet);
+    assert_round_refusal(remove(&store).await.unwrap_err(), 7, 7, &wallet);
 }
 
 #[tokio::test]
 async fn remove_refuses_fresh_outputs_under_growing_total_483() {
     let (store, wallet) = store(&[7, 8, 9], None).await;
-    assert_round_refusal(remove(&store).await.unwrap_err(), 9, &wallet);
+    assert_round_refusal(remove(&store).await.unwrap_err(), 8, 9, &wallet);
+}
+
+#[tokio::test]
+async fn remove_refuses_fresh_outputs_when_total_drops_once_then_holds_483() {
+    let (store, wallet) = store(&[7, 6], None).await;
+    assert_round_refusal(remove(&store).await.unwrap_err(), 6, 6, &wallet);
 }
 
 #[tokio::test]
@@ -189,6 +195,21 @@ async fn remove_smaller_totals_can_finish_after_two_rounds_483() {
     let (store, wallet) = store(&[7, 6, 5, 1], None).await;
     assert_eq!(remove(&store).await.unwrap().len(), 4);
     assert_eq!(wallet.signs.lock().unwrap().len(), 4);
+}
+
+#[tokio::test]
+async fn remove_totals_shrinking_by_one_each_round_complete_483() {
+    let (store, wallet) = store(&[4, 3, 2, 1], None).await;
+    let txids = remove(&store).await.unwrap();
+    assert_eq!(txids.len(), 4);
+    assert_eq!(
+        txids.iter().collect::<std::collections::HashSet<_>>().len(),
+        4
+    );
+    assert_eq!(wallet.list_args.lock().unwrap().len(), 4);
+    assert_eq!(wallet.creates.lock().unwrap().len(), 4);
+    assert_eq!(wallet.signs.lock().unwrap().len(), 4);
+    assert_eq!(wallet.signature_args.lock().unwrap().len(), 4);
 }
 
 #[tokio::test]
