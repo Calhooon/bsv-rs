@@ -1,6 +1,6 @@
 //! The Socket.IO transport passes an `AuthMessage`'s text through (#280): a
 //! certificateRequest's and a certificateResponse's signatures cover their
-//! JSON text as transmitted, and a `serde_json::Value` sorts object keys,
+//! parsed JSON text, and a `serde_json::Value` sorts object keys,
 //! so the send writes the message's serialized text through
 //! `SocketIoSink::send_socketio_text` and the dispatch reads the event
 //! argument's text.

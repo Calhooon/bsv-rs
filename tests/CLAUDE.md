@@ -9,6 +9,8 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 ## Files
 
+`auth_response_order_400.rs`: three tests against Node 22.18.0 / ts-stack@edf6e03 recorded certificateResponse bytes. Numeric field/keyring names are reserialized in JavaScript order; the typed fallback preserves nonnumeric insertion order without retained text or a sorted Value. All RED on base 8e57ee46 with serde_json's default, then green; the third checks class property order and omission of an extra property. The #280 text and #394 ordinary-lookup pins remain, and all existing fixtures retain beta's bytes. Recorder: `support/auth_response_order_400.mjs`.
+
 | File | Tests | Feature Gate | Description |
 |------|------:|-------------|-------------|
 | `kvstore_local_parser_words_489.rs` | 13 | `kvstore` | #489: 52 recorded Node 22 get/set cases. Original five malformed-parser tests RED on `bcea54a1`; six accepted-reference key/token cases RED on `9bcbe433` and now carry native parser words; two lock-after pins green on that tip, recording the later local checks beside the reference's refusal. Acceptance and standalone diagnostics unchanged. |

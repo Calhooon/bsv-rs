@@ -1,7 +1,8 @@
 //! BRC-103's signed certificate texts (#280): a certificateRequest's
 //! signature covers the UTF-8 bytes of its `requestedCertificates` JSON text
-//! and a certificateResponse's those of its `certificates` text, the text as
-//! transmitted. BRC-103 at `5119a9b` names no serialization
+//! and a certificateResponse's those of its restored certificate JSON (#400).
+//! The compact #280 fixtures already have the reference class order.
+//! BRC-103 at `5119a9b` names no serialization
 //! (`peer-to-peer/0103.md:133-137`, `:172`); the reference signs
 //! `JSON.stringify` of what it sends and verifies `JSON.stringify` of what it
 //! parsed (`ts-stack@edf6e03` `Peer.ts:453`, `:1068`, `:1140`, `:1203`).
@@ -276,12 +277,20 @@ fn a_received_certificate_response_with_decrypted_fields_verifies_over_its_text(
     let receiver = PrivateKey::from_hex(&"0c".repeat(32)).unwrap();
     let certifier = PrivateKey::from_hex(&"0d".repeat(32)).unwrap();
 
-    // The certificates in sorted key order, a `decryptedFields` member added:
-    // no serializer here writes these bytes
-    let mut value =
-        serde_json::to_value(vec![certificate(&sender.public_key(), &certifier)]).unwrap();
-    value[0]["decryptedFields"] = serde_json::json!({"name": "Alice", "email": "a@b.c"});
-    let certificates = serde_json::to_string(&value).unwrap();
+    // Write the reference class order, with a decryptedFields member added,
+    // without losing the nested maps' order through a sorted Value (#400).
+    #[derive(serde::Serialize)]
+    struct DecryptedCertificate {
+        #[serde(flatten)]
+        certificate: VerifiableCertificate,
+        #[serde(rename = "decryptedFields")]
+        decrypted_fields: IndexMap<&'static str, &'static str>,
+    }
+    let certificates = serde_json::to_string(&[DecryptedCertificate {
+        certificate: certificate(&sender.public_key(), &certifier),
+        decrypted_fields: IndexMap::from([("name", "Alice"), ("email", "a@b.c")]),
+    }])
+    .unwrap();
     let (nonce, your_nonce) = (b64(1), b64(2));
     let signature = sign(
         &sender,

@@ -1,8 +1,9 @@
-//! The requestedCertificates preimage: JSON.stringify(JSON.parse(text)),
-//! as ts-stack@edf6e03 Peer.ts:1068 does (#426). This body is byte-compared
-//! (#400), so neither a sorted Value nor the typed set (which drops extra
-//! properties) can represent it. Objects keep insertion order, except JS
-//! array-index keys, and duplicate names replace the value in its first slot.
+//! Certificate member preimages, as ts-stack@edf6e03 Peer.ts:1068,1203
+//! re-stringifies them (#426, #400). Requests retain extra properties;
+//! responses restore the certificate class layout before signing. Retained
+//! text needs this ordered parser, not a sorted Value or a typed view that
+//! drops extra properties. Objects keep insertion order, except JS array-index
+//! keys, and duplicate names replace the value in its first slot.
 
 use std::{fmt::Write as _, iter::Peekable, str::Chars};
 
@@ -49,8 +50,12 @@ enum Write<'a> {
 
 fn stringify_valid(text: &str) -> Option<String> {
     let nodes = parse(text)?;
+    stringify_nodes(&nodes, text.len())
+}
+
+fn stringify_nodes(nodes: &[Node], capacity: usize) -> Option<String> {
     let mut pending = vec![Write::Node(nodes.len().checked_sub(1)?)];
-    let mut output = String::with_capacity(text.len());
+    let mut output = String::with_capacity(capacity);
     while let Some(next) = pending.pop() {
         match next {
             Write::Text(text) => output.push_str(text),
@@ -102,6 +107,42 @@ fn array_index(key: &[u16]) -> Option<u32> {
 /// UTF-16 (including lone surrogates) and every property before stringifying.
 pub(super) fn stringify(raw: &RawValue) -> Vec<u8> {
     stringify_valid(raw.get()).unwrap_or_default().into_bytes()
+}
+
+/// Peer.ts:341-357 restores each received certificate as its class before
+/// JSON.stringify: constructor property order, no unknown properties, and
+/// decryptedFields retained even though the Rust typed view does not hold it.
+pub(super) fn stringify_certificates(raw: &RawValue) -> Vec<u8> {
+    let Some(mut nodes) = parse(raw.get()) else {
+        return Vec::new();
+    };
+    if let Some(Node::Array(certificates)) = nodes.last() {
+        for certificate in certificates.clone() {
+            if let Some(Node::Object(properties)) = nodes.get_mut(certificate) {
+                let mut ordered = IndexMap::new();
+                for name in [
+                    "type",
+                    "serialNumber",
+                    "subject",
+                    "certifier",
+                    "revocationOutpoint",
+                    "fields",
+                    "signature",
+                    "keyring",
+                    "decryptedFields",
+                ] {
+                    let key: Vec<u16> = name.encode_utf16().collect();
+                    if let Some(value) = properties.shift_remove(&key) {
+                        ordered.insert(key, value);
+                    }
+                }
+                *properties = ordered;
+            }
+        }
+    }
+    stringify_nodes(&nodes, raw.get().len())
+        .unwrap_or_default()
+        .into_bytes()
 }
 
 fn parse(text: &str) -> Option<Vec<Node>> {
