@@ -710,13 +710,16 @@ Migration: handle the new refusal in the existing variant; no API additions.
 
 | Policy | Reason and reference | Refusal |
 | --- | --- | --- |
-| `MAX_LOCAL_REMOVE_ROUNDS`: two completed page spends before refusing another page whose total has not shrunk below the first | One current token per key; a second round covers one written during the first. `set` spends the previous tokens and writes one (`ts-stack@edf6e03` `LocalKVStore.ts:373-425,455,496,515-528`). The reference has no bound (`:574-590`). Change this policy by a measurement, never silently. | `Error::KvStoreLocalError`: `Wallet returned an inconsistent KVStore output list: after 2 removal rounds, totalOutputs first seen was 7 and last seen is 7 for key alpha`, with the actual completed count, first/last totals and key. |
+| `MAX_LOCAL_REMOVE_ROUNDS`: two completed page spends before refusing another page whose total has not shrunk below the previous total | One current token per key; a second round covers one written during the first. `set` spends the previous tokens and writes one (`ts-stack@edf6e03` `LocalKVStore.ts:373-382,455,496,515-528`). The reference has no bound (`:574-590`). Change this policy by a measurement, never silently. | `Error::KvStoreLocalError`: `Wallet returned an inconsistent KVStore output list: after 2 removal rounds, previous totalOutputs was 6 and current totalOutputs is 6 for key alpha`, with the actual completed count, previous/current totals and key. |
 
 The check follows #479's unchanged empty-page refusal and precedes the next
 authentication or spend. Earlier rounds remain spent, never reported as whole
-success. Smaller totals may finish normally; one- and two-round removals keep
-their wallet bytes. `tests/kvstore_local_rounds_483.rs` has two timeout witnesses
-on the base and four passing controls; all six pass with the bound. The #454
+success. After two rounds, each further page must have a total below the
+previous total to finish normally; the 10,000-total limit allows at most
+10,002 listing rounds. One- and two-round removals keep their wallet bytes.
+`tests/kvstore_local_rounds_483.rs` retains the six original tests and adds a
+7-then-6 plateau witness that times out on `f98d9175`, plus a 4, 3, 2, 1 control
+that passes on both. All eight pass with the previous-total rule. The #454
 vectors and #479 tests remain unchanged. This is the keeper's policy (01:1xZ
 on #483), not a limit present in the reference.
 

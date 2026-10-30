@@ -9,8 +9,10 @@ use crate::script::LockingScript;
 use crate::wallet::{Counterparty, CreateActionArgs, CreateActionOutput, WalletInterface};
 use crate::{Error, Result};
 
-/// Policy (#483): two removal rounds (one listed page spent per round) cover
+/// Policy (#483): allow two removal rounds (one listed page spent per round) for
 /// one current token per key plus a token written during the first round.
+/// After those rounds, every page's total must fall below the previous total
+/// so fresh outputs cannot keep removal spending forever.
 /// The reference has no bound (LocalKVStore.ts:574-590 at edf6e03).
 /// Change this policy only with a measurement, never silently.
 const MAX_LOCAL_REMOVE_ROUNDS: usize = 2;
@@ -92,7 +94,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         let mut txids = Vec::new();
         let mut consumed = std::collections::HashSet::new();
         let mut rounds_completed = 0;
-        let mut first_total = None;
+        let mut previous_total = u32::MAX;
         loop {
             let listed = self.get_outputs(key, MAX_LOCAL_OUTPUTS).await?;
             let count = listed.outputs.len();
@@ -104,13 +106,14 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     listed.total_outputs
                 )));
             }
-            let first_total = *first_total.get_or_insert(listed.total_outputs);
-            if rounds_completed >= MAX_LOCAL_REMOVE_ROUNDS && listed.total_outputs >= first_total {
+            if rounds_completed >= MAX_LOCAL_REMOVE_ROUNDS && listed.total_outputs >= previous_total
+            {
                 return Err(super::lookup::refused(format!(
-                    "Wallet returned an inconsistent KVStore output list: after {rounds_completed} removal rounds, totalOutputs first seen was {first_total} and last seen is {} for key {key}",
+                    "Wallet returned an inconsistent KVStore output list: after {rounds_completed} removal rounds, previous totalOutputs was {previous_total} and current totalOutputs is {} for key {key}",
                     listed.total_outputs
                 )));
             }
+            previous_total = listed.total_outputs;
             if count > 0 {
                 let outputs = self.authenticate_outputs(key, &listed).await?;
                 for output in &outputs {
