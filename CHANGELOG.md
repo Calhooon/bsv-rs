@@ -70,6 +70,71 @@ The reference's `set(key, value)` takes no options and always writes one satoshi
 crate's additions, now recorded in the root divergence list. At one satoshi,
 the search and these four request/result behaviors match the reference.
 
+### Fixed: local removal stops after two rounds (#483)
+
+`LocalKVStore::remove` counts completed page spends and refuses a third spend,
+even when every reported total shrinks. Before this change the loop had no
+bound: a wallet that kept answering fresh, authenticated outputs under a total
+that did not shrink kept the removal spending forever, page after page, as the
+reference's `LocalKVStore.ts:574-590` still does. The keeper's policy (02:1xZ on #483)
+is two rounds: the reference keeps one current token per key, and a second
+round covers a token written during the first. One token per page under a
+larger total is an inconsistent wallet answer; ten thousand spends for one
+key is the exposure this bound refuses. Removal costs at most three listings
+and two spends for any wallet. A complete page within the cap, or an empty
+page with total zero, still completes normally.
+
+The cap is checked first after #479's unchanged empty-page check, before any
+further authentication or spend. The shrinking rule remains beneath it: the
+second listing's total must fall below the first's. A plateau or rise is
+refused there. Both guards return `Error::KvStoreLocalError`, displayed without
+a category prefix, with the operation's completed rounds, totals and key:
+
+| Guard | Refusal words (example) |
+| --- | --- |
+| Two-round cap, third listing | `Wallet returned an inconsistent KVStore output list: after 2 removal rounds, first totalOutputs was 7, previous totalOutputs was 6 and current totalOutputs is 5 for key alpha` |
+| Shrinking guard, second listing | `Wallet returned an inconsistent KVStore output list: after 1 removal round, previous totalOutputs was 7 and current totalOutputs is 7 for key alpha` |
+
+Earlier spends remain spent; an error never reports their txids as complete
+removal. A nonempty third listing cannot spend even if its page equals its
+total. A third listing with total zero completes without another spend.
+
+| Policy | Bound and reason | Reference | Change rule |
+| --- | --- | --- | --- |
+| `MAX_LOCAL_REMOVE_ROUNDS`: two completed page spends; shrinking totals beneath the cap | At most three listings and two spends for any wallet. One current token per key plus one written during the first round; a wallet listing one token at a time under a larger total must not expose that key to 10,000 spends. The second listing must shrink below the first. | `ts-stack@edf6e03` `LocalKVStore.ts:574-590` has no round bound. `set` spends the previous tokens and writes one (`:373-382,455,496,515-528`). | The constant is the sole production round-policy number; change it by a measurement, never silently. |
+
+`tests/kvstore_local_rounds_483.rs` uses writer-built signed tokens in fresh
+transactions on every page. On an archived `33fd45b5` with this test file
+overlaid, the 7, 6, 5, ... witness makes seven listings and seven spends instead
+of stopping at three and two. Second-listing plateau (7, 7) and rise (7, 8)
+witnesses also fail there: that fold only compared totals from the third
+listing. The 7, 6, 6 witness still stops on the third listing, now by the cap
+rather than the shrinking guard; its exact words assert that distinction.
+All eight tests pass with both guards, including one-round removal, two-round
+removal for a token written during the first, third-listing zero-total
+completion, and #479 empty-page precedence. The four tests in
+`kvstore_local_empty_page_479.rs` pass on both; the #454 recorded vectors are
+unchanged.
+
+Migration: handle the refusal in the existing local-store error variant;
+earlier spends do not establish complete removal. Consistent one- and
+two-round wallet requests and their bytes are unchanged; no public API is added.
+
+### Notes: cross-SDK parity (#483)
+
+At `ts-stack@edf6e03`, `LocalKVStore.ts:574-590` repeats the same listing
+request, authenticates and spends one page per round (`:585`), and exits only
+when the page length equals the reported total (`:587`). Distinct outputs
+bypass its consumed-output check. Its `set` gathers the previous token inputs
+at `:373-382,455,496` and spends them while writing one replacement at
+`:515-528`. By the keeper's word (02:1xZ on #483), this crate caps removal at
+two rounds, with the shrinking guard beneath it, for at most three listings
+and two spends for any wallet. One current token plus a token written during
+the first round is the reason; an inconsistent wallet cannot demand ten
+thousand spends for a key. The reference has no bound at `:574-590` and no
+such typed, counted refusal. This is a deliberate policy divergence, changed
+only by a measurement and never silently.
+
 ### Fixed: local KVStore original-error messages omit family prefixes (#477)
 
 The shared `original_error_message` helper now reads `WalletFault.message`
@@ -141,299 +206,7 @@ messages agree and separately pin the Rust parsers' unchanged words.
 Go at `2ca481c`, `kvstore/local_kv_store.go:70-111,347-363,498-516`, wraps errors
 with operation names and has no equivalent `Original error:` contract; the
 TypeScript reference decides this change.
-### Fixed: local removal refuses unshrinking totals after two rounds (#483)
-### Fixed: local removal requires shrinking totals after two rounds (#483)
-### Fixed: local removal stops after two rounds (#483)
 
-`LocalKVStore::remove` counts completed page spends and refuses a third spend,
-even when every reported total shrinks. Before this change the loop had no
-bound: a wallet that kept answering fresh, authenticated outputs under a total
-that did not shrink kept the removal spending forever, page after page, as the
-reference's `LocalKVStore.ts:574-590` still does. The keeper's policy (02:1xZ on #483)
-is two rounds: the reference keeps one current token per key, and a second
-round covers a token written during the first. One token per page under a
-larger total is an inconsistent wallet answer; ten thousand spends for one
-key is the exposure this bound refuses. Removal costs at most three listings
-and two spends for any wallet. A complete page within the cap, or an empty
-page with total zero, still completes normally.
-
-The cap is checked first after #479's unchanged empty-page check, before any
-further authentication or spend. The shrinking rule remains beneath it: the
-second listing's total must fall below the first's. A plateau or rise is
-refused there. Both guards return `Error::KvStoreLocalError`, displayed without
-a category prefix, with the operation's completed rounds, totals and key:
-
-| Guard | Refusal words (example) |
-| --- | --- |
-| Two-round cap, third listing | `Wallet returned an inconsistent KVStore output list: after 2 removal rounds, first totalOutputs was 7, previous totalOutputs was 6 and current totalOutputs is 5 for key alpha` |
-| Shrinking guard, second listing | `Wallet returned an inconsistent KVStore output list: after 1 removal round, previous totalOutputs was 7 and current totalOutputs is 7 for key alpha` |
-
-Earlier spends remain spent; an error never reports their txids as complete
-removal. A nonempty third listing cannot spend even if its page equals its
-total. A third listing with total zero completes without another spend.
-
-| Policy | Bound and reason | Reference | Change rule |
-| --- | --- | --- | --- |
-| `MAX_LOCAL_REMOVE_ROUNDS`: two completed page spends; shrinking totals beneath the cap | At most three listings and two spends for any wallet. One current token per key plus one written during the first round; a wallet listing one token at a time under a larger total must not expose that key to 10,000 spends. The second listing must shrink below the first. | `ts-stack@edf6e03` `LocalKVStore.ts:574-590` has no round bound. `set` spends the previous tokens and writes one (`:373-382,455,496,515-528`). | The constant is the sole production round-policy number; change it by a measurement, never silently. |
-
-`tests/kvstore_local_rounds_483.rs` uses writer-built signed tokens in fresh
-transactions on every page. On an archived `33fd45b5` with this test file
-overlaid, the 7, 6, 5, ... witness makes seven listings and seven spends instead
-of stopping at three and two. Second-listing plateau (7, 7) and rise (7, 8)
-witnesses also fail there: that fold only compared totals from the third
-listing. The 7, 6, 6 witness still stops on the third listing, now by the cap
-rather than the shrinking guard; its exact words assert that distinction.
-All eight tests pass with both guards, including one-round removal, two-round
-removal for a token written during the first, third-listing zero-total
-completion, and #479 empty-page precedence. The four tests in
-`kvstore_local_empty_page_479.rs` pass on both; the #454 recorded vectors are
-unchanged.
-
-Migration: handle the refusal in the existing local-store error variant;
-earlier spends do not establish complete removal. Consistent one- and
-two-round wallet requests and their bytes are unchanged; no public API is added.
-
-### Notes: cross-SDK parity (#483)
-
-At `ts-stack@edf6e03`, `LocalKVStore.ts:574-590` repeats the same listing
-request, authenticates and spends one page per round (`:585`), and exits only
-when the page length equals the reported total (`:587`). Distinct outputs
-bypass its consumed-output check. Its `set` gathers the previous token inputs
-at `:373-382,455,496` and spends them while writing one replacement at
-`:515-528`. By the keeper's word (02:1xZ on #483), this crate caps removal at
-two rounds, with the shrinking guard beneath it, for at most three listings
-and two spends for any wallet. One current token plus a token written during
-the first round is the reason; an inconsistent wallet cannot demand ten
-thousand spends for a key. The reference has no bound at `:574-590` and no
-such typed, counted refusal. This is a deliberate policy divergence, changed
-only by a measurement and never silently.
-
-### Fixed: local removal refuses an empty page under a positive total (#479)
-
-`LocalKVStore::remove` now ends on the first empty page whose `totalOutputs` is
-positive. Previously it repeated the same request forever. The refusal is
-`Error::KvStoreLocalError`, with the local store's own words, displayed without
-a category prefix: `Wallet returned an inconsistent KVStore output list:
-totalOutputs is 7, but page at offset 0 is empty for key alpha` for the reported
-witness. The total and key come from that operation. Each removal request omits
-the offset (zero), even after a preceding page has been spent; the diagnostic
-reports that request offset, not the number already consumed. A later empty
-page returns an error even if earlier pages were spent, never a partial txid
-list as a successful complete removal. Earlier spends are not rolled back.
-
-`tests/kvstore_local_empty_page_479.rs` bounds each removal with a one-second
-timeout and a yielding stub wallet. The initial-empty and post-spend-empty
-tests time out on base `cc17b9cbb86923ac31df869d002eca43af414f51`; the consistent
-two-page and zero-total controls pass there. All four pass with the guard.
-Consistent wallet requests and the recorded #454 vectors remain unchanged.
-
-Migration: no new variant or public shape; callers must handle this new
-`KvStoreLocalError` refusal instead of waiting indefinitely or assuming a
-partial removal completed. Its message is local-store text, not reference text.
-
-### Notes: cross-SDK parity (#479)
-
-The reference at `ts-stack@edf6e03` loops at `LocalKVStore.ts:574-590` when the
-wallet answers `{ totalOutputs: 7, outputs: [] }`. This crate ends that loop by
-the keeper's word (00:1xZ on #479): a caller's cost is bounded by the caller,
-never by the answer. Under Node 22.18.0 the unmodified reference remained
-pending through a one-second worker timeout, repeating the same request with no offset.
-This is a stated divergence; the witness is prepared for the captain to file
-in the reference tracker under the owner's name.
-
-The reference's `set` reads one page at `LocalKVStore.ts:455`, checked at
-`:173-203`; `:329-339` returns immediately for an empty page and refuses an
-incomplete nonempty collapse. It cannot loop this way, so it is unchanged.
-`GlobalKVStore.ts:583-604` makes one overlay query and iterates its output array,
-without reading a total or paging in a loop; it is unchanged too.
-### Fixed: HTTP JSON result scalars, bindings and global bounds (#432)
-
-`HttpWalletJson` now checks the remaining 71 rows of the #408 result inventory
-at the reference's result boundary and in its order (`ts-stack@edf6e03`,
-`WalletResultValidation.ts:1-2367`, `HTTPWalletJSON.ts:280-341`). The serialized
-request is owned before the HTTP await. The result checks run before typed
-serde decoding. Numeric record keys follow ECMAScript index order; named
-request attributes retain their serialized order. The checks also validate code-5 action evidence under the reference's
-explicit `returnTXIDOnly` review request. New helpers live alongside the
-existing result reader; `http_json.rs` stays below its 1,113-line ceiling.
-
-Absent history-output tags now decode as an empty native vector. False
-`accepted`, `valid`, `authenticated` and `relinquished` verdicts are refused;
-`aborted: false` remains valid. Height must be 1 through 2^32−1 before the
-trait converts it. Integer JSON spellings such as `1.0` and `-0` are accepted
-when the reference accepts them. The reference's base64 grammar permits
-nonzero unused padding bits: a native byte reference decodes them, then writes
-its canonical spelling.
-
-The other rows were wrong because typed decoding alone neither bound a result
-to its request nor checked the reference's limits and error precedence.
-Action BEEF now has exact framing, subject selection, input/output and source
-value checks. Lists enforce counts, requested inclusion flags, filter echoes,
-and BEEF commitments. Certificates and linkages enforce identity, requested
-fields and filters. Every call checks unsafe keys, graph/array/byte budgets and
-the HTTP response cap. The inventory in `src/wallet/substrates/CLAUDE.md`
-retains each reference site and each old behavior; the table below gives a
-recorded RED assertion's old and new words for every row and names its test in
-`tests/wallet_http_json_pending_432.rs` (the `wallet error: ` display prefix is
-unchanged). Each test also covers the row's other recorded cases and verdicts.
-The #268 auth test's `proveCertificate` stub, an empty keyring with the field
-`name` requested, carries the requested field now: R86 refuses the empty keyring
-as the reference does (`tests/auth_certificate_json_268.rs`, outside the lane's
-`wallet_*`, `arch_*` and `fixtures_*` gate; CI reached it).
-The #339 dhat test's `createAction` stub (`tests/memory_profiling.rs`, run by CI's
-own step) answered 1 MiB of bytes as `tx` under a dummy txid; it answers a real
-transaction's atomic BEEF with its txid now, since R28 refuses a `tx` that is not
-one.
-
-| Row / test | Old words or verdict at 455fe780 | New reference words or verdict |
-| R03 `row_03_global_bounds_and_keys` | accepted | Invalid HTTPWalletJSON acquireCertificate raw response result object key __proto__: expected a safe record key |
-| R06 `row_06_aborted_boolean` | failed to parse JSON response: missing field &#96;aborted&#96; | Invalid abortAction result aborted: expected a boolean |
-| R07 `row_07_accepted_verdict` | accepted | Invalid internalizeAction result accepted: expected true |
-| R08 `row_08_relinquished_verdict` | accepted | Invalid relinquishOutput result relinquished: expected true |
-| R09 `row_09_valid_verdict` | accepted | Invalid verifyHmac result valid: expected true |
-| R10 `row_10_authenticated_verdict` | accepted | Invalid isAuthenticated result authenticated: expected true |
-| R11 `row_11_public_key` | accepted | Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes |
-| R15 `row_15_linkage_keys` | failed to parse JSON response: invalid public key: Invalid public key encoding: elliptic curve point encoding error | Invalid revealCounterpartyKeyLinkage result verifier: expected 33 hexadecimal bytes |
-| R17 `row_17_linkage_time` | accepted | Invalid revealCounterpartyKeyLinkage result revelationTime: expected 1–64 UTF-8 bytes |
-| R18 `row_18_linkage_request` | accepted | Invalid revealCounterpartyKeyLinkage result verifier: expected the requested verifier |
-| R19 `row_19_specific_scalars` | accepted | Invalid revealSpecificKeyLinkage result protocolID[1]: expected 5–400 UTF-8 bytes |
-| R20 `row_20_specific_parties` | accepted | Invalid revealSpecificKeyLinkage result counterparty: expected the prover's identity key for counterparty self |
-| R21 `row_21_specific_protocol` | accepted | Invalid revealSpecificKeyLinkage result protocolID: expected the requested protocol |
-| R22 `row_22_height_without_truncation` | 4294967296 narrowed to 0 | Invalid getHeight result height: expected an integer from 1 to 4294967295 |
-| R23 `row_23_header` | accepted | Invalid getHeaderForHeight result header: expected 80 hexadecimal bytes |
-| R24 `row_24_network` | failed to parse JSON response: invalid type: null, expected a string | Invalid getNetwork result network: expected mainnet or testnet |
-| R25 `row_25_version` | accepted | Invalid getVersion result version: expected 7–30 UTF-8 bytes |
-| R26 `row_26_action_txid` | accepted | Invalid signAction result txid: expected a string |
-| R28 `row_28_action_beef` | accepted | Invalid signAction result tx: expected a complete, exactly framed BEEF transaction |
-| R29 `row_29_change_outpoints` | accepted | Invalid createAction result noSendChange[0]: expected a canonical transaction outpoint |
-| R30 `row_30_batch_results` | accepted | Invalid signAction result sendWithResults: expected at most 1001 transaction results |
-| R32 `row_32_signable_reference` | accepted | Invalid createAction result signableTransaction.reference: expected 1+ UTF-8 bytes |
-| R33 `row_33_deferred_or_completed` | accepted | Invalid createAction result signableTransaction: expected the requested deferred-signing transaction |
-| R34 `row_34_signed_txid_required` | accepted | Invalid signAction result txid: expected the completed signed transaction |
-| R35 `row_35_request_beef_evidence` | accepted | Invalid createAction result request.inputBEEF: expected an exactly framed BEEF envelope |
-| R36 `row_36_version_and_lock_time` | accepted | Invalid createAction result tx.version: expected the requested transaction version |
-| R37 `row_37_unique_transaction_inputs` | accepted | Invalid createAction result tx.inputs[1]: expected a unique transaction input outpoint |
-| R38 `row_38_requested_inputs` | accepted | Invalid createAction result tx.inputs: expected every requested input exactly once |
-| R39 `row_39_requested_outputs` | accepted | Invalid createAction result tx.outputs: expected every requested output with its requested amount and script |
-| R40 `row_40_source_values` | accepted | Invalid signAction result tx.inputs[0].sourceSatoshis: expected source transaction evidence for every completed transaction input |
-| R41 `row_41_conservation` | accepted | Invalid createAction result tx.outputs: expected a total value no greater than the transaction inputs |
-| R42 `row_42_requested_spends` | accepted | Invalid signAction result tx.inputs[1]: expected the requested input index |
-| R43 `row_43_change_subject` | accepted | Invalid createAction result noSendChange[0]: expected an outpoint of the returned transaction |
-| R44 `row_44_submitted_batch` | accepted | Invalid signAction result sendWithResults[1].txid: expected a unique transaction |
-| R45 `row_45_evidence_required` | accepted | Invalid createAction result txid: expected present with tx |
-| R46 `row_46_action_outcome` | accepted | Invalid signAction result noSendChange: expected an absent field |
-| R47 `row_47_safe_totals_and_u32_residue` | failed to parse JSON response: invalid value: integer &#96;-1&#96;, expected u32 | Invalid listActions result totalActions: expected an integer from 0 to 9007199254740991 |
-| R49 `row_49_page_limits` | accepted | Invalid listActions result totalActions: expected at least 1 |
-| R50 `row_50_action_scalars` | accepted | Invalid listActions result actions[0].satoshis: expected an integer from -2100000000000000 to 2100000000000000 |
-| R51 `row_51_history_descriptions` | failed to parse JSON response: invalid type: null, expected a string | Invalid listActions result actions[0].description: expected a string |
-| R52 `row_52_label_filter` | accepted | Invalid listActions result actions[0].labels[0]: expected 1–300 UTF-8 bytes |
-| R53 `row_53_history_version` | failed to parse JSON response: invalid type: null, expected u32 | Invalid listActions result actions[0].version: expected an integer from 0 to 4294967295 |
-| R54 `row_54_requested_history_inputs` | accepted | Invalid listActions result actions[0].inputs: expected the explicitly requested inputs |
-| R55 `row_55_history_source` | failed to parse JSON response: missing field &#96;tags&#96; | Invalid listActions result actions[0].inputs[0].sourceOutpoint: expected a canonical transaction outpoint |
-| R56 `row_56_history_scripts` | failed to parse JSON response: missing field &#96;tags&#96; | Invalid listActions result actions[0].inputs[0].sourceLockingScript: expected a string |
-| R57 `row_57_history_sequence` | failed to parse JSON response: invalid type: null, expected u32 | Invalid listActions result actions[0].inputs[0].sequenceNumber: expected an integer from 0 to 4294967295 |
-| R58 `row_58_requested_history_outputs` | accepted | Invalid listActions result actions[0].outputs: expected the explicitly requested outputs |
-| R59 `row_59_history_output_value` | failed to parse JSON response: invalid type: null, expected u64 | Invalid listActions result actions[0].outputs[0].satoshis: expected an integer from 0 to 2100000000000000 |
-| R60 `row_60_history_output_metadata` | failed to parse JSON response: invalid type: null, expected a boolean | Invalid listActions result spendable: expected a boolean |
-| R61 `row_61_absent_tags_and_bounds` | failed to parse JSON response: missing field &#96;tags&#96; | accepted |
-| R62 `row_62_output_beef` | accepted | Invalid listOutputs result BEEF: expected a complete, exactly framed BEEF envelope |
-| R63 `row_63_required_output_beef` | accepted | Invalid listOutputs result BEEF: expected the requested complete output transactions |
-| R64 `row_64_unique_outputs` | accepted | Invalid listOutputs result outputs[0].outpoint: expected a canonical transaction outpoint |
-| R65 `row_65_output_scalars` | accepted | Invalid listOutputs result outputs[0].satoshis: expected an integer from 0 to 2100000000000000 |
-| R66 `row_66_output_commitments` | accepted | Invalid listOutputs result outputs[0].satoshis: expected the amount committed by BEEF |
-| R67 `row_67_output_metadata` | accepted | Invalid listOutputs result outputs[0].tags[0]: expected 1–300 UTF-8 bytes |
-| R68 `row_68_output_filter` | accepted | Invalid listOutputs result outputs[0].tags: expected the explicitly requested output tags |
-| R73 `row_73_certificate_unsafe_fields` | accepted | Invalid HTTPWalletJSON acquireCertificate raw response result object key __proto__: expected a safe record key |
-| R76 `row_76_certificate_filter` | accepted | Invalid listCertificates result certificates[0].certifier: expected one of the requested certifiers |
-| R77 `row_77_certificate_keyring` | accepted | Invalid listCertificates result certificates[0].keyring key: expected a safe 1–50 byte field name |
-| R78 `row_78_certificate_verifier` | accepted | Invalid listCertificates result certificates[0].verifier: expected a string |
-| R79 `row_79_certifier_metadata` | accepted | Invalid discoverByIdentityKey result certificates[0].certifierInfo.name: expected 1–100 UTF-8 bytes |
-| R80 `row_80_discovery_maps` | accepted | Invalid discoverByIdentityKey result certificates[0].publiclyRevealedKeyring key: expected a safe 1–50 byte field name |
-| R81 `row_81_any_attributes` | accepted | Invalid discoverByAttributes result certificates[0].decryptedFields: expected a match for the requested any attribute |
-| R82 `row_82_named_attributes` | accepted | Invalid discoverByAttributes result certificates[0].decryptedFields.name: expected the requested public attribute |
-| R83 `row_83_acquired_certificate` | accepted | Invalid acquireCertificate result certificate.type: expected the requested certificate type |
-| R84 `row_84_partial_certificate` | accepted | Invalid proveCertificate result certificate.serialNumber: expected the requested certificate serialNumber |
-| R85 `row_85_proof_keyring` | accepted | Invalid proveCertificate result keyringForVerifier key: expected a safe 1–50 byte field name |
-| R86 `row_86_revealed_field_set` | accepted | Invalid proveCertificate result keyringForVerifier: expected exactly the requested certificate fields |
-| R87 `row_87_proof_verifier` | accepted | Invalid proveCertificate result verifier: expected a string |
-| R88 `row_88_request_snapshot` | accepted | Wallet result request records must contain only safe string keys |
-
-All 71 tests were RED on a scratch copy of `455fe78092952a22e4f386ac22642987dbf8120a`
-with an independent Cargo target. The extended #408 Node 22.18.0 recorder
-preserves its 387 existing cases byte for byte and adds 626 cases (126 accepted,
-500 refused), for 1,013 total. The cold-review fold adds seven R03 cases and
-disambiguates thirteen duplicate case names; every earlier body, request and
-reference verdict remains byte-identical. It generates every new case
-from the unmodified edf6e03 SDK built outside the worktree. Large boundary
-cases use expansion recipes. A repeated recording is compared byte for byte.
-HTTP tests bind only wiremock ephemeral ports, including HTTP/2 for the
-oversized Content-Length header; no default wallet endpoint is contacted. The
-existing `fixtures_replay` recorder also refreshes seven HTTP golden files:
-only `client_result` changes (empty actions, unbound BEEF, false verdicts and
-network words); every request, raw response and non-HTTP fixture is unchanged.
-The #339 review test now matches the reference in 39 of 41 cases, removing
-its transaction-binding exception; its successful retry mock supplies both
-the signed transaction and its computed txid.
-
-The cold-review regressions in `wallet_http_json_linear_432` compare the three
-4 MiB bodies at depths 2,000, 4,000 and 8,000 on success and error paths. The
-median time ratio is bounded against the smallest body's byte-size ratio,
-without an absolute time limit. They also preserve the final duplicate field
-value on the raw fallback and ignore unrelated deep/nonfinite extensions
-inside code-5 result records. R03's seven added recorder cases cover both
-height spellings, the two error envelopes and the lone-surrogate residue.
-
-Migration: callers that branched on `valid: false` or `authenticated: false`
-now handle an `Err`.
-Wrapped heights, unrelated BEEF and mismatched request or filter facts are
-also refused in the reference's words; public field types stay unchanged.
-
-The `http` feature adds optional `regex` and enables the existing optional
-`unicode-normalization`: the reference's identity search uses `\p{Dash}`,
-`\p{Pattern_Syntax}`, `\p{Quotation_Mark}`, `\p{Terminal_Punctuation}` and
-`\p{Mn}` plus NFD (`WalletResultValidation.ts:1577-1582,1617-1619`), which the
-serde model cannot express. `regex`, `regex-automata` and `regex-syntax` are
-MIT OR Apache-2.0; `aho-corasick` is Unlicense OR MIT. The dependency tree grows
-by the regex family (`regex`, `regex-automata`, `regex-syntax`, `aho-corasick`);
-the exact line count depends on the lockfile's resolution. The combined wasm32 slice
-(`auth,wallet,transaction,overlay,socketio,wasm`, without native-only `http`)
-builds. `regex-syntax` uses Unicode 16.0, as Node 22.18.0's ICU 77.1 does;
-`unicode-normalization` 0.1.26 uses Unicode 18.0. This table-version difference
-can move identity-search results when tables change. Six compiled expressions
-are cached in `LazyLock`s, available below the Rust 1.88 minimum.
-
-### Notes: cross-SDK parity (#432)
-
-The 88-row inventory has 85 fully Done rows and three stated residue rows,
-with no Pending work hidden. R02's executable JavaScript values, descriptors,
-prototypes, sparse arrays, shared/detached typed arrays and aliasing are not
-HTTP JSON values. R03 checks the expressible budgets; its aggregate-byte cap
-is dominated by the bounded 256 MiB JSON body. The cold-review fold indexes
-containers on a heap stack in one scan and walks their links for budgets;
-it never reparses a descendant through each ancestor and keeps no Value per
-ordinary byte. Its fallback normalizes raw tokens and historical byte objects,
-so an unrelated `1e400` or depth-129 array no longer defeats an integral `1.0`
-height. Node 22.18.0 at edf6e03 accepts both (height 1), reads `1e400` as Infinity
-and has no JSON depth bound; serde's typed 128-level guard stays enabled here.
-Code-5 error envelopes and their nested result records select known members
-from the raw body, likewise ignoring unrelated extras. Lone UTF-16 surrogates
-are the true R03 residue:
-`{"version":"123456\ud800"}` is accepted there, refused here with
-`Invalid getVersion result version: expected a string`.
-R47 checks 0 through 2^53-1 but keeps public `u32` list totals as a scoping
-choice, not a representation limit: the reference's PositiveIntegerOrZero
-allows that range and u64 can carry it. Five wide-total cases still assert
-serde's range refusal; the separately filed R47 lane widens the fields.
-The native byte form of a signable reference does not preserve a base64
-padding-bit spelling, as described above.
-
-Go's `~/bsv/go-sdk/wallet/substrates/http_wallet_json.go` at local `2ca481c`
-uses `api` (`:37-75`) to read the body and method-specific `json.Unmarshal`
-(`:79-400`) to decode it. It has no `validateWalletResult` equivalent, no
-request/filter/BEEF binding or global graph/byte/unsafe-key checks. Its typed
-integers and keys can reject shapes in Go's words but do not provide these
-reference checks or this refusal order. Existing #137 error-class mapping and
-transport-fault policies remain port extensions.
 ### Fixed: wallet wire numeric and pre-entry collection bounds (#473)
 
 The wire readers now make the reference's checks before reading entries or
@@ -655,6 +428,294 @@ limit, not the returned page. This change follows TypeScript under the owner's
 2026-10-26 ruling (c); Go was read, not executed. Existing codec differences,
 including Go's absent-string convention and full-wallet processor stubs, remain.
 
+### Fixed: HTTP JSON result scalars, bindings and global bounds (#432)
+
+`HttpWalletJson` now checks the remaining 71 rows of the #408 result inventory
+at the reference's result boundary and in its order (`ts-stack@edf6e03`,
+`WalletResultValidation.ts:1-2367`, `HTTPWalletJSON.ts:280-341`). The serialized
+request is owned before the HTTP await. The result checks run before typed
+serde decoding. Numeric record keys follow ECMAScript index order; named
+request attributes retain their serialized order. The checks also validate code-5 action evidence under the reference's
+explicit `returnTXIDOnly` review request. New helpers live alongside the
+existing result reader; `http_json.rs` stays below its 1,113-line ceiling.
+
+Absent history-output tags now decode as an empty native vector. False
+`accepted`, `valid`, `authenticated` and `relinquished` verdicts are refused;
+`aborted: false` remains valid. Height must be 1 through 2^32−1 before the
+trait converts it. Integer JSON spellings such as `1.0` and `-0` are accepted
+when the reference accepts them. The reference's base64 grammar permits
+nonzero unused padding bits: a native byte reference decodes them, then writes
+its canonical spelling.
+
+The other rows were wrong because typed decoding alone neither bound a result
+to its request nor checked the reference's limits and error precedence.
+Action BEEF now has exact framing, subject selection, input/output and source
+value checks. Lists enforce counts, requested inclusion flags, filter echoes,
+and BEEF commitments. Certificates and linkages enforce identity, requested
+fields and filters. Every call checks unsafe keys, graph/array/byte budgets and
+the HTTP response cap. The inventory in `src/wallet/substrates/CLAUDE.md`
+retains each reference site and each old behavior; the table below gives a
+recorded RED assertion's old and new words for every row and names its test in
+`tests/wallet_http_json_pending_432.rs` (the `wallet error: ` display prefix is
+unchanged). Each test also covers the row's other recorded cases and verdicts.
+The #268 auth test's `proveCertificate` stub, an empty keyring with the field
+`name` requested, carries the requested field now: R86 refuses the empty keyring
+as the reference does (`tests/auth_certificate_json_268.rs`, outside the lane's
+`wallet_*`, `arch_*` and `fixtures_*` gate; CI reached it).
+The #339 dhat test's `createAction` stub (`tests/memory_profiling.rs`, run by CI's
+own step) answered 1 MiB of bytes as `tx` under a dummy txid; it answers a real
+transaction's atomic BEEF with its txid now, since R28 refuses a `tx` that is not
+one.
+
+| Row / test | Old words or verdict at 455fe780 | New reference words or verdict |
+| R03 `row_03_global_bounds_and_keys` | accepted | Invalid HTTPWalletJSON acquireCertificate raw response result object key __proto__: expected a safe record key |
+| R06 `row_06_aborted_boolean` | failed to parse JSON response: missing field &#96;aborted&#96; | Invalid abortAction result aborted: expected a boolean |
+| R07 `row_07_accepted_verdict` | accepted | Invalid internalizeAction result accepted: expected true |
+| R08 `row_08_relinquished_verdict` | accepted | Invalid relinquishOutput result relinquished: expected true |
+| R09 `row_09_valid_verdict` | accepted | Invalid verifyHmac result valid: expected true |
+| R10 `row_10_authenticated_verdict` | accepted | Invalid isAuthenticated result authenticated: expected true |
+| R11 `row_11_public_key` | accepted | Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes |
+| R15 `row_15_linkage_keys` | failed to parse JSON response: invalid public key: Invalid public key encoding: elliptic curve point encoding error | Invalid revealCounterpartyKeyLinkage result verifier: expected 33 hexadecimal bytes |
+| R17 `row_17_linkage_time` | accepted | Invalid revealCounterpartyKeyLinkage result revelationTime: expected 1–64 UTF-8 bytes |
+| R18 `row_18_linkage_request` | accepted | Invalid revealCounterpartyKeyLinkage result verifier: expected the requested verifier |
+| R19 `row_19_specific_scalars` | accepted | Invalid revealSpecificKeyLinkage result protocolID[1]: expected 5–400 UTF-8 bytes |
+| R20 `row_20_specific_parties` | accepted | Invalid revealSpecificKeyLinkage result counterparty: expected the prover's identity key for counterparty self |
+| R21 `row_21_specific_protocol` | accepted | Invalid revealSpecificKeyLinkage result protocolID: expected the requested protocol |
+| R22 `row_22_height_without_truncation` | 4294967296 narrowed to 0 | Invalid getHeight result height: expected an integer from 1 to 4294967295 |
+| R23 `row_23_header` | accepted | Invalid getHeaderForHeight result header: expected 80 hexadecimal bytes |
+| R24 `row_24_network` | failed to parse JSON response: invalid type: null, expected a string | Invalid getNetwork result network: expected mainnet or testnet |
+| R25 `row_25_version` | accepted | Invalid getVersion result version: expected 7–30 UTF-8 bytes |
+| R26 `row_26_action_txid` | accepted | Invalid signAction result txid: expected a string |
+| R28 `row_28_action_beef` | accepted | Invalid signAction result tx: expected a complete, exactly framed BEEF transaction |
+| R29 `row_29_change_outpoints` | accepted | Invalid createAction result noSendChange[0]: expected a canonical transaction outpoint |
+| R30 `row_30_batch_results` | accepted | Invalid signAction result sendWithResults: expected at most 1001 transaction results |
+| R32 `row_32_signable_reference` | accepted | Invalid createAction result signableTransaction.reference: expected 1+ UTF-8 bytes |
+| R33 `row_33_deferred_or_completed` | accepted | Invalid createAction result signableTransaction: expected the requested deferred-signing transaction |
+| R34 `row_34_signed_txid_required` | accepted | Invalid signAction result txid: expected the completed signed transaction |
+| R35 `row_35_request_beef_evidence` | accepted | Invalid createAction result request.inputBEEF: expected an exactly framed BEEF envelope |
+| R36 `row_36_version_and_lock_time` | accepted | Invalid createAction result tx.version: expected the requested transaction version |
+| R37 `row_37_unique_transaction_inputs` | accepted | Invalid createAction result tx.inputs[1]: expected a unique transaction input outpoint |
+| R38 `row_38_requested_inputs` | accepted | Invalid createAction result tx.inputs: expected every requested input exactly once |
+| R39 `row_39_requested_outputs` | accepted | Invalid createAction result tx.outputs: expected every requested output with its requested amount and script |
+| R40 `row_40_source_values` | accepted | Invalid signAction result tx.inputs[0].sourceSatoshis: expected source transaction evidence for every completed transaction input |
+| R41 `row_41_conservation` | accepted | Invalid createAction result tx.outputs: expected a total value no greater than the transaction inputs |
+| R42 `row_42_requested_spends` | accepted | Invalid signAction result tx.inputs[1]: expected the requested input index |
+| R43 `row_43_change_subject` | accepted | Invalid createAction result noSendChange[0]: expected an outpoint of the returned transaction |
+| R44 `row_44_submitted_batch` | accepted | Invalid signAction result sendWithResults[1].txid: expected a unique transaction |
+| R45 `row_45_evidence_required` | accepted | Invalid createAction result txid: expected present with tx |
+| R46 `row_46_action_outcome` | accepted | Invalid signAction result noSendChange: expected an absent field |
+| R47 `row_47_safe_totals_and_u32_residue` | failed to parse JSON response: invalid value: integer &#96;-1&#96;, expected u32 | Invalid listActions result totalActions: expected an integer from 0 to 9007199254740991 |
+| R49 `row_49_page_limits` | accepted | Invalid listActions result totalActions: expected at least 1 |
+| R50 `row_50_action_scalars` | accepted | Invalid listActions result actions[0].satoshis: expected an integer from -2100000000000000 to 2100000000000000 |
+| R51 `row_51_history_descriptions` | failed to parse JSON response: invalid type: null, expected a string | Invalid listActions result actions[0].description: expected a string |
+| R52 `row_52_label_filter` | accepted | Invalid listActions result actions[0].labels[0]: expected 1–300 UTF-8 bytes |
+| R53 `row_53_history_version` | failed to parse JSON response: invalid type: null, expected u32 | Invalid listActions result actions[0].version: expected an integer from 0 to 4294967295 |
+| R54 `row_54_requested_history_inputs` | accepted | Invalid listActions result actions[0].inputs: expected the explicitly requested inputs |
+| R55 `row_55_history_source` | failed to parse JSON response: missing field &#96;tags&#96; | Invalid listActions result actions[0].inputs[0].sourceOutpoint: expected a canonical transaction outpoint |
+| R56 `row_56_history_scripts` | failed to parse JSON response: missing field &#96;tags&#96; | Invalid listActions result actions[0].inputs[0].sourceLockingScript: expected a string |
+| R57 `row_57_history_sequence` | failed to parse JSON response: invalid type: null, expected u32 | Invalid listActions result actions[0].inputs[0].sequenceNumber: expected an integer from 0 to 4294967295 |
+| R58 `row_58_requested_history_outputs` | accepted | Invalid listActions result actions[0].outputs: expected the explicitly requested outputs |
+| R59 `row_59_history_output_value` | failed to parse JSON response: invalid type: null, expected u64 | Invalid listActions result actions[0].outputs[0].satoshis: expected an integer from 0 to 2100000000000000 |
+| R60 `row_60_history_output_metadata` | failed to parse JSON response: invalid type: null, expected a boolean | Invalid listActions result spendable: expected a boolean |
+| R61 `row_61_absent_tags_and_bounds` | failed to parse JSON response: missing field &#96;tags&#96; | accepted |
+| R62 `row_62_output_beef` | accepted | Invalid listOutputs result BEEF: expected a complete, exactly framed BEEF envelope |
+| R63 `row_63_required_output_beef` | accepted | Invalid listOutputs result BEEF: expected the requested complete output transactions |
+| R64 `row_64_unique_outputs` | accepted | Invalid listOutputs result outputs[0].outpoint: expected a canonical transaction outpoint |
+| R65 `row_65_output_scalars` | accepted | Invalid listOutputs result outputs[0].satoshis: expected an integer from 0 to 2100000000000000 |
+| R66 `row_66_output_commitments` | accepted | Invalid listOutputs result outputs[0].satoshis: expected the amount committed by BEEF |
+| R67 `row_67_output_metadata` | accepted | Invalid listOutputs result outputs[0].tags[0]: expected 1–300 UTF-8 bytes |
+| R68 `row_68_output_filter` | accepted | Invalid listOutputs result outputs[0].tags: expected the explicitly requested output tags |
+| R73 `row_73_certificate_unsafe_fields` | accepted | Invalid HTTPWalletJSON acquireCertificate raw response result object key __proto__: expected a safe record key |
+| R76 `row_76_certificate_filter` | accepted | Invalid listCertificates result certificates[0].certifier: expected one of the requested certifiers |
+| R77 `row_77_certificate_keyring` | accepted | Invalid listCertificates result certificates[0].keyring key: expected a safe 1–50 byte field name |
+| R78 `row_78_certificate_verifier` | accepted | Invalid listCertificates result certificates[0].verifier: expected a string |
+| R79 `row_79_certifier_metadata` | accepted | Invalid discoverByIdentityKey result certificates[0].certifierInfo.name: expected 1–100 UTF-8 bytes |
+| R80 `row_80_discovery_maps` | accepted | Invalid discoverByIdentityKey result certificates[0].publiclyRevealedKeyring key: expected a safe 1–50 byte field name |
+| R81 `row_81_any_attributes` | accepted | Invalid discoverByAttributes result certificates[0].decryptedFields: expected a match for the requested any attribute |
+| R82 `row_82_named_attributes` | accepted | Invalid discoverByAttributes result certificates[0].decryptedFields.name: expected the requested public attribute |
+| R83 `row_83_acquired_certificate` | accepted | Invalid acquireCertificate result certificate.type: expected the requested certificate type |
+| R84 `row_84_partial_certificate` | accepted | Invalid proveCertificate result certificate.serialNumber: expected the requested certificate serialNumber |
+| R85 `row_85_proof_keyring` | accepted | Invalid proveCertificate result keyringForVerifier key: expected a safe 1–50 byte field name |
+| R86 `row_86_revealed_field_set` | accepted | Invalid proveCertificate result keyringForVerifier: expected exactly the requested certificate fields |
+| R87 `row_87_proof_verifier` | accepted | Invalid proveCertificate result verifier: expected a string |
+| R88 `row_88_request_snapshot` | accepted | Wallet result request records must contain only safe string keys |
+
+All 71 tests were RED on a scratch copy of `455fe78092952a22e4f386ac22642987dbf8120a`
+with an independent Cargo target. The extended #408 Node 22.18.0 recorder
+preserves its 387 existing cases byte for byte and adds 626 cases (126 accepted,
+500 refused), for 1,013 total. The cold-review fold adds seven R03 cases and
+disambiguates thirteen duplicate case names; every earlier body, request and
+reference verdict remains byte-identical. It generates every new case
+from the unmodified edf6e03 SDK built outside the worktree. Large boundary
+cases use expansion recipes. A repeated recording is compared byte for byte.
+HTTP tests bind only wiremock ephemeral ports, including HTTP/2 for the
+oversized Content-Length header; no default wallet endpoint is contacted. The
+existing `fixtures_replay` recorder also refreshes seven HTTP golden files:
+only `client_result` changes (empty actions, unbound BEEF, false verdicts and
+network words); every request, raw response and non-HTTP fixture is unchanged.
+The #339 review test now matches the reference in 39 of 41 cases, removing
+its transaction-binding exception; its successful retry mock supplies both
+the signed transaction and its computed txid.
+
+The cold-review regressions in `wallet_http_json_linear_432` compare the three
+4 MiB bodies at depths 2,000, 4,000 and 8,000 on success and error paths. The
+median time ratio is bounded against the smallest body's byte-size ratio,
+without an absolute time limit. They also preserve the final duplicate field
+value on the raw fallback and ignore unrelated deep/nonfinite extensions
+inside code-5 result records. R03's seven added recorder cases cover both
+height spellings, the two error envelopes and the lone-surrogate residue.
+
+Migration: callers that branched on `valid: false` or `authenticated: false`
+now handle an `Err`.
+Wrapped heights, unrelated BEEF and mismatched request or filter facts are
+also refused in the reference's words; public field types stay unchanged.
+
+The `http` feature adds optional `regex` and enables the existing optional
+`unicode-normalization`: the reference's identity search uses `\p{Dash}`,
+`\p{Pattern_Syntax}`, `\p{Quotation_Mark}`, `\p{Terminal_Punctuation}` and
+`\p{Mn}` plus NFD (`WalletResultValidation.ts:1577-1582,1617-1619`), which the
+serde model cannot express. `regex`, `regex-automata` and `regex-syntax` are
+MIT OR Apache-2.0; `aho-corasick` is Unlicense OR MIT. The dependency tree grows
+by the regex family (`regex`, `regex-automata`, `regex-syntax`, `aho-corasick`);
+the exact line count depends on the lockfile's resolution. The combined wasm32 slice
+(`auth,wallet,transaction,overlay,socketio,wasm`, without native-only `http`)
+builds. `regex-syntax` uses Unicode 16.0, as Node 22.18.0's ICU 77.1 does;
+`unicode-normalization` 0.1.26 uses Unicode 18.0. This table-version difference
+can move identity-search results when tables change. Six compiled expressions
+are cached in `LazyLock`s, available below the Rust 1.88 minimum.
+
+### Notes: cross-SDK parity (#432)
+
+The 88-row inventory has 85 fully Done rows and three stated residue rows,
+with no Pending work hidden. R02's executable JavaScript values, descriptors,
+prototypes, sparse arrays, shared/detached typed arrays and aliasing are not
+HTTP JSON values. R03 checks the expressible budgets; its aggregate-byte cap
+is dominated by the bounded 256 MiB JSON body. The cold-review fold indexes
+containers on a heap stack in one scan and walks their links for budgets;
+it never reparses a descendant through each ancestor and keeps no Value per
+ordinary byte. Its fallback normalizes raw tokens and historical byte objects,
+so an unrelated `1e400` or depth-129 array no longer defeats an integral `1.0`
+height. Node 22.18.0 at edf6e03 accepts both (height 1), reads `1e400` as Infinity
+and has no JSON depth bound; serde's typed 128-level guard stays enabled here.
+Code-5 error envelopes and their nested result records select known members
+from the raw body, likewise ignoring unrelated extras. Lone UTF-16 surrogates
+are the true R03 residue:
+`{"version":"123456\ud800"}` is accepted there, refused here with
+`Invalid getVersion result version: expected a string`.
+R47 checks 0 through 2^53-1 at the JSON validator's bound and keeps the public
+`u32` list totals: on the keeper's word (03:1xZ, #467 (a)) `u32` is the width
+of BRC-100 (`wallet/0100.md:274`), the reference's typedef (`@maximum
+4294967295`), its wire reader and processor, and Go; the JSON validator's
+2^53-1 at `WalletResultValidation.ts:1926` is one layer against four, a stated
+residue filed upstream as ts-stack #1449. Five wide-total cases still assert
+serde's range refusal above 2^32-1.
+The native byte form of a signable reference does not preserve a base64
+padding-bit spelling, as described above.
+
+Go's `~/bsv/go-sdk/wallet/substrates/http_wallet_json.go` at local `2ca481c`
+uses `api` (`:37-75`) to read the body and method-specific `json.Unmarshal`
+(`:79-400`) to decode it. It has no `validateWalletResult` equivalent, no
+request/filter/BEEF binding or global graph/byte/unsafe-key checks. Its typed
+integers and keys can reject shapes in Go's words but do not provide these
+reference checks or this refusal order. Existing #137 error-class mapping and
+transport-fault policies remain port extensions.
+
+### Fixed: local removal refuses an empty page under a positive total (#479)
+
+`LocalKVStore::remove` now ends on the first empty page whose `totalOutputs` is
+positive. Previously it repeated the same request forever. The refusal is
+`Error::KvStoreLocalError`, with the local store's own words, displayed without
+a category prefix: `Wallet returned an inconsistent KVStore output list:
+totalOutputs is 7, but page at offset 0 is empty for key alpha` for the reported
+witness. The total and key come from that operation. Each removal request omits
+the offset (zero), even after a preceding page has been spent; the diagnostic
+reports that request offset, not the number already consumed. A later empty
+page returns an error even if earlier pages were spent, never a partial txid
+list as a successful complete removal. Earlier spends are not rolled back.
+
+`tests/kvstore_local_empty_page_479.rs` bounds each removal with a one-second
+timeout and a yielding stub wallet. The initial-empty and post-spend-empty
+tests time out on base `cc17b9cbb86923ac31df869d002eca43af414f51`; the consistent
+two-page and zero-total controls pass there. All four pass with the guard.
+Consistent wallet requests and the recorded #454 vectors remain unchanged.
+
+Migration: no new variant or public shape; callers must handle this new
+`KvStoreLocalError` refusal instead of waiting indefinitely or assuming a
+partial removal completed. Its message is local-store text, not reference text.
+
+### Notes: cross-SDK parity (#479)
+
+The reference at `ts-stack@edf6e03` loops at `LocalKVStore.ts:574-590` when the
+wallet answers `{ totalOutputs: 7, outputs: [] }`. This crate ends that loop by
+the keeper's word (00:1xZ on #479): a caller's cost is bounded by the caller,
+never by the answer. Under Node 22.18.0 the unmodified reference remained
+pending through a one-second worker timeout, repeating the same request with no offset.
+This is a stated divergence; the defect is filed on the reference's tracker
+under the owner's name as ts-stack #1446 (the witness: about 82,000 identical
+requests in 1,000 ms on a fresh edf6e03 bundle).
+
+The reference's `set` reads one page at `LocalKVStore.ts:455`, checked at
+`:173-203`; `:329-339` returns immediately for an empty page and refuses an
+incomplete nonempty collapse. It cannot loop this way, so it is unchanged.
+`GlobalKVStore.ts:583-604` makes one overlay query and iterates its output array,
+without reading a total or paging in a loop; it is unchanged too.
+
+### Fixed: the wire originator drops one leading byte-order mark (#471)
+
+The processor now removes one leading U+FEFF (`ef bb bf`) after the strict
+UTF-8 check and before checking for an empty originator or validating its
+hostname. A BOM-only header reaches the wallet as `None`, as an empty header
+does (#329), instead of receiving code 6. This follows the reference's own
+behavior under the owner's ruling (c) of 2026-10-26; no refusal words change.
+
+At `ts-stack@edf6e03`, `packages/sdk/src/primitives/utils.ts:224-228`
+implements `toUTF8Strict` with `new TextDecoder('utf-8', { fatal: true })`.
+Its default `ignoreBOM: false` removes exactly one leading BOM, as specified
+by the [WHATWG serialization rule](https://encoding.spec.whatwg.org/#concept-td-serialize)
+and witnessed under Node v22.18.0. `WalletWireProcessor.ts:286-294` decodes
+before the empty-string check and `validateOriginator` call. A second or
+nonleading BOM survives decoding; the validator then trims edge U+FEFF
+characters (`wallet/validationHelpers.ts:1003-1006`). Consequently all
+three hostname examples below reach the wallet as `a.b` on both versions.
+
+Rows for the toolbox's behavior table (`BOM` means U+FEFF):
+
+| Wire originator | Old decoding and result | New decoding and reference result |
+| --- | --- | --- |
+| `BOM` | BOM kept; code 6, `The originator parameter must be at least 1 length.` | Empty; code 0, wallet originator `None` (reference `''`) |
+| `BOM` + `a.b` | BOM kept; validation trims it; code 0, `a.b` | `a.b`; code 0, `a.b` |
+| `BOM` + `BOM` + `a.b` | Both BOMs kept; validation trims them; code 0, `a.b` | Second BOM kept; validation trims it; code 0, `a.b` |
+| `a.b` + `BOM` | Trailing BOM kept; validation trims it; code 0, `a.b` | Trailing BOM kept; validation trims it; code 0, `a.b` |
+
+Rows for the CLI's operator-visible table:
+
+| Wire originator | Old code and words or wallet value | New code and words or wallet value |
+| --- | --- | --- |
+| `BOM` | 6, `The originator parameter must be at least 1 length.` | 0, absent originator (`None`) |
+| `BOM` + `a.b` | 0, `a.b` (BOM kept until validation) | 0, `a.b` (leading BOM removed before validation) |
+| `BOM` + `BOM` + `a.b` | 0, `a.b` (both BOMs kept until validation) | 0, `a.b` (second BOM kept until validation) |
+| `a.b` + `BOM` | 0, `a.b` (trailing BOM kept until validation) | 0, `a.b` (trailing BOM kept until validation) |
+
+`tests/support/wire_originator_338.mjs`, invoked through the #406 recorder,
+writes all four processor cases to `tests/vectors/wallet_wire/originator_338.json`,
+including their decoded strings, response frames, codes, refusal messages
+(`null` for these four successes) and wallet observations. Two runs are
+byte-identical; all seventeen prior processor cases, nine transceiver cases,
+the length probes and the linkage recording are unchanged.
+`tests/wallet_wire_originator_bom_471.rs` tests each case separately. On a
+scratch copy of base `ad6e350a7407409860e9df481fb8453eab001bfe`, BOM-only is
+RED on the old code-6 refusal; the three hostname cases are passing controls
+because their observable behavior already matches the reference. All four
+are GREEN with the reader change. Four REDs would misstate the reference.
+
+
+Go at `2ca481c` reads the originator bytes with `ReadBytes` and converts them
+directly with `string(originatorBytes)` (`wallet/serializer/frame.go:49-58`);
+it does not strip a BOM. This crate follows the TypeScript decoder. The
+TypeScript transceiver (`WalletWireTransceiver.ts:95-100`) validates the
+caller's string and encodes the normalized result, without decoding it;
+there is no outgoing TextDecoder BOM rule. Its validator already trims edge
+BOMs and still refuses a BOM-only caller string. This change is reader-only.
 
 ### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
 
@@ -725,101 +786,38 @@ request JSON; #340 adds count/key wrapper cases. Every pre-existing payload
 remains identical when those newly recorded members are removed. No vector was
 hand-edited. Contact helpers and local listing were split to keep touched source
 files below 800 lines and production functions at most 60 lines.
-### Fixed: the wire originator drops one leading byte-order mark (#471)
 
-The processor now removes one leading U+FEFF (`ef bb bf`) after the strict
-UTF-8 check and before checking for an empty originator or validating its
-hostname. A BOM-only header reaches the wallet as `None`, as an empty header
-does (#329), instead of receiving code 6. This follows the reference's own
-behavior under the owner's ruling (c) of 2026-10-26; no refusal words change.
+### Changed: per-input verification work budget (#378, part 2)
 
-At `ts-stack@edf6e03`, `packages/sdk/src/primitives/utils.ts:224-228`
-implements `toUTF8Strict` with `new TextDecoder('utf-8', { fatal: true })`.
-Its default `ignoreBOM: false` removes exactly one leading BOM, as specified
-by the [WHATWG serialization rule](https://encoding.spec.whatwg.org/#concept-td-serialize)
-and witnessed under Node v22.18.0. `WalletWireProcessor.ts:286-294` decodes
-before the empty-string check and `validateOriginator` call. A second or
-nonleading BOM survives decoding; the validator then trims edge U+FEFF
-characters (`wallet/validationHelpers.ts:1003-1006`). Consequently all
-three hostname examples below reach the wallet as `a.b` on both versions.
+`Transaction::verify_with_work_budget` and
+`verify_with_chain_params_and_work_budget` add an optional work budget beside
+the memory budget. Both stream verifiers add `with_work_budget`, beside the
+existing `set_work_limit`. Each input uses the same `SpendParams::work_limit`
+counter: reached opcodes and bytes hashed, reserved before execution.
 
-Rows for the toolbox's behavior table (`BOM` means U+FEFF):
+A refused charge is `NotJudgedCause::WorkBudgetExceeded { input, budget,
+work_done }`, carried by `Error::TransactionNotJudged`,
+`SpendRefusal::NotJudged` and `Verdict::NotJudged`. Migration: callers
+matching `set_work_limit` exhaustion through `SpendRefusal::Resource` must now
+match `SpendRefusal::NotJudged` and its `NotJudgedCause::WorkBudgetExceeded`
+cause. The diagnostic names the input once, the budget and already charged
+work, never script failure. A spend inside the budget keeps its verdict; the
+memory-budget classes and checks are unchanged. The work budget does not
+interrupt a running arithmetic opcode or impose an elapsed-time bound.
 
-| Wire originator | Old decoding and result | New decoding and reference result |
-| --- | --- | --- |
-| `BOM` | BOM kept; code 6, `The originator parameter must be at least 1 length.` | Empty; code 0, wallet originator `None` (reference `''`) |
-| `BOM` + `a.b` | BOM kept; validation trims it; code 0, `a.b` | `a.b`; code 0, `a.b` |
-| `BOM` + `BOM` + `a.b` | Both BOMs kept; validation trims them; code 0, `a.b` | Second BOM kept; validation trims it; code 0, `a.b` |
-| `a.b` + `BOM` | Trailing BOM kept; validation trims it; code 0, `a.b` | Trailing BOM kept; validation trims it; code 0, `a.b` |
+### Notes: cross-SDK parity (#378, part 2)
 
-Rows for the CLI's operator-visible table:
-
-| Wire originator | Old code and words or wallet value | New code and words or wallet value |
-| --- | --- | --- |
-| `BOM` | 6, `The originator parameter must be at least 1 length.` | 0, absent originator (`None`) |
-| `BOM` + `a.b` | 0, `a.b` (BOM kept until validation) | 0, `a.b` (leading BOM removed before validation) |
-| `BOM` + `BOM` + `a.b` | 0, `a.b` (both BOMs kept until validation) | 0, `a.b` (second BOM kept until validation) |
-| `a.b` + `BOM` | 0, `a.b` (trailing BOM kept until validation) | 0, `a.b` (trailing BOM kept until validation) |
-
-`tests/support/wire_originator_338.mjs`, invoked through the #406 recorder,
-writes all four processor cases to `tests/vectors/wallet_wire/originator_338.json`,
-including their decoded strings, response frames, codes, refusal messages
-(`null` for these four successes) and wallet observations. Two runs are
-byte-identical; all seventeen prior processor cases, nine transceiver cases,
-the length probes and the linkage recording are unchanged.
-`tests/wallet_wire_originator_bom_471.rs` tests each case separately. On a
-scratch copy of base `ad6e350a7407409860e9df481fb8453eab001bfe`, BOM-only is
-RED on the old code-6 refusal; the three hostname cases are passing controls
-because their observable behavior already matches the reference. All four
-are GREEN with the reader change. Four REDs would misstate the reference.
-
-
-Go at `2ca481c` reads the originator bytes with `ReadBytes` and converts them
-directly with `string(originatorBytes)` (`wallet/serializer/frame.go:49-58`);
-it does not strip a BOM. This crate follows the TypeScript decoder. The
-TypeScript transceiver (`WalletWireTransceiver.ts:95-100`) validates the
-caller's string and encodes the normalized result, without decoding it;
-there is no outgoing TextDecoder BOM rule. Its validator already trims edge
-BOMs and still refuses a BOM-only caller string. This change is reader-only.
-
-### Fixed: short ECIES envelopes use the reference's bounded words (#463)
-
-The lower and upper envelope limits now share the guard in `ecies_bounds.rs`,
-before parsing a key, deriving a secret or hashing. The separate minimum checks
-returned `Data too short`, where the reference's same bounded-array check rejects
-both edges with its bounded words. The minimum lengths and accepted inputs do not
-change; framing and MAC checks after the guard stay as before.
-
-| Reader | Minimum bytes | Old refusal payload | New refusal payload |
-| --- | --- | --- | --- |
-| `electrum_decrypt` | 52 (`4 + 16 + 32`) | `Data too short` | `Electrum ECIES envelope must be a bounded dense byte array` |
-| `bitcore_decrypt` | 97 (`33 + 16 + 16 + 32`) | `Data too short` | `Bitcore ECIES envelope must be a bounded dense byte array` |
-
-Both refusals remain `Error::EciesDecryptionFailed`, the variant used by #333's
-upper envelope limit. Its Display still prefixes the payload with
-`ECIES decryption failed: `. Downstream callers matching `Data too short` or
-`ECIES decryption failed: Data too short` must update their text match to the new
-payload or displayed text for the relevant reader.
-
-`tests/compat_ecies_short_envelope_463.rs` pins the variant and exact Display for
-51-byte Electrum and 96-byte Bitcore envelopes. Both refusal tests were RED on
-scratch `ad2c0001`, while its two exact-minimum controls passed: a writer-produced
-envelope decrypts, then a flipped MAC byte reaches `EciesHmacMismatch`. All four
-pass with the shared guard. The eight #333 tests, including its three boundary
-controls, remain unchanged and pass.
-
-### Notes: cross-SDK parity
-
-The TypeScript minimums and upper bound are passed together to `compatBytes` at
-`ts-stack@edf6e03` `packages/sdk/src/compat/ECIES.ts:589-594,704-709`;
-`packages/sdk/src/compat/CompatValidation.ts:10-15` supplies the refusal words.
-Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-108`
-also rejects below 52 bytes, with `invalid encrypted text: length`. This change
-follows the TypeScript words under the owner's ruling (c).
-
-Go's `BitcoreDecrypt` (`compat/ecies/ecies.go:191-208` at `2ca481c`) has no length
-check at all: from reading the code, a short envelope would panic when it is
-sliced (not run).
+The reference's `Transaction.verify` has no work bound. Existing crate entry
+points and both new budget surfaces default to `None`, preserving that
+behavior byte for byte. The budget is each service door's policy: the
+toolbox's internalize and signer, the engine's script door and the tracker's
+door set it at their re-pin, each brief naming its value beside the sibling's
+memory rows. `tests/transaction_work_budget_378.rs` covers whole, sync and
+async verification, exact and exhausted budgets, deferred inputs, resume and
+unchanged verdicts; it also pins `NotJudgedCause` at 24 bytes and `Error` at
+56 on 64-bit targets, with the cause's input index a `u32` as in the streaming
+verdict. `tests/script_work_budget.rs` pins the existing signature accounting
+and `beef_stream::not_judged_tests` pins the underlying typed spend refusal.
 
 ### Fixed: the wire header refusals use the reference's words (#458)
 
@@ -959,226 +957,44 @@ here with the precision words, as the TypeScript reference refuses it.
 The pre-existing getHeight, unbounded satoshis and missing collection-size
 checks are filed separately and unchanged by this fold.
 
-### Changed: per-input verification work budget (#378, part 2)
+### Fixed: short ECIES envelopes use the reference's bounded words (#463)
 
-`Transaction::verify_with_work_budget` and
-`verify_with_chain_params_and_work_budget` add an optional work budget beside
-the memory budget. Both stream verifiers add `with_work_budget`, beside the
-existing `set_work_limit`. Each input uses the same `SpendParams::work_limit`
-counter: reached opcodes and bytes hashed, reserved before execution.
+The lower and upper envelope limits now share the guard in `ecies_bounds.rs`,
+before parsing a key, deriving a secret or hashing. The separate minimum checks
+returned `Data too short`, where the reference's same bounded-array check rejects
+both edges with its bounded words. The minimum lengths and accepted inputs do not
+change; framing and MAC checks after the guard stay as before.
 
-A refused charge is `NotJudgedCause::WorkBudgetExceeded { input, budget,
-work_done }`, carried by `Error::TransactionNotJudged`,
-`SpendRefusal::NotJudged` and `Verdict::NotJudged`. Migration: callers
-matching `set_work_limit` exhaustion through `SpendRefusal::Resource` must now
-match `SpendRefusal::NotJudged` and its `NotJudgedCause::WorkBudgetExceeded`
-cause. The diagnostic names the input once, the budget and already charged
-work, never script failure. A spend inside the budget keeps its verdict; the
-memory-budget classes and checks are unchanged. The work budget does not
-interrupt a running arithmetic opcode or impose an elapsed-time bound.
+| Reader | Minimum bytes | Old refusal payload | New refusal payload |
+| --- | --- | --- | --- |
+| `electrum_decrypt` | 52 (`4 + 16 + 32`) | `Data too short` | `Electrum ECIES envelope must be a bounded dense byte array` |
+| `bitcore_decrypt` | 97 (`33 + 16 + 16 + 32`) | `Data too short` | `Bitcore ECIES envelope must be a bounded dense byte array` |
 
-### Notes: cross-SDK parity (#378, part 2)
+Both refusals remain `Error::EciesDecryptionFailed`, the variant used by #333's
+upper envelope limit. Its Display still prefixes the payload with
+`ECIES decryption failed: `. Downstream callers matching `Data too short` or
+`ECIES decryption failed: Data too short` must update their text match to the new
+payload or displayed text for the relevant reader.
 
-The reference's `Transaction.verify` has no work bound. Existing crate entry
-points and both new budget surfaces default to `None`, preserving that
-behavior byte for byte. The budget is each service door's policy: the
-toolbox's internalize and signer, the engine's script door and the tracker's
-door set it at their re-pin, each brief naming its value beside the sibling's
-memory rows. `tests/transaction_work_budget_378.rs` covers whole, sync and
-async verification, exact and exhausted budgets, deferred inputs, resume and
-unchanged verdicts; it also pins `NotJudgedCause` at 24 bytes and `Error` at
-56 on 64-bit targets, with the cause's input index a `u32` as in the streaming
-verdict. `tests/script_work_budget.rs` pins the existing signature accounting
-and `beef_stream::not_judged_tests` pins the underlying typed spend refusal.
-
-### Fixed: the reference's ECIES byte bounds before work (#333)
-
-A framed envelope over the bound was read and failed on its MAC; it is now
-refused in the reference's words before reading.
-Both `electrum_decrypt` and `bitcore_decrypt` reject more than 16,777,376 bytes
-(16 MiB plus 160) before parsing a key, deriving a secret, hashing or AES,
-with `Electrum ECIES envelope must be a bounded dense byte array` or
-`Bitcore ECIES envelope must be a bounded dense byte array`, respectively.
-The bound is the reference's, not a caller policy: `ts-stack@edf6e03`
-`packages/sdk/src/compat/ECIES.ts:12,589-594,704-709` spells the shared constant
-`MAX_ECIES_ENVELOPE_BYTES` (the filing calls it `MAX_ELECTRUM_ECIES_ENVELOPE_BYTES`).
-`CompatValidation.ts:1,8-15` supplies the 16 MiB base and the refusal suffix.
-
-The encryptors also adopt the reference's 16,777,216-byte plaintext bound
-before work (`ECIES.ts:551,673`, `CompatValidation.ts:1,8-15`), with
-`Electrum ECIES plaintext must be a bounded dense byte array` and
-`Bitcore ECIES plaintext must be a bounded dense byte array`.
-These plaintext refusals use the additive `Error::EciesInvalidPlaintext` variant,
-whose Display is the reference's words alone. They are validation failures before
-encryption, not `EciesDecryptionFailed`; `CryptoError` would add its own prefix.
-Migration: match `EciesInvalidPlaintext` for an oversized encryption input;
-decrypt-side envelope refusals keep their existing variants and Display text.
-The single/shared and base64 helpers inherit the Electrum bounds; the reference
-defines no separate helper or base64-text bound, so none is added.
-The fixed-size Bitcore IV already has the reference's 16-byte size in its Rust type.
-This change left short-input, framing and MAC refusals within the limits unchanged;
-#463 above updates the short-input words.
-
-`tests/compat_ecies_bounds_333.rs` pins one byte over each limit, the exact limits,
-and a framed oversized Electrum envelope (the exact cap is not a valid Electrum
-frame size). It builds each large buffer once, retaining a small writer-produced
-header and zero-filling the rest without computing a large envelope's MAC.
-The 16 MiB plaintext round trips with and without an Electrum key and through
-Bitcore. On scratch `455fe780`, five regressions were RED and three controls
-passed; all eight pass with the guards. No hash-count hook exists: the guard's
-length-only code path precedes every key read and hash call.
-The cold-review fold pins the plaintext variant and exact Display in both
-encrypt tests, including the Electrum helpers: both fail on a scratch copy with
-the old `EciesDecryptionFailed` plaintext refusal, and all eight pass after it.
-
-The encrypt-side refusal is carried by `Error::EciesInvalidPlaintext(String)`,
-whose Display is the reference's words alone; no release and not this PR's base
-ever printed a wrapped `ECIES decryption failed: ...` text for an encrypt call (the
-plaintext bound is new in this change), so no caller matched it.
+`tests/compat_ecies_short_envelope_463.rs` pins the variant and exact Display for
+51-byte Electrum and 96-byte Bitcore envelopes. Both refusal tests were RED on
+scratch `ad2c0001`, while its two exact-minimum controls passed: a writer-produced
+envelope decrypts, then a flipped MAC byte reaches `EciesHmacMismatch`. All four
+pass with the shared guard. The eight #333 tests, including its three boundary
+controls, remain unchanged and pass.
 
 ### Notes: cross-SDK parity
 
-Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-153`
-has a minimum length but no upper bound and hashes the prefix at `:143`.
-Its `BitcoreDecrypt` (`:191-214`) and both encryptors (`:62-102,157-188`)
-also have no upper byte bound. Rust follows the TypeScript bounds here.
-At the exact envelope cap Rust retains its existing Electrum framing error
-and Bitcore MAC error; TypeScript rejects Bitcore's unaligned frame before
-the MAC (`ECIES.ts:710-711`). These framing and MAC checks are unchanged.
-The short-envelope words left unchanged by #333 are corrected by #463 above.
+The TypeScript minimums and upper bound are passed together to `compatBytes` at
+`ts-stack@edf6e03` `packages/sdk/src/compat/ECIES.ts:589-594,704-709`;
+`packages/sdk/src/compat/CompatValidation.ts:10-15` supplies the refusal words.
+Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-108`
+also rejects below 52 bytes, with `invalid encrypted text: length`. This change
+follows the TypeScript words under the owner's ruling (c).
 
-The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
-`:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
-`:704-709`) are filed as #463 for a lane.
-
-### Fixed: required flag reasons and the original sighash census (#453)
-
-`ScriptFlags::check` now explains why an unsupported word is refused and
-names all three required flags in each sentence. Under any supported word,
-`spend/signature_encoding.rs` requires a signature's fork-ID bit and strict
-encodings remain enabled; a word without these rules would be judged
-differently from the node. Pre-Genesis block and UTXO rules are not implemented.
-The restriction and the `Spend::validate` prefix and final period are unchanged.
-
-| Missing flag | Old text | New text |
-|---|---|---|
-| SIGHASH_FORKID | `SIGHASH_FORKID is not set: this interpreter requires it in a flag word` | `SIGHASH_FORKID is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
-| GENESIS | `GENESIS is not set: this interpreter requires it in a flag word` | `GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
-| UTXO_AFTER_GENESIS | `UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word` | `UTXO_AFTER_GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
-
-The three DER-off witnesses in `tests/script_signature_words_417.rs` and
-the 86 recorded words in `tests/support/conformance_forkid_gate_429.rs` pin
-the new sentences. Both tests fail with #434's old sentences in an isolated
-scratch copy of `ed1093cf` with its own `CARGO_TARGET_DIR`. The documentation
-now states the reason too, and `flags.rs` remains at its 872-line ceiling.
-The three stale `FORKID is always enabled here` comments in
-`spend/crypto.rs` now describe both modes: a signature without the bit is
-deleted from the scriptCode, including a default-mode legacy signature or
-an empty signature; BIP143 applies to FORKID without CHRONICLE, and the
-original digest applies otherwise. No interpreter verdict changes.
-
-The allowlist's `legacy/OTDA sighash not implemented in bsv-rs` reason was
-wrong: #22 supplied the original digest and #429 enabled signatures without
-the fork-ID bit in default mode. The census only called the BIP143 preimage
-API. With that class removed on a scratch copy and the existing original
-digest API used, all 1,244 excluded vectors pass, zero fail and zero panic;
-there are no refusal groups. They now run in the census. All 2,000 sighash
-vectors compare both `regular_hash` and `original_hash`, preserving the
-Teranode fixtures' CHRONICLE-bit convention and the original digest's `one`
-sentinels. No vector is edited or copied. The revised allowlist is RED with
-the old harness, which still excludes those 1,244 vectors.
-
-The measured evaluation counts before and after, with
-`BSV_CONFORMANCE_DIR=~/bsv/ts-stack/conformance`:
-
-| Count | Before | After |
-|---|---:|---:|
-| Total | 5,116 | 5,116 |
-| Run | 2,876 | 4,120 |
-| Passed | 2,865 | 4,109 |
-| Unsupported | 2,203 | 959 |
-| Original-digest exclusion | 1,244 | 0 |
-| Corpus-skipped | 37 | 37 |
-| Known failures | 11 | 11 |
-| Unexplained failures / panics | 0 / 0 | 0 / 0 |
-
-Every other class keeps its count and stated reason in
-`tests/support/conformance_script_allowlist.rs`; no new exclusion is added.
-The remaining 11 known failures are the recorded multiple-ELSE difference
-and ten eager CHECKMULTISIG encoding checks, as before.
-
-The downstream scan checked the old sentences, missing-flag prefixes and
-`Invalid verification flags:` in `~/bsv/bsv-overlay-cloudflare`,
-`~/bsv/rust-message-box`, `~/bsv/bsv-wallet-toolbox-rs` and
-`~/bsv/bsv-wallet-cli`: no matches. `~/bsv/bsv-middleware-cloudflare-public`
-and `~/bsv/rust-chaintracks` were absent at those paths and remain unverified.
-A downstream matching these errors must use the new sentences above.
-
-### Fixed: one wallet double-spend retry for revocation and the global key-value store (#340)
-
-The global store now retries `set` and `remove` after a wallet's structured
-`WERR_REVIEW_ACTIONS` with valid double-spend evidence. Every retry follows
-successful synchronization of the competing transactions and repeats the
-lookup, input selection, BEEF merge and bound action. An action that failed
-at signAction is aborted with its own reference before synchronization; the
-next createAction supplies a new reference. The per-key lock covers every
-attempt. Global set prepares its replacement script once, outside the retry,
-as the reference does.
-
-The local store does not retry, as the reference's does not. Local set makes
-one bound action; local removal makes one bound action per batch and stops on
-failure. The local retry and broadcaster added in the unreleased #340 change
-are removed, including `LocalKVStore::with_broadcaster`. Local failures still
-abort the action before returning the wallet error.
-
-The reference rule moved from identity's private `double_spend.rs` to
-`src/overlay/wallet_retry.rs`, beside the port of `overlay-tools`, where
-`ts-stack@edf6e03` defines `withDoubleSpendRetry` (`:140-165`, default at `:8`).
-It makes at most five attempts, synchronizes only between attempts, and returns
-the final wallet error unchanged. Other errors, missing or malformed evidence,
-and failed synchronization stop immediately. Identity revocation uses the
-same rule with its existing error category and verdicts. The public
-`overlay::with_double_spend_retry` in `retry.rs` remains a different rule:
-error-text matching, three retries (four attempts) by default, and no
-competing-transaction synchronization.
-
-`tests/kvstore_double_spend_retry_340.rs` pins global set/remove recovery,
-the fresh lookup's exact inputs and merged BEEF, distinct action references,
-abort-before-sync order, five-attempt exhaustion in the wallet's words, and
-no retry for unstructured or malformed evidence or failed synchronization.
-The four local once/always set/remove cases pin one createAction, one abort,
-no broadcast and the unchanged wallet error; all four fail on a scratch copy
-of the retrying `dd0a4a59` tree and pass after the removal. The shared rule's
-five unit tests and all nine existing `identity_revocation_checks_327`
-verdict tests remain unchanged.
-
-Migration: no published public item moved. The old identity helper was private
-and the removed local `with_broadcaster` was never published.
-`GlobalKVStore::with_broadcaster(TopicBroadcaster)` remains additive for
-caller-owned synchronization and completed-transaction broadcasts. Existing
-config struct literals are unchanged.
-
-### Notes: cross-SDK parity (#340)
-
-The global paths follow `GlobalKVStore.ts:307-393,434-491`: the lookup is
-inside `withDoubleSpendRetry`. The reference's `completeBoundAction.ts:1148-1150`
-aborts the failed reference and rethrows; it contains no retry. At this pin,
-`LocalKVStore.ts:413-425,515-550,567-594` calls that boundary without a retry
-wrapper. The local store does not retry, as the reference's does not. Go at
-`2ca481c` likewise has no double-spend retry in `kvstore/local_kv_store.go`
-(`Set`:217-366; `Remove`:429-524); its removal loop is pagination, and its
-signAction failures relinquish the selected outputs then return the error.
-
-Filed as #470: local bound-action failures still return the wallet error unwrapped; the reference adds `There are N outputs with tag K that cannot be unlocked. Original error: ...` (`LocalKVStore.ts:427-431,551-555`).
-
-The three older #326, #341/#342 and #344 recorder outputs regenerate
-byte-identically under Node 22.18.0 from `ts-stack@edf6e03`. The
-`--double-spend-retry` mode records eight actual global/local sequences in
-`kvstore_retry_340.json`, including the local single-attempt verdicts. The fold
-corrects the recorder's comment and output description only; all cases are
-unchanged, and the revised output is byte-identical on rerun. No vector bytes
-were edited by hand. Recording and tests inject all lookup and broadcast
-answers in process; no live host or default port is used.
+Go's `BitcoreDecrypt` (`compat/ecies/ecies.go:191-208` at `2ca481c`) has no length
+check at all: from reading the code, a short envelope would panic when it is
+sliced (not run).
 
 ### Fixed: the Peer's certificate paths, nonce intake and sending bound (#445)
 
@@ -1295,6 +1111,349 @@ certificate-response path (`auth/peer.go:961-963`). It refuses a nonce that
 `base64.StdEncoding` cannot decode at the signer as `failed to decode initial
 nonce` (`auth/peer.go:585-588`). Go was read, not executed for this fold.
 
+### Fixed: one wallet double-spend retry for revocation and the global key-value store (#340)
+
+The global store now retries `set` and `remove` after a wallet's structured
+`WERR_REVIEW_ACTIONS` with valid double-spend evidence. Every retry follows
+successful synchronization of the competing transactions and repeats the
+lookup, input selection, BEEF merge and bound action. An action that failed
+at signAction is aborted with its own reference before synchronization; the
+next createAction supplies a new reference. The per-key lock covers every
+attempt. Global set prepares its replacement script once, outside the retry,
+as the reference does.
+
+The local store does not retry, as the reference's does not. Local set makes
+one bound action; local removal makes one bound action per batch and stops on
+failure. The local retry and broadcaster added in the unreleased #340 change
+are removed, including `LocalKVStore::with_broadcaster`. Local failures still
+abort the action before returning the wallet error.
+
+The reference rule moved from identity's private `double_spend.rs` to
+`src/overlay/wallet_retry.rs`, beside the port of `overlay-tools`, where
+`ts-stack@edf6e03` defines `withDoubleSpendRetry` (`:140-165`, default at `:8`).
+It makes at most five attempts, synchronizes only between attempts, and returns
+the final wallet error unchanged. Other errors, missing or malformed evidence,
+and failed synchronization stop immediately. Identity revocation uses the
+same rule with its existing error category and verdicts. The public
+`overlay::with_double_spend_retry` in `retry.rs` remains a different rule:
+error-text matching, three retries (four attempts) by default, and no
+competing-transaction synchronization.
+
+`tests/kvstore_double_spend_retry_340.rs` pins global set/remove recovery,
+the fresh lookup's exact inputs and merged BEEF, distinct action references,
+abort-before-sync order, five-attempt exhaustion in the wallet's words, and
+no retry for unstructured or malformed evidence or failed synchronization.
+The four local once/always set/remove cases pin one createAction, one abort,
+no broadcast and the unchanged wallet error; all four fail on a scratch copy
+of the retrying `dd0a4a59` tree and pass after the removal. The shared rule's
+five unit tests and all nine existing `identity_revocation_checks_327`
+verdict tests remain unchanged.
+
+Migration: no published public item moved. The old identity helper was private
+and the removed local `with_broadcaster` was never published.
+`GlobalKVStore::with_broadcaster(TopicBroadcaster)` remains additive for
+caller-owned synchronization and completed-transaction broadcasts. Existing
+config struct literals are unchanged.
+
+### Notes: cross-SDK parity (#340)
+
+The global paths follow `GlobalKVStore.ts:307-393,434-491`: the lookup is
+inside `withDoubleSpendRetry`. The reference's `completeBoundAction.ts:1148-1150`
+aborts the failed reference and rethrows; it contains no retry. At this pin,
+`LocalKVStore.ts:413-425,515-550,567-594` calls that boundary without a retry
+wrapper. The local store does not retry, as the reference's does not. Go at
+`2ca481c` likewise has no double-spend retry in `kvstore/local_kv_store.go`
+(`Set`:217-366; `Remove`:429-524); its removal loop is pagination, and its
+signAction failures relinquish the selected outputs then return the error.
+
+Filed as #470: local bound-action failures still return the wallet error unwrapped; the reference adds `There are N outputs with tag K that cannot be unlocked. Original error: ...` (`LocalKVStore.ts:427-431,551-555`).
+
+The three older #326, #341/#342 and #344 recorder outputs regenerate
+byte-identically under Node 22.18.0 from `ts-stack@edf6e03`. The
+`--double-spend-retry` mode records eight actual global/local sequences in
+`kvstore_retry_340.json`, including the local single-attempt verdicts. The fold
+corrects the recorder's comment and output description only; all cases are
+unchanged, and the revised output is byte-identical on rerun. No vector bytes
+were edited by hand. Recording and tests inject all lookup and broadcast
+answers in process; no live host or default port is used.
+
+### Fixed: required flag reasons and the original sighash census (#453)
+
+`ScriptFlags::check` now explains why an unsupported word is refused and
+names all three required flags in each sentence. Under any supported word,
+`spend/signature_encoding.rs` requires a signature's fork-ID bit and strict
+encodings remain enabled; a word without these rules would be judged
+differently from the node. Pre-Genesis block and UTXO rules are not implemented.
+The restriction and the `Spend::validate` prefix and final period are unchanged.
+
+| Missing flag | Old text | New text |
+|---|---|---|
+| SIGHASH_FORKID | `SIGHASH_FORKID is not set: this interpreter requires it in a flag word` | `SIGHASH_FORKID is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
+| GENESIS | `GENESIS is not set: this interpreter requires it in a flag word` | `GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
+| UTXO_AFTER_GENESIS | `UTXO_AFTER_GENESIS is not set: this interpreter requires it in a flag word` | `UTXO_AFTER_GENESIS is not set: a word without it is not implemented by this interpreter (it requires SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS)` |
+
+The three DER-off witnesses in `tests/script_signature_words_417.rs` and
+the 86 recorded words in `tests/support/conformance_forkid_gate_429.rs` pin
+the new sentences. Both tests fail with #434's old sentences in an isolated
+scratch copy of `ed1093cf` with its own `CARGO_TARGET_DIR`. The documentation
+now states the reason too, and `flags.rs` remains at its 872-line ceiling.
+The three stale `FORKID is always enabled here` comments in
+`spend/crypto.rs` now describe both modes: a signature without the bit is
+deleted from the scriptCode, including a default-mode legacy signature or
+an empty signature; BIP143 applies to FORKID without CHRONICLE, and the
+original digest applies otherwise. No interpreter verdict changes.
+
+The allowlist's `legacy/OTDA sighash not implemented in bsv-rs` reason was
+wrong: #22 supplied the original digest and #429 enabled signatures without
+the fork-ID bit in default mode. The census only called the BIP143 preimage
+API. With that class removed on a scratch copy and the existing original
+digest API used, all 1,244 excluded vectors pass, zero fail and zero panic;
+there are no refusal groups. They now run in the census. All 2,000 sighash
+vectors compare both `regular_hash` and `original_hash`, preserving the
+Teranode fixtures' CHRONICLE-bit convention and the original digest's `one`
+sentinels. No vector is edited or copied. The revised allowlist is RED with
+the old harness, which still excludes those 1,244 vectors.
+
+The measured evaluation counts before and after, with
+`BSV_CONFORMANCE_DIR=~/bsv/ts-stack/conformance`:
+
+| Count | Before | After |
+|---|---:|---:|
+| Total | 5,116 | 5,116 |
+| Run | 2,876 | 4,120 |
+| Passed | 2,865 | 4,109 |
+| Unsupported | 2,203 | 959 |
+| Original-digest exclusion | 1,244 | 0 |
+| Corpus-skipped | 37 | 37 |
+| Known failures | 11 | 11 |
+| Unexplained failures / panics | 0 / 0 | 0 / 0 |
+
+Every other class keeps its count and stated reason in
+`tests/support/conformance_script_allowlist.rs`; no new exclusion is added.
+The remaining 11 known failures are the recorded multiple-ELSE difference
+and ten eager CHECKMULTISIG encoding checks, as before.
+
+The downstream scan checked the old sentences, missing-flag prefixes and
+`Invalid verification flags:` in `~/bsv/bsv-overlay-cloudflare`,
+`~/bsv/rust-message-box`, `~/bsv/bsv-wallet-toolbox-rs` and
+`~/bsv/bsv-wallet-cli`: no matches. `~/bsv/bsv-middleware-cloudflare-public`
+and `~/bsv/rust-chaintracks` were absent at those paths and remain unverified.
+A downstream matching these errors must use the new sentences above.
+
+### Fixed: the reference's ECIES byte bounds before work (#333)
+
+A framed envelope over the bound was read and failed on its MAC; it is now
+refused in the reference's words before reading.
+Both `electrum_decrypt` and `bitcore_decrypt` reject more than 16,777,376 bytes
+(16 MiB plus 160) before parsing a key, deriving a secret, hashing or AES,
+with `Electrum ECIES envelope must be a bounded dense byte array` or
+`Bitcore ECIES envelope must be a bounded dense byte array`, respectively.
+The bound is the reference's, not a caller policy: `ts-stack@edf6e03`
+`packages/sdk/src/compat/ECIES.ts:12,589-594,704-709` spells the shared constant
+`MAX_ECIES_ENVELOPE_BYTES` (the filing calls it `MAX_ELECTRUM_ECIES_ENVELOPE_BYTES`).
+`CompatValidation.ts:1,8-15` supplies the 16 MiB base and the refusal suffix.
+
+The encryptors also adopt the reference's 16,777,216-byte plaintext bound
+before work (`ECIES.ts:551,673`, `CompatValidation.ts:1,8-15`), with
+`Electrum ECIES plaintext must be a bounded dense byte array` and
+`Bitcore ECIES plaintext must be a bounded dense byte array`.
+These plaintext refusals use the additive `Error::EciesInvalidPlaintext` variant,
+whose Display is the reference's words alone. They are validation failures before
+encryption, not `EciesDecryptionFailed`; `CryptoError` would add its own prefix.
+Migration: match `EciesInvalidPlaintext` for an oversized encryption input;
+decrypt-side envelope refusals keep their existing variants and Display text.
+The single/shared and base64 helpers inherit the Electrum bounds; the reference
+defines no separate helper or base64-text bound, so none is added.
+The fixed-size Bitcore IV already has the reference's 16-byte size in its Rust type.
+This change left short-input, framing and MAC refusals within the limits unchanged;
+#463 above updates the short-input words.
+
+`tests/compat_ecies_bounds_333.rs` pins one byte over each limit, the exact limits,
+and a framed oversized Electrum envelope (the exact cap is not a valid Electrum
+frame size). It builds each large buffer once, retaining a small writer-produced
+header and zero-filling the rest without computing a large envelope's MAC.
+The 16 MiB plaintext round trips with and without an Electrum key and through
+Bitcore. On scratch `455fe780`, five regressions were RED and three controls
+passed; all eight pass with the guards. No hash-count hook exists: the guard's
+length-only code path precedes every key read and hash call.
+The cold-review fold pins the plaintext variant and exact Display in both
+encrypt tests, including the Electrum helpers: both fail on a scratch copy with
+the old `EciesDecryptionFailed` plaintext refusal, and all eight pass after it.
+
+The encrypt-side refusal is carried by `Error::EciesInvalidPlaintext(String)`,
+whose Display is the reference's words alone; no release and not this PR's base
+ever printed a wrapped `ECIES decryption failed: ...` text for an encrypt call (the
+plaintext bound is new in this change), so no caller matched it.
+
+### Notes: cross-SDK parity
+
+Go's `ElectrumDecrypt` at `go-sdk@2ca481c` `compat/ecies/ecies.go:105-153`
+has a minimum length but no upper bound and hashes the prefix at `:143`.
+Its `BitcoreDecrypt` (`:191-214`) and both encryptors (`:62-102,157-188`)
+also have no upper byte bound. Rust follows the TypeScript bounds here.
+At the exact envelope cap Rust retains its existing Electrum framing error
+and Bitcore MAC error; TypeScript rejects Bitcore's unaligned frame before
+the MAC (`ECIES.ts:710-711`). These framing and MAC checks are unchanged.
+The short-envelope words left unchanged by #333 are corrected by #463 above.
+
+The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
+`:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
+`:704-709`) are filed as #463 for a lane.
+
+### Fixed: internalizeAction's unreachable wire fallbacks and JSON null remittances (#393)
+
+The two notes from #384's review are resolved. The transceiver's
+`payment_remittance required for wallet payment` refusal and its empty
+basket-insertion write have been removed. Its public `internalize_action`
+always calls `validate_internalize_action_args` before encoding; the
+`WalletClient` wire dispatch reaches that same method. No entry bypasses the
+validator. `ProtoWallet`, `WalletClient` and `HttpWalletJson` also validate;
+the processor still refuses internalizeAction as needing a full wallet.
+`payment_remittance_guard_precedes_encoding_and_sending` and
+`insertion_remittance_guard_precedes_encoding_and_sending` cover missing,
+wrong-only and crossed remittances, including a payment key that would fail
+hex decoding if encoding ran. Each asserts the validator's exact refusal
+and zero frames sent.
+
+A JSON `null` remittance used to become `None`, erasing its presence.
+`types/internalize_output.rs` now distinguishes a missing member from null
+while reading, sharing the protocol/presence check with the typed validator.
+The public fields, their types and serialization stay unchanged. A null
+beside the other protocol's remittance is refused with that protocol's
+one-remittance words. A matching null alone reaches the object refusal,
+`The paymentRemittance parameter must be a plain object` or
+`The insertionRemittance parameter must be a plain object`. An absent
+other remittance remains accepted; an absent required one remains refused
+by the typed validator.
+
+`tests/support/internalize_null_remittance_393.mjs` measured the actual
+`ts-stack@edf6e03` SDK bundle under Node v22.18.0 and wrote
+`tests/vectors/internalize_null_remittance_393.json`: 12 cases, 10 refusals
+(code 6), two acceptances. No validator was copied into the script.
+`tests/wallet_internalize_remittance_393.rs` pins all cases in 10 tests:
+the four `a_null_*` tests pin each protocol's crossed-null and lone-null
+reading; `two_null_remittances_are_present_and_refused_for_either_protocol`
+and `a_lone_null_of_the_other_protocol_is_present_and_refused` pin the other
+four null cases; the two `an_undefined_*` tests pin absence, and the two
+`*_guard_precedes_encoding_and_sending` tests pin validation before encoding.
+On a scratch copy of the base, the six null tests fail because JSON null
+was accepted by deserialization; the other four pass. With the transceiver's
+validation call removed on that scratch copy, both guard tests fail too.
+`fuzz_wire_protocol` also reads `InternalizeOutput` JSON; a bounded run
+seeded with the 12 measured outputs completed after 24 seconds with no
+crash, timeout or allocation failure.
+
+### Notes: cross-SDK parity (#393)
+
+The measured null verdicts and words match `validateInternalizeOutput`
+(`validationHelpers.ts:966-984`, remittance object checks at `:914-951`).
+`HTTPWalletJSON.ts:291-303` validates the supplied object before serializing
+it, retaining null's presence; `WalletWireProcessor.ts:1085-1136` constructs
+only the selected remittance from the frame, which has no null encoding.
+Rust rejects null at the serde intake, a deserialization error carrying
+those words, rather than the reference's callable validator's code-6 error.
+The other validation gaps documented with #384 remain outside this change.
+Go at `2ca481c` reads both missing and null remittances as nil pointers
+(`wallet/interfaces.go:422-427`, `wallet/encoding_json.go:384-395`). Its
+writer refuses a nil selected remittance in its own words and ignores the
+other (`wallet/serializer/internalize_action.go:29-44`), so its null reading
+differs from this crate and the reference. The two oversized files shrink:
+`transceiver.rs` 1,643 to 1,636 lines; `types.rs` 1,912 to 1,899. The new
+75-line type/reader file keeps every added function below 60 lines.
+
+A word-order residual: a `null` sitting beside a malformed remittance object, or
+beside an `outputIndex` that is not a `u32`, is refused in serde's words before the
+presence check here, where the reference gives its crossed-remittance words there
+(`validationHelpers.ts:971-977` before `:979`); both sides refuse, only the words
+differ, in the existing typed-reading class.
+
+### Fixed: out-of-scope words are not judged; live Genesis authority (#452, #451)
+
+A pre-Genesis coin, a tip at `u32::MAX`, or a zero Genesis/Chronicle
+activation set through public fields previously became `SpendRefusal::Script`
+and `TransactionError("Script validation failed for input N: ...")`.
+Those answers falsely judged a transaction for an unsupported era or a broken
+configuration. The keeper's word of 2026-10-29 18:1xZ is implemented as
+`Verdict::NotJudged { offset, txid, input, cause }` and
+`SpendRefusal::NotJudged { input, cause }`, with `input: u32` and the shared
+`script::NotJudgedCause`. The whole path returns
+`Error::TransactionNotJudged { txid: String, input_index: usize, cause }`.
+The display txid identifies the unproven transaction being checked, including
+an ancestor reached by the whole-path walk. Its cause is not a resource limit
+and must not inhabit `ScriptEvaluationDeclined`. New arms
+are appended, preserving every existing variant's discriminant.
+
+`NotJudgedCause` carries `PreGenesisCoin { height, genesis_height }`,
+`TipHeightOverflow { tip }`, or `ZeroActivationHeight(ActivationHeightsError)`
+(`ZeroGenesis` / `ZeroChronicle`). The existing pre-Genesis spend and streaming
+source-height overflow refusals also retain their facts in `PreGenesisSpend`
+and `SourceHeightOverflow`. The latter is reachable through synchronous
+streaming `Headers`, whose heights are `u64`; the in-memory `MerklePath`
+conversion and async `ChainTracker` path refuse those heights earlier.
+Every diagnostic is one sentence naming the input and the bound it falls
+outside, with the height where the cause has one (the zero-activation sentence
+names the parameter's value, not a height).
+No such refusal says that script validation failed.
+The standalone `input_script_flags` API retains its error type and text, while
+the live verifiers use the same checked composition with typed causes.
+The whole path checks word scope before checking for a missing unlocking
+script, so an out-of-scope input with no unlocking script reports `NotJudged`.
+
+`ChainTip.genesis_height` is deprecated since `0.9.0-beta.4`. With `ChainParams`,
+the params alone decide Genesis, including the stream's P2SH output check.
+With no `ChainParams`, that check still reads the tip's deprecated copy,
+falling back to mainnet's figure only when no tip is supplied. There are no
+default-path verdict changes. The copy still functions until its removal at
+the next api-break, when the default stream path judges by mainnet's heights
+as the reference does with no chain parameters (the keeper's word of
+2026-10-29 20:1xZ): a caller on another chain supplies its `ChainParams`, told
+so by the deprecation message now and the docs then. Compatibility
+constructors and the one default-path reader have scoped and explained
+deprecation allowances. STN is not modelled: nothing in the stack runs there,
+and the node at `879fc8b` leaves BIP65, BIP66 and CSV
+heights uninitialized (`bsv-script-lean/docs/PARAMETERS.md:205`, finding #39),
+so a verdict there is not reproducible. Additive support waits for a consumer
+that names a use.
+
+`tests/beef_not_judged_452.rs` pins all five causes' typed `Verdict` and
+whole `Error`, with exact sentences, both zero fields, a nonzero input, no-tip cases,
+synchronous/two-pass/asynchronous readers and deferred transactions. Its
+`a_pre_genesis_coin_is_not_judged_by_the_stream_452`,
+`an_overflowing_tip_is_not_judged_by_the_stream_452` and
+`a_zero_activation_is_not_judged_by_the_stream_452` each have a matching
+`*_by_the_whole_path_452` witness. The three
+`beef_stream::not_judged_tests` witnesses match the actual `SpendRefusal` before
+its conversion to `Verdict`. `chain_params_alone_decide_when_the_tip_disagrees_451`
+pins disagreeing authorities, including the P2SH check in both directions.
+`a_pre_genesis_spend_is_not_judged_452` covers a mainnet tip below 620,537
+on both paths; its base-API witness is RED on the pre-#452 base with
+`SpendRefused::Script` and `TransactionError`. Further witnesses name the
+unproven ancestor, pin scope before a missing unlocking script, and reach
+`SourceHeightOverflow` through the synchronous and two-pass stream readers.
+The 13 #440 witnesses retain their decisions; their two scope refusals now
+assert `NotJudged`. The word witnesses retain their verdicts. The historical
+P2SH boundary witness retains its original regtest heights: a tip of 9,998
+accepts the output and 9,999 refuses it with Genesis at 10,000.
+
+**API break (`api-break`, beta line):** adding `SpendRefusal::NotJudged` extends
+an exhaustive enum. Migration: downstream `match` expressions add
+`SpendRefusal::NotJudged { input, cause } => ...`; `Verdict` and `Error` remain
+non-exhaustive. Match typed causes for the toolbox's #461 skip and pre-Genesis
+refusal, and in the CLI; never match diagnostic text. Migrate Genesis readers
+to `ChainParams`; remove `ChainTip.genesis_height` initializers at the next
+api-break, when the deprecated field is removed.
+
+### Notes: cross-SDK parity
+
+The reference has no automatic per-input word in `Transaction.verify`
+(`ts-stack@edf6e03 packages/sdk/src/transaction/Transaction.ts:1391-1456`);
+this is the live chain-parameter path's refusal contract, not a change to SDK
+default evaluation. The sibling's `engine.word-out-of-scope` reading is two
+refusals, not a judgment (`bsv-script-lean/docs/CONFORMANCE-2026-09-27.md:351-354`),
+which this typed class makes visible to hosts. Go's interpreter supports the
+pre-Genesis eras (`go-sdk@2ca481c spv/verify.go:537-560`); our refusal states our
+scope, never that a coin the node can spend is invalid.
+
 ### Changed: arithmetic guard allocation and script-number encoding (#378, part 1)
 
 Arithmetic guards keep their one- or two-operand metadata in stack arrays, removing
@@ -1390,160 +1549,6 @@ retain their expected verdicts and bytes. Measurements, raw samples, source
 probes and gate/fuzz logs are under
 `/Volumes/Lanes/out/bsv-rs/fix-378-op-mul-time/`; the table is the performance pin,
 with no wall-clock assertion or 16 MiB bench in the crate.
-
-### Fixed: out-of-scope words are not judged; live Genesis authority (#452, #451)
-
-A pre-Genesis coin, a tip at `u32::MAX`, or a zero Genesis/Chronicle
-activation set through public fields previously became `SpendRefusal::Script`
-and `TransactionError("Script validation failed for input N: ...")`.
-Those answers falsely judged a transaction for an unsupported era or a broken
-configuration. The keeper's word of 2026-10-29 18:1xZ is implemented as
-`Verdict::NotJudged { offset, txid, input, cause }` and
-`SpendRefusal::NotJudged { input, cause }`, with `input: u32` and the shared
-`script::NotJudgedCause`. The whole path returns
-`Error::TransactionNotJudged { txid: String, input_index: usize, cause }`.
-The display txid identifies the unproven transaction being checked, including
-an ancestor reached by the whole-path walk. Its cause is not a resource limit
-and must not inhabit `ScriptEvaluationDeclined`. New arms
-are appended, preserving every existing variant's discriminant.
-
-`NotJudgedCause` carries `PreGenesisCoin { height, genesis_height }`,
-`TipHeightOverflow { tip }`, or `ZeroActivationHeight(ActivationHeightsError)`
-(`ZeroGenesis` / `ZeroChronicle`). The existing pre-Genesis spend and streaming
-source-height overflow refusals also retain their facts in `PreGenesisSpend`
-and `SourceHeightOverflow`. The latter is reachable through synchronous
-streaming `Headers`, whose heights are `u64`; the in-memory `MerklePath`
-conversion and async `ChainTracker` path refuse those heights earlier.
-Every diagnostic is one sentence naming the input and the bound it falls
-outside, with the height where the cause has one (the zero-activation sentence
-names the parameter's value, not a height).
-No such refusal says that script validation failed.
-The standalone `input_script_flags` API retains its error type and text, while
-the live verifiers use the same checked composition with typed causes.
-The whole path checks word scope before checking for a missing unlocking
-script, so an out-of-scope input with no unlocking script reports `NotJudged`.
-
-`ChainTip.genesis_height` is deprecated since `0.9.0-beta.4`. With `ChainParams`,
-the params alone decide Genesis, including the stream's P2SH output check.
-With no `ChainParams`, that check still reads the tip's deprecated copy,
-falling back to mainnet's figure only when no tip is supplied. There are no
-default-path verdict changes. The copy still functions until its removal at
-the next api-break, when the default stream path judges by mainnet's heights
-as the reference does with no chain parameters (the keeper's word of
-2026-10-29 20:1xZ): a caller on another chain supplies its `ChainParams`, told
-so by the deprecation message now and the docs then. Compatibility
-constructors and the one default-path reader have scoped and explained
-deprecation allowances. STN is not modelled: nothing in the stack runs there,
-and the node at `879fc8b` leaves BIP65, BIP66 and CSV
-heights uninitialized (`bsv-script-lean/docs/PARAMETERS.md:205`, finding #39),
-so a verdict there is not reproducible. Additive support waits for a consumer
-that names a use.
-
-`tests/beef_not_judged_452.rs` pins all five causes' typed `Verdict` and
-whole `Error`, with exact sentences, both zero fields, a nonzero input, no-tip cases,
-synchronous/two-pass/asynchronous readers and deferred transactions. Its
-`a_pre_genesis_coin_is_not_judged_by_the_stream_452`,
-`an_overflowing_tip_is_not_judged_by_the_stream_452` and
-`a_zero_activation_is_not_judged_by_the_stream_452` each have a matching
-`*_by_the_whole_path_452` witness. The three
-`beef_stream::not_judged_tests` witnesses match the actual `SpendRefusal` before
-its conversion to `Verdict`. `chain_params_alone_decide_when_the_tip_disagrees_451`
-pins disagreeing authorities, including the P2SH check in both directions.
-`a_pre_genesis_spend_is_not_judged_452` covers a mainnet tip below 620,537
-on both paths; its base-API witness is RED on the pre-#452 base with
-`SpendRefused::Script` and `TransactionError`. Further witnesses name the
-unproven ancestor, pin scope before a missing unlocking script, and reach
-`SourceHeightOverflow` through the synchronous and two-pass stream readers.
-The 13 #440 witnesses retain their decisions; their two scope refusals now
-assert `NotJudged`. The word witnesses retain their verdicts. The historical
-P2SH boundary witness retains its original regtest heights: a tip of 9,998
-accepts the output and 9,999 refuses it with Genesis at 10,000.
-
-**API break (`api-break`, beta line):** adding `SpendRefusal::NotJudged` extends
-an exhaustive enum. Migration: downstream `match` expressions add
-`SpendRefusal::NotJudged { input, cause } => ...`; `Verdict` and `Error` remain
-non-exhaustive. Match typed causes for the toolbox's #461 skip and pre-Genesis
-refusal, and in the CLI; never match diagnostic text. Migrate Genesis readers
-to `ChainParams`; remove `ChainTip.genesis_height` initializers at the next
-api-break, when the deprecated field is removed.
-
-### Notes: cross-SDK parity
-
-The reference has no automatic per-input word in `Transaction.verify`
-(`ts-stack@edf6e03 packages/sdk/src/transaction/Transaction.ts:1391-1456`);
-this is the live chain-parameter path's refusal contract, not a change to SDK
-default evaluation. The sibling's `engine.word-out-of-scope` reading is two
-refusals, not a judgment (`bsv-script-lean/docs/CONFORMANCE-2026-09-27.md:351-354`),
-which this typed class makes visible to hosts. Go's interpreter supports the
-pre-Genesis eras (`go-sdk@2ca481c spv/verify.go:537-560`); our refusal states our
-scope, never that a coin the node can spend is invalid.
-
-### Fixed: internalizeAction's unreachable wire fallbacks and JSON null remittances (#393)
-
-The two notes from #384's review are resolved. The transceiver's
-`payment_remittance required for wallet payment` refusal and its empty
-basket-insertion write have been removed. Its public `internalize_action`
-always calls `validate_internalize_action_args` before encoding; the
-`WalletClient` wire dispatch reaches that same method. No entry bypasses the
-validator. `ProtoWallet`, `WalletClient` and `HttpWalletJson` also validate;
-the processor still refuses internalizeAction as needing a full wallet.
-`payment_remittance_guard_precedes_encoding_and_sending` and
-`insertion_remittance_guard_precedes_encoding_and_sending` cover missing,
-wrong-only and crossed remittances, including a payment key that would fail
-hex decoding if encoding ran. Each asserts the validator's exact refusal
-and zero frames sent.
-
-A JSON `null` remittance used to become `None`, erasing its presence.
-`types/internalize_output.rs` now distinguishes a missing member from null
-while reading, sharing the protocol/presence check with the typed validator.
-The public fields, their types and serialization stay unchanged. A null
-beside the other protocol's remittance is refused with that protocol's
-one-remittance words. A matching null alone reaches the object refusal,
-`The paymentRemittance parameter must be a plain object` or
-`The insertionRemittance parameter must be a plain object`. An absent
-other remittance remains accepted; an absent required one remains refused
-by the typed validator.
-
-`tests/support/internalize_null_remittance_393.mjs` measured the actual
-`ts-stack@edf6e03` SDK bundle under Node v22.18.0 and wrote
-`tests/vectors/internalize_null_remittance_393.json`: 12 cases, 10 refusals
-(code 6), two acceptances. No validator was copied into the script.
-`tests/wallet_internalize_remittance_393.rs` pins all cases in 10 tests:
-the four `a_null_*` tests pin each protocol's crossed-null and lone-null
-reading; `two_null_remittances_are_present_and_refused_for_either_protocol`
-and `a_lone_null_of_the_other_protocol_is_present_and_refused` pin the other
-four null cases; the two `an_undefined_*` tests pin absence, and the two
-`*_guard_precedes_encoding_and_sending` tests pin validation before encoding.
-On a scratch copy of the base, the six null tests fail because JSON null
-was accepted by deserialization; the other four pass. With the transceiver's
-validation call removed on that scratch copy, both guard tests fail too.
-`fuzz_wire_protocol` also reads `InternalizeOutput` JSON; a bounded run
-seeded with the 12 measured outputs completed after 24 seconds with no
-crash, timeout or allocation failure.
-
-### Notes: cross-SDK parity (#393)
-
-The measured null verdicts and words match `validateInternalizeOutput`
-(`validationHelpers.ts:966-984`, remittance object checks at `:914-951`).
-`HTTPWalletJSON.ts:291-303` validates the supplied object before serializing
-it, retaining null's presence; `WalletWireProcessor.ts:1085-1136` constructs
-only the selected remittance from the frame, which has no null encoding.
-Rust rejects null at the serde intake, a deserialization error carrying
-those words, rather than the reference's callable validator's code-6 error.
-The other validation gaps documented with #384 remain outside this change.
-Go at `2ca481c` reads both missing and null remittances as nil pointers
-(`wallet/interfaces.go:422-427`, `wallet/encoding_json.go:384-395`). Its
-writer refuses a nil selected remittance in its own words and ignores the
-other (`wallet/serializer/internalize_action.go:29-44`), so its null reading
-differs from this crate and the reference. The two oversized files shrink:
-`transceiver.rs` 1,643 to 1,636 lines; `types.rs` 1,912 to 1,899. The new
-75-line type/reader file keeps every added function below 60 lines.
-
-A word-order residual: a `null` sitting beside a malformed remittance object, or
-beside an `outputIndex` that is not a `u32`, is refused in serde's words before the
-presence check here, where the reference gives its crossed-remittance words there
-(`validationHelpers.ts:971-977` before `:979`); both sides refuse, only the words
-differ, in the existing typed-reading class.
 
 ### Changed: HMAC tag enums are non-exhaustive before beta.4 (#443)
 
