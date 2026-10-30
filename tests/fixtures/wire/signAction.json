@@ -4,7 +4,8 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "ok": {}
+          "display": "wallet error: Invalid signAction result txid: expected the completed signed transaction",
+          "error": "WalletError(\"Invalid signAction result txid: expected the completed signed transaction\")"
         },
         "processor_observed": null,
         "processor_response_hex": "01307369676e416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
@@ -26,23 +27,8 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "ok": {
-            "sendWithResults": [
-              {
-                "status": "sending",
-                "txid": "3131313131313131313131313131313131313131313131313131313131313131"
-              }
-            ],
-            "tx": [
-              1,
-              0,
-              190,
-              239,
-              0,
-              0
-            ],
-            "txid": "3131313131313131313131313131313131313131313131313131313131313131"
-          }
+          "display": "wallet error: Invalid signAction result tx: expected a complete, exactly framed BEEF transaction",
+          "error": "WalletError(\"Invalid signAction result tx: expected a complete, exactly framed BEEF transaction\")"
         },
         "processor_observed": null,
         "processor_response_hex": "01307369676e416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
