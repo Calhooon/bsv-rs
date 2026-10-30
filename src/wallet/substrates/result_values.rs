@@ -6,32 +6,19 @@ use crate::Error;
 use indexmap::IndexMap;
 use serde_json::value::RawValue;
 
-#[path = "result_values/action_binding.rs"]
 mod action_binding;
-#[path = "result_values/actions.rs"]
 mod actions;
-#[path = "result_values/beef.rs"]
 mod beef;
-#[path = "result_values/boundary.rs"]
 mod boundary;
-#[path = "result_values/bytes.rs"]
 mod bytes;
-#[path = "result_values/certificate.rs"]
 mod certificate;
-#[path = "result_values/certificates.rs"]
 mod certificates;
-#[path = "result_values/identity.rs"]
 mod identity;
-#[path = "result_values/lists.rs"]
 mod lists;
-#[path = "result_values/raw_tree.rs"]
 mod raw_tree;
 #[cfg(feature = "http")]
-#[path = "result_values/review_projection.rs"]
 mod review_projection;
-#[path = "result_values/scalars.rs"]
 mod scalars;
-#[path = "result_values/timestamp.rs"]
 pub(crate) mod timestamp;
 mod wire;
 

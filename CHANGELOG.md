@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: three post-#487 review nits (#502)
+
+- Removed 13 redundant `#[path]` attributes; Rust resolves the same result modules in the same order without them.
+- Shared `boundary::MAX_BYTES` with the wire byte check and request-frame cap, formatting the unchanged refusal from that one numeric definition.
+- Enabled output-script binding in the 64 MiB dhat pin (`fixture(64, true)`): peak 201,331,778 → 335,550,248 bytes; budget 268,436,568 → 402,654,852 bytes (four → six frame lengths) to cover the encoded request buffers; existing exact pins stay exact.
+
 ### Fixed: refuse oversized wallet wire requests before decoding (#505)
 
 `WalletWireProcessor::process_message` now refuses a complete request above

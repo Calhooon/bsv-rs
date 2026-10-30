@@ -13,7 +13,7 @@ This module provides transport substrates for communicating with BSV wallets ove
 | `http_wire.rs` | Binary wire protocol over HTTP; the frame's originator validated, refused when not the configured one, sent raw as `Origin` (#323) | ~243 |
 | `http_json.rs` | JSON API over HTTP; an error body read as its `WalletRefusalClass` by name or code (#137); the constructor's originator sent as `Origin` and `Originator`, a call with none refused, a body over 256 MiB refused (#323); the answer read by `http_json/answer.rs` | ~1078 |
 | `http_json/answer.rs` | The answer's reading (#339): busy/code-5/class/transport errors; a success body checked by `result_values.rs` before serde, then the typed reading with #365's normalized byte fallback | ~99 |
-| `result_values.rs` | Shared result dispatch, borrowed JSON records/arrays and typed wire byte slices (#408, #432, #487); HTTP checks precede typed decoding, wire checks borrow byte fields and scan only metadata | ~220 |
+| `result_values.rs` | Shared result dispatch, borrowed JSON records/arrays and typed wire byte slices (#408, #432, #487); HTTP checks precede typed decoding, wire checks borrow byte fields and scan only metadata | 205 |
 | `result_values/bytes.rs` | Reference byte type/length checks, HMAC exactly 32, signature at most 72; the existing canonical DER checker includes scalar range and permits high S | 123 |
 | `result_values/lists.rs` | List fields, page limits, filters and BEEF commitments in reference order (#432) | 464 |
 | `result_values/certificate.rs` | Signed wallet-certificate structure: base64 identifiers, compressed keys, revocation outpoint, field names/values, canonical DER and encoded size at most 16 MiB; no cryptographic signature verification | ~105 |

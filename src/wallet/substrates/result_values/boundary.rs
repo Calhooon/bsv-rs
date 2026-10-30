@@ -6,9 +6,9 @@ use crate::Error;
 use num_traits::ToPrimitive;
 use serde_json::{value::RawValue, Value};
 
-const MAX_BYTES: usize = 256 * 1024 * 1024;
+pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
 /// The complete outgoing frame's bound, beside the response/byte-field cap.
-const MAX_WIRE_REQUEST_BYTES: usize = 256 * 1024 * 1024;
+const MAX_WIRE_REQUEST_BYTES: usize = MAX_BYTES;
 const MAX_NODES: usize = 1_000_000;
 
 pub(super) fn unsafe_key(key: &str) -> bool {
