@@ -13,18 +13,19 @@ This module provides transport substrates for communicating with BSV wallets ove
 | `http_wire.rs` | Binary wire protocol over HTTP; the frame's originator validated, refused when not the configured one, sent raw as `Origin` (#323) | ~243 |
 | `http_json.rs` | JSON API over HTTP; an error body read as its `WalletRefusalClass` by name or code (#137); the constructor's originator sent as `Origin` and `Originator`, a call with none refused, a body over 256 MiB refused (#323); the answer read by `http_json/answer.rs` | ~1078 |
 | `http_json/answer.rs` | The answer's reading (#339): busy/code-5/class/transport errors; a success body checked by `result_values.rs` before serde, then the typed reading with #365's normalized byte fallback | ~99 |
-| `http_json/result_values.rs` | Shared result dispatch and borrowed JSON records/arrays (#408, #432, #487); HTTP checks precede typed decoding, wire checks consume a JSON view of the decoded answer | ~203 |
-| `http_json/result_values/bytes.rs` | Reference byte type/length checks, HMAC exactly 32, signature at most 72; the existing canonical DER checker includes scalar range and permits high S | ~87 |
-| `http_json/result_values/lists.rs` | List fields, page limits, filters and BEEF commitments in reference order (#432) | ~123 |
-| `http_json/result_values/certificate.rs` | Signed wallet-certificate structure: base64 identifiers, compressed keys, revocation outpoint, field names/values, canonical DER and encoded size at most 16 MiB; no cryptographic signature verification | ~105 |
-| `http_json/byte_fields.rs` | The byte fields of a wallet's JSON body as the reference's `HTTPWalletJSON` reads them (#339, #365; `ts-stack@edf6e03` `HTTPWalletJSON.ts:322-341`): `byte_array` (`normalizeBRC100ByteArray`, an array of bytes or the historical object form `{"0": 1, ..}`, each `isByte`, so `1.0` and `-0` too), `normalize` (`normalizeBRC100WalletByteFields`: the seventeen `walletByteFieldNames` at any depth) and `refusal` (the byte fields `validateWalletResult` reads per call: the action results' `tx` and `signableTransaction.tx`, ciphertext, plaintext, hmac, signature, the linkages' `encryptedLinkage` and `encryptedLinkageProof`, listOutputs' `BEEF`; the first that is no array of bytes `Invalid <call> result <field>: expected an array of bytes`) | ~251 |
+| `result_values.rs` | Shared result dispatch, borrowed JSON records/arrays and typed wire byte slices (#408, #432, #487); HTTP checks precede typed decoding, wire checks borrow byte fields and scan only metadata | ~220 |
+| `result_values/bytes.rs` | Reference byte type/length checks, HMAC exactly 32, signature at most 72; the existing canonical DER checker includes scalar range and permits high S | ~87 |
+| `result_values/lists.rs` | List fields, page limits, filters and BEEF commitments in reference order (#432) | ~123 |
+| `result_values/certificate.rs` | Signed wallet-certificate structure: base64 identifiers, compressed keys, revocation outpoint, field names/values, canonical DER and encoded size at most 16 MiB; no cryptographic signature verification | ~105 |
+| `byte_fields.rs` | The byte fields of a wallet's JSON body as the reference's `HTTPWalletJSON` reads them (#339, #365; `ts-stack@edf6e03` `HTTPWalletJSON.ts:322-341`): `byte_array` (`normalizeBRC100ByteArray`, an array of bytes or the historical object form `{"0": 1, ..}`, each `isByte`, so `1.0` and `-0` too), `normalize` (`normalizeBRC100WalletByteFields`: the seventeen `walletByteFieldNames` at any depth) and `refusal` (the byte fields `validateWalletResult` reads per call: the action results' `tx` and `signableTransaction.tx`, ciphertext, plaintext, hmac, signature, the linkages' `encryptedLinkage` and `encryptedLinkageProof`, listOutputs' `BEEF`; the first that is no array of bytes `Invalid <call> result <field>: expected an array of bytes`) | ~251 |
 | `origin.rs` | The two substrates' shared rules (#323): the reference's `normalizeWalletHttpBaseUrl` and `toOriginHeader`, the client `new` builds (`redirect::Policy::none()`), the redirect refusal | ~195 |
 | `http_json/review_actions.rs` | A wallet's code-5 body read as the reference's `HTTPWalletJSON` reads it (#339; `ts-stack@edf6e03` `HTTPWalletJSON.ts:117-241`): a 400 body with an own `isError`, code 5 and `reviewActionResults`; the envelope, the message, the call, the action-result members through `validateWalletResult`'s action checks under `returnTXIDOnly: true` (`WalletResultValidation.ts:1242-1374`; including the transaction-against-request checks since #432), then the results, each refusal `WalletError` in the reference's words; the five members `Error::WalletReviewActions`; a `tx` or `competingBeef` in the historical object form (`{"0": 1, ..}`) read as its bytes by `byte_fields.rs`'s reader, the success path's too (#365) | ~386 |
 | `http_json/key_requests.rs` | The nine key-related calls' JSON bodies; the seven key-related requests carry `privileged`, `privilegedReason` and `seekPermission` in the reference's names, an absent one omitted (`JsonPermission`, flattened; bsv-rs#193) | ~246 |
-| `http_json/result_values/actions.rs`, `action_binding.rs`, `beef.rs` | #432 action order, request inputs/outputs, conservation and exact BEEF subject parsing | <400 each |
-| `http_json/result_values/lists.rs`, `certificates.rs`, `identity.rs` | #432 list pages and filters, output commitments, certificate proofs and identity search | <450 each |
-| `http_json/result_values/timestamp.rs` | Dependency-free ISO shape/date predicate shared by HTTP, wire client and processor (#487) | ~100 |
-| `http_json/result_values/scalars.rs`, `boundary.rs`, `raw_tree.rs` | #432 scalar words, request/body bounds, a flat JSON container index and raw normalization, graph budgets and unsafe keys | <500 each |
+| `result_values/actions.rs`, `action_binding.rs`, `beef.rs` | #432 action order, request inputs/outputs, conservation and exact BEEF subject parsing | <500 each |
+| `result_values/lists.rs`, `certificates.rs`, `identity.rs` | #432 list pages and filters, output commitments, certificate proofs and identity search | <500 each |
+| `result_values/wire.rs` | Typed byte-slice projections for the nine wire result sites; metadata alone enters the shared JSON predicates (#487) | <300 |
+| `result_values/timestamp.rs` | Dependency-free ISO shape/date predicate shared by HTTP, wire client and processor (#487) | ~100 |
+| `result_values/scalars.rs`, `boundary.rs`, `raw_tree.rs` | #432 scalar words, request/body bounds, a flat JSON container index and raw normalization, graph budgets and unsafe keys | <500 each |
 | `CLAUDE.md` | This documentation | ~260 |
 
 ## Available Substrates
@@ -252,7 +253,7 @@ grouped on a row; their fields and bounds are enumerated below.
 | R32: signableTransaction.reference nonempty canonical base64; :1273/:1443–1448 | Base64 decoder, empty accepted | **Done** (#432): reference order and words; `row_32_signable_reference`. | Already: bytes render as canonical base64. Now: empty reference refused. |
 | R33: createAction requires deferred transaction when signAndProcess=false or any requested input unsigned; otherwise completed txid, no signable result; :1275–1311 | Not checked | **Done** (#432): reference order and words; `row_33_deferred_or_completed`. | Now: deferred/completed outcome bound to inputs/options. |
 | R34: signAction requires completed txid; :1313–1315 | Not checked | **Done** (#432): reference order and words; `row_34_signed_txid_required`. | Now: signAction requires its completed txid. |
-| R35: Request inputBEEF exactly framed; source values recovered by requested outpoints; :297–334/:1243–1246 | Not checked | **Done** (#432): reference order and words; `row_35_request_beef_evidence`. | Now: request BEEF evidence captured once for input bindings (snapshot before send); malformed request evidence refused. |
+| R35: Request inputBEEF exactly framed; source values recovered by requested outpoints; :297–334/:1243–1246 | Not checked | **Done** (#432): reference order and words; `row_35_request_beef_evidence`. | Now: malformed inputBEEF is refused before sending, code 6: `The inputBEEF parameter must be a complete, exactly framed BEEF envelope` (T:162; validationHelpers.ts:775–781); its typed bytes are parsed once for source amounts. |
 | R36: createAction transaction version/lockTime equal request (defaults 1/0); :1061–1070 | Not checked | **Done** (#432): reference order and words; `row_36_version_and_lock_time`. | Now: transaction version/lockTime match request/defaults. |
 | R37: Transaction input sourceTXID hex32, sourceOutputIndex uint32; unique outpoints; :1036–1045/:1072–1080/:1168–1174 | Not parsed on JSON success | **Done** (#432): reference order and words; `row_37_unique_transaction_inputs`. | Now: unique transaction input outpoints; raw transaction types enforce fixed hash/u32. |
 | R38: Each requested input exactly once, unique requested outpoint; sequence default 0xffffffff and optional unlocking script match; :1081–1122 | Not checked | **Done** (#432): reference order and words; `row_38_requested_inputs`. | Now: requested input multiplicity, sequence and script. |
@@ -269,7 +270,7 @@ grouped on a row; their fields and bounds are enumerated below.
 |---|---|---|---|
 | R47: totalActions/totalOutputs/totalCertificates safe integer 0–2^53−1; :1926 | u32 (too narrow), serde words | **Done with residue** (#432): safe-integer bound and reference words before decoding; `row_47_safe_totals_and_u32_residue`. The public `u32` totals still refuse 2^32 through 2^53−1 with serde words; the keeper’s 2026-10-26 ruling keeps all four totals `u32` at every layer. | Already: all four totals remain u32 by ruling; #473 strict unsigned reads. TS values above u32 remain a stated representation difference. |
 | R48: actions/outputs/certificates required array, ≤100,000; each visited item an object; :1927–1928/:1960/:2098/:1870 | Typed Vec/struct; wrong types serde words; positional structs possible | **Done** | Already: typed arrays/entries; #473 and certificate page limits before allocation. |
-| R49: Total at least page length; page ≤request.limit (default 10, limit integer ≤10000); :1929–1936 | Not checked | **Done** (#432): reference order and words; `row_49_page_limits`. | Already: #473 page ≤limit/default and count ≤total. Now: result-binding request limit ≤10000 at listOutputs/listCertificates. |
+| R49: Total at least page length; page ≤request.limit (default 10, limit integer ≤10000); :1929–1936 | Not checked | **Done** (#432): reference order and words; `row_49_page_limits`. | Already: #473 page ≤limit/default and count ≤total. Now: listOutputs/listCertificates refuse an invalid argument limit before sending, code 6: `The limit parameter must be no more than 10000 length.` (T:624/1476, `validateWalletArgs`). |
 | R50: actions[i].txid hex32; satoshis integer −21e14..21e14; status completed/unprocessed/sending/unproven/unsigned/nosend/nonfinal/failed; isOutgoing boolean; :1961–1968 | Typed hex/i64/enum/bool, amount wider | **Done** (#432): reference order and words; `row_50_action_scalars`. | Already: typed action scalars and existing action-satoshi range (#236); listActions is outside nine. |
 | R51: Action/input/output descriptions empty or 5–2000 UTF-8 bytes; :1941–1945/:1969/:2037/:2073 | String only | **Done** (#432): reference order and words; `row_51_history_descriptions`. | Gap outside nine: listActions description bounds are not newly applied. |
 | R52: Action labels optional array, each 1–300 UTF-8 bytes; labels required if includeLabels, match requested any/all filter (default any) when present; :1970–1992 | Typed Option<Vec<String>>, null absent; no bound/binding | **Done** (#432): reference order and words; `row_52_label_filter`. | Already: #473 label count; gap outside nine: label length/presence/query. |
@@ -311,7 +312,7 @@ grouped on a row; their fields and bounds are enumerated below.
 | R85: proveCertificate.keyringForVerifier object, safe 1–50 byte keys and canonical base64 values; :2334/:1455–1474 | Required typed map, serde words | **Done** (#432): reference order and words; `row_85_proof_keyring`. | Now: proof safe unique 1–50-byte keys use reference reader; nonempty base64 values use shared row. Wrong value types inexpressible. |
 | R86: Proof keyring has exactly requested field set (deduplicated); :2335–2350 | Not bound | **Done** (#432): reference order and words; `row_86_revealed_field_set`. | Now: proof keyring exactly matches deduplicated requested fields. |
 | R87: Optional proof certificate checked; optional verifier valid key / matches request ignoring case; :2352–2361 | Typed optional cert/string; null absent | **Done** (#432): reference order and words; `row_87_proof_verifier`. | Already/inexpressible: wire proof returns only keyring, no optional certificate or verifier. |
-| R88: Request snapshots preserve only binding fields; reject malformed request arrays/properties/unsafe keys; :234–508/:1540–1568 | Rust owns typed request across await, but no result-binding snapshot | **Done** (#432): reference order and words; `row_88_request_snapshot`. | Now: own the reference binding fields before await, check request arrays/record keys, preserve map iteration; native types exclude aliases/accessors. |
+| R88: Request snapshots preserve only binding fields; reject malformed request arrays/properties/unsafe keys; :234–508/:1540–1568 | Rust owns typed request across await, but no result-binding snapshot | **Done** (#432): reference order and words; `row_88_request_snapshot`. | Now: capture binding metadata and borrow immutable script slices before await; native types exclude aliases/accessors. Unsafe proveCertificate field keys are refused before sending, code 6: `The fields parameter must be an object with safe string keys` (T:1565). |
 
 Tests: `tests/wallet_http_json_pending_432.rs` has one test for each of the
 71 rows completed or narrowed by #432; the R-numbers above are stable inventory
@@ -356,21 +357,29 @@ exclude sparse arrays, accessors and noncanonical spend indexes.
 
 The nine listed sites in `WalletWireTransceiver.ts` at `edf6e03` are :227,
 :320, :665, :837, :910, :1093, :1438, :1551 and :1618. They invoke the same
-`result_values` implementation through a JSON view of the typed answer and a
-request snapshot made before awaiting. The files remain here; the logical
-module is `wallet::substrates::result_values`, available without `http`.
-HTTP-only body handling, normalization and discovery-search dependencies
+`result_values` implementation with borrowed byte fields and a metadata
+snapshot made before awaiting. The module and its files now live under
+`wallet::substrates::result_values`, available without `http`; `byte_fields.rs`
+is beside it. HTTP body handling, normalization and discovery-search dependencies
 remain feature-gated. No dependency or public type changes.
 
 The wire reader leaves action/output BEEF as bytes. The shared validator
 parses each returned envelope once, reusing its subject/output index for all
-bindings and conservation checks; request inputBEEF is parsed once when
-capturing source values. A JSON serialization and one global snapshot scan
-precede the same scalar/container rows. The original typed value is returned,
-without a serde decode or wire re-encoding. The two linkage rows and their
-ISO predicate, including the processor's calls, now use this implementation.
-The wire's response cap bounds individual byte payloads before this work;
-certificate readers bound the entire certificate, including its prefix.
+bindings and conservation checks; request inputBEEF is parsed once before
+sending. Byte arrays, script slices and the signable reference never go through
+JSON: metadata contains only their presence, while shared predicates read the
+typed slices. The metadata graph scan counts a byte field as one node, as the
+reference does. Result byte counts are checked together; the whole-response
+cap also bounds them. The original typed value is returned unchanged.
+The two linkage rows and their ISO predicate, including processor calls, use
+this implementation. Certificate readers bound the whole certificate.
+
+R35/R49/R88 argument witnesses now call the reference transceiver's actual
+`validateWalletArgs` path (T:162/624/1476/1565); all four are code 6 before a
+request leaves. The 36 row tests remain, plus group 0's 48 accepting frames
+and six matching refusals, two named #183 off-curve certificate refusals,
+and four independent no-transmission tests. Both sides refuse the two #183
+frames in different words; the recorded reference words remain unchanged.
 
 The pin also has discovery sites at :1796/:1842, outside #487's enumerated
 nine. Those and listActions (which has no `validateWalletResult` call at its

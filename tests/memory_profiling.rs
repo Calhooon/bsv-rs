@@ -16,6 +16,10 @@
 #[path = "support/beef_chain.rs"]
 mod beef_chain;
 
+#[cfg(feature = "wallet")]
+#[path = "support/wire_result_cost_487.rs"]
+mod wire_result_cost_487;
+
 use bsv_rs::primitives::bsv::shamir::split_private_key;
 use bsv_rs::primitives::ec::PrivateKey;
 use bsv_rs::primitives::hash;
@@ -33,13 +37,49 @@ fn serial() -> std::sync::MutexGuard<'static, ()> {
     PROFILER.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// #487, following #339: construct the answer before profiling, then bound
+/// the client's peak to four frame copies, including the transport's copy.
+#[cfg(feature = "wallet")]
+#[test]
+fn wire_64_mib_create_action_costs_the_typed_reading_487() {
+    let _serial = serial();
+    let (args, frame) = wire_result_cost_487::fixture(64, false);
+    let budget = 4 * frame.len();
+    let wallet =
+        bsv_rs::wallet::wire::WalletWireTransceiver::new(wire_result_cost_487::Fixed(frame));
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    let _profiler = dhat::Profiler::builder().testing().build();
+    let result = runtime
+        .block_on(wallet.create_action(args, Some("cost.invalid")))
+        .unwrap();
+    assert!(result.tx.as_ref().unwrap().len() > 64 * 1024 * 1024);
+    let peak = dhat::HeapStats::get().max_bytes;
+    println!("#487 64 MiB wire answer: peak {peak} bytes; budget {budget} bytes");
+    assert!(
+        peak < budget,
+        "#487 typed answer peak {peak} exceeds {budget}"
+    );
+}
+
+/// Profiling artifacts belong outside the source tree, including in CI.
+fn heap_profile() -> dhat::Profiler {
+    let path = std::env::var_os("BSV_DHAT_FILE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::env::temp_dir().join(format!("bsv-rs-dhat-{}.json", std::process::id()))
+        });
+    dhat::Profiler::builder().file_name(path).build()
+}
+
 /// Helper to run profiled operations and report stats
 #[allow(dead_code)]
 fn profile_operation<F>(name: &str, iterations: usize, mut op: F)
 where
     F: FnMut(),
 {
-    let _profiler = dhat::Profiler::new_heap();
+    let _profiler = heap_profile();
 
     for _ in 0..iterations {
         op();
@@ -67,7 +107,7 @@ fn test_encryption_allocations() {
     for &size in sizes {
         let plaintext = vec![0u8; size];
 
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..100 {
             let ciphertext = key.encrypt(&plaintext).unwrap();
@@ -95,7 +135,7 @@ fn test_key_derivation_allocations() {
 
     // BRC-42 key derivation
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for i in 0..100 {
             let invoice_id = format!("invoice-{}", i);
@@ -112,7 +152,7 @@ fn test_key_derivation_allocations() {
 
     // ECDH shared secret
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..100 {
             let _ = alice.derive_shared_secret(&bob_pub);
@@ -134,7 +174,7 @@ fn test_shamir_allocations() {
 
     // 3-of-5 split
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..50 {
             let _ = split_private_key(&key, 3, 5);
@@ -150,7 +190,7 @@ fn test_shamir_allocations() {
 
     // 5-of-10 split
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..50 {
             let _ = split_private_key(&key, 5, 10);
@@ -167,7 +207,7 @@ fn test_shamir_allocations() {
     // Recovery
     {
         let shares = split_private_key(&key, 3, 5).unwrap();
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..50 {
             let subset = bsv_rs::primitives::bsv::shamir::KeyShares::new(
@@ -196,7 +236,7 @@ fn test_signing_allocations() {
 
     // Sign
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..100 {
             let _ = key.sign(&msg_hash);
@@ -213,7 +253,7 @@ fn test_signing_allocations() {
     // Verify
     {
         let sig = key.sign(&msg_hash).unwrap();
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..100 {
             let _ = pubkey.verify(&msg_hash, &sig);
@@ -229,7 +269,7 @@ fn test_signing_allocations() {
 
     // Full sign+verify cycle
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..100 {
             let sig = key.sign(&msg_hash).unwrap();
@@ -253,7 +293,7 @@ fn test_hashing_allocations() {
 
     // SHA-256 on 1KB
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..1000 {
             let _ = hash::sha256(&data_1kb);
@@ -268,7 +308,7 @@ fn test_hashing_allocations() {
 
     // SHA-256 on 16KB
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..100 {
             let _ = hash::sha256(&data_16kb);
@@ -283,7 +323,7 @@ fn test_hashing_allocations() {
 
     // Hash160
     {
-        let _profiler = dhat::Profiler::new_heap();
+        let _profiler = heap_profile();
 
         for _ in 0..1000 {
             let _ = hash::hash160(&data_1kb);

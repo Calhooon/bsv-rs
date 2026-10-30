@@ -29,6 +29,39 @@ pub fn cases(call: WalletCall) -> Vec<Case> {
         .collect()
 }
 
+/// Keep an accepting action in the wire corpus when result validation changes.
+/// The minimal request asks for remix change; these writers supply its BEEF.
+pub fn accepting_wire_action(call: WalletCall, mut case: Case) -> Case {
+    if case.name != "minimal" || !matches!(call, WalletCall::CreateAction | WalletCall::SignAction)
+    {
+        return case;
+    }
+    use bsv_rs::script::{LockingScript, UnlockingScript};
+    use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
+    let mut parent = Transaction::new();
+    let mut input = TransactionInput::new("11".repeat(32), 0);
+    input.unlocking_script = Some(UnlockingScript::new());
+    parent.add_input(input).unwrap();
+    parent
+        .add_output(TransactionOutput::new(
+            1,
+            LockingScript::from_binary(&[0x51]).unwrap(),
+        ))
+        .unwrap();
+    parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 800_000));
+    let mut tx = Transaction::new();
+    let mut input = TransactionInput::with_source_transaction(parent, 0);
+    input.unlocking_script = Some(UnlockingScript::new());
+    tx.add_input(input).unwrap();
+    tx.add_output(TransactionOutput::new(
+        0,
+        LockingScript::from_binary(&[0x00, 0x6a]).unwrap(),
+    ))
+    .unwrap();
+    case.result = json!({"txid": tx.id(), "tx": tx.to_atomic_beef(true).unwrap()});
+    case
+}
+
 fn certificate(full: bool) -> Value {
     json!({"type": to_base64(&[0x11; 32]), "serialNumber": to_base64(&[0x22; 32]),
         "subject": PUBLIC_KEY, "certifier": VERIFIER, "revocationOutpoint": format!("{}.1", "33".repeat(32)),

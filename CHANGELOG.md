@@ -142,8 +142,9 @@ certificate checks at :1477–1537/:1800–1916, and the global snapshot at
 violate the named row, with otherwise sufficient framing. The wire bytes
 and returned values of a conforming wallet are unchanged.
 
-The toolbox's result table (every new refusal is an uncoded client
-`Error::WalletError`; a wallet's own error-frame codes are unchanged):
+The toolbox's result table (result refusals are uncoded client
+`Error::WalletError`; R35/R49/R88 argument refusals are code-6
+`InvalidParameter` before sending; a wallet's error-frame codes are unchanged):
 
 | Row / answer constraint | Old verdict | New verdict / recorded words |
 | R03 03 global graph budget | Accepted | Refused: `Invalid listOutputs result object graph: expected a bounded result` |
@@ -154,7 +155,7 @@ The toolbox's result table (every new refusal is an uncoded client
 | R32 32 nonempty reference | Accepted | Refused: `Invalid createAction result signableTransaction.reference: expected 1+ UTF-8 bytes` |
 | R33 33 deferred or completed | Accepted | Refused: `Invalid createAction result signableTransaction: expected the requested deferred-signing transaction` |
 | R34 34 signed txid | Accepted | Refused: `Invalid signAction result txid: expected the completed signed transaction` |
-| R35 35 request source evidence | Accepted | Refused: `Invalid createAction result request.inputBEEF: expected an exactly framed BEEF envelope` |
+| R35 35 request source evidence | Accepted | Client refuses before sending, code 6: `The inputBEEF parameter must be a complete, exactly framed BEEF envelope` |
 | R36 36 requested version lock time | Accepted | Refused: `Invalid createAction result tx.version: expected the requested transaction version` |
 | R37 37 unique inputs | Accepted | Refused: `Invalid createAction result tx.inputs[1]: expected a unique transaction input outpoint` |
 | R38 38 requested inputs | Accepted | Refused: `Invalid createAction result tx.inputs: expected every requested input exactly once` |
@@ -166,7 +167,7 @@ The toolbox's result table (every new refusal is an uncoded client
 | R44 44 submitted batch | Accepted | Refused: `Invalid signAction result sendWithResults[1].txid: expected a unique transaction` |
 | R45 45 transaction evidence | Accepted | Refused: `Invalid createAction result txid: expected present with tx` |
 | R46 46 action outcome | Accepted | Refused: `Invalid createAction result outcome: expected a transaction, signable transaction, or batch-send result` |
-| R49 49 requested page limit | Accepted | Refused: `Invalid listOutputs result limit: expected an integer from 0 to 10000` |
+| R49 49 requested page limit | Accepted | Client refuses before sending (listOutputs and listCertificates), code 6: `The limit parameter must be no more than 10000 length.` |
 | R62 62 output beef | Accepted | Refused: `Invalid listOutputs result BEEF: expected a complete, exactly framed BEEF envelope` |
 | R63 63 requested output beef | Accepted | Refused: `Invalid listOutputs result BEEF: expected the requested complete output transactions` |
 | R64 64 unique outputs | Accepted | Refused: `Invalid listOutputs result outputs[1].outpoint: expected a unique output in the result page` |
@@ -181,17 +182,17 @@ The toolbox's result table (every new refusal is an uncoded client
 | R84 84 partial certificate binding | Accepted | Refused: `Invalid acquireCertificate result certificate.fields: expected the requested certificate fields` |
 | R85 85 proof keyring | Accepted | Refused: `Invalid proveCertificate result keyringForVerifier.name: expected 1+ UTF-8 bytes` |
 | R86 86 revealed fields | Accepted | Refused: `Invalid proveCertificate result keyringForVerifier: expected exactly the requested certificate fields` |
-| R88 88 request snapshot | Accepted | Refused: `Wallet result request records must contain only safe string keys` |
+| R88 88 request snapshot | Accepted | Client refuses before sending, code 6: `The fields parameter must be an object with safe string keys` |
 
-The CLI's result table (the same local error payload; it is not a new wallet
-error code and does not mean the wallet refused before acting):
+The CLI's result table (result refusals occur after the wallet answers; the
+three argument rows above refuse locally before the request reaches it):
 
 | Result facts | Old client behavior | New client behavior |
 | Action R28/R31–46 | Returned decoded action | Refuses invalid BEEF, outcome/evidence coupling, input/output/spend bindings, change/batch membership, source values or conservation |
-| Output R49/R62–68 | Returned decoded page | Refuses overlarge requested limit, malformed/missing BEEF, duplicate outputs, missing metadata, mismatched committed values/scripts or requested tag query |
+| Output R49/R62–68 | Returned decoded page | Refuses an overlarge argument limit before sending; after the answer, refuses malformed/missing BEEF, duplicate outputs, missing metadata, mismatched committed values/scripts or requested tag query |
 | Crypto R14 | Returned arbitrary signature bytes | Refuses >72 bytes or noncanonical DER/scalars; permits high S |
 | Certificate R74–77/R83–86 | Returned decoded certificate/map | Refuses unsigned/out-of-range signatures, oversized whole certificates, wrong certifier/type/partial fields, empty keyring values or incorrect revealed field set |
-| Boundary R03/R04/R88 | Returned decoded answer | Refuses aggregate graph/byte budgets, >256 MiB response frames and malformed binding snapshots |
+| Boundary R03/R04/R88 | Returned decoded answer | Refuses aggregate graph/byte budgets and >256 MiB response frames; unsafe certificate field keys are code 6 before sending |
 | Linkage R15–21 | #406 checks | Identical words and verdicts, shared implementation |
 | Numeric/page rows | #473 checks | Identical reader words; all four totals remain u32 |
 
@@ -200,25 +201,58 @@ before; callers now receive the recorded client error. Fix the wallet's
 answer or handle that error. Validation does not establish broadcast success,
 chain proof, or cryptographic verification of a certificate signature.
 
-The JSON view costs one serialization and snapshot scan per site. Action
-results parse each present BEEF once; listOutputs parses BEEF once and reuses
-its output index; createAction parses request inputBEEF once when capturing
-source values. All other sites do zero BEEF parses. The typed wire reader
-has not already parsed any of these BEEFs, and the original result is returned
-without a second serde decode or wire write. Existing HTTP tests and rows
-stay in place. ISO checks and the processor's linkage/signature checks now
-share these rows as well. No new dependency or public type change.
+Byte fields are checked on the decoded typed answer. BEEF is parsed once,
+hashes are computed over its slices, signatures use their original byte slice,
+and output scripts are compared as bytes. Metadata alone is serialized for
+the shared scalar/container and graph predicates; even request-side
+createAction scripts stay borrowed across the await. The selected BEEF subject
+is moved out of its parsed envelope, without a script clone. The original
+result is returned without decoding it again. The shared module and byte reader
+now live under `substrates/`, beside their two callers. No new dependency or
+public type change.
 
-The full typed / #473 / new census is in `src/wallet/substrates/CLAUDE.md`.
-The pin also validates discovery at :1796/:1842, outside the nine sites
-specified for this issue; those gaps, and rows for calls with no such
-reference return-site validation, remain explicit there. The 36 new-row tests
-in `tests/wallet_wire_result_validation_487.rs` consume #408's recorder mode
-`http_json_result_values_408.mjs --wire-487`. Complete recordings, expanded
-frame SHA-256 identities and RED/green evidence accompany the lane REPORT.
-Request-only R35/R49/R88 witnesses use the reference snapshot/result pipeline
-because argument validation would otherwise mask the result predicate.
-The whole-response and certificate-reader caps keep their reader words.
+`validateWalletArgs` runs before sending in the reference's transceiver at
+:162/:624/:1476/:1565. The corresponding local helpers now reject malformed
+inputBEEF (`validationHelpers.ts:775–781`), list limits above 10000
+(:1202/:1653), and unsafe proof field keys (:87–96/:1476–1480), using the
+existing `InvalidParameter` and typed-byte validation helpers. The action,
+output and certificate processor handlers here remain unimplemented stubs;
+this does not claim a new full argument-validation pass at those handlers.
+
+Release measurements on this machine compare the pre-#487 base `b75c110e`
+and this fold on the same conforming createAction answer, including a matching
+requested output, with `/usr/bin/time -l` for process peak RSS. The checked-in
+64 MiB dhat regression starts after constructing the answer and bounds the
+client peak to four frame lengths (268,436,568 bytes); the fold uses
+about 201.3 MB. The budget follows #339's transport-plus-decoder pattern.
+
+| Payload | Base `b75c110e`: median call / peak RSS | Fold: median call / peak RSS |
+|---|---|---|
+| 16 MiB | 9.3 ms / 228.3 MiB | 25.0 ms / 228.7 MiB |
+| 64 MiB | 105.2 ms / 900.3 MiB | 278.1 ms / 900.7 MiB |
+
+Three alternating runs per tree and size, release `wallet` builds on an Apple M1 Max
+(10 logical CPUs). The machine was busy: one-minute load 16.9–27.0.
+Call time excludes fixture construction; peak RSS includes it. The fold is
+2.68× / 2.64× the base call time at 16 / 64 MiB, with essentially the same RSS.
+
+The full typed / #473 / new census remains in `src/wallet/substrates/CLAUDE.md`.
+Discovery at :1796/:1842 and the request-frame cap at :105 remain outside this
+fold. The 36 original row tests now run with group 0 embedded: all 48 accepting
+frames plus six matching refusals; two off-curve certificate frames are pinned
+separately by name as the already stated #183 difference. Four independent
+argument-side tests prove no request leaves. On an archive of `3593365b`, the
+48 accepting frames and both #183 pins stay green; the argument tests fail in
+old result words or after transmitting, and the 64 MiB memory test exceeds its
+budget. All 43 wire tests and the memory pin pass on the fold. The Rust fixture
+recorder restores accepting createAction and signAction cases using its own
+BEEF and wire writers. The populated createAction serialization test also uses
+a writer-built input BEEF, so it reaches the processor instead of the new
+argument refusal. Varint tests use the accepted value one to locate a field;
+the two client limits' u32 boundary is refused before sending, while their
+raw codecs still write it exactly. The Node 22.18.0 recorder is run twice byte-identically;
+R35/R49/R88 now use the real reference client, without bypassing its argument
+validation. Whole-response and certificate caps keep their reader words.
 
 ### Notes: cross-SDK parity
 

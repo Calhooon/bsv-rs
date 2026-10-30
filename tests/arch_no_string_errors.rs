@@ -18,89 +18,89 @@ const HOMES: &[&str] = &[
 const ALLOWED: &[(&str, &str, usize)] = &[
     // #432: the result decoder's ECMAScript array-index key order.
     (
-        "src/wallet/substrates/http_json/result_values.rs",
+        "src/wallet/substrates/result_values.rs",
         ".filter(|n| *n != u32::MAX && n.to_string() == key);",
         1,
     ),
     // #432: method dispatch, schema-field names, filter modes and canonical
     // JSON index spellings. These predicates never inspect error messages.
     (
-        "src/wallet/substrates/http_json/result_values/actions.rs",
+        "src/wallet/substrates/result_values/actions.rs",
         "if call == \"createAction\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/actions.rs",
+        "src/wallet/substrates/result_values/actions.rs",
         "if call == \"signAction\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/actions.rs",
+        "src/wallet/substrates/result_values/actions.rs",
         "if call == \"signAction\" && result.contains_key(\"noSendChange\") {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/boundary.rs",
+        "src/wallet/substrates/result_values/boundary.rs",
         "if call == \"createAction\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/raw_tree.rs",
+        "src/wallet/substrates/result_values/raw_tree.rs",
         "key == &i.to_string() && matches!(value, Member::Scalar(text) if is_byte(text))",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "src/wallet/substrates/result_values/certificates.rs",
         "if call == \"listCertificates\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "src/wallet/substrates/result_values/certificates.rs",
         "if key == \"certifier\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "src/wallet/substrates/result_values/certificates.rs",
         "if call == \"discoverByIdentityKey\"",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/certificates.rs",
+        "src/wallet/substrates/result_values/certificates.rs",
         "if call == \"discoverByAttributes\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/identity.rs",
+        "src/wallet/substrates/result_values/identity.rs",
         "Some(actual) if key == \"userName\" => *actual == normalized,",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/lists.rs",
+        "src/wallet/substrates/result_values/lists.rs",
         "if !outputs.is_empty() && request[\"include\"] == \"entire transactions\" && beef.is_none() {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/lists.rs",
+        "src/wallet/substrates/result_values/lists.rs",
         "if request[\"include\"] == \"locking scripts\" && locking.is_none() {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/lists.rs",
+        "src/wallet/substrates/result_values/lists.rs",
         "let matches = if request[mode] == \"all\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/scalars.rs",
+        "src/wallet/substrates/result_values/scalars.rs",
         "if call == \"revealCounterpartyKeyLinkage\" {",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/scalars.rs",
+        "src/wallet/substrates/result_values/scalars.rs",
         "(_, Some(\"self\" | \"anyone\")) if call == \"revealSpecificKeyLinkage\" => None,",
         1,
     ),
     (
-        "src/wallet/substrates/http_json/result_values/scalars.rs",
+        "src/wallet/substrates/result_values/scalars.rs",
         "if call == \"revealSpecificKeyLinkage\" {",
         1,
     ),

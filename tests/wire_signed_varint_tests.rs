@@ -19,6 +19,8 @@
 //! (`util/reader.go:210-222`). The processor reads no argument of createAction
 //! or of the list calls (its handlers refuse before reading), so those fields
 //! have a writer here and no reader.
+//! The listOutputs/listCertificates clients enforce 1..=10000 before sending
+//! (#487); their codecs' u32 bound is tested directly alongside that refusal.
 
 #![cfg(feature = "wallet")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -196,12 +198,13 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
 }
 
 /// The bytes `field` takes for `value`: the field sits where the absent frame
-/// and the `Some(0)` frame part, and everything around it is the absent
+/// and the `Some(1)` frame part, and everything around it is the absent
 /// frame's, nine `0xFF` replaced.
 async fn bytes_of(field: Field, value: Option<i64>) -> Vec<u8> {
     let absent = frame(field, None).await.unwrap();
-    let zero = frame(field, Some(0)).await.unwrap();
-    let at = absent.iter().zip(&zero).position(|(a, z)| a != z).unwrap();
+    // One is valid for the client-side list limits too (#487).
+    let one = frame(field, Some(1)).await.unwrap();
+    let at = absent.iter().zip(&one).position(|(a, z)| a != z).unwrap();
     assert_eq!(
         absent[at..at + 9],
         ABSENT,
@@ -240,6 +243,21 @@ async fn a_present_ten_leaves_as_the_reference_byte_0x0a_at_every_field() {
 async fn a_u32_field_at_its_bound_leaves_as_the_plain_five_byte_varint() {
     for field in U32_FIELDS {
         let bound = Some(i64::from(u32::MAX));
+        if matches!(field, ListOutputsLimit | ListCertificatesLimit) {
+            // The codec still writes u32::MAX; these two client arguments
+            // are capped before transmission (T:624/1476, #487).
+            assert_eq!(
+                frame(field, bound).await,
+                Err(Error::WalletRefusal {
+                    class: bsv_rs::WalletRefusalClass::InvalidParameter,
+                    message: "The limit parameter must be no more than 10000 length.".into(),
+                })
+            );
+            let mut writer = WireWriter::new();
+            writer.write_optional_var_int(Some(u64::from(u32::MAX)));
+            assert_eq!(writer.into_bytes(), U32_MAX);
+            continue;
+        }
         assert_eq!(bytes_of(field, bound).await, U32_MAX, "{field:?}");
     }
 }
