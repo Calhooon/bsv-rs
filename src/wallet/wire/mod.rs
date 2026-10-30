@@ -72,6 +72,7 @@
 //! let result = wallet.get_public_key(args, Some("example.com")).await?;
 //! ```
 
+mod bounds;
 mod calls;
 #[cfg(feature = "tracing")]
 mod diagnostics;
@@ -229,18 +230,18 @@ impl WireReader<'_> {
     /// A count, then `#requireResponseCollectionLength` (`:1955-1969`) with a
     /// byte per item.
     pub(crate) fn read_collection_count(&mut self, name: &str) -> Result<usize, Error> {
-        let count = self.read_var_int_num_strict()?;
-        if count > MAX_WIRE_RESPONSE_COLLECTION_ITEMS {
+        let count = self.read_var_int_num_strict_u64()?;
+        if count > MAX_WIRE_RESPONSE_COLLECTION_ITEMS as u64 {
             return Err(refused(format!(
                 "Wallet Wire {name} exceeds the maximum collection size of {MAX_WIRE_RESPONSE_COLLECTION_ITEMS}"
             )));
         }
-        if count > self.remaining() {
+        if count > self.remaining() as u64 {
             return Err(refused(format!(
                 "Wallet Wire {name} count exceeds the remaining response data"
             )));
         }
-        Ok(count)
+        Ok(count as usize) // At most 100000, also representable on wasm32.
     }
 
     /// `#readBooleanFlag` (`:1971-1977`).

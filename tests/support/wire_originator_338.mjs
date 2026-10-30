@@ -58,6 +58,14 @@ async function transceiverCase({ WalletWireTransceiver, WalletWireProcessor, Uti
   return { name, originator, frames, observed, thrown }
 }
 
+if (process.argv[2] === '--bounds-473') {
+  const { pathToFileURL } = await import('node:url')
+  const { writeFileSync } = await import('node:fs')
+  const { recordBounds473 } = await import('./wire_bounds_473.mjs')
+  const sdk = await import(pathToFileURL(process.argv[3]).href)
+  writeFileSync(process.argv[4], JSON.stringify(await recordBounds473(sdk), null, 2) + '\n')
+}
+
 export async function recordOriginators(sdk) {
   const processor = []
   const transceiver = []

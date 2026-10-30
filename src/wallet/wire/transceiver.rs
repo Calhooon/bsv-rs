@@ -408,7 +408,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .await?;
 
         let mut reader = WireReader::new(&response);
-        reader.read_var_int()
+        reader.read_height_result()
     }
 
     /// Gets the network the wallet is connected to.
@@ -604,7 +604,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         };
 
         // Parse no_send_change (Go uses VarInt(MaxUint64) for nil)
-        let no_send_change_len = reader.read_optional_count()?;
+        let no_send_change_len =
+            reader.read_response_count("createAction noSendChange", 100_000, 33)?;
         let no_send_change = if no_send_change_len != u64::MAX {
             let mut outpoints = Vec::with_capacity(bounded_capacity(
                 no_send_change_len as usize,
@@ -783,21 +784,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let total_actions = reader.read_var_int_u32("listActions totalActions")?;
-        let mut actions = Vec::with_capacity(bounded_capacity(
-            total_actions as usize,
-            reader.remaining(),
-            1,
-        ));
-
-        for _ in 0..total_actions {
-            actions.push(reader.read_wallet_action()?);
-        }
-
-        Ok(ListActionsResult {
-            total_actions,
-            actions,
-        })
+        reader.read_actions_page(args.limit)
     }
 
     /// Internalizes an external transaction.
@@ -911,29 +898,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let total_outputs = reader.read_var_int_u32("listOutputs totalOutputs")?;
-        // Go uses VarInt(MaxUint64) for nil BEEF, VarInt(len) for present
-        let beef_len = reader.read_var_int()?;
-        let beef = if beef_len == u64::MAX {
-            None
-        } else {
-            Some(reader.read_bytes(reader.wire_length(beef_len)?)?.to_vec())
-        };
-
-        let mut outputs = Vec::with_capacity(bounded_capacity(
-            total_outputs as usize,
-            reader.remaining(),
-            1,
-        ));
-        for _ in 0..total_outputs {
-            outputs.push(reader.read_wallet_output()?);
-        }
-
-        Ok(ListOutputsResult {
-            total_outputs,
-            beef,
-            outputs,
-        })
+        reader.read_outputs_page(args.limit)
     }
 
     /// Relinquishes an output from a basket.
@@ -1232,12 +1197,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let num_fields = reader.read_var_int_num_strict_u64()?;
-        let mut keyring_for_verifier = indexmap::IndexMap::with_capacity(bounded_capacity(
-            usize::try_from(num_fields).unwrap_or(usize::MAX),
-            reader.remaining(),
-            1,
-        ));
+        let num_fields = reader.read_collection_count("proveCertificate keyring")?;
+        let mut keyring_for_verifier =
+            indexmap::IndexMap::with_capacity(bounded_capacity(num_fields, reader.remaining(), 1));
         for _ in 0..num_fields {
             let key = reader.read_string()?;
             let value_len = reader.read_length()?;
