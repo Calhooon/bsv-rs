@@ -84,16 +84,16 @@ impl std::fmt::Display for MessageType {
 /// `requestedCertificates` object (ts-stack@edf6e03 `Peer.ts:453,1068`):
 /// insertion order and extra properties survive, whitespace and redundant
 /// escapes do not (#426). A certificateResponse signs its `certificates`
-/// text as transmitted (#280).
+/// parsed array in the same way (#400).
 ///
 /// [`certificates_text`](Self::certificates_text) and
 /// [`requested_certificates_text`](Self::requested_certificates_text) retain
 /// the JSON received, or the compact text built by the corresponding setter.
 /// The serializer writes a carried text while it reads back to the typed
-/// member; a member changed since is serialized afresh. Request signing
-/// re-serializes the complete retained object with JavaScript's string,
-/// number and property-order rules, rather than dropping extra properties
-/// through the typed set. Response signing keeps the retained bytes.
+/// member; a member changed since is serialized afresh. Certificate signing
+/// re-serializes the complete retained member with JavaScript's string,
+/// number and property-order rules. Requests retain extra properties; responses
+/// restore the certificate class layout, including decryptedFields (#400).
 /// The serde representation is JSON's (`serde_json` raw values).
 #[derive(Debug, Clone)]
 pub struct AuthMessage {
@@ -128,7 +128,7 @@ pub struct AuthMessage {
     pub signature: Option<Vec<u8>>,
 
     /// The `certificates` member's JSON text: as received, or as this
-    /// crate sends it. The certificateResponse signature covers its bytes.
+    /// crate sends it. The signature covers its parsed JSON.stringify form.
     pub certificates_text: Option<Box<RawValue>>,
 
     /// The `requestedCertificates` member's JSON text: as received, or as
@@ -173,7 +173,7 @@ impl AuthMessage {
         self.requested_certificates = Some(requested);
     }
 
-    /// The `certificates` text this message sends and signs: the carried
+    /// The `certificates` text this message sends: the carried
     /// text while it reads back to `certificates`, `None` otherwise.
     fn current_certificates_text(&self) -> Option<&RawValue> {
         current_text(
@@ -198,7 +198,7 @@ impl AuthMessage {
     /// - InitialResponse: yourNonce || initialNonce (initiator's nonce || responder's session nonce, decoded from base64)
     /// - General: the payload
     /// - CertificateRequest: JSON.stringify of the parsed `requestedCertificates`
-    /// - CertificateResponse: the `certificates` JSON text as transmitted
+    /// - CertificateResponse: JSON.stringify of the parsed `certificates`
     pub fn signing_data(&self) -> Vec<u8> {
         match self.message_type {
             MessageType::InitialResponse => {
@@ -233,13 +233,19 @@ impl AuthMessage {
                 }
             }
             MessageType::CertificateResponse => {
-                // The certificates text as transmitted (Peer.ts:1140, :1203)
+                // Peer.ts:1140, :1203 re-stringifies the parsed array (#400).
+                // The fallback serializes Vec<VerifiableCertificate> directly:
+                // declaration-order properties and IndexMap fields/keyring,
+                // never an intermediate sorted serde_json::Value.
                 match self.current_certificates_text() {
-                    Some(text) => text.get().as_bytes().to_vec(),
+                    Some(text) => super::requested_certificates_json::stringify_certificates(text),
                     None => self
                         .certificates
                         .as_ref()
-                        .and_then(|certs| serde_json::to_vec(certs).ok())
+                        .and_then(|certificates| serde_json::value::to_raw_value(certificates).ok())
+                        .map(|text| {
+                            super::requested_certificates_json::stringify_certificates(&text)
+                        })
                         .unwrap_or_default(),
                 }
             }

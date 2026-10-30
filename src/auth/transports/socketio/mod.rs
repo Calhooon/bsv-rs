@@ -146,7 +146,7 @@ pub trait SocketIoSink: Send + Sync {
     /// without the leading `4`) as the text given. [`SocketIoTransport`]
     /// sends every `authMessage` EVENT through this method, since a
     /// certificateRequest's and a certificateResponse's signatures cover
-    /// their JSON text as transmitted (#280). The default decodes the
+    /// their parsed JSON text (#280, #400). The default decodes the
     /// packet and forwards it to [`SocketIoSink::send_socketio`], whose
     /// `serde_json::Value` arguments sort object keys: override it to
     /// write the text (`EngineIoPacket::Message(packet.to_string())`) and
