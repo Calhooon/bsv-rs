@@ -3,6 +3,10 @@
 export async function recordLocalParserWords489 (c) {
   const { recording, fresh, record, stop, sourceOf, LocalKVStore, Script,
     PublicKey, PushDrop, Utils } = c
+  const gx = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+  const gy = '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
+  const hybrid = '06' + gx + gy
+  const reducedX = '02' + ((1n << 256n) - (1n << 32n) - 977n + 1n).toString(16)
   const definitions = [
     { name: 'key_non_hex', kind: 'invalid_hex', publicKey: 'zz' },
     { name: 'key_non_hex_odd', kind: 'invalid_hex', publicKey: 'not-hex' },
@@ -21,7 +25,17 @@ export async function recordLocalParserWords489 (c) {
     { name: 'token_not_pushdrop', kind: 'token', asm: 'OP_TRUE' },
     { name: 'token_empty', kind: 'token', empty: true },
     { name: 'token_no_checksig', kind: 'token', noChecksig: true },
-    { name: 'token_key_only', kind: 'token', keyOnly: true }
+    { name: 'token_key_only', kind: 'token', keyOnly: true },
+    { name: 'key_odd_valid', kind: 'key_odd_valid', publicKey: '2' + gx, divergence: true },
+    { name: 'key_hybrid_valid', kind: 'key_hybrid_valid', publicKey: hybrid, divergence: true },
+    { name: 'key_odd_hybrid_valid', kind: 'key_odd_hybrid_valid', publicKey: hybrid.slice(1), divergence: true },
+    { name: 'key_reduced_x', kind: 'key_reduced_x', publicKey: reducedX, divergence: true },
+    { name: 'token_hybrid_valid', kind: 'token_hybrid_valid', keyBytes: Utils.toArray(hybrid, 'hex'), divergence: true },
+    { name: 'token_reduced_x', kind: 'token_reduced_x', keyBytes: Utils.toArray(reducedX, 'hex'), divergence: true },
+    { name: 'token_lock_after_one_field', kind: 'token_lock_after_one_field',
+      asm: `OP_1 OP_DROP 02${gx} OP_CHECKSIG`, divergence: true },
+    { name: 'token_lock_after_two_fields', kind: 'token_lock_after_two_fields',
+      asm: `OP_1 OP_2 OP_2DROP 02${gx} OP_CHECKSIG`, divergence: true }
   ]
   const cases = []
   for (const definition of definitions) {
@@ -63,6 +77,7 @@ export async function recordLocalParserWords489 (c) {
         public_key: definition.publicKey ?? null,
         locking_script: script.toHex(), source_beef: Utils.toHex(source.toBEEF()),
         parser_error: parserError,
+        ...(definition.divergence ? { parser_accepted: parserError === null } : {}),
         error: await stop(() => operation === 'get'
           ? store.get('alpha') : store.set('alpha', 'two')) })
     }

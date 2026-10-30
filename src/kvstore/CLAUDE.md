@@ -25,8 +25,8 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
-| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches use the reference words (#489) | 305 |
-| `local_parser_words.rs` | Maps local hex/key/PushDrop failures by variant and input shape to the reference's messages; primitives and wallet-supplied errors retain their own text (#489) | 84 |
+| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches and the stated lock-after difference (#489) | 308 |
+| `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489) | 103 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478) | 46 |
 | `local_outpoint.rs` | Exactly one validated completed output with the requested amount and new script; reference refusal words; amount option is this crate's addition (#478) | 24 |
 | `local_outpoint_tests.rs` | Recorded one-satoshi search: nonzero index, no match and two matches (#478) | 28 |
@@ -694,14 +694,23 @@ differences are stated in the #477 changelog parity note.
 
 Since #489, the local hex/public-key and PushDrop parser catches select the
 reference's `Invalid hex string`, `Unknown point format`, `Invalid point`,
-hybrid-key parity and token-decode messages by variant and input shape, without matching error
-text or changing the primitives' own diagnostics. The reference is
+hybrid-key parity and token-decode messages by variant, input shape and
+reference point acceptance, without matching error text or changing acceptance
+or the primitives' own diagnostics. The reference is
 `LocalKVStore.ts:239-246,278-282,340-345`, `PublicKey.ts:49-51`,
-`Point.ts:303-325,345-347,365-372`, `hex.ts:6-15`,
+`Point.ts:303-325,345-347,365-384`, `hex.ts:6-15,28-30`,
 `PushDrop.ts:73-77,96-115` and `PushDropValidation.ts:54-74` at edf6e03.
-`kvstore_local_parser_words_489.rs` compares the full wrapper for 36 recorded
-get/set cases in five tests, all RED on base `bcea54a1`, then green; the
-extended #326 mode writes the vectors twice byte-identically under Node 22.
+The key parse is `:246`, not `:248`. `kvstore_local_parser_words_489.rs`
+compares the full wrapper for 52 recorded get/set cases in 13 tests. The
+original five tests were RED on `bcea54a1`; six new accepted-key/token tests
+are RED on `9bcbe433`, while the two lock-after pins are green there. All
+13 pass after the fold; the extended #326 mode writes the vectors twice
+byte-identically under Node 22, preserving the original 36 cases.
+The stated #489 parity differences are also in the root and changelog:
+odd-length, on-curve hybrid and reduced-x keys accepted by the reference
+remain refused here in the native parser's own words, while lock-after
+tokens reach later field-count/envelope checks here and fail the reference's
+lock-before key read. The fold changes neither acceptance rule.
 An error injected by the wallet still uses #477's original extraction rule.
 The BEEF/transaction diagnostic differences in its parity note remain.
 

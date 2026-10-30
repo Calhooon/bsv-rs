@@ -6,7 +6,10 @@ mod identity_reveal_wallet;
 
 use bsv_rs::kvstore::{KVStoreConfig, LocalKVStore};
 use bsv_rs::primitives::{from_hex, PublicKey};
-use bsv_rs::script::{templates::PushDrop, LockingScript};
+use bsv_rs::script::{
+    templates::{LockPosition, PushDrop},
+    LockingScript,
+};
 use bsv_rs::transaction::Transaction;
 use bsv_rs::wallet::*;
 use bsv_rs::{Error, Result};
@@ -117,17 +120,88 @@ async fn assert_cases(kind: &str, count: usize) {
         "each corruption recorded for get and set"
     );
     for case in cases {
-        let store =
-            LocalKVStore::new(wallet(case), KVStoreConfig::default().with_encrypt(false)).unwrap();
-        let actual = match case["operation"].as_str().unwrap() {
-            "get" => store.get("alpha", "missing").await.map(|_| ()),
-            "set" => store.set("alpha", "two", None).await.map(|_| ()),
-            operation => panic!("unrecorded operation {operation}"),
-        }
-        .unwrap_err();
+        let actual = local_failure(case).await;
         let expected = case["error"].as_str().unwrap();
         assert_eq!(actual.to_string(), expected, "{}", case["name"]);
         assert_eq!(actual, Error::KvStoreLocalError(expected.into()));
+    }
+}
+
+async fn local_failure(case: &Value) -> Error {
+    let store =
+        LocalKVStore::new(wallet(case), KVStoreConfig::default().with_encrypt(false)).unwrap();
+    match case["operation"].as_str().unwrap() {
+        "get" => store.get("alpha", "missing").await.map(|_| ()),
+        "set" => store.set("alpha", "two", None).await.map(|_| ()),
+        operation => panic!("unrecorded operation {operation}"),
+    }
+    .unwrap_err()
+}
+
+fn divergence_cases(kind: &str) -> Vec<Value> {
+    let recorded: Value =
+        serde_json::from_str(include_str!("vectors/kvstore_local_454.json")).unwrap();
+    let cases: Vec<_> = recorded["parser_words_489"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| case["kind"] == kind)
+        .cloned()
+        .collect();
+    assert_eq!(cases.len(), 2, "each divergence recorded for get and set");
+    cases
+}
+
+fn wrapped(message: &str) -> String {
+    format!("Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: {message}")
+}
+
+async fn assert_stricter_key(kind: &str, native: Error) {
+    for case in divergence_cases(kind) {
+        assert_eq!(case["parser_accepted"], true, "reference accepts this key");
+        assert!(case["parser_error"].is_null());
+        let (actual_native, reference_later_check) = match case["public_key"].as_str() {
+            Some(key) => (
+                PublicKey::from_hex(key).unwrap_err(),
+                "KVStore token locking key does not belong to the wallet",
+            ),
+            None => (
+                PushDrop::decode(
+                    &LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap(),
+                )
+                .unwrap_err(),
+                "PushDrop token must use the canonical PushDrop envelope",
+            ),
+        };
+        assert_eq!(actual_native, native, "standalone parser still refuses");
+        assert_eq!(case["error"], wrapped(reference_later_check));
+        assert_eq!(
+            local_failure(&case).await,
+            Error::KvStoreLocalError(wrapped(&native.to_string())),
+            "{} {}: use native words when the reference parser accepts",
+            case["name"],
+            case["operation"]
+        );
+    }
+}
+
+async fn assert_lock_after(kind: &str, fields: usize, local_message: &str) {
+    for case in divergence_cases(kind) {
+        let reference_message = "script.chunks[0].data must have value";
+        assert_eq!(
+            case["parser_accepted"], false,
+            "reference decodes lock-before"
+        );
+        assert_eq!(case["parser_error"], reference_message);
+        assert_eq!(case["error"], wrapped(reference_message));
+        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+        let decoded = PushDrop::decode(&script).unwrap();
+        assert_eq!(decoded.lock_position, LockPosition::After);
+        assert_eq!(decoded.fields.len(), fields);
+        assert_eq!(
+            local_failure(&case).await,
+            Error::KvStoreLocalError(wrapped(local_message))
+        );
     }
 }
 
@@ -166,4 +240,82 @@ async fn non_pushdrop_token_uses_reference_words_489() {
         Error::ScriptParseError("Script too short for PushDrop".into())
     );
     assert_cases("token", 8).await;
+}
+
+#[tokio::test]
+async fn reference_accepts_odd_valid_key_but_local_keeps_native_words_489() {
+    assert_stricter_key(
+        "key_odd_valid",
+        Error::InvalidHex("Odd number of digits".into()),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reference_accepts_hybrid_key_but_local_keeps_native_words_489() {
+    assert_stricter_key(
+        "key_hybrid_valid",
+        Error::InvalidPublicKey(
+            "Invalid public key encoding: elliptic curve point encoding error".into(),
+        ),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reference_accepts_odd_hybrid_key_but_local_keeps_native_words_489() {
+    assert_stricter_key(
+        "key_odd_hybrid_valid",
+        Error::InvalidHex("Odd number of digits".into()),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reference_accepts_reduced_x_key_but_local_keeps_native_words_489() {
+    assert_stricter_key(
+        "key_reduced_x",
+        Error::InvalidPublicKey("Point not on curve".into()),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reference_decodes_hybrid_token_but_local_keeps_native_words_489() {
+    assert_stricter_key(
+        "token_hybrid_valid",
+        Error::InvalidPublicKey(
+            "Invalid public key encoding: elliptic curve point encoding error".into(),
+        ),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reference_decodes_reduced_x_token_but_local_keeps_native_words_489() {
+    assert_stricter_key(
+        "token_reduced_x",
+        Error::InvalidPublicKey("Point not on curve".into()),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn lock_after_one_field_reaches_local_field_count_not_reference_decode_489() {
+    assert_lock_after(
+        "token_lock_after_one_field",
+        1,
+        "Unexpected PushDrop token field count",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn lock_after_two_fields_reaches_local_envelope_not_reference_decode_489() {
+    assert_lock_after(
+        "token_lock_after_two_fields",
+        2,
+        "PushDrop token must use the canonical PushDrop envelope",
+    )
+    .await;
 }
