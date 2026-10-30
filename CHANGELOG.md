@@ -36,7 +36,7 @@ The reference at `ts-stack@edf6e03` loops at `LocalKVStore.ts:574-590` when the
 wallet answers `{ totalOutputs: 7, outputs: [] }`. This crate ends that loop by
 the keeper's word (00:1xZ on #479): a caller's cost is bounded by the caller,
 never by the answer. Under Node 22.18.0 the unmodified reference remained
-pending through a one-second worker timeout, repeatedly asking for offset zero.
+pending through a one-second worker timeout, repeating the same request with no offset.
 This is a stated divergence; the witness is prepared for the captain to file
 in the reference tracker under the owner's name.
 
