@@ -194,6 +194,51 @@ The single-test control with the same delay and `--test-threads=1` passes at
 17,004 bytes at every depth, without a timeout warning.
 Five unforced runs of the pin with `--test-threads=1` also pass at 17,004
 bytes at all three depths.
+### Added: a default-mode fuzz target for the script interpreter (#398)
+
+`fuzz_script_spend` picks a node word from its first byte, so every input ran
+under `ScriptFlags::block` or `standard` and the default mode (no `set_flags`,
+the TypeScript reference's verdicts) was never fuzzed: over its 678 seeds the
+word target makes 681 evaluations, 0 of them in the default mode, on the base
+`faa2c97e` and on this tip. `fuzz_script_spend_default`, a sibling `[[bin]]`,
+evaluates `Spend` without a word under the same work budget, counting allocator
+and bounds, now one module both targets include (`fuzz/fuzz_targets/spend/`):
+687 default-mode evaluations over its seeds. A sibling and not a first-byte
+value of the word target: the word target's corpus keeps every entry's meaning,
+and the default mode has its own hour in the nightly rather than a share of
+the word target's.
+
+The input is the word target's layout (byte 0's bit 2 the version, bytes 1-2
+the unlocking length), so its seeds are the word target's 678, copied, and six
+written for the verdicts the mode was missing, each reaching the reference's
+refusal: `OP_LSHIFTNUM` and `OP_RSHIFTNUM` by 2^31 (`shift count exceeds
+INT_MAX.`, #383), a 9-byte `OP_LEFT` length read in two's complement
+(`OP_LEFT length (-2) must be in range [0, 3]`) and an `OP_NUM2BIN` size of
+2^31 (`OP_NUM2BIN size exceeds the node int32 push limit.`, #382), and
+`1 <536,870,888> OP_LSHIFTNUM` and a 67,108,863-byte operand read by
+`OP_1ADD` (`Invalid string length`, #331). Bit 3 of byte 0 selects a budget
+of 128 MiB instead of 1 MiB: under 1 MiB the two #331 inputs are the budget's
+declines (`Script element allocation has exceeded 1048576 bytes`), never the
+read figure's verdict; 128 MiB holds one operand past the figure (V8's
+`BigInt` cap, 2^30 bits, stays a decline here). Every copied seed has bit 3
+clear. Measured on an 8 MiB squaring chain under the 128 MiB budget
+(`0x7fffffff` and 21 `OP_DUP OP_MUL`), a build without a sanitizer peaks at a
+resident set of 133 MB and `cargo fuzz`'s default AddressSanitizer build at
+2,247 MB, where libFuzzer stops it as `out-of-memory (used: 2067Mb; limit:
+2048Mb)` (3,394 MB with the limit off): the resident set is the sanitizer's
+shadow and quarantine, not the interpreter's, and an `oom` artifact of that
+accounting would hide a real one. So the nightly builds and runs this one
+target with `-s none` (a matrix `sanitizer`, every other target keeping
+AddressSanitizer): its subject is the interpreter's budget arithmetic and
+refusals, panics and aborts libFuzzer catches without a sanitizer. A raised
+`-rss_limit_mb` would mask the next real excess as well.
+
+The nightly's fuzz matrix runs the new target (`.github/workflows/nightly.yml`),
+and `tests/arch_fuzz_targets_dispatched.rs` pins the matrix to
+`fuzz/Cargo.toml`'s `[[bin]]`s both ways, every target to a seed corpus, and
+this target's `sanitizer: none` with the build and run commands' `-s`.
+On the tip, 90 seconds each from the seed corpus: `fuzz_script_spend` 1,398
+executions, `fuzz_script_spend_default` 4,014, no crash. No public change.
 
 ### Fixed: local KVStore parser words inside Original error (#489)
 

@@ -127,3 +127,9 @@ name = "fuzz_shamir_backup"
 path = "fuzz_targets/fuzz_shamir_backup.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_script_spend_default"
+path = "fuzz_targets/fuzz_script_spend_default.rs"
+test = false
+doc = false
