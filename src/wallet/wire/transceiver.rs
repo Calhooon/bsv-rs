@@ -126,6 +126,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Write parameters
         writer.write_bytes(params);
 
+        // Refuse the complete frame before even allocating the transport future.
+        super::result_validation::request_length(writer.as_bytes().len())?;
+
         // Transmit
         let response = self.wire.transmit_to_wallet(writer.as_bytes()).await?;
         super::result_validation::response_length(response.len())?;

@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: refuse oversized wallet wire requests before transmission (#496)
+
+`WalletWireTransceiver` now refuses a complete request frame above 256 MiB
+(268,435,456 bytes) after building the frame and before calling the transport,
+including before allocating its future. The named request bound sits beside
+the existing response cap. The refusal is
+`Error::WalletError("Wallet Wire request exceeds the maximum permitted size")`,
+without an SDK code, as for the client-side refusals in #473 and #487. A frame
+exactly at the cap is sent; argument validation, originator normalization,
+serialization and all behavior at or below the cap are unchanged.
+
+The deciding reference is `ts-stack@edf6e03`:
+`WalletWire.ts:9` defines `MAX_WALLET_WIRE_FRAME_BYTES = 256 * 1024 * 1024`;
+`WalletWireTransceiver.ts:95-104` normalizes the originator and builds the frame,
+`:104-107` throws `Error('Wallet Wire request exceeds the maximum permitted size')`,
+then `:108-133` sends and bounds the response. The call's argument validation
+already ran (`:938` for encrypt, before its parameter writer). This follows
+the owner's ruling (c) of 2026-10-26: the reference's own behavior.
+
+The toolbox's and CLI's tables change as follows:
+
+| Consumer | Request | Before | Now |
+|---|---|---|---|
+| Toolbox error table | Complete frame above 268,435,456 bytes | Sent to the transport; no client frame-size refusal | `WalletError`, no SDK code: `Wallet Wire request exceeds the maximum permitted size` |
+| CLI operator-visible table | Complete frame above 268,435,456 bytes | Sent to the transport; any later transport or wallet outcome | Local failure before sending: `wallet error: Wallet Wire request exceeds the maximum permitted size` |
+| Both | Complete frame at or below 268,435,456 bytes | Sent | Sent, with unchanged bytes and response handling |
+
+`tests/wallet_wire_request_frame_cap_496.rs` pins two boundaries through a
+counting stub wallet: cap + 1 refuses with zero transport and wallet calls;
+cap sends once, reaches the wallet once and returns its answer. On the base,
+the first sent and reached the wallet; the second already passed. The #487
+recorder's `--request-frame-cap-496` mode writes both frame recipes and hashes
+under Node 22.18.0; two runs are byte-identical. The at-cap bytes are captured
+from the reference's compact transport. Its transceiver cannot emit an
+oversized frame, so that candidate is built by the SDK writer from the captured
+header and trailer, and the reference processor supplies the same uncoded
+refusal with zero wallet calls. No frame is handwritten.
+
+### Notes: cross-SDK parity (#496)
+
+The TypeScript processor also rejects oversized requests before decoding or
+wallet dispatch (`WalletWireProcessor.ts:248-269`), with the same uncoded
+words on both legacy and compact inputs. This change is the transceiver's
+guard only; this crate's processor retains its existing behavior without a
+whole-request cap. Go at `2ca481c` has no corresponding frame cap:
+`wallet/serializer/frame.go:19-36` writes the full request and
+`wallet/substrates/wallet_wire_transceiver.go:23-35` immediately transmits it.
+The request bound follows TypeScript; Go's behavior differs above it.
+The reference's processor does not answer the recorded at-cap frame end to end:
+under Node 22.18.0 `Array.from` of the 268,435,414-byte plaintext
+(`WalletWireProcessor.ts:1427`) fails on V8's array limit with code 1
+`Invalid array length` and no wallet call, so the at-cap test's answer comes from
+the reference's transceiver over a stub transport and this crate's processor
+(the cold review's measurement). The processor's own cap is bsv-rs#505.
+
 ### Fixed: local KVStore parser words inside Original error (#489)
 
 Local authentication now uses the reference's parser messages for inputs

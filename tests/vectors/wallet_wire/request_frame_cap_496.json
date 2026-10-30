@@ -1,0 +1,76 @@
+{
+  "source": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "recorder": "wire_result_validation_487.mjs --request-frame-cap-496",
+  "cap": 268435456,
+  "originator": "fixtures.invalid",
+  "args": {
+    "protocolID": [
+      0,
+      "frame cap"
+    ],
+    "keyID": "key"
+  },
+  "response_hex": "00123456",
+  "rows": [
+    {
+      "name": "at_cap",
+      "frame_bytes": 268435456,
+      "request_parts": [
+        {
+          "hex": "0b1066697874757265732e696e76616c696400096672616d6520636170036b657900fffffed6ffff0f",
+          "repeat": 1
+        },
+        {
+          "hex": "a5",
+          "repeat": 268435414
+        },
+        {
+          "hex": "ff",
+          "repeat": 1
+        }
+      ],
+      "frame_sha256": "e68e81847ea915a536ae30f6627c6a3c5698de13f7815389968734832120898a",
+      "plaintext_length": 268435414,
+      "transmissions": 1,
+      "reference": {
+        "accepted": true,
+        "ciphertext": [
+          18,
+          52,
+          86
+        ]
+      }
+    },
+    {
+      "name": "above_cap",
+      "frame_bytes": 268435457,
+      "request_parts": [
+        {
+          "hex": "0b1066697874757265732e696e76616c696400096672616d6520636170036b657900fffffed7ffff0f",
+          "repeat": 1
+        },
+        {
+          "hex": "a5",
+          "repeat": 268435415
+        },
+        {
+          "hex": "ff",
+          "repeat": 1
+        }
+      ],
+      "frame_sha256": "3f70435133c8302aba66d4a7b9325db71cb0eca1190ac30a00d5cb3fc4f6ed8a",
+      "plaintext_length": 268435415,
+      "transmissions": 0,
+      "reference": {
+        "message": "Wallet Wire request exceeds the maximum permitted size",
+        "code": null
+      },
+      "processor_refusal": {
+        "message": "Wallet Wire request exceeds the maximum permitted size",
+        "code": null,
+        "wallet_calls": 0
+      }
+    }
+  ]
+}

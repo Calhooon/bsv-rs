@@ -7,6 +7,8 @@ use num_traits::ToPrimitive;
 use serde_json::{value::RawValue, Value};
 
 const MAX_BYTES: usize = 256 * 1024 * 1024;
+/// The complete outgoing frame's bound, beside the response/byte-field cap.
+const MAX_WIRE_REQUEST_BYTES: usize = 256 * 1024 * 1024;
 const MAX_NODES: usize = 1_000_000;
 
 pub(super) fn unsafe_key(key: &str) -> bool {
@@ -194,6 +196,16 @@ pub(in crate::wallet::substrates) fn normalize_numbers(value: &mut Value) {
             _ => {}
         }
     }
+}
+
+/// `WalletWireTransceiver.ts:104-107` at `ts-stack@edf6e03`.
+pub(crate) fn wire_request_length(length: usize) -> Result<()> {
+    if length > MAX_WIRE_REQUEST_BYTES {
+        return Err(Error::WalletError(
+            "Wallet Wire request exceeds the maximum permitted size".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// The wire frame limit also bounds every individual result byte field.

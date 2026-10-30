@@ -39,7 +39,7 @@ mod wire;
 pub(crate) use action_binding::input_sources;
 #[cfg(feature = "http")]
 pub(super) use boundary::{normalize_numbers, response_bytes};
-pub(crate) use boundary::{request, wire_response_length};
+pub(crate) use boundary::{request, wire_request_length, wire_response_length};
 #[cfg(feature = "http")]
 pub(super) use review_projection::body as review_body;
 pub(crate) use wire::{signature as wire_signature, WireResult};

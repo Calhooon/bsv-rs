@@ -204,3 +204,65 @@ export async function recordWire487(sdk) {
   return { source: 'ts-stack@edf6e03' , node: process.version,
     recorder: 'http_json_result_values_408.mjs --wire-487', rows, excluded }
 }
+
+// #496: use the compact transport to observe the complete request at the cap.
+// A refused request never reaches that transport: build that candidate with
+// the SDK writer and the header/trailer observed from a small encrypt call,
+// then pass it to the reference processor to record its independent refusal.
+export async function recordRequestFrameCap496(sdk) {
+  const { Utils, WalletWireTransceiver, WalletWireProcessor } = sdk
+  const cap = 256 * 1024 * 1024
+  const originator = 'fixtures.invalid'
+  const args = { protocolID: [0, 'frame cap'], keyID: 'key' }
+  const ciphertext = Uint8Array.of(0x12, 0x34, 0x56)
+  const response = new Utils.WriterUint8Array().writeUInt8(0).write(ciphertext).toUint8Array()
+  let seed
+  await new WalletWireTransceiver({ async transmitToWalletUint8Array(frame) {
+    seed = frame
+    return response
+  } }).encrypt({ ...args, plaintext: new Uint8Array() }, originator)
+  const header = seed.subarray(0, seed.length - 2) // zero-byte length and seekPermission
+  const suffix = seed.subarray(seed.length - 1)
+  const rows = []
+  for (const extra of [0, 1]) {
+    const length = cap + extra - header.length - 5 - suffix.length
+    const plaintext = new Uint8Array(length).fill(0xa5)
+    const prefix = new Utils.WriterUint8Array().write(header).writeVarIntNum(length).toUint8Array()
+    const candidate = new Utils.WriterUint8Array(undefined, cap + extra)
+      .write(prefix).write(plaintext).write(suffix).toUint8ArrayZeroCopy()
+    let transmissions = 0, error, value
+    const client = new WalletWireTransceiver({ async transmitToWalletUint8Array(frame) {
+      transmissions++
+      if (Buffer.compare(frame, candidate) !== 0) throw new Error('request bytes differ')
+      return response
+    } })
+    try { value = await client.encrypt({ ...args, plaintext }, originator) }
+    catch (e) { error = { message: e.message, code: e.code ?? null } }
+    let processorRefusal
+    if (extra) {
+      let calls = 0
+      const processor = new WalletWireProcessor({ async encrypt() { calls++; return { ciphertext } } })
+      try { await processor.transmitToWalletUint8Array(candidate) }
+      catch (e) { processorRefusal = { message: e.message, code: e.code ?? null, wallet_calls: calls } }
+      if (!error || transmissions || !processorRefusal || calls) throw new Error('missing pre-send refusal')
+    } else if (error || transmissions !== 1) throw new Error('boundary was not sent')
+    rows.push({ name: extra ? 'above_cap' : 'at_cap', frame_bytes: candidate.length,
+      request_parts: [{ hex: Utils.toHex(prefix), repeat: 1 },
+        { hex: 'a5', repeat: length }, { hex: Utils.toHex(suffix), repeat: 1 }],
+      frame_sha256: createHash('sha256').update(candidate).digest('hex'),
+      plaintext_length: length, transmissions,
+      reference: error ?? { accepted: true, ciphertext: value.ciphertext },
+      ...(processorRefusal ? { processor_refusal: processorRefusal } : {}) })
+  }
+  return { source: 'ts-stack@edf6e03', node: process.version,
+    recorder: 'wire_result_validation_487.mjs --request-frame-cap-496', cap, originator, args,
+    response_hex: Utils.toHex(response), rows }
+}
+
+if (process.argv[2] === '--request-frame-cap-496') {
+  if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
+  const { pathToFileURL } = await import('node:url')
+  const { writeFileSync } = await import('node:fs')
+  const sdk = await import(pathToFileURL(process.argv[3]).href)
+  writeFileSync(process.argv[4], JSON.stringify(await recordRequestFrameCap496(sdk), null, 2) + '\n')
+}
