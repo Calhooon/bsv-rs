@@ -41,6 +41,7 @@ use super::validation::{self, explicit_wallet_code, Refusal};
 use super::WalletCall;
 use crate::primitives::to_base64;
 use crate::wallet::interface::WalletInterface;
+use crate::wallet::substrates::result_values::wire_request_length;
 use crate::wallet::types::Network;
 use crate::wallet::AbortActionArgs;
 use crate::Error;
@@ -108,7 +109,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     /// The response format is:
     /// - Error byte (0 = success, non-zero = error code)
     /// - Result data or error message
+    ///
+    /// Above 256 MiB, returns `Err(Error::WalletError(..))` before decoding.
+    /// The reference throws outside its catch (`WalletWireProcessor.ts:248-274`, `ts-stack@edf6e03`, #505).
     pub async fn process_message(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+        wire_request_length(message.len())?;
         let result = self.process_message_inner(message).await;
         self.encode_response(result)
     }

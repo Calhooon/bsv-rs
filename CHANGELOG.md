@@ -7,10 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: refuse oversized wallet wire requests before decoding (#505)
+
+`WalletWireProcessor::process_message` now refuses a complete request above
+256 MiB (268,435,456 bytes) before constructing a reader, decoding arguments
+or calling the wallet. It reuses #496's `wire_request_length` and
+`MAX_WIRE_REQUEST_BYTES` in `substrates/result_values/boundary.rs`; the length
+comparison precedes any allocation. The refusal is
+`Err(Error::WalletError("Wallet Wire request exceeds the maximum permitted size"))`
+returned by `process_message`, not an error frame. A frame exactly at the cap
+still reaches the wallet.
+
+The reference is `ts-stack@edf6e03`: `WalletWire.ts:9` defines
+`MAX_WALLET_WIRE_FRAME_BYTES`; `WalletWireProcessor.ts:248-250` (legacy array)
+and `:265-269` (compact bytes) reject lengths strictly greater than that cap
+with those uncoded words. Both throw from `transmitToWallet` before
+`#processMessage` is entered, outside its `try` (`:274`) and so outside the
+catch that writes error frames (`:2370-2396`): the caller's promise rejects
+and no frame is written. `process_message` is that method here, so the
+refusal is its `Err` in the same words, as #496's transceiver returns its own.
+This follows the owner's ruling (c): the reference's own resource safeguard
+needs no new word.
+
+The toolbox's and CLI's tables change as follows:
+
+| Consumer | Request | Before | Now |
+|---|---|---|---|
+| Toolbox error table | Complete frame above 268,435,456 bytes | Decoded; an otherwise valid request reached the wallet | `process_message` returns `Err(WalletError)`: `Wallet Wire request exceeds the maximum permitted size`; no frame, no wallet call |
+| CLI operator-visible table | Complete frame above 268,435,456 bytes | Any decode or wallet outcome | The transport hosting the processor receives the error before decoding, as a host of the reference's `transmitToWallet` receives its rejection; the transceiver refuses such a frame itself first (#496) |
+| Both | Complete frame exactly at 268,435,456 bytes | Decoded and dispatched | Decoded and dispatched |
+
+`tests/wallet_wire_processor_request_cap_505.rs` builds valid encrypt frames
+with this crate's `WireWriter`, using a large plaintext that itself remains
+below the byte-field limit. The transceiver cannot supply the over-cap frame
+because #496 already refuses it. On base
+`8fd26a3ecc61cc485647f2152e5482a211491692`, cap + 1 reached the counting wallet
+once (the RED assertion); exactly cap reached it once and returned its answer.
+With the guard, cap + 1 makes zero wallet calls and `process_message` returns
+the error in the reference's words; exactly cap still returns the wallet's
+answer. No recorded vectors change.
+
+The wire decoder fuzz target checks that same size boundary: an oversized
+request returns the exact `Err(WalletError)` above; failures at or below the
+cap remain framed responses.
+
+Migration: a request above the cap was decoded before; now
+`process_message` returns `Err` for it, where every other refusal is an
+`Ok` error frame: a host that relays `process_message`'s answer handles
+the `Err` as it handles a transport failure. No API change; requests at or
+below the cap are unchanged.
+
+### Notes: cross-SDK parity (#505)
+
+Go at `2ca481c` checks only for an empty message before `ReadRequestFrame`
+(`wallet/substrates/wallet_wire_processor.go:24-29`), returning `empty message`.
+It has no complete-request upper bound. The keeper's 2026-10-30 08:1xZ ruling
+holds this as a stated row: the frame cap is the reference's own resource
+safeguard, not a BRC number, and Go's choice stands. This processor cap is
+hardening, alongside #496's transceiver cap; it does not reopen that held row.
+The reference's exact-cap encrypt decode also hits V8's `Array.from` limit
+before dispatch (`WalletWireProcessor.ts:1427`, measured in #496); Rust's
+exact-cap control exercises its own existing, accepted decode path.
+
 ## [0.9.0-beta.4] - 2026-10-30
 
 The 0.9.0 line's fourth prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (21.6 of the brief, the one-hour shape of 19.7: bsv-rs 0.9.0-beta.4, then the toolbox's re-pin lane at the index hour, then the CLI's pin) at the tip after #507 landed (8fd26a3e): the beta.4 milestone's content, the request-frame cap (#496) and the discovery answers' validation (#495), with #372, #398, the #375 census and its filing queue, the DER witness and the docs follow-ups; #491 (R56) moved to the beta.5 milestone on the stack's word. The four 0.9.0 PRs held behind the tag (#510, #511, #509, #508) are not in it.
-
 ### Added: certificate DER round-trip witness and census split (#375)
 
 `tests/auth_certificate_der_roundtrip_375.rs` and
