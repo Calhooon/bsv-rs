@@ -35,6 +35,8 @@
 // #478 extends --kvstore-local-454 with key requests, descriptions and the
 // exact local token-search block. Also pass --local-source followed by the
 // archived packages/sdk/src/kvstore/LocalKVStore.ts used to build the bundle.
+// #489 extends that mode with corrupted keys/tokens and their full lookup
+// errors. The SDK writes each source transaction and BEEF, including mutations.
 //
 // The randomness is #310's SHA-256 counter stream, installed before the SDK
 // loads, so two runs print the same file. The wallet is the ProtoWallet of the
@@ -68,7 +70,7 @@ Object.defineProperty(globalThis, 'crypto', {
 
 const [sdkPath] = process.argv.slice(2)
 const {
-  ContactsManager326: ContactsManager, GlobalKVStore, LocalKVStore, LookupResolver, ProtoWallet, PrivateKey,
+  ContactsManager326: ContactsManager, GlobalKVStore, LocalKVStore, LookupResolver, ProtoWallet, PrivateKey, PublicKey,
   Script, Transaction, Beef, Utils, PushDrop, TopicBroadcaster, WalletError, WERR_REVIEW_ACTIONS, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
 } = await import(pathToFileURL(sdkPath).href)
 
@@ -188,7 +190,7 @@ if (process.argv.includes('--kvstore-local-454')) {
   const { recordLocal454 } = await import('./kvstore_local_454.mjs')
   await emit(JSON.stringify(await recordLocal454({
     recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
-    LookupResolver, Transaction, Beef, Script, Utils, WalletError, PushDrop,
+    LookupResolver, Transaction, Beef, Script, Utils, WalletError, PushDrop, PublicKey,
     localSource: process.argv[process.argv.indexOf('--local-source') + 1],
     resetCounter () { counter = 0 }
   }), null, 2))

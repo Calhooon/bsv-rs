@@ -16,7 +16,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
-| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 536 |
+| `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 538 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
@@ -25,7 +25,8 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
-| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction for lookup and action wrappers (#477) | 305 |
+| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches use the reference words (#489) | 305 |
+| `local_parser_words.rs` | Maps local hex/key/PushDrop failures by variant and input shape to the reference's messages; primitives and wallet-supplied errors retain their own text (#489) | 84 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478) | 46 |
 | `local_outpoint.rs` | Exactly one validated completed output with the requested amount and new script; reference refusal words; amount option is this crate's addition (#478) | 24 |
 | `local_outpoint_tests.rs` | Recorded one-satoshi search: nonzero index, no match and two matches (#478) | 28 |
@@ -690,6 +691,19 @@ including four fault families and real malformed BEEF/action replies. The
 #326 `--kvstore-local-454` recorder adds 60 injected and six malformed cases;
 the original four action records are unchanged. The parsers' pre-existing word
 differences are stated in the #477 changelog parity note.
+
+Since #489, the local hex/public-key and PushDrop parser catches select the
+reference's `Invalid hex string`, `Unknown point format`, `Invalid point`,
+hybrid-key parity and token-decode messages by variant and input shape, without matching error
+text or changing the primitives' own diagnostics. The reference is
+`LocalKVStore.ts:239-246,278-282,340-345`, `PublicKey.ts:49-51`,
+`Point.ts:303-325,345-347,365-372`, `hex.ts:6-15`,
+`PushDrop.ts:73-77,96-115` and `PushDropValidation.ts:54-74` at edf6e03.
+`kvstore_local_parser_words_489.rs` compares the full wrapper for 36 recorded
+get/set cases in five tests, all RED on base `bcea54a1`, then green; the
+extended #326 mode writes the vectors twice byte-identically under Node 22.
+An error injected by the wallet still uses #477's original extraction rule.
+The BEEF/transaction diagnostic differences in its parity note remain.
 
 ### Local request words and token index (#478)
 

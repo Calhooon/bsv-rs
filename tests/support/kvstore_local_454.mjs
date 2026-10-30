@@ -2,6 +2,7 @@
 // and unlocking scripts, plus pagination/authentication verdicts. No network.
 import { recordOriginalErrors477 } from './kvstore_original_error_477.mjs'
 import { recordTokenSearch478 } from './kvstore_local_divergences_478.mjs'
+import { recordLocalParserWords489 } from './kvstore_local_parser_words_489.mjs'
 
 export async function recordLocal454 (c) {
   const { recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
@@ -65,5 +66,6 @@ export async function recordLocal454 (c) {
     description: '#454: two live tokens, exact merged BEEF, requests and unlocking scripts',
     signable_reference: 'UlJSUlJSUlI=', runs,
     original_errors_477: await recordOriginalErrors477(c),
-    token_search: await recordTokenSearch478(c) }
+    token_search: await recordTokenSearch478(c),
+    parser_words_489: await recordLocalParserWords489(c) }
 }

@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: local KVStore parser words inside Original error (#489)
+
+Local authentication now uses the reference's parser messages inside the
+`Invalid value found. Relinquish the corrupted output from the {context}
+basket before using this key again. Original error: {message}` wrapper.
+Previously, a malformed locking key or token exposed this crate's native
+hex, public-key or script-parser diagnostic. The local parser catches select
+the reference text by error variant and input shape; they do not compare
+diagnostic strings or change the primitives' own errors. Wallet-supplied
+errors still follow #477's extraction rule, including an injected
+`InvalidPublicKey` error. No public shape changes; update matches on the
+wrapped parser suffixes below. Local parser failures use `KvStoreLocalError`,
+including authentication during remove, where there is no lookup wrapper.
+
+The deciding reference is `ts-stack@edf6e03`, under Node 22.18.0:
+`LocalKVStore.ts:239-246` derives and parses the locking key, `:278-282`
+calls `decodeCanonicalPushDrop`, and `:340-345` wraps `error.message`.
+`PublicKey.ts:49-51` delegates to `Point.fromString` (`Point.ts:345-347`);
+`utils.ts:126-128` and `hex.ts:6-15` reject non-hex text. `Point.ts:303-325`
+distinguishes an unknown length/prefix from a point off the curve
+(`:280-283,365-372`); hybrid `06`/`07` keys with the wrong Y parity throw
+`Point string value is wrong length` before the curve check (`:309-317`).
+`PushDropValidation.ts:54-74` calls
+`PushDrop.decode` at `:59`: its default lock-before path reads the initial
+chunk's key at `PushDrop.ts:73-77`, then the fields at `:96-115`, before
+the canonical decoder checks field count and envelope. These are the actual
+lines at the pin; the finding's `LocalKVStore.ts:248,250-260` is offset.
+Go at `2ca481c`, `kvstore/local_kv_store.go:66-111`, uses operation wrappers
+and has no equivalent `Original error:` contract.
+
+For the toolbox's error table, the exact suffixes after `Original error:`
+are below.
+
+| Recorded corruption | Old suffix | New suffix |
+|---|---|---|
+| Key `zz` | `invalid hex string: Invalid character 'z' at position 0` | `Invalid hex string` |
+| Key `not-hex` | `invalid hex string: Odd number of digits` | `Invalid hex string` |
+| Key `02`, key `05` plus 32 zero bytes, empty key, token key with the same `05` prefix | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Unknown point format` |
+| Key `2` (odd hex, padded by the reference) | `invalid hex string: Odd number of digits` | `Unknown point format` |
+| Key `02` plus 32 zero bytes, key `04` plus 64 zero bytes, token with the same `02` key | `invalid public key: Point not on curve` | `Invalid point` |
+| Hybrid `06` key with odd Y; hybrid `07` key/token with even Y | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Point string value is wrong length` |
+| Token with one-byte key `02` | `script parse error: Expected OP_CHECKSIG at end` | `Unknown point format` |
+| Token script `51` (`OP_TRUE`) | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
+| Empty token script | `script parse error: Script too short for PushDrop` | `Cannot read properties of undefined (reading 'data')` |
+| Token with `OP_TRUE` replacing `OP_CHECKSIG` | `script parse error: Expected OP_CHECKSIG after pubkey` | `PushDrop token must use the canonical PushDrop envelope` |
+| Token containing only the valid key push | `script parse error: Script too short for PushDrop` | `Unexpected PushDrop token field count` |
+
+For the CLI's operator-visible table, the lookup wrapper remains as quoted
+above, with these changed suffixes (the other corruption rows use the same
+suffixes as the toolbox table):
+
+| Failure | Old suffix | New suffix |
+|---|---|---|
+| Non-hex locking key `zz` | `invalid hex string: Invalid character 'z' at position 0` | `Invalid hex string` |
+| Locking key `02` with the wrong length | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `Unknown point format` |
+| Off-curve locking key `02` plus 32 zero bytes | `invalid public key: Point not on curve` | `Invalid point` |
+| Non-PushDrop token script `51` | `script parse error: Script too short for PushDrop` | `script.chunks[0].data must have value` |
+
+`tests/kvstore_local_parser_words_489.rs` has one regression per required
+failure class plus a hybrid-parity regression, all five RED on scratch base
+`bcea54a1fb065e39039ce9f38e70eb316084a604` with the old whole wrapped text,
+then green. They compare the full message and `KvStoreLocalError` variant
+against 36 recorded cases (18 corruptions, both get and set), and pin the
+standalone hex, public-key and PushDrop errors as unchanged. The #326
+recorder's extended `--kvstore-local-454` mode writes every source BEEF and
+every expected message; two Node 22 runs are byte-identical. All previous
+`kvstore_local_454.json` fields are unchanged. The #477 parity note still
+applies to the BEEF and transaction parser diagnostics it names.
+
 ### Fixed: four older LocalKVStore request/result differences (#478)
 
 Local token creation now sends the reference's `forSelf: false`, uses its
