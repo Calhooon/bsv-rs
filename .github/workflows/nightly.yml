@@ -220,10 +220,24 @@ jobs:
           - fuzz_messages_signed
           - fuzz_script_parser
           - fuzz_script_spend
+          - fuzz_script_spend_default
           - fuzz_shamir_backup
           - fuzz_transaction_parser
           - fuzz_wire_decoders
           - fuzz_wire_protocol
+        # The default-mode spend target is built without a sanitizer
+        # (bsv-rs#398): its subject is the interpreter's budget arithmetic and
+        # refusals, a panic or an abort libFuzzer catches without one, and
+        # AddressSanitizer's shadow and quarantine take a legitimate run under
+        # its 128 MiB budget past libFuzzer's 2,048 MB RSS limit (an 8 MiB
+        # squaring chain: 2,247 MB under ASan, an `oom` artifact that is the
+        # sanitizer's accounting; 133 MB without). Every other target keeps
+        # AddressSanitizer.
+        include:
+          - target: fuzz_script_spend_default
+            sanitizer: none
+    env:
+      FUZZ_SANITIZER: ${{ matrix.sanitizer || 'address' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -252,7 +266,7 @@ jobs:
       - name: Build the target
         run: |
           export PATH="$RUNNER_TEMP/tools/bin:$PATH"
-          cargo fuzz build -O "${{ matrix.target }}"
+          cargo fuzz build -O -s "$FUZZ_SANITIZER" "${{ matrix.target }}"
 
       # One hour from the checked-in corpus. New entries are written to
       # $RUNNER_TEMP/new (the leading corpus directory); a crash's input to
@@ -262,7 +276,7 @@ jobs:
           export PATH="$RUNNER_TEMP/tools/bin:$PATH"
           mkdir -p "$RUNNER_TEMP/new" "$RUNNER_TEMP/artifacts" "fuzz/corpus/${{ matrix.target }}"
           status=0
-          cargo fuzz run -O "${{ matrix.target }}" "$RUNNER_TEMP/new" "fuzz/corpus/${{ matrix.target }}" -- \
+          cargo fuzz run -O -s "$FUZZ_SANITIZER" "${{ matrix.target }}" "$RUNNER_TEMP/new" "fuzz/corpus/${{ matrix.target }}" -- \
             -fork=2 -ignore_crashes=1 -max_total_time=3600 \
             -artifact_prefix="$RUNNER_TEMP/artifacts/" > "$RUNNER_TEMP/fuzz.log" 2>&1 || status=$?
           tail -n 40 "$RUNNER_TEMP/fuzz.log"

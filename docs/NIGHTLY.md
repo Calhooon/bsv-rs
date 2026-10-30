@@ -159,7 +159,7 @@ The fuzz job files its own crashes (below).
 
 ## Fuzz (#82)
 
-**What runs.** One job per target of `fuzz/Cargo.toml` (18 today; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for one hour from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=3600`): a crash is recorded and the run goes on.
+**What runs.** One job per target of `fuzz/Cargo.toml` (19 today, pinned to the matrix by `tests/arch_fuzz_targets_dispatched.rs`; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (AddressSanitizer, but `-s none` for `fuzz_script_spend_default`, whose 128 MiB budget ASan's resident set takes past the 2,048 MB RSS limit, #398) (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for one hour from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=3600`): a crash is recorded and the run goes on.
 
 **Where the results land.**
 

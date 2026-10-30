@@ -89,7 +89,7 @@ Across every module: one `Error` enum ([`src/error.rs`](../src/error.rs),
 variant is additive); `TransportFault` and `WalletRefusalClass` (#137) re-exported at the crate root; the
 `http` feature for reqwest (ARC, WhatsOnChain, the headers service, the HTTP
 substrates, the overlay hosts), `websocket` opt-in and outside `full`, `wasm`
-for the JS RNG and timers; the 18 fuzz targets of
+for the JS RNG and timers; the 19 fuzz targets of
 [`fuzz/fuzz_targets/CLAUDE.md`](../fuzz/fuzz_targets/CLAUDE.md).
 
 ## 3. The invariants
@@ -218,7 +218,7 @@ for f in tests/vectors/*.json; do python3 -c "import json; d=json.load(open('$f'
 ls tests/vectors/wallet_wire | wc -l                            # 54
 ls tests/vectors/beef_of_any_size | wc -l                       # 49
 find tests/fixtures -name '*.json' | wc -l                      # 65
-ls fuzz/fuzz_targets/*.rs | wc -l                               # 18
+ls fuzz/fuzz_targets/*.rs | wc -l                               # 19
 ls examples | wc -l                                             # 6
 find src -name CLAUDE.md | wc -l                                # 27 (28 from #161)
 ```
@@ -242,5 +242,5 @@ find src -name CLAUDE.md | wc -l                                # 27 (28 from #1
 | `wycheproof/` | 2 files (HKDF-SHA256, HKDF-SHA512) |
 
 Lines under `src/`: 102,200. Fixture files under `tests/fixtures/`: 65.
-Fuzz targets: 13. README examples: 6. Module `CLAUDE.md` files under `src/`:
+Fuzz targets: 19. README examples: 6. Module `CLAUDE.md` files under `src/`:
 27 at that commit, 28 with `src/block/CLAUDE.md` (#161).
