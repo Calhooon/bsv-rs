@@ -123,6 +123,14 @@ For a behavior PR:
 4. Commit the intended golden changes in their own commit. If a case was added
    or removed, include the census change in that fixture commit.
 
+For #487, two identical recordings from the implementation archive
+`14c1079f` updated `wire/createAction.json`, `wire/signAction.json` and
+`wire/listOutputs.json`. Only `expected.client_result` changed: the old
+accepted invalid action/output facts now carry the reference result refusal.
+Request/response bytes, processor observations, all HTTP snapshots and the
+65-file / 913-entry census are unchanged. The recordings and field-by-field
+diff are retained beside the lane REPORT.
+
 A refactor produces no fixture diff. A writer and reader changing together
 still changes the golden output and fails replay. Do not repair disagreements
 by editing the shared vectors or silently rewriting recorded fields.
