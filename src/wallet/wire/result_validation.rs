@@ -88,6 +88,10 @@ pub(super) fn signature(signature: &[u8]) -> Result<()> {
     result_values::wire_signature(signature)
 }
 
+pub(super) fn request_length(length: usize) -> Result<()> {
+    result_values::wire_request_length(length)
+}
+
 pub(super) fn response_length(length: usize) -> Result<()> {
     result_values::wire_response_length(length)
 }
