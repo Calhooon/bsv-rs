@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-beta.4] - 2026-10-30
+
+The 0.9.0 line's fourth prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (21.6 of the brief, the one-hour shape of 19.7: bsv-rs 0.9.0-beta.4, then the toolbox's re-pin lane at the index hour, then the CLI's pin) at the tip after #507 landed (8fd26a3e): the beta.4 milestone's content, the request-frame cap (#496) and the discovery answers' validation (#495), with #372, #398, the #375 census and its filing queue, the DER witness and the docs follow-ups; #491 (R56) moved to the beta.5 milestone on the stack's word. The four 0.9.0 PRs held behind the tag (#510, #511, #509, #508) are not in it.
+
 ### Added: certificate DER round-trip witness and census split (#375)
 
 `tests/auth_certificate_der_roundtrip_375.rs` and
@@ -1289,81 +1293,6 @@ caller's string and encodes the normalized result, without decoding it;
 there is no outgoing TextDecoder BOM rule. Its validator already trims edge
 BOMs and still refuses a BOM-only caller string. This change is reader-only.
 
-### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
-
-- All four wallet PushDrop spending sites (shared kvstore tokens, contact update,
-  contact removal, identity revocation) now send `data: SHA256(preimage)`, as
-  `ts-stack@edf6e03` `PushDrop.ts:234-258` does. Sending the double hash as
-  `hashToDirectlySign` produced the same signature but a different wallet request.
-  `kvstore_two_token_454` compares recorded request bodies and unlocking bytes;
-  `contacts_signaction_326`, `identity_wallet_calls_318` and
-  `identity_revocation_checks_327` pin the identity requests.
-- Local mutations request `MAX_LOCAL_OUTPUTS` (10,000). Reads reject ambiguous
-  totals; set rejects an incomplete collapse; remove authenticates and consumes
-  each page until its length equals `totalOutputs` (`LocalKVStore.ts:173-203,
-  332-339,455,574-590`). The old ten-output set and hundred-output removal could
-  leave live tokens behind. `kvstore_local_454` covers eleven live tokens, an
-  incomplete response, hidden duplicates, the total bound, and multiple removal
-  pages.
-- Every listed local token now counts only after its exact BEEF transaction,
-  index, metadata, canonical two-field envelope, wallet locking key and field
-  signature pass authentication (`LocalKVStore.ts:231-307`). Previously only the
-  last listed script was decoded, permitting unauthenticated spends. The writer
-  now includes its field signature so its own tokens pass that check. A missing
-  optional listed script is read from BEEF. `kvstore_local_454` checks corrupted
-  non-final outputs, wrong keys/signatures, duplicates and missing BEEF/scripts.
-- The #326 recorder's new `--kvstore-local-454` mode writes two-token local/global
-  set/remove witnesses. `kvstore_two_token_454` compares input descriptions,
-  merged BEEF, signature requests and unlocking scripts. Older metadata-only
-  assertions remain explicitly named for tests using different token bodies.
-- Local bound-action failures now use the reference's exact count/key wrapper
-  (`LocalKVStore.ts:427-431,547-551`), where the wallet's error escaped directly.
-  Set counts authenticated outputs; remove uses the page's reported total.
-  `kvstore_local_error_470` replays the #340 recorder under Node 22.18.0, including
-  zero/two-token set and a two-output removal page whose total is seven. Failures
-  before the bound action retain the reference's separate lookup/authentication
-  behavior. Existing aborts and the absence of a local retry are unchanged.
-
-For the toolbox's caller-visible error table (both set and remove, key `alpha`):
-
-| Before | After |
-|---|---|
-| `Undelayed createAction or signAction results require review.` | `There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review.` |
-
-Migration: `Error::KvStoreLocalError(String)` is an additive variant of the
-non-exhaustive error enum, displaying the reference message without a Rust
-category prefix. Local action callers matching the old wallet variant or
-unwrapped text must match this wrapper. No public method, config field or
-existing type path changes. Existing unsigned local tokens now fail the required
-authentication; use the reference's relinquish/rewrite workflow for such tokens.
-
-### Notes: cross-SDK parity
-
-The deciding reference is TypeScript `ts-stack@edf6e03`, exercised under Node
-22.18.0. Go at `2ca481c`, read by path `kvstore/local_kv_store.go:66-171`, decodes
-only the last BEEF output without these key/signature checks; set uses limit 10
-at `:228`, remove limit 100 at `:436` and stops below 100 at `:518`. Its signing
-failures use `error SignAction: ...` (`:347-362`) and `SignAction (Remove): ...`
-(`:498-513`), with relinquishment attempts. This change follows TypeScript. Go's PushDrop unlocker still sends
-`HashToDirectlySign` (`transaction/template/pushdrop/pushdrop.go:216-222`), so
-the wallet request shape intentionally follows TypeScript here too.
-The shared Rust spender still takes the source script and value from the bound
-signable transaction, the existing #343 finding; global duplicate selection and
-other previously stated global differences remain.
-
-The three older #326 kvstore modes and the identity recorders were rerun.
-`kvstore_tags_344` and identity #307/#310/#315 are byte-identical. The #326,
-#341/#342, identity #318/#327 vectors are re-recorded only to add signature
-request JSON; #340 adds count/key wrapper cases. Every pre-existing payload
-remains identical when those newly recorded members are removed. No vector was
-hand-edited. Contact helpers and local listing were split to keep touched source
-files below 800 lines and production functions at most 60 lines.
-
-Census (#375; current reading, historical account above retained):
-
-- Row 70: Ours: owned values, canonical reference bytes and the retained legacy token namespace are local boundaries; completeBoundAction.ts:1022-1151 at edf6e03 specifies the matching bound-action path. Theirs: go-sdk, filing pending (the witness: tests/kvstore_bound_action_341_342.rs; tests/kvstore_signaction_326.rs). Draft: [local-kvstore-wallet-contract](./docs/lanes/375-filings/local-kvstore-wallet-contract.md).
-- Row 77: Ours: the bound signable transaction is the signing authority, duplicate outpoints are collapsed, and local derivation/case/request choices are explicit; completeBoundAction.ts:1063-1146, GlobalKVStore.ts:343-380,666-668 at edf6e03 give the comparison.
-
 ### Changed: per-input verification work budget (#378, part 2)
 
 `Transaction::verify_with_work_budget` and
@@ -1897,6 +1826,81 @@ The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
 Census (#375; current reading, historical account above retained):
 
 - Row 8: Ours: the native MAC diagnostic at the exact cap; both sides refuse the unaligned Bitcore envelope (ECIES.ts:710-711 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/compat_ecies_bounds_333.rs). Draft: [ecies-byte-bounds](./docs/lanes/375-filings/ecies-byte-bounds.md).
+
+### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
+
+- All four wallet PushDrop spending sites (shared kvstore tokens, contact update,
+  contact removal, identity revocation) now send `data: SHA256(preimage)`, as
+  `ts-stack@edf6e03` `PushDrop.ts:234-258` does. Sending the double hash as
+  `hashToDirectlySign` produced the same signature but a different wallet request.
+  `kvstore_two_token_454` compares recorded request bodies and unlocking bytes;
+  `contacts_signaction_326`, `identity_wallet_calls_318` and
+  `identity_revocation_checks_327` pin the identity requests.
+- Local mutations request `MAX_LOCAL_OUTPUTS` (10,000). Reads reject ambiguous
+  totals; set rejects an incomplete collapse; remove authenticates and consumes
+  each page until its length equals `totalOutputs` (`LocalKVStore.ts:173-203,
+  332-339,455,574-590`). The old ten-output set and hundred-output removal could
+  leave live tokens behind. `kvstore_local_454` covers eleven live tokens, an
+  incomplete response, hidden duplicates, the total bound, and multiple removal
+  pages.
+- Every listed local token now counts only after its exact BEEF transaction,
+  index, metadata, canonical two-field envelope, wallet locking key and field
+  signature pass authentication (`LocalKVStore.ts:231-307`). Previously only the
+  last listed script was decoded, permitting unauthenticated spends. The writer
+  now includes its field signature so its own tokens pass that check. A missing
+  optional listed script is read from BEEF. `kvstore_local_454` checks corrupted
+  non-final outputs, wrong keys/signatures, duplicates and missing BEEF/scripts.
+- The #326 recorder's new `--kvstore-local-454` mode writes two-token local/global
+  set/remove witnesses. `kvstore_two_token_454` compares input descriptions,
+  merged BEEF, signature requests and unlocking scripts. Older metadata-only
+  assertions remain explicitly named for tests using different token bodies.
+- Local bound-action failures now use the reference's exact count/key wrapper
+  (`LocalKVStore.ts:427-431,547-551`), where the wallet's error escaped directly.
+  Set counts authenticated outputs; remove uses the page's reported total.
+  `kvstore_local_error_470` replays the #340 recorder under Node 22.18.0, including
+  zero/two-token set and a two-output removal page whose total is seven. Failures
+  before the bound action retain the reference's separate lookup/authentication
+  behavior. Existing aborts and the absence of a local retry are unchanged.
+
+For the toolbox's caller-visible error table (both set and remove, key `alpha`):
+
+| Before | After |
+|---|---|
+| `Undelayed createAction or signAction results require review.` | `There are 1 outputs with tag alpha that cannot be unlocked. Original error: Undelayed createAction or signAction results require review.` |
+
+Migration: `Error::KvStoreLocalError(String)` is an additive variant of the
+non-exhaustive error enum, displaying the reference message without a Rust
+category prefix. Local action callers matching the old wallet variant or
+unwrapped text must match this wrapper. No public method, config field or
+existing type path changes. Existing unsigned local tokens now fail the required
+authentication; use the reference's relinquish/rewrite workflow for such tokens.
+
+### Notes: cross-SDK parity
+
+The deciding reference is TypeScript `ts-stack@edf6e03`, exercised under Node
+22.18.0. Go at `2ca481c`, read by path `kvstore/local_kv_store.go:66-171`, decodes
+only the last BEEF output without these key/signature checks; set uses limit 10
+at `:228`, remove limit 100 at `:436` and stops below 100 at `:518`. Its signing
+failures use `error SignAction: ...` (`:347-362`) and `SignAction (Remove): ...`
+(`:498-513`), with relinquishment attempts. This change follows TypeScript. Go's PushDrop unlocker still sends
+`HashToDirectlySign` (`transaction/template/pushdrop/pushdrop.go:216-222`), so
+the wallet request shape intentionally follows TypeScript here too.
+The shared Rust spender still takes the source script and value from the bound
+signable transaction, the existing #343 finding; global duplicate selection and
+other previously stated global differences remain.
+
+The three older #326 kvstore modes and the identity recorders were rerun.
+`kvstore_tags_344` and identity #307/#310/#315 are byte-identical. The #326,
+#341/#342, identity #318/#327 vectors are re-recorded only to add signature
+request JSON; #340 adds count/key wrapper cases. Every pre-existing payload
+remains identical when those newly recorded members are removed. No vector was
+hand-edited. Contact helpers and local listing were split to keep touched source
+files below 800 lines and production functions at most 60 lines.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 70: Ours: owned values, canonical reference bytes and the retained legacy token namespace are local boundaries; completeBoundAction.ts:1022-1151 at edf6e03 specifies the matching bound-action path. Theirs: go-sdk, filing pending (the witness: tests/kvstore_bound_action_341_342.rs; tests/kvstore_signaction_326.rs). Draft: [local-kvstore-wallet-contract](./docs/lanes/375-filings/local-kvstore-wallet-contract.md).
+- Row 77: Ours: the bound signable transaction is the signing authority, duplicate outpoints are collapsed, and local derivation/case/request choices are explicit; completeBoundAction.ts:1063-1146, GlobalKVStore.ts:343-380,666-668 at edf6e03 give the comparison.
 
 ### Fixed: internalizeAction's unreachable wire fallbacks and JSON null remittances (#393)
 
