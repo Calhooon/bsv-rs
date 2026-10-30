@@ -1,0 +1,1240 @@
+{
+  "reference": "ts-stack@edf6e03 (unmodified)",
+  "node": "v22.18.0",
+  "recorder": "wire_originator_338.mjs --bounds-473 (processor requests and transceiver results)",
+  "rows": [
+    {
+      "name": "create_no_send_change_at",
+      "call": "createAction",
+      "reader": "client_create",
+      "args": {
+        "description": "bound test"
+      },
+      "payload_hex": "0000fea0860100",
+      "response_hex": "000000fea0860100",
+      "code": null,
+      "message": "Wallet Wire createAction noSendChange count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "create_no_send_change_past",
+      "call": "createAction",
+      "reader": "client_create",
+      "args": {
+        "description": "bound test"
+      },
+      "payload_hex": "0000fea1860100",
+      "response_hex": "000000fea1860100",
+      "code": null,
+      "message": "Wallet Wire createAction noSendChange exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "create_no_send_change_short",
+      "call": "createAction",
+      "reader": "client_create",
+      "args": {
+        "description": "bound test"
+      },
+      "payload_hex": "000001",
+      "response_hex": "00000001",
+      "code": null,
+      "message": "Wallet Wire createAction noSendChange count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "create_send_with_results_at",
+      "call": "createAction",
+      "reader": "client_create",
+      "args": {
+        "description": "bound test"
+      },
+      "payload_hex": "0000fffffffffffffffffffde903",
+      "response_hex": "000000fffffffffffffffffffde903",
+      "code": null,
+      "message": "Wallet Wire sendWithResults count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "create_send_with_results_past",
+      "call": "createAction",
+      "reader": "client_create",
+      "args": {
+        "description": "bound test"
+      },
+      "payload_hex": "0000fffffffffffffffffffdea03",
+      "response_hex": "000000fffffffffffffffffffdea03",
+      "code": null,
+      "message": "Wallet Wire sendWithResults exceeds the maximum collection size of 1001",
+      "value": null
+    },
+    {
+      "name": "create_send_with_results_short",
+      "call": "createAction",
+      "reader": "client_create",
+      "args": {
+        "description": "bound test"
+      },
+      "payload_hex": "0000ffffffffffffffffff01",
+      "response_hex": "000000ffffffffffffffffff01",
+      "code": null,
+      "message": "Wallet Wire sendWithResults count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "sign_send_with_results_at",
+      "call": "signAction",
+      "reader": "client_sign",
+      "args": {
+        "spends": {},
+        "reference": "AQ=="
+      },
+      "payload_hex": "0000fde903",
+      "response_hex": "000000fde903",
+      "code": null,
+      "message": "Wallet Wire sendWithResults count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "sign_send_with_results_past",
+      "call": "signAction",
+      "reader": "client_sign",
+      "args": {
+        "spends": {},
+        "reference": "AQ=="
+      },
+      "payload_hex": "0000fdea03",
+      "response_hex": "000000fdea03",
+      "code": null,
+      "message": "Wallet Wire sendWithResults exceeds the maximum collection size of 1001",
+      "value": null
+    },
+    {
+      "name": "sign_send_with_results_short",
+      "call": "signAction",
+      "reader": "client_sign",
+      "args": {
+        "spends": {},
+        "reference": "AQ=="
+      },
+      "payload_hex": "000001",
+      "response_hex": "00000001",
+      "code": null,
+      "message": "Wallet Wire sendWithResults count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_labels_at",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000fea0860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000fea0860100",
+      "code": null,
+      "message": "Wallet Wire listActions labels count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_labels_past",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000fea1860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000fea1860100",
+      "code": null,
+      "message": "Wallet Wire listActions labels exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "action_labels_short",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000001000001",
+      "response_hex": "000100000000000000000000000000000000000000000000000000000000000000000001000001",
+      "code": null,
+      "message": "Wallet Wire listActions labels count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_inputs_at",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fea0860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fea0860100",
+      "code": null,
+      "message": "Wallet Wire listActions inputs count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_inputs_past",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fea1860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fea1860100",
+      "code": null,
+      "message": "Wallet Wire listActions inputs exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "action_inputs_short",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001",
+      "code": null,
+      "message": "Wallet Wire listActions inputs count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_outputs_at",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fffffffffffffffffffea0860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fffffffffffffffffffea0860100",
+      "code": null,
+      "message": "Wallet Wire listActions outputs count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_outputs_past",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fffffffffffffffffffea1860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100fffffffffffffffffffea1860100",
+      "code": null,
+      "message": "Wallet Wire listActions outputs exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "action_outputs_short",
+      "call": "listActions",
+      "reader": "wallet_action",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff01",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff01",
+      "code": null,
+      "message": "Wallet Wire listActions outputs count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_output_tags_at",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "0000ffffffffffffffffff0100fffffffffffffffffffea0860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff010000ffffffffffffffffff0100fffffffffffffffffffea0860100",
+      "code": null,
+      "message": "Wallet Wire listActions output tags count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "action_output_tags_past",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "0000ffffffffffffffffff0100fffffffffffffffffffea1860100",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff010000ffffffffffffffffff0100fffffffffffffffffffea1860100",
+      "code": null,
+      "message": "Wallet Wire listActions output tags exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "action_output_tags_short",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "0000ffffffffffffffffff0100ffffffffffffffffff01",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff010000ffffffffffffffffff0100ffffffffffffffffff01",
+      "code": null,
+      "message": "Wallet Wire listActions output tags count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "output_tags_at",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffea0860100",
+      "response_hex": "0001ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffea0860100",
+      "code": null,
+      "message": "Wallet Wire listOutputs tags count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "output_tags_past",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffea1860100",
+      "response_hex": "0001ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffea1860100",
+      "code": null,
+      "message": "Wallet Wire listOutputs tags exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "output_tags_short",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffff01",
+      "response_hex": "0001ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffff01",
+      "code": null,
+      "message": "Wallet Wire listOutputs tags count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "output_labels_at",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffea0860100",
+      "response_hex": "0001ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffea0860100",
+      "code": null,
+      "message": "Wallet Wire listOutputs labels count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "output_labels_past",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffea1860100",
+      "response_hex": "0001ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000fffffffffffffffffffffffffffffffffffffffffffffffffffffffea1860100",
+      "code": null,
+      "message": "Wallet Wire listOutputs labels exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "output_labels_short",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff01",
+      "response_hex": "0001ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff01",
+      "code": null,
+      "message": "Wallet Wire listOutputs labels count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "prove_keyring_at",
+      "call": "proveCertificate",
+      "reader": "client_prove",
+      "args": {
+        "certificate": {
+          "type": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "serialNumber": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "certifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+          "signature": "3006020101020101",
+          "fields": {
+            "f": "AQ=="
+          }
+        },
+        "fieldsToReveal": [
+          "f"
+        ],
+        "verifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "payload_hex": "fea0860100",
+      "response_hex": "00fea0860100",
+      "code": null,
+      "message": "Wallet Wire proveCertificate keyring count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "prove_keyring_past",
+      "call": "proveCertificate",
+      "reader": "client_prove",
+      "args": {
+        "certificate": {
+          "type": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "serialNumber": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "certifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+          "signature": "3006020101020101",
+          "fields": {
+            "f": "AQ=="
+          }
+        },
+        "fieldsToReveal": [
+          "f"
+        ],
+        "verifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "payload_hex": "fea1860100",
+      "response_hex": "00fea1860100",
+      "code": null,
+      "message": "Wallet Wire proveCertificate keyring exceeds the maximum collection size of 100000",
+      "value": null
+    },
+    {
+      "name": "prove_keyring_short",
+      "call": "proveCertificate",
+      "reader": "client_prove",
+      "args": {
+        "certificate": {
+          "type": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "serialNumber": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "certifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+          "signature": "3006020101020101",
+          "fields": {
+            "f": "AQ=="
+          }
+        },
+        "fieldsToReveal": [
+          "f"
+        ],
+        "verifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "payload_hex": "01",
+      "response_hex": "0001",
+      "code": null,
+      "message": "Wallet Wire proveCertificate keyring count exceeds the remaining response data",
+      "value": null
+    },
+    {
+      "name": "spends_at",
+      "call": 2,
+      "reader": "spends",
+      "payload_hex": "fea0860100",
+      "request_hex": "0200fea0860100",
+      "response_hex": "0149496e76616c6964207369676e416374696f6e207370656e6473206c656e6774683a2065786365656473207468652072656d61696e696e672057616c6c65742057697265206672616d6500",
+      "code": 1,
+      "message": "Invalid signAction spends length: exceeds the remaining Wallet Wire frame"
+    },
+    {
+      "name": "spends_past",
+      "call": 2,
+      "reader": "spends",
+      "payload_hex": "fea1860100",
+      "request_hex": "0200fea1860100",
+      "response_hex": "014c496e76616c6964207369676e416374696f6e207370656e6473206c656e6774683a2065787065637465642030207468726f756768203130303030302c2072656365697665642031303030303100",
+      "code": 1,
+      "message": "Invalid signAction spends length: expected 0 through 100000, received 100001"
+    },
+    {
+      "name": "spends_short",
+      "call": 2,
+      "reader": "spends",
+      "payload_hex": "01",
+      "request_hex": "020001",
+      "response_hex": "0149496e76616c6964207369676e416374696f6e207370656e6473206c656e6774683a2065786365656473207468652072656d61696e696e672057616c6c65742057697265206672616d6500",
+      "code": 1,
+      "message": "Invalid signAction spends length: exceeds the remaining Wallet Wire frame"
+    },
+    {
+      "name": "insertion_tags_at",
+      "call": 5,
+      "reader": "basket",
+      "payload_hex": "00fffffffffffffffffffea0860100",
+      "request_hex": "05000001000200fffffffffffffffffffea0860100",
+      "response_hex": "0155496e76616c696420696e7465726e616c697a65416374696f6e206f75747075742074616773206c656e6774683a2065786365656473207468652072656d61696e696e672057616c6c65742057697265206672616d6500",
+      "code": 1,
+      "message": "Invalid internalizeAction output tags length: exceeds the remaining Wallet Wire frame"
+    },
+    {
+      "name": "insertion_tags_past",
+      "call": 5,
+      "reader": "basket",
+      "payload_hex": "00fffffffffffffffffffea1860100",
+      "request_hex": "05000001000200fffffffffffffffffffea1860100",
+      "response_hex": "0158496e76616c696420696e7465726e616c697a65416374696f6e206f75747075742074616773206c656e6774683a2065787065637465642030207468726f756768203130303030302c2072656365697665642031303030303100",
+      "code": 1,
+      "message": "Invalid internalizeAction output tags length: expected 0 through 100000, received 100001"
+    },
+    {
+      "name": "insertion_tags_short",
+      "call": 5,
+      "reader": "basket",
+      "payload_hex": "00ffffffffffffffffff01",
+      "request_hex": "05000001000200ffffffffffffffffff01",
+      "response_hex": "0155496e76616c696420696e7465726e616c697a65416374696f6e206f75747075742074616773206c656e6774683a2065786365656473207468652072656d61696e696e672057616c6c65742057697265206672616d6500",
+      "code": 1,
+      "message": "Invalid internalizeAction output tags length: exceeds the remaining Wallet Wire frame"
+    },
+    {
+      "name": "input_satoshis_range_at",
+      "call": "listActions",
+      "reader": "action_input",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ff0040075af0750700ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001000000000000000000000000000000000000000000000000000000000000000000ff0040075af0750700ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0,
+            "inputs": [
+              {
+                "sourceOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+                "sourceSatoshis": 2100000000000000,
+                "inputDescription": "",
+                "sequenceNumber": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "input_satoshis_range_past",
+      "call": "listActions",
+      "reader": "action_input",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ff0140075af0750700ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001000000000000000000000000000000000000000000000000000000000000000000ff0140075af0750700ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "code": null,
+      "message": "Invalid listActions input sourceSatoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001",
+      "value": null
+    },
+    {
+      "name": "input_satoshis_precision_at",
+      "call": "listActions",
+      "reader": "action_input",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff1f00ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff1f00ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "code": null,
+      "message": "Invalid listActions input sourceSatoshis: expected an integer from 0 to 2100000000000000, received 9007199254740991",
+      "value": null
+    },
+    {
+      "name": "input_satoshis_precision_past",
+      "call": "listActions",
+      "reader": "action_input",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ff0000000000002000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001000000000000000000000000000000000000000000000000000000000000000000ff0000000000002000ffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "input_satoshis_sentinel",
+      "call": "listActions",
+      "reader": "action_input",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff010001000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "action_output_satoshis_range_at",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00ff0040075af0750700ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff0100ff0040075af0750700ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 2100000000000000,
+                "spendable": true,
+                "outputDescription": "",
+                "basket": "",
+                "tags": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "action_output_satoshis_range_past",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00ff0140075af0750700ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff0100ff0140075af0750700ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Invalid listActions output satoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001",
+      "value": null
+    },
+    {
+      "name": "action_output_satoshis_precision_at",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00ffffffffffffff1f00ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff0100ffffffffffffff1f00ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Invalid listActions output satoshis: expected an integer from 0 to 2100000000000000, received 9007199254740991",
+      "value": null
+    },
+    {
+      "name": "action_output_satoshis_precision_past",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00ff0000000000002000ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff0100ff0000000000002000ffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "action_output_satoshis_sentinel",
+      "call": "listActions",
+      "reader": "action_output",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00ffffffffffffffffffffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff010000ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "output_satoshis_range_at",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ff0040075af0750700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000ff0040075af0750700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+            "satoshis": 2100000000000000
+          }
+        ]
+      }
+    },
+    {
+      "name": "output_satoshis_range_past",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ff0140075af0750700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000ff0140075af0750700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Invalid listOutputs satoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001",
+      "value": null
+    },
+    {
+      "name": "output_satoshis_precision_at",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff1f00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000ffffffffffffff1f00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Invalid listOutputs satoshis: expected an integer from 0 to 2100000000000000, received 9007199254740991",
+      "value": null
+    },
+    {
+      "name": "output_satoshis_precision_past",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ff0000000000002000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000ff0000000000002000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "output_satoshis_sentinel",
+      "call": "listOutputs",
+      "reader": "wallet_output",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0001ffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "height_lower_at",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "01",
+      "response_hex": "0001",
+      "code": 0,
+      "message": null,
+      "value": {
+        "height": 1
+      }
+    },
+    {
+      "name": "height_lower_past",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "00",
+      "response_hex": "0000",
+      "code": null,
+      "message": "Wallet returned an invalid height",
+      "value": null
+    },
+    {
+      "name": "height_range_at",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "feffffffff",
+      "response_hex": "00feffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "height": 4294967295
+      }
+    },
+    {
+      "name": "height_range_past",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "ff0000000001000000",
+      "response_hex": "00ff0000000001000000",
+      "code": null,
+      "message": "Wallet returned an invalid height",
+      "value": null
+    },
+    {
+      "name": "height_precision_at",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "ffffffffffffff1f00",
+      "response_hex": "00ffffffffffffff1f00",
+      "code": null,
+      "message": "Wallet returned an invalid height",
+      "value": null
+    },
+    {
+      "name": "height_precision_past",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "ff0000000000002000",
+      "response_hex": "00ff0000000000002000",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "height_sentinel",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "ffffffffffffffffff",
+      "response_hex": "00ffffffffffffffffff",
+      "code": null,
+      "message": "number too large to retain precision - use readVarIntBn",
+      "value": null
+    },
+    {
+      "name": "height_trailing",
+      "call": "getHeight",
+      "reader": "client_height",
+      "args": {},
+      "payload_hex": "0000",
+      "response_hex": "000000",
+      "code": null,
+      "message": "Wallet Wire getHeight response contains trailing data",
+      "value": null
+    },
+    {
+      "name": "listActions_page_10",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "0a000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "000a000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalActions": 10,
+        "actions": [
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "listActions_page_11",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "0b000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "000b000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Wallet Wire listActions response exceeds the requested page limit of 10",
+      "value": null
+    },
+    {
+      "name": "listActions_limit_at",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": [],
+        "limit": 2
+      },
+      "payload_hex": "02000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0002000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalActions": 2,
+        "actions": [
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          },
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "listActions_limit_past",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": [],
+        "limit": 2
+      },
+      "payload_hex": "03000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0003000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Wallet Wire listActions response exceeds the requested page limit of 2",
+      "value": null
+    },
+    {
+      "name": "listActions_over_total",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "00000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0000000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Wallet Wire listActions response returned 1 records but declared a total of 0",
+      "value": null
+    },
+    {
+      "name": "listActions_partial_total",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "64000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0064000000000000000000000000000000000000000000000000000000000000000000010000ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalActions": 100,
+        "actions": [
+          {
+            "txid": "0000000000000000000000000000000000000000000000000000000000000000",
+            "satoshis": 0,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "listActions_empty_total",
+      "call": "listActions",
+      "reader": "client_actions",
+      "args": {
+        "labels": []
+      },
+      "payload_hex": "feffffffff",
+      "response_hex": "00feffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalActions": 4294967295,
+        "actions": []
+      }
+    },
+    {
+      "name": "listOutputs_page_10",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "0affffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000200ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000300ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000500ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000600ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000800ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000900ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "000affffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000200ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000300ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000500ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000600ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000800ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000900ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalOutputs": 10,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.1",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.2",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.3",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.4",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.5",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.6",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.7",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.8",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.9",
+            "satoshis": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "listOutputs_page_11",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "0bffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000200ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000300ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000500ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000600ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000800ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000900ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000a00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "000bffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000200ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000300ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000400ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000500ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000600ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000800ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000900ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000a00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Wallet Wire listOutputs response exceeds the requested page limit of 10",
+      "value": null
+    },
+    {
+      "name": "listOutputs_limit_at",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test",
+        "limit": 2
+      },
+      "payload_hex": "02ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0002ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalOutputs": 2,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+            "satoshis": 0
+          },
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.1",
+            "satoshis": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "listOutputs_limit_past",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test",
+        "limit": 2
+      },
+      "payload_hex": "03ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000200ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0003ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000200ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Wallet Wire listOutputs response exceeds the requested page limit of 2",
+      "value": null
+    },
+    {
+      "name": "listOutputs_over_total",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "00ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0000ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": null,
+      "message": "Wallet Wire listOutputs response returned 1 records but declared a total of 0",
+      "value": null
+    },
+    {
+      "name": "listOutputs_partial_total",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "64ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0064ffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalOutputs": 100,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+            "satoshis": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "listOutputs_empty_total",
+      "call": "listOutputs",
+      "reader": "client_outputs",
+      "args": {
+        "basket": "bound test"
+      },
+      "payload_hex": "feffffffffffffffffffffffffff",
+      "response_hex": "00feffffffffffffffffffffffffff",
+      "code": 0,
+      "message": null,
+      "value": {
+        "totalOutputs": 4294967295,
+        "outputs": []
+      }
+    }
+  ]
+}

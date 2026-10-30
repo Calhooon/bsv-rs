@@ -233,6 +233,227 @@ request/filter/BEEF binding or global graph/byte/unsafe-key checks. Its typed
 integers and keys can reject shapes in Go's words but do not provide these
 reference checks or this refusal order. Existing #137 error-class mapping and
 transport-fault policies remain port extensions.
+### Fixed: wallet wire numeric and pre-entry collection bounds (#473)
+
+The wire readers now make the reference's checks before reading entries or
+allocating their collections. The reference is the unmodified `ts-stack@edf6e03`
+under Node v22.18.0. `tests/wallet_wire_bounds_473.rs` replays the #338 recorder's
+`--bounds-473` mode (`tests/support/wire_bounds_473.mjs`): 73 cases, two runs
+byte-identical, 39 regression tests. Each test is RED on base
+`f9c99065c3ff2bd7395cdfb6cd5238156fd48bab` and GREEN with the bounds.
+
+`getHeight` reads `readVarIntNumStrict(false)`, checks trailing bytes, then
+requires 1 through 4294967295 (`WalletWireTransceiver.ts:1882-1888`). Nine `ff`
+bytes are **not** absence here: the unsigned read refuses them. The signed
+reader's `-1` sentinel is only available when `signed` is true
+(`primitives/readVarIntNumStrict.ts:15-36`, especially `:33-35`). The result
+validator's `getHeight` row says
+`rangedInteger(result.height, call, 'height', 1, 0xffffffff)`
+(`WalletResultValidation.ts:2293-2294`); its expectation is
+`an integer from 1 to 4294967295` (`:946-958`). The transceiver's own refusal,
+which comes first on the client, is `Wallet returned an invalid height`.
+
+The three formerly unbounded unsigned satoshi reads are all **result-side**:
+
+| Rust read | Reference strict read and range | Result validator |
+| --- | --- | --- |
+| `WireReader::read_wallet_action_input`, `source_satoshis` | `WalletWireTransceiver.ts:480-485`, `listActions input sourceSatoshis`, 0 through 21e14 | `WalletResultValidation.ts:2010`, `uint(input.sourceSatoshis, ..., 21e14)` |
+| `WireReader::read_wallet_action_output`, `satoshis` | `WalletWireTransceiver.ts:523-528`, `listActions output satoshis`, 0 through 21e14 | `WalletResultValidation.ts:2053`, `uint(output.satoshis, ..., 21e14)` |
+| `WireReader::read_wallet_output`, `satoshis` | `WalletWireTransceiver.ts:670-675`, `listOutputs satoshis`, 0 through 21e14 | `WalletResultValidation.ts:2105`, `uint(output.satoshis, ..., 21e14)` |
+
+The common domain is also explicit in `validationHelpers.ts:266-270`:
+`!Number.isSafeInteger(v) || v < 0 || v > 21e14` throws
+`WERR_INVALID_PARAMETER(name, 'a valid number of satoshis')`. That helper is
+**request-side**, called by `validateCreateActionOutput` at `:635`, after
+`WalletWireProcessor.ts:376` reads the amount strictly. It is not the function
+invoked by the three result readers. Those use `#requireInteger`'s words
+(`WalletWireTransceiver.ts:2018-2025`), and then the result validator's `uint`
+(`WalletResultValidation.ts:935-943`). Precision is checked before the range.
+
+Collection inventory (P = `WalletWireProcessor.ts`, T =
+`WalletWireTransceiver.ts`, V = `validationHelpers.ts`, R =
+`WalletResultValidation.ts`, all at the pin above). Every count below is checked
+before its entries. The availability check immediately follows the maximum:
+P `:109-126`, T `:1955-1969`; `min` means minimum remaining bytes per entry.
+
+| Side and collection | Reference count/check | Maximum; min | Rust disposition |
+| --- | --- | --- | --- |
+| Request createAction inputs | P:320-324; V:758 | 100000; 1 | Handler remains an explicit full-wallet stub; no corresponding read |
+| Request createAction outputs | P:363-367; V:759 | 100000; 1 | Stub |
+| Request createAction output tags | P:403-413; V:639 | 100000; 1 | Stub |
+| Request createAction labels | P:447-455; V:762 | 100000; 1 | Stub |
+| Request createAction knownTxids | P:495-508; V:662 | 100000; 32 | Stub |
+| Request createAction noSendChange | P:526-538; V:667 | 100000; 33 | Stub |
+| Request createAction sendWith | P:545-557; V:137,795-799 | 1000; 32 (999 when joining a new transaction) | Stub |
+| Request signAction spends | P:655-663; V:835-840,90-91 | 100000; 1 | Added to the existing public spend-map reader; processor remains stub |
+| Request signAction sendWith | P:712-724; V:137,871-875 | 1000; 32 (999 when joining the signed transaction) | Stub |
+| Request listActions labels | P:818-827; V:1691 | 100000; 1 | Stub |
+| Request internalizeAction outputs | P:1072-1080; V:1052 | 100000; 1 | Stub |
+| Request internalizeAction output tags | P:1121-1132; V:948 | 100000; 1 | Added to existing basket-insertion reader; processor remains stub |
+| Request internalizeAction labels | P:1147-1157; V:1054 | 100000; 1 | Stub |
+| Request listOutputs tags | P:1192-1199; V:1637 | 100000; 1 | Stub |
+| Request acquireCertificate fields | P:1864-1877; V:1235,90-91 | 100000; 2 | Stub |
+| Request acquireCertificate keyringForSubject | P:1926-1939; V:1252,90-91 | 100000; 2 | Stub |
+| Request listCertificates certifiers | P:1990-1998; V:1195 | 100000; 33 | Stub |
+| Request listCertificates types | P:2004-2012; V:1198 | 100000; 32 | Stub |
+| Request proveCertificate fields | P:2145-2158; V:1235,90-91 | 100000; 2 | Stub |
+| Request proveCertificate fieldsToReveal | P:2169-2177; V:1506,1513-1514 | 100; 1 | Stub |
+| Request discoverByAttributes attributes | P:2309-2322; V:1560-1561 | 32; 2 (validator requires 1 through 32) | Stub |
+| Result createAction noSendChange | T:246-256; R:1258 | 100000; 33 | Added |
+| Result createAction/signAction sendWithResults | T:258,318,1220-1224; R:1014-1021 | 1001; 33 | Added to their shared reader |
+| Result listActions labels | T:428-433; R:1970 | 100000; 1 | Added |
+| Result listActions inputs | T:450-455; R:1995 | 100000; 1 | Added |
+| Result listActions outputs | T:459-464; R:2041 | 100000; 1 | Added |
+| Result listActions output tags | T:535-540; R:2071 | 100000; 1 | Added |
+| Result listOutputs tags | T:681-686; R:2135 | 100000; 1 | Added |
+| Result listOutputs labels | T:690-695; R:2136 | 100000; 1 | Added |
+| Result listCertificates keyring | T:1515-1517 | 100000; 1 | Already checked |
+| Result proveCertificate keyring | T:1603-1606 | 100000; 1 | Added |
+| Result discovery public keyring, both discovery calls | T:1712-1718 | 100000; 1 | Already checked |
+| Result discovery decrypted fields, both discovery calls | T:1730-1737 | 100000; 1 | Already checked |
+| Result listActions/listOutputs pages | T:386-391,660-665,1940-1952; R:1919-1936 | Requested limit, default 10; returned count at most total | Added; reads the actual page to EOF, not `total` entries |
+| Result listCertificates/discovery pages | T:1508-1510,1550,1699-1701,1759 | Requested limit, default 10; returned count at most total | Already checked |
+
+V's common array bound is `an array of at most 100000 items` (`:105-114`),
+its object bound `an object with at most 100000 properties` (`:90-91`). R's
+common array bound is `at most 100000 entries` (`:971-975`), used by
+`stringArray` (`:978-987`) and the result paths above. Snapshotting separately
+limits the result object graph to 1000000 nodes/properties and an array to
+1000000 entries (`R:215-219,688-742,772-814`); these are post-decode object
+checks, not additional wire collection lengths. Certificate binary fields are
+already bounded at their own count (`auth/certificates/Certificate.ts:356-387`;
+`wire/mod.rs::read_certificate_fields`), not a second request-record encoding.
+
+There is no uncapped logical entry array in these two reference files: each is
+covered above or by the page/result validators. Byte sequences are not subject
+to the 100000-entry collection cap: transaction/BEEF, scripts, error text,
+linkage/proof, encrypted/plain data, signatures/HMACs, certificate payloads,
+UTF-8 strings and keys keep their existing byte/domain checks. In particular a
+page's *total* remains a u32 total, not capped to its page length. Rust's public
+standalone `read_string_array`, `read_string_map`, `read_optional_string_map`
+retain their generic behavior; no arbitrary collection cap was added to them.
+Unimplemented request handlers remain unimplemented, and their missing parsing
+is not claimed fixed by this change.
+
+Caller-visible rows for the **toolbox** follow. `local` means an uncoded
+TypeScript decoder Error / Rust `Error::WalletError`; it is not a remote code-1
+frame. Request-reader errors frame as code 1 if passed through the processor.
+For collection rows, the at-cap frame has no entries: the new availability
+refusal proves the maximum check accepted the count before the next check.
+
+| Check | Value | Old reading | New refusal code and words |
+| --- | --- | --- | --- |
+| getHeight | 0 or 4294967296 | accepted u64 | local: `Wallet returned an invalid height` |
+| getHeight precision | 9007199254740992; unsigned u64::MAX | accepted u64 | local: `number too large to retain precision - use readVarIntBn` |
+| getHeight trailing data | height 0 plus a byte | accepted 0 | local: `Wallet Wire getHeight response contains trailing data` |
+| listActions input sourceSatoshis range | 2100000000000001 | accepted u64 | local: `Invalid listActions input sourceSatoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001` |
+| listActions input sourceSatoshis precision | 9007199254740992; unsigned u64::MAX | accepted u64 | local: `number too large to retain precision - use readVarIntBn` |
+| listActions output satoshis range | 2100000000000001 | accepted u64 | local: `Invalid listActions output satoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001` |
+| listActions output satoshis precision | 9007199254740992; unsigned u64::MAX | accepted u64 | local: `number too large to retain precision - use readVarIntBn` |
+| listOutputs satoshis range | 2100000000000001 | accepted u64 | local: `Invalid listOutputs satoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001` |
+| listOutputs satoshis precision | 9007199254740992; unsigned u64::MAX | accepted u64 | local: `number too large to retain precision - use readVarIntBn` |
+| createAction noSendChange size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire createAction noSendChange exceeds the maximum collection size of 100000` |
+| createAction noSendChange availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire createAction noSendChange count exceeds the remaining response data` |
+| sendWithResults (createAction) size | 1002 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire sendWithResults exceeds the maximum collection size of 1001` |
+| sendWithResults (createAction) availability | 1001, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire sendWithResults count exceeds the remaining response data` |
+| sendWithResults (signAction) size | 1002 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire sendWithResults exceeds the maximum collection size of 1001` |
+| sendWithResults (signAction) availability | 1001, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire sendWithResults count exceeds the remaining response data` |
+| listActions labels size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions labels exceeds the maximum collection size of 100000` |
+| listActions labels availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions labels count exceeds the remaining response data` |
+| listActions inputs size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions inputs exceeds the maximum collection size of 100000` |
+| listActions inputs availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions inputs count exceeds the remaining response data` |
+| listActions outputs size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions outputs exceeds the maximum collection size of 100000` |
+| listActions outputs availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions outputs count exceeds the remaining response data` |
+| listActions output tags size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions output tags exceeds the maximum collection size of 100000` |
+| listActions output tags availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listActions output tags count exceeds the remaining response data` |
+| listOutputs tags size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listOutputs tags exceeds the maximum collection size of 100000` |
+| listOutputs tags availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listOutputs tags count exceeds the remaining response data` |
+| listOutputs labels size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listOutputs labels exceeds the maximum collection size of 100000` |
+| listOutputs labels availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire listOutputs labels count exceeds the remaining response data` |
+| proveCertificate keyring size | 100001 | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire proveCertificate keyring exceeds the maximum collection size of 100000` |
+| proveCertificate keyring availability | 100000, no entries; 1, no entries | local: `ReaderUint8Array read exceeds available data` | local: `Wallet Wire proveCertificate keyring count exceeds the remaining response data` |
+| signAction spends size | 100001 | `ReaderUint8Array read exceeds available data` | Rust WalletError / reference processor code 1: `Invalid signAction spends length: expected 0 through 100000, received 100001` |
+| signAction spends availability | 100000, no entries; 1, no entries | `ReaderUint8Array read exceeds available data` | Rust WalletError / reference processor code 1: `Invalid signAction spends length: exceeds the remaining Wallet Wire frame` |
+| internalizeAction output tags size | 100001 | `ReaderUint8Array read exceeds available data` | Rust WalletError / reference processor code 1: `Invalid internalizeAction output tags length: expected 0 through 100000, received 100001` |
+| internalizeAction output tags availability | 100000, no entries; 1, no entries | `ReaderUint8Array read exceeds available data` | Rust WalletError / reference processor code 1: `Invalid internalizeAction output tags length: exceeds the remaining Wallet Wire frame` |
+| listActions page | 11 returned, default limit 10 | accepted 11 entries | local: `Wallet Wire listActions response exceeds the requested page limit of 10` |
+| listOutputs page | 11 returned, default limit 10 | accepted 11 entries | local: `Wallet Wire listOutputs response exceeds the requested page limit of 10` |
+| listActions declared total | total 0, one entry | accepted empty page, ignored the entry | local: `Wallet Wire listActions response returned 1 records but declared a total of 0` |
+| listOutputs declared total | total 0, one entry | accepted empty page, ignored the entry | local: `Wallet Wire listOutputs response returned 1 records but declared a total of 0` |
+
+The **CLI** operator-visible table shows Rust `Display` (the payload prefixed by `wallet error:`,
+`src/error.rs:204-207`); a reference processor frame keeps its unprefixed payload:
+
+| Check | Value | Old reading | New refusal code and words |
+| --- | --- | --- | --- |
+| getHeight | 0 or 4294967296 | accepted u64 | WalletError (no SDK code): `wallet error: Wallet returned an invalid height` |
+| getHeight precision | 9007199254740992; unsigned u64::MAX | accepted u64 | WalletError (no SDK code): `wallet error: number too large to retain precision - use readVarIntBn` |
+| getHeight trailing data | height 0 plus a byte | accepted 0 | WalletError (no SDK code): `wallet error: Wallet Wire getHeight response contains trailing data` |
+| listActions input sourceSatoshis range | 2100000000000001 | accepted u64 | WalletError (no SDK code): `wallet error: Invalid listActions input sourceSatoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001` |
+| listActions input sourceSatoshis precision | 9007199254740992; unsigned u64::MAX | accepted u64 | WalletError (no SDK code): `wallet error: number too large to retain precision - use readVarIntBn` |
+| listActions output satoshis range | 2100000000000001 | accepted u64 | WalletError (no SDK code): `wallet error: Invalid listActions output satoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001` |
+| listActions output satoshis precision | 9007199254740992; unsigned u64::MAX | accepted u64 | WalletError (no SDK code): `wallet error: number too large to retain precision - use readVarIntBn` |
+| listOutputs satoshis range | 2100000000000001 | accepted u64 | WalletError (no SDK code): `wallet error: Invalid listOutputs satoshis: expected an integer from 0 to 2100000000000000, received 2100000000000001` |
+| listOutputs satoshis precision | 9007199254740992; unsigned u64::MAX | accepted u64 | WalletError (no SDK code): `wallet error: number too large to retain precision - use readVarIntBn` |
+| createAction noSendChange size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire createAction noSendChange exceeds the maximum collection size of 100000` |
+| createAction noSendChange availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire createAction noSendChange count exceeds the remaining response data` |
+| sendWithResults (createAction) size | 1002 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire sendWithResults exceeds the maximum collection size of 1001` |
+| sendWithResults (createAction) availability | 1001, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire sendWithResults count exceeds the remaining response data` |
+| sendWithResults (signAction) size | 1002 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire sendWithResults exceeds the maximum collection size of 1001` |
+| sendWithResults (signAction) availability | 1001, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire sendWithResults count exceeds the remaining response data` |
+| listActions labels size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions labels exceeds the maximum collection size of 100000` |
+| listActions labels availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions labels count exceeds the remaining response data` |
+| listActions inputs size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions inputs exceeds the maximum collection size of 100000` |
+| listActions inputs availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions inputs count exceeds the remaining response data` |
+| listActions outputs size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions outputs exceeds the maximum collection size of 100000` |
+| listActions outputs availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions outputs count exceeds the remaining response data` |
+| listActions output tags size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions output tags exceeds the maximum collection size of 100000` |
+| listActions output tags availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listActions output tags count exceeds the remaining response data` |
+| listOutputs tags size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listOutputs tags exceeds the maximum collection size of 100000` |
+| listOutputs tags availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listOutputs tags count exceeds the remaining response data` |
+| listOutputs labels size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listOutputs labels exceeds the maximum collection size of 100000` |
+| listOutputs labels availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire listOutputs labels count exceeds the remaining response data` |
+| proveCertificate keyring size | 100001 | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire proveCertificate keyring exceeds the maximum collection size of 100000` |
+| proveCertificate keyring availability | 100000, no entries; 1, no entries | WalletError (no SDK code): `wallet error: ReaderUint8Array read exceeds available data` | WalletError (no SDK code): `wallet error: Wallet Wire proveCertificate keyring count exceeds the remaining response data` |
+| signAction spends size | 100001 | `wallet error: ReaderUint8Array read exceeds available data` | WalletError (reference processor code 1): `wallet error: Invalid signAction spends length: expected 0 through 100000, received 100001` |
+| signAction spends availability | 100000, no entries; 1, no entries | `wallet error: ReaderUint8Array read exceeds available data` | WalletError (reference processor code 1): `wallet error: Invalid signAction spends length: exceeds the remaining Wallet Wire frame` |
+| internalizeAction output tags size | 100001 | `wallet error: ReaderUint8Array read exceeds available data` | WalletError (reference processor code 1): `wallet error: Invalid internalizeAction output tags length: expected 0 through 100000, received 100001` |
+| internalizeAction output tags availability | 100000, no entries; 1, no entries | `wallet error: ReaderUint8Array read exceeds available data` | WalletError (reference processor code 1): `wallet error: Invalid internalizeAction output tags length: exceeds the remaining Wallet Wire frame` |
+| listActions page | 11 returned, default limit 10 | accepted 11 entries | WalletError (no SDK code): `wallet error: Wallet Wire listActions response exceeds the requested page limit of 10` |
+| listOutputs page | 11 returned, default limit 10 | accepted 11 entries | WalletError (no SDK code): `wallet error: Wallet Wire listOutputs response exceeds the requested page limit of 10` |
+| listActions declared total | total 0, one entry | accepted empty page, ignored the entry | WalletError (no SDK code): `wallet error: Wallet Wire listActions response returned 1 records but declared a total of 0` |
+| listOutputs declared total | total 0, one entry | accepted empty page, ignored the entry | WalletError (no SDK code): `wallet error: Wallet Wire listOutputs response returned 1 records but declared a total of 0` |
+
+Valid numeric values within the bounds, optional `-1` counts, and page entries
+within the requested limit retain their readings. Complete satoshi values at
+2100000000000000, heights 1 and 4294967295, and ten-entry pages are recorded
+successes. Truncated collections now use the reference's availability words.
+Two older u32 boundary controls now accept an empty page at `u32::MAX`, as
+recorded in #473, while their overflow assertions stay unchanged.
+A shorter page with a larger declared total is accepted; extra entries beyond
+the declared total use `Wallet Wire <call> response returned N records but
+declared a total of M`, as `#assertPageCount` requires. The reader check occurs
+before the entry and allocation; counted records retain u64 until the maximum
+and remaining bytes have been checked, including on wasm32; no dependency or public signature changes.
+
+### Notes: cross-SDK parity
+
+Go at `2ca481c5931b987a0c8f48bb341c70b7477b6b07` does not apply these TypeScript
+numeric or collection bounds at these reads. `wallet/serializer/get_height.go:18`
+uses `ReadVarInt32`, whose `util/reader.go:123-125` casts to u32 without checking
+the range. Satoshis are raw `ReadVarInt` at
+`wallet/serializer/list_actions.go:255,282` and `list_outputs.go:149`.
+`list_actions.go:239-292` loops over the input/output counts and reads tags,
+`list_outputs.go:161-162` reads tags/labels, `create_action_result.go:70-108`
+reads noSendChange/sendWithResults, `sign_action_args.go:60-66` reads spends,
+`internalize_action.go:94` reads insertion tags, and `prove_certificate.go:167`
+reads the result keyring, without these fixed caps. `util/reader.go:238-280`
+checks the string-slice count against `math.MaxInt`, not 100000; the txid-slice
+reader has no such cap. `list_actions.go:44-45` bounds the *outgoing requested*
+limit, not the returned page. This change follows TypeScript under the owner's
+2026-10-26 ruling (c); Go was read, not executed. Existing codec differences,
+including Go's absent-string convention and full-wallet processor stubs, remain.
+
 
 ### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
 

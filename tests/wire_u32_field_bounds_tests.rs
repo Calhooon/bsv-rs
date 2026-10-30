@@ -288,16 +288,6 @@ fn canned(total: u64, rest: &[u8]) -> WalletWireTransceiver<CannedWire> {
     WalletWireTransceiver::new(CannedWire { body })
 }
 
-/// A reader that reads as many entries as the total names: `u32::MAX` with no
-/// entry after it passes the bound and stops at the read of the entry after it.
-fn assert_read_past_total(err: Error) {
-    assert_eq!(
-        err,
-        Error::WalletError("ReaderUint8Array read exceeds available data".into()),
-        "the total accepted, the entry after it short: {err:?}"
-    );
-}
-
 async fn list_actions(total: u64) -> bsv_rs::Result<ListActionsResult> {
     let args = ListActionsArgs {
         labels: vec![],
@@ -321,7 +311,10 @@ async fn list_actions(total: u64) -> bsv_rs::Result<ListActionsResult> {
 async fn a_list_actions_total_above_u32_max_is_refused_not_truncated() {
     let read = list_actions(0).await.unwrap();
     assert_eq!(read.total_actions, 0);
-    assert_read_past_total(list_actions(u32::MAX as u64).await.unwrap_err());
+    // #473: the reference reads the page to EOF, independently of its total.
+    let read = list_actions(u32::MAX as u64).await.unwrap();
+    assert_eq!(read.total_actions, u32::MAX);
+    assert!(read.actions.is_empty());
     assert_eq!(
         list_actions(OVER).await.unwrap_err(),
         refusal("listActions totalActions")
@@ -354,7 +347,9 @@ async fn list_outputs(total: u64) -> bsv_rs::Result<ListOutputsResult> {
 async fn a_list_outputs_total_above_u32_max_is_refused_not_truncated() {
     let read = list_outputs(0).await.unwrap();
     assert_eq!((read.total_outputs, read.beef), (0, None));
-    assert_read_past_total(list_outputs(u32::MAX as u64).await.unwrap_err());
+    let read = list_outputs(u32::MAX as u64).await.unwrap();
+    assert_eq!(read.total_outputs, u32::MAX);
+    assert!(read.outputs.is_empty());
     assert_eq!(
         list_outputs(OVER).await.unwrap_err(),
         refusal("listOutputs totalOutputs")

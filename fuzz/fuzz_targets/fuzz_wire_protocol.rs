@@ -1,7 +1,12 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
+#[path = "support/wire_bounds_473.rs"]
+mod bounds_473;
+mod support;
+
 fuzz_target!(|data: &[u8]| {
+    bounds_473::exercise(data);
     // The JSON intake must also return on malformed or null remittances (#393).
     let _ = serde_json::from_slice::<bsv_rs::wallet::InternalizeOutput>(data);
 

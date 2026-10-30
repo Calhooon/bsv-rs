@@ -10,6 +10,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) and its unique-key rule for both discovery readers (`set_unique_record_entry`, #192), the signature calls' data-type flag writer (#199), the key-related parameters' and privileged pair's writers (#193), the certificate pages' limit and total checks (`require_page_capacity`, `assert_page_count`, #190), the discovery maps' one reading for both readers (`read_discovery_maps`, `read_counted_wire_record`: strict count, key 1 to 50 bytes and safe, unique) and listActions' satoshis in the reference's bound (`read_action_satoshis`, #236), the certificate checks the readers and the writer share (`require_compressed_key`, the field-name and DER checks, #189); the u32 field readers and `integer_refusal` (`#requireInteger`'s words, `WalletWireTransceiver.ts:2018-2025`, every integer bound's; #255) | ~600 |
+| `bounds.rs` | #473 pre-entry collection checks (maximum before available bytes), unsigned satoshi range/precision, getHeight precision/trailing/range, and listActions/listOutputs page readers; generic string-array/map codecs keep their existing behavior | ~144 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
 | `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support; basic reads and `wire_length` in `reader.rs` (#458), every byte length through `wire_length`/`read_length`, compared with the bytes remaining before it is narrowed to `usize` (#192); `certificate_bytes`, the certificate writers' one body: the reference's checks and three bounds, the fields in the signed order (#189, #246) | ~2412 |
 | `processor.rs` | Generic server-side processor over WalletInterface; every call it reads ends in `assert_request_consumed` (#193), then the reference's argument validation, the wallet, the result check (#216); a wallet's `WalletRefusal` or boxed `AbortAccepted` framed with its class's SDK code and words, a class with none as `Wallet operation failed` (#137, #439); the acceptance record stays in Rust; optional event formatting lives in `diagnostics.rs`; the originator read and normalization live in `originator.rs` (#338) | ~929 |
@@ -19,7 +20,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | `validation.rs` | The processor's `validateWalletArgs` and `validateWalletResult` (`ts-stack@edf6e03` `validationHelpers.ts`, `WalletResultValidation.ts`) for the wired calls, in the reference's words: an argument refused code 6 (`WERR_INVALID_PARAMETER`), a result refused code 1; `Refusal` (the code and the words a frame carries); getHeaderForHeight's height in `#requireInteger`'s words (#216); the two linkage calls' raw keys judged as points and their args built, revealSpecificKeyLinkage's absent counterparty refused (#226); the error-to-frame conversion (`From<Error> for Refusal`, `explicit_wallet_code`: a `WalletRefusal`'s or `AbortAccepted`'s class's `wire_code`; `wire_message` keeps its message, #137, #439); all nine cryptographic argument validators and canonical DER predicate shared with `../validation/crypto.rs` (#415, #420); the five remaining validators moved there, the wire wrappers preserving their existing refusal texts; specific linkage takes its required counterparty from the shared validator, removing the unreachable second refusal (#427) | ~599 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191), the keys 33 raw bytes in a private request type for validation to judge (#226); for verifyHmac, the 32 raw HMAC bytes ahead of the data, and for createSignature and verifySignature, the data-type flag (`1` the data, `2` the hash, another refused), verifySignature's signature ahead of it (#199); the seven key-related calls' requests whole, the privileged pair inside the key-related parameters and seekPermission last, getPublicKey's identityKey byte ahead, and `assert_request_consumed`, a byte after the last field refused (#193) | ~308 |
 | `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194); for encrypt, decrypt, createHmac and createSignature, the bytes alone, and for verifyHmac, verifySignature and waitForAuthentication, nothing after the error byte, a false verdict an error frame (#197); abortAction's, the error byte alone or a refusal framed code 8 (#206) | ~148 |
-| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods (the two linkage calls in `linkage.rs`); an error frame coded 2 to 8 read as `WalletRefusal` with its class (`frame_error`, #137); originator validated before constructing a frame, normalized length checked without a truncating cast (#338); internalizeAction always validates before encoding, so the unreachable missing-payment refusal and empty-insertion fallback are removed (#393; the two `*_guard_precedes_encoding_and_sending` tests) | 1636 |
+| `transceiver.rs` | Client-side message serialization: getHeight and the two action/output pages delegate to `bounds.rs` (#473); noSendChange and proveCertificate keyrings checked before entries; 26 of the 28 methods (the two linkage calls in `linkage.rs`); an error frame coded 2 to 8 read as `WalletRefusal` with its class (`frame_error`, #137); originator validated before constructing a frame, normalized length checked without a truncating cast (#338); internalizeAction always validates before encoding, so the unreachable missing-payment refusal and empty-insertion fallback are removed (#393; the two `*_guard_precedes_encoding_and_sending` tests) | 1636 |
 | `linkage.rs` | The transceiver's revealCounterpartyKeyLinkage and revealSpecificKeyLinkage (#406), the reference's request and answer (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790-924`): the arguments judged before a byte is sent and the answer after it is read (each key a point, the level 0 to 2, no trailing byte, then the result bound to the request), the processor's `validation.rs` checks reused | ~205 |
 
 ## Architecture
@@ -315,6 +316,39 @@ Run tests:
 ```bash
 cargo test wallet::wire --features wallet
 ```
+
+### Numeric and collection reads (#473)
+
+`bounds.rs` follows `ts-stack@edf6e03` `WalletWireTransceiver.ts:1882-1888`
+for getHeight: unsigned strict number, consumed response, then 1..=4294967295.
+The result validator repeats the range at `WalletResultValidation.ts:2293-2294`.
+`readVarIntNumStrict.ts:33-35` keeps the signed -1 sentinel only at optional
+sites; all four unsigned numeric reads reject it with the precision words.
+The three satoshi result reads (`T:480-485,523-528,670-675`) check 0..=21e14
+before the next field. Their validators are `R:2010,2053,2105`, not the request
+helper `validationHelpers.ts:266-270` (`a valid number of satoshis`).
+
+The size check precedes the remaining-data check and all collection allocation
+(`T:1955-1969`, `WalletWireProcessor.ts:109-126`). Newly covered: createAction
+noSendChange; createAction/signAction sendWithResults (1001, 33 bytes per entry);
+listActions labels/inputs/outputs/output tags; listOutputs tags/labels;
+proveCertificate keyring (100000, at least one byte per entry); the existing
+signAction spend-map and basket-insertion tag readers (request words).
+`listActions` and `listOutputs` now read until EOF, checking the requested
+limit (default 10) before each entry, and returned count against total after
+it (`T:386-391,660-665,1940-1952`). The total remains a u32 and may exceed the
+returned page length. The certificate/discovery collections already had their
+bounds. See the #473 CHANGELOG inventory for every reference request/result
+site, its validator, and whether Rust has a reader or a full-wallet stub.
+
+Generic standalone `read_string_array`, `read_string_map`, and
+`read_optional_string_map` gain no arbitrary bound. Binary byte payloads keep
+their separate checks. No logical reference entry array is uncapped; counts
+for unimplemented request handlers are documented, not claimed implemented.
+Go `2ca481c` reads the three satoshis as raw varints and height via a narrowing
+u32 cast (`serializer/list_actions.go:255,282`, `list_outputs.go:149`,
+`get_height.go:18`; `util/reader.go:123-125`). Its string-slice guard is
+`math.MaxInt`, not these collection limits (`util/reader.go:263-275`).
 
 ## Cross-SDK Compatibility
 

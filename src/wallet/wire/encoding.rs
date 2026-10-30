@@ -351,7 +351,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads an array of SendWithResults.
     pub fn read_send_with_result_array(&mut self) -> Result<Option<Vec<SendWithResult>>, Error> {
-        let count = self.read_optional_count()?;
+        let count = self.read_response_count("sendWithResults", 1001, 33)?;
         if count == NIL_SENTINEL {
             return Ok(None);
         }
@@ -376,7 +376,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads a map of u32 to SignActionSpend.
     pub fn read_sign_action_spends(&mut self) -> Result<HashMap<u32, SignActionSpend>, Error> {
-        let count = self.read_var_int_num_strict_u64()?;
+        let count = self.read_request_count("signAction spends")?;
         let mut spends =
             HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
@@ -503,7 +503,7 @@ impl<'a> WireReader<'a> {
         let basket = self.read_string()?;
         let custom_instructions = self.read_optional_string()?;
         let tags = {
-            let arr = self.read_string_array()?;
+            let arr = self.read_insertion_tags()?;
             if arr.is_empty() {
                 None
             } else {
@@ -545,7 +545,7 @@ impl<'a> WireReader<'a> {
     /// Reads a WalletActionInput (Go-compatible format).
     pub fn read_wallet_action_input(&mut self) -> Result<WalletActionInput, Error> {
         let source_outpoint = self.read_outpoint()?;
-        let source_satoshis = self.read_var_int()?;
+        let source_satoshis = self.read_satoshis("listActions input sourceSatoshis")?;
         let source_locking_script = self.read_optional_bytes()?;
         let unlocking_script = self.read_optional_bytes()?;
         let input_description = self.read_string()?;
@@ -568,12 +568,12 @@ impl<'a> WireReader<'a> {
     ///          → OutputDescription → Basket → Tags → CustomInstructions
     pub fn read_wallet_action_output(&mut self) -> Result<WalletActionOutput, Error> {
         let output_index = self.read_var_int_u32("listActions output outputIndex")?;
-        let satoshis = self.read_var_int()?;
+        let satoshis = self.read_satoshis("listActions output satoshis")?;
         let locking_script = self.read_optional_bytes()?;
         let spendable = self.read_optional_bool()?.unwrap_or(false);
         let output_description = self.read_string()?;
         let basket = self.read_optional_string()?.unwrap_or_default();
-        let tags = self.read_string_array()?;
+        let tags = self.read_response_strings("listActions output tags")?;
         let custom_instructions = self.read_optional_string()?;
 
         Ok(WalletActionOutput {
@@ -605,7 +605,7 @@ impl<'a> WireReader<'a> {
         let is_outgoing = self.read_optional_bool()?.unwrap_or(false);
         let description = self.read_string()?;
         let labels = {
-            let arr = self.read_string_array()?;
+            let arr = self.read_response_strings("listActions labels")?;
             if arr.is_empty() {
                 None
             } else {
@@ -617,7 +617,7 @@ impl<'a> WireReader<'a> {
         let lock_time = self.read_var_int_u32("listActions lockTime")?;
 
         // Read optional inputs array (Go uses VarInt(MaxUint64) for nil)
-        let inputs_count = self.read_optional_count()?;
+        let inputs_count = self.read_response_count("listActions inputs", 100_000, 1)?;
         let inputs = if inputs_count == NIL_SENTINEL {
             None
         } else {
@@ -630,7 +630,7 @@ impl<'a> WireReader<'a> {
         };
 
         // Read optional outputs array (Go uses VarInt(MaxUint64) for nil)
-        let outputs_count = self.read_optional_count()?;
+        let outputs_count = self.read_response_count("listActions outputs", 100_000, 1)?;
         let outputs = if outputs_count == NIL_SENTINEL {
             None
         } else {
@@ -665,11 +665,11 @@ impl<'a> WireReader<'a> {
     /// Note: Go WalletOutput does NOT have a `spendable` field. Defaults to true.
     pub fn read_wallet_output(&mut self) -> Result<WalletOutput, Error> {
         let outpoint = self.read_outpoint()?;
-        let satoshis = self.read_var_int()?;
+        let satoshis = self.read_satoshis("listOutputs satoshis")?;
         let locking_script = self.read_optional_bytes()?;
         let custom_instructions = self.read_optional_string()?;
         let tags = {
-            let arr = self.read_string_array()?;
+            let arr = self.read_response_strings("listOutputs tags")?;
             if arr.is_empty() {
                 None
             } else {
@@ -677,7 +677,7 @@ impl<'a> WireReader<'a> {
             }
         };
         let labels = {
-            let arr = self.read_string_array()?;
+            let arr = self.read_response_strings("listOutputs labels")?;
             if arr.is_empty() {
                 None
             } else {
