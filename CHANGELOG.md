@@ -272,6 +272,12 @@ TypeScript client at the enumerated sites. The keeper's 2026-10-26 ruling
 on #467 keeps all four totals `u32` at every layer; reference safe integers
 above that range remain a stated representation difference.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
+- Row 2: Ours: the general PushDrop decoder tries both lock positions, but the local canonical-envelope check still refuses these tokens; BRC-48 scripts/0048.md:13-18 and LocalKVStore.ts:278-282 at edf6e03 distinguish the template from this site.
+
+
 ### Fixed: four older LocalKVStore request/result differences (#478)
 
 Local token creation now sends the reference's `forSelf: false`, uses its
@@ -334,6 +340,11 @@ The reference's `set(key, value)` takes no options and always writes one satoshi
 (`LocalKVStore.ts:448,526`). The config and per-set amount options are this
 crate's additions, now recorded in the root divergence list. At one satoshi,
 the search and these four request/result behaviors match the reference.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 5: Ours: an optional local token-amount extension with the reference default of one satoshi; LocalKVStore.ts:449,526 at edf6e03 and BRC-48 scripts/0048.md:33.
+
 
 ### Fixed: local removal stops after two rounds (#483)
 
@@ -399,6 +410,11 @@ the first round is the reason; an inconsistent wallet cannot demand ten
 thousand spends for a key. The reference has no bound at `:574-590` and no
 such typed, counted refusal. This is a deliberate policy divergence, changed
 only by a measurement and never silently.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 4: Ours: the keeper's 02:1xZ word on #483 requires two completed rounds and shrinking totals, versus LocalKVStore.ts:574-590 at edf6e03.
+
 
 ### Fixed: local KVStore original-error messages omit family prefixes (#477)
 
@@ -471,6 +487,11 @@ messages agree and separately pin the Rust parsers' unchanged words.
 Go at `2ca481c`, `kvstore/local_kv_store.go:70-111,347-363,498-516`, wraps errors
 with operation names and has no equivalent `Original error:` contract; the
 TypeScript reference decides this change.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 3: Ours: native parser diagnostics for the same refused bytes; BRC-95 transactions/0095.md:31-32,67-69 specifies the header and missing-subject refusal, not its text.
+
 
 ### Fixed: wallet wire numeric and pre-entry collection bounds (#473)
 
@@ -693,6 +714,11 @@ limit, not the returned page. This change follows TypeScript under the owner's
 2026-10-26 ruling (c); Go was read, not executed. Existing codec differences,
 including Go's absent-string convention and full-wallet processor stubs, remain.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 10: Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+
+
 ### Fixed: HTTP JSON result scalars, bindings and global bounds (#432)
 
 `HttpWalletJson` now checks the remaining 71 rows of the #408 result inventory
@@ -885,6 +911,11 @@ integers and keys can reject shapes in Go's words but do not provide these
 reference checks or this refusal order. Existing #137 error-class mapping and
 transport-fault policies remain port extensions.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 7: Ours: the keeper's 03:1xZ word on #467 selects BRC-100 wallet/0100.md:274 and Wallet.interfaces.ts:31-35 over the JSON validator's wider total. Theirs: ts-stack #1449.
+
+
 ### Fixed: local removal refuses an empty page under a positive total (#479)
 
 `LocalKVStore::remove` now ends on the first empty page whose `totalOutputs` is
@@ -924,6 +955,11 @@ The reference's `set` reads one page at `LocalKVStore.ts:455`, checked at
 incomplete nonempty collapse. It cannot loop this way, so it is unchanged.
 `GlobalKVStore.ts:583-604` makes one overlay query and iterates its output array,
 without reading a total or paging in a loop; it is unchanged too.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 6: Ours: the keeper's 00:1xZ word on #479 bounds a caller's cost when a positive total has an empty page. Theirs: ts-stack #1446.
+
 
 ### Fixed: the wire originator drops one leading byte-order mark (#471)
 
@@ -1051,6 +1087,12 @@ request JSON; #340 adds count/key wrapper cases. Every pre-existing payload
 remains identical when those newly recorded members are removed. No vector was
 hand-edited. Contact helpers and local listing were split to keep touched source
 files below 800 lines and production functions at most 60 lines.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 70: Ours: owned values, canonical reference bytes and the retained legacy token namespace are local boundaries; completeBoundAction.ts:1022-1151 at edf6e03 specifies the matching bound-action path. Theirs: go-sdk, filing pending (the witness: tests/kvstore_bound_action_341_342.rs; tests/kvstore_signaction_326.rs). Draft: [local-kvstore-wallet-contract](./docs/lanes/375-filings/local-kvstore-wallet-contract.md).
+- Row 77: Ours: the bound signable transaction is the signing authority, duplicate outpoints are collapsed, and local derivation/case/request choices are explicit; completeBoundAction.ts:1063-1146, GlobalKVStore.ts:343-380,666-668 at edf6e03 give the comparison.
+
 
 ### Changed: per-input verification work budget (#378, part 2)
 
@@ -1222,6 +1264,12 @@ here with the precision words, as the TypeScript reference refuses it.
 The pre-existing getHeight, unbounded satoshis and missing collection-size
 checks are filed separately and unchanged by this fold.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
+- Row 10: Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+
+
 ### Fixed: short ECIES envelopes use the reference's bounded words (#463)
 
 The lower and upper envelope limits now share the guard in `ecies_bounds.rs`,
@@ -1260,6 +1308,11 @@ follows the TypeScript words under the owner's ruling (c).
 Go's `BitcoreDecrypt` (`compat/ecies/ecies.go:191-208` at `2ca481c`) has no length
 check at all: from reading the code, a short envelope would panic when it is
 sliced (not run).
+
+Census (#375; current reading, historical account above retained):
+
+- Row 8: Ours: the native MAC diagnostic at the exact cap; both sides refuse the unaligned Bitcore envelope (ECIES.ts:710-711 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/compat_ecies_bounds_333.rs). Draft: [ecies-byte-bounds](./docs/lanes/375-filings/ecies-byte-bounds.md).
+
 
 ### Fixed: the Peer's certificate paths, nonce intake and sending bound (#445)
 
@@ -1376,6 +1429,11 @@ certificate-response path (`auth/peer.go:961-963`). It refuses a nonce that
 `base64.StdEncoding` cannot decode at the signer as `failed to decode initial
 nonce` (`auth/peer.go:585-588`). Go was read, not executed for this fold.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 25: Ours: static certificate policies, cancellation of outstanding futures and the native timeout text are local limits against Peer.ts:674,1231-1239 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/auth_peer_certificate_paths_445.rs; tests/vectors/auth_peer_certificate_paths_445.json). Draft: [peer-certificate-count-bound](./docs/lanes/375-filings/peer-certificate-count-bound.md).
+
+
 ### Fixed: one wallet double-spend retry for revocation and the global key-value store (#340)
 
 The global store now retries `set` and `remove` after a wallet's structured
@@ -1441,6 +1499,11 @@ corrects the recorder's comment and output description only; all cases are
 unchanged, and the revised output is byte-identical on rerun. No vector bytes
 were edited by hand. Recording and tests inject all lookup and broadcast
 answers in process; no live host or default port is used.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 77: Ours: the bound signable transaction is the signing authority, duplicate outpoints are collapsed, and local derivation/case/request choices are explicit; completeBoundAction.ts:1063-1146, GlobalKVStore.ts:343-380,666-668 at edf6e03 give the comparison.
+
 
 ### Fixed: required flag reasons and the original sighash census (#453)
 
@@ -1565,6 +1628,11 @@ The too-short envelope's words (`Data too short` here at `ecies.rs:180-181` and
 `:327-328`, the reference's bounded-envelope words at `ECIES.ts:589-594` and
 `:704-709`) are filed as #463 for a lane.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 8: Ours: the native MAC diagnostic at the exact cap; both sides refuse the unaligned Bitcore envelope (ECIES.ts:710-711 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/compat_ecies_bounds_333.rs). Draft: [ecies-byte-bounds](./docs/lanes/375-filings/ecies-byte-bounds.md).
+
+
 ### Fixed: internalizeAction's unreachable wire fallbacks and JSON null remittances (#393)
 
 The two notes from #384's review are resolved. The transceiver's
@@ -1631,6 +1699,11 @@ beside an `outputIndex` that is not a `u32`, is refused in serde's words before 
 presence check here, where the reference gives its crossed-remittance words there
 (`validationHelpers.ts:971-977` before `:979`); both sides refuse, only the words
 differ, in the existing typed-reading class.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 79: Ours: the typed null/presence boundary and code-free deserialization error are native choices; validationHelpers.ts:966-984 at edf6e03 refuses the same selected null remittance before wallet dispatch.
+
 
 ### Fixed: out-of-scope words are not judged; live Genesis authority (#452, #451)
 
@@ -1858,6 +1931,11 @@ This is a Rust API extensibility change. HMAC issuance, verification,
 legacy acceptance counts and the strict nonce path retain #379's behavior
 and its cross-SDK parity reading.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: ts-stack #1369. Theirs: go-sdk, filing pending (the witness: tests/vectors/wallet_hmac_key_379.json; tests/wallet_hmac_issuance_379.rs). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
+
+
 ### Fixed: the wallet wire's originator bound and normalization (#338)
 
 The processor used to pass an originator through without checking its length
@@ -1922,6 +2000,11 @@ of 255, with no 250-byte check or hostname normalization. Its writer casts the
 length to `byte` and can wrap above 255. Rust follows TypeScript's 250-byte
 bound and refuses before writing. The existing empty-originator difference
 remains: Rust dispatches `None`, TypeScript dispatches `''`.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
+
 
 ### Verified: handshake refusal words and signed-header order (#366, #369)
 
@@ -2003,6 +2086,12 @@ That transport calls `authpayload.FromHTTPResponse` at `:195`;
 headers. Go agrees on letter/digit/dash names and differs on the wider
 token punctuation witness. Go was read, not executed in this lane.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 68: Ours: typed transport-fault classes follow the keeper's #87 division, and native reason-phrase/UTF-16 representation is a platform boundary; SimplifiedFetchTransport.ts:220-232,464-579 at edf6e03 records the refusal.
+- Row 78: Ours: reference-compatible localeCompare ordering; BRC-104 peer-to-peer/0104.md:105,196,209 says lexicographic but names no locale or byte comparator, so the keeper must settle the signed-header profile. Theirs: BRCs, filing pending (the witness: tests/transport_header_collation_369.rs; tests/vectors/transport_header_collation_369.json). Draft: [signed-header-sort](./docs/lanes/375-filings/signed-header-sort.md).
+
+
 ### Fixed: spend every current key-value token (#343)
 
 `GlobalKVStore::set` now requests token data for the exact key, controller and
@@ -2072,6 +2161,11 @@ here, `data: sha256(preimage)` in the reference's `PushDrop.ts:246-248`) is
 crate-wide and older than this change; it and the local lookup pagination gap
 (`LocalKVStore.ts:332-339,574-590`) are filed as follow-ups.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 77: Ours: the bound signable transaction is the signing authority, duplicate outpoints are collapsed, and local derivation/case/request choices are explicit; completeBoundAction.ts:1063-1146, GlobalKVStore.ts:343-380,666-668 at edf6e03 give the comparison.
+
+
 ### Fixed: required script flag refusals name the word's missing flag (#434)
 
 `ScriptFlags::check` still requires SIGHASH_FORKID, GENESIS and
@@ -2111,6 +2205,11 @@ Pinning the census messages exposes one existing wording difference:
 encoding for the public key and signature.` where the TypeScript recording
 returns `The signature format is invalid.` Both refusals and their distinct
 messages are now pinned; no interpreter behavior is changed for that row.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 11: Ours: the existing native CHECKMULTISIG diagnostic on the same refusal; node.tx-valid.shared.0097 in tests/vectors/script_forkid_census_429.json and the #434 parity note pin both messages.
+
 
 ### Added: typed wallet faults and stored abort acceptance (#439)
 
@@ -2254,6 +2353,11 @@ crate refuses a pre-Genesis coin. Its zero-valued activation fields make the
 rules active from the start (`heights.go:3-16`); this crate instead follows
 the SV node's refusal of zero. Pre-Genesis interpretation remains unsupported
 here, as described above.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 12: Ours: the live-door policy and unsupported pre-Genesis boundary follow the keeper's 2026-10-28/29 rulings recorded in #440; bitcoin-sv v1.2.2 validation.cpp:1032 selects tip plus one. Theirs: go-sdk, filing pending (the witness: tests/beef_stream_word_440.rs; tests/beef_stream_word_440.rs). Draft: [spv-chain-era-policy](./docs/lanes/375-filings/spv-chain-era-policy.md).
+
 
 ### Fixed: Peer nonce claims, certificate-session lookup and validation waits (#362, #363, #364)
 
@@ -2485,6 +2589,11 @@ output authorization and trusted-input-amount extension are not exposed by
 either store and are not added here. Rust errors retain the `KvStoreError`
 variant and its display prefix.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 70: Ours: owned values, canonical reference bytes and the retained legacy token namespace are local boundaries; completeBoundAction.ts:1022-1151 at edf6e03 specifies the matching bound-action path. Theirs: go-sdk, filing pending (the witness: tests/kvstore_bound_action_341_342.rs; tests/kvstore_signaction_326.rs). Draft: [local-kvstore-wallet-contract](./docs/lanes/375-filings/local-kvstore-wallet-contract.md).
+
+
 ### Changed: issue the amended BRC-56 minimal-length HMAC key; name and count the 32-byte-key tag as legacy (#379, PR #389)
 
 The owner's two words, through the keeper:
@@ -2589,6 +2698,11 @@ here under `BothEncodings`, but it refuses our leading-zero minimal-key
 tags. No claim is made about Go after that pin. This is the HMAC row's
 reading for #375; the main-merge gate is not changed.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: ts-stack #1369. Theirs: go-sdk, filing pending (the witness: tests/vectors/wallet_hmac_key_379.json; tests/wallet_hmac_issuance_379.rs). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
+
+
 ### Fixed: the KVStore reader accepts the reference writer's untagged token (#344)
 
 The public token reader now distinguishes exactly five fields (no tags,
@@ -2670,6 +2784,11 @@ context has no controller selector. The rest of the reference's canonical
 PushDrop, protocol/value/controller bounds, overlay selector/active-state checks and
 local-token authentication are outside this tag fix; it does not claim full
 reader parity. The #326 signAction/previous-token findings remain separate.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 70: Ours: owned values, canonical reference bytes and the retained legacy token namespace are local boundaries; completeBoundAction.ts:1022-1151 at edf6e03 specifies the matching bound-action path. Theirs: go-sdk, filing pending (the witness: tests/kvstore_bound_action_341_342.rs; tests/kvstore_signaction_326.rs). Draft: [local-kvstore-wallet-contract](./docs/lanes/375-filings/local-kvstore-wallet-contract.md).
+
 
 ## [0.9.0-beta.3] - 2026-10-28
 
@@ -2846,6 +2965,11 @@ The reference writers use `JSON.stringify` (`auth-express-middleware/src/index.t
 and Rust's header writer uses `serde_json::to_string` (`http.rs:581`). #422's
 H3/H3b/H5/H5b verdicts remain historical evidence of the old behavior above.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 58: Ours: the certificateResponse preimage preserves transmitted text; BRC-103 peer-to-peer/0103.md:133-137,172 does not specify canonical JSON, and the keeper selected parsed-object parity only for certificateRequest (#426, 2026-10-28 12:1xZ). Theirs: BRCs, filing pending (the witness: tests/auth_signed_text_280.rs; tests/vectors/auth_signed_text_280.json). Draft: [auth-certificate-json-preimage](./docs/lanes/375-filings/auth-certificate-json-preimage.md).
+
+
 ### Fixed: inherent specific-key linkage returns counterparty keys, as the trait does (#427)
 
 `ProtoWallet::reveal_specific_key_linkage` now returns the counterparty's
@@ -2905,6 +3029,12 @@ Go at `2ca481c` resolves the same three forms to public keys
 public keys serialize compressed; #420's existing input-encoding and
 type-enforced limitations still apply. No current-reference result-form
 divergence remains for the three representable counterparty variants.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 19: Ours: the newer reference is the authority under CLAUDE.md rule 1: ProtoWallet.ts:235-250 at edf6e03 returns compressed keys; the 9e3ede6b alias forms are historical reference-version evidence.
+
+
 ### Fixed: the default mode accepts signatures without the fork-ID bit over the original digest (#429)
 
 Without an explicit flag word, a `0x01` signature at transaction version 1
@@ -3026,6 +3156,11 @@ empty word. Rust still refuses that word before execution. #429 adds no
 DER-off API and does not change those existing findings.
 
 The default accepts a pre-fork form no BSV wallet produces because the reference's default does, and the node refuses it, so a door on a live chain passes the word. `Transaction::verify` (`src/transaction/transaction.rs:1821`) and the streaming reader take no word, so they accept a `0x01` signature over the original digest now, as the reference's `Transaction.verify` and `Beef.verifyValid` do; a door that wants the node's verdict runs `Spend::set_flags` per input.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 13: Ours: the node order-overflow predicate and the supported-word boundary are local choices; bitcoin-sv v1.2.2 interpreter.cpp:265-310 and the three DER-off witnesses in tests/script_signature_words_417.rs expose the unsupported empty word, not an upstream defect.
+
 
 ### Changed: the default mode runs all ten Chronicle opcodes at every version, gates the Chronicle hash type by version, and uses the reference's non-minimal-number words (#397)
 
@@ -3166,6 +3301,11 @@ format is invalid.`): the second fold took the gate's inner words at
 `Spend.ts:591`, which the wrapper at `:622-625` never lets out; the third
 fold answers the wrapper's words, by the captain's reading of rule 1, and
 no words difference remains.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 30: Ours: the keeper's 2026-10-28 05:1xZ/07:1xZ words select the reference's three independent default switches. Theirs: ts-stack #1437. Theirs: go-sdk, filing pending (the witness: tests/script_chronicle_default_397.rs; tests/vectors/script_signature_words_417.json). Draft: [chronicle-default-hash-type](./docs/lanes/375-filings/chronicle-default-hash-type.md).
+
 
 ### Fixed: ProtoWallet validates signature and HMAC arguments before cryptography (#415)
 
@@ -3441,6 +3581,11 @@ accepted uncompressed counterparty (or parser error for malformed long hex)
 invalid public key: Point not on curve
   -> The counterparty parameter must be a valid compressed secp256k1 public key
 
+Census (#375; current reading, historical account above retained):
+
+- Row 71: Ours: the native multi-substrate API owns its validation and originator-forwarding boundary; WalletClient.ts:83-118 at edf6e03 is broader, while BRC-100 specifies the wallet interface rather than a required client constructor.
+
+
 ### Notes: cross-SDK parity (#420)
 
 The five validators and every reachable refusal follow `ts-stack@edf6e03`
@@ -3572,6 +3717,11 @@ present-bit signature is accepted; the recorder can replay the saved
 inputs against either build. No DER-off behavior or flag support is changed
 by this fix.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 13: Ours: the node order-overflow predicate and the supported-word boundary are local choices; bitcoin-sv v1.2.2 interpreter.cpp:265-310 and the three DER-off witnesses in tests/script_signature_words_417.rs expose the unsupported empty word, not an upstream defect.
+
+
 ### Added: the wire transceiver makes revealCounterpartyKeyLinkage and revealSpecificKeyLinkage as the reference's does; the client's existing linkage arms route to it (#406)
 
 The finding (#404's second item, split out by the keeper on 2026-10-28
@@ -3680,6 +3830,12 @@ absent, `serializer.go:177-190`), reads the answer to its end
 security level unbounded (`serializer.go:165-174`), and checks nothing
 against the request; its two vectors are this transceiver's bytes both
 ways.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 72: Ours: native compressed-key refusal text differs while refusing the same malformed keys (WalletWireTransceiver.ts:790-924 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/wire_linkage_calls_406.rs; tests/vectors/wallet_wire/linkage_calls_406.json). Draft: [linkage-reason-and-result-validation](./docs/lanes/375-filings/linkage-reason-and-result-validation.md).
+
+
 ### Fixed: `HttpWalletJson` reads every success-path byte field as the reference's `HTTPWalletJSON` does, the historical object form included (#365)
 
 The reference runs `normalizeBRC100WalletByteFields` over every answer's
@@ -3780,6 +3936,11 @@ result with `json.Unmarshal` (`wallet/substrates/http_wallet_json.go:77-79`,
 (`wallet/encoding.go:24-31`), which `encoding/json` also reads from a
 base64 string (`"AQID"` is `[1 2 3]`, a text the reference refuses), and
 normalizes nothing.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 55: Ours: the keeper's #137 fault-class reading accepts toolbox name envelopes, and native JSON parsing retains its own refusal words; HTTPWalletJSON.ts:199-267,322-341 at edf6e03 is the comparison, not a finding against that parser.
+
 
 ### Fixed: the HTTP auth transport's handshake, JSON, certificate-header and redirect refusals use the reference's words (#410)
 
@@ -3928,6 +4089,12 @@ requested certificates in response: %w` (`:220-227`). Its default
 `http.Client{}` and supplied client use their own redirect policy
 (`:31-44`, `:111`, `:175`); no `CheckRedirect` is installed. Those Go words
 and policy are not the TypeScript reference's.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 74: Ours: native JSON/string/number and diagnostic representations remain bounded by the Rust data model; SimplifiedFetchTransport.ts:158-162 at edf6e03 delegates to JSON.parse, with the nine nonfinite cases recorded in the #410 parity note.
+
+
 ### Verified: a general message's wallet refusal precedes the Peer's own signature words (#407)
 
 The proposed change in #407 would replace a `ProtoWallet`'s error with the
@@ -4126,6 +4293,12 @@ multi-substrate client (its `wallet/README.md` names a
 (`substrates.NewHTTPWalletJSON(originator, baseURL, httpClient)`,
 `NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
 originator per call.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 71: Ours: the native multi-substrate API owns its validation and originator-forwarding boundary; WalletClient.ts:83-118 at edf6e03 is broader, while BRC-100 specifies the wallet interface rather than a required client constructor.
+
+
 ### Fixed: SimplifiedFetchTransport applies the reference's six response bounds and mappings (#416)
 
 The #410 fold left three response mappings as documented divergences; its
@@ -4288,6 +4461,11 @@ to measure the path Rust implements; the older reference reaches its handler
 through normal intake. This crate still implements the listener path, not
 the reference's automatic certificate response or all of its intake/replay
 checks. The Rust tests exercise its full HTTP-to-Peer path without an adapter.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 75: Ours: builder configuration and typed HTTP framing are native API choices; SimplifiedFetchTransport.ts:234-428 at edf6e03 supplies the matched response bounds. Theirs: go-sdk, filing pending (the witness: tests/auth_transport_bounds_416.rs; tests/vectors/auth_http_certificate_request_416.json). Theirs: ts-stack, filing pending (the witness: tests/auth_transport_bounds_416.rs; tests/vectors/auth_http_certificate_request_416.json). Draft: [auth-http-response-bounds](./docs/lanes/375-filings/auth-http-response-bounds.md).
+
 
 ### Changed: the auth and identity certificate maps and `resolve_by_attributes`'s attributes keep insertion order, the reference's `Record` order, one order through the crate after the wallet's (#394)
 
@@ -4540,6 +4718,11 @@ behind `http`, as it was; #404 moves the client core under `wallet` with the
 HTTP substrates behind `http` (the keeper's word of 2026-10-28), and has the
 client implement `WalletInterface` as the reference's does (`WalletClient.ts:82`).
 
+Census (#375; current reading, historical account above retained):
+
+- Row 69: Ours: native insertion order and the bounded collation profile are owned limitations; BRC-52 peer-to-peer/0052.md:99-103 requires an issuer's actual signed order, and the keeper's 2026-10-28 04:5xZ word selects ordered attribute lookup bodies.
+
+
 ### Notes: cross-SDK parity (#335)
 
 The reference's client validates every call's arguments and its result
@@ -4556,6 +4739,12 @@ multi-substrate client (its `wallet/README.md` names a
 (`substrates.NewHTTPWalletJSON(originator, baseURL, httpClient)`,
 `NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
 originator per call.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 71: Ours: the native multi-substrate API owns its validation and originator-forwarding boundary; WalletClient.ts:83-118 at edf6e03 is broader, while BRC-100 specifies the wallet interface rather than a required client constructor.
+
+
 ### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release` (#401)
 ### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release`; the #382 dhat pin at a twelfth of its memory (#401)
 
@@ -4797,6 +4986,11 @@ requested certificates in response: %w` (`:220-227`). Its default
 (`:31-44`, `:111`, `:175`); no `CheckRedirect` is installed. Those Go words
 and policy are not the TypeScript reference's.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 74: Ours: native JSON/string/number and diagnostic representations remain bounded by the Rust data model; SimplifiedFetchTransport.ts:158-162 at edf6e03 delegates to JSON.parse, with the nine nonfinite cases recorded in the #410 parity note.
+
+
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 
 The finding (#331's fourth fold's cold re-review, at `bb80a525`): five
@@ -4971,6 +5165,12 @@ skip applies under explicit flags alone, `Spend.ts:827-848`), where this
 crate's default runs them as `OP_NOP4`-`OP_NOP8` unless the coin is marked
 post-Chronicle (`aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` at version 1:
 `ok true` there, a refusal here). Both are #397, with the keeper's word (the opcode gate and the words follow the reference's default; the cross-SDK filing ts-stack #1437).
+
+Census (#375; current reading, historical account above retained):
+
+- Row 29: Ours: explicit words follow bitcoin-sv v1.2.3 src/script/int_serialization.h:61-118 and interpreter.cpp:1708-1721; SDK mode separately follows Spend.ts:540-561 at edf6e03, including its words.
+
+
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 
 The finding (#331's fourth fold's cold re-review, at `bb80a525`): five
@@ -5186,6 +5386,11 @@ signer sorts and their JSON is #268's (a follow-up decides whether they move
 too); a wallet certificate converted from one takes the signed order. (#394,
 above, moves them.)
 
+Census (#375; current reading, historical account above retained):
+
+- Row 69: Ours: native insertion order and the bounded collation profile are owned limitations; BRC-52 peer-to-peer/0052.md:99-103 requires an issuer's actual signed order, and the keeper's 2026-10-28 04:5xZ word selects ordered attribute lookup bodies.
+
+
 ### Fixed: internalizeAction judges an output's protocol and its one remittance before the remittances' fields, as the reference orders it (#384)
 
 `wallet::validation::validate_internalize_action_args` read each output's
@@ -5249,6 +5454,11 @@ an absent remittance in its own words (`payment remittance is required for
 wallet payment protocol`, `wallet/serializer/internalize_action.go:29-30`;
 `insertion remittance is required for basket insertion protocol`, `:38-39`)
 and writes the protocol's remittance alone, dropping the other.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 79: Ours: the typed null/presence boundary and code-free deserialization error are native choices; validationHelpers.ts:966-984 at edf6e03 refuses the same selected null remittance before wallet dispatch.
+
 
 ### Added: the streaming BEEF reader takes the caller's memory budget for its scripts, as `Transaction::verify` does since #331 (#373)
 
@@ -5405,6 +5615,11 @@ counts the big-number library's working memory (BN.js, OpenSSL's `BIGNUM`).
 The reference's `OP_NUM2BIN` refusal writes no number
 (`OP_NUM2BIN size exceeds the node int32 push limit.`, `:1942`); this crate's
 words are its own.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 64: Ours: the keeper's #331/#374 words (2026-10-27 and 21:5xZ) select uncapped defaults, allocator declines and reference-limit verdicts; the 1 GiB element cap remains this crate's boundary. Theirs: ts-stack, filing pending (the witness: tests/script_reference_read_limit_331.rs). Draft: [arithmetic-range-error-verdict](./docs/lanes/375-filings/arithmetic-range-error-verdict.md).
+
 
 ## [0.9.0-beta.2] - 2026-10-28
 
@@ -5829,6 +6044,11 @@ the reference's `Spend` by #378. go-sdk@2ca481c's
 policy's 100,000,000 bytes (`interpreter.DefaultMaxStackMemory`,
 `spv/verify.go:64-68`).
 
+Census (#375; current reading, historical account above retained):
+
+- Row 64: Ours: the keeper's #331/#374 words (2026-10-27 and 21:5xZ) select uncapped defaults, allocator declines and reference-limit verdicts; the 1 GiB element cap remains this crate's boundary. Theirs: ts-stack, filing pending (the witness: tests/script_reference_read_limit_331.rs). Draft: [arithmetic-range-error-verdict](./docs/lanes/375-filings/arithmetic-range-error-verdict.md).
+
+
 ### Changed: a push runs exactly the required set; the measurements run on dispatch and before every tag, each in its own workflow with its own badge (the owner's word of 2026-10-27)
 
 The owner's word at 20:1xZ, 2026-10-27, through the keeper: "sick of seeing
@@ -6092,6 +6312,11 @@ status <n>: <body>`).
 `notDelayedResults`, `src/storage/traits.rs:289,337`, are its own types),
 so there is nothing of its to compare.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 55: Ours: the keeper's #137 fault-class reading accepts toolbox name envelopes, and native JSON parsing retains its own refusal words; HTTPWalletJSON.ts:199-267,322-341 at edf6e03 is the comparison, not a finding against that parser.
+
+
 ### Fixed: `SimplifiedFetchTransport` refuses a general answer without valid BSV authentication, in the reference's words (#354)
 
 A general message's answer whose auth headers were absent was read as
@@ -6207,6 +6432,11 @@ classes here, where the reference's `#sendAuthMessage` throws
 `#createUnauthenticatedResponseError`'s words with `response lacked
 required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
 follow-up is #366).
+
+Census (#375; current reading, historical account above retained):
+
+- Row 68: Ours: typed transport-fault classes follow the keeper's #87 division, and native reason-phrase/UTF-16 representation is a platform boundary; SimplifiedFetchTransport.ts:220-232,464-579 at edf6e03 records the refusal.
+
 
 ### Fixed: `Peer`'s client path verifies the initial response and general messages as the reference's `Peer` does: the nonce, the session, the pinned identity, the signature (#353)
 
@@ -6627,6 +6857,11 @@ words are this crate's: the reference's `fetch` throws its runtime's
 JSON substrate's `validateWalletArgs` before the request are not carried:
 findings outside #323.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 53: Ours: native-only HTTP constructors and diagnostic types; HTTPWalletJSON.ts:280-314 and HTTPWalletWire.ts:17-20 at edf6e03 separate browser Origin handling from the native originator contract. Theirs: go-sdk, filing pending (the witness: tests/wallet_http_originator_323.rs). Draft: [http-wallet-origin-redirect](./docs/lanes/375-filings/http-wallet-origin-redirect.md).
+
+
 ### Deprecated: the ARC client surface, nowhere a default (#350)
 
 The owner's word of 2026-10-27: "arc is just deprecated, arcade is the
@@ -6731,6 +6966,11 @@ struct with no constructor and no default URL (GorillaPool appears only in
 `docs/examples/broadcaster/broadcaster_gp/broadcaster_gp.go:16`), and Go has no
 `LivePolicy` (`transaction/fee_model/` holds `sats_per_kb.go` alone): the
 caller names every ARC URL there, as this crate now asks.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 54: Ours: the owner's 2026-10-27 word on #350 deprecates ARC and removes default service URLs; DefaultBroadcaster.ts:1-12 and LivePolicy.ts:10 at edf6e03 record the deliberate difference.
+
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
@@ -6853,6 +7093,11 @@ Spends }` (`kvstore/local_kv_store.go:342-345`, `:494-497`), the bytes
 createAction answered (`Reference []byte`, `wallet/interfaces.go:203-206`,
 `:222-226`), and no options: the reference's bytes, without
 `completeBoundAction`'s options.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 70: Ours: owned values, canonical reference bytes and the retained legacy token namespace are local boundaries; completeBoundAction.ts:1022-1151 at edf6e03 specifies the matching bound-action path. Theirs: go-sdk, filing pending (the witness: tests/kvstore_bound_action_341_342.rs; tests/kvstore_signaction_326.rs). Draft: [local-kvstore-wallet-contract](./docs/lanes/375-filings/local-kvstore-wallet-contract.md).
+
 
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 
@@ -7056,6 +7301,11 @@ request timeout, `:30-37`) is not this crate's: outside #320. The tail of the re
 runtime's (`fetch failed` under Node); this crate's is `redirect refused:
 {status}`.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 67: Ours: an injected reqwest client owns its redirect policy; SimplifiedFetchTransport.ts:64-67,128,212 at edf6e03 instead passes a per-request fetch option. Theirs: go-sdk, filing pending (the witness: tests/transport_client_hook_320.rs). Draft: [auth-http-redirects](./docs/lanes/375-filings/auth-http-redirects.md).
+
+
 ### Fixed: `electrum_decrypt` finds an embedded key the reference's way, so a no-key envelope of any length opens (#109)
 
 With an expected sender, `compat::ecies::electrum_decrypt` decided from the
@@ -7141,6 +7391,11 @@ off-curve rows), the difference CLAUDE.md lists for certificate keys
 (#183). The reference bounds an envelope at 16 MiB + 160 bytes
 (`ECIES.ts:12`, `:589-594`, `CompatValidation.ts:1`), which this crate
 does not: a finding outside #109.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 66: Ours: native field-prime key rejection is earlier than the reference MAC/mismatch refusal (Point.ts:365-367 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/compat_ecies_envelope_109.rs; tests/vectors/compat_ecies_envelope_109.json). Draft: [electrum-envelope-key-detection](./docs/lanes/375-filings/electrum-envelope-key-detection.md).
+
 
 ### Fixed: the Socket.IO codec reads a frame as `socket.io-parser` reads it, and carries the id on every packet (#110)
 
@@ -7236,6 +7491,11 @@ within `u64` is exact here and the nearest double there, so
 `18446744073709552000` there. The JSON numbers' differences are #285's.
 go-sdk@2ca481c carries no Socket.IO codec.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 51: Ours: the supported Socket.IO packet/id and Rust string domain is narrower than socket.io-parser 4.2.7; tests/socketio_packet_validity_110.rs records each refused shape without claiming the reference rejects it.
+
+
 ### Fixed: the identity client's wallet calls send what the reference sends (#318)
 
 `IdentityClient` passed `"identity-client"` as the originator on every
@@ -7325,6 +7585,11 @@ signAction the hex of the reference (`src/identity/contacts.rs:447`,
 `:438`), the same fault as the revocation's: a finding outside #318,
 closed by #326.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 65: Ours: the typed certificate member order and stored map order are local serialization choices; IdentityClient.ts:502-509 and identityTokenValidation.ts at edf6e03 authenticate and accept either object order.
+
+
 ### Fixed: `Transaction::verify` answers a decline as a decline, and the block path's consensus budget can be the node's verdict (#38)
 
 Two gaps the docs pass of #36 left. First, `Transaction::verify` evaluates
@@ -7404,6 +7669,11 @@ error with two `%w`, `ErrScriptVerificationFailed` and the interpreter's own,
 so `errors.Is(err, ctx.Err())` tells a stopped evaluation from an invalid
 script (`spv/verify.go:64-76`, `:547-560`); it carries no consensus figure.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 64: Ours: the keeper's #331/#374 words (2026-10-27 and 21:5xZ) select uncapped defaults, allocator declines and reference-limit verdicts; the 1 GiB element cap remains this crate's boundary. Theirs: ts-stack, filing pending (the witness: tests/script_reference_read_limit_331.rs). Draft: [arithmetic-range-error-verdict](./docs/lanes/375-filings/arithmetic-range-error-verdict.md).
+
+
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 
 `IdentityClient::publicly_reveal_attributes` called createAction with the
@@ -7460,6 +7730,11 @@ The originator: the recorder's reference was configured with
 `"identity-client"`, so the two calls carry the same originator in the
 vector; by default the reference sends none where this crate sent
 `"identity-client"`, the difference of #318, closed there.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 65: Ours: the typed certificate member order and stored map order are local serialization choices; IdentityClient.ts:502-509 and identityTokenValidation.ts at edf6e03 authenticate and accept either object order.
+
 
 ### Fixed: `Certificate` parses its signature's DER and re-encodes it on read, as the reference does (#305)
 
@@ -7554,6 +7829,12 @@ cannot parse, writing none (`certificate.go:274-280`), then writes
 is re-encoded on write, not written as given. `Verify` parses with
 `ec.ParseSignature` and returns `failed to parse signature` (`:168-172`).
 This crate follows the reference.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+
+
 ### Fixed: the identity token `publicly_reveal_attributes` publishes is the reference's, signed by the subject, and createAction's empty answer is refused (#310)
 
 `IdentityClient::publicly_reveal_attributes` locked its identity token as
@@ -7671,6 +7952,11 @@ The reference's createAction asks for the output alone with
 `acceptDelayedBroadcast: false`. Not changed here (outside #310's three
 items); a finding for its own issue, fixed by #315.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 65: Ours: the typed certificate member order and stored map order are local serialization choices; IdentityClient.ts:502-509 and identityTokenValidation.ts at edf6e03 authenticate and accept either object order.
+
+
 ### Fixed: `publicly_reveal_attributes` verifies the master certificate, and checks the names to reveal, before any wallet call, as the reference does (#307)
 
 `IdentityClient::publicly_reveal_attributes` refused a certificate with no
@@ -7774,6 +8060,11 @@ integer-like; a wallet of another order (a Go map's) is named otherwise
 here, the bound in the message that value's. Every value is refused in
 either order.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 63: Ours: integer-like map keys keep native insertion order; the noninteger case follows IdentityClient.ts:485,492-499 and validationHelpers.ts:488-498 at edf6e03, with the residual explicitly owned by #385.
+
+
 ### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
 
 `ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
@@ -7864,6 +8155,12 @@ reference holds hex text and answers `false` at `verify`; this crate holds
 bytes and refuses the text where it reads it (`Certificate`'s JSON), as Go,
 whose `Signature` is a `util.ByteString`, refuses it at its JSON
 (`util/bytestring.go:26-42`).
+
+Census (#375; current reading, historical account above retained):
+
+- Row 59: Ours: the verification verdict follows Certificate.ts:425-440 at edf6e03; rejecting non-hex at the native byte boundary rather than later is a local representation choice under BRC-52 peer-to-peer/0052.md:93,103.
+
+
 ### Fixed: `Certificate::to_binary` and `from_binary` carry the reference's 16 MiB frame and 72-byte signature bounds (#301)
 
 `Certificate::to_binary` wrote and `from_binary` read a frame of any length
@@ -7920,6 +8217,11 @@ reference's `Signature.fromDER` at both sites (`Certificate.ts:310`, `:396`)
 and its re-encoding on read (`sig.toString('hex')`, `:397`); `Certificate`
 keeps the signature's bytes as given, the wire's reader and writer alone
 parse the DER (#183, #189).
+
+Census (#375; current reading, historical account above retained):
+
+- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+
 
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
@@ -8061,6 +8363,11 @@ and the 72-byte signature bound and DER re-encoding at both
 (`:300-312`, `:389-398`); the two bounds are carried since #301, the DER
 parse and re-encoding remain the wire's alone.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+
+
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 
 `Certificate::to_binary` wrote and `from_binary` read a field value of any
@@ -8124,6 +8431,12 @@ field!` and `Failed to decrypt all master certificate fields.`,
 `MasterCertificate.ts:622`, `:560`; `Failed to decrypt selectively
 revealed certificate fields using keyring: <words>`,
 `VerifiableCertificate.ts:214-217`): the inner refusal is returned as is.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 60: Ours: native ordering and UTF-8 diagnostic residuals; BRC-52 peer-to-peer/0052.md:97-103 preserves the signed text without specifying a runtime error type. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_bounds_297.rs; tests/vectors/auth_certificate_signature_der_305.json; tests/auth_certificate_frame_bounds_301.rs). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+
+
 ### Fixed: `Peer` refuses a malformed requested certificate set where the reference does, on its own policy and on receipt (#294)
 
 `validate_requested_certificate_set` refuses a type ID that is not base64
@@ -8218,6 +8531,11 @@ malformed policy reach `process_certificate_response` unchecked, where the
 reference's `Peer` holds only a policy it validated at construction
 (`Peer.ts:158`); a policy that enters through `Peer`'s own doors is checked.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 62: Ours: constructor-time validation, missing/null modeling and aggregate-budget coverage remain local limitations against AuthMessageValidation.ts:107-162 and Peer.ts:158 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/auth_requested_set_validation_294.rs). Draft: [requested-certificate-set-validation](./docs/lanes/375-filings/requested-certificate-set-validation.md).
+
+
 ### Fixed: a JSON number reads to the correctly rounded double, so a Socket.IO frame round-trips every finite `f64` (#285)
 
 The Socket.IO codec (`src/auth/transports/socketio/codec.rs`) reads and
@@ -8270,6 +8588,12 @@ it back as `null`, so the reference's encoding of such a frame is not a
 fixed point (its data changes); this crate refuses the frame as
 `Malformed` with `serde_json`'s reason (rule 5: the exact value back or a
 refusal), pinned by `a_number_past_the_double_range_is_refused_with_a_reason`.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 50: Ours: the typed JSON domain preserves u64 and refuses non-finite values rather than rewriting them; BRC-103 peer-to-peer/0103.md:133-137 does not mandate JSON number re-encoding, and tests/socketio_float_round_trip.rs pins this local representation.
+
+
 ### Changed: `RequestedCertificateSet::types` keeps insertion order, as the reference's `Record` does (#288)
 
 `RequestedCertificateSet::types` was a `HashMap<String, Vec<String>>`
@@ -8466,6 +8790,11 @@ upstream filing against ts-stack is the keeper's to carry. go-sdk at
 `UnlockingScriptLength` is read and written by `wallet/serializer` alone)
 and judges neither.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 57: Ours: BRC-100 wallet/0100.md:649 requires a positive unlockingScriptLength, with native early bound wording. Theirs: ts-stack, filing pending (the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Theirs: go-sdk, filing pending (the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Draft: [create-action-positive-script-length](./docs/lanes/375-filings/create-action-positive-script-length.md).
+
+
 ### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
 
 `Certificate::from_binary` refused a revocation outpoint index above
@@ -8494,6 +8823,12 @@ precision bound) into the outpoint string; its `toBinary` refuses one above
 truncation above the bound) and its writer writes a `uint32` (`:20-25`).
 This crate's reader refuses it: no SDK writer produces the oversized index,
 so the bound meets the north star's "accept what the reference accepts".
+
+Census (#375; current reading, historical account above retained):
+
+- Row 47: Ours: native u32 index types and bound-error wording follow the transaction outpoint width (BRC-100 wallet/0100.md:274). Theirs: go-sdk #387. Theirs: ts-stack, filing pending (the witness: tests/auth_reader_bounds.rs). Draft: [certificate-outpoint-bound](./docs/lanes/375-filings/certificate-outpoint-bound.md).
+
+
 ### Removed: the processor's `with_config`, `network()` and `version()` (#222)
 
 `WalletWireProcessor::with_config`, `network()` and `version()`,
@@ -8597,6 +8932,11 @@ sends verifies here as received, and a text whose map keys are not sorted
 BRC-103's (`0103.md:133-137`, `:172`); the sentence for upstream, "the
 signature is over the UTF-8 bytes of the JSON text as transmitted", is
 the keeper's filing.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 58: Ours: the certificateResponse preimage preserves transmitted text; BRC-103 peer-to-peer/0103.md:133-137,172 does not specify canonical JSON, and the keeper selected parsed-object parity only for certificateRequest (#426, 2026-10-28 12:1xZ). Theirs: BRCs, filing pending (the witness: tests/auth_signed_text_280.rs; tests/vectors/auth_signed_text_280.json). Draft: [auth-certificate-json-preimage](./docs/lanes/375-filings/auth-certificate-json-preimage.md).
+
 
 ### Changed: the secrets scan covers the commits the event brings (#272)
 
@@ -8794,6 +9134,11 @@ index is written by TypeScript alone (its default issuance,
 (`go-sdk@2ca481c` `transaction/outpoint.go:50`); this crate reads it as the
 reference does and writes `<txid>.<index>` always.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 52: Ours: cached decryptedFields is omitted and an absent revocation outpoint is retained as None in this typed API; BRC-52 peer-to-peer/0052.md:85-103 and Certificate.ts:257-258 at edf6e03 define serialization separately. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_json_268.rs). Draft: [certificate-txid-only-outpoint](./docs/lanes/375-filings/certificate-txid-only-outpoint.md).
+
+
 ### Added: what `auth_certificate.json` vector 0 is, and the test that says so (#252)
 
 Vector 0 of `tests/vectors/auth_certificate.json` (added by 91dacc5,
@@ -8885,6 +9230,12 @@ counterpart: they refuse at the read in `#requireInteger`'s words, named
 `readVarIntNumStrict` ahead of `#requireInteger`; the `u32` readers here
 read the whole varint and refuse it in `#requireInteger`'s words, as they
 refused it in #122's.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 44: Ours: early u32 bounds and native read-site diagnostics; BRC-100 wallet/0100.md:274 defines the widths. Theirs: go-sdk #387. Theirs: ts-stack, filing pending (the witness: tests/wire_method_roundtrip_tests.rs; tests/wire_u32_field_bounds_tests.rs). Draft: [wire-input-index-width](./docs/lanes/375-filings/wire-input-index-width.md).
+
+
 ### Fixed: `read_identity_certificate` refuses a trust outside 1 to 10 in the reference's words (#247)
 
 `WireReader::read_identity_certifier`, which `read_identity_certificate` and
@@ -8924,6 +9275,12 @@ and reads any byte (`:66`, `cert.CertifierInfo.Trust = r.ReadByteValue()`), so
 the entry it writes for an absent certifier info (its zero value, trust 0) is
 refused by this crate's readers as by the reference's; the divergence is the
 #183 line of `CLAUDE.md`'s list, now naming both readers.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk, filing pending (the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
+
+
 ### Changed: a duplicate at an even offset is read as the reference reads it (#167)
 
 A BUMP leaf flagged duplicate (`01`) at an even offset was refused on every
@@ -9066,6 +9423,12 @@ and with `legalOffsetsOnly` false reads it, its walk never reading the
 node at the path's own offset (`MerklePath::new_unchecked` reads it as that
 does). Through 0.9.0-beta.1 this crate refused every even-offset duplicate
 (the published section's #167 entry); the BRC-74 question is upstream.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 39: Ours: strict complete-buffer framing, carried-node consistency and the legal-offset boundary are this reader choice; BRC-74 transactions/0074.md:59-79 leaves the even-offset duplicate question to the recorded upstream clarification. Theirs: BRCs #357.
+
+
 ### Added: a wallet refusal carries its class, `Error::WalletRefusal` (#137)
 
 Every refusal a wallet returned reached this crate as
@@ -9203,6 +9566,12 @@ the pre-fix tree. `tests/wallet_http_json_busy_tests.rs`'s
 and 7 as their classes. `tests/fixtures/wire/error_frames.json` re-recorded in
 its own commit: cases `status_2` to `status_8` read back as the class, their
 bytes unchanged.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 45: Ours: the keeper's 2026-10-25 division and #137 map toolbox fault names to SDK classes; HTTPWalletJSON.ts:199-267 and WalletWireProcessor.ts:2406-2418 at edf6e03 document the differing envelopes.
+
+
 ### Changed: a certificate verifies over the issuer's bytes and signs in the reference's field order; `Certificate` is `#[non_exhaustive]` (#249)
 
 **The break, once (0.9.0's minor).** `auth::Certificate` is
@@ -9602,6 +9971,13 @@ for a BRC-207 module inventory record (`0100.md:1963`, `:1974-1980`);
 nothing this crate serves is a module inventory, and a field that carries no
 verdict here does not move ahead of a consumer that asks (the owner's word,
 2026-10-26).
+
+Census (#375; current reading, historical account above retained):
+
+- Row 48: Ours: the owner's 2026-10-26 #105 item-4 reading of BRC-100 wallet/0100.md:1401-1411 requires these members, as Wallet.interfaces.ts:870-881 at edf6e03 does.
+- Row 49: Ours: the owner's 2026-10-26 #105 reading serves ordinary spendable outputs only; BRC-100 wallet/0100.md:1963,1974-1980 reserves zero for an explicit module inventory.
+
+
 ### Changed: a BEEF is valid whatever its order on the wire; the whole path sorts before judging, the stream holds a child by its index entry until its parent is in, under no bound (#240)
 
 0.9.0-beta.1 (bsv-rs#86) judged a BEEF's transactions in the order written:
@@ -9999,6 +10375,11 @@ refuse a total other than the page's length (`list_certificates.go:86-88`,
 processor writes for a wallet whose total exceeds the page, and enforces no
 page limit. This crate follows the reference.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 43: Theirs: go-sdk #387.
+
+
 ### Fixed: two residual leniencies of the wire readers: a repeated keyring key, a length cut on wasm32 (#192)
 
 Left by the cold review of #184. `WireReader::read_identity_certificate`
@@ -10155,6 +10536,11 @@ go-sdk neither writes nor reads the code: its processor writes nothing for an
 `wallet/serializer/abort_action.go:33-36`), so a refusal is a success frame,
 and its client answers `Aborted: true` for any success (`:38-43`). This crate
 follows the reference.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 42: Theirs: go-sdk, filing pending (the witness: tests/wire_error_frames.rs). Draft: [wire-abort-refusal](./docs/lanes/375-filings/wire-abort-refusal.md).
+
 
 ### Fixed: `read_identity_certificate` takes the transceiver's three readings; a listActions satoshis value in the reference's bound (#236)
 
@@ -10386,6 +10772,11 @@ its own keyring helper (`create_keyring_for_verifier`,
 `src/wallet/wallet.rs:3127`) reads the keyring that issuance writes. Once the
 issuance and the helper move to the reference's scheme, every certificate the
 toolbox issued under the old one is re-issued.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 46: Ours: BRC-52 peer-to-peer/0052.md:99-103 permits retained binary preimages; the ICU-root subset, fallback ties and JSON serialization environment are local limitations. Theirs: go-sdk #388. Theirs: ts-stack #1396.
+
 
 ## [0.9.0-beta.1] - 2026-10-26
 
@@ -10798,6 +11189,11 @@ normalize: `NewSeed` hashes the raw bytes (`compat/bip39/bip39.go:256-257`),
 and its lists are NFD, so Go refuses the NFC phrase this crate prints and seeds
 a non-NFKD passphrase otherwise; the seeds agree where Go's input is already
 NFKD.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 37: Theirs: go-sdk, filing pending (the witness: tests/compat_bip39_nfkd.rs; tests/vectors/bip39_japanese.json). Draft: [bip39-nfkd](./docs/lanes/375-filings/bip39-nfkd.md).
+
 
 ### Changed: the fuzz crates are formatted and checked (#180)
 
@@ -11260,6 +11656,11 @@ go-sdk@2ca481c writes nothing for a false verdict as for a true one
 `:40-44`); this crate follows the TypeScript reference, an error frame for a
 false verdict and a byte after the error byte refused.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 40: Theirs: go-sdk, filing pending (the witness: tests/wire_error_frames.rs). Draft: [wire-false-verdicts](./docs/lanes/375-filings/wire-false-verdicts.md).
+
+
 ### Fixed: both linkage responses put the three keys ahead of everything (#194)
 
 `WalletWireProcessor` wrote revealCounterpartyKeyLinkage's result as
@@ -11467,6 +11868,11 @@ is p + k, for a k that is on the curve, is accepted there, while
 `PublicKey::from_bytes` (k256) refuses it. Such a key is not the encoding of
 any point that this crate or TS writes.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk, filing pending (the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
+
+
 ### Fixed: the transceiver reads certificate results as the reference writes them (#177)
 
 A client on this crate's transceiver could not read a certificate that this
@@ -11551,6 +11957,11 @@ change of the public API's shape, the owner's word).
 `WireReader::read_identity_certificate` and `read_optional_identity_certifier`
 still read the old layout: no caller in the crate, outside this fix, the
 follow-up filed as #184.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk, filing pending (the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
+
 
 ### Fixed: the identity-certificate readers read the reference's layout (#184)
 
@@ -11897,6 +12308,11 @@ read a prefix of the bytes they are handed; this
 crate's `from_binary` refuses a byte after the frame and its `from_reader`
 reads the prefix. The slice's refusal is a tightening past every reference, taken from the charter's one bound and its `trailingBytes` refusal, with the reader form as the parity path.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 39: Ours: strict complete-buffer framing, carried-node consistency and the legal-offset boundary are this reader choice; BRC-74 transactions/0074.md:59-79 leaves the even-offset duplicate question to the recorded upstream clarification. Theirs: BRCs #357.
+
+
 ### Changed: the interpreter is split by opcode group (#85)
 
 `src/script/spend.rs` (4,419 lines) is the directory `src/script/spend/`:
@@ -12097,6 +12513,11 @@ leniency against the BRC's "must". This crate refuses it on both paths, by
 the charter (`InputNamesNoElement`); the stack records the divergence row
 (child before parent, two transactions).
 
+Census (#375; current reading, historical account above retained):
+
+- Row 36: Ours: the shared reader treats reserved BEEF/BUMP forms strictly; BRC-62 transactions/0062.md:68 and BRC-74 transactions/0074.md:66-77 define the encoded flags. Theirs: ts-stack, filing pending (the witness: tests/beef_two_readers_agree.rs). Theirs: go-sdk, filing pending (the witness: tests/beef_two_readers_agree.rs). Draft: [beef-reserved-flags-duplicates](./docs/lanes/375-filings/beef-reserved-flags-duplicates.md).
+
+
 ### Changed: the BIP-39 wordlists are data, not code (#89)
 
 The nine `src/compat/bip39/wordlists/<language>.rs` tables (11,055 lines of
@@ -12276,6 +12697,11 @@ a timeout is a fault with no promise, a broadcaster's fault says whether the
 request was sent, and a rate limit is never a verdict. The wire, every
 request the crate sends and every success path are unchanged.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 34: Ours: typed transport outcome and Retry-After handling follow the stack's rows 26/30 and the keeper's 2026-10-25 #87 division; the older ARC.ts:189-195,219-222 and Go arc.go:162-180,245-249 expose unclassified failures.
+
+
 ### Added: a minimal-length-key HMAC tag refused by name (#148)
 
 BRC-56 keys the HMAC with the shared point's X coordinate as exactly 32
@@ -12314,6 +12740,11 @@ big-endian bytes. This crate makes it under the 32 bytes, as the Go SDK does
 `primitives/ec/symmetric.go:82-90`), and as Python and rs-sdk do by the
 keeper's ruling of 2026-10-24. For one key in 256 a ts-sdk tag fails here; the
 refusal names that gap rather than accept it.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 20: Ours: the owner's 19.5(a), 2026-10-28, authorizes named and counted legacy acceptance; strict issuance/verification follows BRC-56 at d4ce8119f wallet/0056.md:56,66,71-89. Theirs: ts-stack #1369. Theirs: go-sdk, filing pending (the witness: tests/vectors/wallet_hmac_key_379.json; tests/wallet_hmac_issuance_379.rs). Draft: [hmac-minimal-key](./docs/lanes/375-filings/hmac-minimal-key.md).
+
 
 ### Fixed: the wallet wire's optional varints in the reference's plain form (#149)
 
@@ -12363,6 +12794,11 @@ output) leaves as absence's nine `0xFF`, as TS's does. BRC-100 names `VarInt`
 and `-1` for absence (`:1646-1647`, `:1661`, `:1741`, `:1799-1800`; `5119a9b`
 the same nine lines later) and gives no encoding of a negative: its `VarInt`
 (`:1620-1628`) is unsigned.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 16: Ours: the optional-offset writer accepts nonnegative values and only -1 for absence; BRC-100 at 5119a9b names an unsigned VarInt and an absence sentinel, without specifying an encoding for arbitrary negative offsets (the #149 parity reading).
+
 
 ### Fixed: a dead function under every slice without `script` (#115)
 
@@ -12770,6 +13206,12 @@ transaction a byte-reversed txid that nothing finds (the vectors' TypeScript
 generator uses `mergeTransaction`). The writer emits the cut closure (the
 change above), so what this crate writes, TS 3 reads.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 33: Ours: the owner's 2026-10-22 ruling traverses every raw ancestor even behind a proof, with no positional rule; BRC-95 transactions/0095.md:41-56 explains the narrower TS cut. Theirs: go-sdk, filing pending (the witness: tests/beef_atomic_graph.rs). Draft: [atomic-unrelated-data](./docs/lanes/375-filings/atomic-unrelated-data.md).
+- Row 56: Ours: parsing locates the subject while verification judges its graph; BRC-95 transactions/0095.md:51-69 assigns the graph condition to validation, enforced by verify_stream and verify_valid here.
+
+
 ## [0.8.0] - 2026-10-21
 
 Breaking: 0.8.0. `Error` is now `#[non_exhaustive]` and gains `WalletBusy`;
@@ -13131,6 +13573,12 @@ Canonical varints agree with the node and TS strict readers; Go v1.7.1
 uses the CompactSize methods. The tests are `canonical_varint`,
 `chain_encoding` and `chain_primitives`; the vectors CI job runs all three.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 14: Ours: raw base58 follows the strict SDK entry point; bitcoin-sv v1.2.3 src/base58.cpp:25-79 intentionally also accepts whitespace and empty input, as tests/chain_encoding.rs records.
+- Row 15: Theirs: go-sdk, filing pending (the witness: tests/canonical_varint.rs). Draft: [canonical-varint-reader](./docs/lanes/375-filings/canonical-varint-reader.md).
+
+
 ## [0.5.0] - 2026-10-12
 
 ### Mining checks in the streaming BEEF reader (bsv-stack-lean #68)
@@ -13435,6 +13883,11 @@ Read at the pin, not run against the reference:
   crate's walk asks it of every transaction it reaches, as its reader does;
   through 0.4.2 its walk exempted what the reference refuses.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 31: Theirs: ts-stack, filing pending (the witness: tests/vectors/beef_of_any_size/no_input_atomic.bin; tests/vectors/beef_of_any_size/no_output_atomic.bin). Draft: [beef-empty-transactions](./docs/lanes/375-filings/beef-empty-transactions.md).
+
+
 ## [0.4.2] - 2026-10-10
 
 The whole-BEEF path (`Beef::from_binary` then `Beef::verify_valid`) walks a
@@ -13539,6 +13992,11 @@ Read at the pin, not run against the reference:
   (`Beef.ts:1070`, `:1101-1104`). This crate reads each entry, as its reader
   does.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 32: Ours: whole-buffer framing and the proof-based txid-only policy; BRC-62 transactions/0062.md:54-69 and BRC-95 transactions/0095.md:51-69 distinguish framing, proof and ancestry checks. Theirs: ts-stack, filing pending (the witness: tests/merkle_path_lone_leaf.rs). Draft: [merkle-lone-leaf-offset](./docs/lanes/375-filings/merkle-lone-leaf-offset.md).
+
+
 ## [0.4.1] - 2026-10-09
 
 A raw transaction with no input is invalid bytes (bsv-stack-lean #58, found by
@@ -13599,6 +14057,11 @@ The posture of 0.4.0 stands: nothing is refused for a size or a count.
   sort at `:1456-1470` queues an unproven transaction with no input with
   nothing to wait on), so it reads these bytes as valid. This crate follows
   the node. Read at the pin, not run against the reference.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 31: Theirs: ts-stack, filing pending (the witness: tests/vectors/beef_of_any_size/no_input_atomic.bin; tests/vectors/beef_of_any_size/no_output_atomic.bin). Draft: [beef-empty-transactions](./docs/lanes/375-filings/beef-empty-transactions.md).
+
 
 ## [0.4.0] - 2026-10-09
 
@@ -13811,6 +14274,11 @@ a reader whose memory does not grow with the body.
   `REQUESTED_BY_NETWORK` (`metamorph_api.proto:13-28`). Here, as in the
   reference, those two words on a 2xx are `ERR_INVALID_RESPONSE`.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 34: Ours: typed transport outcome and Retry-After handling follow the stack's rows 26/30 and the keeper's 2026-10-25 #87 division; the older ARC.ts:189-195,219-222 and Go arc.go:162-180,245-249 expose unclassified failures.
+
+
 ## [0.3.33] - 2026-10-06
 
 ### Changed
@@ -13894,6 +14362,11 @@ a reader whose memory does not grow with the body.
   this crate's default mode keeps that. Under a word this crate follows the
   node's measured build where the reference source is undefined: a stated
   finding, scoped as above.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 29: Ours: explicit words follow bitcoin-sv v1.2.3 src/script/int_serialization.h:61-118 and interpreter.cpp:1708-1721; SDK mode separately follows Spend.ts:540-561 at edf6e03, including its words.
+
 
 ## [0.3.31] - 2026-09-29
 
@@ -14417,6 +14890,11 @@ unless named.
   "NULLDUMMY always enforced" is re-cut to the version gate. Driving the
   node fixtures through `ScriptFlags::from_names` is the next census step.
 
+Census (#375; current reading, historical account above retained):
+
+- Row 27: Ours: explicit words follow node era gates and NULLFAIL; bitcoin-sv v1.2.2 interpreter.cpp:265-310,360-375 and src/script/flags.rs retain SDK defaults separately.
+
+
 ## [0.3.25] - 2026-09-22
 
 ### Fixed
@@ -14772,6 +15250,14 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   `counterparty=Self` derives a different signing key, so signatures
   differ and Go-produced tokens fail TS validators too. The Go SDK
   needs its own fix; `bsv-rs` matches the deployed reality.
+
+Census (#375; current reading, historical account above retained):
+
+- Row 21: Ours: optional module coverage and local overlay services; BRC-48 scripts/0048.md defines a template, not a requirement that every SDK expose every helper.
+- Row 22: Theirs: ts-stack, filing pending (the witness: src/totp/core.rs; src/totp/core.rs). Draft: [totp-default-digits](./docs/lanes/375-filings/totp-default-digits.md).
+- Row 23: Ours: a nonce is issued and checked by its own peer, and its local wallet derivation uses base64 keyID; BRC-103 peer-to-peer/0103.md:133-137 leaves nonce internals unspecified, while createNonce.ts:26-43 at edf6e03 and Go create_nonce.go:23-32 show the distinct inputs.
+- Row 26: Theirs: go-sdk, filing pending (the witness: tests/overlay_admin_token_ts_parity_tests.rs; tests/vectors/overlay_admin_token_ts_parity.json). Draft: [overlay-admin-derivation](./docs/lanes/375-filings/overlay-admin-derivation.md).
+
 
 ## Earlier releases (from the release commits; no entries were written at the time)
 
