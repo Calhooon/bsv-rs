@@ -2,7 +2,10 @@
 //! once, never reparsed through each ancestor. Arrays keep only container
 //! children and byte statistics, not an allocation for every scalar byte.
 
-use super::{boundary::unsafe_key, invalid, key_order, Result};
+use super::{
+    boundary::{unsafe_key, MAX_BYTES},
+    invalid, key_order, Result,
+};
 use indexmap::IndexMap;
 #[cfg(feature = "http")]
 use num_traits::ToPrimitive;
@@ -10,7 +13,6 @@ use serde_json::value::RawValue;
 #[cfg(feature = "http")]
 use std::ops::Range;
 
-const MAX_BYTES: usize = 256 * 1024 * 1024;
 const MAX_NODES: usize = 1_000_000;
 
 enum Member<'a> {
@@ -276,7 +278,7 @@ impl<'a> Snapshot<'a> {
                 return Err(invalid(
                     call,
                     "byte arrays",
-                    "at most 268435456 total bytes",
+                    &format!("at most {MAX_BYTES} total bytes"),
                 ));
             }
         } else {

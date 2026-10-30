@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the raw result tree reads the shared byte bound (#512)
+
+- `result_values/raw_tree.rs` drops its own copy of the 256 MiB bound and formats its `byte arrays` refusal from `boundary::MAX_BYTES`, the one definition `wire.rs` reads since #502; the words stay `at most 268435456 total bytes` and no behaviour changes.
+
 ### Fixed: require documentation before landing and skip tag benchmark comparisons (#515)
 
 The first beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41058300024)
