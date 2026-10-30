@@ -224,7 +224,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     }
 
     fn invalid_value(&self, error: Error) -> Error {
-        refused(format!("Invalid value found. Relinquish the corrupted output from the {} basket before using this key again. Original error: {}", self.config.protocol_id, message(&error)))
+        refused(format!("Invalid value found. Relinquish the corrupted output from the {} basket before using this key again. Original error: {}", self.config.protocol_id, original_error_message(&error)))
     }
 }
 
@@ -290,12 +290,16 @@ fn decode_token(script: &LockingScript) -> Result<PushDrop> {
     Ok(token)
 }
 
-// Rust's display prefixes are categories, not the wallet's Error.message.
-pub(super) fn message(error: &Error) -> String {
+// Local catches use Error.message, not these variants' display categories.
+// Read payloads directly: their own text may legitimately start with a prefix.
+pub(super) fn original_error_message(error: &Error) -> String {
     match error {
-        Error::WalletError(text) | Error::KvStoreError(text) | Error::KvStoreLocalError(text) => {
-            text.clone()
-        }
+        Error::WalletError(text)
+        | Error::KvStoreError(text)
+        | Error::KvStoreLocalError(text)
+        | Error::BeefError(text)
+        | Error::TransactionError(text) => text.clone(),
+        Error::WalletFault(fault) => fault.message.clone(),
         _ => error.to_string(),
     }
 }

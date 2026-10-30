@@ -25,7 +25,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
-| `local_lookup.rs` | Local output limit/total checks, exact BEEF and canonical token authentication (#454) | 301 |
+| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction for lookup and action wrappers (#477) | 305 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454) | 46 |
 | `local_list.rs` | Existing convenience listing, separated to keep functions below the size limit | 78 |
 
@@ -678,6 +678,16 @@ text, merged BEEF, every unlocking script and each signature request.
 10/100 limits and different error wrappers; TypeScript decides this behavior.
 Migration: additive `Error::KvStoreLocalError`; callers matching bare wallet
 errors must handle the wrapped text. Public store/config paths are unchanged.
+
+Since #477, all four catches use `original_error_message`: `WalletFault`'s
+message, BEEF/transaction payloads and the three existing wallet/kvstore string
+payloads are kept without their outer categories; every other variant uses its
+Display text. Payload text is never stripped by matching a prefix. The nine
+tests in `kvstore_local_original_error_477.rs` compare whole wrapped strings,
+including four fault families and real malformed BEEF/action replies. The
+#326 `--kvstore-local-454` recorder adds 60 injected and six malformed cases;
+the original four action records are unchanged. The parsers' pre-existing word
+differences are stated in the #477 changelog parity note.
 
 ### Empty removal page (#479)
 

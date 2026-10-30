@@ -319,5 +319,482 @@
         }
       ]
     }
-  ]
+  ],
+  "original_errors_477": {
+    "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+    "messages": {
+      "wallet_fault": "backend: café\nretry",
+      "beef_error": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+      "transaction_error": "beef must conform to BRC-95 and must contain the subject txid.",
+      "wallet_error": "wallet error: preserve this payload",
+      "kvstore_error": "kvstore error: preserve this payload",
+      "kvstore_local_error": "local: preserve this payload"
+    },
+    "injected": [
+      {
+        "kind": "wallet_fault",
+        "operation": "get",
+        "stage": "listOutputs",
+        "message": "backend: café\nretry",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "set",
+        "stage": "listOutputs",
+        "message": "backend: café\nretry",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "get",
+        "stage": "getPublicKey",
+        "message": "backend: café\nretry",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "set",
+        "stage": "getPublicKey",
+        "message": "backend: café\nretry",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "get",
+        "stage": "verifySignature",
+        "message": "backend: café\nretry",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "set",
+        "stage": "verifySignature",
+        "message": "backend: café\nretry",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "set",
+        "stage": "createAction",
+        "message": "backend: café\nretry",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "remove",
+        "stage": "createAction",
+        "message": "backend: café\nretry",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "set",
+        "stage": "signAction",
+        "message": "backend: café\nretry",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "wallet_fault",
+        "operation": "remove",
+        "stage": "signAction",
+        "message": "backend: café\nretry",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: backend: café\nretry"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "get",
+        "stage": "listOutputs",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "listOutputs",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "get",
+        "stage": "getPublicKey",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "getPublicKey",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "get",
+        "stage": "verifySignature",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "verifySignature",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "createAction",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "signAction",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "remove",
+        "stage": "signAction",
+        "message": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "get",
+        "stage": "listOutputs",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "set",
+        "stage": "listOutputs",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "get",
+        "stage": "getPublicKey",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "set",
+        "stage": "getPublicKey",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "get",
+        "stage": "verifySignature",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "set",
+        "stage": "verifySignature",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "set",
+        "stage": "createAction",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "set",
+        "stage": "signAction",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "remove",
+        "stage": "signAction",
+        "message": "beef must conform to BRC-95 and must contain the subject txid.",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "get",
+        "stage": "listOutputs",
+        "message": "wallet error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "set",
+        "stage": "listOutputs",
+        "message": "wallet error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "get",
+        "stage": "getPublicKey",
+        "message": "wallet error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "set",
+        "stage": "getPublicKey",
+        "message": "wallet error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "get",
+        "stage": "verifySignature",
+        "message": "wallet error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "set",
+        "stage": "verifySignature",
+        "message": "wallet error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "set",
+        "stage": "createAction",
+        "message": "wallet error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "message": "wallet error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "set",
+        "stage": "signAction",
+        "message": "wallet error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "wallet_error",
+        "operation": "remove",
+        "stage": "signAction",
+        "message": "wallet error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: wallet error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "get",
+        "stage": "listOutputs",
+        "message": "kvstore error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "set",
+        "stage": "listOutputs",
+        "message": "kvstore error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "get",
+        "stage": "getPublicKey",
+        "message": "kvstore error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "set",
+        "stage": "getPublicKey",
+        "message": "kvstore error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "get",
+        "stage": "verifySignature",
+        "message": "kvstore error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "set",
+        "stage": "verifySignature",
+        "message": "kvstore error: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "set",
+        "stage": "createAction",
+        "message": "kvstore error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "message": "kvstore error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "set",
+        "stage": "signAction",
+        "message": "kvstore error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_error",
+        "operation": "remove",
+        "stage": "signAction",
+        "message": "kvstore error: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: kvstore error: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "get",
+        "stage": "listOutputs",
+        "message": "local: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "set",
+        "stage": "listOutputs",
+        "message": "local: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "get",
+        "stage": "getPublicKey",
+        "message": "local: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "set",
+        "stage": "getPublicKey",
+        "message": "local: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "get",
+        "stage": "verifySignature",
+        "message": "local: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "set",
+        "stage": "verifySignature",
+        "message": "local: preserve this payload",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "set",
+        "stage": "createAction",
+        "message": "local: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "message": "local: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "set",
+        "stage": "signAction",
+        "message": "local: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: local: preserve this payload"
+      },
+      {
+        "kind": "kvstore_local_error",
+        "operation": "remove",
+        "stage": "signAction",
+        "message": "local: preserve this payload",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: local: preserve this payload"
+      }
+    ],
+    "malformed": [
+      {
+        "kind": "beef_error",
+        "operation": "get",
+        "stage": "listOutputs",
+        "bytes": "000000000000",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "listOutputs",
+        "bytes": "000000000000",
+        "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "beef_error",
+        "operation": "set",
+        "stage": "createAction",
+        "bytes": "000000000000",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "set",
+        "stage": "createAction",
+        "bytes": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      },
+      {
+        "kind": "beef_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "bytes": "000000000000",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+      },
+      {
+        "kind": "transaction_error",
+        "operation": "remove",
+        "stage": "createAction",
+        "bytes": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000006f21034aa97ff131e800e89db1861bbd91c8fc081b27169a0e3a33fdcc06cbb2561b73ac036f6e6546304402206297a3eceda7db9f3aa42fe14070df42a234a6e11ade460abd48f0b849c8cd9502203aedf60612a4eb95997e826de01537eb9aa2b4ab8b60fae6523c8fd343ddc1746d0000000000",
+        "error": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: beef must conform to BRC-95 and must contain the subject txid."
+      }
+    ]
+  }
 }
