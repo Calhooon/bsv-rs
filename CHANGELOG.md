@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: local KVStore original-error messages omit family prefixes (#477)
+
+The shared `original_error_message` helper now reads `WalletFault.message`
+and the payloads of `BeefError` and `TransactionError` at every local wrapper.
+Previously those variants inserted Rust's category prefix after `Original
+error:`. `WalletError`, `KvStoreError` and `KvStoreLocalError` keep their entire
+strings, including any prefix that is part of the payload. Other variants keep
+their own Display diagnostics. The outer variant remains `KvStoreLocalError`;
+no public API or standalone error Display changes.
+
+The reference is `ts-stack@edf6e03`: the two lookup catches at
+`LocalKVStore.ts:315-321,340-345`, removal at `:427-430` and replacement at
+`:547-550` all read `error.message`. `WalletError.ts:3-16` calls
+`super(message)` without a category. `Beef.ts:1251-1254,1296-1308` and
+`Transaction.ts:302-311` throw ordinary `Error`s. At this pin, the finding's
+`:227` is lock cleanup; the lookup wrappers are the lines cited above.
+
+Rows for the toolbox's error table; these are the exact words after
+`Original error:` (`\n` denotes the actual newline in the wallet message):
+
+| Variant | Old words | New words |
+|---|---|---|
+| `WalletFault` (every family) | `wallet error: backend: café\nretry` | `backend: café\nretry` |
+| `BeefError` | `BEEF error: invalid BEEF at byte 0: BadVersion { word: 0 }` | `invalid BEEF at byte 0: BadVersion { word: 0 }` |
+| `TransactionError` | `transaction error: Not an Atomic BEEF format` | `Not an Atomic BEEF format` |
+| `WalletError` | `wallet error: preserve this payload` | Unchanged |
+| `KvStoreError` | `kvstore error: preserve this payload` | Unchanged |
+| `KvStoreLocalError` | `local: preserve this payload` | Unchanged |
+| Every other enabled variant | Its own Display text | Unchanged |
+
+Rows for the CLI's operator-visible table (the same suffix applies to the
+lookup wrapper and the count/key action wrapper):
+
+| Failure | Old suffix | New suffix |
+|---|---|---|
+| Wallet storage/service/transport/internal fault | `wallet error: backend: café\nretry` | `backend: café\nretry` |
+| BEEF with version zero | `BEEF error: invalid BEEF at byte 0: BadVersion { word: 0 }` | `invalid BEEF at byte 0: BadVersion { word: 0 }` |
+| Non-atomic BEEF where an action requires Atomic BEEF | `transaction error: Not an Atomic BEEF format` | `Not an Atomic BEEF format` |
+
+`tests/kvstore_local_original_error_477.rs` has nine tests. Five fail on base
+`5981e285a6594ff1e3f7b67b21137c2ce3bc08e5` because the whole wrapped string
+contains the extra category: one per changed variant plus two actual corrupt
+response cases. The three existing payload variants and the other-variant
+Display control pass there. All nine pass with the helper. The injected cases
+exercise both lookup catches and both action wrappers; all four fault families
+are tested. The #326 recorder's `--kvstore-local-454` mode adds 60 injected
+cases and six malformed-response cases to `kvstore_local_454.json`, produced
+twice byte-identically under Node 22.18.0. The four existing action recordings
+are unchanged. Migration: update matches on these three wrapped suffixes only.
+
+### Notes: cross-SDK parity (#477)
+
+The original-error extraction now follows the reference. The parsers' existing
+diagnostic differences remain: for version-zero BEEF the reference says
+`Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0`,
+where this crate says `invalid BEEF at byte 0: BadVersion { word: 0 }`; for
+non-atomic action BEEF the reference says `beef must conform to BRC-95 and must
+contain the subject txid.`, where this crate says `Not an Atomic BEEF format`.
+These are recorded divergences, not claimed whole-message parity for malformed
+BEEF. The tests compare both references' wrappers exactly when their input
+messages agree and separately pin the Rust parsers' unchanged words.
+Go at `2ca481c`, `kvstore/local_kv_store.go:70-111,347-363,498-516`, wraps errors
+with operation names and has no equivalent `Original error:` contract; the
+TypeScript reference decides this change.
+
 ### Fixed: local removal refuses an empty page under a positive total (#479)
 
 `LocalKVStore::remove` now ends on the first empty page whose `totalOutputs` is

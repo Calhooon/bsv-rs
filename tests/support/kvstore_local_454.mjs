@@ -1,5 +1,7 @@
 // #454: actual SDK-written tokens, complete action inputs/BEEF, request text
 // and unlocking scripts, plus pagination/authentication verdicts. No network.
+import { recordOriginalErrors477 } from './kvstore_original_error_477.mjs'
+
 export async function recordLocal454 (c) {
   const { recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
     LookupResolver, Beef, Script, Utils } = c
@@ -50,5 +52,6 @@ export async function recordLocal454 (c) {
   }
   return { reference: 'ts-stack@edf6e03; Node ' + process.version,
     description: '#454: two live tokens, exact merged BEEF, requests and unlocking scripts',
-    signable_reference: 'UlJSUlJSUlI=', runs }
+    signable_reference: 'UlJSUlJSUlI=', runs,
+    original_errors_477: await recordOriginalErrors477(c) }
 }

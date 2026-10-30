@@ -164,6 +164,6 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
 fn unlock_error(total: u32, key: &str, error: Error) -> Error {
     super::lookup::refused(format!(
         "There are {total} outputs with tag {key} that cannot be unlocked. Original error: {}",
-        super::lookup::message(&error)
+        super::lookup::original_error_message(&error)
     ))
 }

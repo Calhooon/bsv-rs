@@ -66,7 +66,7 @@ Object.defineProperty(globalThis, 'crypto', {
 const [sdkPath] = process.argv.slice(2)
 const {
   ContactsManager326: ContactsManager, GlobalKVStore, LocalKVStore, LookupResolver, ProtoWallet, PrivateKey,
-  Script, Transaction, Beef, Utils, PushDrop, TopicBroadcaster, WERR_REVIEW_ACTIONS, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
+  Script, Transaction, Beef, Utils, PushDrop, TopicBroadcaster, WalletError, WERR_REVIEW_ACTIONS, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
 } = await import(pathToFileURL(sdkPath).href)
 
 const emit = text => new Promise(resolve => process.stdout.write(text + '\n', resolve))
@@ -185,7 +185,7 @@ if (process.argv.includes('--kvstore-local-454')) {
   const { recordLocal454 } = await import('./kvstore_local_454.mjs')
   await emit(JSON.stringify(await recordLocal454({
     recording, fresh, record, stop, sourceOf, LocalKVStore, GlobalKVStore,
-    LookupResolver, Transaction, Beef, Script, Utils,
+    LookupResolver, Transaction, Beef, Script, Utils, WalletError,
     resetCounter () { counter = 0 }
   }), null, 2))
   process.exit(0)
