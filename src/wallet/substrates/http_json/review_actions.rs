@@ -6,15 +6,12 @@
 //! then `reviewActionResults`, each refusal in the reference's words, the
 //! five members carried by [`ReviewActionsRefusal`].
 //!
-//! Not ported: the checks `validateWalletResult` makes of a returned `tx`'s
-//! transaction against the request (`validateCreateActionTransaction`,
-//! `validateSignActionTransaction`, `validateTransactionValueConservation`),
-//! which this substrate's success path does not make either; the `tx` is
-//! read as a BEEF and bound to `txid`.
+//! #432 applies the shared result validator to these four members before the
+//! error envelope is decoded, including transaction evidence and request binding.
 
-use super::byte_fields::{byte_array, MAX_BYTES};
+use super::byte_fields::byte_array;
 use crate::primitives::{from_hex, to_hex};
-use crate::transaction::{Beef, BeefTx};
+use crate::transaction::Beef;
 use crate::wallet::{
     CreateActionArgs, Outpoint, ReviewActionResult, ReviewActionResultStatus, ReviewActionsRefusal,
     SendWithResult, SendWithResultStatus, SignActionArgs, TxId,
@@ -28,48 +25,33 @@ const MAXIMUM_SEND_WITH_TRANSACTIONS: usize = 1000;
 /// `requireErrorString`'s default bound (`HTTPWalletJSON.ts:117`).
 const MAX_ERROR_STRING_BYTES: usize = 4096;
 
-/// What a code-5 body is bound to: the call, its `sendWith`, and for a
-/// createAction whether it asks for a transaction and whether one is to be
-/// signed later (`validateActionResult`'s request checks).
+/// The call and submitted txids used to bind review outcomes. Transaction
+/// validation uses the complete request captured by the common result path.
 pub(super) struct ReviewRequest {
     call: &'static str,
     send_with: Vec<TxId>,
-    create: Option<CreateShape>,
-}
-
-struct CreateShape {
-    creates_transaction: bool,
-    deferred_signing: bool,
 }
 
 impl ReviewRequest {
     pub(super) fn create_action(args: &CreateActionArgs) -> Self {
-        let options = args.options.as_ref();
-        let send_with = options
-            .and_then(|o| o.send_with.clone())
-            .unwrap_or_default();
-        let inputs = args.inputs.as_deref().unwrap_or_default();
-        let outputs = args.outputs.as_deref().map_or(0, <[_]>::len);
-        let creates_transaction = !inputs.is_empty() || outputs > 0 || send_with.is_empty();
-        let unsigned_input = inputs.iter().any(|i| i.unlocking_script.is_none());
-        let deferred = options.and_then(|o| o.sign_and_process) == Some(false) || unsigned_input;
         Self {
             call: "createAction",
-            send_with,
-            create: Some(CreateShape {
-                creates_transaction,
-                deferred_signing: creates_transaction && deferred,
-            }),
+            send_with: args
+                .options
+                .as_ref()
+                .and_then(|o| o.send_with.clone())
+                .unwrap_or_default(),
         }
     }
 
     pub(super) fn sign_action(args: &SignActionArgs) -> Self {
         Self {
             call: "signAction",
-            send_with: (args.options.as_ref())
+            send_with: args
+                .options
+                .as_ref()
                 .and_then(|o| o.send_with.clone())
                 .unwrap_or_default(),
-            create: None,
         }
     }
 }
@@ -102,8 +84,13 @@ pub(super) fn is_review_body(status: u16, body: &Value) -> bool {
 /// `deserializeWalletError` (`HTTPWalletJSON.ts:199-241`) for code 5:
 /// `call` the method answered, `request` its binding when it is
 /// createAction or signAction.
-pub(super) fn read(body: &Value, call: &str, request: Option<&ReviewRequest>) -> Error {
-    match read_members(body, call, request) {
+pub(super) fn read(
+    body: &Value,
+    call: &str,
+    request: Option<&ReviewRequest>,
+    binding: &Value,
+) -> Error {
+    match read_members(body, call, request, binding) {
         Ok(refusal) => Error::WalletReviewActions(Box::new(refusal)),
         Err(error) => error,
     }
@@ -113,6 +100,7 @@ fn read_members(
     body: &Value,
     call: &str,
     request: Option<&ReviewRequest>,
+    binding: &Value,
 ) -> Result<ReviewActionsRefusal, Error> {
     let data = (body.as_object()).ok_or_else(|| refused("Invalid wallet error envelope"))?;
     if data.get("isError") != Some(&Value::Bool(true)) || !safe_integer(data.get("code")) {
@@ -130,6 +118,7 @@ fn read_members(
     if !matches!(data.get("sendWithResults"), Some(Value::Array(_))) {
         return Err(refused("Invalid wallet error sendWithResults"));
     }
+    super::result_values::review(data, call, binding)?;
     let action = action_result(data, request)?;
     let mut allowed: HashSet<String> = request.send_with.iter().map(|t| to_hex(t)).collect();
     allowed.extend(action.txid.map(|t| to_hex(&t)));
@@ -217,133 +206,37 @@ fn outpoint(value: &Value, call: &str, field: &str) -> Result<Outpoint, Error> {
     })
 }
 
-/// The transaction a result's `tx` carries (`actionBeefTransaction`,
-/// `WalletResultValidation.ts:1376-1420`): a BEEF this crate reads whole,
-/// its transaction the one of `txid`, else the atomic subject, else the
-/// last full transaction; its txid.
-fn beef_subject(bytes: &[u8], txid: Option<&TxId>) -> Option<String> {
-    let beef = Beef::from_binary(bytes).ok()?;
-    let full = |id: &str| beef.find_txid(id).is_some_and(|t| t.tx().is_some());
-    let requested = txid.map(|t| to_hex(t)).filter(|id| full(id));
-    let atomic = beef.atomic_txid.clone().filter(|id| full(id));
-    let last = beef
-        .txs
-        .iter()
-        .rev()
-        .find(|t| t.tx().is_some())
-        .map(BeefTx::txid);
-    requested.or(atomic).or(last)
-}
-
-/// `validateActionResult` (`WalletResultValidation.ts:1242-1374`) on
-/// `{ txid, tx, noSendChange, sendWithResults }` under the request with
-/// `returnTXIDOnly: true` (`HTTPWalletJSON.ts:211-228`): each member's
-/// shape, then the members bound to the request and to one another.
+/// Decode the four members after the common result validator has checked
+/// their structure, transaction framing, source values and request binding.
 fn action_result(
     data: &Map<String, Value>,
     request: &ReviewRequest,
 ) -> Result<ActionMembers, Error> {
     let call = request.call;
-    let txid = (data.get("txid"))
+    let txid = data
+        .get("txid")
         .map(|v| hex32(v, call, "txid"))
         .transpose()?;
-    let tx = (data.get("tx"))
-        .map(|v| tx_member(v, txid.as_ref(), call))
+    let tx = data
+        .get("tx")
+        .map(|value| byte_array(value).ok_or_else(|| invalid(call, "tx", "an array of bytes")))
         .transpose()?;
     let no_send_change = match optional_array(data.get("noSendChange"), call, "noSendChange")? {
         None => None,
         Some(items) => Some(
-            (items.iter().enumerate())
+            items
+                .iter()
+                .enumerate()
                 .map(|(i, v)| outpoint(v, call, &format!("noSendChange[{i}]")))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
     };
-    let members = ActionMembers {
+    Ok(ActionMembers {
         txid,
         tx,
         no_send_change,
         send_with_results: send_with_results(data.get("sendWithResults"), call)?,
-    };
-    bind(&members, request)?;
-    Ok(members)
-}
-
-/// A result's `tx`: `bytes`, then `actionBeefTransaction` and the txid it
-/// must match (`WalletResultValidation.ts:1248-1257`).
-fn tx_member(value: &Value, txid: Option<&TxId>, call: &str) -> Result<Vec<u8>, Error> {
-    if value
-        .as_array()
-        .is_some_and(|items| items.len() > MAX_BYTES)
-    {
-        return Err(invalid(call, "tx", format!("at most {MAX_BYTES} bytes")));
-    }
-    let bytes = byte_array(value).ok_or_else(|| invalid(call, "tx", "an array of bytes"))?;
-    let subject = beef_subject(&bytes, txid)
-        .ok_or_else(|| invalid(call, "tx", "a complete, exactly framed BEEF transaction"))?;
-    if txid.is_some_and(|txid| !subject.eq_ignore_ascii_case(&to_hex(txid))) {
-        return Err(invalid(call, "tx", "a BEEF transaction matching txid"));
-    }
-    Ok(bytes)
-}
-
-/// The request checks of `validateActionResult` (`:1280-1373`) in its
-/// order; a code-5 body carries no `signableTransaction`.
-fn bind(members: &ActionMembers, request: &ReviewRequest) -> Result<(), Error> {
-    let call = request.call;
-    let txid = members.txid;
-    match &request.create {
-        Some(create) if create.creates_transaction && create.deferred_signing => {
-            let expected = "the requested deferred-signing transaction";
-            return Err(invalid(call, "signableTransaction", expected));
-        }
-        Some(create) if create.creates_transaction && txid.is_none() => {
-            return Err(invalid(call, "txid", "the requested completed transaction"));
-        }
-        None if txid.is_none() => {
-            return Err(invalid(call, "txid", "the completed signed transaction"));
-        }
-        _ => {}
-    }
-    if let Some(change) = &members.no_send_change {
-        let Some(subject) = txid else {
-            return Err(invalid(
-                call,
-                "noSendChange",
-                "associated with a transaction",
-            ));
-        };
-        if let Some(i) = change.iter().position(|o| o.txid != subject) {
-            let field = format!("noSendChange[{i}]");
-            return Err(invalid(
-                call,
-                &field,
-                "an outpoint of the returned transaction",
-            ));
-        }
-    }
-    let mut allowed: HashSet<TxId> = request.send_with.iter().copied().collect();
-    allowed.extend(txid);
-    let mut seen = HashSet::new();
-    for (i, result) in members.send_with_results.iter().enumerate() {
-        let field = format!("sendWithResults[{i}].txid");
-        if !seen.insert(result.txid) {
-            return Err(invalid(call, &field, "a unique transaction"));
-        }
-        if !allowed.is_empty() && !allowed.contains(&result.txid) {
-            return Err(invalid(call, &field, "a submitted or returned transaction"));
-        }
-    }
-    if members.tx.is_some() && txid.is_none() {
-        return Err(invalid(call, "txid", "present with tx"));
-    }
-    if request.create.is_none() && members.no_send_change.is_some() {
-        return Err(invalid(call, "noSendChange", "an absent field"));
-    }
-    if txid.is_none() && members.send_with_results.is_empty() {
-        let expected = "a transaction, signable transaction, or batch-send result";
-        return Err(invalid(call, "outcome", expected));
-    }
-    Ok(())
+    })
 }
 
 /// `validateSendWithResults` (`WalletResultValidation.ts:1013-1031`).

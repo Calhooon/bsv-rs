@@ -45,6 +45,194 @@ The reference's `set` reads one page at `LocalKVStore.ts:455`, checked at
 incomplete nonempty collapse. It cannot loop this way, so it is unchanged.
 `GlobalKVStore.ts:583-604` makes one overlay query and iterates its output array,
 without reading a total or paging in a loop; it is unchanged too.
+### Fixed: HTTP JSON result scalars, bindings and global bounds (#432)
+
+`HttpWalletJson` now checks the remaining 71 rows of the #408 result inventory
+at the reference's result boundary and in its order (`ts-stack@edf6e03`,
+`WalletResultValidation.ts:1-2367`, `HTTPWalletJSON.ts:280-341`). The serialized
+request is owned before the HTTP await. The result checks run before typed
+serde decoding. Numeric record keys follow ECMAScript index order; named
+request attributes retain their serialized order. The checks also validate code-5 action evidence under the reference's
+explicit `returnTXIDOnly` review request. New helpers live alongside the
+existing result reader; `http_json.rs` stays below its 1,113-line ceiling.
+
+Absent history-output tags now decode as an empty native vector. False
+`accepted`, `valid`, `authenticated` and `relinquished` verdicts are refused;
+`aborted: false` remains valid. Height must be 1 through 2^32−1 before the
+trait converts it. Integer JSON spellings such as `1.0` and `-0` are accepted
+when the reference accepts them. The reference's base64 grammar permits
+nonzero unused padding bits: a native byte reference decodes them, then writes
+its canonical spelling.
+
+The other rows were wrong because typed decoding alone neither bound a result
+to its request nor checked the reference's limits and error precedence.
+Action BEEF now has exact framing, subject selection, input/output and source
+value checks. Lists enforce counts, requested inclusion flags, filter echoes,
+and BEEF commitments. Certificates and linkages enforce identity, requested
+fields and filters. Every call checks unsafe keys, graph/array/byte budgets and
+the HTTP response cap. The inventory in `src/wallet/substrates/CLAUDE.md`
+retains each reference site and each old behavior; the table below gives a
+recorded RED assertion's old and new words for every row and names its test in
+`tests/wallet_http_json_pending_432.rs` (the `wallet error: ` display prefix is
+unchanged). Each test also covers the row's other recorded cases and verdicts.
+The #268 auth test's `proveCertificate` stub, an empty keyring with the field
+`name` requested, carries the requested field now: R86 refuses the empty keyring
+as the reference does (`tests/auth_certificate_json_268.rs`, outside the lane's
+`wallet_*`, `arch_*` and `fixtures_*` gate; CI reached it).
+The #339 dhat test's `createAction` stub (`tests/memory_profiling.rs`, run by CI's
+own step) answered 1 MiB of bytes as `tx` under a dummy txid; it answers a real
+transaction's atomic BEEF with its txid now, since R28 refuses a `tx` that is not
+one.
+
+| Row / test | Old words or verdict at 455fe780 | New reference words or verdict |
+| R03 `row_03_global_bounds_and_keys` | accepted | Invalid HTTPWalletJSON acquireCertificate raw response result object key __proto__: expected a safe record key |
+| R06 `row_06_aborted_boolean` | failed to parse JSON response: missing field &#96;aborted&#96; | Invalid abortAction result aborted: expected a boolean |
+| R07 `row_07_accepted_verdict` | accepted | Invalid internalizeAction result accepted: expected true |
+| R08 `row_08_relinquished_verdict` | accepted | Invalid relinquishOutput result relinquished: expected true |
+| R09 `row_09_valid_verdict` | accepted | Invalid verifyHmac result valid: expected true |
+| R10 `row_10_authenticated_verdict` | accepted | Invalid isAuthenticated result authenticated: expected true |
+| R11 `row_11_public_key` | accepted | Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes |
+| R15 `row_15_linkage_keys` | failed to parse JSON response: invalid public key: Invalid public key encoding: elliptic curve point encoding error | Invalid revealCounterpartyKeyLinkage result verifier: expected 33 hexadecimal bytes |
+| R17 `row_17_linkage_time` | accepted | Invalid revealCounterpartyKeyLinkage result revelationTime: expected 1–64 UTF-8 bytes |
+| R18 `row_18_linkage_request` | accepted | Invalid revealCounterpartyKeyLinkage result verifier: expected the requested verifier |
+| R19 `row_19_specific_scalars` | accepted | Invalid revealSpecificKeyLinkage result protocolID[1]: expected 5–400 UTF-8 bytes |
+| R20 `row_20_specific_parties` | accepted | Invalid revealSpecificKeyLinkage result counterparty: expected the prover's identity key for counterparty self |
+| R21 `row_21_specific_protocol` | accepted | Invalid revealSpecificKeyLinkage result protocolID: expected the requested protocol |
+| R22 `row_22_height_without_truncation` | 4294967296 narrowed to 0 | Invalid getHeight result height: expected an integer from 1 to 4294967295 |
+| R23 `row_23_header` | accepted | Invalid getHeaderForHeight result header: expected 80 hexadecimal bytes |
+| R24 `row_24_network` | failed to parse JSON response: invalid type: null, expected a string | Invalid getNetwork result network: expected mainnet or testnet |
+| R25 `row_25_version` | accepted | Invalid getVersion result version: expected 7–30 UTF-8 bytes |
+| R26 `row_26_action_txid` | accepted | Invalid signAction result txid: expected a string |
+| R28 `row_28_action_beef` | accepted | Invalid signAction result tx: expected a complete, exactly framed BEEF transaction |
+| R29 `row_29_change_outpoints` | accepted | Invalid createAction result noSendChange[0]: expected a canonical transaction outpoint |
+| R30 `row_30_batch_results` | accepted | Invalid signAction result sendWithResults: expected at most 1001 transaction results |
+| R32 `row_32_signable_reference` | accepted | Invalid createAction result signableTransaction.reference: expected 1+ UTF-8 bytes |
+| R33 `row_33_deferred_or_completed` | accepted | Invalid createAction result signableTransaction: expected the requested deferred-signing transaction |
+| R34 `row_34_signed_txid_required` | accepted | Invalid signAction result txid: expected the completed signed transaction |
+| R35 `row_35_request_beef_evidence` | accepted | Invalid createAction result request.inputBEEF: expected an exactly framed BEEF envelope |
+| R36 `row_36_version_and_lock_time` | accepted | Invalid createAction result tx.version: expected the requested transaction version |
+| R37 `row_37_unique_transaction_inputs` | accepted | Invalid createAction result tx.inputs[1]: expected a unique transaction input outpoint |
+| R38 `row_38_requested_inputs` | accepted | Invalid createAction result tx.inputs: expected every requested input exactly once |
+| R39 `row_39_requested_outputs` | accepted | Invalid createAction result tx.outputs: expected every requested output with its requested amount and script |
+| R40 `row_40_source_values` | accepted | Invalid signAction result tx.inputs[0].sourceSatoshis: expected source transaction evidence for every completed transaction input |
+| R41 `row_41_conservation` | accepted | Invalid createAction result tx.outputs: expected a total value no greater than the transaction inputs |
+| R42 `row_42_requested_spends` | accepted | Invalid signAction result tx.inputs[1]: expected the requested input index |
+| R43 `row_43_change_subject` | accepted | Invalid createAction result noSendChange[0]: expected an outpoint of the returned transaction |
+| R44 `row_44_submitted_batch` | accepted | Invalid signAction result sendWithResults[1].txid: expected a unique transaction |
+| R45 `row_45_evidence_required` | accepted | Invalid createAction result txid: expected present with tx |
+| R46 `row_46_action_outcome` | accepted | Invalid signAction result noSendChange: expected an absent field |
+| R47 `row_47_safe_totals_and_u32_residue` | failed to parse JSON response: invalid value: integer &#96;-1&#96;, expected u32 | Invalid listActions result totalActions: expected an integer from 0 to 9007199254740991 |
+| R49 `row_49_page_limits` | accepted | Invalid listActions result totalActions: expected at least 1 |
+| R50 `row_50_action_scalars` | accepted | Invalid listActions result actions[0].satoshis: expected an integer from -2100000000000000 to 2100000000000000 |
+| R51 `row_51_history_descriptions` | failed to parse JSON response: invalid type: null, expected a string | Invalid listActions result actions[0].description: expected a string |
+| R52 `row_52_label_filter` | accepted | Invalid listActions result actions[0].labels[0]: expected 1–300 UTF-8 bytes |
+| R53 `row_53_history_version` | failed to parse JSON response: invalid type: null, expected u32 | Invalid listActions result actions[0].version: expected an integer from 0 to 4294967295 |
+| R54 `row_54_requested_history_inputs` | accepted | Invalid listActions result actions[0].inputs: expected the explicitly requested inputs |
+| R55 `row_55_history_source` | failed to parse JSON response: missing field &#96;tags&#96; | Invalid listActions result actions[0].inputs[0].sourceOutpoint: expected a canonical transaction outpoint |
+| R56 `row_56_history_scripts` | failed to parse JSON response: missing field &#96;tags&#96; | Invalid listActions result actions[0].inputs[0].sourceLockingScript: expected a string |
+| R57 `row_57_history_sequence` | failed to parse JSON response: invalid type: null, expected u32 | Invalid listActions result actions[0].inputs[0].sequenceNumber: expected an integer from 0 to 4294967295 |
+| R58 `row_58_requested_history_outputs` | accepted | Invalid listActions result actions[0].outputs: expected the explicitly requested outputs |
+| R59 `row_59_history_output_value` | failed to parse JSON response: invalid type: null, expected u64 | Invalid listActions result actions[0].outputs[0].satoshis: expected an integer from 0 to 2100000000000000 |
+| R60 `row_60_history_output_metadata` | failed to parse JSON response: invalid type: null, expected a boolean | Invalid listActions result spendable: expected a boolean |
+| R61 `row_61_absent_tags_and_bounds` | failed to parse JSON response: missing field &#96;tags&#96; | accepted |
+| R62 `row_62_output_beef` | accepted | Invalid listOutputs result BEEF: expected a complete, exactly framed BEEF envelope |
+| R63 `row_63_required_output_beef` | accepted | Invalid listOutputs result BEEF: expected the requested complete output transactions |
+| R64 `row_64_unique_outputs` | accepted | Invalid listOutputs result outputs[0].outpoint: expected a canonical transaction outpoint |
+| R65 `row_65_output_scalars` | accepted | Invalid listOutputs result outputs[0].satoshis: expected an integer from 0 to 2100000000000000 |
+| R66 `row_66_output_commitments` | accepted | Invalid listOutputs result outputs[0].satoshis: expected the amount committed by BEEF |
+| R67 `row_67_output_metadata` | accepted | Invalid listOutputs result outputs[0].tags[0]: expected 1–300 UTF-8 bytes |
+| R68 `row_68_output_filter` | accepted | Invalid listOutputs result outputs[0].tags: expected the explicitly requested output tags |
+| R73 `row_73_certificate_unsafe_fields` | accepted | Invalid HTTPWalletJSON acquireCertificate raw response result object key __proto__: expected a safe record key |
+| R76 `row_76_certificate_filter` | accepted | Invalid listCertificates result certificates[0].certifier: expected one of the requested certifiers |
+| R77 `row_77_certificate_keyring` | accepted | Invalid listCertificates result certificates[0].keyring key: expected a safe 1–50 byte field name |
+| R78 `row_78_certificate_verifier` | accepted | Invalid listCertificates result certificates[0].verifier: expected a string |
+| R79 `row_79_certifier_metadata` | accepted | Invalid discoverByIdentityKey result certificates[0].certifierInfo.name: expected 1–100 UTF-8 bytes |
+| R80 `row_80_discovery_maps` | accepted | Invalid discoverByIdentityKey result certificates[0].publiclyRevealedKeyring key: expected a safe 1–50 byte field name |
+| R81 `row_81_any_attributes` | accepted | Invalid discoverByAttributes result certificates[0].decryptedFields: expected a match for the requested any attribute |
+| R82 `row_82_named_attributes` | accepted | Invalid discoverByAttributes result certificates[0].decryptedFields.name: expected the requested public attribute |
+| R83 `row_83_acquired_certificate` | accepted | Invalid acquireCertificate result certificate.type: expected the requested certificate type |
+| R84 `row_84_partial_certificate` | accepted | Invalid proveCertificate result certificate.serialNumber: expected the requested certificate serialNumber |
+| R85 `row_85_proof_keyring` | accepted | Invalid proveCertificate result keyringForVerifier key: expected a safe 1–50 byte field name |
+| R86 `row_86_revealed_field_set` | accepted | Invalid proveCertificate result keyringForVerifier: expected exactly the requested certificate fields |
+| R87 `row_87_proof_verifier` | accepted | Invalid proveCertificate result verifier: expected a string |
+| R88 `row_88_request_snapshot` | accepted | Wallet result request records must contain only safe string keys |
+
+All 71 tests were RED on a scratch copy of `455fe78092952a22e4f386ac22642987dbf8120a`
+with an independent Cargo target. The extended #408 Node 22.18.0 recorder
+preserves its 387 existing cases byte for byte and adds 626 cases (126 accepted,
+500 refused), for 1,013 total. The cold-review fold adds seven R03 cases and
+disambiguates thirteen duplicate case names; every earlier body, request and
+reference verdict remains byte-identical. It generates every new case
+from the unmodified edf6e03 SDK built outside the worktree. Large boundary
+cases use expansion recipes. A repeated recording is compared byte for byte.
+HTTP tests bind only wiremock ephemeral ports, including HTTP/2 for the
+oversized Content-Length header; no default wallet endpoint is contacted. The
+existing `fixtures_replay` recorder also refreshes seven HTTP golden files:
+only `client_result` changes (empty actions, unbound BEEF, false verdicts and
+network words); every request, raw response and non-HTTP fixture is unchanged.
+The #339 review test now matches the reference in 39 of 41 cases, removing
+its transaction-binding exception; its successful retry mock supplies both
+the signed transaction and its computed txid.
+
+The cold-review regressions in `wallet_http_json_linear_432` compare the three
+4 MiB bodies at depths 2,000, 4,000 and 8,000 on success and error paths. The
+median time ratio is bounded against the smallest body's byte-size ratio,
+without an absolute time limit. They also preserve the final duplicate field
+value on the raw fallback and ignore unrelated deep/nonfinite extensions
+inside code-5 result records. R03's seven added recorder cases cover both
+height spellings, the two error envelopes and the lone-surrogate residue.
+
+Migration: callers that branched on `valid: false` or `authenticated: false`
+now handle an `Err`.
+Wrapped heights, unrelated BEEF and mismatched request or filter facts are
+also refused in the reference's words; public field types stay unchanged.
+
+The `http` feature adds optional `regex` and enables the existing optional
+`unicode-normalization`: the reference's identity search uses `\p{Dash}`,
+`\p{Pattern_Syntax}`, `\p{Quotation_Mark}`, `\p{Terminal_Punctuation}` and
+`\p{Mn}` plus NFD (`WalletResultValidation.ts:1577-1582,1617-1619`), which the
+serde model cannot express. `regex`, `regex-automata` and `regex-syntax` are
+MIT OR Apache-2.0; `aho-corasick` is Unlicense OR MIT. The dependency tree grows
+by the regex family (`regex`, `regex-automata`, `regex-syntax`, `aho-corasick`);
+the exact line count depends on the lockfile's resolution. The combined wasm32 slice
+(`auth,wallet,transaction,overlay,socketio,wasm`, without native-only `http`)
+builds. `regex-syntax` uses Unicode 16.0, as Node 22.18.0's ICU 77.1 does;
+`unicode-normalization` 0.1.26 uses Unicode 18.0. This table-version difference
+can move identity-search results when tables change. Six compiled expressions
+are cached in `LazyLock`s, available below the Rust 1.88 minimum.
+
+### Notes: cross-SDK parity (#432)
+
+The 88-row inventory has 85 fully Done rows and three stated residue rows,
+with no Pending work hidden. R02's executable JavaScript values, descriptors,
+prototypes, sparse arrays, shared/detached typed arrays and aliasing are not
+HTTP JSON values. R03 checks the expressible budgets; its aggregate-byte cap
+is dominated by the bounded 256 MiB JSON body. The cold-review fold indexes
+containers on a heap stack in one scan and walks their links for budgets;
+it never reparses a descendant through each ancestor and keeps no Value per
+ordinary byte. Its fallback normalizes raw tokens and historical byte objects,
+so an unrelated `1e400` or depth-129 array no longer defeats an integral `1.0`
+height. Node 22.18.0 at edf6e03 accepts both (height 1), reads `1e400` as Infinity
+and has no JSON depth bound; serde's typed 128-level guard stays enabled here.
+Code-5 error envelopes and their nested result records select known members
+from the raw body, likewise ignoring unrelated extras. Lone UTF-16 surrogates
+are the true R03 residue:
+`{"version":"123456\ud800"}` is accepted there, refused here with
+`Invalid getVersion result version: expected a string`.
+R47 checks 0 through 2^53-1 but keeps public `u32` list totals as a scoping
+choice, not a representation limit: the reference's PositiveIntegerOrZero
+allows that range and u64 can carry it. Five wide-total cases still assert
+serde's range refusal; the separately filed R47 lane widens the fields.
+The native byte form of a signable reference does not preserve a base64
+padding-bit spelling, as described above.
+
+Go's `~/bsv/go-sdk/wallet/substrates/http_wallet_json.go` at local `2ca481c`
+uses `api` (`:37-75`) to read the body and method-specific `json.Unmarshal`
+(`:79-400`) to decode it. It has no `validateWalletResult` equivalent, no
+request/filter/BEEF binding or global graph/byte/unsafe-key checks. Its typed
+integers and keys can reject shapes in Go's words but do not provide these
+reference checks or this refusal order. Existing #137 error-class mapping and
+transport-fault policies remain port extensions.
 
 ### Fixed: PushDrop wallet requests and local KVStore lookup/action parity (#454, #470)
 

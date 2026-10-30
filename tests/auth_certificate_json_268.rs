@@ -403,10 +403,12 @@ async fn a_wallet_certificate_with_a_txid_alone_revocation_outpoint_verifies() {
         .await;
     Mock::given(method("POST"))
         .and(path("/proveCertificate"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(serde_json::json!({ "keyringForVerifier": {} })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            // The reference refuses a keyring that is not exactly the requested
+            // fields (WalletResultValidation.ts:2342-2349, the #432 row R86): the
+            // stub carries the one requested field, "name", under a base64 value.
+            "keyringForVerifier": { "name": to_base64(&[9u8; 32]) },
+        })))
         .mount(&server)
         .await;
 

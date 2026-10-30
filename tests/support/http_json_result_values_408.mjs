@@ -8,10 +8,12 @@
 // the same bodyText, keeping a 16 MiB boundary out of the fixture.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { extend432 } from './http_json_pending_432.mjs'
 
 if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
 const [sdkPath, outPath] = process.argv.slice(2)
-const { HTTPWalletJSON } = await import(pathToFileURL(sdkPath).href)
+const sdk = await import(pathToFileURL(sdkPath).href)
+const { HTTPWalletJSON } = sdk
 const shapes = JSON.parse(readFileSync(new URL('../vectors/wallet_http_json_shapes_105.json', import.meta.url)))
 const bytes = JSON.parse(readFileSync(new URL('../vectors/http_json_success_bytes_365.json', import.meta.url)))
 const seeds = new Map()
@@ -163,15 +165,19 @@ for (const extra of [-1, 0, 1]) {
     { marker, length: 16 * 1024 * 1024 - 182 + extra })
 }
 
+extend432(cases, seeds, sdk)
+
 for (const c of cases) {
   const expansion = c.expansion?.array
     ? JSON.stringify(Array(c.expansion.length).fill(c.expansion.item))
     : 'x'.repeat(c.expansion?.length ?? 0)
   const text = c.expansion ? c.bodyText.replace(c.expansion.marker, expansion) : c.bodyText
-  const fetch = async () => new Response(text, { status: 200, headers: { 'Content-Type': 'application/json' } })
+  const fetch = async () => new Response(text, { status: c.status ?? 200, headers: { 'Content-Type': 'application/json', ...c.headers } })
   const wallet = new HTTPWalletJSON('fixtures.invalid', 'http://127.0.0.1:49151', fetch)
   try {
-    await wallet[c.call](structuredClone(c.args))
+    if (c.mode === 'snapshot') sdk.snapshotWalletResultRequest(c.call, structuredClone(c.args))
+    else if (c.mode === 'result') sdk.validateWalletResult(c.call, JSON.parse(text), structuredClone(c.args))
+    else await wallet[c.call](structuredClone(c.args))
     c.reference = { accepted: true }
   } catch (error) { c.reference = { error: error.message } }
 }

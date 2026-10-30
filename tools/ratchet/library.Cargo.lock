@@ -219,6 +219,7 @@ dependencies = [
  "pbkdf2",
  "primeorder",
  "rand",
+ "regex",
  "reqwest",
  "ripemd",
  "ryu-js",

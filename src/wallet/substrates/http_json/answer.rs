@@ -6,7 +6,7 @@
 
 use super::review_actions::{self, ReviewRequest};
 use super::{byte_fields, result_values};
-use super::{request_error, wallet_busy_from_response, wallet_error_from_body};
+use super::{wallet_busy_from_response, wallet_error_from_body};
 use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, TransportFault};
 use reqwest::{Response, StatusCode};
@@ -18,11 +18,18 @@ pub(super) async fn refusal(
     response: Response,
     method: &str,
     review: Option<&ReviewRequest>,
+    binding: &serde_json::Value,
 ) -> Error {
     let status = response.status();
     let transport = fault::status_fault(status, response.headers());
     let retry_after = fault::retry_after(response.headers()).map(str::to_owned);
-    let text = response.text().await.unwrap_or_default();
+    let text = match result_values::response_bytes(response).await {
+        Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+        Err(error) => return error,
+    };
+    if let Err(error) = result_values::snapshot(method, text.as_bytes()) {
+        return error;
+    }
 
     // The body's busy word, at any status, is the wallet's promise
     // that it took no action; the status alone promises nothing
@@ -31,9 +38,9 @@ pub(super) async fn refusal(
     }
     // A 400's code-5 body with its results is the reference's
     // WERR_REVIEW_ACTIONS, every member read as it reads them (#339)
-    if let Ok(body) = serde_json::from_str::<serde_json::Value>(&text) {
+    if let Some(body) = result_values::review_body(&text) {
         if review_actions::is_review_body(status.as_u16(), &body) {
-            return review_actions::read(&body, method, review);
+            return review_actions::read(&body, method, review, binding);
         }
     }
     let detail = format!("HTTP {} for {}: {}", status, method, text);
@@ -73,24 +80,30 @@ pub(super) async fn refusal(
 pub(super) async fn success<R: for<'de> Deserialize<'de>>(
     response: Response,
     call: &str,
+    request: &serde_json::Value,
 ) -> Result<R, Error> {
     // #408 borrows field slices and checks ordinary bytes without a Value
     // per byte. Only #365's fallback constructs the normalized Value tree.
-    let text = response
-        .bytes()
-        .await
-        .map_err(|e| request_error(e, "failed to parse JSON response"))?;
-    result_values::validate(call, &text)?;
+    let text = result_values::response_bytes(response).await?;
+    let snapshot = result_values::validate(call, &text, request)?;
     let typed = match serde_json::from_slice::<R>(&text) {
         Ok(result) => return Ok(result),
         Err(e) => e,
     };
     let parse_error = |e| Error::WalletError(format!("failed to parse JSON response: {e}"));
     let Ok(mut body) = serde_json::from_slice::<serde_json::Value>(&text) else {
-        return Err(parse_error(typed));
+        // JSON.parse has neither serde Value's number range nor its depth
+        // bound. Normalize the indexed raw body when unrelated data exceeds
+        // either; R still uses serde's ordinary typed depth guard.
+        return match snapshot {
+            Some(snapshot) => serde_json::from_str(&snapshot.normalized()).map_err(parse_error),
+            None => Err(parse_error(typed)),
+        };
     };
+    drop(snapshot);
     drop(text);
     byte_fields::normalize(&mut body);
+    result_values::normalize_numbers(&mut body);
     if let Some(refusal) = byte_fields::refusal(call, &body) {
         return Err(refusal);
     }

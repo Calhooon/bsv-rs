@@ -1,15 +1,26 @@
-//! The first #408 slice of `validateWalletResult` (`ts-stack@edf6e03`).
-//! Borrow the JSON fields before serde can turn a present null into None.
-//! Scalar and request-binding checks still outstanding are inventoried in
-//! `../CLAUDE.md`; this reader covers bytes, container shapes and certificates.
+//! `validateWalletResult` at ts-stack@edf6e03 (#408, #432).
+//! Borrow JSON fields so a present null never becomes an absent optional field.
+//! Checks run in reference order before the public types decode the result.
 
 use crate::Error;
 use indexmap::IndexMap;
 use serde_json::value::RawValue;
 
+mod action_binding;
+mod actions;
+mod beef;
+mod boundary;
 mod bytes;
 mod certificate;
-mod shapes;
+mod certificates;
+mod identity;
+mod lists;
+mod raw_tree;
+mod review_projection;
+mod scalars;
+
+pub(super) use boundary::{normalize_numbers, request, response_bytes};
+pub(super) use review_projection::body as review_body;
 
 type Object<'a> = IndexMap<String, &'a RawValue>;
 type Result<T> = std::result::Result<T, Error>;
@@ -21,8 +32,32 @@ fn invalid(call: &str, field: &str, expected: &str) -> Error {
 }
 
 fn record<'a>(raw: Option<&'a RawValue>, call: &str, field: &str) -> Result<Object<'a>> {
-    raw.and_then(|v| serde_json::from_str(v.get()).ok())
-        .ok_or_else(|| invalid(call, field, "an object"))
+    let mut object: Object<'a> = raw
+        .and_then(|v| serde_json::from_str(v.get()).ok())
+        .ok_or_else(|| invalid(call, field, "an object"))?;
+    object.sort_by(|a, _, b, _| key_order(a).cmp(&key_order(b)));
+    Ok(object)
+}
+
+fn key_order(key: &str) -> (bool, u32) {
+    let index = key
+        .parse::<u32>()
+        .ok()
+        .filter(|n| *n != u32::MAX && n.to_string() == key);
+    (index.is_none(), index.unwrap_or(0))
+}
+
+fn request_keys<'a>(request: &'a serde_json::Value, field: &str) -> Vec<&'a str> {
+    if let Some(keys) = request
+        .get(format!("${field}Keys"))
+        .and_then(serde_json::Value::as_array)
+    {
+        return keys.iter().filter_map(serde_json::Value::as_str).collect();
+    }
+    request[field]
+        .as_object()
+        .map(|fields| fields.keys().map(String::as_str).collect())
+        .unwrap_or_default()
 }
 
 fn array<'a>(raw: Option<&'a RawValue>, call: &str, field: &str) -> Result<Vec<&'a RawValue>> {
@@ -39,19 +74,23 @@ fn member<'a>(object: &Object<'a>, key: &str) -> Option<&'a RawValue> {
     object.get(key).copied()
 }
 
-/// Keep syntax errors in serde's existing words. Valid JSON is checked even
-/// when its typed deserializer would succeed (`Option` consumes null).
-pub(super) fn validate(call: &str, text: &[u8]) -> Result<()> {
+/// Keep syntax errors in serde's words; all result checks precede typed decoding.
+pub(super) fn validate<'a>(
+    call: &str,
+    text: &'a [u8],
+    request: &serde_json::Value,
+) -> Result<Option<raw_tree::Snapshot<'a>>> {
     let Ok(raw) = serde_json::from_slice::<&RawValue>(text) else {
-        return Ok(());
+        return Ok(None);
     };
+    let snapshot = raw_tree::Snapshot::read(raw, &format!("HTTPWalletJSON {call} raw response"))?;
     let result = record(Some(raw), call, "value").map_err(|_| {
         Error::WalletError(format!(
             "Invalid HTTPWalletJSON {call} response: expected an object"
         ))
     })?;
     match call {
-        "createAction" | "signAction" => shapes::action(&result, call),
+        "createAction" | "signAction" => actions::validate(&result, call, request),
         "encrypt" => bytes::read(
             member(&result, "ciphertext"),
             call,
@@ -67,16 +106,26 @@ pub(super) fn validate(call: &str, text: &[u8]) -> Result<()> {
             bytes::read(member(&result, "hmac"), call, "hmac", Some(32), None).map(|_| ())
         }
         "createSignature" => signature(&result, call),
-        "revealCounterpartyKeyLinkage" | "revealSpecificKeyLinkage" => linkage(&result, call),
-        "listActions" => shapes::actions(&result, call),
-        "listOutputs" => shapes::outputs(&result, call),
-        "acquireCertificate" => certificate::validate(Some(raw), call, "certificate"),
-        "listCertificates" | "discoverByIdentityKey" | "discoverByAttributes" => {
-            shapes::certificates(&result, call)
+        "revealCounterpartyKeyLinkage" | "revealSpecificKeyLinkage" => {
+            scalars::linkage(&result, call, request)
         }
-        "proveCertificate" => shapes::proof(&result, call),
-        _ => Ok(()),
+        "listActions" => lists::actions(&result, call, request),
+        "listOutputs" => lists::outputs(&result, call, request),
+        "acquireCertificate" => certificates::acquire(raw, call, request),
+        "listCertificates" | "discoverByIdentityKey" | "discoverByAttributes" => {
+            certificates::list(&result, call, request)
+        }
+        "proveCertificate" => certificates::proof(&result, call, request),
+        _ => scalars::validate(&result, call),
+    }?;
+    Ok(Some(snapshot))
+}
+
+pub(super) fn snapshot(call: &str, text: &[u8]) -> Result<()> {
+    if let Ok(raw) = serde_json::from_slice::<&RawValue>(text) {
+        raw_tree::Snapshot::read(raw, &format!("HTTPWalletJSON {call} raw response"))?;
     }
+    Ok(())
 }
 
 fn signature(result: &Object<'_>, call: &str) -> Result<()> {
@@ -97,20 +146,24 @@ fn signature(result: &Object<'_>, call: &str) -> Result<()> {
     Ok(())
 }
 
-fn linkage(result: &Object<'_>, call: &str) -> Result<()> {
-    for field in ["encryptedLinkage", "encryptedLinkageProof"] {
-        bytes::read(member(result, field), call, field, None, None)?;
+/// Code-5 replies carry the same action facts under an explicit txid-only request.
+pub(super) fn review(
+    data: &serde_json::Map<String, serde_json::Value>,
+    call: &str,
+    request: &serde_json::Value,
+) -> Result<()> {
+    let mut request = request.clone();
+    if !request["options"].is_object() {
+        request["options"] = serde_json::json!({});
     }
-    if call == "revealSpecificKeyLinkage"
-        && member(result, "protocolID")
-            .and_then(|raw| serde_json::from_str::<Vec<serde::de::IgnoredAny>>(raw.get()).ok())
-            .is_none_or(|tuple| tuple.len() != 2)
-    {
-        return Err(invalid(
-            call,
-            "protocolID",
-            "a [securityLevel, protocolName] tuple",
-        ));
-    }
-    Ok(())
+    request["options"]["returnTXIDOnly"] = serde_json::Value::Bool(true);
+    let action: serde_json::Map<_, _> = ["txid", "tx", "noSendChange", "sendWithResults"]
+        .iter()
+        .filter_map(|name| {
+            data.get(*name)
+                .map(|value| ((*name).to_string(), value.clone()))
+        })
+        .collect();
+    let encoded = serde_json::to_vec(&action).map_err(|e| Error::WalletError(e.to_string()))?;
+    validate(call, &encoded, &request).map(|_| ())
 }

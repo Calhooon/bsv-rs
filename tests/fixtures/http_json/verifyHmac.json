@@ -3,9 +3,8 @@
     {
       "expected": {
         "client_result": {
-          "ok": {
-            "valid": false
-          }
+          "display": "wallet error: Invalid verifyHmac result valid: expected true",
+          "error": "WalletError(\"Invalid verifyHmac result valid: expected true\")"
         },
         "request": {
           "headers": {

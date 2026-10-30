@@ -337,8 +337,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: unknown network: fixture-unknown",
-          "error": "WalletError(\"unknown network: fixture-unknown\")"
+          "display": "wallet error: Invalid getNetwork result network: expected mainnet or testnet",
+          "error": "WalletError(\"Invalid getNetwork result network: expected mainnet or testnet\")"
         },
         "request": {
           "headers": {

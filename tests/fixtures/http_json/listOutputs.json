@@ -38,34 +38,8 @@
     {
       "expected": {
         "client_result": {
-          "ok": {
-            "BEEF": [
-              1,
-              0,
-              190,
-              239,
-              0,
-              0
-            ],
-            "outputs": [
-              {
-                "customInstructions": "keep",
-                "labels": [
-                  "alpha",
-                  "omega"
-                ],
-                "lockingScript": "51",
-                "outpoint": "3131313131313131313131313131313131313131313131313131313131313131.2",
-                "satoshis": 1234,
-                "spendable": false,
-                "tags": [
-                  "alpha",
-                  "omega"
-                ]
-              }
-            ],
-            "totalOutputs": 1
-          }
+          "display": "wallet error: Invalid listOutputs result outputs[0].outpoint: expected an output contained in BEEF",
+          "error": "WalletError(\"Invalid listOutputs result outputs[0].outpoint: expected an output contained in BEEF\")"
         },
         "request": {
           "headers": {

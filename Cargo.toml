@@ -77,6 +77,8 @@ lazy_static = "1.4"
 
 # BIP-39's NFKD form of a mnemonic, a passphrase and a wordlist (optional, for compat)
 unicode-normalization = { version = "0.1", optional = true }
+# The HTTP wallet's identity query grammar and NFD folding (#432).
+regex = { version = "1", optional = true }
 
 # Insertion-ordered map (optional, for wallet): a requested certificate set's `types`, the
 # reference's `Record` order on the wire and in the signed text (bsv-rs#288), and the wallet
@@ -176,7 +178,7 @@ full = ["primitives", "block", "script", "transaction", "wallet", "messages", "c
 # Native-only (#152): reqwest's futures are not `Send` on wasm32 and its wasm
 # backend has no `ClientBuilder::timeout`, so `build.rs` refuses `http` on a
 # wasm32 target with one message. No Worker asks for it (docs/DEPENDENTS.md).
-http = ["dep:reqwest", "dep:hyper"]
+http = ["dep:reqwest", "dep:hyper", "dep:regex", "dep:unicode-normalization"]
 websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
 # Socket.IO 5 / Engine.IO 4 + BRC-103 transport. Substrate-agnostic:
 # pulls in no new dependency (uses serde_json + async-trait + futures,
