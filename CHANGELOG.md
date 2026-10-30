@@ -37,6 +37,13 @@ Rows for the toolbox's error table; these are the exact words after
 | `KvStoreLocalError` | `local: preserve this payload` | Unchanged |
 | Every other enabled variant | Its own Display text | Unchanged |
 
+The `wallet error:` and `kvstore error:` texts in the `WalletError` and
+`KvStoreError` rows are the test payloads themselves, not prefixes: a
+`WalletError(String)` and a `KvStoreError(String)` carry their whole payload
+unchanged. `WalletBusy`, `WalletTransport` and `TransportFault` keep their
+Display (`wallet busy: …` and the transport texts) by choice: the reference
+has no error of those kinds to take a message from.
+
 Rows for the CLI's operator-visible table (the same suffix applies to the
 lookup wrapper and the count/key action wrapper):
 
