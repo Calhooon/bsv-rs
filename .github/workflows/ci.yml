@@ -359,7 +359,7 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          if [ -n "$BASE_REF" ] && [ "$BASE_REF" != 0000000000000000000000000000000000000000 ]; then
+          if [ -n "$BASE_REF" ] && [ "$BASE_REF" != 0000000000000000000000000000000000000000 ] && git rev-parse --verify --quiet --end-of-options "${BASE_REF}^{commit}" >/dev/null 2>&1; then
             tools/ratchet/run --check --against "$BASE_REF"
           else
             tools/ratchet/run --check
