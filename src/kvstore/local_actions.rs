@@ -88,6 +88,14 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         loop {
             let listed = self.get_outputs(key, MAX_LOCAL_OUTPUTS).await?;
             let count = listed.outputs.len();
+            // Each batch requests offset zero after spending the previous page.
+            // Unlike the reference loop, refuse a page that cannot make progress (#479).
+            if count == 0 && listed.total_outputs > 0 {
+                return Err(super::lookup::refused(format!(
+                    "Wallet returned an inconsistent KVStore output list: totalOutputs is {}, but page at offset 0 is empty for key {key}",
+                    listed.total_outputs
+                )));
+            }
             if count > 0 {
                 let outputs = self.authenticate_outputs(key, &listed).await?;
                 for output in &outputs {
