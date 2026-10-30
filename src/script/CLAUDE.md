@@ -45,7 +45,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
 | `not_judged.rs` | `NotJudgedCause` under `block`: typed height/activation facts and `WorkBudgetExceeded { input: u32, budget: u64, work_done: u64 }`, shared by verifier refusals; one sentence per cause (#452, #378). The cause stays 24 bytes and `Error` 56 on 64-bit targets. |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError`; `check` names the missing flag, explains that a word without it is not implemented and lists all three required flags: SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS (#453). A word's mandatory fork-ID and strict encoding checks would otherwise differ from the node; default mode can compute the original digest without FORKID (#429). The file remains 872 lines |
-| `input_flags.rs` | Under `block`, `input_script_flags` computes spend-era transaction flags plus source-era UTXO bits from `ChainParams` and heights (#440); pre-Genesis explicitly refused |
+| `input_flags.rs` | Under `block`, `Word::{Standard, Block}` and `ChainParams::word_for_input` expose typed refusals and own the no-tip latest-era rule (#520); the private `checked_input_script_flags` composes spend-era flags plus source-era UTXO bits, shared with the unchanged `input_script_flags` API (#440) |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
 | `templates/mod.rs` | Templates module declarations and re-exports |
@@ -376,26 +376,42 @@ impl ScriptFlags {
 }
 ```
 
-### Per-input live word (`input_flags.rs`, `block` feature, #440)
+### Per-input live word (`input_flags.rs`, `block` feature, #440, #520)
 
-`input_script_flags(&ChainParams, spend_height, source_proven_height, mined)` is
-one composition function for all doors: spend-era transaction flags plus only
-the source-era `UTXO_AFTER_GENESIS` / `UTXO_AFTER_CHRONICLE` bits. Heights are
-inclusive. `None` for an unproven source uses the spend era; no tip is resolved
-by the verifier to the latest activation height. `mined` selects the block
-word, otherwise standard policy. A pre-Genesis source or spend is an explicit
-`ScriptFlagsError::NotApplicable`, never silently PostGenesis.
-Zero Genesis or Chronicle activation heights are refused with that same class
-before era selection, in the node's words. The shared check in `ChainParams`
+`ChainParams::word_for_input(word: Word, spend_height: Option<u32>, source_height: Option<u32>) -> Result<ScriptFlags, NotJudgedCause>`
+is the public typed door. `Word::Standard` is live-door policy; `Word::Block`
+is the consensus word for a mined transaction. A `None` spend height uses the
+latest era the parameters know, the maximum activation height; an activation
+is held back only for a named spend height that has not reached it. A `None`
+source is an unmined parent taking the spend's era. Transaction flags follow
+the spend; only `UTXO_AFTER_GENESIS` / `UTXO_AFTER_CHRONICLE` follow the source.
+The method cites the live-door code and `ProtocolEra::at_height`'s inclusive
+table. The transaction and stream verifiers call it with `Word::Standard`.
+
+`checked_input_script_flags` stays `pub(crate)`, the one composition shared by
+the method and the retained
+`input_script_flags(&ChainParams, spend_height, source_proven_height, mined)`.
+The latter keeps `ScriptFlagsError::NotApplicable` and its exact texts;
+`mined` selects block, otherwise standard. The typed check order is zero
+Genesis, zero Chronicle, pre-Genesis spend, pre-Genesis coin. Tip and wide
+source conversions precede composition at the adapters; the stream's existing
+source-before-tip priority when both overflow is preserved.
+The legacy selector refuses zero Genesis or Chronicle activation heights as
+`ScriptFlagsError::NotApplicable` before era selection, in the node's words.
+The shared check in `ChainParams`
 also serves `with_activation_heights`, whose typed `ActivationHeightsError`
 keeps `block` independent of `script`; public field mutations cannot bypass
 the composition check. `configscriptpolicy.cpp:310-321,353-364` at `879fc8b`
 pins the refusal, and the two `a_zero_*_activation_height_is_refused` tests
-exercise both entry points. The internal checked composition also returns the typed `NotJudgedCause` for live verifiers; the public standalone selector retains `ScriptFlagsError` and its text (#452).
+exercise both entry points. The toolbox migration is to call the method and
+delete `refusal_cause`, its mirrored era order and its no-tip fallback.
 
 The node sites are `bitcoin-sv@879fc8b policy.h:226-245` and
 `validation.cpp:2973-2982`; sibling `docs/PARAMETERS.md:103,123,125,168`.
-Unit tests pin the numeric same-era and mixed-era words and both boundaries;
+`tests/script_word_for_input_520.rs` pins 102 rows under both words, legacy
+equivalence, 97 rows through both synchronous stream paths, conversion order
+and independent spend/coin execution witnesses. Unit tests pin the numeric
+same-era and mixed-era words and both boundaries;
 `tests/beef_stream_word_440.rs` exercises them through the verifier. The
 existing `flags.rs` words and the four interpreter witness files are unchanged.
 

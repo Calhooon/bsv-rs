@@ -37,7 +37,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `verify.rs` | The existing SPV graph walk and `Transaction::verify_with_chain_params`, sharing fee/value/proof/resource behavior and the per-transaction sighash cache |
-| `verification_flags.rs` | Resolves tip + 1 (checked) or the no-tip latest era, then uses the shared checked input-word composition; returns `NotJudgedCause`, never a script failure (#452) |
+| `verification_flags.rs` | Checks tip + 1, then calls `ChainParams::word_for_input(Word::Standard, ...)`; the public resolver owns the no-tip latest-era rule and returns `NotJudgedCause`, never a script failure (#452, #520) |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |

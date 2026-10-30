@@ -5,8 +5,8 @@ use crate::block::ChainParams;
 
 /// Computes the node's word for one input from chain facts, never a caller's
 /// flag word or era resolver. `spend_height` is the candidate block height
-/// (tip + 1), or the containing block height when `mined`. With no mining tip,
-/// callers use the latest activation height in `chain` for an unmined spend.
+/// (tip + 1), or the containing block height when `mined`. For optional heights
+/// and typed refusals, use [`ChainParams::word_for_input`], which owns the no-tip rule.
 /// `source_proven_height` is the source transaction's verified BUMP height;
 /// an unproven source (`None`) takes the spend's era.
 ///
@@ -72,6 +72,67 @@ pub(crate) fn checked_input_script_flags(
         source_bits |= ScriptFlags::UTXO_AFTER_CHRONICLE;
     }
     Ok(word.without(coin_bits) | source_bits)
+}
+
+/// Which node word to use for an input, independent of its script era.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Word {
+    /// Mempool policy, used at a live wallet, topic or tracker door.
+    Standard,
+    /// Consensus rules, used for a transaction in a mined block.
+    Block,
+}
+
+impl ChainParams {
+    /// Resolves the node's word for one input from this chain's activation heights.
+    ///
+    /// [`Word::Standard`] selects the live door's policy; [`Word::Block`] selects
+    /// the consensus word for a mined transaction. `spend_height` is the candidate
+    /// block height (tip + 1), or the containing block height for a mined spend.
+    /// With `None`, the no-tip rule uses the latest era the parameters know:
+    /// `max(genesis_height, chronicle_height)`. An activation is held back only
+    /// for a named spend height that has not reached it. This is the live-door
+    /// rule at `bsv-wallet-toolbox-rs@819dbcef`
+    /// `src/storage/sqlx/beef_verification/live_word.rs:55-70`, moved here on the
+    /// [keeper's #520 ruling](https://github.com/Calhooon/bsv-rs/issues/520#issuecomment-6530114599).
+    ///
+    /// Transaction flags follow the spend's era. Only `UTXO_AFTER_GENESIS` and
+    /// `UTXO_AFTER_CHRONICLE` follow `source_height`, the source's verified BUMP
+    /// height. `None` is an unmined parent taking the spend's era. Both use the
+    /// inclusive era table in `src/script/flags.rs:102-110`
+    /// ([`ProtocolEra::at_height`]); the word is composed by the same private
+    /// helper as [`input_script_flags`]. Requires the `script` and `block` features.
+    ///
+    /// # Errors
+    /// Returns [`NotJudgedCause`] in the existing order: a zero Genesis height,
+    /// a zero Chronicle height, a pre-Genesis spend, then a pre-Genesis coin.
+    /// Callers derive these `u32` heights before calling: an overflowing tip + 1
+    /// is [`NotJudgedCause::TipHeightOverflow`]; an out-of-range wider source is
+    /// [`NotJudgedCause::SourceHeightOverflow`]. These conversion refusals cannot
+    /// arise from already-representable heights. The stream retains its existing
+    /// source-conversion-before-tip-conversion order when both overflow.
+    ///
+    /// ```
+    /// use bsv_rs::{block::ChainParams, script::{ScriptFlags, Word}};
+    /// let flags = ChainParams::mainnet()
+    ///     .word_for_input(Word::Standard, None, Some(800_000))?;
+    /// assert!(flags.contains(ScriptFlags::CHRONICLE));
+    /// assert!(!flags.contains(ScriptFlags::UTXO_AFTER_CHRONICLE));
+    /// # Ok::<(), bsv_rs::script::NotJudgedCause>(())
+    /// ```
+    pub fn word_for_input(
+        &self,
+        word: Word,
+        spend_height: Option<u32>,
+        source_height: Option<u32>,
+    ) -> Result<ScriptFlags, NotJudgedCause> {
+        checked_input_script_flags(
+            self,
+            spend_height.unwrap_or_else(|| self.genesis_height.max(self.chronicle_height)),
+            source_height,
+            word == Word::Block,
+        )
+    }
 }
 
 #[cfg(test)]
