@@ -115,7 +115,7 @@ impl KVStoreInterpreter {
         // The reference interpreter's reader (#544): the canonical envelope,
         // the protocol, key, value, controller and tags in their bounds, the
         // controller-linked key and the controller's signature
-        // (`kvStoreTokenValidation.ts:86-122`); a token it refuses is no value
+        // (`kvStoreTokenValidation.ts:85-119`); a token it refuses is no value
         // (`kvStoreInterpreter.ts:48`).
         let token = super::token_validation::decode_and_verify(script).ok()?;
 

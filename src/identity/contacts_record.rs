@@ -1,5 +1,5 @@
 //! The contact record the reference's token carries (#544): `validateContact`
-//! (`ts-stack@edf6e03` `ContactsManager.ts:171-209`), the seven display
+//! (`ts-stack@edf6e03` `ContactsManager.ts:171-198`), the seven display
 //! fields (`:35-43`) with the reference's spellings plus an optional
 //! `metadata` object, every other member refused, in the reference's words.
 //! This crate's `Contact` maps onto it: `notes` and `tags` travel in
@@ -177,7 +177,7 @@ pub(super) struct ContactRecord {
     pub metadata: Option<Map<String, Value>>,
 }
 
-/// `validateContact` (`ContactsManager.ts:171-209`) on a parsed record: an
+/// `validateContact` (`ContactsManager.ts:171-198`) on a parsed record: an
 /// object of the display fields and an optional `metadata`, judged member
 /// by member in the reference's order and words.
 pub(super) fn validate(value: &Value) -> Result<ContactRecord> {

@@ -1,10 +1,10 @@
 //! #544, site 5: an advertisement is read as the reference reads it
 //! (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts`): the static decode's
-//! checks in its words (`decodeAdvertisement`, `:162-196`, `:237-239`: the
+//! checks in its words (`decodeAdvertisement`, `:159-197`, `:237-239`: the
 //! canonical five-field envelope, the protocol, the canonical identity key,
 //! the advertisement URI, the topic or service name, the signature's length
 //! and canonical DER), and the author where the reference checks it
-//! (`decodeAndVerifyOverlayAdvertisement`, `:198-215`), at the lookup
+//! (`decodeAndVerifyOverlayAdvertisement`, `:199-222`), at the lookup
 //! resolver's SLAP discovery (`LookupResolver.ts:2206`) and the SHIP
 //! broadcaster's host discovery (`SHIPBroadcaster.ts:775`). Against the
 //! overlay cases of `tests/vectors/token_envelope_544.json`

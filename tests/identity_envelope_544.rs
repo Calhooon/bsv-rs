@@ -3,7 +3,7 @@
 //! (`ts-stack@edf6e03` `IdentityClient.ts:773-815`: exactly two fields, the
 //! canonical signed envelope, the locking key, the field signature; the key
 //! and the signature the subject's, as the toolbox's discovery reads a
-//! published token, `identityUtils.ts:497-540`), a token that fails skipped
+//! published token, `identityUtils.ts:497-559`), a token that fails skipped
 //! (`IdentityClient.ts:823`). Against `tests/vectors/token_envelope_544.json`
 //! (`tests/support/token_envelope_544.mjs`, Node v22.18.0): the reference's
 //! own token for a certificate of the subject 9 and five one-change tokens,

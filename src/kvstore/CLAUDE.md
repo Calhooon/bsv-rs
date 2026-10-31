@@ -24,7 +24,8 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
-| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629; since #537 its three readers (`extract_fields`, `extract_value`, `is_kvstore_token`) decode lock-before alone, as `kvStoreTokenValidation.ts:88` does, a lock-after token no value (`tests/kvstore_interpreter_lock_position_537.rs`) |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; since #544 `interpret`/`interpret_script` read through `token_validation.rs` alone, the raw-protocol form no value there (`tests/kvstore_interpreter_envelope_544.rs`) | 656; since #537 its three readers (`extract_fields`, `extract_value`, `is_kvstore_token`) decode lock-before alone, as `kvStoreTokenValidation.ts:88` does, a lock-after token no value (`tests/kvstore_interpreter_lock_position_537.rs`) |
+| `token_validation.rs` | #544: `decode_and_verify`, the reference's `decodeAndVerifyKVStoreToken` (`ts-stack@edf6e03` `kvStoreTokenValidation.ts:85-119`): the canonical five- or six-field envelope and bounds, the protocol canonical JSON `[level, name]`, key, value, a 33-byte controller, the tags, the controller-linked locking key, the controller's signature; crate-internal, read by `interpret_script`; its unit test replays the recorded words | 155 |
 | `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches (#489); the token decode lock-before alone, as the reference's (#499) | 308 |
 | `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489); the point and envelope words come from `script::templates::pushdrop_position` since #537, its point check `PublicKey::from_reference_der` (#498) | 58 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478) | 46 |
@@ -794,12 +795,16 @@ limit present in the reference.
 3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`.
    All present fields preceding the signature are signed, including `[]`.
 
-The reference form is also authenticated by `interpret_script` for history.
+Since #544 `interpret_script` reads a token through `token_validation.rs`,
+the reference's `decodeAndVerifyKVStoreToken` whole (the canonical envelope,
+the bounds, the canonical JSON protocol, the controller-linked key, the
+signature), a refused token no value, as `kvStoreInterpreter.ts:48` answers;
+the raw-protocol form is no value there, and so in the global store's reads.
 A string context names an App protocol, matching the reference's `[1, name]`;
 the default `kvstore` configuration reads the reference's `[1,"kvstore"]`.
-The raw-protocol form keeps the historical extraction-only history behavior.
-The reference's other canonical PushDrop/protocol/value/controller checks and its
-controller context are not fully implemented here; see #344's parity note.
+The reference interpreter's controller context is not implemented
+(`KVStoreContext` has no controller, a public shape), and a `None` context
+reads any key where the reference answers nothing: stated in the #544 row.
 
 ### History Building
 

@@ -105,7 +105,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         .lock())
     }
 
-    /// `#readListedSource` (`ContactsManager.ts:628-658`): the listed
+    /// `#readListedSource` (`ContactsManager.ts:633-658`): the listed
     /// output's script from the BEEF, its transaction by the outpoint's txid.
     fn listed_source(existing: &ListOutputsResult, output: &WalletOutput) -> Result<LockingScript> {
         let refused = |words: &str| Error::IdentityError(words.into());
@@ -148,7 +148,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         Ok((key_id, stored.identity_key))
     }
 
-    /// `#findExistingOutput` (`ContactsManager.ts:586-626`): every listed
+    /// `#findExistingOutput` (`ContactsManager.ts:587-626`): every listed
     /// output authenticated, the one stored for `identity_key` and its key
     /// ID; none when nothing is listed, refused otherwise in the
     /// reference's words.

@@ -487,7 +487,7 @@ impl WalletInterface for MockWallet {
 /// the value, the controller, the optional tags, then the controller's
 /// signature over them for `anyone`, locked with its key for `anyone`, as
 /// `GlobalKVStore.ts` writes it; the interpreter reads no other since #544
-/// (`kvStoreTokenValidation.ts:86-122`).
+/// (`kvStoreTokenValidation.ts:85-119`).
 fn create_signed_token(
     protocol_id: &str,
     key: &str,

@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the six token-decode sites run the reference's envelope, signature and hash-binding checks (#544)
+
+After #537 the six sites decoded a PushDrop token at the reference's lock
+position, but did not run the checks the reference runs on the decoded
+record: they accepted tokens the reference refuses. The keeper's words
+(2026-10-31 07:1xZ, recorded on #544): the port accepts what the reference
+refuses at the record level; a parity row at the pin with the reference
+lines, a witness vector recorded from the pinned bundle, a test RED on the
+base. And (09:1xZ), the contacts site exactly, every other site read the
+same way: the reference's envelope, signature and field set at the pin.
+
+| Site | Before | Now (`ts-stack@edf6e03`) |
+|---|---|---|
+| Contacts manager (`src/identity/contacts*.rs`) | wrote the ciphertext as the one PushDrop field; read the first field of any lock-before token, decrypted it and deserialized this crate's `Contact` JSON (`identityKey`, `name`, `avatarUrl`, `addedAt`, `notes`, `tags`, `metadata`); spent a listed output unauthenticated | writes the signed two-field token (`#encryptAndLock`, `ContactsManager.ts:748-772`: getPublicKey `forSelf` false, createSignature over the ciphertext); reads each listed output as `#readKeyID` and `#authenticateContactScript` do (`:414-466`: two fields, the ciphertext 1 to 65 KiB plus 1 KiB, the signature 8 to 80 bytes, `assertCanonicalSignedPushDrop` `:225-241`, the lock the wallet's key for the protocol, key ID and self, `verifySignature` over the ciphertext), a refused one dropped on a load (`:507-513`); the plaintext `validateContact`'s record (`:171-198`), validated before any wallet call (`:527-528`); the update and removal lookups authenticate every listed output before a spend (`:587-626`, `:891-959`) and refuse in the reference's words |
+| Identity client (`src/identity/client.rs`, `client_token.rs`) | both `ls_identity` parsers read the first field of any lock-before token whose certificate verified | both run the revocation's token checks (`IdentityClient.ts:773-815`: exactly two fields, the canonical envelope `:130-147`, the locking key, the field signature) with the key and signature the subject's, as the toolbox's discovery reads a published token (`wallet-toolbox` `identityUtils.ts:497-559`); a token that fails skipped (`IdentityClient.ts:823`) |
+| Registry client (`src/registry/token.rs`) | #543's reader | unchanged: it already runs every check of `registryTokenValidation.ts:19-64`; stated with a pin, green on the base |
+| KVStore interpreter (`src/kvstore/token_validation.rs`) | the JSON-protocol form's locking key and signature; no envelope or bound check; the raw-protocol form read unauthenticated as to its key | `decodeAndVerifyKVStoreToken` whole (`kvStoreTokenValidation.ts:85-119`: the canonical five- or six-field envelope with its bounds, the canonical JSON protocol, the key, value, controller and tags in their bounds, the controller-linked key, the signature), a refused token no value (`kvStoreInterpreter.ts:48`) |
+| Overlay admin token (`src/overlay/admin_token_validation.rs`) | `decode_overlay_admin_token` read any lock-before token of four or more fields (the legacy unsigned token among them); no URI, name, key or signature check; no author check at the SLAP or SHIP discovery | the decode is `decodeAdvertisement` (`OverlayAdminTokenTemplate.ts:159-197`, the static decode `:237-239`: five canonical fields, SHIP or SLAP, a canonical identity key, an advertisement URI, a `tm_`/`ls_` name, a canonical DER signature of 8 to 80 bytes) in the reference's words; `decode_and_verify_overlay_admin_token`, an addition in the reference's shape (`decodeAndVerifyOverlayAdvertisement`, `:199-222`: the expected protocol, the linked key's signature, the locking key), read at the SLAP discovery and the SHIP discovery as the reference reads it there (`LookupResolver.ts:2206`, `SHIPBroadcaster.ts:775`) |
+| Storage downloader (`src/storage/downloader.rs`, `advertisement.rs`) | read field 2 as the host and field 3 as the expiry of any lock-before token of four or more fields; no signature, no key, no hash binding: an advertisement for another file named its host | each output through `decodeAndVerifyUHRPAdvertisement` (`UHRPAdvertisementValidation.ts:37-115`: six canonical fields, the host's canonical key, the 32-byte hash, a credential-free HTTPS location, positive canonical CompactSize expiry and size, a canonical DER signature, the host-linked locking key, the host's signature), then the hash binding and the expiry (`StorageDownloader.ts:117`) and one host per location (`:118-120`), a refused output skipped (`:121`) |
+
+`addedAt` leaves the contact token: the plaintext is the reference's record
+alone, and a saved-at time lives in the manager's own cache beside the token
+(a contact loaded from a token reads `added_at` from the cache when it holds
+the identity, else 0). `notes` and `tags` travel in the record's `metadata`
+(the reference's place for them, `saveContact`'s "notes, aliases"), and are
+read back out of it. For the toolbox's and the CLI's tables: the toolbox has
+no contacts path and the CLI none, so neither table changes.
+
+The witness is recorded, never written by hand, by one recorder for the six
+sites: `tests/support/token_envelope_544.mjs` runs each site's reference
+counterpart (the bundle of `ts-stack@edf6e03`, an entry re-exporting
+`ContactsManager`, `kvStoreInterpreter` and
+`decodeAndVerifyOverlayAdvertisement`, under Node v22.18.0; ProtoWallets in
+process; `LookupResolver.prototype.query` answering one output) on the
+reference's own token and on tokens changed in one respect, with its words
+and outcome, and reads this crate's tokens (the contacts base token from
+#542's vector, the tip's and the SHIP and SLAP advertisements from the ignored
+`record_this_crates_tokens_544`) both ways: `tests/vectors/token_envelope_544.json`,
+two runs byte-identical. Per site: `tests/identity_contacts_envelope_544.rs`
+(the reference's token read here with its `notes`, `tags` and `avatarURL`;
+nine one-change tokens and a bad key ID dropped; the reference reading this
+crate's tip token with no refusal, the base's dropped for its field count;
+five records refused before any wallet call in `saveContact`'s words; 4 of 4
+RED on `f47f231f`), `tests/identity_envelope_544.rs` (the reference's
+revelation read by both parsers, five one-change tokens skipped; RED),
+`tests/registry_envelope_544.rs` (five tokens in the validator's words and
+the resolver's outcome; green on the base: nothing was missing),
+`tests/kvstore_interpreter_envelope_544.rs` and
+`src/kvstore/token_validation_tests.rs` (seven tokens; RED),
+`tests/overlay_admin_token_envelope_544.rs` (fifteen tokens' decode and
+verify words, this crate's advertisements verified by the reference, both
+discoveries skipping unauthenticated ones; compile-RED on the base, the
+verifier absent, and 3 of 4 RED without its lines), and
+`tests/storage_advertisement_envelope_544.rs` with the unit test in
+`src/storage/advertisement.rs` (eight advertisements; RED for the hash
+binding first).
+
+Migration. One public addition in the reference's shape:
+`overlay::decode_and_verify_overlay_admin_token(script, expected:
+Option<Protocol>)`. No public type changes shape. Behaviour a caller may
+see: `ContactsManager::add_contact` refuses a record the reference refuses
+(an empty name, a non-canonical identity key, an unsafe avatar scheme, a
+`metadata` that is not an object) as `Error::IdentityError` in its words
+before any wallet call, `remove_contact` refuses a non-canonical identity
+key, and the update and removal refuse a listed output that does not
+authenticate (`Unable to authenticate a contact lookup result`, `Unable to
+authenticate or remove a contact output`) where they spent or skipped it;
+a contact token written before #544 (one field) is no longer read, as the
+reference reads none; `decode_overlay_admin_token` refuses the legacy 4-field
+token of the deprecated `create_overlay_admin_token` (`Unexpected PushDrop
+token field count`) and any token the reference's decode refuses, in its
+words (`is_overlay_admin_token`, `is_ship_token` and `is_slap_token` follow
+it); the kvstore interpreter, and the global store's reads through it, read
+no raw-protocol token written before #343; `StorageDownloader::resolve`
+names no host for an advertisement it cannot authenticate or that names
+another file.
+
+### Notes: cross-SDK parity (#544)
+
+Residues, stated: this crate's `Contact` has no badge members, so a
+reference record's `badgeIconURL`, `badgeLabel` and `badgeClickURL` are read
+and dropped and a save from here writes them empty; the record is read as a
+`serde_json::Value` (keys sorted), so of several unexpected members the first
+refused is the first in byte order, where the reference names the first in
+its text; `validateContact`'s words reach `add_contact` alone (a load drops,
+as the reference's `getContacts` does). The identity parsers run the
+revocation's token checks, not the toolbox's `certificateRecord` member
+checks (`identityUtils.ts:87-132`). `KVStoreContext` carries no controller (a
+public shape), and a `None` context reads any key, where the reference's
+interpreter answers nothing without a context and a controller
+(`kvStoreInterpreter.ts:35`). The downloader keeps its lookup-level handling
+(a non-output-list answer an empty list, no 100-output bound, no txid hint;
+`StorageDownloader.ts:77-112`). Go at `2ca481c` runs none of these record
+checks at its counterparts.
+
+Census (#375; current reading):
+
+- Row 86: Ours: closed by #544 at the pin; residues the contact's badges and member order, the toolbox certificate record, the interpreter's controller context and the downloader's lookup-level checks. Theirs: go-sdk, filing pending (the witness: tests/identity_contacts_envelope_544.rs; tests/vectors/token_envelope_544.json).
+
 ### Fixed: the registry client uses the reference's definition-token layout and locking key (#543)
 
 The registry client read and wrote a definition token of 6, 6 and 7 fields

@@ -4,10 +4,10 @@
 //! canonical signed envelope, the locking key, the field signature) with the
 //! key and the signature the subject's, as the reference's discovery reads a
 //! published token (the toolbox's `decodeIdentityOutput`,
-//! `wallet-toolbox/src/utility/identityUtils.ts:497-540`: the anyone
+//! `wallet-toolbox/src/utility/identityUtils.ts:497-559`: the anyone
 //! wallet's key for counterparty the subject, `verifySignature` as anyone
 //! with counterparty the subject). A token that fails is skipped, as the
-//! reference skips it (`IdentityClient.ts:823`, `identityUtils.ts:563`).
+//! reference skips it (`IdentityClient.ts:823`, `identityUtils.ts:555-557`).
 
 use super::IdentityClient;
 use crate::identity::token_envelope::is_canonical_signed_pushdrop;

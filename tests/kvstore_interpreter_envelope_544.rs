@@ -1,6 +1,6 @@
 //! #544, site 4: the kvstore interpreter reads a token through the
 //! reference's `decodeAndVerifyKVStoreToken` (`ts-stack@edf6e03`
-//! `kvStoreTokenValidation.ts:86-122`): the canonical envelope of five or
+//! `kvStoreTokenValidation.ts:85-119`): the canonical envelope of five or
 //! six fields, the canonical JSON protocol, the bounds, the controller-linked
 //! locking key and the controller's signature, a refused token no value, as
 //! `kvStoreInterpreter.ts:48` answers `undefined`. Against the kvstore cases
