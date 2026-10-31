@@ -14,10 +14,11 @@
 //! the few named in [`NOT_ON_THE_FULL_SET`], and every cell of the test
 //! matrix. The jobs that judge something other than the commit live in
 //! workflows of their own (bench.yml, msrv.yml, features.yml, machete.yml,
-//! docs.yml), which no push and no pull request starts.
+//! docs.yml for actionlint), which no push and no pull request starts.
+//! Documentation belongs to ci.yml's required set on both lines (#515).
 //!
-//! This guard reads `.github/workflows/ci.yml` (nothing else; no network, no
-//! environment) at the string level and evaluates each job's `if:` and its
+//! This guard reads `.github/workflows/*.yml` (no network, no environment)
+//! at the string level and evaluates each job's `if:` and its
 //! matrix for an event. The parser is small and its limits are deliberate: a
 //! job is a two-space key under `jobs:`; it reads the job's `name:`, `if:`
 //! (inline or a `>-` block), `needs:` (one id or a flow list) and the keys of
@@ -38,12 +39,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-/// The required contexts of `beta`'s protection, read 2026-10-26 by
+/// `beta`'s required contexts as they will be after #515 lands, not a live snapshot.
+/// Existing protection read 2026-10-30 by
 /// `gh api repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --jq '.contexts'`.
+/// The captain adds `Documentation` and reads the protection back after landing.
 const REQUIRED_ON_BETA: &[&str] = &[
     "Test Suite (ubuntu-latest, stable)",
     "Clippy",
     "Rustfmt",
+    "Documentation",
     "vectors",
     "deny",
     "main-in-beta",
@@ -54,12 +58,16 @@ const REQUIRED_ON_BETA: &[&str] = &[
     "wasm32 (combined)",
 ];
 
-/// The required contexts of `main`'s protection, read 2026-10-26 by
+/// `main`'s required contexts as they will be after #515 reaches `main`, not a live snapshot.
+/// Existing protection read 2026-10-30 by
 /// `gh api repos/Calhooon/bsv-rs/branches/main/protection/required_status_checks --jq '.contexts'`.
+/// The protection follows the landing: the captain PATCHes `Documentation` into `main`'s contexts
+/// only after the job has reported green on `main`, never before, and reads it back.
 const REQUIRED_ON_MAIN: &[&str] = &[
     "Test Suite (ubuntu-latest, stable)",
     "Clippy",
     "Rustfmt",
+    "Documentation",
     "vectors",
     "deny",
     "dependents",
@@ -721,6 +729,77 @@ fn a_push_to_main_runs_exactly_mains_required_set() {
 }
 
 #[test]
+fn documentation_is_a_pr_and_push_gate_with_warnings_denied() {
+    let ci = read(".github/workflows/ci.yml");
+    assert!(ci.contains("  pull_request:\n    branches: [main, beta]\n"));
+    assert!(ci.contains("  push:\n    branches: [main, beta]\n"));
+    assert!(ci.contains(
+        "        run: cargo doc --no-deps --all-features\n        env:\n          RUSTDOCFLAGS: -Dwarnings\n"
+    ));
+    for (line, required) in [("beta", REQUIRED_ON_BETA), ("main", REQUIRED_ON_MAIN)] {
+        assert!(required.contains(&"Documentation"));
+        assert!(pr_refusals(&ci, line, required).is_empty());
+        assert!(push_refusals(&ci, line, required).is_empty());
+    }
+    assert!(
+        !read(".github/workflows/docs.yml").contains("cargo doc"),
+        "release.yml already runs Documentation through ci.yml"
+    );
+}
+
+#[test]
+fn benchmark_comparisons_skip_tags_and_allow_branch_dispatches_and_pr_callers() {
+    let all = jobs(&read(".github/workflows/bench.yml"));
+    for (event, expected) in [
+        (
+            Event {
+                name: "push",
+                base_ref: "",
+                git_ref: "refs/tags/v0.9.0-beta.4",
+            },
+            false,
+        ),
+        (
+            Event {
+                name: "workflow_dispatch",
+                base_ref: "",
+                git_ref: "refs/tags/v0.9.0-beta.4",
+            },
+            false,
+        ),
+        (
+            Event {
+                name: "workflow_dispatch",
+                base_ref: "",
+                git_ref: "refs/heads/beta",
+            },
+            true,
+        ),
+        (
+            Event {
+                name: "workflow_dispatch",
+                base_ref: "",
+                git_ref: "refs/heads/main",
+            },
+            true,
+        ),
+        (pull_request("beta"), true),
+        (pull_request("main"), true),
+    ] {
+        let ran = runs(&all, &event);
+        assert_eq!(
+            ran.get("benchmarks"),
+            Some(&Some(expected)),
+            "benchmark comparisons on {} at {}",
+            event.name,
+            event.git_ref
+        );
+        assert_eq!(ran.get("benchmarks-build"), Some(&Some(true)));
+        assert_eq!(ran.get("scoreboard"), Some(&Some(true)));
+    }
+}
+
+#[test]
 fn a_dispatch_and_a_tags_call_run_every_job_and_the_whole_matrix() {
     let errors = full_refusals(&read(".github/workflows/ci.yml"));
     assert!(errors.is_empty(), "{}", errors.join("\n"));
@@ -762,13 +841,13 @@ fn the_measurements_run_on_dispatch_and_before_a_tag_never_on_a_push() {
 }
 
 /// A job outside every required set, inserted first under `jobs:` with `condition`.
-fn with_docs_job(ci: &str, condition: Option<&str>) -> String {
+fn with_unrequired_job(ci: &str, condition: Option<&str>) -> String {
     let condition = condition.map_or(String::new(), |c| format!("    if: {c}\n"));
     edited(
         ci,
         "\njobs:\n",
         &format!(
-            "\njobs:\n  docs:\n    name: Documentation\n{condition}    runs-on: ubuntu-latest\n"
+            "\njobs:\n  extra:\n    name: Unrequired check\n{condition}    runs-on: ubuntu-latest\n"
         ),
     )
 }
@@ -781,32 +860,34 @@ fn edited(text: &str, old: &str, new: &str) -> String {
 
 #[test]
 fn a_required_job_gated_off_pull_requests_is_refused() {
-    let ci = edited(
-        &read(".github/workflows/ci.yml"),
-        "  clippy:\n    name: Clippy\n",
-        "  clippy:\n    name: Clippy\n    if: github.event_name != 'pull_request'\n",
-    );
-    for (line, required) in [("beta", REQUIRED_ON_BETA), ("main", REQUIRED_ON_MAIN)] {
-        let errors = pr_refusals(&ci, line, required);
-        assert_eq!(
-            errors,
-            [format!(
-                "`Clippy` is required on {line} but no job is proven to run it on a pull request into {line}"
-            )]
+    for (id, name) in [("clippy", "Clippy"), ("docs", "Documentation")] {
+        let ci = edited(
+            &read(".github/workflows/ci.yml"),
+            &format!("  {id}:\n    name: {name}\n"),
+            &format!("  {id}:\n    name: {name}\n    if: github.event_name != 'pull_request'\n"),
         );
+        for (line, required) in [("beta", REQUIRED_ON_BETA), ("main", REQUIRED_ON_MAIN)] {
+            let errors = pr_refusals(&ci, line, required);
+            assert_eq!(
+                errors,
+                [format!(
+                    "`{name}` is required on {line} but no job is proven to run it on a pull request into {line}"
+                )]
+            );
+        }
     }
 }
 
 #[test]
 fn an_unrequired_job_left_on_pull_requests_is_refused() {
-    let ci = with_docs_job(&read(".github/workflows/ci.yml"), None);
+    let ci = with_unrequired_job(&read(".github/workflows/ci.yml"), None);
     let errors = pr_refusals(&ci, "beta", REQUIRED_ON_BETA);
     assert_eq!(
         errors,
-        ["job `docs` runs `Documentation` on a pull request into beta, not a required context there"]
+        ["job `extra` runs `Unrequired check` on a pull request into beta, not a required context there"]
     );
     // the old condition, off pull requests alone, puts it back on the push run
-    let ci = with_docs_job(
+    let ci = with_unrequired_job(
         &read(".github/workflows/ci.yml"),
         Some("github.event_name != 'pull_request'"),
     );
@@ -815,7 +896,7 @@ fn an_unrequired_job_left_on_pull_requests_is_refused() {
         assert_eq!(
             push_refusals(&ci, line, required),
             [format!(
-                "job `docs` runs `Documentation` on a push to {line}, not a required context there"
+                "job `extra` runs `Unrequired check` on a push to {line}, not a required context there"
             )]
         );
     }
@@ -883,14 +964,14 @@ fn the_whole_test_matrix_on_a_pull_request_is_refused_cell_by_cell() {
 #[test]
 fn a_job_on_a_condition_the_parser_cannot_decide_is_refused_both_ways() {
     // the benchmarks job's old record trigger: a pull request whose body names a marker
-    let ci = with_docs_job(
+    let ci = with_unrequired_job(
         &read(".github/workflows/ci.yml"),
         Some("contains(github.event.pull_request.body, '[docs]')"),
     );
     let errors = pr_refusals(&ci, "beta", REQUIRED_ON_BETA);
     assert_eq!(
         errors,
-        ["job `docs` runs `Documentation` on a pull request into beta, not a required context there"]
+        ["job `extra` runs `Unrequired check` on a pull request into beta, not a required context there"]
     );
     let ci = edited(
         &read(".github/workflows/ci.yml"),

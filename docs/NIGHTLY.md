@@ -16,8 +16,16 @@ of 2026-10-27). Its `ci-full` job dispatches `ci.yml` on `beta` and on `main`,
 so each line's whole test matrix and `dependents` run at its tip (a pull
 request and a push run only the line's required set). The other measurements
 are workflows of their own, dispatched on the line and called by `release.yml`
-before every tag: `bench.yml`, `msrv.yml`, `features.yml`, `machete.yml`,
-`docs.yml`. A dispatched run resolves the selected ref once, then every mutation
+before every tag: `bench.yml` (build and scoreboard; comparisons only on branch
+dispatches), `msrv.yml`, `features.yml`, `machete.yml`, `docs.yml` (actionlint).
+`Documentation` is a required job in `ci.yml` on both lines after #515's
+protection update: it also runs on pull requests and pushes, with
+`cargo doc --no-deps --all-features` under `RUSTDOCFLAGS: -Dwarnings`.
+The captain adds that context to `beta`'s protection at the landing and to
+`main`'s once `main`'s `ci.yml` carries the job, reading each back, then
+updates the sequencer's required-check list. The constants
+in `tests/arch_ci_pr_runs_the_required_set.rs` name that intended set.
+A dispatched run resolves the selected ref once, then every mutation
 shard, the score job and every fuzz job check out that same commit.
 
 GitHub requires the workflow on the default branch (`main`) to enable manual

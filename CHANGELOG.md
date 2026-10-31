@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `Documentation` runs in `ci.yml` on every pull request and push; a tag's call skips the benchmark comparison (cherry-picked from beta `a67ea411`, PR #524, issue #515)
+
+Two CI facts, taken from `beta` by `git cherry-pick -x`, no code. A Release run
+on `beta` failed rustdoc on an unresolved intra-doc link that two reviewed pull
+requests had let through: `Documentation` lived in `docs.yml`, which no pull
+request and no push starts. The job moves back into `ci.yml` with no
+condition, so it runs on pull requests, pushes, dispatches and the Release
+workflow's call; its command is unchanged (`cargo doc --no-deps --all-features`
+under `RUSTDOCFLAGS: -Dwarnings`), and `docs.yml` keeps `actionlint` alone.
+`tests/arch_ci_pr_runs_the_required_set.rs` names `Documentation` in
+`REQUIRED_ON_MAIN` (13 contexts) and `REQUIRED_ON_BETA` (12), the intended
+protection, not the live one: the captain adds the context to `main`'s
+protection only after the job has reported green on `main`, reads it back, and
+adds it to the sequencer's required-check list.
+
+`bench.yml`'s `Benchmark Regression Check` refuses a caller on a `refs/tags/`
+ref (`if: ${{ !startsWith(github.ref, 'refs/tags/') }}`): a reusable workflow
+sees its caller's ref, and on a tag's call the comparison measured the runner's
+load. A branch dispatch still compares the commit with the last release tag
+before it; `Benchmarks Build` and the `scoreboard` still run on every tag.
+`documentation_is_a_pr_and_push_gate_with_warnings_denied` and
+`benchmark_comparisons_skip_tags_and_allow_branch_dispatches_and_pr_callers`
+pin the two.
+
 ### Changed: a push runs exactly the required set; the measurements run on dispatch and before every tag, each in its own workflow with its own badge (the owner's word of 2026-10-27)
 
 The owner's word at 20:1xZ, 2026-10-27, through the keeper: "sick of seeing

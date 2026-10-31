@@ -4,8 +4,9 @@ name: Bench
 # commit (beta's push run was red on the regression check alone, 2026-10-27), so they are off the
 # push run (ci.yml runs the required set, nothing more; the owner's word of 2026-10-27, the
 # keeper's ruling). On demand (`gh workflow run bench.yml --ref main`) and called by release.yml
-# on every version tag before it publishes. Main's bodies, not beta's: main has no
-# tools/bench-compare and no benches/baseline.json, so no record input and no corpus secret.
+# on every version tag before it publishes (build and scoreboard only; comparisons skip tag refs).
+# Main's bodies, not beta's: main has no tools/bench-compare and no benches/baseline.json, so no
+# record input and no corpus secret.
 on:
   workflow_dispatch:
   workflow_call:
@@ -51,10 +52,13 @@ jobs:
 
   benchmarks:
     name: Benchmark Regression Check
+    # A reusable workflow sees its caller's ref: release.yml supplies refs/tags/v* (#515).
+    # Keep comparisons on branch dispatches and permit PR callers, never a tag (even dispatched).
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
-    # main's critcmp body; a dispatch and a tag's call carry no pull request, so the commit is
-    # compared with the last release tag before it (a beta prerelease tag is never main's, a tag
-    # never with itself). critcmp prints the comparison; it judges nothing
+    # main's critcmp body; a branch dispatch carries no pull request, so the commit is compared
+    # with the last release tag before it (a beta prerelease tag is never main's). critcmp prints
+    # the comparison; it judges nothing
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
