@@ -7,11 +7,10 @@
 use crate::overlay::types::Protocol;
 use crate::primitives::hash::sha256;
 use crate::primitives::{PrivateKey, PublicKey};
-use crate::script::templates::pushdrop_position::lock_after_refusal;
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::{Counterparty, KeyDeriver, Protocol as WalletProtocol, SecurityLevel};
-use crate::{Error, Result};
+use crate::Result;
 
 /// BRC-43 protocol names for SHIP/SLAP key derivation.
 ///
@@ -50,25 +49,24 @@ impl OverlayAdminTokenData {
     }
 }
 
-/// Decodes a SHIP or SLAP advertisement from a locking script.
+/// Decodes a SHIP or SLAP advertisement from a locking script, as the
+/// reference's static `OverlayAdminTokenTemplate.decode` does
+/// (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:162-196`, `:237-239`;
+/// #544): the canonical lock-before envelope of five fields
 ///
-/// Accepts EITHER layout:
+///   1. Protocol (`"SHIP"` or `"SLAP"`)
+///   2. Identity key (a canonical 33-byte compressed public key)
+///   3. Domain (an `https://`-family, `wss://` or `js8c+bsvauth+smf:` URI)
+///   4. Topic (`tm_…`) or service (`ls_…`) name
+///   5. Signature (canonical DER, 8 to 80 bytes)
 ///
-/// - **Current spec (5 fields, signed)** — what
-///   [`create_signed_overlay_admin_token`] emits and what
-///   `@bsv/overlay-discovery-services` tm_ship/tm_slap validators admit:
-///
-///   1. Protocol ("SHIP" or "SLAP")
-///   2. Identity key (33-byte compressed public key)
-///   3. Domain (UTF-8 string)
-///   4. Topic or service name (UTF-8 string)
-///   5. Signature (DER-encoded ECDSA, not parsed here)
-///
-/// - **Legacy 4-field unsigned** — what the deprecated
-///   [`create_overlay_admin_token`] emits. Decoded for backward
-///   compatibility with any older on-chain tokens; however, such
-///   tokens will NOT be admitted by current validators and are
-///   effectively decorative.
+/// each field judged in the reference's order and words. Like the
+/// reference's, this decode checks the structure, not the author; a
+/// consumer that trusts the advertisement uses
+/// [`decode_and_verify_overlay_admin_token`]. The legacy 4-field unsigned
+/// token that the deprecated [`create_overlay_admin_token`] writes is
+/// refused (`Unexpected PushDrop token field count`), as the reference
+/// refuses it (until #544 it was decoded here).
 ///
 /// # Arguments
 ///
@@ -76,8 +74,8 @@ impl OverlayAdminTokenData {
 ///
 /// # Returns
 ///
-/// The decoded token data, or an error if the script is not a valid
-/// advertisement token.
+/// The decoded token data, or `Error::OverlayError` in the reference's
+/// words if the script is not a canonical advertisement.
 ///
 /// # Example
 ///
@@ -91,54 +89,28 @@ impl OverlayAdminTokenData {
 /// println!("Domain: {}", token.domain);
 /// ```
 pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdminTokenData> {
-    // Lock-before alone, as OverlayAdminTokenTemplate.ts:164 decodes it; a
-    // lock-after token refused in that site's words, its five fields (#537).
-    let pushdrop = PushDrop::decode_before(script).map_err(|_| {
-        let words = lock_after_refusal(script, &[5]);
-        Error::OverlayError(
-            words
-                .unwrap_or("Script is not a valid PushDrop format")
-                .into(),
-        )
-    })?;
+    super::admin_token_validation::decode(script).map(|(data, _)| data)
+}
 
-    let fields = &pushdrop.fields;
-
-    // Must have at least 4 fields
-    if fields.len() < 4 {
-        return Err(Error::OverlayError(format!(
-            "Invalid SHIP/SLAP advertisement: expected at least 4 fields, got {}",
-            fields.len()
-        )));
-    }
-
-    // Parse protocol (first field)
-    let protocol_str = std::str::from_utf8(&fields[0])
-        .map_err(|_| Error::OverlayError("Protocol field is not valid UTF-8".into()))?;
-
-    let protocol = Protocol::parse(protocol_str)
-        .ok_or_else(|| Error::OverlayError(format!("Invalid protocol type: {}", protocol_str)))?;
-
-    // Parse identity key (second field, 33 bytes compressed pubkey)
-    let identity_key = PublicKey::from_bytes(&fields[1])
-        .map_err(|e| Error::OverlayError(format!("Invalid identity key: {}", e)))?;
-
-    // Parse domain (third field)
-    let domain = std::str::from_utf8(&fields[2])
-        .map_err(|_| Error::OverlayError("Domain field is not valid UTF-8".into()))?
-        .to_string();
-
-    // Parse topic or service (fourth field)
-    let topic_or_service = std::str::from_utf8(&fields[3])
-        .map_err(|_| Error::OverlayError("Topic/service field is not valid UTF-8".into()))?
-        .to_string();
-
-    Ok(OverlayAdminTokenData {
-        protocol,
-        identity_key,
-        domain,
-        topic_or_service,
-    })
+/// Decodes and authenticates a SHIP or SLAP advertisement, as the
+/// reference's `decodeAndVerifyOverlayAdvertisement` does
+/// (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:198-215`; #544): the
+/// static decode's checks, then the protocol `expected` when given, the
+/// signature by the identity key's child for `anyone` (protocol
+/// `[2, 'service host interconnect' | 'service lookup availability']`, key
+/// ID `1`) over the four data fields, and the locking key that child. The
+/// reference's lookup resolver and SHIP broadcaster read an advertisement
+/// through it (`LookupResolver.ts:2206`, `SHIPBroadcaster.ts:775`), as this
+/// crate's do.
+///
+/// # Errors
+///
+/// `Error::OverlayError` in the reference's words.
+pub fn decode_and_verify_overlay_admin_token(
+    script: &LockingScript,
+    expected: Option<Protocol>,
+) -> Result<OverlayAdminTokenData> {
+    super::admin_token_validation::decode_and_verify(script, expected)
 }
 
 /// Create an overlay admin token locking script.
@@ -354,9 +326,9 @@ mod tests {
         let private_key = PrivateKey::random();
         let public_key = private_key.public_key();
 
-        let script = create_overlay_admin_token(
+        let script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Ship,
-            &public_key,
             "https://example.com",
             "tm_test_topic",
         );
@@ -482,11 +454,10 @@ mod tests {
     #[allow(deprecated)]
     fn test_create_and_decode_slap_token() {
         let private_key = PrivateKey::random();
-        let public_key = private_key.public_key();
 
-        let script = create_overlay_admin_token(
+        let script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Slap,
-            &public_key,
             "https://service.example.com",
             "ls_myservice",
         );
@@ -502,18 +473,17 @@ mod tests {
     #[allow(deprecated)]
     fn test_is_ship_token() {
         let private_key = PrivateKey::random();
-        let public_key = private_key.public_key();
 
-        let ship_script = create_overlay_admin_token(
+        let ship_script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Ship,
-            &public_key,
             "https://example.com",
             "tm_test",
         );
 
-        let slap_script = create_overlay_admin_token(
+        let slap_script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Slap,
-            &public_key,
             "https://example.com",
             "ls_test",
         );
@@ -526,18 +496,17 @@ mod tests {
     #[allow(deprecated)]
     fn test_is_slap_token() {
         let private_key = PrivateKey::random();
-        let public_key = private_key.public_key();
 
-        let slap_script = create_overlay_admin_token(
+        let slap_script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Slap,
-            &public_key,
             "https://example.com",
             "ls_test",
         );
 
-        let ship_script = create_overlay_admin_token(
+        let ship_script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Ship,
-            &public_key,
             "https://example.com",
             "tm_test",
         );
@@ -550,11 +519,10 @@ mod tests {
     #[allow(deprecated)]
     fn test_is_overlay_admin_token() {
         let private_key = PrivateKey::random();
-        let public_key = private_key.public_key();
 
-        let admin_script = create_overlay_admin_token(
+        let admin_script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Ship,
-            &public_key,
             "https://example.com",
             "tm_test",
         );
@@ -571,11 +539,10 @@ mod tests {
     #[allow(deprecated)]
     fn test_identity_key_hex() {
         let private_key = PrivateKey::random();
-        let public_key = private_key.public_key();
 
-        let script = create_overlay_admin_token(
+        let script = create_signed_overlay_admin_token(
+            &private_key,
             Protocol::Ship,
-            &public_key,
             "https://example.com",
             "tm_test",
         );
@@ -613,18 +580,22 @@ mod tests {
         let private_key = PrivateKey::random();
         let public_key = private_key.public_key();
 
-        // Create with invalid protocol
+        // Create with invalid protocol: five fields, the reference's
+        // `assertProtocol` words (`OverlayAdminTokenTemplate.ts:51-55`; #544)
         let fields = vec![
             b"INVALID".to_vec(),
             public_key.to_compressed().to_vec(),
-            b"domain".to_vec(),
-            b"topic".to_vec(),
+            b"https://example.com".to_vec(),
+            b"tm_topic".to_vec(),
+            vec![0x30; 8],
         ];
         let pushdrop = PushDrop::new(public_key, fields);
         let script = pushdrop.lock();
 
         let result = decode_overlay_admin_token(&script);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid protocol"));
+        assert_eq!(
+            result.unwrap_err(),
+            crate::Error::OverlayError("Advertisement protocol must be SHIP or SLAP".into())
+        );
     }
 }

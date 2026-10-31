@@ -51,6 +51,7 @@
 //!
 //! A global reputation tracker is shared across all operations.
 
+mod admin_token_validation;
 pub mod facilitators;
 pub mod historian;
 pub mod host_reputation_tracker;
@@ -86,8 +87,9 @@ pub use lookup_resolver::{LookupResolver, LookupResolverConfig};
 #[allow(deprecated)]
 pub use overlay_admin_token_template::create_overlay_admin_token;
 pub use overlay_admin_token_template::{
-    create_signed_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token,
-    is_ship_token, is_slap_token, OverlayAdminTokenData,
+    create_signed_overlay_admin_token, decode_and_verify_overlay_admin_token,
+    decode_overlay_admin_token, is_overlay_admin_token, is_ship_token, is_slap_token,
+    OverlayAdminTokenData,
 };
 
 // Re-exports from topic_broadcaster

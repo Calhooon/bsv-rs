@@ -100,10 +100,3 @@ pub(crate) fn canonical_refusal(script: &LockingScript, counts: &[usize]) -> Opt
         "Unexpected PushDrop token field count"
     })
 }
-
-/// [`canonical_refusal`] for a token written lock-after (one the general
-/// decoder reads at that position), `None` for any other script.
-pub(crate) fn lock_after_refusal(script: &LockingScript, counts: &[usize]) -> Option<&'static str> {
-    PushDrop::decode_lock_after(&script.chunks()).ok()?;
-    canonical_refusal(script, counts)
-}

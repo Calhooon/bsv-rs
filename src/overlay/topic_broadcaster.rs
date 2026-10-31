@@ -7,7 +7,7 @@ use crate::overlay::{
     facilitators::{HttpsOverlayBroadcastFacilitator, OverlayBroadcastFacilitator},
     host_reputation_tracker::get_overlay_host_reputation_tracker,
     lookup_resolver::{LookupResolver, LookupResolverConfig},
-    overlay_admin_token_template::decode_overlay_admin_token,
+    overlay_admin_token_template::decode_and_verify_overlay_admin_token,
     types::{
         HostResponse, LookupAnswer, LookupQuestion, NetworkPreset, Protocol, TaggedBEEF,
         MAX_SHIP_QUERY_TIMEOUT_MS,
@@ -327,7 +327,11 @@ impl TopicBroadcaster {
                         .get(output.output_index as usize)
                         .map(|o| &o.locking_script)
                     {
-                        if let Ok(token) = decode_overlay_admin_token(script) {
+                        // Decoded and authenticated as the reference's
+                        // broadcaster does (`SHIPBroadcaster.ts:775`, #544)
+                        if let Ok(token) =
+                            decode_and_verify_overlay_admin_token(script, Some(Protocol::Ship))
+                        {
                             // Only include SHIP tokens for our topics
                             if token.protocol == Protocol::Ship
                                 && self.topics.contains(&token.topic_or_service)
