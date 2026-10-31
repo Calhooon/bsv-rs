@@ -119,7 +119,7 @@ fn work_exhaustion_returns_a_not_judged_spend_refusal_378() {
     assert_refusal(
         stop_with_evaluation(
             Evaluation {
-                work: crate::transaction::WorkBudget::default().with_work_budget(Some(0)),
+                work: crate::transaction::WorkBudget::default().with_per_input(Some(0)),
                 ..Evaluation::NONE
             },
             10_000,

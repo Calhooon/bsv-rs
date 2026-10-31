@@ -8,7 +8,15 @@ use crate::script::NotJudgedCause;
 /// [`crate::script::Spend::work_spent`]: reached opcodes and bytes hashed.
 /// The transaction total is charged after each input, in input order. These
 /// are local evaluator policies, never consensus rules or elapsed-time bounds.
+///
+/// Construct a policy with [`Self::new`] and its field setters; fields remain
+/// readable, and destructuring outside this crate requires `..`.
+///
+/// ```compile_fail
+/// let _ = bsv_rs::transaction::WorkBudget { per_input: None, per_transaction: None };
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct WorkBudget {
     /// Maximum work charged within one input; `None` leaves it unbounded.
     pub per_input: Option<u64>,
@@ -17,24 +25,30 @@ pub struct WorkBudget {
 }
 
 impl WorkBudget {
+    /// Creates a local work policy with both bounds unbounded.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            per_input: None,
+            per_transaction: None,
+        }
+    }
+
     /// Sets the local per-input work bound.
     #[must_use]
-    pub const fn with_work_budget(mut self, limit: Option<u64>) -> Self {
+    pub const fn with_per_input(mut self, limit: Option<u64>) -> Self {
         self.per_input = limit;
         self
     }
 
     /// Sets the local work bound across each transaction's inputs.
     #[must_use]
-    pub const fn with_transaction_work_budget(mut self, limit: Option<u64>) -> Self {
+    pub const fn with_per_transaction(mut self, limit: Option<u64>) -> Self {
         self.per_transaction = limit;
         self
     }
 
-    pub(super) const NONE: Self = Self {
-        per_input: None,
-        per_transaction: None,
-    };
+    pub(super) const NONE: Self = Self::new();
 
     // A transaction-only bound still needs the interpreter's existing counter.
     pub(super) fn input_limit(self) -> Option<u64> {
@@ -69,7 +83,7 @@ mod tests {
 
     #[test]
     fn a_transaction_total_cannot_wrap_back_inside_its_budget() {
-        let policy = WorkBudget::default().with_transaction_work_budget(Some(u64::MAX));
+        let policy = WorkBudget::default().with_per_transaction(Some(u64::MAX));
         let mut total = u64::MAX - 1;
         assert_eq!(policy.charge(&mut total, 0, 1), Ok(()));
         assert_eq!(

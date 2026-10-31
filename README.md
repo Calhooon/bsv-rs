@@ -97,8 +97,9 @@ wall-clock or total computation bound.
 pins the verification paths.
 
 For a transaction-wide work bound, `transaction::WorkBudget` carries
-`per_input` and `per_transaction`, both optional. Its `with_work_budget` and
-`with_transaction_work_budget` builders configure the policy passed to
+readable `per_input` and `per_transaction` fields, both optional. It is
+`#[non_exhaustive]`: start with `WorkBudget::new()` (both bounds `None`) and use
+`with_per_input` and `with_per_transaction` to configure the policy passed to
 `Transaction::verify_with_work_budgets` or the chain-parameter counterpart.
 Stream verifiers add `with_transaction_work_budget` beside `with_work_budget`.
 Inputs are charged in verification order; a total above the bound returns

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `WorkBudget` is `#[non_exhaustive]` with a constructor and field setters (#527)
+
+`transaction::WorkBudget` previously allowed downstream struct literals, so
+adding a third bound would break every such consumer. The keeper's
+2026-10-30 20:1xZ word for 0.9.0-beta.5 seals that shape now:
+`#[non_exhaustive]` with both fields still public and readable, a const
+`new()` with both bounds `None`, and const, `#[must_use]` `with_per_input` and
+`with_per_transaction` setters taking `Option<u64>`. Derived `Default` equals
+`new()`; the existing accounting and verifier behavior are unchanged.
+
+Migration: `WorkBudget { per_input: a, per_transaction: b }` becomes
+`WorkBudget::new().with_per_input(a).with_per_transaction(b)`; a destructure
+outside the crate takes `..`. On `WorkBudget`, `with_work_budget` and
+`with_transaction_work_budget` are replaced by `with_per_input` and
+`with_per_transaction`, with no aliases. The verifier builders keep their
+names and signatures.
+
+This is a semver-major change on the beta line under `api-break`.
+`WorkBudget` is in no published prerelease: it arrived in #519 (`77cccd70`),
+after v0.9.0-beta.4 (`56d12075`). The struct's `compile_fail` doctest pins the
+external literal's rejection; `tests/transaction_work_budget_519.rs` pins
+`a_new_work_budget_matches_the_unbounded_default_527`,
+`work_budget_field_setters_keep_both_bounds_readable_527`, and
+`work_budget_construction_and_both_field_setters_are_const_527`.
+Each was RED on the pre-fix base. The literal in
+`tests/transaction_work_budget_519.rs` now uses the constructor and setters;
+all #519 assertions retain their meaning.
+
 ### Changed: the raw result tree reads the shared byte bound (#512)
 
 - `result_values/raw_tree.rs` drops its own copy of the 256 MiB bound and formats its `byte arrays` refusal from `boundary::MAX_BYTES`, the one definition `wire.rs` reads since #502; the words stay `at most 268435456 total bytes` and no behaviour changes.
@@ -47,7 +75,8 @@ that tag callers skip comparisons without disabling branch dispatches.
 
 `transaction::WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`
 is one local policy type for both bounds. Its adjacent `with_work_budget` and
-`with_transaction_work_budget` builders set each bound independently; both
+`with_transaction_work_budget` builders (since #527, above, `with_per_input`
+and `with_per_transaction`) set each bound independently; both
 default to `None`. `StreamVerifier` and `AsyncStreamVerifier` retain their
 existing `with_work_budget(Option<u64>)` and add the adjacent
 `with_transaction_work_budget(Option<u64>)`. Whole-transaction callers pass the

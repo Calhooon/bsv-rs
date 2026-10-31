@@ -69,7 +69,7 @@ impl Transaction {
             chain_tracker,
             fee_model,
             memory_limit,
-            WorkBudget::NONE.with_work_budget(work_limit),
+            WorkBudget::NONE.with_per_input(work_limit),
             None,
         )
         .await
@@ -99,7 +99,7 @@ impl Transaction {
             chain_tracker,
             fee_model,
             memory_limit,
-            WorkBudget::NONE.with_work_budget(work_limit),
+            WorkBudget::NONE.with_per_input(work_limit),
             Some(chain),
         )
         .await

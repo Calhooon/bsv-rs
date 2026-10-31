@@ -123,9 +123,9 @@ impl AsyncByteSource for Chunk {
 }
 
 fn budget(input: Option<u64>, transaction: Option<u64>) -> WorkBudget {
-    WorkBudget::default()
-        .with_work_budget(input)
-        .with_transaction_work_budget(transaction)
+    WorkBudget::new()
+        .with_per_input(input)
+        .with_per_transaction(transaction)
 }
 
 fn cause() -> NotJudgedCause {
@@ -430,10 +430,9 @@ fn the_cause_keeps_the_error_size_and_the_existing_display_words_519() {
     }
     assert_eq!(
         budget(Some(68), Some(70)),
-        WorkBudget {
-            per_input: Some(68),
-            per_transaction: Some(70)
-        }
+        WorkBudget::new()
+            .with_per_input(Some(68))
+            .with_per_transaction(Some(70))
     );
     let refusal = SpendRefusal::NotJudged {
         input: 1,
@@ -448,4 +447,40 @@ fn the_cause_keeps_the_error_size_and_the_existing_display_words_519() {
         std::mem::size_of::<NotJudgedCause>(),
         std::mem::size_of::<Error>()
     );
+}
+
+#[test]
+fn a_new_work_budget_matches_the_unbounded_default_527() {
+    let budget = WorkBudget::new();
+    assert_eq!(budget, WorkBudget::default());
+    assert_eq!(budget.per_input, None);
+    assert_eq!(budget.per_transaction, None);
+}
+
+#[test]
+fn work_budget_field_setters_keep_both_bounds_readable_527() {
+    let budget = WorkBudget::new()
+        .with_per_input(Some(68))
+        .with_per_transaction(Some(70));
+    let WorkBudget {
+        per_input,
+        per_transaction,
+        ..
+    } = budget;
+    assert_eq!(per_input, Some(68));
+    assert_eq!(per_transaction, Some(70));
+    assert_eq!(
+        budget.with_per_input(None).with_per_transaction(None),
+        WorkBudget::new()
+    );
+}
+
+#[test]
+fn work_budget_construction_and_both_field_setters_are_const_527() {
+    const B: WorkBudget = WorkBudget::new().with_per_input(Some(1));
+    const BOTH: WorkBudget = B.with_per_transaction(Some(2));
+    assert_eq!(B.per_input, Some(1));
+    assert_eq!(B.per_transaction, None);
+    assert_eq!(BOTH.per_input, Some(1));
+    assert_eq!(BOTH.per_transaction, Some(2));
 }
