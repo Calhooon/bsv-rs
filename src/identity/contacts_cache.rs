@@ -71,7 +71,8 @@ impl<W: WalletInterface> ContactsManager<W> {
         };
         let script = crate::script::LockingScript::from_binary(&bytes)
             .map_err(|e| Error::IdentityError(format!("Failed to parse locking script: {e}")))?;
-        let Ok(decoded) = PushDrop::decode(&script) else {
+        // Lock-before alone, as ContactsManager.ts:432 decodes it (#537).
+        let Ok(decoded) = PushDrop::decode_before(&script) else {
             return Ok(None);
         };
         let Some(ciphertext) = decoded.fields.first() else {
