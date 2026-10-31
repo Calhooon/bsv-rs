@@ -94,7 +94,11 @@ refused is the first in byte order, where the reference names the first in
 its text; `validateContact`'s words reach `add_contact` alone (a load drops,
 as the reference's `getContacts` does). The identity parsers run the
 revocation's token checks, not the toolbox's `certificateRecord` member
-checks (`identityUtils.ts:87-132`). `KVStoreContext` carries no controller (a
+checks (`identityUtils.ts:87-132`) nor its byte bounds before them (the
+certificate field 1 to 256 KiB, the signature 8 to 80 bytes, `:503-509`):
+a signed certificate field above 256 KiB is read here where the toolbox's
+discovery skips it (a signature outside 8 to 80 bytes fails the DER check
+here either way). `KVStoreContext` carries no controller (a
 public shape), and a `None` context reads any key, where the reference's
 interpreter answers nothing without a context and a controller
 (`kvStoreInterpreter.ts:35`). The downloader keeps its lookup-level handling
@@ -104,7 +108,7 @@ checks at its counterparts.
 
 Census (#375; current reading):
 
-- Row 86: Ours: closed by #544 at the pin; residues the contact's badges and member order, the toolbox certificate record, the interpreter's controller context and the downloader's lookup-level checks. Theirs: go-sdk, filing pending (the witness: tests/identity_contacts_envelope_544.rs; tests/vectors/token_envelope_544.json).
+- Row 86: Ours: closed by #544 at the pin; residues the contact's badges and member order, the toolbox certificate record and byte bounds, the interpreter's controller context and the downloader's lookup-level checks. Theirs: go-sdk, filing pending (the witness: tests/identity_contacts_envelope_544.rs; tests/vectors/token_envelope_544.json).
 
 ### Fixed: the registry client uses the reference's definition-token layout and locking key (#543)
 
