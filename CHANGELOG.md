@@ -7,1248 +7,206 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed: Contact carries the reference's badge fields through read and write (#552)
-
-The reference's contact record carries three badge fields beside its name
-and keys: `validateContact` (`ts-stack@edf6e03`
-`packages/sdk/src/identity/ContactsManager.ts:171-192`) takes every one of
-the seven display fields (`:35-43`) through `ownData` (`:47-53`, a missing
-key refused as `must be an own data property`) and then its validator
-(`:75`, a non-string refused), so a record the reference reads carries
-`badgeIconURL`, `badgeLabel` and `badgeClickURL` as strings, empty where
-unset. After #544 this crate wrote and read that record, but its `Contact`
-had no badge members: a reference contact's badges were dropped on read,
-every save wrote them empty, and a round trip through this crate's update
-(read, change the name, save) erased the badges the reference had stored.
-The keeper's reading (2026-10-31 12:1xZ, issue #552): a user's data lost on
-an update, a parity row at the pin.
-
-| | Before | Now |
-|---|---|---|
-| Read (`list_contacts_with_refresh`, `contact_of`) | the three badge values read, validated and dropped | kept in `Contact::badge_icon_url`, `badge_label`, `badge_click_url` |
-| Write (`add_contact`, `update_contact`, `record_of`) | `badgeIconURL`, `badgeLabel`, `badgeClickURL` written `""` | written as the `Contact` holds them, `""` where unset, as the reference writes them |
-| A reference contact updated here | its badges erased in the token written | its badges kept; the reference reads back the record it wrote with the new name |
-
-For the toolbox's and the CLI's tables: the toolbox has no contacts path and
-the CLI none, so neither table changes.
-
-The witness is recorded, never written by hand:
-`tests/support/contact_badges_552.mjs` runs the reference's own
-`ContactsManager` (the bundle of `ts-stack@edf6e03`, an entry re-exporting
-it, under Node v22.18.0, the ProtoWallet of the scalar 9 in process, a
-SHA-256 counter stream for its randomness): `saveContact` of a contact with
-the three badges set, its token, plaintext and `getContacts` read-back; it
-takes this crate's tokens from the tip and the base as input (written by the
-ignored `record_this_crates_tokens_552`) and records the reference's
-`getContacts` reading of each with its verdict, `equal` to the record
-expected: `tests/vectors/contact_badges_552.json`, two runs byte-identical.
-`tests/identity_contact_badges_552.rs` (hermetic: the counting wallet of
-#318, no network, no port): the reference's badges read here; the
-reference's contact read, its name changed and saved through
-`update_contact`, the token's record the reference's with the new name and
-the badges kept, and the reference's verdict on the tip's update `equal`, on
-the base's the badges `""`; the reverse, a contact with badges saved by
-`add_contact` and read by the reference with them, the base's empty. The
-tests read `Contact`'s JSON, naming no badge member, so they compile on the
-base: 3 of 3 RED on `69d315fc`, the badges erased.
-
-`Contact` is closed (the keeper's word of 2026-10-31 13:1xZ on PR #554,
-shape (b), as #527 closed `WorkBudget`): the reference's record has grown
-and will grow again, and an open struct breaks a downstream literal at every
-field the reference adds, a closed one once. `Contact` is
-`#[non_exhaustive]`; `Contact::new(name, identity_key)` takes the two members
-`validateContact` requires non-empty (`name` with `allowEmpty` false,
-`ContactsManager.ts:183`; `identityKey` a canonical compressed key, `:186`),
-every other display member empty, `metadata` absent and `added_at` 0; a
-`with_` setter for each optional member (`with_avatar_url`, `with_added_at`,
-`with_notes`, `with_tags`, `with_metadata`, `with_badge_icon_url`,
-`with_badge_label`, `with_badge_click_url`); the fields stay `pub` to read
-and to assign. `Contact` carries no `abbreviated_key` (the record's is
-computed at the write, the row below), so there is no
-`with_abbreviated_key`. `new` judges nothing: the reference runs
-`validateContact` at the save (`saveContact`, `:527-528`) and the read
-(`#parseContactPlaintext`, `:468-472`), never at construction, so a `new`
-of an empty name or a key that is not canonical builds, and `add_contact`
-refuses it in the reference's words before any wallet call (#544's
-validation; `new_holds_its_values_and_add_contact_refuses_them_552`).
-`Contact` no longer derives `Default`: a default contact (empty name, empty
-key) is a record the reference refuses, and with `new` naming the two
-required members it was the one way past them; the in-crate uses moved to
-`new` (`from_identity`, the unit and integration tests). The serialized
-record is unchanged byte for byte: `record_of` and `contact_of` are the
-lane's, and the record of `Contact::new(..)` with the three badge setters is
-the vector's `reverse.contact`
-(`a_contact_built_by_new_writes_the_vectors_record_552`); `Contact`'s own
-JSON (serde) is unchanged too.
-
-Pins of the fold, in `tests/identity_contact_shape_552.rs` and the
-`compile_fail` doc test on `Contact` (`src/identity/types.rs`, a struct
-literal naming all ten fields from outside the crate): the doc test RED on
-the pre-fold tip `738bdfde` (`Test compiled successfully, but it's marked
-compile_fail`), green after; the three tests compile-RED there (`E0599`, no
-`Contact::new`), green after.
-
-Migration (api-break, once). `Contact` is `#[non_exhaustive]`
-(cargo-semver-checks 0.51.0: `struct_marked_non_exhaustive`, the one lint;
-`constructible_struct_adds_field` on the three badge fields no longer fires,
-the struct being unconstructible outside the crate) and no longer
-implements `Default` (no 0.51.0 lint names it; `Contact::default()` no
-longer compiles). A struct literal of `Contact` outside the crate, with or
-without `..Default::default()`, no longer compiles (E0639); write
-`Contact::new(name, key).with_avatar_url(..)` and the other setters, or
-assign a `pub` field on a contact built by `new`. A destructuring pattern
-needs `..`. Reading the fields is unchanged. No downstream named in
-`CLAUDE.md` that this lane could read builds a `Contact`
-(`bsv-wallet-cli`, `bsv-overlay-cloudflare`, `rust-message-box`,
-`rust-chaintracks`, `bsv-middleware-cloudflare-public` grepped by path; the
-captain tells the CLI on #376 at the landing). `Contact::from_identity`
-keeps writing the badges empty and `to_displayable_identity` keeps its fixed
-"Personal contact" badge: two rows of one record, filed for their own lane
-(stated below).
-
-### Notes: cross-SDK parity (#552)
-
-Residues, stated, not changed: `Contact::from_identity` does not copy a
-`DisplayableIdentity`'s badges into the contact (the reference's
-`saveContact` takes the `DisplayableIdentity` whole), and
-`Contact::to_displayable_identity` answers its fixed badges, not the stored
-ones. This crate recomputes `abbreviatedKey` from the identity key
-(`02abcd...wxyz`) on every write, so a reference record's own
-`abbreviatedKey` is replaced by an update here; the recorder writes this
-crate's form so the witness isolates the badges. The fold's reading of the
-reference at `ts-stack@edf6e03`: the reference does not recompute it.
-`IdentityClient.ts:1166` (`subject.substring(0, 10)...`) is in
-`parseIdentity` (`:1044`), which builds a `DisplayableIdentity` from a
-certificate (`resolveByIdentityKey`, `resolveByAttributes`, `:1002-1033`),
-not on the save path; `saveContact` (`ContactsManager.ts:527-528`) and
-`#encryptAndLock` (`:748`) write `validateContact`'s record, whose
-`abbreviatedKey` is the caller's as given (`:185`, `boundedString` to 256
-characters, empty allowed). So the reference keeps the stored
-`abbreviatedKey` through a read and a save, and this crate replaces it with
-its own `02abcd...wxyz`: a row, the list's last in `CLAUDE.md`, open, #559. Go at
-`2ca481c` has no contacts manager.
-
-Census (#375; current reading):
-
-- Row 87: Ours: closed by #552 at the pin; residues the badges through from_identity and to_displayable_identity; the recomputed abbreviatedKey its own row, open, #559. Theirs: none (the witness: tests/identity_contact_badges_552.rs; tests/vectors/contact_badges_552.json; tests/identity_contact_shape_552.rs).
-
-### Fixed: the registry client unlocks a definition token as the reference does on revoke and update (#548)
-
-`revoke_own_registry_entry` and `update_definition` answered the wallet's
-signable transaction with an empty unlocking script for the definition
-token's input, keyed by the token's output index, not its input index in
-the transaction (`src/registry/client.rs:653`, `:877` at `69d315fc`). The
-reference unlocks the token with `PushDrop.unlock(protocol, '1', 'anyone',
-'all', false, satoshis, lockingScript)` (`ts-stack@edf6e03`
-`RegistryClient.ts:540-548` for `removeDefinition`, `:630-639` for
-`updateDefinition`; `PushDrop.ts:217-262`): the BIP-143 preimage under
-SIGHASH_ALL | FORKID over the authenticated record's satoshis and locking
-script, its SHA-256 signed by the wallet's `createSignature` under the
-type's protocol (`[1, basketmap|protomap|certmap]`), key ID `1`,
-counterparty `anyone`, one push of the checksig signature, at the token's
-index in the signable transaction (`completeBoundAction`). Since #543 the
-token is locked with the operator's `anyone`-linked key, which only that
-signature opens. Both sites now build the spend through the one PushDrop
-signer the key-value stores and the identity client use
-(`wallet::pushdrop::sign`, now compiled under `registry` too), from
-`src/registry/unlock.rs`: the token's input found in the signable
-transaction by its outpoint, the createAction input still declaring
-`unlockingScriptLength: 74` as the reference's does. Their signAction now
-carries the signable transaction's `reference` as the base64 text the
-wallet answered (`to_base64`, as the key-value stores and the contacts
-manager send it; `completeBoundAction.ts:1044-1051`, `:1118`, BRC-100's
-`Base64String`), where it sent the UTF-8 reading of its bytes
-(`String::from_utf8(..).unwrap_or_default()`, `src/registry/client.rs:657`,
-`:877` at `20b0fcae`): an empty text for bytes that are not UTF-8, another
-reference for bytes that are, so no wallet found the action to sign.
-
-For the toolbox's and the CLI's tables: a revoke or an update built by this
-crate before this landing did not spend the definition token: its input
-carried an empty unlocking script (at the wrong index when the wallet put
-the token anywhere but at its own output index), which does not satisfy the
-token's lock, so the revocation or update was not a valid spend unless the
-wallet replaced the script itself; one built now carries the reference's
-script.
-
-The witness is recorded, never written by hand:
-`tests/support/registry_unlocking_548.mjs` runs the reference's own
-`registerDefinition`, `removeDefinition` and `updateDefinition` (the bundle
-of `ts-stack@edf6e03` under Node v22.18.0) with a `ProtoWallet` of the
-scalar 9 for each definition type, its createAction answered with a
-signable transaction spending a made-up funding input at index 0 and the
-token at index 1, its signAction recorded and answered with no transaction;
-`tests/vectors/registry_unlocking_548.json` holds six cases (basket,
-protocol, certificate; revoke, update): the signable transaction, the spend
-index, the unlocking script, the unlocker's createSignature arguments and
-the reference interpreter's verdict (`Spend.validate`: valid for all six).
-The `ProtoWallet`'s signatures are RFC 6979's, deterministic, so the bytes
-are compared; two runs byte-identical.
-`tests/registry_unlocking_548.rs` builds the same spends here over the
-recorded signable transaction (the #318 counting wallet, nothing broadcast)
-and compares the spends (index and script) and the createSignature
-arguments to the reference's, and runs this crate's spend under the node's
-block word after Chronicle; both tests RED on `69d315fc` (`[(0, "")]`
-against the reference's `[(1, 4830...)]`); a third,
-`a_revoke_and_an_update_send_sign_action_the_base64_reference_548`, compares
-the reference signAction carries with the recorded `signable_reference`,
-RED on `20b0fcae` (`"RRRRRRRR"` against `"UlJSUlJSUlI="`).
-
-### Notes: cross-SDK parity (#548)
-
-Residues at these two sites, stated: the registry client does not run
-`completeBoundAction`'s bindings (the requested inputs and outputs in the
-signable transaction, the signed template and scripts checked after
-signing), does not abort a failed action, and sends signAction no options
-where the reference sends `{ acceptDelayedBroadcast, returnTXIDOnly: false,
-noSend, sendWith }`; the key-value stores' port of that boundary
-(`src/kvstore/bound/`) is module-private. Nor does it run
-`authenticateRegistryRecord` (`RegistryClient.ts:453-513`, called first by
-`removeDefinition` and `updateDefinition`): the reference reads the record's
-transaction from its BEEF, requires the output to be a one-satoshi token
-whose satoshis and locking script equal the record's, parses the definition
-from that script and checks its operator, before any wallet call; this crate
-checks the operator of the record's own definition and signs over the
-record's satoshis and locking script as given, so a record whose metadata
-does not match its BEEF reaches createAction here and is refused there.
-go-sdk at `2ca481c` unlocks the
-token with the same PushDrop unlocker but signs it at, and keys the spend by,
-the token's output index (`registry/methods.go:416-441`), right only when the
-wallet places the token's input at that index.
-
-Census (#375; current reading):
-
-- Row 85: Ours: closed by #548 at the pin: revoke and update unlock the definition token as RegistryClient.ts:540-548,630-639 and PushDrop.ts:217-262 at edf6e03 do (the type's protocol, key ID 1, counterparty anyone, SIGHASH_ALL | FORKID over the record's satoshis and locking script, keyed by the token's input index); residues completeBoundAction's bindings, abort and signAction options and authenticateRegistryRecord's checks (RegistryClient.ts:453-513) at these two sites. Theirs: go-sdk, filing pending: its revoke signs and keys the spend at the token's output index, not its input index (the witness: tests/registry_unlocking_548.rs; tests/vectors/registry_unlocking_548.json).
-
-### Fixed: a SEC 1 tag 05 is refused as the reference refuses it (#550)
-
-k256 (sec1 0.8.1, `src/point.rs:521-533`) reads a SEC 1 tag `05` as a compact
-point, so `PublicKey::from_bytes(05 || Gx)` returned the key `02 || Gx`, and
-every site that reads a key through `from_bytes` without a prefix check took
-the compact form as a key. The reference's `Point.fromDER` reads the prefixes
-`02`, `03`, `04`, `06`, `07` and refuses every other as `Unknown point format`
-(`ts-stack@edf6e03` `Point.ts:303-325`). `from_bytes` now refuses a `05` tag
-before k256 reads it, as `Error::InvalidPublicKey("Invalid public key encoding:
-unknown point format")`, the words `from_hex`'s lenient parser (#498,
-`src/primitives/ec/public_key_forms.rs`) already used for every shape the
-reference does not read; `from_hex` refused `05` on the base already (its
-`unknown point format` arm; `public_key_forms_498.json` records the reference
-refusing `compressed_prefix_05` and `compact_prefix_05_odd_length`), unchanged.
-Other tags k256 refuses keep k256's words.
-
-| Site | Before (base `69d315fc`) | Now | The reference (`ts-stack@edf6e03`) |
-|---|---|---|---|
-| `PublicKey::from_bytes` | `05 \|\| Gx` read as `02 \|\| Gx` | refused, `InvalidPublicKey` | `Unknown point format` |
-| `PublicKey::from_hex` | refused (#498) | unchanged | `Unknown point format` |
-| `PushDrop::decode`, both positions (`pushdrop.rs:289,335`) | the token read with the compact key | refused, `InvalidPublicKey` | `PushDrop.decode`: `Unknown point format` |
-| The kvstore token reader and interpreter (`kvstore/token_validation.rs`, #544) | a `05` locking key: `PushDrop token must use the canonical PushDrop envelope`; a `05` controller field: read as the compact key, so a token signed by `02 \|\| x` read to its value | `Unknown point format` for both (`point_message` at the controller, as `validateKVStoreController` reads it, `kvStoreTokenValidation.ts:76-81`); no value | the same words; no value |
-| `KVStoreInterpreter::verify_signature` (`interpreter.rs:168`) | `true` for that token | `false` | (its reader refuses the controller) |
-| `messages::verify`, the signer (`signed.rs:170`) | read as the compact key: `Ok(true)` on the recorded message | refused, `InvalidPublicKey` | `Unknown point format` |
-| `messages::verify` and `messages::decrypt`, the recipient (`signed.rs:205`, `encrypted.rs:184`) | parsed, then compared as keys: a mismatch naming `02 \|\| x` (or a match when the recipient's key is `02 \|\| x`) | the bytes compared with the recipient's compressed key, as the reference compares their hex (`SignedMessage.ts:85-97`, `EncryptedMessage.ts:88-94`): `MessageRecipientMismatch` naming the `05` bytes | the mismatch naming the `05` bytes |
-| `messages::decrypt`, the sender (`encrypted.rs:177`) | decrypted | refused, `InvalidPublicKey` | `Unknown point format` |
-| `Certificate::from_binary`, subject and certifier | parsed | refused, `InvalidPublicKey` | `Invalid certificate subject` (`certifier`)`: expected a compressed secp256k1 public key` |
-| `compat::ecies::bitcore_decrypt`, the sender | decrypted | refused, `InvalidPublicKey` | `Unknown point format` |
-| The wire processor's counterparty (`wallet/wire/encoding.rs:165`) | getPublicKey answered with a key derived for the compact point | a key whose tag is not `02`/`03` is `#decodeCounterparty`'s `Point.fromDER` (`WalletWireProcessor.ts:2459-2460`): the error frame `01`, `Unknown point format`, an empty stack, byte for byte | the same frame |
-| `validate_requested_certificate_set`, a certifier text | accepted | refused, `Certifier '05…' is not a valid public key` | (this crate's checker; the `Peer` does not call it) |
-
-Guarded already and unchanged: the script interpreter
-(`src/script/spend/crypto.rs:397-407`, every mode), the registry reader
-(`point_message` since #543), the overlay admin token (`from_reference_der`),
-the wire's linkage keys (`require_compressed_key`), `wallet/validation/crypto.rs`
-and `wallet/wire/mod.rs:381-384`; `auth/utils/validation.rs:353,364` re-parse a
-held key's compressed bytes, which never open with `05`.
-
-Pinned by `tests/primitives_sec1_tag_05_550.rs` (10 tests, 9 RED on the base;
-the kvstore interpreter's reference-token test answers no value on both) and
-`a_tag_05_key_is_refused_in_the_reference_words_550` in
-`src/kvstore/token_validation_tests.rs` (RED on the base in the envelope
-words), against `tests/vectors/sec1_tag_05_550.json`: 14 cases recorded by
-`tests/support/sec1_tag_05_550.mjs` from the edf6e03 bundle under Node
-v22.18.0 (`node tests/support/sec1_tag_05_550.mjs <sdk.mjs>
-tests/vectors/token_envelope_544.json`; two runs byte-identical).
-
-### Notes: cross-SDK parity (#550)
-
-The verdict is the reference's at every site above. The words are the
-reference's where the site hands them on (the wire frame, the kvstore
-reader; the recipient mismatch carries the reference's hex, not its words); elsewhere the refusal keeps this crate's
-`InvalidPublicKey` class and its `Invalid public key encoding: unknown point
-format` words, as each site words every other key it refuses. Go at
-`2ca481c` refuses a 33-byte `05` key too (`ParsePubKey`,
-`primitives/ec/publickey.go:87-89,115-121`: the low bit cleared, `04` is not
-the compressed format). Not pinned: the wallet result validators' key reads (`wallet/substrates/result_values/certificate.rs:54`, the one unpinned verdict change, and `scalars.rs`), now refusing `05` through `from_bytes` as the reference's `isValidCompressedPublicKey` does; a parser fuzz target does not cover `from_bytes`.
-
-### Fixed: the six token-decode sites run the reference's envelope, signature and hash-binding checks (#544)
-
-After #537 the six sites decoded a PushDrop token at the reference's lock
-position, but did not run the checks the reference runs on the decoded
-record: they accepted tokens the reference refuses. The keeper's words
-(2026-10-31 07:1xZ, recorded on #544): the port accepts what the reference
-refuses at the record level; a parity row at the pin with the reference
-lines, a witness vector recorded from the pinned bundle, a test RED on the
-base. And (09:1xZ), the contacts site exactly, every other site read the
-same way: the reference's envelope, signature and field set at the pin.
-
-| Site | Before | Now (`ts-stack@edf6e03`) |
-|---|---|---|
-| Contacts manager (`src/identity/contacts*.rs`) | wrote the ciphertext as the one PushDrop field; read the first field of any lock-before token, decrypted it and deserialized this crate's `Contact` JSON (`identityKey`, `name`, `avatarUrl`, `addedAt`, `notes`, `tags`, `metadata`); spent a listed output unauthenticated | writes the signed two-field token (`#encryptAndLock`, `ContactsManager.ts:748-772`: getPublicKey `forSelf` false, createSignature over the ciphertext); reads each listed output as `#readKeyID` and `#authenticateContactScript` do (`:414-466`: two fields, the ciphertext 1 to 65 KiB plus 1 KiB, the signature 8 to 80 bytes, `assertCanonicalSignedPushDrop` `:225-241`, the lock the wallet's key for the protocol, key ID and self, `verifySignature` over the ciphertext), a refused one dropped on a load (`:507-513`); the plaintext `validateContact`'s record (`:171-198`), validated before any wallet call (`:527-528`); the update and removal lookups authenticate every listed output before a spend (`:587-626`, `:891-959`) and refuse in the reference's words |
-| Identity client (`src/identity/client.rs`, `client_token.rs`) | both `ls_identity` parsers read the first field of any lock-before token whose certificate verified | both run the revocation's token checks (`IdentityClient.ts:773-815`: exactly two fields, the canonical envelope `:130-147`, the locking key, the field signature) with the key and signature the subject's, as the toolbox's discovery reads a published token (`wallet-toolbox` `identityUtils.ts:497-559`); a token that fails skipped (`IdentityClient.ts:823`) |
-| Registry client (`src/registry/token.rs`) | #543's reader | unchanged: it already runs every check of `registryTokenValidation.ts:19-64`; stated with a pin, green on the base |
-| KVStore interpreter (`src/kvstore/token_validation.rs`) | the JSON-protocol form's locking key and signature; no envelope or bound check; the raw-protocol form read unauthenticated as to its key | `decodeAndVerifyKVStoreToken` whole (`kvStoreTokenValidation.ts:85-119`: the canonical five- or six-field envelope with its bounds, the canonical JSON protocol, the key, value, controller and tags in their bounds, the controller-linked key, the signature), a refused token no value (`kvStoreInterpreter.ts:48`) |
-| Overlay admin token (`src/overlay/admin_token_validation.rs`) | `decode_overlay_admin_token` read any lock-before token of four or more fields (the legacy unsigned token among them); no URI, name, key or signature check; no author check at the SLAP or SHIP discovery | the decode is `decodeAdvertisement` (`OverlayAdminTokenTemplate.ts:159-197`, the static decode `:237-239`: five canonical fields, SHIP or SLAP, a canonical identity key, an advertisement URI, a `tm_`/`ls_` name, a canonical DER signature of 8 to 80 bytes) in the reference's words; `decode_and_verify_overlay_admin_token`, an addition in the reference's shape (`decodeAndVerifyOverlayAdvertisement`, `:199-222`: the expected protocol, the linked key's signature, the locking key), read at the SLAP discovery and the SHIP discovery as the reference reads it there (`LookupResolver.ts:2206`, `SHIPBroadcaster.ts:775`) |
-| Storage downloader (`src/storage/downloader.rs`, `advertisement.rs`) | read field 2 as the host and field 3 as the expiry of any lock-before token of four or more fields; no signature, no key, no hash binding: an advertisement for another file named its host | each output through `decodeAndVerifyUHRPAdvertisement` (`UHRPAdvertisementValidation.ts:37-115`: six canonical fields, the host's canonical key, the 32-byte hash, a credential-free HTTPS location, positive canonical CompactSize expiry and size, a canonical DER signature, the host-linked locking key, the host's signature), then the hash binding and the expiry (`StorageDownloader.ts:117`) and one host per location (`:118-120`), a refused output skipped (`:121`) |
-
-`addedAt` leaves the contact token: the plaintext is the reference's record
-alone, and a saved-at time lives in the manager's own cache beside the token
-(a contact loaded from a token reads `added_at` from the cache when it holds
-the identity, else 0). `notes` and `tags` travel in the record's `metadata`
-(the reference's place for them, `saveContact`'s "notes, aliases"), and are
-read back out of it. For the toolbox's and the CLI's tables: the toolbox has
-no contacts path and the CLI none, so neither table changes.
-
-The witness is recorded, never written by hand, by one recorder for the six
-sites: `tests/support/token_envelope_544.mjs` runs each site's reference
-counterpart (the bundle of `ts-stack@edf6e03`, an entry re-exporting
-`ContactsManager`, `kvStoreInterpreter` and
-`decodeAndVerifyOverlayAdvertisement`, under Node v22.18.0; ProtoWallets in
-process; `LookupResolver.prototype.query` answering one output) on the
-reference's own token and on tokens changed in one respect, with its words
-and outcome, and reads this crate's tokens (the contacts base token from
-#542's vector, the tip's and the SHIP and SLAP advertisements from the ignored
-`record_this_crates_tokens_544`) both ways: `tests/vectors/token_envelope_544.json`,
-two runs byte-identical. Per site: `tests/identity_contacts_envelope_544.rs`
-(the reference's token read here with its `notes`, `tags` and `avatarURL`;
-nine one-change tokens and a bad key ID dropped; the reference reading this
-crate's tip token with no refusal, the base's dropped for its field count;
-five records refused before any wallet call in `saveContact`'s words; 4 of 4
-RED on `f47f231f`), `tests/identity_envelope_544.rs` (the reference's
-revelation read by both parsers, five one-change tokens skipped; RED),
-`tests/registry_envelope_544.rs` (five tokens in the validator's words and
-the resolver's outcome; green on the base: nothing was missing),
-`tests/kvstore_interpreter_envelope_544.rs` and
-`src/kvstore/token_validation_tests.rs` (seven tokens; RED),
-`tests/overlay_admin_token_envelope_544.rs` (fifteen tokens' decode and
-verify words, this crate's advertisements verified by the reference, both
-discoveries skipping unauthenticated ones; compile-RED on the base, the
-verifier absent, and 3 of 4 RED without its lines), and
-`tests/storage_advertisement_envelope_544.rs` with the unit test in
-`src/storage/advertisement.rs` (eight advertisements; RED for the hash
-binding first).
-
-Migration. One public addition in the reference's shape:
-`overlay::decode_and_verify_overlay_admin_token(script, expected:
-Option<Protocol>)`. No public type changes shape. Behaviour a caller may
-see: `ContactsManager::add_contact` refuses a record the reference refuses
-(an empty name, a non-canonical identity key, an unsafe avatar scheme, a
-`metadata` that is not an object) as `Error::IdentityError` in its words
-before any wallet call, `remove_contact` refuses a non-canonical identity
-key, and the update and removal refuse a listed output that does not
-authenticate (`Unable to authenticate a contact lookup result`, `Unable to
-authenticate or remove a contact output`) where they spent or skipped it;
-a contact token written before #544 (one field) is no longer read, as the
-reference reads none; `decode_overlay_admin_token` refuses the legacy 4-field
-token of the deprecated `create_overlay_admin_token` (`Unexpected PushDrop
-token field count`) and any token the reference's decode refuses, in its
-words (`is_overlay_admin_token`, `is_ship_token` and `is_slap_token` follow
-it); the kvstore interpreter, and the global store's reads through it, read
-no raw-protocol token written before #343; `StorageDownloader::resolve`
-names no host for an advertisement it cannot authenticate or that names
-another file.
-
-### Notes: cross-SDK parity (#544)
-
-Residues, stated: this crate's `Contact` has no badge members, so a
-reference record's `badgeIconURL`, `badgeLabel` and `badgeClickURL` are read
-and dropped and a save from here writes them empty; the record is read as a
-`serde_json::Value` (keys sorted), so of several unexpected members the first
-refused is the first in byte order, where the reference names the first in
-its text; `validateContact`'s words reach `add_contact` alone (a load drops,
-as the reference's `getContacts` does). The identity parsers run the
-revocation's token checks, not the toolbox's `certificateRecord` member
-checks (`identityUtils.ts:87-132`) nor its byte bounds before them (the
-certificate field 1 to 256 KiB, the signature 8 to 80 bytes, `:503-509`):
-a signed certificate field above 256 KiB is read here where the toolbox's
-discovery skips it (a signature outside 8 to 80 bytes fails the DER check
-here either way). `KVStoreContext` carries no controller (a
-public shape), and a `None` context reads any key, where the reference's
-interpreter answers nothing without a context and a controller
-(`kvStoreInterpreter.ts:35`). The downloader keeps its lookup-level handling
-(a non-output-list answer an empty list, no 100-output bound, no txid hint;
-`StorageDownloader.ts:77-112`). Go at `2ca481c` runs none of these record
-checks at its counterparts.
-
-Census (#375; current reading):
-
-- Row 86: Ours: closed by #544 at the pin; residues the contact's badges and member order, the toolbox certificate record and byte bounds, the interpreter's controller context and the downloader's lookup-level checks. Theirs: go-sdk, filing pending (the witness: tests/identity_contacts_envelope_544.rs; tests/vectors/token_envelope_544.json).
-
-### Fixed: the registry client uses the reference's definition-token layout and locking key (#543)
-
-The registry client read and wrote a definition token of 6, 6 and 7 fields
-(basket, protocol, certificate: the data fields, the operator's identity key
-last), unsigned, locked with the operator's identity key. The reference's
-token carries one more field, the operator's signature over the data fields,
-and is locked with the operator's key linked to `anyone`
-(`ts-stack@edf6e03` `RegistryClient.ts:308-342`, `:688-722`;
-`PushDrop.ts:146-202`). A token written here was refused by the reference's
-validator (`Unexpected PushDrop token field count`), and the reference's
-token was skipped here by the field count. The keeper's reading (2026-10-31
-07:1xZ, recorded on #543): a parse divergence that dropped the reference's
-signature from the record; a parity row at the pin, the second of three
-after #537.
-
-| | Before | Now |
-|---|---|---|
-| Script fields (basket / protocol / certificate) | 6 / 6 / 7 | 7 / 7 / 8: the same data fields, then the signature (`registryTokenValidation.ts:13-17,29`) |
-| Signature | none | the wallet's `createSignature` over the data fields' bytes concatenated, protocol `[1, basketmap]`, `[1, protomap]` or `[1, certmap]`, key ID `1`, counterparty `anyone` (`PushDrop.ts:173-185`) |
-| Locking key | the identity key | the wallet's `getPublicKey` for the same protocol and key ID, counterparty `anyone`, `forSelf` true (`RegistryClient.ts:320`, `PushDrop.ts:155-163`) |
-| Protocol field | `[1, "name"]` | `[1,"name"]`, `JSON.stringify` (`RegistryClient.ts:697`) |
-| Reader | the field count alone | `decodeAndVerifyRegistryToken` (`registryTokenValidation.ts:20-64`): the canonical lock-before envelope of the type's count plus one, each field at most 16 KiB and 64 KiB in all, the data fields strict UTF-8, the operator's key a point, the locking key the one `anyone` derives for the operator, and the signature verified by the `anyone` wallet against the operator |
-| `DefinitionType::expected_field_count` | 6 / 6 / 7 | 7 / 7 / 8, the script's count as its documentation says |
-
-The reader is public as `registry::decode_and_verify_registry_token`, the
-reference's exported function, an addition. It refuses as
-`Error::RegistryError` in the reference's words: `Unexpected PushDrop token
-field count`, `PushDrop token contains an oversized field`, `PushDrop token
-payload is too large`, `PushDrop token must use the canonical PushDrop
-envelope`, `The encoded data was not valid for encoding utf-8`, the
-operator key's `Invalid hex string`, `Unknown point format` and `Invalid
-point` (`PublicKey.fromString`, `registryTokenValidation.ts:36`; `hex.ts:28-30`,
-`Point.ts:303-325`), a locking key with a `05` prefix's `Unknown point
-format` (`PushDropValidation.ts:59`, `PushDrop.ts:74-75`), `Registry token
-locking key is not linked to its operator`, the verifier's argument checks'
-`The counterparty parameter must be even length, not 65.`, `... no more than
-66 length.` and `... a valid compressed secp256k1 public key`
-(`validatePublicKey`, `validationHelpers.ts:185-196`, `:522-534`, through
-`validateEncryptionArgs`, `:228`) and `The signature parameter must be a
-canonical DER-encoded ECDSA signature` (`ProtoWallet.ts:359`,
-`validationHelpers.ts:1801`), and the verifier's own `Signature is not valid`
-(the reference's `ProtoWallet.verifySignature` throws before
-`registryTokenValidation.ts:52`'s `Registry token signature is invalid` is
-reached). The operator's text is read twice, as the reference reads it: as
-a key by `PublicKey.fromString` for the linkage (here `PublicKey::from_hex`,
-the reference's lenient forms since #498, after the reference's words for
-the forms it refuses, as k256 reads a `05`-prefixed key as a compact point),
-then as `verifySignature`'s counterparty, which admits 66 hex characters of a
-compressed valid point alone: an uncompressed, odd-length, hybrid or
-`02 || (p+1)` operator, signed by the operator's wallet over its own text and
-locked with the key derived for it, is refused there in the reference's
-words, and an upper-case one is accepted, as `validateHexString` lowercases
-it (`:533`). A `05` locking key is judged in `Point.fromDER`'s words before
-the envelope, where the canonical check would refuse it in other words. The three resolvers and `list_own_registry_entries`
-call it and skip a refused token, as `RegistryClient.ts:392` and `:445` do;
-`register_definition` and `update_definition` write the reference's token.
-`to_pushdrop_fields` and `from_pushdrop_fields` keep the data fields alone,
-as `#buildPushDropFields` does; no public struct changes.
-
-A token written before this landing is not the reference's token: the
-reference and this crate now skip it at every resolver and listing. For the
-toolbox's and the CLI's tables:
-
-| Consumer | Token | Before | Now |
-|---|---|---|---|
-| Toolbox / CLI resolving or listing a definition | written by this crate before #543 (6/6/7, unsigned, identity key) | read | skipped, as the reference skips it |
-| Toolbox / CLI resolving or listing a definition | written by the reference | skipped | read |
-| Toolbox / CLI registering or updating a definition | written now | refused by the reference's validator | the reference's bytes for the same definition, wallet and key |
-
-`list_own_registry_entries` no longer returns a pre-#543 token; a
-`RegistryRecord` built for it by hand still reaches
-`revoke_own_registry_entry` and `update_definition`, which do not read the
-token's fields.
-
-The witness is recorded, never written by hand:
-`tests/support/registry_token_fields_543.mjs` (the bundle of `ts-stack@edf6e03`
-under Node v22.18.0) runs the reference's own `registerDefinition` with a
-`ProtoWallet` of the scalar 9 up to its createAction for one definition of
-each type, and records the token (locking key, data fields, signature,
-script), the wallet calls, the validator's verdict and the reference's
-`resolve` of it; this crate's pre-#543 token of each type (its writer's
-bytes), ten one-change tokens of each type with the validator's words
-(the identity key, a signature over other data, absent or doubled, a field
-that is not UTF-8, an operator that is not hex, of an unknown format or not
-a point, a signature that is not DER, a `05` locking key) and five operator
-texts of each type, each signed and locked for its text (uncompressed,
-odd-length, hybrid, upper-case, `02 || (p+1)`), with the validator's verdict,
-in `tests/vectors/registry_token_fields_543.json` (3 tokens, 3 pre-#543
-tokens, 30 refusals, 15 counterparty cases: 12 refused, 3 accepted, 12 operator-order
-cases, the operator judged before a non-DER signature and read untrimmed; two runs
-byte for byte). `tests/registry_token_fields_543.rs` (6 tests, an injected
-resolver on `.invalid` hosts and the counting wallet of #318): the
-reference's tokens read by the three resolvers and the listing;
-`register_definition` and `update_definition` writing the reference's bytes,
-its two wallet calls with the reference's arguments; the pre-#543 tokens,
-the thirty refusals and the twelve refused operator texts skipped as the
-reference skips them, the three upper-case ones read. The first four red on
-`b51cbea7` (the reference's tokens skipped, the identity-keyed unsigned
-script written, the pre-#543 and the unsigned anyone-keyed tokens read).
-`tests/registry_token_words_543.rs` (6 tests): the public reader's fields,
-its thirty-three refusals and the fifteen operator texts in the recorded
-verdicts and words; it does not compile on
-`b51cbea7` (`E0432`, the reader absent), and
-`the_operator_key_and_signature_refusals_are_the_reference_words_through_registry_error_543`
-is red on the reader's first cut (`InvalidHex`, `InvalidPublicKey("Point not
-on curve")`, a `05` key reaching the linkage refusal, and a `WalletRefusal`
-for the non-DER signature), and
-`the_operator_text_is_checked_as_the_reference_counterparty_543`,
-`a_05_locking_key_is_refused_in_the_reference_words_543` and
-`an_operator_text_the_reference_counterparty_check_refuses_is_skipped_543`
-are red on the reader before the counterparty check (`0a187282`: the
-uncompressed operator accepted, the `05` key refused as a non-canonical
-envelope, the uncompressed operator's token resolved).
-`tests/registry_lock_position_537.rs`'s
-control becomes the reference's signed token of the type: #537's unsigned
-relock is no token since this landing.
-
-### Notes: cross-SDK parity (#543)
-
-Two residues remain at the writer, stated: a certificate definition's
-`fields` JSON is written from a `HashMap` (`CertificateDefinitionData.fields`),
-so a definition of two or more fields is written in an order the reference's
-`JSON.stringify` (insertion order) need not share, and its signature is over
-those bytes (the reader accepts either, verifying the bytes received); and
-the reference's `validateDefinitionData` normalizes a URL (`new URL(...).href`,
-`RegistryClient.ts:80-99`) before writing it, which this crate's writer does
-not, so `https://icon.example` is written as given where the reference writes
-`https://icon.example/`. The vector's definitions carry one certificate field
-and normalized URLs. Go at `2ca481c` locks its registry token signed, with
-counterparty `anyone` and `forSelf` false (`registry/methods.go:45-55`), and
-reads 6/6/7 fields with no verification (`registry/client.go:246,267,293`).
-
-One spend stays open, stated (#548): `revoke_own_registry_entry` and
-`update_definition` sign the token's input with an empty unlocking script
-(`src/registry/client.rs:653`, `:877`), where the reference unlocks it with
-the PushDrop unlocker for the type's protocol, key ID `1`, counterparty
-Closed by #548 (its entry above).
-`anyone`, `all`, over the authenticated output's satoshis and script
-(`RegistryClient.ts:540-548`, `:630-639`), before `completeBoundAction`.
-
-Census (#375; current reading):
-
-- Row 84: Ours: closed by #543 at the pin; residues the certificate fields' map order and URL normalization at the writer. Theirs: go-sdk, filing pending (the witness: tests/registry_token_fields_543.rs; tests/vectors/registry_token_fields_543.json).
-- Row 85: Ours: closed by #548 at the pin: revoke and update unlock the definition token as RegistryClient.ts:540-548,630-639 and PushDrop.ts:217-262 at edf6e03 do (the type's protocol, key ID 1, counterparty anyone, SIGHASH_ALL | FORKID over the record's satoshis and locking script, keyed by the token's input index); residues completeBoundAction's bindings, abort and signAction options and authenticateRegistryRecord's checks (RegistryClient.ts:453-513) at these two sites. Theirs: go-sdk, filing pending: its revoke signs and keys the spend at the token's output index, not its input index (the witness: tests/registry_unlocking_548.rs; tests/vectors/registry_unlocking_548.json).
-
-### Fixed: the contacts manager uses the reference's contact protocol (#542)
-
-The contacts manager derived every contact key at security level 1:
-`Protocol::new(SecurityLevel::App, "contact")`, `[1, 'contact']`, at four
-sites, while `ContactsManagerConfig::protocol_id` held `(2, "contact")` and
-went unread. The reference uses `[2, 'contact']`, counterparty `'self'`, for
-every contact operation (`ts-stack@edf6e03`
-`packages/sdk/src/identity/ContactsManager.ts:30`). Each site now reads the
-protocol from the configuration (`ContactsManager::protocol`, private), so the
-default is the reference's `[2, 'contact']`:
-
-| Site (this crate) | Wallet call | Reference |
-|---|---|---|
-| `contacts.rs`, `create_identity_tag` | createHmac over the identity key, key ID the identity key (the lookup and output tag) | `#hashIdentityKey`, `:572-583` |
-| `contacts_actions.rs`, `contact_lock` | encrypt, then getPublicKey `forSelf` for the PushDrop lock, key ID the record's | `#encryptAndLock`, `:748-772` |
-| `contacts_actions.rs`, `contact_unlock` | the PushDrop spend's createSignature, the stored key ID | `#updateContactOutput`, `:821-830` |
-| `contacts_cache.rs`, `decode_cached_contact` | decrypt, the stored key ID | `#decryptContactOutputs`, `:494-501` |
-
-Before, level 1 against the reference's level 2 at every site: the
-reference's contact record did not decrypt here (dropped from
-`list_contacts_with_refresh`), this crate's ciphertext did not decrypt there
-(`Decryption failed!`), the token was locked to another key, the identity tag
-was another HMAC (so neither side's lookup by tag found the other's record),
-and a spend of the reference's token was signed by a key its lock does not
-name. Now the records are readable across implementations at the protocol:
-the reference's record is read here, and this crate's ciphertext is decrypted
-by the reference's wallet under `[2, 'contact']`. The keeper's reading
-(2026-10-31 07:1xZ, issue #542): a cross-implementation incompatibility, a
-parity row at the pin. The toolbox has no contacts path; the CLI's tables are
-unchanged. No public item changes; a caller who set `protocol_id` now gets
-the level it set (it was ignored before).
-
-The witness is recorded, never written by hand:
-`tests/support/contacts_protocol_542.mjs` runs the reference's own
-`ContactsManager.saveContact` (the bundle of `ts-stack@edf6e03`, an entry
-re-exporting `ContactsManager`, under Node v22.18.0, the ProtoWallet of the
-scalar 9, #310's randomness) and reads back with its `getContacts`; it takes
-this crate's token from the base and the tip as input (written by the ignored
-`record_this_crates_contact_token_542`) and records the reference's verdicts on
-them, in `tests/vectors/contacts_protocol_542.json` (two runs byte for byte).
-`tests/identity_contacts_protocol_542.rs`: the reference's record read here,
-the identity tag the reference's HMAC, this crate's token locked to the key the
-reference derives and its ciphertext decrypted under the reference's protocol,
-the spend of the reference's token verified under the reference's lock, each
-red on `b51cbea7`; the reference's recorded verdicts on the base's token
-(another key, `Decryption failed!`) and the tip's (its key, the record
-decrypted).
-
-### Notes: cross-SDK parity
-
-The reference's `ContactsManager` still drops this crate's token, on the base
-and the tip alike, before it decrypts: this crate writes the ciphertext as the
-one PushDrop field, where the reference writes a second field, its signature
-over the ciphertext, and refuses a one-field token (`Invalid contact PushDrop
-field count`, `ContactsManager.ts:433`; recorded in the vector's `read_back`).
-This crate's plaintext is its `Contact` JSON (`identityKey`, `name`,
-`addedAt`, `tags`), the reference's the seven display fields and `metadata`
-(`validateContact`, `:171-195`); whether the reference's parser admits this
-crate's plaintext is not measured, since the field count refuses first. Both
-are pre-existing and outside #542's protocol; the root `CLAUDE.md` row states
-them for the keeper. Go at `2ca481c` has no contacts manager.
-
-### Changed: `PublicKey::from_hex` accepts the reference's lenient forms (#498)
-
-The keeper's word (2026-10-30 05:1xZ, on #498, under the reading of record
-of 10-26): accept what the reference accepts, refuse what the standard
-forbids and the reference refuses, the question upstream, the pinned tests
-kept so strictness can return. A key the reference reads and this crate
-refused was two verdicts for one user. `PublicKey::from_hex` now reads a
-key string as
-`PublicKey.fromString` does at `ts-stack@edf6e03` (`PublicKey.ts:49-51`,
-`Point.fromString` at `Point.ts:345-348`), one parser
-(`src/primitives/ec/public_key_forms.rs`):
-
-| Form | Before | Now | The reference's site |
-|---|---|---|---|
-| An odd-length string (`2`+Gx, `3`+Gx, `4`+Gx+Gy, `6`+Gx+Gy, `7`+Gx+y) | `invalid hex string: Odd number of digits` | read with a leading `0` | `utils.ts:127-128` (`hexToUint8Array`; the rule of `hex.ts:27-29`) |
-| A hybrid key (`06`/`07` + x + y) whose prefix's low bit is y's last byte's | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | accepted | `Point.ts:305-321` |
-| A coordinate at or above p: a compressed x (`02`+(p+1)), an uncompressed or hybrid x or y (`04`+(p+1)+y) | `invalid public key: Point not on curve` (compressed), the encoding error (uncompressed, hybrid) | reduced modulo p | `Point.ts:365-384` (`fromX`), `:495-510` (`validate`) |
-
-Every refusal the reference makes stays a refusal, in this crate's class and
-words: a hybrid key with the wrong parity, a reduced x with no root, a point
-off the curve, a length or prefix it does not read (`05`, `00`, empty) are
-`Error::InvalidPublicKey` with the strict parser's words, a non-hex character
-`Error::InvalidHex` (an odd-length string's character named at its place in
-the string given). No new `Error` variant and no public shape change. The key
-held is the reduced point, so `to_hex`, `to_hex_uncompressed`, `to_compressed`
-and `to_uncompressed` write the strict form: a lenient form read
-and written back is the strict form. `PublicKey::from_bytes` is unchanged and
-strict (compressed or uncompressed only, x and y below p): the PushDrop decoder's key
-push, the wire's certificate keys and the HTTP JSON result validator's keys
-(`isValidCompressedPublicKey`, `Secp256k1Validation.ts:15-22`, which refuses
-an x at or above p: `result_values/scalars.rs` and `certificate.rs` now read
-through `from_bytes`, where they relied on `from_hex`'s strictness) keep it.
-
-serde's reading of a `PublicKey` and `KeyringRevealer`'s stay strict, as
-before (PR #538's cold review): the hex decoded, then `from_bytes`, in the
-base's words, through the crate-visible `PublicKey::from_strict_hex`. They
-read the argument paths where the reference validates rather than parses:
-`AuthMessage.identityKey` (`assertAuthIdentityKey`,
-`AuthMessageValidation.ts:81-89`), `KeyringRevealer`
-(`validateKeyringRevealer` → `validatePublicKey`,
-`validationHelpers.ts:185-191,1243-1246`), `auth::Certificate`'s subject and
-certifier (`Certificate.ts:240-245`), the wallet `Certificate`'s subject and
-certifier, `KeyLinkageResult`'s three keys and `PeerSession.peer_identity_key`.
-`from_hex` and the local store's point check read as the reference's
-`fromString` does; these do not. An older gap stays as it was: the
-reference's `identityKey` and `KeyringRevealer` checks also refuse an
-uncompressed `04` key and upper-case hex, which `from_bytes` reads (not
-widened here). `tests/auth_serde_key_strictness_498.rs` pins the fifteen
-recorded lenient forms of the vector refused on `AuthMessage`,
-`KeyringRevealer` and both certificate keys: green on `aa5d60db`, three of
-three RED on the pre-fold `82d0944b`, green after; and on
-`KeyLinkageResult`'s three keys, `PeerSession.peer_identity_key` and the
-wallet `Certificate`'s subject and certifier, RED with the visitor on
-`from_hex`. On a certificate key the
-reference's `Certificate.toBinary` refuses the odd and hybrid forms by its
-`02`/`03` regex (`Certificate.ts:240-254`) but reads a compressed x at or
-above p through `fromDER`, reduced, signing the unreduced bytes; this crate
-refuses that form as #183's row states, holding no unreduced bytes.
-
-Four non-serde sites read strictly too (the re-review): the Peer's identity
-pin (`initiate_handshake`), where the reference keeps the pin's text and
-refuses an initial response whose canonical identity key is another text
-(`Peer.ts:627-637,903-908`), and the three certificate intakes,
-`get_verifiable_certificates` and the identity client's two token parsers:
-the reference refuses a wallet certificate whose certifier text is none of
-the requested set's canonical keys (`getVerifiableCertificates.ts:76-81`,
-`AuthMessageValidation.ts:123-124`), and its `Certificate.toBinary` judges
-the subject and a published certificate's keys (`Certificate.ts:240-246`,
-`IdentityClient.ts:799-823`); the reference throws where
-`get_verifiable_certificates` skips the certificate, a difference older than
-#498. Read leniently, a hybrid or odd-length form reduced to the canonical
-point: a handshake pinned to it authenticated, a wallet's certificate the
-reference cannot serialize was forwarded under the canonical key, a
-published one verified. `tests/auth_key_strictness_sites_498.rs` (the pin and
-the wallet intake) and `a_published_certificate_key_in_a_lenient_form_is_skipped_498`
-(`src/identity/client_field_value_261_tests.rs`, both parsers) pin them, all
-three RED with the four sites reading through `from_hex`.
-
-Three more read strictly (the third review and its fold): the HTTP
-transport's general answer, whose `x-bsv-auth-identity-key` header is the
-message's `identityKey` (`SimplifiedFetchTransport.ts:346`), refused by
-`assertAuthIdentityKey` (`AuthMessageValidation.ts:344`, `:81-89`); the
-BRC-105 payment's counterparty, the same header handed to the wallet, whose
-validator refuses a non-compressed key (`AuthFetch.ts:735-738,873-878`,
-`validationHelpers.ts:185-196`; through `AuthFetch` the header is the
-authenticated sender's canonical hex and a fallback answer with any `x-bsv`
-header is refused, `:693-697`, so the pin calls the payment directly); and
-the Peer's own identity key, its wallet's answer, which the reference asserts
-(`Peer.ts:1354-1355`). Read leniently, a hybrid, odd-length or `02`+(p+1)
-header became a canonical sender, reached the wallet's createAction, or
-became the Peer's key. `tests/auth_header_key_strictness_498.rs`,
-`src/auth/clients/payment_key_strictness_498_tests.rs` and
-`a_wallet_identity_key_in_a_lenient_form_is_refused_by_the_peer_498` pin
-them, each RED on `6481787b`. The other `from_hex` callers read a wallet's
-derived key (the PushDrop lockers, the payment's derived key, the registry's
-identity key, the `ProtoWallet` linkage results) or the local store's
-parser, where the reference parses with `PublicKey.fromString` or keeps the
-text unvalidated, and stay lenient.
-
-For the toolbox's and the CLI's tables: the local store's lookup with a
-wallet key in one of these forms now reaches the reference's later words,
-inside the unchanged `Invalid value found. Relinquish the corrupted output
-from the kvstore basket before using this key again. Original error:` wrapper:
-
-| Wallet locking key | Old suffix | New suffix (the reference's) |
-|---|---|---|
-| `2` + Gx | `invalid hex string: Odd number of digits` | `KVStore token locking key does not belong to the wallet` |
-| `06` + Gx + Gy | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `KVStore token locking key does not belong to the wallet` |
-| `6` + Gx + Gy | `invalid hex string: Odd number of digits` | `KVStore token locking key does not belong to the wallet` |
-| `02` + (p+1) | `invalid public key: Point not on curve` | `KVStore token locking key does not belong to the wallet` |
-
-A token whose key push is a hybrid or reduced-x key keeps #489's native
-words (the byte path is strict). The pins: `tests/primitives_public_key_forms_498.rs`
-replays `tests/vectors/public_key_forms_498.json` (39 key strings, 19 the
-reference accepts and 20 it refuses, recorded by
-`tests/support/public_key_forms_498.mjs` against the reference bundled at
-`edf6e03`, Node 22.18.0): the same verdict, the same point, the strict form
-written back; four of its six tests RED on the base `aa5d60db` (each
-accepted form refused), the two controls green there. The four #489 pins
-`reference_accepts_{odd_valid,hybrid,odd_hybrid,reduced_x}_key_but_local_keeps_native_words_489`
-are kept as `reference_and_local_accept_{..}_key_489_498`, RED on the base,
-each marked "strictness returns on the upstream's answer"; the two token pins
-are unchanged. `result_values/key_strictness_498_tests.rs` pins the validator's
-refusal of `02`+(p+1) for a result key and a certificate subject (both RED
-with `from_hex` lenient and the two sites unchanged).
-
-### Notes: cross-SDK parity (#498)
-
-The ecosystem is split; the reference is the most tolerant reader. Each form
-read by `PublicKey.fromString` (`ts-stack@edf6e03`), go-sdk's
-`PublicKeyFromString` (`2ca481c`, `primitives/ec/publickey.go:79-129,221-231`)
-and py-sdk's `PublicKey(str)` (`4c30e2e`, `bsv/keys.py:23-45`, coincurve
-20.0.0's libsecp256k1 parse), each run on the vector's inputs:
-
-| Form | TS | Go | Python | This crate |
-|---|---|---|---|---|
-| Odd-length string | accepts | refuses (`encoding/hex: odd length hex string`) | refuses (`bytes.fromhex`) | accepts |
-| Hybrid, matching parity | accepts | accepts | accepts | accepts |
-| Hybrid, wrong parity | refuses | refuses | refuses | refuses |
-| Compressed x at or above p | accepts, reduced | accepts, x kept unreduced (`Compressed()` writes `02`+(p+1) back) | refuses | accepts, reduced |
-| Uncompressed or hybrid x or y at or above p | accepts; `toString` writes the coordinate unreduced, its compressed prefix from y's unreduced parity (`04`+x+(p+1) reads as y = 1 and writes `02`+x, the negated point) | refuses (`pubkey X/Y parameter is >= to P`) | refuses | accepts, reduced; writes the point read (`03`+x) |
-
-Two differences remain. The reference's serialization of an uncompressed or
-hybrid key with a coordinate at or above p differs from this crate's (five
-recorded cases, `the_reference_writes_an_unreduced_coordinate_back_498`; for
-a y above p the reference's compressed text names the other point: for
-`04`+x+(p+1) it computes with y = 1 and writes `02`+x, the negated point,
-where this crate writes `03`+x, the point read; that `02`+x is the
-reference's defect, never parity, by the keeper's word of 2026-10-31 06:1xZ
-(`Point.ts:303-321,472-478,527-536`; a FILE draft in the #375 queue, filed at
-the owner's cadence word), and a leading space is read
-by Python's `bytes.fromhex` alone. Strictness returns on the upstream's
-answer: `PublicKey::from_bytes` is the strict reading, and flipping the
-pins back is the change. Ours: the keeper's 2026-10-30 05:1xZ word on #498 accepts the reference's key forms on the hex path (Point.ts:303-325,365-384 at edf6e03), while BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed and the byte path stays strict.
-
-### Changed: six call sites decode PushDrop tokens with the reference's lock position (#537)
-
-After #499 made the local store's token decode lock-before alone, six other
-call sites still called the general `PushDrop::decode`, which reads a script
-whose first chunk is not a 33- or 65-byte push as lock-after: a token written
-lock-after was read here and refused by every counterpart. The keeper's word
-(2026-10-31 06:1xZ, issue #537): parity per site. `PushDrop.decode(script,
-lockPosition = 'before')` (`ts-stack@edf6e03` `PushDrop.ts:63-78`) reads the
-key from `chunks[0]` and never tries the other position, and each
-counterpart below calls it with that default (or through
-`decodeCanonicalPushDrop`, `PushDropValidation.ts:59`); none passes
-`'after'`. Each site now calls `PushDrop::decode_before`, the lock-before
-path alone (crate-visible, `src/script/templates/pushdrop_position.rs`), and
-takes the reference's outcome for a lock-after token there.
-
-| Site (this crate) | Reference counterpart | Lock-after token, before | Now | The corner: a lock-after token whose first field is a valid point |
-|---|---|---|---|---|
-| 1 identity client: both `ls_identity` parsers (`resolve_by_identity_key`, `resolve_by_attributes`, `discover_certificates`, `discover_certificates_by_type`) | `IdentityClient.ts:773`, the output skipped by the catch at `:823` | the certificate read and returned | skipped | the reference reads the point as the key, one field, `continue` at `:774` (its revocation ends `No authenticated revelation output matches the requested certificate.`); skipped here before and after |
-| 2 contacts manager (`list_contacts_with_refresh`) | `ContactsManager.ts:432`, the output dropped by `Promise.allSettled` (`:478`, `:507-513`) | decrypted and loaded | dropped before decrypt | `Invalid contact PushDrop field count` there; skipped here before and after |
-| 3 registry client: `resolve_basket`, `resolve_protocol`, `resolve_certificate`, `list_own_registry_entries` | `registryTokenValidation.ts:28` through `RegistryClient.ts:732`, skipped by the catches at `:392`, `:445` | the definition read | skipped | `Unexpected PushDrop token field count` there (five, five and six fields for the three types); skipped here before and after |
-| 4 kvstore interpreter: `extract_fields`, `extract_value`, `is_kvstore_token` | `kvStoreTokenValidation.ts:88`, `undefined` from `kvStoreInterpreter.ts:48` | fields and value read, `true` | `None`, `None`, `false` | `Unexpected PushDrop token field count` there; `None`/`false` here before and after |
-| 5 `decode_overlay_admin_token` | `OverlayAdminTokenTemplate.ts:164`, thrown from `:237-239` | decoded | `Error::OverlayError("Unknown point format")`, the reference's words | `Unexpected PushDrop token field count` there; here `Script is not a valid PushDrop format` before, the reference's words now |
-| 6 storage downloader (`resolve`) | `UHRPAdvertisementValidation.ts:40`, skipped by the catch at `StorageDownloader.ts:121` | the host returned | no host | the advertisement's first field is the host's identity key, so this is its realistic lock-after form: `Unexpected PushDrop token field count` there; no host here before and after |
-
-For every site's first kind (the first field `Unknown point format` to the
-reference's key parse) the reference refuses at the key read. At the four
-skipping sites and the interpreter no words reach a caller. At the admin
-token, a token the general decoder reads lock-after is refused in the words
-`decodeCanonicalPushDrop` throws with the site's five fields (the key
-parse's, else the field count's, else the envelope's; `lock_after_refusal`);
-every other refusal keeps `Script is not a valid PushDrop format`. The
-helpers that choose those words (`point_message`, `canonical_refusal`) move
-from the local store's `local_parser_words.rs` into the same module, shared
-by both; the local store's words are unchanged
-(`kvstore_local_parser_words_489.rs`, `kvstore_local_454.rs`).
-
-The outcomes are recorded, never written by hand:
-`tests/support/pushdrop_lock_position_537.mjs` (the bundle of
-`ts-stack@edf6e03` under Node v22.18.0) writes the lock-after tokens from
-their fields, runs each site's counterpart on them (`revokeCertificateRevelation`,
-`getContacts`, `RegistryClient.resolve` and `StorageDownloader.resolve` with
-`LookupResolver.prototype.query` answering the token; the kvstore and admin
-token validators called), and records the decode, the site's words and its
-outcome in `tests/vectors/pushdrop_lock_position_537.json` (six sites, 16
-cases; two runs byte for byte). One test per site replays its cases and a
-control, the same fields locked before by this crate's writer and accepted:
-`tests/identity_lock_position_537.rs`,
-`tests/identity_contacts_lock_position_537.rs`,
-`tests/registry_lock_position_537.rs`,
-`tests/kvstore_interpreter_lock_position_537.rs`,
-`tests/overlay_admin_token_lock_position_537.rs`,
-`tests/storage_lock_position_537.rs`, each red on `23eea600` (the lock-after
-token read, at the registry for all three types on both paths). The general
-`PushDrop::decode` and its public shape are unchanged, for the template's own
-callers; no public item is added.
-
-### Notes: cross-SDK parity
-
-The #499 census Row 2 is rewritten: its clause that the general decoder
-elsewhere still tries both lock positions is closed by #537 for the six
-sites; the general decoder's two positions remain this crate's template
-behaviour. Go at `2ca481c` decodes lock-before alone (#499's note,
-`transaction/template/pushdrop/pushdrop.go:20-52`).
-### Changed: R56 lets an unsigned action's input carry no unlockingScript, as the reference wallet answers (#491)
-
-R56 (`src/wallet/substrates/result_values/lists.rs`, `action_inputs` through
-`unlocking_requested`), the listActions input row of #432's result inventory,
-demanded `unlockingScript` under `includeInputUnlockingScripts` on every input.
-It now lets an input of an action whose `status` is exactly `unsigned` omit the
-key; every other status keeps the demand in the same words. The status is read
-from the action object the input belongs to. Nothing else in R56, or in any
-other row, changes: a present `unlockingScript` must still be even hex, and the
-`sourceLockingScript` demand under `includeInputSourceLockingScripts` is
-unchanged for every status.
-
-The word is the stack's (the keeper, 2026-10-31 05:1xZ, recorded on #491):
-form (a) in its narrow reading, at `ts-stack@edf6e03`. The reference disagrees
-with itself. Its wallet leaves the key absent when
-`getRawTxOfKnownValidTransaction` returns nothing
-(`packages/wallet/wallet-toolbox/src/storage/methods/listActionsIdb.ts:77-91`:
-`wo.unlockingScript = input?.unlockingScript?.toHex()`). That holds outside
-the known-valid set, a `proven_txs` row or a `proven_tx_reqs` row with status
-unsent, unmined, unconfirmed, sending, nosend or completed
-(`packages/wallet/wallet-toolbox/src/storage/StorageKnex.ts:189-209`). An
-unsigned transaction is outside that set and holds no unlocking script. Its
-SDK refuses any such page (`packages/sdk/src/wallet/WalletResultValidation.ts:2027-2035`),
-and runs that validator on every answer (`packages/sdk/src/wallet/WalletClient.ts:113-118`).
-The defect is ts-stack #1451 (open). Only the `unsigned` status is decidable
-from the answer: an action's status and a request row's status are different
-enumerations, so whether a signed action's transaction is known valid is a
-storage fact the answer does not show, and projecting it onto the answer would
-be this crate's invention.
+## [0.9.0-beta.5] - 2026-10-31
+
+The 0.9.0 line's fifth prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (14:4xZ on 2026-10-31, the rulings page's entry of that hour, 22.6 of the brief in the one-hour shape of 19.7: bsv-rs 0.9.0-beta.5, then the toolbox's re-pin at the index hour, then the CLI's pin PR with its gate once after) at the tip after #554 landed (`e215aea8`): the beta.5 milestone's content (the per-transaction work budget #519, the public typed word resolver #520, `WorkBudget` `#[non_exhaustive]` #527, R56 for an unsigned action's input #491) and the 0.9.0 landings since beta.4 (the processor request cap #505, the #487 nits #502, the ordered certificate response #400, AuthFetch #423, the preimage witness #375, the Documentation check #515, the one byte bound #512 #526 #532, the local store's lock-before decode #499, the arch allowlist rule #347, the fixtures' Origin header #346, the six sites' lock position #537, the lenient key parser with every validator path strict #498, the contacts protocol and envelope #542 #543, the token-decode record checks #544, a SEC 1 tag `05` refused #550, the registry's definition-token unlock #548, `Contact`'s badge fields and its closing #552): 24 entries. The lenient string parser lands with every validator path strict, never alone (the keeper's 08:1xZ recommendation); `Contact`'s closing is the line's one api-break since beta.4, its migration in #552's notes.
+
+### Fixed: refuse oversized wallet wire requests before decoding (#505)
+
+`WalletWireProcessor::process_message` now refuses a complete request above
+256 MiB (268,435,456 bytes) before constructing a reader, decoding arguments
+or calling the wallet. It reuses #496's `wire_request_length` and
+`MAX_WIRE_REQUEST_BYTES` in `substrates/result_values/boundary.rs`; the length
+comparison precedes any allocation. The refusal is
+`Err(Error::WalletError("Wallet Wire request exceeds the maximum permitted size"))`
+returned by `process_message`, not an error frame. A frame exactly at the cap
+still reaches the wallet.
+
+The reference is `ts-stack@edf6e03`: `WalletWire.ts:9` defines
+`MAX_WALLET_WIRE_FRAME_BYTES`; `WalletWireProcessor.ts:248-250` (legacy array)
+and `:265-269` (compact bytes) reject lengths strictly greater than that cap
+with those uncoded words. Both throw from `transmitToWallet` before
+`#processMessage` is entered, outside its `try` (`:274`) and so outside the
+catch that writes error frames (`:2370-2396`): the caller's promise rejects
+and no frame is written. `process_message` is that method here, so the
+refusal is its `Err` in the same words, as #496's transceiver returns its own.
+This follows the owner's ruling (c): the reference's own resource safeguard
+needs no new word.
 
 The toolbox's and CLI's tables change as follows:
 
-| Consumer | Answer under `includeInputUnlockingScripts` | Before | Now |
+| Consumer | Request | Before | Now |
 |---|---|---|---|
-| Toolbox result table | An `unsigned` action's input without `unlockingScript` (`transactions.rs:420-426`, the reference wallet's line) | Refused: `Invalid listActions result actions[N].inputs[M].unlockingScript: expected the explicitly requested unlocking script` | Accepted |
-| Toolbox result table | An input without `unlockingScript` of an action with status completed, unprocessed, sending, unproven, nosend, nonfinal or failed | Refused in those words | Refused in those words (unchanged) |
-| CLI operator-visible table | Fixture 145 (`pin-spend`, the stored unsigned template's input) | Refused by R56 | Passes R56; refused by R51 instead, its one-byte `inputDescription` `"c"` outside 5 to 2000 bytes (`Invalid listActions result actions[5].inputs[0].inputDescription: expected 5–2000 UTF-8 bytes`), a rule the reference's validator also applies (`historyDescription`, after its R56 check) |
-| Both | An `unsigned` action's input with an `unlockingScript` | Validated as even hex | Validated as even hex (unchanged) |
+| Toolbox error table | Complete frame above 268,435,456 bytes | Decoded; an otherwise valid request reached the wallet | `process_message` returns `Err(WalletError)`: `Wallet Wire request exceeds the maximum permitted size`; no frame, no wallet call |
+| CLI operator-visible table | Complete frame above 268,435,456 bytes | Any decode or wallet outcome | The transport hosting the processor receives the error before decoding, as a host of the reference's `transmitToWallet` receives its rejection; the transceiver refuses such a frame itself first (#496) |
+| Both | Complete frame exactly at 268,435,456 bytes | Decoded and dispatched | Decoded and dispatched |
 
-The residue row [D]: a signed action with status unprocessed, nonfinal or
-failed stays strict here, though the reference wallet answers its input
-without the key when the request row is outside the known-valid set. It stays
-until ts-stack #1451 answers. If the validator is amended upstream, this crate
-follows the amended text; if the wallet is amended to emit the key, R56 returns
-to strict for `unsigned` too and the toolbox's `transactions.rs:420` follows
-the wallet.
+`tests/wallet_wire_processor_request_cap_505.rs` builds valid encrypt frames
+with this crate's `WireWriter`, using a large plaintext that itself remains
+below the byte-field limit. The transceiver cannot supply the over-cap frame
+because #496 already refuses it. On base
+`8fd26a3ecc61cc485647f2152e5482a211491692`, cap + 1 reached the counting wallet
+once (the RED assertion); exactly cap reached it once and returned its answer.
+With the guard, cap + 1 makes zero wallet calls and `process_message` returns
+the error in the reference's words; exactly cap still returns the wallet's
+answer. No recorded vectors change.
 
-Fixture 145's description: the CLI's fixture carries `inputDescription: "c"`,
-which R51 refuses on both sides; R56 ran first, so its refusal was the only
-one seen. This change does not make fixture 145 pass. The cold review ran the
-recorded body (`bsv-wallet-cli` beta `c1f7cd3`,
-`tests/wire/145-listActions.afterOverlongSpend.json`) through both: this crate
-refuses it at R51 (`Invalid listActions result actions[5].inputs[0].inputDescription:
-expected 5–2000 UTF-8 bytes`); the reference refuses it at R56 and, with a script
-supplied, at R51 in the same words (`historyDescription`,
-`WalletResultValidation.ts:2037`). The R51 refusal is recorded as its own case
-(`unsigned_fixture_145_description_with_script`), and it stands on the CLI's or
-toolbox's side.
+The wire decoder fuzz target checks that same size boundary: an oversized
+request returns the exact `Err(WalletError)` above; failures at or below the
+cap remain framed responses.
 
-The pins, in `tests/wallet_http_json_result_values_408.rs` on the new
-`unsigned_491` group of `tests/vectors/http_json_result_values_408.json`, 13
-listActions bodies in fixture 145's shape (a funded coin and the stored
-template), recorded by `tests/support/http_json_result_values_408.mjs` under
-Node 22.18.0 against the SDK built from `edf6e03`. The reference refuses 12
-and accepts the one with a script; every earlier case re-recorded byte for
-byte. `an_unsigned_actions_input_may_omit_its_unlocking_script_as_the_reference_wallet_answers`
-asserts the reference's refusal and this crate's acceptance (the divergence,
-stated in the test). It failed on base `02abc87f` (`Err(WalletError("Invalid
-listActions result actions[1].inputs[0].unlockingScript: expected the
-explicitly requested unlocking script"))` against `Ok(())`) and passes here.
-`the_strict_rule_stays_for_every_other_status_and_returns_on_the_upstreams_answer`
-judges the other eleven cases in the reference's words: the seven other
-statuses, a present script, an odd-length script, the source-locking demand,
-and the fixture's description with a script supplied (R51). It is the strict rule kept for return. #432's
-`row_56_history_scripts` (a `completed` action's input) is unchanged.
+Migration: a request above the cap was decoded before; now
+`process_message` returns `Err` for it, where every other refusal is an
+`Ok` error frame: a host that relays `process_message`'s answer handles
+the `Err` as it handles a transport failure. No API change; requests at or
+below the cap are unchanged.
 
-Census (#375; current reading):
+### Notes: cross-SDK parity (#505)
 
-- Row 83: Ours: the stack's 2026-10-31 05:1xZ word relaxes the unsigned status alone, the one the answer decides. Theirs: ts-stack #1451 (the witness: tests/wallet_http_json_result_values_408.rs; tests/vectors/http_json_result_values_408.json, group unsigned_491; bsv-wallet-cli#371).
+Go at `2ca481c` checks only for an empty message before `ReadRequestFrame`
+(`wallet/substrates/wallet_wire_processor.go:24-29`), returning `empty message`.
+It has no complete-request upper bound. The keeper's 2026-10-30 08:1xZ ruling
+holds this as a stated row: the frame cap is the reference's own resource
+safeguard, not a BRC number, and Go's choice stands. This processor cap is
+hardening, alongside #496's transceiver cap; it does not reopen that held row.
+The reference's exact-cap encrypt decode also hits V8's `Array.from` limit
+before dispatch (`WalletWireProcessor.ts:1427`, measured in #496); Rust's
+exact-cap control exercises its own existing, accepted decode path.
 
-### Changed: the fixtures capture the Origin header beside Originator (#346)
+### Changed: three post-#487 review nits (#502)
 
-The #323 CI fold's re-review (Opus, 2026-10-27) found that the public-surface
-fixtures' HTTP recorder (`tests/support/fixtures/http.rs`) captured the JSON
-substrate's `originator` header alone; since #323 the substrate sends `Origin`
-and `Originator` both in the origin form, as the reference's `HTTPWalletJSON`
-does (`ts-stack@edf6e03` `HTTPWalletJSON.ts:311-314`), and `Origin` was pinned
-by `tests/wallet_http_originator_323.rs` alone. The recorder's request envelope
-gains one member, `expected.request.headers.origin`, named as `originator` is
-(the lower-case header name) and compared by the replay as every other member
-is. The 29 files under `tests/fixtures/http_json/` were re-recorded by the
-recorder (`BSV_FIXTURES_RECORD=1`): 71 insertions, one `"origin":
-"http://fixtures.invalid"` per captured request (the 56 call cases and 15 of
-the 16 error cases; `connection_error` has no request), and with that member
-removed every file equals its base JSON; the census (65 files, 913 entries) is
-unchanged. `fixtures_replay` fails on the base against the re-recorded files
-(`/cases/0[minimal]/expected/request/headers/origin: expected
-"http://fixtures.invalid", actual null`) and on a tip whose substrate stops
-sending `Origin`; `wallet_http_originator_323.rs` stays beside it.
+- Removed 13 redundant `#[path]` attributes; Rust resolves the same result modules in the same order without them.
+- Shared `boundary::MAX_BYTES` with the wire byte check and request-frame cap, formatting the unchanged refusal from that one numeric definition.
+- Enabled output-script binding in the 64 MiB dhat pin (`fixture(64, true)`): peak 201,331,778 → 335,550,248 bytes; budget 268,436,568 → 402,654,852 bytes (four → six frame lengths) to cover the encoded request buffers; existing exact pins stay exact.
 
-### Changed: an unused arch allowlist entry reads red (#347)
+### Fixed: signed certificate-response JSON order, with a crate-wide body census (#400)
 
-The #323 CI fold's re-review found that `tests/arch_no_string_errors.rs`'s
-allowlist had carried two stale entries covering four sites
-(`http_json.rs:912` and `http_wire.rs:209` at `953d9c00`, both lines gone)
-until the fold removed them by hand: nothing refused an allowance that had
-outlived its line. `arch_support::check_sites` now refuses an entry that
-matches no site its rule finds, and an entry whose ceiling is above the sites
-it matches, naming the entry and saying to delete it or lower its ceiling. It covers the four `(file, line text,
-ceiling)` lists: `arch_no_string_errors`, `arch_network_sites`, `arch_no_env`
-and `arch_no_system_time` (the last two empty). `arch_no_unwrap.rs` applies
-the same rule in the same words to its `(file, ceiling)` list. The other
-lists already refused a stale entry (`arch_ci_runs_every_test`'s run-apart
-list, `arch_arc_deprecated`'s items, `arch_one_wallet_byte_bound`'s
-constants); `arch_secrets_scan_scope` carries none. The cold review found one
-list the rule had missed: `arch_ci_pr_runs_the_required_set`'s full-set
-exceptions (`NOT_ON_THE_FULL_SET`), where an entry naming no job, or a job
-that runs on every dispatch, passed; such an entry is now red naming it
-(`a_stale_full_set_exception_is_refused_naming_the_entry`; all five entries
-are used today).
+The #400 census was made at beta base `8e57ee462aee6cc5e4888fee7edc02ee2b61d4aa`
+against `ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`
+(`packages/sdk/src/`, `packages/wallet/`, and the AuthSocket client).
+Reference filenames below are relative to `packages/sdk/src/`, except
+AuthSocketClient in `packages/messaging/authsocket-client/src/`.
+Line references to Rust writers identify the base implementation.
 
-One stale allowance was on the tip: `src/transaction/beef_stream.rs`'s
-unwrap/expect ceiling was 24 with 23 sites; it is now 23. Every other entry
-matches its sites exactly. Pinned by
-`an_unused_allowlist_entry_reads_red_naming_the_entry` and
-`a_stale_ceiling_entry_reads_red_naming_the_entry`; a stale entry added to
-the real string-errors list stayed green on the base and is red here. The
-rule is in `docs/ARCH-RULES.md`. No library change.
+**Finding: 31 writer groups, one nonempty finding: `certificates`.**
+The reference signs the certificateResponse array at `Peer.ts:1140` and
+re-stringifies its restored certificates to verify at `:1203`. Retaining raw
+text signed numeric field/keyring names in the wrong order and retained an
+incoming certificate's property order instead of the reference class layout.
+The fix orders this one body at its signing site: #426's ordered-node parser
+restores the class properties, keeps nested objects in their text's order,
+and applies JavaScript's numeric-key, string and number rules. The fallback
+serializes typed `Vec<VerifiableCertificate>` directly to `RawValue`, preserving
+struct declaration order and the nested `IndexMap` entries before using the
+same signing function. It never passes through a sorted `Value`.
 
-### Changed: the local store decodes lock-before alone, as the reference does (#499)
+serde_json's default is unchanged, no key order of any other body moves, and nothing unifies across a consumer's graph.
 
-The keeper's word (2026-10-30 05:1xZ, issue #499): lock-before alone, as the
-reference decodes it. At `ts-stack@edf6e03` the local lookup decodes a token
-with `decodeCanonicalPushDrop` (`LocalKVStore.ts:278-282`), which calls
-`PushDrop.decode(lockingScript)` with its default `lockPosition = 'before'`
-(`PushDropValidation.ts:59`, `PushDrop.ts:63-77`): the first chunk's data
-(`verifyNotNull(..., 'script.chunks[0].data must have value')`) is read as the
-key by `PublicKey.fromString` before any field is counted. This crate's local
-decode called the general `PushDrop::decode`, which reads a script whose first
-chunk is not a 33- or 65-byte push as lock-after, so a lock-after token
-reached the later field-count or canonical-envelope check and told another
-refusal than the reference's. `local_parser_words.rs::decode_pushdrop` now
-reads the first chunk as the reference does and never the lock-after layout;
-the refusal is the reference's first-chunk words, `Error::KvStoreLocalError`
-in the lookup wrapper (`Invalid value found. Relinquish the corrupted output
-from the kvstore basket before using this key again. Original error: <words>`,
-`LocalKVStore.ts:340-345`), on get and set alike.
+The transport retains its text; both sides derive the reference's signed
+JSON from it. Signatures over noncanonical raw response text are no longer
+accepted; callers signing messages use `signing_data()`. No public API shape
+or dependency changes. Other direct-map representations retain their
+documented integer-name ordering; this is not a general JS serializer.
 
-| Token (`<G>` the generator's compressed push) | Before (#489's stated row) | Now, the reference's |
-|---|---|---|
-| `51 75 <G> ac` | `Unexpected PushDrop token field count` | `script.chunks[0].data must have value` |
-| `51 52 6d <G> ac` | `PushDrop token must use the canonical PushDrop envelope` | `script.chunks[0].data must have value` |
-| `00 75 <G> ac` | `Unexpected PushDrop token field count` | `script.chunks[0].data must have value` |
-| `01 07 75 <G> ac` | `Unexpected PushDrop token field count` | `Unknown point format` |
-| `02 07 08 01 09 6d <G> ac` | `PushDrop token must use the canonical PushDrop envelope` | `Unknown point format` |
-| `51 52 6d <04 Gx Gy> ac` | `PushDrop token must use the canonical PushDrop envelope` | `script.chunks[0].data must have value` |
+`tests/auth_response_order_400.rs` has three regressions: received numeric
+field/keyring names, the typed fallback without retained text, and reversed
+class properties with an ignored extension. All three fail on unchanged
+`8e57ee46` for the signed bytes' order with serde_json's default. The expected
+bytes come from the pinned Peer's actual `sendCertificateResponse`, using
+numeric keys `10,2` and nonnumeric keys `z,a` to distinguish both ordering
+rules. `tests/support/auth_response_order_400.mjs` writes the vector under
+Node 22.18.0; two runs are byte-identical and the reference receiver verifies
+both input permutations. The kept #280 and #394 pins cover signed text and
+unchanged ordinary lookup bytes.
 
-The #489 entry's note that `00 75 <G> ac` gets `Unknown point format` in the
-reference was wrong: `OP_0` carries no data there, so the reference says
-`script.chunks[0].data must have value`, as recorded. The words are recorded,
-never written by hand: the #326 recorder's `--kvstore-local-454` mode
-(`tests/support/signaction_reference_326.mjs` through
-`tests/support/kvstore_local_parser_words_489.mjs`, the bundle of
-`ts-stack@edf6e03` under Node v22.18.0) now writes the six shapes as kind
-`token_lock_after` for get and set into `tests/vectors/kvstore_local_454.json`
-(`parser_words_489`, 52 cases to 60: the two #489 lock-after inputs lose their
-`parser_accepted` flag and four are new); every other field of the vector is
-byte for byte unchanged, and the recorder reproduced the base vector byte for
-byte before the extension. `a_lock_after_token_is_refused_by_the_reference_lock_before_read_499`
-in `tests/kvstore_local_parser_words_489.rs` replaces #489's two lock-after
-pins and asserts the port's words equal the vector's for all twelve cases; it
-was red on `aa5d60db` (`Unexpected PushDrop token field count` for the first).
+A whole-body comparison below means a reader requires particular serialized
+bytes or a recorded assertion requires them. A signature on **received**
+opaque bytes is listed too: it authenticates that serialization but does
+not require the receiver to rebuild JSON in its own key order. Thus the
+registry and contact rows are not canonical JSON checks.
 
-The general `PushDrop::decode` and its lock-after path are unchanged (the test
-asserts each shape still decodes there as lock-after). Every reference call of
-`PushDrop.decode` under `packages/sdk/src` at `edf6e03` takes the lock-before
-default (`PushDropValidation.ts:59`, reached from the kvstore, registry,
-overlay admin token and UHRP validators; `ContactsManager.ts:432`;
-`IdentityClient.ts:773`) and none passes `'after'`; this crate's identity,
-registry, kvstore interpreter, overlay admin token and storage call sites keep
-the general decoder's detection, a question for a second issue, not this one.
-No public API, acceptance of a valid token or other error text changes.
+Order notation: **V** means Value/Map (sorted keys, unchanged). **I** means IndexMap insertion
+order; **H** means HashMap unspecified iteration order. Derived Serialize
+uses declaration order. JavaScript puts array-index names first numerically,
+then other names in insertion order; the signed-member reserializer applies
+that extra rule. The table enumerates all 28 HTTP wallet calls and the other
+writer families, including internal serializers and binary-body exclusions.
 
-### Notes: cross-SDK parity
+| Body | Writer in `src/` | Compared whole by whom | Reference key order | Rust key order (base → fixed) | Verdict |
+|---|---|---|---|---|---|
+| Wallet HTTP: `getPublicKey`, `encrypt`, `decrypt`, `createHmac`, `verifyHmac`, `createSignature`, `verifySignature`, `revealCounterpartyKeyLinkage`, `revealSpecificKeyLinkage` | `wallet/substrates/http_json.rs:159`, `http_json/key_requests.rs` | Local HTTP fixtures retain `request_body_hex`; reference HTTPWalletJSON:303-316 sends caller arguments, wallet readers parse members | Caller object order; nested Records in JS order | Request struct declaration order; certificate Records use I | Recorded with the same structs; nested Value order unchanged |
+| Wallet HTTP: `createAction`, `signAction`, `abortAction`, `listActions`, `internalizeAction`, `listOutputs`, `relinquishOutput` | `wallet/substrates/http_json.rs:419-488` → `:159` | Same HTTP fixtures; #326 records signAction text but its Rust comparisons parse that text to Value | Caller argument/option order | Argument/option struct declaration order | Struct bytes and fixture map order unchanged; #326 checks members |
+| Wallet HTTP: `acquireCertificate`, `listCertificates`, `proveCertificate`, `relinquishCertificate`, `discoverByIdentityKey`, `discoverByAttributes` | `wallet/substrates/http_json.rs:493-552` → `:159` | Same HTTP fixtures; certificate signing uses a separate binary preimage | Caller argument order, JS Records | Struct order; I for certificate fields/keyrings/attributes | Struct bytes and fixture map order unchanged; no JSON signature over request |
+| Wallet HTTP: `isAuthenticated`, `waitForAuthentication`, `getHeight`, `getHeaderForHeight`, `getNetwork`, `getVersion` | `wallet/substrates/http_json.rs:340-409,558-582` → `:159` | Same HTTP fixtures (including `{ height }` and empty objects) | Caller object order | Struct order / empty object | Struct bytes and fixture map order unchanged |
+| Overlay `/lookup` envelope, including caller-supplied lookup services | `overlay/facilitators.rs:143-166`, `lookup_resolver/query.rs:47` | #394 local byte assertions; LookupResolver:787-797 serializes, no canonical comparison of request text | `service,query` | `query,service` (explicit struct); raw query or V | Envelope order remains local; ordinary query Values stay sorted |
+| SLAP discovery `{service}`, SHIP discovery `{topics}`, UHRP discovery `{uhrpUrl}` | `overlay/lookup_resolver.rs:330`, `topic_broadcaster.rs:312`, `storage/downloader.rs:94` | Lookup members; no whole query fixture | One key; topic array in supplied order | Same one key and array order | No differing key order |
+| Identity attribute lookup `{attributes,certifiers}` | `identity/client.rs:686-705` → `query_ordered` | #394 byte assertion; IdentityClient:667-694 supplies attributes to wallet discovery, not an overlay HTTP request | `attributes,certifiers`; attributes in JS order | Struct `attributes,certifiers`, attributes I, via RawValue | #394 already preserves witnessed attribute order; overlay envelope is local |
+| Other identity lookups: resolve key, discover certificates/type, revoke serial, general query | `identity/client.rs:622,737,773,801-836`, `identity/revoke.rs:152` | Parsed lookup members; no recorded whole-query comparison | Caller order; not every Rust convenience query has a corresponding TS method | V: sorted, unchanged | No order-sensitive reader |
+| Global KV lookup (key/controller/protocol/tags/pagination) | `kvstore/types.rs:338`, `global_actions.rs:205-216` | Parsed lookup members; GlobalKVStore filters the returned protocol separately | Validated caller query order | V; `protocolId` replaced by `protocolID` array | No whole-query comparison |
+| Registry basket/protocol/certificate lookup queries | `registry/client.rs:334,368,402` | RegistryClient passes query objects to resolver; no whole-query fixture | Validated query construction order | Struct → V, sorted | No order-sensitive reader |
+| Overlay `/submit` and `X-Topics` | `overlay/facilitators.rs:243-294` | BEEF/transaction bytes verified; topics parsed as array | Binary BEEF body; topics JSON array | Binary BEEF body; `to_string(Vec<String>)` header | No JSON object body; array has no key order |
+| HTTP auth handshake, WebSocket text, Socket.IO `authMessage` event | `auth/transports/http/handshake.rs:19`, `websocket_transport.rs:255`, `socketio/mod.rs:240` | Peer parses outer message; #280 checks signed members, not outer property sequence | Message construction order (varies by message type) | `AuthMessage::serialize` declaration order; retained raw signed members | Outer order immaterial; signed members below |
+| `requestedCertificates` member / HTTP certificate header | `auth/types.rs:174,222-233`, `requested_certificates_json.rs`, `auth/transports/http.rs:581` | **Yes:** Peer:453,1068 signs/verifies JSON.stringify(parsed member); #280/#288/#416/#426 recorded preimages | `certifiers,types` when built; incoming JS order, including extra properties and numeric-key ordering | Typed set + I when built; #426 ordered complete parser for incoming preimage; RawValue on transport | Already handled by #426; retained complete ordered parse |
+| `certificates` array member | `auth/types.rs:165,236-245`, `auth/certificates/certificate_json.rs`, `verifiable.rs` | **Yes:** Peer:1140,1203 signs/verifies JSON.stringify of the parsed array; #280 and new #400 recorded preimages | Certificate construction order; array-index names numerically first within fields/keyring | Base signs retained RawValue/I order; fixed signing restores class properties then applies JS property ordering | **Only nonempty finding, fixed at signing:** numeric names `10,2` sign as `2,10`; class properties restored; typed fallback retains nested insertion order |
+| BRC-104 application request/response, possibly containing JSON | `auth/transports/http/general.rs:96`, `http.rs` payload writers | **Yes:** Peer verifies binary payload including original body; #353/#354/#369 fixtures | Supplied body bytes, not JSON regenerated from members | Supplied body bytes, unchanged; binary payload writer | No JSON serialization or key-order loss |
+| AuthSocket `{eventName,data}` signed general payload | `auth/transports/socketio/mod.rs:442-452` | Signature binds transmitted payload; AuthSocketClient:105-120 parses it; unit byte witnesses cover outer order | `eventName,data`; nested caller data in JS order | Struct `eventName,data`; nested data V | Outer order already matches; nested order not regenerated by verifier |
+| Other Socket.IO packet data (events/acks/connect/errors) | `auth/transports/socketio/codec.rs:304,310` | #110/#285 fixtures compare framing, values and numeric text; #280 uses separate retained message text | Packet array order, object JS order | Array order; V object keys | Value keys stay sorted; numeric formatting differences remain #285 |
+| Published identity token `{...certificate,keyring}` | `identity/reveal.rs:240-289` | **Yes:** PushDrop signature; #310 recorded `published_json`, signature and locking script | `type,subject,serialNumber,certifier,revocationOutpoint,signature,fields,keyring`; supplied maps | Same explicit `Published` struct, I fields and ordered keyring pairs | #310/#385/#394 already preserve witnessed bytes |
+| Encrypted contact JSON | `identity/contacts_actions.rs:41` | ContactsManager:470-471 decrypts then parses; randomized ciphertext authenticated as received; no plaintext whole-body fixture | Validated `name,avatarURL,abbreviatedKey,identityKey,badgeIconURL,badgeLabel,badgeClickURL,metadata?` | Contact struct `identityKey,name,avatarUrl?,addedAt,notes?,tags,metadata?`; metadata V | Local contact shape differs; no canonical plaintext comparison |
+| Contact `customInstructions` | `identity/contacts.rs:125` | ContactsManager:418 parses; action comparisons parse enclosing JSON | `keyID` only | V `keyID` only | Same order |
+| Global KV token protocol and namespace | `kvstore/global_actions.rs:137,156`, `interpreter.rs:196` | **Yes:** kvStoreTokenValidation:95-98 re-stringifies protocol and compares text; token signature; #343/#454 recording | `[level,name]` | Tuple `[level,name]` | Already canonical; no object keys |
+| Global KV token tags | `kvstore/global_actions.rs:163` | Signature over received field bytes (kvStoreTokenValidation:113-118); #343/#454 token witnesses | String array in supplied order | Vec in supplied order | Same array order |
+| KV TTL value envelope (local/global) | `kvstore/types.rs:480-488` | Signed/encrypted as a supplied string; decoded as members, no canonical JSON comparison | `v,e` | `TtlEnvelope` struct `v,e` | Same key order |
+| Registry protocol token field / identifier | `registry/types.rs:401,421` (manual format, not serde) | Registry token validator signs/verifies received field bytes, then RegistryClient:750-753 parses protocol | Compact `[level,name]` | `[level, "name"]` with space | Whitespace differs, no keys and no canonical text comparison |
+| Registry certificate descriptor field | `registry/types.rs:688` | registryTokenValidation:45-52 verifies received field bytes; RegistryClient:764-765 parses JSON; no recorded whole-field fixture | JS field-name order; descriptors `friendlyName,description,type,fieldIcon` | H field names; same descriptor struct order | Reader accepts permutations signed with their own bytes; no canonical JSON comparison |
+| Host reputation persistence and `to_json` | `overlay/host_reputation_tracker.rs:236,518` | HostReputationTracker:333 stores JSON; reader parses it; no whole-text fixture | Object.fromEntries / insertion order | H hosts, entry struct order | Persistence format has no canonical order |
+| ARC transaction request | `transaction/broadcasters/arc.rs:416` | ARC member reader; HTTP test matches parsed body | `rawTx` only | `ArcRequest` struct `rawTx` | Same order |
+| UHRP upload-info request | `storage/uploader.rs:349-357` | StorageUploader:336,368 sends; storage tests compare parsed body | `fileSize,retentionPeriod` | V `fileSize,retentionPeriod` | Same order |
+| UHRP renewal request | `storage/uploader.rs:273-281` | StorageUploader:591 sends; storage tests compare parsed body | `uhrpUrl,additionalMinutes` | V: `additionalMinutes,uhrpUrl`, unchanged | Order differs, unchanged; no canonical comparison |
+| Transaction JSON / pretty JSON | `transaction/tx_json.rs:87,97` | Field/hex reader; transaction ID hashes binary transaction, not this JSON; no whole-text vector | No matching TS transaction JSON writer; Rust API follows Go format | Struct `txid,hex,inputs,outputs,version,lockTime`; input `unlockingScript,txid,vout,sequence`; output `satoshis,lockingScript` | No reference JSON key-order requirement |
+| Wallet wire and shared result-validation scratch JSON | `wallet/wire/result_validation.rs:22,50`, `substrates/result_values.rs:216`, `result_values/wire.rs:51`, `raw_tree.rs:306` | Internal metadata/member validation only; wire fixtures compare binary frames | Reference validates JS objects, wire format is binary | Struct or V; path keys individually quoted; no JSON on wire | Not an external JSON body |
+| JSON-valued adapters / remaining serde calls | `auth/certificates/verifiable.rs:286`, `identity/reveal.rs:124`, `result_values/boundary.rs:43`; returned `BroadcastFailure.more` Values in `transaction/broadcasters/{arc,transport_fault}.rs`; unit tests and examples | to_value returns objects; fixtures compare values; no text writer beyond the rows above | JS object order | V; unit-test serialization follows its input type | No additional emitted body |
 
-The #489 row "Local token decode also tries lock-after" becomes the new
-behaviour's row: the local site now refuses as the reference does; the
-general decoder's lock-after detection at the other sites remains this
-crate's (census Row 2 of the #489 entry, rewritten). Go at `2ca481c` decodes
-lock-before alone too (`transaction/template/pushdrop/pushdrop.go:20-52`, its
-lock-after branch commented out as absent from the TypeScript), read by its
-`LocalKVStore` (`kvstore/local_kv_store.go:132`), which refuses any such token
-in its own words (`invalid pushdrop token format found for key ...`).
+The 65-file / 913-case fixture corpus retains beta's bytes. The Rust fixture
+recorder with serde_json's default and the Node 22 `fixtures_order_400.mjs` writer
+confirm byte-for-byte equality; no existing vector needs a key-order rewrite.
+The #394 envelope remains `query,service`, and ordinary query Values remain
+sorted. Only the new #400 certificate-response witness is recorded.
 
-### Changed: the three remaining copies of the substrates' byte bound read the one definition (#532)
+The same census is in `src/CLAUDE.md`. Search scope, fixture interpretation,
+the full integration-suite command and gate results are recorded in
+`docs/lanes/fix-400-json-bodies-census.md`.
 
-PR #531's cold review found three constants under `src/wallet` still holding
-the substrates' 256 MiB byte bound, the reference's
-`MAX_WALLET_WIRE_FRAME_BYTES`, under their own literal after #526 made
-`byte_fields::MAX_BYTES` its one definition: `substrates/http_wire.rs` (the
-HTTP wire substrate's frame cap, `HTTPWalletWire.ts:28`),
-`validation/crypto.rs` (`validateByteArray`'s default bound,
-`validationHelpers.ts:150`) and `wire/validation.rs` (the processor's byte
-arrays and the result's `bytes`, `WalletResultValidation.ts:873`). Each keeps
-its name and now reads `byte_fields::MAX_BYTES`, whose visibility moves from
-`pub(super)` to `pub(crate)`: the one change that reaches all three readers,
-since `byte_fields` is already a `pub(crate)` module of `substrates`, compiled
-under `wallet` alone; moving the definition would have touched every existing
-reader. `tests/arch_one_wallet_byte_bound.rs`'s enumerated list of other
-definitions shrinks from four to one (it fails on the base, five definitions
-found against two expected, and passes here): `http_json.rs`'s
-`MAX_WALLET_JSON_REQUEST_BYTES`, the reference's own request bound
-(`HTTPWalletJSON.ts:60`), a different bound of the same value, which stays its
-own constant. No behaviour change: every refusal's words and every recorded
-wire frame are unchanged.
+Migration: no public type or method changes, and every reader here, in the
+reference and in Go parses JSON by member and accepts any key order.
+serde_json's default is unchanged: no key order of any other body this crate
+writes moves, and nothing unifies across a consumer's dependency graph (no
+feature, no new crate). Only the certificate response's signed text changes,
+to the reference's property order. A peer at 0.9.0-beta.3 or earlier that
+sends a certificateResponse with integer-like field or keyring names out of
+ascending order signed its raw text, and this crate's Peer now refuses it, as
+the reference's does.
 
-### Changed: one definition of the wallet substrates' byte bound (#526)
+### Notes: cross-SDK parity (#400)
 
-PR #525's cold review found the substrates' 256 MiB byte bound, the
-reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`ts-stack@edf6e03`
-`packages/sdk/src/wallet/substrates/WalletWire.ts:9`, read by
-`WalletResultValidation.ts:632-636,680-733,873-879`), defined twice in
-sibling modules, each `pub(super)` and neither visible to the other:
-`byte_fields.rs` (`bytes`' default bound, read by `byte_fields.rs` and
-`result_values/bytes.rs`) and `result_values/boundary.rs` (read by
-`boundary.rs`, `raw_tree.rs` and `wire.rs`, and the source of
-`MAX_WIRE_REQUEST_BYTES`). `byte_fields::MAX_BYTES` is now the one
-definition and `boundary.rs` reads it with a `use`. That site needs no
-visibility change: a `pub(super)` item of `substrates::byte_fields` is
-already visible throughout `substrates` and its descendants (so
-`result_values/bytes.rs` read it before), where `boundary.rs`'s constant
-would have needed a wider visibility and a re-export out of the private
-`mod boundary`. `tests/arch_one_wallet_byte_bound.rs` reads every `.rs` file
-under `src/wallet` and pins exactly one `MAX_BYTES` definition of the value,
-beside four other definitions, enumerated: `MAX_WALLET_JSON_REQUEST_BYTES` in
-`http_json.rs`, the reference's own request bound (`HTTPWalletJSON.ts:60`),
-and `MAX_WALLET_WIRE_FRAME_BYTES` in `http_wire.rs`, `validation/crypto.rs`
-and `wire/validation.rs`, copies of the same reference constant
-(`HTTPWalletWire.ts:28`, `validationHelpers.ts:150`,
-`WalletResultValidation.ts:873`) outside #526's two, left to a follow-up;
-the test was red on `aeb92b01` (two
-`MAX_BYTES` lines). No behaviour change: the value, every refusal's words
-and every recorded frame are unchanged, and `MAX_WIRE_REQUEST_BYTES` still
-equals the bound.
+go-sdk@2ca481c signs and verifies a certificateResponse over `json.Marshal`
+of the certificates (`auth/peer.go:1189` sending, `:898` re-marshalling the
+parsed copy): its struct order is the reference class's (`type,
+serialNumber, subject, certifier, revocationOutpoint, fields, signature`,
+`auth/certificates/certificate.go:34-52`; `keyring, decryptedFields`,
+`verifiable.go:19-28`), and every map's keys are sorted by bytes. Its preimage
+equals the reference's and this crate's only when the field and keyring names'
+byte order is also the order JavaScript writes them (`10` sorts before `2`
+there, after it here and in the reference; `z,a` as inserted here, `a,z`
+there), so such a certificate verifies between this crate and the reference
+and fails between either and Go. The members' value encodings in Go's
+marshalling are not compared here. Theirs: go-sdk, the filing is row 61's (the certificate-response preimage draft, tenth
+in the queue; the witness there tests/auth_certificate_preimage_375.rs; this entry's witness:
+tests/auth_response_order_400.rs; tests/vectors/auth_response_order_400.json).
 
-### Changed: `WorkBudget` is `#[non_exhaustive]` with a constructor and field setters (#527)
+Census (#375; current reading, historical account above retained):
 
-`transaction::WorkBudget` previously allowed downstream struct literals, so
-adding a third bound would break every such consumer. The keeper's
-2026-10-30 20:1xZ word for 0.9.0-beta.5 seals that shape now:
-`#[non_exhaustive]` with both fields still public and readable, a const
-`new()` with both bounds `None`, and const, `#[must_use]` `with_per_input` and
-`with_per_transaction` setters taking `Option<u64>`. Derived `Default` equals
-`new()`; the existing accounting and verifier behavior are unchanged.
-
-Migration: `WorkBudget { per_input: a, per_transaction: b }` becomes
-`WorkBudget::new().with_per_input(a).with_per_transaction(b)`; a destructure
-outside the crate takes `..`. On `WorkBudget`, `with_work_budget` and
-`with_transaction_work_budget` are replaced by `with_per_input` and
-`with_per_transaction`, with no aliases. The verifier builders keep their
-names and signatures.
-
-This is a semver-major change on the beta line under `api-break`.
-`WorkBudget` is in no published prerelease: it arrived in #519 (`77cccd70`),
-after v0.9.0-beta.4 (`56d12075`). The struct's `compile_fail` doctest pins the
-external literal's rejection; `tests/transaction_work_budget_519.rs` pins
-`a_new_work_budget_matches_the_unbounded_default_527`,
-`work_budget_field_setters_keep_both_bounds_readable_527`, and
-`work_budget_construction_and_both_field_setters_are_const_527`.
-Each was RED on the pre-fix base. The literal in
-`tests/transaction_work_budget_519.rs` now uses the constructor and setters;
-all #519 assertions retain their meaning.
-
-### Changed: the raw result tree reads the shared byte bound (#512)
-
-- `result_values/raw_tree.rs` drops its own copy of the 256 MiB bound and formats its `byte arrays` refusal from `boundary::MAX_BYTES`, the one definition `wire.rs` reads since #502; the words stay `at most 268435456 total bytes` and no behaviour changes.
-
-### Fixed: require documentation before landing and skip tag benchmark comparisons (#515)
-
-The first beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41058300024)
-failed rustdoc on an unresolved intra-doc link that had passed two reviewed PRs:
-`Documentation` was absent from their required set. On the keeper's 2026-10-30
-13:2xZ word, the job moves from `docs.yml` back into `ci.yml`, whose triggers
-include pull requests and pushes to both lines. Its command stays
-`cargo doc --no-deps --all-features` under `RUSTDOCFLAGS: -Dwarnings`.
-`Documentation` joins `REQUIRED_ON_BETA` and `REQUIRED_ON_MAIN`;
-`docs.yml` retains actionlint. The constants describe the intended protection
-after landing, not the current settings: the captain must add `Documentation`
-to `beta`'s protection when this lands on `beta`, and to `main`'s only when
-`main`'s `ci.yml` carries the job (its cherry-pick; before that no run into
-`main` reports the context and every pull request there would wait on it),
-reading each back, then update the sequencer's required-check list.
-
-The third beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41076363406)
-published successfully but concluded failure on benchmark comparisons, reporting
-`FAIL (9 of 9 benches measured)` against the +5% p99 threshold, including
-nanosecond-scale wire-codec measurements.
-Its job list names `Bench / Benchmark Regression Check`: the job had moved to
-`bench.yml` and had no event guard there. The PR-only guard reported for
-`ci.yml` was not the running job. A reusable workflow reads its caller's
-event and ref ([GitHub's caller context](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#github-context)),
-so the Release call is a tag push, with empty PR refs.
-The comparison job now rejects `refs/tags/` through `github.ref`, including
-manual dispatches of a tag; branch dispatches and PR callers remain allowed
-by the guard. Beta's existing dispatch/call-only benchmark triggers remain,
-as do tag benchmark builds and the scoreboard. No baselines or thresholds
-change. Architecture tests prove the docs job runs for PRs and pushes and
-that tag callers skip comparisons without disabling branch dispatches.
-
-### Added: per-transaction work budgets (#519)
-
-`transaction::WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`
-is one local policy type for both bounds. Its adjacent `with_work_budget` and
-`with_transaction_work_budget` builders (since #527, above, `with_per_input`
-and `with_per_transaction`) set each bound independently; both
-default to `None`. `StreamVerifier` and `AsyncStreamVerifier` retain their
-existing `with_work_budget(Option<u64>)` and add the adjacent
-`with_transaction_work_budget(Option<u64>)`. Whole-transaction callers pass the
-type to `Transaction::verify_with_work_budgets` or
-`verify_with_chain_params_and_work_budgets`; the existing singular methods and
-their `Option<u64>` signatures remain available.
-
-Each evaluated input's `Spend::work_spent()` is added after its evaluation, in
-input order, to that transaction's running total. A total strictly above the
-transaction bound stops verification before the next input with
-`NotJudgedCause::TransactionWorkBudgetExceeded { input: u32, limit: u64, total: u64 }`:
-the crossing input, the transaction limit, and the charged total including that
-input. The crossing input runs under its per-input bound alone, so a refused
-transaction's work is at most the limit plus one input's charge; with no
-per-input bound that input is unbounded, and a door passes both. This is additive under `NotJudgedCause`'s existing `#[non_exhaustive]`.
-The cause's Display is
-`exceeded transaction work budget {limit} units after {total} units of work.`;
-the existing wrappers still prefix the transaction and/or input once. `Error`
-remains `Clone + PartialEq + Eq`, measured at 56 bytes on 64-bit targets;
-`NotJudgedCause` remains 24 bytes.
-
-`StreamVerifier::work_spent()` and `AsyncStreamVerifier::work_spent()` expose
-the current or most recently evaluated transaction's running total, including
-work before a refusal. A transaction-budget `Verdict::NotJudged` exposes the
-total in its cause and through `Verdict::work_spent() -> Option<u64>`; other
-verdicts have no stored total and return `None`. Accepted totals remain available
-on the stream verifier. The existing whole-transaction `Result<bool>` and
-verdict variant fields are unchanged. Totals reset for each unproven
-transaction, including ancestors and deferred transactions. A proof or
-structure-only read spends no work. A transaction-only bound enables the same
-interpreter accounting; existing per-input, memory and script refusals keep
-their classes. Counters saturate at `u64::MAX`; overflow also exceeds a
-configured transaction bound, so wrapping cannot admit work.
-
-Local limits remain absent from cursors and must be reapplied after resume.
-Metered cursors use BSC5 to retain the transaction and total already charged,
-including pauses in deferred transactions. BSC2/BSC3/BSC4 remain readable and
-unmetered cursors retain their bytes. Applying a budget to an old or unmetered
-cursor replays the transaction prefix so prior work cannot evade its bound.
-
-Migration for the toolbox: **delete the door-side sum and pass the transaction
-limit** alongside the per-input limit, both `Some(1 << 31)` under its current
-policy. The sum described in toolbox #487 and bsv-rs #519 is now owned by this
-verifier. The keeper's [2026-10-30 18:12Z ruling](https://github.com/Calhooon/bsv-rs/issues/519#issuecomment-6530114206)
-sets the two-bound type, the cause's fields and the minor-release classification.
-
-| Consumer table | Before | New not-judged cause and migration |
-|---|---|---|
-| Toolbox doors and signer | `WorkBudgetExceeded { input, budget, work_done }` per input; doors sum input work themselves | Keep the per-input row; add `TransactionWorkBudgetExceeded { input, limit, total }`, delete the sum, and pass the transaction limit. No invalid-transaction verdict is implied. |
-| CLI verification/error table | Existing scope and per-input work causes, wildcard for future causes | Add the transaction-work row, showing the crossing input, limit and total. Its Display uses the sentence above, through the existing `TransactionNotJudged`/`NotJudged` wrappers. |
-
-`tests/transaction_work_budget_519.rs` pins the 68/6/8-unit inputs crossing 70
-at input 1 with total 74, exact/ample bounds, independent limits, refusal
-precedence, accounting without a per-input bound, cursor round trips, ancestors,
-deferred ordering and unchanged error sizes. The beta.4 reproduction returned
-`Ok(true)` and `Valid` with every input green. The existing #378 witnesses also
-remain unchanged.
-
-The transaction-parser fuzz target also parses and rewrites cursors, covering
-the BSC5 accounting state with the required parser run.
-
-### Notes: cross-SDK parity (#519)
-
-This is the keeper's local evaluator policy, not a new consensus rule or an
-elapsed-time bound. The reference's `Transaction.verify` has only the optional
-memory limit at `ts-stack@edf6e03`, `Transaction.ts:1685-1697`, and evaluates
-inputs in their existing order at `:1441-1458`; Go at `2ca481c` adds no matching
-work-budget API. Unconfigured callers retain that unbounded behavior.
-
-### Added: a public typed input-word resolver (#520)
-
-`script::Word::{Standard, Block}` and
-`ChainParams::word_for_input(word: Word, spend_height: Option<u32>, source_height: Option<u32>) -> Result<ScriptFlags, NotJudgedCause>`
-expose the existing private composition under the `script` and `block` features,
-on the [keeper's 2026-10-30 18:12Z ruling](https://github.com/Calhooon/bsv-rs/issues/520#issuecomment-6530114599).
-This is a semver-minor addition of public items (`cargo semver-checks --release-type minor`).
-`Standard` is the live door's policy word; `Block` is the consensus word for a
-mined transaction. `checked_input_script_flags` stays `pub(crate)`;
-`input_script_flags` retains its signature, flags and error texts.
-
-The no-tip rule is now inside the crate: a `None` spend height uses the latest
-era the parameters know, `max(genesis_height, chronicle_height)`; an activation
-is held back only for a named spend height that has not reached it. A `None`
-source height is an unmined parent taking the spend's era. Transaction flags
-follow the spend; only the two UTXO-era bits follow the source. The method's
-docs cite the live door (`bsv-wallet-toolbox-rs@819dbcef`,
-`src/storage/sqlx/beef_verification/live_word.rs:55-70`) and the inclusive era
-table (`src/script/flags.rs:102-110`). The existing transaction and stream
-verifiers now call the method for their standard word.
-
-Migration for the toolbox: check tip + 1 and convert the proven source height
-to `u32`, then call `chain.word_for_input(Word::Standard, spend_height, source_height)`;
-delete `refusal_cause` and the mirrored activation/era order and no-tip fallback.
-The resolver checks zero Genesis, zero Chronicle, pre-Genesis spend, then
-pre-Genesis coin. Conversion refusals remain at the adapters. One existing
-stream edge case differs from the issue's shorthand tip-first order: when both
-the source and tip overflow, `SourceHeightOverflow` wins because the stream
-converts its `u64` source first. That behavior is preserved and pinned.
-
-`tests/script_word_for_input_520.rs` pins the public signature (compile-RED on
-the base), 102 height/activation rows under both words against the legacy
-selector, 97 rows expressible through each synchronous stream path, four
-conversion-priority cases, and seven execution witnesses for independent
-spend/coin era bits. Synthetic BEEF and BUMPs use the crate's writers.
-
-### Added: certificate-response preimage witness across three SDKs (#375)
-
-`tests/auth_certificate_preimage_375.rs` builds and signs two certificates
-with deterministic test keys and IVs, then sends each through this crate's
-`Peer::send_certificate_response` at the #400 signing site. The vector
-`tests/vectors/auth_certificate_preimage_375.json` retains each certificate,
-response, signed text, signature and all three signature-verification verdicts.
-With fields/keyrings inserted as `zeta,alpha,10,2`, the reference and this
-crate sign `2,10,zeta,alpha`; Go re-marshals `10,2,alpha,zeta` and rejects the
-same signature. The byte-ordered `alpha,beta,gamma,zeta` control verifies in
-all three. Rust also accepts both responses through its receiving Peer;
-Node verifies and decrypts both certificates, and Go verifies both certificates.
-
-The Node 22.18.0 recorder uses unmodified `ts-stack@edf6e03` built from a git
-archive. The Go 1.27.0 recorder uses go-sdk v1.7.2 (`2ca481c`), a temporary
-workspace replacement and the already populated module cache (`GOPROXY=off`;
-no download). Each recorder's two runs are byte-identical. The foreign
-recorders execute the Peer's certificate-response signature path through
-`ProtoWallet.verifySignature` / `ProtoWallet.VerifySignature`, isolating it
-from the separate nonce-handshake conventions; neither opens a port.
-No library behavior changes. The Go draft is tenth, after the DER witness,
-with its per-draft keeper word and the owner's cadence still pending; nothing
-is filed. New divergence row 61 is accounted for under #400 below; later
-current census row numbers move with the list, preserving historical prose.
+- Row 61: Ours: the reference's property order at the signing site, #400. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_preimage_375.rs; tests/vectors/auth_certificate_preimage_375.json). Draft: [certificate-response-preimage-go-sdk](./docs/lanes/375-filings/certificate-response-preimage-go-sdk.md).
 
 ### Added: the reference AuthFetch client (#423)
 
@@ -1466,202 +424,1249 @@ request payloads are compared byte-for-byte after normalizing only request-ID
 and payment-suffix entropy. `fuzz_auth_messages` now exercises the new response
 parser (matching the ID to reach the rest) and known-txids parser.
 
-### Fixed: signed certificate-response JSON order, with a crate-wide body census (#400)
+### Added: certificate-response preimage witness across three SDKs (#375)
 
-The #400 census was made at beta base `8e57ee462aee6cc5e4888fee7edc02ee2b61d4aa`
-against `ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`
-(`packages/sdk/src/`, `packages/wallet/`, and the AuthSocket client).
-Reference filenames below are relative to `packages/sdk/src/`, except
-AuthSocketClient in `packages/messaging/authsocket-client/src/`.
-Line references to Rust writers identify the base implementation.
+`tests/auth_certificate_preimage_375.rs` builds and signs two certificates
+with deterministic test keys and IVs, then sends each through this crate's
+`Peer::send_certificate_response` at the #400 signing site. The vector
+`tests/vectors/auth_certificate_preimage_375.json` retains each certificate,
+response, signed text, signature and all three signature-verification verdicts.
+With fields/keyrings inserted as `zeta,alpha,10,2`, the reference and this
+crate sign `2,10,zeta,alpha`; Go re-marshals `10,2,alpha,zeta` and rejects the
+same signature. The byte-ordered `alpha,beta,gamma,zeta` control verifies in
+all three. Rust also accepts both responses through its receiving Peer;
+Node verifies and decrypts both certificates, and Go verifies both certificates.
 
-**Finding: 31 writer groups, one nonempty finding: `certificates`.**
-The reference signs the certificateResponse array at `Peer.ts:1140` and
-re-stringifies its restored certificates to verify at `:1203`. Retaining raw
-text signed numeric field/keyring names in the wrong order and retained an
-incoming certificate's property order instead of the reference class layout.
-The fix orders this one body at its signing site: #426's ordered-node parser
-restores the class properties, keeps nested objects in their text's order,
-and applies JavaScript's numeric-key, string and number rules. The fallback
-serializes typed `Vec<VerifiableCertificate>` directly to `RawValue`, preserving
-struct declaration order and the nested `IndexMap` entries before using the
-same signing function. It never passes through a sorted `Value`.
+The Node 22.18.0 recorder uses unmodified `ts-stack@edf6e03` built from a git
+archive. The Go 1.27.0 recorder uses go-sdk v1.7.2 (`2ca481c`), a temporary
+workspace replacement and the already populated module cache (`GOPROXY=off`;
+no download). Each recorder's two runs are byte-identical. The foreign
+recorders execute the Peer's certificate-response signature path through
+`ProtoWallet.verifySignature` / `ProtoWallet.VerifySignature`, isolating it
+from the separate nonce-handshake conventions; neither opens a port.
+No library behavior changes. The Go draft is tenth, after the DER witness,
+with its per-draft keeper word and the owner's cadence still pending; nothing
+is filed. New divergence row 61 is accounted for under #400 below; later
+current census row numbers move with the list, preserving historical prose.
 
-serde_json's default is unchanged, no key order of any other body moves, and nothing unifies across a consumer's graph.
+### Added: a public typed input-word resolver (#520)
 
-The transport retains its text; both sides derive the reference's signed
-JSON from it. Signatures over noncanonical raw response text are no longer
-accepted; callers signing messages use `signing_data()`. No public API shape
-or dependency changes. Other direct-map representations retain their
-documented integer-name ordering; this is not a general JS serializer.
+`script::Word::{Standard, Block}` and
+`ChainParams::word_for_input(word: Word, spend_height: Option<u32>, source_height: Option<u32>) -> Result<ScriptFlags, NotJudgedCause>`
+expose the existing private composition under the `script` and `block` features,
+on the [keeper's 2026-10-30 18:12Z ruling](https://github.com/Calhooon/bsv-rs/issues/520#issuecomment-6530114599).
+This is a semver-minor addition of public items (`cargo semver-checks --release-type minor`).
+`Standard` is the live door's policy word; `Block` is the consensus word for a
+mined transaction. `checked_input_script_flags` stays `pub(crate)`;
+`input_script_flags` retains its signature, flags and error texts.
 
-`tests/auth_response_order_400.rs` has three regressions: received numeric
-field/keyring names, the typed fallback without retained text, and reversed
-class properties with an ignored extension. All three fail on unchanged
-`8e57ee46` for the signed bytes' order with serde_json's default. The expected
-bytes come from the pinned Peer's actual `sendCertificateResponse`, using
-numeric keys `10,2` and nonnumeric keys `z,a` to distinguish both ordering
-rules. `tests/support/auth_response_order_400.mjs` writes the vector under
-Node 22.18.0; two runs are byte-identical and the reference receiver verifies
-both input permutations. The kept #280 and #394 pins cover signed text and
-unchanged ordinary lookup bytes.
+The no-tip rule is now inside the crate: a `None` spend height uses the latest
+era the parameters know, `max(genesis_height, chronicle_height)`; an activation
+is held back only for a named spend height that has not reached it. A `None`
+source height is an unmined parent taking the spend's era. Transaction flags
+follow the spend; only the two UTXO-era bits follow the source. The method's
+docs cite the live door (`bsv-wallet-toolbox-rs@819dbcef`,
+`src/storage/sqlx/beef_verification/live_word.rs:55-70`) and the inclusive era
+table (`src/script/flags.rs:102-110`). The existing transaction and stream
+verifiers now call the method for their standard word.
 
-A whole-body comparison below means a reader requires particular serialized
-bytes or a recorded assertion requires them. A signature on **received**
-opaque bytes is listed too: it authenticates that serialization but does
-not require the receiver to rebuild JSON in its own key order. Thus the
-registry and contact rows are not canonical JSON checks.
+Migration for the toolbox: check tip + 1 and convert the proven source height
+to `u32`, then call `chain.word_for_input(Word::Standard, spend_height, source_height)`;
+delete `refusal_cause` and the mirrored activation/era order and no-tip fallback.
+The resolver checks zero Genesis, zero Chronicle, pre-Genesis spend, then
+pre-Genesis coin. Conversion refusals remain at the adapters. One existing
+stream edge case differs from the issue's shorthand tip-first order: when both
+the source and tip overflow, `SourceHeightOverflow` wins because the stream
+converts its `u64` source first. That behavior is preserved and pinned.
 
-Order notation: **V** means Value/Map (sorted keys, unchanged). **I** means IndexMap insertion
-order; **H** means HashMap unspecified iteration order. Derived Serialize
-uses declaration order. JavaScript puts array-index names first numerically,
-then other names in insertion order; the signed-member reserializer applies
-that extra rule. The table enumerates all 28 HTTP wallet calls and the other
-writer families, including internal serializers and binary-body exclusions.
+`tests/script_word_for_input_520.rs` pins the public signature (compile-RED on
+the base), 102 height/activation rows under both words against the legacy
+selector, 97 rows expressible through each synchronous stream path, four
+conversion-priority cases, and seven execution witnesses for independent
+spend/coin era bits. Synthetic BEEF and BUMPs use the crate's writers.
 
-| Body | Writer in `src/` | Compared whole by whom | Reference key order | Rust key order (base → fixed) | Verdict |
-|---|---|---|---|---|---|
-| Wallet HTTP: `getPublicKey`, `encrypt`, `decrypt`, `createHmac`, `verifyHmac`, `createSignature`, `verifySignature`, `revealCounterpartyKeyLinkage`, `revealSpecificKeyLinkage` | `wallet/substrates/http_json.rs:159`, `http_json/key_requests.rs` | Local HTTP fixtures retain `request_body_hex`; reference HTTPWalletJSON:303-316 sends caller arguments, wallet readers parse members | Caller object order; nested Records in JS order | Request struct declaration order; certificate Records use I | Recorded with the same structs; nested Value order unchanged |
-| Wallet HTTP: `createAction`, `signAction`, `abortAction`, `listActions`, `internalizeAction`, `listOutputs`, `relinquishOutput` | `wallet/substrates/http_json.rs:419-488` → `:159` | Same HTTP fixtures; #326 records signAction text but its Rust comparisons parse that text to Value | Caller argument/option order | Argument/option struct declaration order | Struct bytes and fixture map order unchanged; #326 checks members |
-| Wallet HTTP: `acquireCertificate`, `listCertificates`, `proveCertificate`, `relinquishCertificate`, `discoverByIdentityKey`, `discoverByAttributes` | `wallet/substrates/http_json.rs:493-552` → `:159` | Same HTTP fixtures; certificate signing uses a separate binary preimage | Caller argument order, JS Records | Struct order; I for certificate fields/keyrings/attributes | Struct bytes and fixture map order unchanged; no JSON signature over request |
-| Wallet HTTP: `isAuthenticated`, `waitForAuthentication`, `getHeight`, `getHeaderForHeight`, `getNetwork`, `getVersion` | `wallet/substrates/http_json.rs:340-409,558-582` → `:159` | Same HTTP fixtures (including `{ height }` and empty objects) | Caller object order | Struct order / empty object | Struct bytes and fixture map order unchanged |
-| Overlay `/lookup` envelope, including caller-supplied lookup services | `overlay/facilitators.rs:143-166`, `lookup_resolver/query.rs:47` | #394 local byte assertions; LookupResolver:787-797 serializes, no canonical comparison of request text | `service,query` | `query,service` (explicit struct); raw query or V | Envelope order remains local; ordinary query Values stay sorted |
-| SLAP discovery `{service}`, SHIP discovery `{topics}`, UHRP discovery `{uhrpUrl}` | `overlay/lookup_resolver.rs:330`, `topic_broadcaster.rs:312`, `storage/downloader.rs:94` | Lookup members; no whole query fixture | One key; topic array in supplied order | Same one key and array order | No differing key order |
-| Identity attribute lookup `{attributes,certifiers}` | `identity/client.rs:686-705` → `query_ordered` | #394 byte assertion; IdentityClient:667-694 supplies attributes to wallet discovery, not an overlay HTTP request | `attributes,certifiers`; attributes in JS order | Struct `attributes,certifiers`, attributes I, via RawValue | #394 already preserves witnessed attribute order; overlay envelope is local |
-| Other identity lookups: resolve key, discover certificates/type, revoke serial, general query | `identity/client.rs:622,737,773,801-836`, `identity/revoke.rs:152` | Parsed lookup members; no recorded whole-query comparison | Caller order; not every Rust convenience query has a corresponding TS method | V: sorted, unchanged | No order-sensitive reader |
-| Global KV lookup (key/controller/protocol/tags/pagination) | `kvstore/types.rs:338`, `global_actions.rs:205-216` | Parsed lookup members; GlobalKVStore filters the returned protocol separately | Validated caller query order | V; `protocolId` replaced by `protocolID` array | No whole-query comparison |
-| Registry basket/protocol/certificate lookup queries | `registry/client.rs:334,368,402` | RegistryClient passes query objects to resolver; no whole-query fixture | Validated query construction order | Struct → V, sorted | No order-sensitive reader |
-| Overlay `/submit` and `X-Topics` | `overlay/facilitators.rs:243-294` | BEEF/transaction bytes verified; topics parsed as array | Binary BEEF body; topics JSON array | Binary BEEF body; `to_string(Vec<String>)` header | No JSON object body; array has no key order |
-| HTTP auth handshake, WebSocket text, Socket.IO `authMessage` event | `auth/transports/http/handshake.rs:19`, `websocket_transport.rs:255`, `socketio/mod.rs:240` | Peer parses outer message; #280 checks signed members, not outer property sequence | Message construction order (varies by message type) | `AuthMessage::serialize` declaration order; retained raw signed members | Outer order immaterial; signed members below |
-| `requestedCertificates` member / HTTP certificate header | `auth/types.rs:174,222-233`, `requested_certificates_json.rs`, `auth/transports/http.rs:581` | **Yes:** Peer:453,1068 signs/verifies JSON.stringify(parsed member); #280/#288/#416/#426 recorded preimages | `certifiers,types` when built; incoming JS order, including extra properties and numeric-key ordering | Typed set + I when built; #426 ordered complete parser for incoming preimage; RawValue on transport | Already handled by #426; retained complete ordered parse |
-| `certificates` array member | `auth/types.rs:165,236-245`, `auth/certificates/certificate_json.rs`, `verifiable.rs` | **Yes:** Peer:1140,1203 signs/verifies JSON.stringify of the parsed array; #280 and new #400 recorded preimages | Certificate construction order; array-index names numerically first within fields/keyring | Base signs retained RawValue/I order; fixed signing restores class properties then applies JS property ordering | **Only nonempty finding, fixed at signing:** numeric names `10,2` sign as `2,10`; class properties restored; typed fallback retains nested insertion order |
-| BRC-104 application request/response, possibly containing JSON | `auth/transports/http/general.rs:96`, `http.rs` payload writers | **Yes:** Peer verifies binary payload including original body; #353/#354/#369 fixtures | Supplied body bytes, not JSON regenerated from members | Supplied body bytes, unchanged; binary payload writer | No JSON serialization or key-order loss |
-| AuthSocket `{eventName,data}` signed general payload | `auth/transports/socketio/mod.rs:442-452` | Signature binds transmitted payload; AuthSocketClient:105-120 parses it; unit byte witnesses cover outer order | `eventName,data`; nested caller data in JS order | Struct `eventName,data`; nested data V | Outer order already matches; nested order not regenerated by verifier |
-| Other Socket.IO packet data (events/acks/connect/errors) | `auth/transports/socketio/codec.rs:304,310` | #110/#285 fixtures compare framing, values and numeric text; #280 uses separate retained message text | Packet array order, object JS order | Array order; V object keys | Value keys stay sorted; numeric formatting differences remain #285 |
-| Published identity token `{...certificate,keyring}` | `identity/reveal.rs:240-289` | **Yes:** PushDrop signature; #310 recorded `published_json`, signature and locking script | `type,subject,serialNumber,certifier,revocationOutpoint,signature,fields,keyring`; supplied maps | Same explicit `Published` struct, I fields and ordered keyring pairs | #310/#385/#394 already preserve witnessed bytes |
-| Encrypted contact JSON | `identity/contacts_actions.rs:41` | ContactsManager:470-471 decrypts then parses; randomized ciphertext authenticated as received; no plaintext whole-body fixture | Validated `name,avatarURL,abbreviatedKey,identityKey,badgeIconURL,badgeLabel,badgeClickURL,metadata?` | Contact struct `identityKey,name,avatarUrl?,addedAt,notes?,tags,metadata?`; metadata V | Local contact shape differs; no canonical plaintext comparison |
-| Contact `customInstructions` | `identity/contacts.rs:125` | ContactsManager:418 parses; action comparisons parse enclosing JSON | `keyID` only | V `keyID` only | Same order |
-| Global KV token protocol and namespace | `kvstore/global_actions.rs:137,156`, `interpreter.rs:196` | **Yes:** kvStoreTokenValidation:95-98 re-stringifies protocol and compares text; token signature; #343/#454 recording | `[level,name]` | Tuple `[level,name]` | Already canonical; no object keys |
-| Global KV token tags | `kvstore/global_actions.rs:163` | Signature over received field bytes (kvStoreTokenValidation:113-118); #343/#454 token witnesses | String array in supplied order | Vec in supplied order | Same array order |
-| KV TTL value envelope (local/global) | `kvstore/types.rs:480-488` | Signed/encrypted as a supplied string; decoded as members, no canonical JSON comparison | `v,e` | `TtlEnvelope` struct `v,e` | Same key order |
-| Registry protocol token field / identifier | `registry/types.rs:401,421` (manual format, not serde) | Registry token validator signs/verifies received field bytes, then RegistryClient:750-753 parses protocol | Compact `[level,name]` | `[level, "name"]` with space | Whitespace differs, no keys and no canonical text comparison |
-| Registry certificate descriptor field | `registry/types.rs:688` | registryTokenValidation:45-52 verifies received field bytes; RegistryClient:764-765 parses JSON; no recorded whole-field fixture | JS field-name order; descriptors `friendlyName,description,type,fieldIcon` | H field names; same descriptor struct order | Reader accepts permutations signed with their own bytes; no canonical JSON comparison |
-| Host reputation persistence and `to_json` | `overlay/host_reputation_tracker.rs:236,518` | HostReputationTracker:333 stores JSON; reader parses it; no whole-text fixture | Object.fromEntries / insertion order | H hosts, entry struct order | Persistence format has no canonical order |
-| ARC transaction request | `transaction/broadcasters/arc.rs:416` | ARC member reader; HTTP test matches parsed body | `rawTx` only | `ArcRequest` struct `rawTx` | Same order |
-| UHRP upload-info request | `storage/uploader.rs:349-357` | StorageUploader:336,368 sends; storage tests compare parsed body | `fileSize,retentionPeriod` | V `fileSize,retentionPeriod` | Same order |
-| UHRP renewal request | `storage/uploader.rs:273-281` | StorageUploader:591 sends; storage tests compare parsed body | `uhrpUrl,additionalMinutes` | V: `additionalMinutes,uhrpUrl`, unchanged | Order differs, unchanged; no canonical comparison |
-| Transaction JSON / pretty JSON | `transaction/tx_json.rs:87,97` | Field/hex reader; transaction ID hashes binary transaction, not this JSON; no whole-text vector | No matching TS transaction JSON writer; Rust API follows Go format | Struct `txid,hex,inputs,outputs,version,lockTime`; input `unlockingScript,txid,vout,sequence`; output `satoshis,lockingScript` | No reference JSON key-order requirement |
-| Wallet wire and shared result-validation scratch JSON | `wallet/wire/result_validation.rs:22,50`, `substrates/result_values.rs:216`, `result_values/wire.rs:51`, `raw_tree.rs:306` | Internal metadata/member validation only; wire fixtures compare binary frames | Reference validates JS objects, wire format is binary | Struct or V; path keys individually quoted; no JSON on wire | Not an external JSON body |
-| JSON-valued adapters / remaining serde calls | `auth/certificates/verifiable.rs:286`, `identity/reveal.rs:124`, `result_values/boundary.rs:43`; returned `BroadcastFailure.more` Values in `transaction/broadcasters/{arc,transport_fault}.rs`; unit tests and examples | to_value returns objects; fixtures compare values; no text writer beyond the rows above | JS object order | V; unit-test serialization follows its input type | No additional emitted body |
+### Added: per-transaction work budgets (#519)
 
-The 65-file / 913-case fixture corpus retains beta's bytes. The Rust fixture
-recorder with serde_json's default and the Node 22 `fixtures_order_400.mjs` writer
-confirm byte-for-byte equality; no existing vector needs a key-order rewrite.
-The #394 envelope remains `query,service`, and ordinary query Values remain
-sorted. Only the new #400 certificate-response witness is recorded.
+`transaction::WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`
+is one local policy type for both bounds. Its adjacent `with_work_budget` and
+`with_transaction_work_budget` builders (since #527, above, `with_per_input`
+and `with_per_transaction`) set each bound independently; both
+default to `None`. `StreamVerifier` and `AsyncStreamVerifier` retain their
+existing `with_work_budget(Option<u64>)` and add the adjacent
+`with_transaction_work_budget(Option<u64>)`. Whole-transaction callers pass the
+type to `Transaction::verify_with_work_budgets` or
+`verify_with_chain_params_and_work_budgets`; the existing singular methods and
+their `Option<u64>` signatures remain available.
 
-The same census is in `src/CLAUDE.md`. Search scope, fixture interpretation,
-the full integration-suite command and gate results are recorded in
-`docs/lanes/fix-400-json-bodies-census.md`.
+Each evaluated input's `Spend::work_spent()` is added after its evaluation, in
+input order, to that transaction's running total. A total strictly above the
+transaction bound stops verification before the next input with
+`NotJudgedCause::TransactionWorkBudgetExceeded { input: u32, limit: u64, total: u64 }`:
+the crossing input, the transaction limit, and the charged total including that
+input. The crossing input runs under its per-input bound alone, so a refused
+transaction's work is at most the limit plus one input's charge; with no
+per-input bound that input is unbounded, and a door passes both. This is additive under `NotJudgedCause`'s existing `#[non_exhaustive]`.
+The cause's Display is
+`exceeded transaction work budget {limit} units after {total} units of work.`;
+the existing wrappers still prefix the transaction and/or input once. `Error`
+remains `Clone + PartialEq + Eq`, measured at 56 bytes on 64-bit targets;
+`NotJudgedCause` remains 24 bytes.
 
-Migration: no public type or method changes, and every reader here, in the
-reference and in Go parses JSON by member and accepts any key order.
-serde_json's default is unchanged: no key order of any other body this crate
-writes moves, and nothing unifies across a consumer's dependency graph (no
-feature, no new crate). Only the certificate response's signed text changes,
-to the reference's property order. A peer at 0.9.0-beta.3 or earlier that
-sends a certificateResponse with integer-like field or keyring names out of
-ascending order signed its raw text, and this crate's Peer now refuses it, as
-the reference's does.
+`StreamVerifier::work_spent()` and `AsyncStreamVerifier::work_spent()` expose
+the current or most recently evaluated transaction's running total, including
+work before a refusal. A transaction-budget `Verdict::NotJudged` exposes the
+total in its cause and through `Verdict::work_spent() -> Option<u64>`; other
+verdicts have no stored total and return `None`. Accepted totals remain available
+on the stream verifier. The existing whole-transaction `Result<bool>` and
+verdict variant fields are unchanged. Totals reset for each unproven
+transaction, including ancestors and deferred transactions. A proof or
+structure-only read spends no work. A transaction-only bound enables the same
+interpreter accounting; existing per-input, memory and script refusals keep
+their classes. Counters saturate at `u64::MAX`; overflow also exceeds a
+configured transaction bound, so wrapping cannot admit work.
 
-### Notes: cross-SDK parity (#400)
+Local limits remain absent from cursors and must be reapplied after resume.
+Metered cursors use BSC5 to retain the transaction and total already charged,
+including pauses in deferred transactions. BSC2/BSC3/BSC4 remain readable and
+unmetered cursors retain their bytes. Applying a budget to an old or unmetered
+cursor replays the transaction prefix so prior work cannot evade its bound.
 
-go-sdk@2ca481c signs and verifies a certificateResponse over `json.Marshal`
-of the certificates (`auth/peer.go:1189` sending, `:898` re-marshalling the
-parsed copy): its struct order is the reference class's (`type,
-serialNumber, subject, certifier, revocationOutpoint, fields, signature`,
-`auth/certificates/certificate.go:34-52`; `keyring, decryptedFields`,
-`verifiable.go:19-28`), and every map's keys are sorted by bytes. Its preimage
-equals the reference's and this crate's only when the field and keyring names'
-byte order is also the order JavaScript writes them (`10` sorts before `2`
-there, after it here and in the reference; `z,a` as inserted here, `a,z`
-there), so such a certificate verifies between this crate and the reference
-and fails between either and Go. The members' value encodings in Go's
-marshalling are not compared here. Theirs: go-sdk, the filing is row 61's (the certificate-response preimage draft, tenth
-in the queue; the witness there tests/auth_certificate_preimage_375.rs; this entry's witness:
-tests/auth_response_order_400.rs; tests/vectors/auth_response_order_400.json).
+Migration for the toolbox: **delete the door-side sum and pass the transaction
+limit** alongside the per-input limit, both `Some(1 << 31)` under its current
+policy. The sum described in toolbox #487 and bsv-rs #519 is now owned by this
+verifier. The keeper's [2026-10-30 18:12Z ruling](https://github.com/Calhooon/bsv-rs/issues/519#issuecomment-6530114206)
+sets the two-bound type, the cause's fields and the minor-release classification.
 
-Census (#375; current reading, historical account above retained):
+| Consumer table | Before | New not-judged cause and migration |
+|---|---|---|
+| Toolbox doors and signer | `WorkBudgetExceeded { input, budget, work_done }` per input; doors sum input work themselves | Keep the per-input row; add `TransactionWorkBudgetExceeded { input, limit, total }`, delete the sum, and pass the transaction limit. No invalid-transaction verdict is implied. |
+| CLI verification/error table | Existing scope and per-input work causes, wildcard for future causes | Add the transaction-work row, showing the crossing input, limit and total. Its Display uses the sentence above, through the existing `TransactionNotJudged`/`NotJudged` wrappers. |
 
-- Row 61: Ours: the reference's property order at the signing site, #400. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_preimage_375.rs; tests/vectors/auth_certificate_preimage_375.json). Draft: [certificate-response-preimage-go-sdk](./docs/lanes/375-filings/certificate-response-preimage-go-sdk.md).
+`tests/transaction_work_budget_519.rs` pins the 68/6/8-unit inputs crossing 70
+at input 1 with total 74, exact/ample bounds, independent limits, refusal
+precedence, accounting without a per-input bound, cursor round trips, ancestors,
+deferred ordering and unchanged error sizes. The beta.4 reproduction returned
+`Ok(true)` and `Valid` with every input green. The existing #378 witnesses also
+remain unchanged.
 
-### Changed: three post-#487 review nits (#502)
+The transaction-parser fuzz target also parses and rewrites cursors, covering
+the BSC5 accounting state with the required parser run.
 
-- Removed 13 redundant `#[path]` attributes; Rust resolves the same result modules in the same order without them.
-- Shared `boundary::MAX_BYTES` with the wire byte check and request-frame cap, formatting the unchanged refusal from that one numeric definition.
-- Enabled output-script binding in the 64 MiB dhat pin (`fixture(64, true)`): peak 201,331,778 → 335,550,248 bytes; budget 268,436,568 → 402,654,852 bytes (four → six frame lengths) to cover the encoded request buffers; existing exact pins stay exact.
+### Notes: cross-SDK parity (#519)
 
-### Fixed: refuse oversized wallet wire requests before decoding (#505)
+This is the keeper's local evaluator policy, not a new consensus rule or an
+elapsed-time bound. The reference's `Transaction.verify` has only the optional
+memory limit at `ts-stack@edf6e03`, `Transaction.ts:1685-1697`, and evaluates
+inputs in their existing order at `:1441-1458`; Go at `2ca481c` adds no matching
+work-budget API. Unconfigured callers retain that unbounded behavior.
 
-`WalletWireProcessor::process_message` now refuses a complete request above
-256 MiB (268,435,456 bytes) before constructing a reader, decoding arguments
-or calling the wallet. It reuses #496's `wire_request_length` and
-`MAX_WIRE_REQUEST_BYTES` in `substrates/result_values/boundary.rs`; the length
-comparison precedes any allocation. The refusal is
-`Err(Error::WalletError("Wallet Wire request exceeds the maximum permitted size"))`
-returned by `process_message`, not an error frame. A frame exactly at the cap
-still reaches the wallet.
+### Fixed: require documentation before landing and skip tag benchmark comparisons (#515)
 
-The reference is `ts-stack@edf6e03`: `WalletWire.ts:9` defines
-`MAX_WALLET_WIRE_FRAME_BYTES`; `WalletWireProcessor.ts:248-250` (legacy array)
-and `:265-269` (compact bytes) reject lengths strictly greater than that cap
-with those uncoded words. Both throw from `transmitToWallet` before
-`#processMessage` is entered, outside its `try` (`:274`) and so outside the
-catch that writes error frames (`:2370-2396`): the caller's promise rejects
-and no frame is written. `process_message` is that method here, so the
-refusal is its `Err` in the same words, as #496's transceiver returns its own.
-This follows the owner's ruling (c): the reference's own resource safeguard
-needs no new word.
+The first beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41058300024)
+failed rustdoc on an unresolved intra-doc link that had passed two reviewed PRs:
+`Documentation` was absent from their required set. On the keeper's 2026-10-30
+13:2xZ word, the job moves from `docs.yml` back into `ci.yml`, whose triggers
+include pull requests and pushes to both lines. Its command stays
+`cargo doc --no-deps --all-features` under `RUSTDOCFLAGS: -Dwarnings`.
+`Documentation` joins `REQUIRED_ON_BETA` and `REQUIRED_ON_MAIN`;
+`docs.yml` retains actionlint. The constants describe the intended protection
+after landing, not the current settings: the captain must add `Documentation`
+to `beta`'s protection when this lands on `beta`, and to `main`'s only when
+`main`'s `ci.yml` carries the job (its cherry-pick; before that no run into
+`main` reports the context and every pull request there would wait on it),
+reading each back, then update the sequencer's required-check list.
+
+The third beta.4 [Release run](https://github.com/Calhooon/bsv-rs/actions/runs/41076363406)
+published successfully but concluded failure on benchmark comparisons, reporting
+`FAIL (9 of 9 benches measured)` against the +5% p99 threshold, including
+nanosecond-scale wire-codec measurements.
+Its job list names `Bench / Benchmark Regression Check`: the job had moved to
+`bench.yml` and had no event guard there. The PR-only guard reported for
+`ci.yml` was not the running job. A reusable workflow reads its caller's
+event and ref ([GitHub's caller context](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#github-context)),
+so the Release call is a tag push, with empty PR refs.
+The comparison job now rejects `refs/tags/` through `github.ref`, including
+manual dispatches of a tag; branch dispatches and PR callers remain allowed
+by the guard. Beta's existing dispatch/call-only benchmark triggers remain,
+as do tag benchmark builds and the scoreboard. No baselines or thresholds
+change. Architecture tests prove the docs job runs for PRs and pushes and
+that tag callers skip comparisons without disabling branch dispatches.
+
+### Changed: the raw result tree reads the shared byte bound (#512)
+
+- `result_values/raw_tree.rs` drops its own copy of the 256 MiB bound and formats its `byte arrays` refusal from `boundary::MAX_BYTES`, the one definition `wire.rs` reads since #502; the words stay `at most 268435456 total bytes` and no behaviour changes.
+
+### Changed: `WorkBudget` is `#[non_exhaustive]` with a constructor and field setters (#527)
+
+`transaction::WorkBudget` previously allowed downstream struct literals, so
+adding a third bound would break every such consumer. The keeper's
+2026-10-30 20:1xZ word for 0.9.0-beta.5 seals that shape now:
+`#[non_exhaustive]` with both fields still public and readable, a const
+`new()` with both bounds `None`, and const, `#[must_use]` `with_per_input` and
+`with_per_transaction` setters taking `Option<u64>`. Derived `Default` equals
+`new()`; the existing accounting and verifier behavior are unchanged.
+
+Migration: `WorkBudget { per_input: a, per_transaction: b }` becomes
+`WorkBudget::new().with_per_input(a).with_per_transaction(b)`; a destructure
+outside the crate takes `..`. On `WorkBudget`, `with_work_budget` and
+`with_transaction_work_budget` are replaced by `with_per_input` and
+`with_per_transaction`, with no aliases. The verifier builders keep their
+names and signatures.
+
+This is a semver-major change on the beta line under `api-break`.
+`WorkBudget` is in no published prerelease: it arrived in #519 (`77cccd70`),
+after v0.9.0-beta.4 (`56d12075`). The struct's `compile_fail` doctest pins the
+external literal's rejection; `tests/transaction_work_budget_519.rs` pins
+`a_new_work_budget_matches_the_unbounded_default_527`,
+`work_budget_field_setters_keep_both_bounds_readable_527`, and
+`work_budget_construction_and_both_field_setters_are_const_527`.
+Each was RED on the pre-fix base. The literal in
+`tests/transaction_work_budget_519.rs` now uses the constructor and setters;
+all #519 assertions retain their meaning.
+
+### Changed: one definition of the wallet substrates' byte bound (#526)
+
+PR #525's cold review found the substrates' 256 MiB byte bound, the
+reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/substrates/WalletWire.ts:9`, read by
+`WalletResultValidation.ts:632-636,680-733,873-879`), defined twice in
+sibling modules, each `pub(super)` and neither visible to the other:
+`byte_fields.rs` (`bytes`' default bound, read by `byte_fields.rs` and
+`result_values/bytes.rs`) and `result_values/boundary.rs` (read by
+`boundary.rs`, `raw_tree.rs` and `wire.rs`, and the source of
+`MAX_WIRE_REQUEST_BYTES`). `byte_fields::MAX_BYTES` is now the one
+definition and `boundary.rs` reads it with a `use`. That site needs no
+visibility change: a `pub(super)` item of `substrates::byte_fields` is
+already visible throughout `substrates` and its descendants (so
+`result_values/bytes.rs` read it before), where `boundary.rs`'s constant
+would have needed a wider visibility and a re-export out of the private
+`mod boundary`. `tests/arch_one_wallet_byte_bound.rs` reads every `.rs` file
+under `src/wallet` and pins exactly one `MAX_BYTES` definition of the value,
+beside four other definitions, enumerated: `MAX_WALLET_JSON_REQUEST_BYTES` in
+`http_json.rs`, the reference's own request bound (`HTTPWalletJSON.ts:60`),
+and `MAX_WALLET_WIRE_FRAME_BYTES` in `http_wire.rs`, `validation/crypto.rs`
+and `wire/validation.rs`, copies of the same reference constant
+(`HTTPWalletWire.ts:28`, `validationHelpers.ts:150`,
+`WalletResultValidation.ts:873`) outside #526's two, left to a follow-up;
+the test was red on `aeb92b01` (two
+`MAX_BYTES` lines). No behaviour change: the value, every refusal's words
+and every recorded frame are unchanged, and `MAX_WIRE_REQUEST_BYTES` still
+equals the bound.
+
+### Changed: the three remaining copies of the substrates' byte bound read the one definition (#532)
+
+PR #531's cold review found three constants under `src/wallet` still holding
+the substrates' 256 MiB byte bound, the reference's
+`MAX_WALLET_WIRE_FRAME_BYTES`, under their own literal after #526 made
+`byte_fields::MAX_BYTES` its one definition: `substrates/http_wire.rs` (the
+HTTP wire substrate's frame cap, `HTTPWalletWire.ts:28`),
+`validation/crypto.rs` (`validateByteArray`'s default bound,
+`validationHelpers.ts:150`) and `wire/validation.rs` (the processor's byte
+arrays and the result's `bytes`, `WalletResultValidation.ts:873`). Each keeps
+its name and now reads `byte_fields::MAX_BYTES`, whose visibility moves from
+`pub(super)` to `pub(crate)`: the one change that reaches all three readers,
+since `byte_fields` is already a `pub(crate)` module of `substrates`, compiled
+under `wallet` alone; moving the definition would have touched every existing
+reader. `tests/arch_one_wallet_byte_bound.rs`'s enumerated list of other
+definitions shrinks from four to one (it fails on the base, five definitions
+found against two expected, and passes here): `http_json.rs`'s
+`MAX_WALLET_JSON_REQUEST_BYTES`, the reference's own request bound
+(`HTTPWalletJSON.ts:60`), a different bound of the same value, which stays its
+own constant. No behaviour change: every refusal's words and every recorded
+wire frame are unchanged.
+
+### Changed: the local store decodes lock-before alone, as the reference does (#499)
+
+The keeper's word (2026-10-30 05:1xZ, issue #499): lock-before alone, as the
+reference decodes it. At `ts-stack@edf6e03` the local lookup decodes a token
+with `decodeCanonicalPushDrop` (`LocalKVStore.ts:278-282`), which calls
+`PushDrop.decode(lockingScript)` with its default `lockPosition = 'before'`
+(`PushDropValidation.ts:59`, `PushDrop.ts:63-77`): the first chunk's data
+(`verifyNotNull(..., 'script.chunks[0].data must have value')`) is read as the
+key by `PublicKey.fromString` before any field is counted. This crate's local
+decode called the general `PushDrop::decode`, which reads a script whose first
+chunk is not a 33- or 65-byte push as lock-after, so a lock-after token
+reached the later field-count or canonical-envelope check and told another
+refusal than the reference's. `local_parser_words.rs::decode_pushdrop` now
+reads the first chunk as the reference does and never the lock-after layout;
+the refusal is the reference's first-chunk words, `Error::KvStoreLocalError`
+in the lookup wrapper (`Invalid value found. Relinquish the corrupted output
+from the kvstore basket before using this key again. Original error: <words>`,
+`LocalKVStore.ts:340-345`), on get and set alike.
+
+| Token (`<G>` the generator's compressed push) | Before (#489's stated row) | Now, the reference's |
+|---|---|---|
+| `51 75 <G> ac` | `Unexpected PushDrop token field count` | `script.chunks[0].data must have value` |
+| `51 52 6d <G> ac` | `PushDrop token must use the canonical PushDrop envelope` | `script.chunks[0].data must have value` |
+| `00 75 <G> ac` | `Unexpected PushDrop token field count` | `script.chunks[0].data must have value` |
+| `01 07 75 <G> ac` | `Unexpected PushDrop token field count` | `Unknown point format` |
+| `02 07 08 01 09 6d <G> ac` | `PushDrop token must use the canonical PushDrop envelope` | `Unknown point format` |
+| `51 52 6d <04 Gx Gy> ac` | `PushDrop token must use the canonical PushDrop envelope` | `script.chunks[0].data must have value` |
+
+The #489 entry's note that `00 75 <G> ac` gets `Unknown point format` in the
+reference was wrong: `OP_0` carries no data there, so the reference says
+`script.chunks[0].data must have value`, as recorded. The words are recorded,
+never written by hand: the #326 recorder's `--kvstore-local-454` mode
+(`tests/support/signaction_reference_326.mjs` through
+`tests/support/kvstore_local_parser_words_489.mjs`, the bundle of
+`ts-stack@edf6e03` under Node v22.18.0) now writes the six shapes as kind
+`token_lock_after` for get and set into `tests/vectors/kvstore_local_454.json`
+(`parser_words_489`, 52 cases to 60: the two #489 lock-after inputs lose their
+`parser_accepted` flag and four are new); every other field of the vector is
+byte for byte unchanged, and the recorder reproduced the base vector byte for
+byte before the extension. `a_lock_after_token_is_refused_by_the_reference_lock_before_read_499`
+in `tests/kvstore_local_parser_words_489.rs` replaces #489's two lock-after
+pins and asserts the port's words equal the vector's for all twelve cases; it
+was red on `aa5d60db` (`Unexpected PushDrop token field count` for the first).
+
+The general `PushDrop::decode` and its lock-after path are unchanged (the test
+asserts each shape still decodes there as lock-after). Every reference call of
+`PushDrop.decode` under `packages/sdk/src` at `edf6e03` takes the lock-before
+default (`PushDropValidation.ts:59`, reached from the kvstore, registry,
+overlay admin token and UHRP validators; `ContactsManager.ts:432`;
+`IdentityClient.ts:773`) and none passes `'after'`; this crate's identity,
+registry, kvstore interpreter, overlay admin token and storage call sites keep
+the general decoder's detection, a question for a second issue, not this one.
+No public API, acceptance of a valid token or other error text changes.
+
+### Notes: cross-SDK parity
+
+The #489 row "Local token decode also tries lock-after" becomes the new
+behaviour's row: the local site now refuses as the reference does; the
+general decoder's lock-after detection at the other sites remains this
+crate's (census Row 2 of the #489 entry, rewritten). Go at `2ca481c` decodes
+lock-before alone too (`transaction/template/pushdrop/pushdrop.go:20-52`, its
+lock-after branch commented out as absent from the TypeScript), read by its
+`LocalKVStore` (`kvstore/local_kv_store.go:132`), which refuses any such token
+in its own words (`invalid pushdrop token format found for key ...`).
+
+### Changed: an unused arch allowlist entry reads red (#347)
+
+The #323 CI fold's re-review found that `tests/arch_no_string_errors.rs`'s
+allowlist had carried two stale entries covering four sites
+(`http_json.rs:912` and `http_wire.rs:209` at `953d9c00`, both lines gone)
+until the fold removed them by hand: nothing refused an allowance that had
+outlived its line. `arch_support::check_sites` now refuses an entry that
+matches no site its rule finds, and an entry whose ceiling is above the sites
+it matches, naming the entry and saying to delete it or lower its ceiling. It covers the four `(file, line text,
+ceiling)` lists: `arch_no_string_errors`, `arch_network_sites`, `arch_no_env`
+and `arch_no_system_time` (the last two empty). `arch_no_unwrap.rs` applies
+the same rule in the same words to its `(file, ceiling)` list. The other
+lists already refused a stale entry (`arch_ci_runs_every_test`'s run-apart
+list, `arch_arc_deprecated`'s items, `arch_one_wallet_byte_bound`'s
+constants); `arch_secrets_scan_scope` carries none. The cold review found one
+list the rule had missed: `arch_ci_pr_runs_the_required_set`'s full-set
+exceptions (`NOT_ON_THE_FULL_SET`), where an entry naming no job, or a job
+that runs on every dispatch, passed; such an entry is now red naming it
+(`a_stale_full_set_exception_is_refused_naming_the_entry`; all five entries
+are used today).
+
+One stale allowance was on the tip: `src/transaction/beef_stream.rs`'s
+unwrap/expect ceiling was 24 with 23 sites; it is now 23. Every other entry
+matches its sites exactly. Pinned by
+`an_unused_allowlist_entry_reads_red_naming_the_entry` and
+`a_stale_ceiling_entry_reads_red_naming_the_entry`; a stale entry added to
+the real string-errors list stayed green on the base and is red here. The
+rule is in `docs/ARCH-RULES.md`. No library change.
+
+### Changed: the fixtures capture the Origin header beside Originator (#346)
+
+The #323 CI fold's re-review (Opus, 2026-10-27) found that the public-surface
+fixtures' HTTP recorder (`tests/support/fixtures/http.rs`) captured the JSON
+substrate's `originator` header alone; since #323 the substrate sends `Origin`
+and `Originator` both in the origin form, as the reference's `HTTPWalletJSON`
+does (`ts-stack@edf6e03` `HTTPWalletJSON.ts:311-314`), and `Origin` was pinned
+by `tests/wallet_http_originator_323.rs` alone. The recorder's request envelope
+gains one member, `expected.request.headers.origin`, named as `originator` is
+(the lower-case header name) and compared by the replay as every other member
+is. The 29 files under `tests/fixtures/http_json/` were re-recorded by the
+recorder (`BSV_FIXTURES_RECORD=1`): 71 insertions, one `"origin":
+"http://fixtures.invalid"` per captured request (the 56 call cases and 15 of
+the 16 error cases; `connection_error` has no request), and with that member
+removed every file equals its base JSON; the census (65 files, 913 entries) is
+unchanged. `fixtures_replay` fails on the base against the re-recorded files
+(`/cases/0[minimal]/expected/request/headers/origin: expected
+"http://fixtures.invalid", actual null`) and on a tip whose substrate stops
+sending `Origin`; `wallet_http_originator_323.rs` stays beside it.
+
+### Changed: R56 lets an unsigned action's input carry no unlockingScript, as the reference wallet answers (#491)
+
+R56 (`src/wallet/substrates/result_values/lists.rs`, `action_inputs` through
+`unlocking_requested`), the listActions input row of #432's result inventory,
+demanded `unlockingScript` under `includeInputUnlockingScripts` on every input.
+It now lets an input of an action whose `status` is exactly `unsigned` omit the
+key; every other status keeps the demand in the same words. The status is read
+from the action object the input belongs to. Nothing else in R56, or in any
+other row, changes: a present `unlockingScript` must still be even hex, and the
+`sourceLockingScript` demand under `includeInputSourceLockingScripts` is
+unchanged for every status.
+
+The word is the stack's (the keeper, 2026-10-31 05:1xZ, recorded on #491):
+form (a) in its narrow reading, at `ts-stack@edf6e03`. The reference disagrees
+with itself. Its wallet leaves the key absent when
+`getRawTxOfKnownValidTransaction` returns nothing
+(`packages/wallet/wallet-toolbox/src/storage/methods/listActionsIdb.ts:77-91`:
+`wo.unlockingScript = input?.unlockingScript?.toHex()`). That holds outside
+the known-valid set, a `proven_txs` row or a `proven_tx_reqs` row with status
+unsent, unmined, unconfirmed, sending, nosend or completed
+(`packages/wallet/wallet-toolbox/src/storage/StorageKnex.ts:189-209`). An
+unsigned transaction is outside that set and holds no unlocking script. Its
+SDK refuses any such page (`packages/sdk/src/wallet/WalletResultValidation.ts:2027-2035`),
+and runs that validator on every answer (`packages/sdk/src/wallet/WalletClient.ts:113-118`).
+The defect is ts-stack #1451 (open). Only the `unsigned` status is decidable
+from the answer: an action's status and a request row's status are different
+enumerations, so whether a signed action's transaction is known valid is a
+storage fact the answer does not show, and projecting it onto the answer would
+be this crate's invention.
 
 The toolbox's and CLI's tables change as follows:
 
-| Consumer | Request | Before | Now |
+| Consumer | Answer under `includeInputUnlockingScripts` | Before | Now |
 |---|---|---|---|
-| Toolbox error table | Complete frame above 268,435,456 bytes | Decoded; an otherwise valid request reached the wallet | `process_message` returns `Err(WalletError)`: `Wallet Wire request exceeds the maximum permitted size`; no frame, no wallet call |
-| CLI operator-visible table | Complete frame above 268,435,456 bytes | Any decode or wallet outcome | The transport hosting the processor receives the error before decoding, as a host of the reference's `transmitToWallet` receives its rejection; the transceiver refuses such a frame itself first (#496) |
-| Both | Complete frame exactly at 268,435,456 bytes | Decoded and dispatched | Decoded and dispatched |
+| Toolbox result table | An `unsigned` action's input without `unlockingScript` (`transactions.rs:420-426`, the reference wallet's line) | Refused: `Invalid listActions result actions[N].inputs[M].unlockingScript: expected the explicitly requested unlocking script` | Accepted |
+| Toolbox result table | An input without `unlockingScript` of an action with status completed, unprocessed, sending, unproven, nosend, nonfinal or failed | Refused in those words | Refused in those words (unchanged) |
+| CLI operator-visible table | Fixture 145 (`pin-spend`, the stored unsigned template's input) | Refused by R56 | Passes R56; refused by R51 instead, its one-byte `inputDescription` `"c"` outside 5 to 2000 bytes (`Invalid listActions result actions[5].inputs[0].inputDescription: expected 5–2000 UTF-8 bytes`), a rule the reference's validator also applies (`historyDescription`, after its R56 check) |
+| Both | An `unsigned` action's input with an `unlockingScript` | Validated as even hex | Validated as even hex (unchanged) |
 
-`tests/wallet_wire_processor_request_cap_505.rs` builds valid encrypt frames
-with this crate's `WireWriter`, using a large plaintext that itself remains
-below the byte-field limit. The transceiver cannot supply the over-cap frame
-because #496 already refuses it. On base
-`8fd26a3ecc61cc485647f2152e5482a211491692`, cap + 1 reached the counting wallet
-once (the RED assertion); exactly cap reached it once and returned its answer.
-With the guard, cap + 1 makes zero wallet calls and `process_message` returns
-the error in the reference's words; exactly cap still returns the wallet's
-answer. No recorded vectors change.
+The residue row [D]: a signed action with status unprocessed, nonfinal or
+failed stays strict here, though the reference wallet answers its input
+without the key when the request row is outside the known-valid set. It stays
+until ts-stack #1451 answers. If the validator is amended upstream, this crate
+follows the amended text; if the wallet is amended to emit the key, R56 returns
+to strict for `unsigned` too and the toolbox's `transactions.rs:420` follows
+the wallet.
 
-The wire decoder fuzz target checks that same size boundary: an oversized
-request returns the exact `Err(WalletError)` above; failures at or below the
-cap remain framed responses.
+Fixture 145's description: the CLI's fixture carries `inputDescription: "c"`,
+which R51 refuses on both sides; R56 ran first, so its refusal was the only
+one seen. This change does not make fixture 145 pass. The cold review ran the
+recorded body (`bsv-wallet-cli` beta `c1f7cd3`,
+`tests/wire/145-listActions.afterOverlongSpend.json`) through both: this crate
+refuses it at R51 (`Invalid listActions result actions[5].inputs[0].inputDescription:
+expected 5–2000 UTF-8 bytes`); the reference refuses it at R56 and, with a script
+supplied, at R51 in the same words (`historyDescription`,
+`WalletResultValidation.ts:2037`). The R51 refusal is recorded as its own case
+(`unsigned_fixture_145_description_with_script`), and it stands on the CLI's or
+toolbox's side.
 
-Migration: a request above the cap was decoded before; now
-`process_message` returns `Err` for it, where every other refusal is an
-`Ok` error frame: a host that relays `process_message`'s answer handles
-the `Err` as it handles a transport failure. No API change; requests at or
-below the cap are unchanged.
+The pins, in `tests/wallet_http_json_result_values_408.rs` on the new
+`unsigned_491` group of `tests/vectors/http_json_result_values_408.json`, 13
+listActions bodies in fixture 145's shape (a funded coin and the stored
+template), recorded by `tests/support/http_json_result_values_408.mjs` under
+Node 22.18.0 against the SDK built from `edf6e03`. The reference refuses 12
+and accepts the one with a script; every earlier case re-recorded byte for
+byte. `an_unsigned_actions_input_may_omit_its_unlocking_script_as_the_reference_wallet_answers`
+asserts the reference's refusal and this crate's acceptance (the divergence,
+stated in the test). It failed on base `02abc87f` (`Err(WalletError("Invalid
+listActions result actions[1].inputs[0].unlockingScript: expected the
+explicitly requested unlocking script"))` against `Ok(())`) and passes here.
+`the_strict_rule_stays_for_every_other_status_and_returns_on_the_upstreams_answer`
+judges the other eleven cases in the reference's words: the seven other
+statuses, a present script, an odd-length script, the source-locking demand,
+and the fixture's description with a script supplied (R51). It is the strict rule kept for return. #432's
+`row_56_history_scripts` (a `completed` action's input) is unchanged.
 
-### Notes: cross-SDK parity (#505)
+Census (#375; current reading):
 
-Go at `2ca481c` checks only for an empty message before `ReadRequestFrame`
-(`wallet/substrates/wallet_wire_processor.go:24-29`), returning `empty message`.
-It has no complete-request upper bound. The keeper's 2026-10-30 08:1xZ ruling
-holds this as a stated row: the frame cap is the reference's own resource
-safeguard, not a BRC number, and Go's choice stands. This processor cap is
-hardening, alongside #496's transceiver cap; it does not reopen that held row.
-The reference's exact-cap encrypt decode also hits V8's `Array.from` limit
-before dispatch (`WalletWireProcessor.ts:1427`, measured in #496); Rust's
-exact-cap control exercises its own existing, accepted decode path.
+- Row 83: Ours: the stack's 2026-10-31 05:1xZ word relaxes the unsigned status alone, the one the answer decides. Theirs: ts-stack #1451 (the witness: tests/wallet_http_json_result_values_408.rs; tests/vectors/http_json_result_values_408.json, group unsigned_491; bsv-wallet-cli#371).
+
+### Changed: six call sites decode PushDrop tokens with the reference's lock position (#537)
+
+After #499 made the local store's token decode lock-before alone, six other
+call sites still called the general `PushDrop::decode`, which reads a script
+whose first chunk is not a 33- or 65-byte push as lock-after: a token written
+lock-after was read here and refused by every counterpart. The keeper's word
+(2026-10-31 06:1xZ, issue #537): parity per site. `PushDrop.decode(script,
+lockPosition = 'before')` (`ts-stack@edf6e03` `PushDrop.ts:63-78`) reads the
+key from `chunks[0]` and never tries the other position, and each
+counterpart below calls it with that default (or through
+`decodeCanonicalPushDrop`, `PushDropValidation.ts:59`); none passes
+`'after'`. Each site now calls `PushDrop::decode_before`, the lock-before
+path alone (crate-visible, `src/script/templates/pushdrop_position.rs`), and
+takes the reference's outcome for a lock-after token there.
+
+| Site (this crate) | Reference counterpart | Lock-after token, before | Now | The corner: a lock-after token whose first field is a valid point |
+|---|---|---|---|---|
+| 1 identity client: both `ls_identity` parsers (`resolve_by_identity_key`, `resolve_by_attributes`, `discover_certificates`, `discover_certificates_by_type`) | `IdentityClient.ts:773`, the output skipped by the catch at `:823` | the certificate read and returned | skipped | the reference reads the point as the key, one field, `continue` at `:774` (its revocation ends `No authenticated revelation output matches the requested certificate.`); skipped here before and after |
+| 2 contacts manager (`list_contacts_with_refresh`) | `ContactsManager.ts:432`, the output dropped by `Promise.allSettled` (`:478`, `:507-513`) | decrypted and loaded | dropped before decrypt | `Invalid contact PushDrop field count` there; skipped here before and after |
+| 3 registry client: `resolve_basket`, `resolve_protocol`, `resolve_certificate`, `list_own_registry_entries` | `registryTokenValidation.ts:28` through `RegistryClient.ts:732`, skipped by the catches at `:392`, `:445` | the definition read | skipped | `Unexpected PushDrop token field count` there (five, five and six fields for the three types); skipped here before and after |
+| 4 kvstore interpreter: `extract_fields`, `extract_value`, `is_kvstore_token` | `kvStoreTokenValidation.ts:88`, `undefined` from `kvStoreInterpreter.ts:48` | fields and value read, `true` | `None`, `None`, `false` | `Unexpected PushDrop token field count` there; `None`/`false` here before and after |
+| 5 `decode_overlay_admin_token` | `OverlayAdminTokenTemplate.ts:164`, thrown from `:237-239` | decoded | `Error::OverlayError("Unknown point format")`, the reference's words | `Unexpected PushDrop token field count` there; here `Script is not a valid PushDrop format` before, the reference's words now |
+| 6 storage downloader (`resolve`) | `UHRPAdvertisementValidation.ts:40`, skipped by the catch at `StorageDownloader.ts:121` | the host returned | no host | the advertisement's first field is the host's identity key, so this is its realistic lock-after form: `Unexpected PushDrop token field count` there; no host here before and after |
+
+For every site's first kind (the first field `Unknown point format` to the
+reference's key parse) the reference refuses at the key read. At the four
+skipping sites and the interpreter no words reach a caller. At the admin
+token, a token the general decoder reads lock-after is refused in the words
+`decodeCanonicalPushDrop` throws with the site's five fields (the key
+parse's, else the field count's, else the envelope's; `lock_after_refusal`);
+every other refusal keeps `Script is not a valid PushDrop format`. The
+helpers that choose those words (`point_message`, `canonical_refusal`) move
+from the local store's `local_parser_words.rs` into the same module, shared
+by both; the local store's words are unchanged
+(`kvstore_local_parser_words_489.rs`, `kvstore_local_454.rs`).
+
+The outcomes are recorded, never written by hand:
+`tests/support/pushdrop_lock_position_537.mjs` (the bundle of
+`ts-stack@edf6e03` under Node v22.18.0) writes the lock-after tokens from
+their fields, runs each site's counterpart on them (`revokeCertificateRevelation`,
+`getContacts`, `RegistryClient.resolve` and `StorageDownloader.resolve` with
+`LookupResolver.prototype.query` answering the token; the kvstore and admin
+token validators called), and records the decode, the site's words and its
+outcome in `tests/vectors/pushdrop_lock_position_537.json` (six sites, 16
+cases; two runs byte for byte). One test per site replays its cases and a
+control, the same fields locked before by this crate's writer and accepted:
+`tests/identity_lock_position_537.rs`,
+`tests/identity_contacts_lock_position_537.rs`,
+`tests/registry_lock_position_537.rs`,
+`tests/kvstore_interpreter_lock_position_537.rs`,
+`tests/overlay_admin_token_lock_position_537.rs`,
+`tests/storage_lock_position_537.rs`, each red on `23eea600` (the lock-after
+token read, at the registry for all three types on both paths). The general
+`PushDrop::decode` and its public shape are unchanged, for the template's own
+callers; no public item is added.
+
+### Notes: cross-SDK parity
+
+The #499 census Row 2 is rewritten: its clause that the general decoder
+elsewhere still tries both lock positions is closed by #537 for the six
+sites; the general decoder's two positions remain this crate's template
+behaviour. Go at `2ca481c` decodes lock-before alone (#499's note,
+`transaction/template/pushdrop/pushdrop.go:20-52`).
+
+### Changed: `PublicKey::from_hex` accepts the reference's lenient forms (#498)
+
+The keeper's word (2026-10-30 05:1xZ, on #498, under the reading of record
+of 10-26): accept what the reference accepts, refuse what the standard
+forbids and the reference refuses, the question upstream, the pinned tests
+kept so strictness can return. A key the reference reads and this crate
+refused was two verdicts for one user. `PublicKey::from_hex` now reads a
+key string as
+`PublicKey.fromString` does at `ts-stack@edf6e03` (`PublicKey.ts:49-51`,
+`Point.fromString` at `Point.ts:345-348`), one parser
+(`src/primitives/ec/public_key_forms.rs`):
+
+| Form | Before | Now | The reference's site |
+|---|---|---|---|
+| An odd-length string (`2`+Gx, `3`+Gx, `4`+Gx+Gy, `6`+Gx+Gy, `7`+Gx+y) | `invalid hex string: Odd number of digits` | read with a leading `0` | `utils.ts:127-128` (`hexToUint8Array`; the rule of `hex.ts:27-29`) |
+| A hybrid key (`06`/`07` + x + y) whose prefix's low bit is y's last byte's | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | accepted | `Point.ts:305-321` |
+| A coordinate at or above p: a compressed x (`02`+(p+1)), an uncompressed or hybrid x or y (`04`+(p+1)+y) | `invalid public key: Point not on curve` (compressed), the encoding error (uncompressed, hybrid) | reduced modulo p | `Point.ts:365-384` (`fromX`), `:495-510` (`validate`) |
+
+Every refusal the reference makes stays a refusal, in this crate's class and
+words: a hybrid key with the wrong parity, a reduced x with no root, a point
+off the curve, a length or prefix it does not read (`05`, `00`, empty) are
+`Error::InvalidPublicKey` with the strict parser's words, a non-hex character
+`Error::InvalidHex` (an odd-length string's character named at its place in
+the string given). No new `Error` variant and no public shape change. The key
+held is the reduced point, so `to_hex`, `to_hex_uncompressed`, `to_compressed`
+and `to_uncompressed` write the strict form: a lenient form read
+and written back is the strict form. `PublicKey::from_bytes` is unchanged and
+strict (compressed or uncompressed only, x and y below p): the PushDrop decoder's key
+push, the wire's certificate keys and the HTTP JSON result validator's keys
+(`isValidCompressedPublicKey`, `Secp256k1Validation.ts:15-22`, which refuses
+an x at or above p: `result_values/scalars.rs` and `certificate.rs` now read
+through `from_bytes`, where they relied on `from_hex`'s strictness) keep it.
+
+serde's reading of a `PublicKey` and `KeyringRevealer`'s stay strict, as
+before (PR #538's cold review): the hex decoded, then `from_bytes`, in the
+base's words, through the crate-visible `PublicKey::from_strict_hex`. They
+read the argument paths where the reference validates rather than parses:
+`AuthMessage.identityKey` (`assertAuthIdentityKey`,
+`AuthMessageValidation.ts:81-89`), `KeyringRevealer`
+(`validateKeyringRevealer` → `validatePublicKey`,
+`validationHelpers.ts:185-191,1243-1246`), `auth::Certificate`'s subject and
+certifier (`Certificate.ts:240-245`), the wallet `Certificate`'s subject and
+certifier, `KeyLinkageResult`'s three keys and `PeerSession.peer_identity_key`.
+`from_hex` and the local store's point check read as the reference's
+`fromString` does; these do not. An older gap stays as it was: the
+reference's `identityKey` and `KeyringRevealer` checks also refuse an
+uncompressed `04` key and upper-case hex, which `from_bytes` reads (not
+widened here). `tests/auth_serde_key_strictness_498.rs` pins the fifteen
+recorded lenient forms of the vector refused on `AuthMessage`,
+`KeyringRevealer` and both certificate keys: green on `aa5d60db`, three of
+three RED on the pre-fold `82d0944b`, green after; and on
+`KeyLinkageResult`'s three keys, `PeerSession.peer_identity_key` and the
+wallet `Certificate`'s subject and certifier, RED with the visitor on
+`from_hex`. On a certificate key the
+reference's `Certificate.toBinary` refuses the odd and hybrid forms by its
+`02`/`03` regex (`Certificate.ts:240-254`) but reads a compressed x at or
+above p through `fromDER`, reduced, signing the unreduced bytes; this crate
+refuses that form as #183's row states, holding no unreduced bytes.
+
+Four non-serde sites read strictly too (the re-review): the Peer's identity
+pin (`initiate_handshake`), where the reference keeps the pin's text and
+refuses an initial response whose canonical identity key is another text
+(`Peer.ts:627-637,903-908`), and the three certificate intakes,
+`get_verifiable_certificates` and the identity client's two token parsers:
+the reference refuses a wallet certificate whose certifier text is none of
+the requested set's canonical keys (`getVerifiableCertificates.ts:76-81`,
+`AuthMessageValidation.ts:123-124`), and its `Certificate.toBinary` judges
+the subject and a published certificate's keys (`Certificate.ts:240-246`,
+`IdentityClient.ts:799-823`); the reference throws where
+`get_verifiable_certificates` skips the certificate, a difference older than
+#498. Read leniently, a hybrid or odd-length form reduced to the canonical
+point: a handshake pinned to it authenticated, a wallet's certificate the
+reference cannot serialize was forwarded under the canonical key, a
+published one verified. `tests/auth_key_strictness_sites_498.rs` (the pin and
+the wallet intake) and `a_published_certificate_key_in_a_lenient_form_is_skipped_498`
+(`src/identity/client_field_value_261_tests.rs`, both parsers) pin them, all
+three RED with the four sites reading through `from_hex`.
+
+Three more read strictly (the third review and its fold): the HTTP
+transport's general answer, whose `x-bsv-auth-identity-key` header is the
+message's `identityKey` (`SimplifiedFetchTransport.ts:346`), refused by
+`assertAuthIdentityKey` (`AuthMessageValidation.ts:344`, `:81-89`); the
+BRC-105 payment's counterparty, the same header handed to the wallet, whose
+validator refuses a non-compressed key (`AuthFetch.ts:735-738,873-878`,
+`validationHelpers.ts:185-196`; through `AuthFetch` the header is the
+authenticated sender's canonical hex and a fallback answer with any `x-bsv`
+header is refused, `:693-697`, so the pin calls the payment directly); and
+the Peer's own identity key, its wallet's answer, which the reference asserts
+(`Peer.ts:1354-1355`). Read leniently, a hybrid, odd-length or `02`+(p+1)
+header became a canonical sender, reached the wallet's createAction, or
+became the Peer's key. `tests/auth_header_key_strictness_498.rs`,
+`src/auth/clients/payment_key_strictness_498_tests.rs` and
+`a_wallet_identity_key_in_a_lenient_form_is_refused_by_the_peer_498` pin
+them, each RED on `6481787b`. The other `from_hex` callers read a wallet's
+derived key (the PushDrop lockers, the payment's derived key, the registry's
+identity key, the `ProtoWallet` linkage results) or the local store's
+parser, where the reference parses with `PublicKey.fromString` or keeps the
+text unvalidated, and stay lenient.
+
+For the toolbox's and the CLI's tables: the local store's lookup with a
+wallet key in one of these forms now reaches the reference's later words,
+inside the unchanged `Invalid value found. Relinquish the corrupted output
+from the kvstore basket before using this key again. Original error:` wrapper:
+
+| Wallet locking key | Old suffix | New suffix (the reference's) |
+|---|---|---|
+| `2` + Gx | `invalid hex string: Odd number of digits` | `KVStore token locking key does not belong to the wallet` |
+| `06` + Gx + Gy | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `KVStore token locking key does not belong to the wallet` |
+| `6` + Gx + Gy | `invalid hex string: Odd number of digits` | `KVStore token locking key does not belong to the wallet` |
+| `02` + (p+1) | `invalid public key: Point not on curve` | `KVStore token locking key does not belong to the wallet` |
+
+A token whose key push is a hybrid or reduced-x key keeps #489's native
+words (the byte path is strict). The pins: `tests/primitives_public_key_forms_498.rs`
+replays `tests/vectors/public_key_forms_498.json` (39 key strings, 19 the
+reference accepts and 20 it refuses, recorded by
+`tests/support/public_key_forms_498.mjs` against the reference bundled at
+`edf6e03`, Node 22.18.0): the same verdict, the same point, the strict form
+written back; four of its six tests RED on the base `aa5d60db` (each
+accepted form refused), the two controls green there. The four #489 pins
+`reference_accepts_{odd_valid,hybrid,odd_hybrid,reduced_x}_key_but_local_keeps_native_words_489`
+are kept as `reference_and_local_accept_{..}_key_489_498`, RED on the base,
+each marked "strictness returns on the upstream's answer"; the two token pins
+are unchanged. `result_values/key_strictness_498_tests.rs` pins the validator's
+refusal of `02`+(p+1) for a result key and a certificate subject (both RED
+with `from_hex` lenient and the two sites unchanged).
+
+### Notes: cross-SDK parity (#498)
+
+The ecosystem is split; the reference is the most tolerant reader. Each form
+read by `PublicKey.fromString` (`ts-stack@edf6e03`), go-sdk's
+`PublicKeyFromString` (`2ca481c`, `primitives/ec/publickey.go:79-129,221-231`)
+and py-sdk's `PublicKey(str)` (`4c30e2e`, `bsv/keys.py:23-45`, coincurve
+20.0.0's libsecp256k1 parse), each run on the vector's inputs:
+
+| Form | TS | Go | Python | This crate |
+|---|---|---|---|---|
+| Odd-length string | accepts | refuses (`encoding/hex: odd length hex string`) | refuses (`bytes.fromhex`) | accepts |
+| Hybrid, matching parity | accepts | accepts | accepts | accepts |
+| Hybrid, wrong parity | refuses | refuses | refuses | refuses |
+| Compressed x at or above p | accepts, reduced | accepts, x kept unreduced (`Compressed()` writes `02`+(p+1) back) | refuses | accepts, reduced |
+| Uncompressed or hybrid x or y at or above p | accepts; `toString` writes the coordinate unreduced, its compressed prefix from y's unreduced parity (`04`+x+(p+1) reads as y = 1 and writes `02`+x, the negated point) | refuses (`pubkey X/Y parameter is >= to P`) | refuses | accepts, reduced; writes the point read (`03`+x) |
+
+Two differences remain. The reference's serialization of an uncompressed or
+hybrid key with a coordinate at or above p differs from this crate's (five
+recorded cases, `the_reference_writes_an_unreduced_coordinate_back_498`; for
+a y above p the reference's compressed text names the other point: for
+`04`+x+(p+1) it computes with y = 1 and writes `02`+x, the negated point,
+where this crate writes `03`+x, the point read; that `02`+x is the
+reference's defect, never parity, by the keeper's word of 2026-10-31 06:1xZ
+(`Point.ts:303-321,472-478,527-536`; a FILE draft in the #375 queue, filed at
+the owner's cadence word), and a leading space is read
+by Python's `bytes.fromhex` alone. Strictness returns on the upstream's
+answer: `PublicKey::from_bytes` is the strict reading, and flipping the
+pins back is the change. Ours: the keeper's 2026-10-30 05:1xZ word on #498 accepts the reference's key forms on the hex path (Point.ts:303-325,365-384 at edf6e03), while BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed and the byte path stays strict.
+
+### Fixed: the contacts manager uses the reference's contact protocol (#542)
+
+The contacts manager derived every contact key at security level 1:
+`Protocol::new(SecurityLevel::App, "contact")`, `[1, 'contact']`, at four
+sites, while `ContactsManagerConfig::protocol_id` held `(2, "contact")` and
+went unread. The reference uses `[2, 'contact']`, counterparty `'self'`, for
+every contact operation (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:30`). Each site now reads the
+protocol from the configuration (`ContactsManager::protocol`, private), so the
+default is the reference's `[2, 'contact']`:
+
+| Site (this crate) | Wallet call | Reference |
+|---|---|---|
+| `contacts.rs`, `create_identity_tag` | createHmac over the identity key, key ID the identity key (the lookup and output tag) | `#hashIdentityKey`, `:572-583` |
+| `contacts_actions.rs`, `contact_lock` | encrypt, then getPublicKey `forSelf` for the PushDrop lock, key ID the record's | `#encryptAndLock`, `:748-772` |
+| `contacts_actions.rs`, `contact_unlock` | the PushDrop spend's createSignature, the stored key ID | `#updateContactOutput`, `:821-830` |
+| `contacts_cache.rs`, `decode_cached_contact` | decrypt, the stored key ID | `#decryptContactOutputs`, `:494-501` |
+
+Before, level 1 against the reference's level 2 at every site: the
+reference's contact record did not decrypt here (dropped from
+`list_contacts_with_refresh`), this crate's ciphertext did not decrypt there
+(`Decryption failed!`), the token was locked to another key, the identity tag
+was another HMAC (so neither side's lookup by tag found the other's record),
+and a spend of the reference's token was signed by a key its lock does not
+name. Now the records are readable across implementations at the protocol:
+the reference's record is read here, and this crate's ciphertext is decrypted
+by the reference's wallet under `[2, 'contact']`. The keeper's reading
+(2026-10-31 07:1xZ, issue #542): a cross-implementation incompatibility, a
+parity row at the pin. The toolbox has no contacts path; the CLI's tables are
+unchanged. No public item changes; a caller who set `protocol_id` now gets
+the level it set (it was ignored before).
+
+The witness is recorded, never written by hand:
+`tests/support/contacts_protocol_542.mjs` runs the reference's own
+`ContactsManager.saveContact` (the bundle of `ts-stack@edf6e03`, an entry
+re-exporting `ContactsManager`, under Node v22.18.0, the ProtoWallet of the
+scalar 9, #310's randomness) and reads back with its `getContacts`; it takes
+this crate's token from the base and the tip as input (written by the ignored
+`record_this_crates_contact_token_542`) and records the reference's verdicts on
+them, in `tests/vectors/contacts_protocol_542.json` (two runs byte for byte).
+`tests/identity_contacts_protocol_542.rs`: the reference's record read here,
+the identity tag the reference's HMAC, this crate's token locked to the key the
+reference derives and its ciphertext decrypted under the reference's protocol,
+the spend of the reference's token verified under the reference's lock, each
+red on `b51cbea7`; the reference's recorded verdicts on the base's token
+(another key, `Decryption failed!`) and the tip's (its key, the record
+decrypted).
+
+### Notes: cross-SDK parity
+
+The reference's `ContactsManager` still drops this crate's token, on the base
+and the tip alike, before it decrypts: this crate writes the ciphertext as the
+one PushDrop field, where the reference writes a second field, its signature
+over the ciphertext, and refuses a one-field token (`Invalid contact PushDrop
+field count`, `ContactsManager.ts:433`; recorded in the vector's `read_back`).
+This crate's plaintext is its `Contact` JSON (`identityKey`, `name`,
+`addedAt`, `tags`), the reference's the seven display fields and `metadata`
+(`validateContact`, `:171-195`); whether the reference's parser admits this
+crate's plaintext is not measured, since the field count refuses first. Both
+are pre-existing and outside #542's protocol; the root `CLAUDE.md` row states
+them for the keeper. Go at `2ca481c` has no contacts manager.
+
+### Fixed: the registry client uses the reference's definition-token layout and locking key (#543)
+
+The registry client read and wrote a definition token of 6, 6 and 7 fields
+(basket, protocol, certificate: the data fields, the operator's identity key
+last), unsigned, locked with the operator's identity key. The reference's
+token carries one more field, the operator's signature over the data fields,
+and is locked with the operator's key linked to `anyone`
+(`ts-stack@edf6e03` `RegistryClient.ts:308-342`, `:688-722`;
+`PushDrop.ts:146-202`). A token written here was refused by the reference's
+validator (`Unexpected PushDrop token field count`), and the reference's
+token was skipped here by the field count. The keeper's reading (2026-10-31
+07:1xZ, recorded on #543): a parse divergence that dropped the reference's
+signature from the record; a parity row at the pin, the second of three
+after #537.
+
+| | Before | Now |
+|---|---|---|
+| Script fields (basket / protocol / certificate) | 6 / 6 / 7 | 7 / 7 / 8: the same data fields, then the signature (`registryTokenValidation.ts:13-17,29`) |
+| Signature | none | the wallet's `createSignature` over the data fields' bytes concatenated, protocol `[1, basketmap]`, `[1, protomap]` or `[1, certmap]`, key ID `1`, counterparty `anyone` (`PushDrop.ts:173-185`) |
+| Locking key | the identity key | the wallet's `getPublicKey` for the same protocol and key ID, counterparty `anyone`, `forSelf` true (`RegistryClient.ts:320`, `PushDrop.ts:155-163`) |
+| Protocol field | `[1, "name"]` | `[1,"name"]`, `JSON.stringify` (`RegistryClient.ts:697`) |
+| Reader | the field count alone | `decodeAndVerifyRegistryToken` (`registryTokenValidation.ts:20-64`): the canonical lock-before envelope of the type's count plus one, each field at most 16 KiB and 64 KiB in all, the data fields strict UTF-8, the operator's key a point, the locking key the one `anyone` derives for the operator, and the signature verified by the `anyone` wallet against the operator |
+| `DefinitionType::expected_field_count` | 6 / 6 / 7 | 7 / 7 / 8, the script's count as its documentation says |
+
+The reader is public as `registry::decode_and_verify_registry_token`, the
+reference's exported function, an addition. It refuses as
+`Error::RegistryError` in the reference's words: `Unexpected PushDrop token
+field count`, `PushDrop token contains an oversized field`, `PushDrop token
+payload is too large`, `PushDrop token must use the canonical PushDrop
+envelope`, `The encoded data was not valid for encoding utf-8`, the
+operator key's `Invalid hex string`, `Unknown point format` and `Invalid
+point` (`PublicKey.fromString`, `registryTokenValidation.ts:36`; `hex.ts:28-30`,
+`Point.ts:303-325`), a locking key with a `05` prefix's `Unknown point
+format` (`PushDropValidation.ts:59`, `PushDrop.ts:74-75`), `Registry token
+locking key is not linked to its operator`, the verifier's argument checks'
+`The counterparty parameter must be even length, not 65.`, `... no more than
+66 length.` and `... a valid compressed secp256k1 public key`
+(`validatePublicKey`, `validationHelpers.ts:185-196`, `:522-534`, through
+`validateEncryptionArgs`, `:228`) and `The signature parameter must be a
+canonical DER-encoded ECDSA signature` (`ProtoWallet.ts:359`,
+`validationHelpers.ts:1801`), and the verifier's own `Signature is not valid`
+(the reference's `ProtoWallet.verifySignature` throws before
+`registryTokenValidation.ts:52`'s `Registry token signature is invalid` is
+reached). The operator's text is read twice, as the reference reads it: as
+a key by `PublicKey.fromString` for the linkage (here `PublicKey::from_hex`,
+the reference's lenient forms since #498, after the reference's words for
+the forms it refuses, as k256 reads a `05`-prefixed key as a compact point),
+then as `verifySignature`'s counterparty, which admits 66 hex characters of a
+compressed valid point alone: an uncompressed, odd-length, hybrid or
+`02 || (p+1)` operator, signed by the operator's wallet over its own text and
+locked with the key derived for it, is refused there in the reference's
+words, and an upper-case one is accepted, as `validateHexString` lowercases
+it (`:533`). A `05` locking key is judged in `Point.fromDER`'s words before
+the envelope, where the canonical check would refuse it in other words. The three resolvers and `list_own_registry_entries`
+call it and skip a refused token, as `RegistryClient.ts:392` and `:445` do;
+`register_definition` and `update_definition` write the reference's token.
+`to_pushdrop_fields` and `from_pushdrop_fields` keep the data fields alone,
+as `#buildPushDropFields` does; no public struct changes.
+
+A token written before this landing is not the reference's token: the
+reference and this crate now skip it at every resolver and listing. For the
+toolbox's and the CLI's tables:
+
+| Consumer | Token | Before | Now |
+|---|---|---|---|
+| Toolbox / CLI resolving or listing a definition | written by this crate before #543 (6/6/7, unsigned, identity key) | read | skipped, as the reference skips it |
+| Toolbox / CLI resolving or listing a definition | written by the reference | skipped | read |
+| Toolbox / CLI registering or updating a definition | written now | refused by the reference's validator | the reference's bytes for the same definition, wallet and key |
+
+`list_own_registry_entries` no longer returns a pre-#543 token; a
+`RegistryRecord` built for it by hand still reaches
+`revoke_own_registry_entry` and `update_definition`, which do not read the
+token's fields.
+
+The witness is recorded, never written by hand:
+`tests/support/registry_token_fields_543.mjs` (the bundle of `ts-stack@edf6e03`
+under Node v22.18.0) runs the reference's own `registerDefinition` with a
+`ProtoWallet` of the scalar 9 up to its createAction for one definition of
+each type, and records the token (locking key, data fields, signature,
+script), the wallet calls, the validator's verdict and the reference's
+`resolve` of it; this crate's pre-#543 token of each type (its writer's
+bytes), ten one-change tokens of each type with the validator's words
+(the identity key, a signature over other data, absent or doubled, a field
+that is not UTF-8, an operator that is not hex, of an unknown format or not
+a point, a signature that is not DER, a `05` locking key) and five operator
+texts of each type, each signed and locked for its text (uncompressed,
+odd-length, hybrid, upper-case, `02 || (p+1)`), with the validator's verdict,
+in `tests/vectors/registry_token_fields_543.json` (3 tokens, 3 pre-#543
+tokens, 30 refusals, 15 counterparty cases: 12 refused, 3 accepted, 12 operator-order
+cases, the operator judged before a non-DER signature and read untrimmed; two runs
+byte for byte). `tests/registry_token_fields_543.rs` (6 tests, an injected
+resolver on `.invalid` hosts and the counting wallet of #318): the
+reference's tokens read by the three resolvers and the listing;
+`register_definition` and `update_definition` writing the reference's bytes,
+its two wallet calls with the reference's arguments; the pre-#543 tokens,
+the thirty refusals and the twelve refused operator texts skipped as the
+reference skips them, the three upper-case ones read. The first four red on
+`b51cbea7` (the reference's tokens skipped, the identity-keyed unsigned
+script written, the pre-#543 and the unsigned anyone-keyed tokens read).
+`tests/registry_token_words_543.rs` (6 tests): the public reader's fields,
+its thirty-three refusals and the fifteen operator texts in the recorded
+verdicts and words; it does not compile on
+`b51cbea7` (`E0432`, the reader absent), and
+`the_operator_key_and_signature_refusals_are_the_reference_words_through_registry_error_543`
+is red on the reader's first cut (`InvalidHex`, `InvalidPublicKey("Point not
+on curve")`, a `05` key reaching the linkage refusal, and a `WalletRefusal`
+for the non-DER signature), and
+`the_operator_text_is_checked_as_the_reference_counterparty_543`,
+`a_05_locking_key_is_refused_in_the_reference_words_543` and
+`an_operator_text_the_reference_counterparty_check_refuses_is_skipped_543`
+are red on the reader before the counterparty check (`0a187282`: the
+uncompressed operator accepted, the `05` key refused as a non-canonical
+envelope, the uncompressed operator's token resolved).
+`tests/registry_lock_position_537.rs`'s
+control becomes the reference's signed token of the type: #537's unsigned
+relock is no token since this landing.
+
+### Notes: cross-SDK parity (#543)
+
+Two residues remain at the writer, stated: a certificate definition's
+`fields` JSON is written from a `HashMap` (`CertificateDefinitionData.fields`),
+so a definition of two or more fields is written in an order the reference's
+`JSON.stringify` (insertion order) need not share, and its signature is over
+those bytes (the reader accepts either, verifying the bytes received); and
+the reference's `validateDefinitionData` normalizes a URL (`new URL(...).href`,
+`RegistryClient.ts:80-99`) before writing it, which this crate's writer does
+not, so `https://icon.example` is written as given where the reference writes
+`https://icon.example/`. The vector's definitions carry one certificate field
+and normalized URLs. Go at `2ca481c` locks its registry token signed, with
+counterparty `anyone` and `forSelf` false (`registry/methods.go:45-55`), and
+reads 6/6/7 fields with no verification (`registry/client.go:246,267,293`).
+
+One spend stays open, stated (#548): `revoke_own_registry_entry` and
+`update_definition` sign the token's input with an empty unlocking script
+(`src/registry/client.rs:653`, `:877`), where the reference unlocks it with
+the PushDrop unlocker for the type's protocol, key ID `1`, counterparty
+Closed by #548 (its entry above).
+`anyone`, `all`, over the authenticated output's satoshis and script
+(`RegistryClient.ts:540-548`, `:630-639`), before `completeBoundAction`.
+
+Census (#375; current reading):
+
+- Row 84: Ours: closed by #543 at the pin; residues the certificate fields' map order and URL normalization at the writer. Theirs: go-sdk, filing pending (the witness: tests/registry_token_fields_543.rs; tests/vectors/registry_token_fields_543.json).
+- Row 85: Ours: closed by #548 at the pin: revoke and update unlock the definition token as RegistryClient.ts:540-548,630-639 and PushDrop.ts:217-262 at edf6e03 do (the type's protocol, key ID 1, counterparty anyone, SIGHASH_ALL | FORKID over the record's satoshis and locking script, keyed by the token's input index); residues completeBoundAction's bindings, abort and signAction options and authenticateRegistryRecord's checks (RegistryClient.ts:453-513) at these two sites. Theirs: go-sdk, filing pending: its revoke signs and keys the spend at the token's output index, not its input index (the witness: tests/registry_unlocking_548.rs; tests/vectors/registry_unlocking_548.json).
+
+### Fixed: the six token-decode sites run the reference's envelope, signature and hash-binding checks (#544)
+
+After #537 the six sites decoded a PushDrop token at the reference's lock
+position, but did not run the checks the reference runs on the decoded
+record: they accepted tokens the reference refuses. The keeper's words
+(2026-10-31 07:1xZ, recorded on #544): the port accepts what the reference
+refuses at the record level; a parity row at the pin with the reference
+lines, a witness vector recorded from the pinned bundle, a test RED on the
+base. And (09:1xZ), the contacts site exactly, every other site read the
+same way: the reference's envelope, signature and field set at the pin.
+
+| Site | Before | Now (`ts-stack@edf6e03`) |
+|---|---|---|
+| Contacts manager (`src/identity/contacts*.rs`) | wrote the ciphertext as the one PushDrop field; read the first field of any lock-before token, decrypted it and deserialized this crate's `Contact` JSON (`identityKey`, `name`, `avatarUrl`, `addedAt`, `notes`, `tags`, `metadata`); spent a listed output unauthenticated | writes the signed two-field token (`#encryptAndLock`, `ContactsManager.ts:748-772`: getPublicKey `forSelf` false, createSignature over the ciphertext); reads each listed output as `#readKeyID` and `#authenticateContactScript` do (`:414-466`: two fields, the ciphertext 1 to 65 KiB plus 1 KiB, the signature 8 to 80 bytes, `assertCanonicalSignedPushDrop` `:225-241`, the lock the wallet's key for the protocol, key ID and self, `verifySignature` over the ciphertext), a refused one dropped on a load (`:507-513`); the plaintext `validateContact`'s record (`:171-198`), validated before any wallet call (`:527-528`); the update and removal lookups authenticate every listed output before a spend (`:587-626`, `:891-959`) and refuse in the reference's words |
+| Identity client (`src/identity/client.rs`, `client_token.rs`) | both `ls_identity` parsers read the first field of any lock-before token whose certificate verified | both run the revocation's token checks (`IdentityClient.ts:773-815`: exactly two fields, the canonical envelope `:130-147`, the locking key, the field signature) with the key and signature the subject's, as the toolbox's discovery reads a published token (`wallet-toolbox` `identityUtils.ts:497-559`); a token that fails skipped (`IdentityClient.ts:823`) |
+| Registry client (`src/registry/token.rs`) | #543's reader | unchanged: it already runs every check of `registryTokenValidation.ts:19-64`; stated with a pin, green on the base |
+| KVStore interpreter (`src/kvstore/token_validation.rs`) | the JSON-protocol form's locking key and signature; no envelope or bound check; the raw-protocol form read unauthenticated as to its key | `decodeAndVerifyKVStoreToken` whole (`kvStoreTokenValidation.ts:85-119`: the canonical five- or six-field envelope with its bounds, the canonical JSON protocol, the key, value, controller and tags in their bounds, the controller-linked key, the signature), a refused token no value (`kvStoreInterpreter.ts:48`) |
+| Overlay admin token (`src/overlay/admin_token_validation.rs`) | `decode_overlay_admin_token` read any lock-before token of four or more fields (the legacy unsigned token among them); no URI, name, key or signature check; no author check at the SLAP or SHIP discovery | the decode is `decodeAdvertisement` (`OverlayAdminTokenTemplate.ts:159-197`, the static decode `:237-239`: five canonical fields, SHIP or SLAP, a canonical identity key, an advertisement URI, a `tm_`/`ls_` name, a canonical DER signature of 8 to 80 bytes) in the reference's words; `decode_and_verify_overlay_admin_token`, an addition in the reference's shape (`decodeAndVerifyOverlayAdvertisement`, `:199-222`: the expected protocol, the linked key's signature, the locking key), read at the SLAP discovery and the SHIP discovery as the reference reads it there (`LookupResolver.ts:2206`, `SHIPBroadcaster.ts:775`) |
+| Storage downloader (`src/storage/downloader.rs`, `advertisement.rs`) | read field 2 as the host and field 3 as the expiry of any lock-before token of four or more fields; no signature, no key, no hash binding: an advertisement for another file named its host | each output through `decodeAndVerifyUHRPAdvertisement` (`UHRPAdvertisementValidation.ts:37-115`: six canonical fields, the host's canonical key, the 32-byte hash, a credential-free HTTPS location, positive canonical CompactSize expiry and size, a canonical DER signature, the host-linked locking key, the host's signature), then the hash binding and the expiry (`StorageDownloader.ts:117`) and one host per location (`:118-120`), a refused output skipped (`:121`) |
+
+`addedAt` leaves the contact token: the plaintext is the reference's record
+alone, and a saved-at time lives in the manager's own cache beside the token
+(a contact loaded from a token reads `added_at` from the cache when it holds
+the identity, else 0). `notes` and `tags` travel in the record's `metadata`
+(the reference's place for them, `saveContact`'s "notes, aliases"), and are
+read back out of it. For the toolbox's and the CLI's tables: the toolbox has
+no contacts path and the CLI none, so neither table changes.
+
+The witness is recorded, never written by hand, by one recorder for the six
+sites: `tests/support/token_envelope_544.mjs` runs each site's reference
+counterpart (the bundle of `ts-stack@edf6e03`, an entry re-exporting
+`ContactsManager`, `kvStoreInterpreter` and
+`decodeAndVerifyOverlayAdvertisement`, under Node v22.18.0; ProtoWallets in
+process; `LookupResolver.prototype.query` answering one output) on the
+reference's own token and on tokens changed in one respect, with its words
+and outcome, and reads this crate's tokens (the contacts base token from
+#542's vector, the tip's and the SHIP and SLAP advertisements from the ignored
+`record_this_crates_tokens_544`) both ways: `tests/vectors/token_envelope_544.json`,
+two runs byte-identical. Per site: `tests/identity_contacts_envelope_544.rs`
+(the reference's token read here with its `notes`, `tags` and `avatarURL`;
+nine one-change tokens and a bad key ID dropped; the reference reading this
+crate's tip token with no refusal, the base's dropped for its field count;
+five records refused before any wallet call in `saveContact`'s words; 4 of 4
+RED on `f47f231f`), `tests/identity_envelope_544.rs` (the reference's
+revelation read by both parsers, five one-change tokens skipped; RED),
+`tests/registry_envelope_544.rs` (five tokens in the validator's words and
+the resolver's outcome; green on the base: nothing was missing),
+`tests/kvstore_interpreter_envelope_544.rs` and
+`src/kvstore/token_validation_tests.rs` (seven tokens; RED),
+`tests/overlay_admin_token_envelope_544.rs` (fifteen tokens' decode and
+verify words, this crate's advertisements verified by the reference, both
+discoveries skipping unauthenticated ones; compile-RED on the base, the
+verifier absent, and 3 of 4 RED without its lines), and
+`tests/storage_advertisement_envelope_544.rs` with the unit test in
+`src/storage/advertisement.rs` (eight advertisements; RED for the hash
+binding first).
+
+Migration. One public addition in the reference's shape:
+`overlay::decode_and_verify_overlay_admin_token(script, expected:
+Option<Protocol>)`. No public type changes shape. Behaviour a caller may
+see: `ContactsManager::add_contact` refuses a record the reference refuses
+(an empty name, a non-canonical identity key, an unsafe avatar scheme, a
+`metadata` that is not an object) as `Error::IdentityError` in its words
+before any wallet call, `remove_contact` refuses a non-canonical identity
+key, and the update and removal refuse a listed output that does not
+authenticate (`Unable to authenticate a contact lookup result`, `Unable to
+authenticate or remove a contact output`) where they spent or skipped it;
+a contact token written before #544 (one field) is no longer read, as the
+reference reads none; `decode_overlay_admin_token` refuses the legacy 4-field
+token of the deprecated `create_overlay_admin_token` (`Unexpected PushDrop
+token field count`) and any token the reference's decode refuses, in its
+words (`is_overlay_admin_token`, `is_ship_token` and `is_slap_token` follow
+it); the kvstore interpreter, and the global store's reads through it, read
+no raw-protocol token written before #343; `StorageDownloader::resolve`
+names no host for an advertisement it cannot authenticate or that names
+another file.
+
+### Notes: cross-SDK parity (#544)
+
+Residues, stated: this crate's `Contact` has no badge members, so a
+reference record's `badgeIconURL`, `badgeLabel` and `badgeClickURL` are read
+and dropped and a save from here writes them empty; the record is read as a
+`serde_json::Value` (keys sorted), so of several unexpected members the first
+refused is the first in byte order, where the reference names the first in
+its text; `validateContact`'s words reach `add_contact` alone (a load drops,
+as the reference's `getContacts` does). The identity parsers run the
+revocation's token checks, not the toolbox's `certificateRecord` member
+checks (`identityUtils.ts:87-132`) nor its byte bounds before them (the
+certificate field 1 to 256 KiB, the signature 8 to 80 bytes, `:503-509`):
+a signed certificate field above 256 KiB is read here where the toolbox's
+discovery skips it (a signature outside 8 to 80 bytes fails the DER check
+here either way). `KVStoreContext` carries no controller (a
+public shape), and a `None` context reads any key, where the reference's
+interpreter answers nothing without a context and a controller
+(`kvStoreInterpreter.ts:35`). The downloader keeps its lookup-level handling
+(a non-output-list answer an empty list, no 100-output bound, no txid hint;
+`StorageDownloader.ts:77-112`). Go at `2ca481c` runs none of these record
+checks at its counterparts.
+
+Census (#375; current reading):
+
+- Row 86: Ours: closed by #544 at the pin; residues the contact's badges and member order, the toolbox certificate record and byte bounds, the interpreter's controller context and the downloader's lookup-level checks. Theirs: go-sdk, filing pending (the witness: tests/identity_contacts_envelope_544.rs; tests/vectors/token_envelope_544.json).
+
+### Fixed: a SEC 1 tag 05 is refused as the reference refuses it (#550)
+
+k256 (sec1 0.8.1, `src/point.rs:521-533`) reads a SEC 1 tag `05` as a compact
+point, so `PublicKey::from_bytes(05 || Gx)` returned the key `02 || Gx`, and
+every site that reads a key through `from_bytes` without a prefix check took
+the compact form as a key. The reference's `Point.fromDER` reads the prefixes
+`02`, `03`, `04`, `06`, `07` and refuses every other as `Unknown point format`
+(`ts-stack@edf6e03` `Point.ts:303-325`). `from_bytes` now refuses a `05` tag
+before k256 reads it, as `Error::InvalidPublicKey("Invalid public key encoding:
+unknown point format")`, the words `from_hex`'s lenient parser (#498,
+`src/primitives/ec/public_key_forms.rs`) already used for every shape the
+reference does not read; `from_hex` refused `05` on the base already (its
+`unknown point format` arm; `public_key_forms_498.json` records the reference
+refusing `compressed_prefix_05` and `compact_prefix_05_odd_length`), unchanged.
+Other tags k256 refuses keep k256's words.
+
+| Site | Before (base `69d315fc`) | Now | The reference (`ts-stack@edf6e03`) |
+|---|---|---|---|
+| `PublicKey::from_bytes` | `05 \|\| Gx` read as `02 \|\| Gx` | refused, `InvalidPublicKey` | `Unknown point format` |
+| `PublicKey::from_hex` | refused (#498) | unchanged | `Unknown point format` |
+| `PushDrop::decode`, both positions (`pushdrop.rs:289,335`) | the token read with the compact key | refused, `InvalidPublicKey` | `PushDrop.decode`: `Unknown point format` |
+| The kvstore token reader and interpreter (`kvstore/token_validation.rs`, #544) | a `05` locking key: `PushDrop token must use the canonical PushDrop envelope`; a `05` controller field: read as the compact key, so a token signed by `02 \|\| x` read to its value | `Unknown point format` for both (`point_message` at the controller, as `validateKVStoreController` reads it, `kvStoreTokenValidation.ts:76-81`); no value | the same words; no value |
+| `KVStoreInterpreter::verify_signature` (`interpreter.rs:168`) | `true` for that token | `false` | (its reader refuses the controller) |
+| `messages::verify`, the signer (`signed.rs:170`) | read as the compact key: `Ok(true)` on the recorded message | refused, `InvalidPublicKey` | `Unknown point format` |
+| `messages::verify` and `messages::decrypt`, the recipient (`signed.rs:205`, `encrypted.rs:184`) | parsed, then compared as keys: a mismatch naming `02 \|\| x` (or a match when the recipient's key is `02 \|\| x`) | the bytes compared with the recipient's compressed key, as the reference compares their hex (`SignedMessage.ts:85-97`, `EncryptedMessage.ts:88-94`): `MessageRecipientMismatch` naming the `05` bytes | the mismatch naming the `05` bytes |
+| `messages::decrypt`, the sender (`encrypted.rs:177`) | decrypted | refused, `InvalidPublicKey` | `Unknown point format` |
+| `Certificate::from_binary`, subject and certifier | parsed | refused, `InvalidPublicKey` | `Invalid certificate subject` (`certifier`)`: expected a compressed secp256k1 public key` |
+| `compat::ecies::bitcore_decrypt`, the sender | decrypted | refused, `InvalidPublicKey` | `Unknown point format` |
+| The wire processor's counterparty (`wallet/wire/encoding.rs:165`) | getPublicKey answered with a key derived for the compact point | a key whose tag is not `02`/`03` is `#decodeCounterparty`'s `Point.fromDER` (`WalletWireProcessor.ts:2459-2460`): the error frame `01`, `Unknown point format`, an empty stack, byte for byte | the same frame |
+| `validate_requested_certificate_set`, a certifier text | accepted | refused, `Certifier '05…' is not a valid public key` | (this crate's checker; the `Peer` does not call it) |
+
+Guarded already and unchanged: the script interpreter
+(`src/script/spend/crypto.rs:397-407`, every mode), the registry reader
+(`point_message` since #543), the overlay admin token (`from_reference_der`),
+the wire's linkage keys (`require_compressed_key`), `wallet/validation/crypto.rs`
+and `wallet/wire/mod.rs:381-384`; `auth/utils/validation.rs:353,364` re-parse a
+held key's compressed bytes, which never open with `05`.
+
+Pinned by `tests/primitives_sec1_tag_05_550.rs` (10 tests, 9 RED on the base;
+the kvstore interpreter's reference-token test answers no value on both) and
+`a_tag_05_key_is_refused_in_the_reference_words_550` in
+`src/kvstore/token_validation_tests.rs` (RED on the base in the envelope
+words), against `tests/vectors/sec1_tag_05_550.json`: 14 cases recorded by
+`tests/support/sec1_tag_05_550.mjs` from the edf6e03 bundle under Node
+v22.18.0 (`node tests/support/sec1_tag_05_550.mjs <sdk.mjs>
+tests/vectors/token_envelope_544.json`; two runs byte-identical).
+
+### Notes: cross-SDK parity (#550)
+
+The verdict is the reference's at every site above. The words are the
+reference's where the site hands them on (the wire frame, the kvstore
+reader; the recipient mismatch carries the reference's hex, not its words); elsewhere the refusal keeps this crate's
+`InvalidPublicKey` class and its `Invalid public key encoding: unknown point
+format` words, as each site words every other key it refuses. Go at
+`2ca481c` refuses a 33-byte `05` key too (`ParsePubKey`,
+`primitives/ec/publickey.go:87-89,115-121`: the low bit cleared, `04` is not
+the compressed format). Not pinned: the wallet result validators' key reads (`wallet/substrates/result_values/certificate.rs:54`, the one unpinned verdict change, and `scalars.rs`), now refusing `05` through `from_bytes` as the reference's `isValidCompressedPublicKey` does; a parser fuzz target does not cover `from_bytes`.
+
+### Fixed: the registry client unlocks a definition token as the reference does on revoke and update (#548)
+
+`revoke_own_registry_entry` and `update_definition` answered the wallet's
+signable transaction with an empty unlocking script for the definition
+token's input, keyed by the token's output index, not its input index in
+the transaction (`src/registry/client.rs:653`, `:877` at `69d315fc`). The
+reference unlocks the token with `PushDrop.unlock(protocol, '1', 'anyone',
+'all', false, satoshis, lockingScript)` (`ts-stack@edf6e03`
+`RegistryClient.ts:540-548` for `removeDefinition`, `:630-639` for
+`updateDefinition`; `PushDrop.ts:217-262`): the BIP-143 preimage under
+SIGHASH_ALL | FORKID over the authenticated record's satoshis and locking
+script, its SHA-256 signed by the wallet's `createSignature` under the
+type's protocol (`[1, basketmap|protomap|certmap]`), key ID `1`,
+counterparty `anyone`, one push of the checksig signature, at the token's
+index in the signable transaction (`completeBoundAction`). Since #543 the
+token is locked with the operator's `anyone`-linked key, which only that
+signature opens. Both sites now build the spend through the one PushDrop
+signer the key-value stores and the identity client use
+(`wallet::pushdrop::sign`, now compiled under `registry` too), from
+`src/registry/unlock.rs`: the token's input found in the signable
+transaction by its outpoint, the createAction input still declaring
+`unlockingScriptLength: 74` as the reference's does. Their signAction now
+carries the signable transaction's `reference` as the base64 text the
+wallet answered (`to_base64`, as the key-value stores and the contacts
+manager send it; `completeBoundAction.ts:1044-1051`, `:1118`, BRC-100's
+`Base64String`), where it sent the UTF-8 reading of its bytes
+(`String::from_utf8(..).unwrap_or_default()`, `src/registry/client.rs:657`,
+`:877` at `20b0fcae`): an empty text for bytes that are not UTF-8, another
+reference for bytes that are, so no wallet found the action to sign.
+
+For the toolbox's and the CLI's tables: a revoke or an update built by this
+crate before this landing did not spend the definition token: its input
+carried an empty unlocking script (at the wrong index when the wallet put
+the token anywhere but at its own output index), which does not satisfy the
+token's lock, so the revocation or update was not a valid spend unless the
+wallet replaced the script itself; one built now carries the reference's
+script.
+
+The witness is recorded, never written by hand:
+`tests/support/registry_unlocking_548.mjs` runs the reference's own
+`registerDefinition`, `removeDefinition` and `updateDefinition` (the bundle
+of `ts-stack@edf6e03` under Node v22.18.0) with a `ProtoWallet` of the
+scalar 9 for each definition type, its createAction answered with a
+signable transaction spending a made-up funding input at index 0 and the
+token at index 1, its signAction recorded and answered with no transaction;
+`tests/vectors/registry_unlocking_548.json` holds six cases (basket,
+protocol, certificate; revoke, update): the signable transaction, the spend
+index, the unlocking script, the unlocker's createSignature arguments and
+the reference interpreter's verdict (`Spend.validate`: valid for all six).
+The `ProtoWallet`'s signatures are RFC 6979's, deterministic, so the bytes
+are compared; two runs byte-identical.
+`tests/registry_unlocking_548.rs` builds the same spends here over the
+recorded signable transaction (the #318 counting wallet, nothing broadcast)
+and compares the spends (index and script) and the createSignature
+arguments to the reference's, and runs this crate's spend under the node's
+block word after Chronicle; both tests RED on `69d315fc` (`[(0, "")]`
+against the reference's `[(1, 4830...)]`); a third,
+`a_revoke_and_an_update_send_sign_action_the_base64_reference_548`, compares
+the reference signAction carries with the recorded `signable_reference`,
+RED on `20b0fcae` (`"RRRRRRRR"` against `"UlJSUlJSUlI="`).
+
+### Notes: cross-SDK parity (#548)
+
+Residues at these two sites, stated: the registry client does not run
+`completeBoundAction`'s bindings (the requested inputs and outputs in the
+signable transaction, the signed template and scripts checked after
+signing), does not abort a failed action, and sends signAction no options
+where the reference sends `{ acceptDelayedBroadcast, returnTXIDOnly: false,
+noSend, sendWith }`; the key-value stores' port of that boundary
+(`src/kvstore/bound/`) is module-private. Nor does it run
+`authenticateRegistryRecord` (`RegistryClient.ts:453-513`, called first by
+`removeDefinition` and `updateDefinition`): the reference reads the record's
+transaction from its BEEF, requires the output to be a one-satoshi token
+whose satoshis and locking script equal the record's, parses the definition
+from that script and checks its operator, before any wallet call; this crate
+checks the operator of the record's own definition and signs over the
+record's satoshis and locking script as given, so a record whose metadata
+does not match its BEEF reaches createAction here and is refused there.
+go-sdk at `2ca481c` unlocks the
+token with the same PushDrop unlocker but signs it at, and keys the spend by,
+the token's output index (`registry/methods.go:416-441`), right only when the
+wallet places the token's input at that index.
+
+Census (#375; current reading):
+
+- Row 85: Ours: closed by #548 at the pin: revoke and update unlock the definition token as RegistryClient.ts:540-548,630-639 and PushDrop.ts:217-262 at edf6e03 do (the type's protocol, key ID 1, counterparty anyone, SIGHASH_ALL | FORKID over the record's satoshis and locking script, keyed by the token's input index); residues completeBoundAction's bindings, abort and signAction options and authenticateRegistryRecord's checks (RegistryClient.ts:453-513) at these two sites. Theirs: go-sdk, filing pending: its revoke signs and keys the spend at the token's output index, not its input index (the witness: tests/registry_unlocking_548.rs; tests/vectors/registry_unlocking_548.json).
+
+### Fixed: Contact carries the reference's badge fields through read and write (#552)
+
+The reference's contact record carries three badge fields beside its name
+and keys: `validateContact` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:171-192`) takes every one of
+the seven display fields (`:35-43`) through `ownData` (`:47-53`, a missing
+key refused as `must be an own data property`) and then its validator
+(`:75`, a non-string refused), so a record the reference reads carries
+`badgeIconURL`, `badgeLabel` and `badgeClickURL` as strings, empty where
+unset. After #544 this crate wrote and read that record, but its `Contact`
+had no badge members: a reference contact's badges were dropped on read,
+every save wrote them empty, and a round trip through this crate's update
+(read, change the name, save) erased the badges the reference had stored.
+The keeper's reading (2026-10-31 12:1xZ, issue #552): a user's data lost on
+an update, a parity row at the pin.
+
+| | Before | Now |
+|---|---|---|
+| Read (`list_contacts_with_refresh`, `contact_of`) | the three badge values read, validated and dropped | kept in `Contact::badge_icon_url`, `badge_label`, `badge_click_url` |
+| Write (`add_contact`, `update_contact`, `record_of`) | `badgeIconURL`, `badgeLabel`, `badgeClickURL` written `""` | written as the `Contact` holds them, `""` where unset, as the reference writes them |
+| A reference contact updated here | its badges erased in the token written | its badges kept; the reference reads back the record it wrote with the new name |
+
+For the toolbox's and the CLI's tables: the toolbox has no contacts path and
+the CLI none, so neither table changes.
+
+The witness is recorded, never written by hand:
+`tests/support/contact_badges_552.mjs` runs the reference's own
+`ContactsManager` (the bundle of `ts-stack@edf6e03`, an entry re-exporting
+it, under Node v22.18.0, the ProtoWallet of the scalar 9 in process, a
+SHA-256 counter stream for its randomness): `saveContact` of a contact with
+the three badges set, its token, plaintext and `getContacts` read-back; it
+takes this crate's tokens from the tip and the base as input (written by the
+ignored `record_this_crates_tokens_552`) and records the reference's
+`getContacts` reading of each with its verdict, `equal` to the record
+expected: `tests/vectors/contact_badges_552.json`, two runs byte-identical.
+`tests/identity_contact_badges_552.rs` (hermetic: the counting wallet of
+#318, no network, no port): the reference's badges read here; the
+reference's contact read, its name changed and saved through
+`update_contact`, the token's record the reference's with the new name and
+the badges kept, and the reference's verdict on the tip's update `equal`, on
+the base's the badges `""`; the reverse, a contact with badges saved by
+`add_contact` and read by the reference with them, the base's empty. The
+tests read `Contact`'s JSON, naming no badge member, so they compile on the
+base: 3 of 3 RED on `69d315fc`, the badges erased.
+
+`Contact` is closed (the keeper's word of 2026-10-31 13:1xZ on PR #554,
+shape (b), as #527 closed `WorkBudget`): the reference's record has grown
+and will grow again, and an open struct breaks a downstream literal at every
+field the reference adds, a closed one once. `Contact` is
+`#[non_exhaustive]`; `Contact::new(name, identity_key)` takes the two members
+`validateContact` requires non-empty (`name` with `allowEmpty` false,
+`ContactsManager.ts:183`; `identityKey` a canonical compressed key, `:186`),
+every other display member empty, `metadata` absent and `added_at` 0; a
+`with_` setter for each optional member (`with_avatar_url`, `with_added_at`,
+`with_notes`, `with_tags`, `with_metadata`, `with_badge_icon_url`,
+`with_badge_label`, `with_badge_click_url`); the fields stay `pub` to read
+and to assign. `Contact` carries no `abbreviated_key` (the record's is
+computed at the write, the row below), so there is no
+`with_abbreviated_key`. `new` judges nothing: the reference runs
+`validateContact` at the save (`saveContact`, `:527-528`) and the read
+(`#parseContactPlaintext`, `:468-472`), never at construction, so a `new`
+of an empty name or a key that is not canonical builds, and `add_contact`
+refuses it in the reference's words before any wallet call (#544's
+validation; `new_holds_its_values_and_add_contact_refuses_them_552`).
+`Contact` no longer derives `Default`: a default contact (empty name, empty
+key) is a record the reference refuses, and with `new` naming the two
+required members it was the one way past them; the in-crate uses moved to
+`new` (`from_identity`, the unit and integration tests). The serialized
+record is unchanged byte for byte: `record_of` and `contact_of` are the
+lane's, and the record of `Contact::new(..)` with the three badge setters is
+the vector's `reverse.contact`
+(`a_contact_built_by_new_writes_the_vectors_record_552`); `Contact`'s own
+JSON (serde) is unchanged too.
+
+Pins of the fold, in `tests/identity_contact_shape_552.rs` and the
+`compile_fail` doc test on `Contact` (`src/identity/types.rs`, a struct
+literal naming all ten fields from outside the crate): the doc test RED on
+the pre-fold tip `738bdfde` (`Test compiled successfully, but it's marked
+compile_fail`), green after; the three tests compile-RED there (`E0599`, no
+`Contact::new`), green after.
+
+Migration (api-break, once). `Contact` is `#[non_exhaustive]`
+(cargo-semver-checks 0.51.0: `struct_marked_non_exhaustive`, the one lint;
+`constructible_struct_adds_field` on the three badge fields no longer fires,
+the struct being unconstructible outside the crate) and no longer
+implements `Default` (no 0.51.0 lint names it; `Contact::default()` no
+longer compiles). A struct literal of `Contact` outside the crate, with or
+without `..Default::default()`, no longer compiles (E0639); write
+`Contact::new(name, key).with_avatar_url(..)` and the other setters, or
+assign a `pub` field on a contact built by `new`. A destructuring pattern
+needs `..`. Reading the fields is unchanged. No downstream named in
+`CLAUDE.md` that this lane could read builds a `Contact`
+(`bsv-wallet-cli`, `bsv-overlay-cloudflare`, `rust-message-box`,
+`rust-chaintracks`, `bsv-middleware-cloudflare-public` grepped by path; the
+captain tells the CLI on #376 at the landing). `Contact::from_identity`
+keeps writing the badges empty and `to_displayable_identity` keeps its fixed
+"Personal contact" badge: two rows of one record, filed for their own lane
+(stated below).
+
+### Notes: cross-SDK parity (#552)
+
+Residues, stated, not changed: `Contact::from_identity` does not copy a
+`DisplayableIdentity`'s badges into the contact (the reference's
+`saveContact` takes the `DisplayableIdentity` whole), and
+`Contact::to_displayable_identity` answers its fixed badges, not the stored
+ones. This crate recomputes `abbreviatedKey` from the identity key
+(`02abcd...wxyz`) on every write, so a reference record's own
+`abbreviatedKey` is replaced by an update here; the recorder writes this
+crate's form so the witness isolates the badges. The fold's reading of the
+reference at `ts-stack@edf6e03`: the reference does not recompute it.
+`IdentityClient.ts:1166` (`subject.substring(0, 10)...`) is in
+`parseIdentity` (`:1044`), which builds a `DisplayableIdentity` from a
+certificate (`resolveByIdentityKey`, `resolveByAttributes`, `:1002-1033`),
+not on the save path; `saveContact` (`ContactsManager.ts:527-528`) and
+`#encryptAndLock` (`:748`) write `validateContact`'s record, whose
+`abbreviatedKey` is the caller's as given (`:185`, `boundedString` to 256
+characters, empty allowed). So the reference keeps the stored
+`abbreviatedKey` through a read and a save, and this crate replaces it with
+its own `02abcd...wxyz`: a row, the list's last in `CLAUDE.md`, open, #559. Go at
+`2ca481c` has no contacts manager.
+
+Census (#375; current reading):
+
+- Row 87: Ours: closed by #552 at the pin; residues the badges through from_identity and to_displayable_identity; the recomputed abbreviatedKey its own row, open, #559. Theirs: none (the witness: tests/identity_contact_badges_552.rs; tests/vectors/contact_badges_552.json; tests/identity_contact_shape_552.rs).
 
 ## [0.9.0-beta.4] - 2026-10-30
 
