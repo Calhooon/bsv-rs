@@ -224,11 +224,8 @@ pub(super) fn record_of(contact: &Contact) -> Result<ContactRecord> {
             .insert("tags".into(), contact.tags.clone().into());
     }
     // The stored value as given, as `saveContact` writes it (#559); a
-    // contact built here takes `to_displayable_identity`'s form.
-    let abbreviated_key = contact
-        .abbreviated_key
-        .clone()
-        .unwrap_or_else(|| contact.to_displayable_identity().abbreviated_key);
+    // contact built here takes `to_displayable_identity`'s form (#568).
+    let abbreviated_key = contact.to_displayable_identity().abbreviated_key;
     let mut record = serde_json::json!({
         "name": contact.name,
         "avatarURL": contact.avatar_url.clone().unwrap_or_default(),

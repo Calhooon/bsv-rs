@@ -1,0 +1,103 @@
+{
+  "cases": [
+    {
+      "name": "parsed_identity",
+      "identity": {
+        "name": "alice@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "02f9308a01...",
+        "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net"
+      },
+      "key_id": "LHeupcQNIkQinA1WlyvWuqIswaBUWqt5zQ7PEBzlNHY=",
+      "custom_instructions": "{\"keyID\":\"LHeupcQNIkQinA1WlyvWuqIswaBUWqt5zQ7PEBzlNHY=\"}",
+      "locking_script": "2102bed71e6709f6cd4757b08451335ddb65a6e54a042f7bab5eaa1ac5a46cc7c222ac4d9401382a5c8abedc3e078b9bbb97d9b285a62f6619a30e1420c40c24d8c19c3e0bcd9a12c2fbbfbcd2c1518f5d13becae65045cf401086b955f50033603d052b1489a873686aea5384b70e38e24a62522d7bb97c7d45786fb003cabcca7893baea8d24e9cc85a41af6f5254b5b95b067d4c3209d7256e7e5252e8dfc2d135d45956c0f62bde630fac2575e52565eaf65bf39d0ded9c1def3ee7e0885c511a2f474ae3092c56defd1740945e12fbc8f88e11e7ef006eb2de2ffb43e9908842bf7dd033ade157d3f70bbf576dbfbf2d04ff87598b74cffc33e394898ac498d839d4d7e584a553a75e5af0d9131e0e18ee4a499dcb4f69b530f06863feb5758e561634010c2ed120f596ce04a6e67b4368e7890decc3e61b3d1cf5497bf5b2202822086b0ba8971ed9a0e9edd18528dda511ba42d29ffedbc05bb8c3034742a0545d3d43d84503736d8690fd32281506660dcbc3c929b9d63208d8c9a0e46275ae4ff89a14a8f7ff305014c133c36a9c7ce74e2804761e8546fd9f8ffe43ff06ec032a6e29c80bd4ff88b65d488bb26a78627e83560c159473045022100c4c78d6c3733a53eabef51b151143a964fd3eee89352fd888be966f7b1239a90022008f0a453088e2e5cb3aff83fd45fb9a748a2c7b86eeec58e603de3bee530e6336d",
+      "saved": {
+        "name": "alice@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "02f9308a01...",
+        "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net/"
+      },
+      "resolved": {
+        "name": "alice@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "02f9308a01...",
+        "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net/"
+      }
+    },
+    {
+      "name": "another_clients_text",
+      "identity": {
+        "name": "bob@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "Bob (desk 4)",
+        "identityKey": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net"
+      },
+      "key_id": "HQp3mCA8gsENhO6qJ6i3t3uwtsSLYicFGsrcZgZZfoQ=",
+      "custom_instructions": "{\"keyID\":\"HQp3mCA8gsENhO6qJ6i3t3uwtsSLYicFGsrcZgZZfoQ=\"}",
+      "locking_script": "2103716ff3f3b5bda246e5287a325c7aab2100ff1d4c5efb51d2c3d3a93a1b558fb6ac4d91010a6cf035a7b010ae2dbda75ecf105f36e53ca7182431206b3ac5cca8e8a2fbc4c794f1425e37671fc6eaf565a0ab29fcc6f7c3db40ae4d78878125188f54ee249c892e11f610b40f621d56a1d425040e4284d947bc73c2da376cb5908aa1001b944a20538814a3079d7ad54a28bb533dba825547e2dc235c7423553202a2f5a4a5811cc186912c5c78a33a8546aa45dc28b38327a7e61b6039def9ccc40d954f0b0e3a6003cf62f8fcaef364bd11c9d2131c5476d88f911452a1da30170e2cc45cccc91a1300d21374cac47cbe354491c3fc0e517c760b9d6e550a5ac78bf1ac7cf5db2a0dd2f2f6c7506f4e2ee24f05d4bab8d854b0ebcc25514b21ad0050da28e2d407b34e9294b2edf4010630e9938dfceb76a30047daccea467e84c2f6a05bb06774badc7eed44ac7d1f150ff27ebbb9e20ae865e2875af9cbb7c5fc85c8ac1baf56eb074928cda6adb8886218645eea005c89686e348492c478ebf418ce36d6865b1a5a50c6229da6891a2ffca54e4da04b84b9b6d8b673332b23ede52aa9c081cffbdefc59e92d0ab5c85140d44146304402203a3d44468b9a1cba221a50e3d5e112ec17b710304aba5888423ea5a281aac86502207026d8548af4a11fb2ff1de2add7f09be0892a2605118bcf509d99a8a59260d26d",
+      "saved": {
+        "name": "bob@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "Bob (desk 4)",
+        "identityKey": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net/"
+      },
+      "resolved": {
+        "name": "bob@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "Bob (desk 4)",
+        "identityKey": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net/"
+      }
+    },
+    {
+      "name": "empty",
+      "identity": {
+        "name": "carol@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "",
+        "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net"
+      },
+      "key_id": "aPPSdJejtEgcQlLM7UQyObzZjUyKCsN9syDbXyvoTI8=",
+      "custom_instructions": "{\"keyID\":\"aPPSdJejtEgcQlLM7UQyObzZjUyKCsN9syDbXyvoTI8=\"}",
+      "locking_script": "21022e9d486e6a0b54dc3aa7e228244eef5e9664610980485b881c3efd5f70842c80ac4d87011f9b1e2e7e0080b9e9517d5f911fd70a49802007ee41c4d97d73362383eb75fb1be7b1a55717bac16916e9d116071ad4d980aaf9b05db596eb656467ef1ac12ebd29ad13349833efbbd77722ef7d8ca82c2958ce0b7e183efeed7b94ac6257a08a5264b92e0d4014edcdbaa8dc8382c7e70f34ae13310ac71159bf22854682450cfe792838ff9b2122b1c8b2b56e210919d606578f558aba9f91eb57fa173c367a6c415570b1ee4bdaa8c8323fa03870fadf8a554c6095b702045901756389c57490aea92b4afb355f191d5707a173d537f4c2e7c9c9c4f8dfc1cf808d8b1e231f73a5d3b95f3d7436f75287cdd132dd5ac96f3ef08facf644d5a0da3abb5121ce4b8a8118a67e10dd5a74edf96f823b025ee2c4821a2bb5b5874781aa675276b19f9254e0424c9eb695154fdc87b1fa90f357fee4ef0c47ccbe5c71400333c24571eafbd96d9b345fef9127c8d67a77fb479f6f8178077db5c3bc91e1cbdf29b862c030a28155d090c8594d6c010314db7ae57df528a3f7290a07cae33be56c7e66589e4e60c3463044022072bc4ed9174200b0d3129f8a812dfea11045c03511ae23fdadcf2ff03977362002207b3e5fd3fb77dc6dec3ed2460c202f82d658c6ae65f036e10436fb8de0dc70726d",
+      "saved": {
+        "name": "carol@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "",
+        "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net/"
+      },
+      "resolved": {
+        "name": "carol@example.com",
+        "avatarURL": "XUTZxep7BBghAJbSBwTjNfmcsDdRFs5EaGEgkESGSgjJVYgMEizu",
+        "abbreviatedKey": "",
+        "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "badgeIconURL": "https://example.com/certifier.png",
+        "badgeLabel": "Email certified by Example Certifier",
+        "badgeClickURL": "https://socialcert.net/"
+      }
+    }
+  ]
+}

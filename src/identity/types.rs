@@ -396,10 +396,10 @@ impl Contact {
         self
     }
 
-    /// Create a new contact from a displayable identity, its badges carried
-    /// as given: the reference's contact is the identity
-    /// (`ContactsManager.ts:28`), its `saveContact` keeping every display
-    /// field (`:171-198`; #558).
+    /// Create a new contact from a displayable identity, its badges and its
+    /// `abbreviated_key` carried as given: the reference's contact is the
+    /// identity (`ContactsManager.ts:28`), its `saveContact` keeping every
+    /// display field (`:171-198`; #558, #568).
     pub fn from_identity(identity: DisplayableIdentity) -> Self {
         Self::new(identity.name, identity.identity_key)
             .with_avatar_url(identity.avatar_url)
@@ -407,21 +407,26 @@ impl Contact {
             .with_badge_icon_url(identity.badge_icon_url)
             .with_badge_label(identity.badge_label)
             .with_badge_click_url(identity.badge_click_url)
+            .with_abbreviated_key(identity.abbreviated_key)
     }
 
     /// Convert this contact to a displayable identity, its badges the ones
     /// stored (`""` where unset), as the reference's `resolveByIdentityKey`
-    /// returns a contact read (`IdentityClient.ts:575-576`; #558).
+    /// returns a contact read (`IdentityClient.ts:575-576`; #558), and its
+    /// `abbreviated_key` the stored one (#568); a contact built here with
+    /// none takes this crate's form, the one its saved record carries.
     pub fn to_displayable_identity(&self) -> DisplayableIdentity {
-        let abbreviated = if self.identity_key.len() > 10 {
-            format!(
-                "{}...{}",
-                &self.identity_key[..6],
-                &self.identity_key[self.identity_key.len() - 4..]
-            )
-        } else {
-            self.identity_key.clone()
-        };
+        let abbreviated = self.abbreviated_key.clone().unwrap_or_else(|| {
+            if self.identity_key.len() > 10 {
+                format!(
+                    "{}...{}",
+                    &self.identity_key[..6],
+                    &self.identity_key[self.identity_key.len() - 4..]
+                )
+            } else {
+                self.identity_key.clone()
+            }
+        });
 
         DisplayableIdentity {
             name: self.name.clone(),
