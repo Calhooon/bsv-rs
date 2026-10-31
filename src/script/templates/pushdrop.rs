@@ -314,7 +314,7 @@ impl PushDrop {
 
     /// Decodes a lock-after pattern script.
     /// Pattern: <fields...> OP_2DROP... OP_DROP <pubkey> OP_CHECKSIG
-    fn decode_lock_after(chunks: &[ScriptChunk]) -> Result<Self> {
+    pub(crate) fn decode_lock_after(chunks: &[ScriptChunk]) -> Result<Self> {
         if chunks.len() < 2 {
             return Err(Error::ScriptParseError("Script too short".into()));
         }
