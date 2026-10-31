@@ -6,13 +6,13 @@
 //! - Discovering certificates for an identity
 //! - Managing personal contacts
 
-use crate::auth::certificates::{revocation_outpoint_from_str, Certificate};
+use crate::auth::certificates::Certificate;
 use crate::auth::VerifiableCertificate;
 use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, OutputListItem,
     OverlayBroadcastFacilitator, TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::{from_base64, from_hex, PrivateKey, PublicKey};
+use crate::primitives::PrivateKey;
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Broadcaster, Transaction};
 use crate::wallet::{
@@ -940,81 +940,30 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             Err(_) => return Ok(None), // Failed to decode PushDrop
         };
 
-        // Step 4: Get the first field (certificate JSON)
-        let cert_json_bytes = match pushdrop.fields.first() {
-            Some(f) => f,
-            None => return Ok(None), // No fields in PushDrop
+        // Step 4: The toolbox's record checks and byte bounds, or skipped (#553)
+        let Some(record) = record::read(&pushdrop.fields) else {
+            return Ok(None);
         };
-
-        // Parse the JSON
-        let cert_json_str = match String::from_utf8(cert_json_bytes.clone()) {
-            Ok(s) => s,
-            Err(_) => return Ok(None), // Invalid UTF-8 in certificate data
-        };
-
-        let cert_data: serde_json::Value = match serde_json::from_str(&cert_json_str) {
-            Ok(v) => v,
-            Err(_) => return Ok(None), // Failed to parse certificate JSON
-        };
-
-        // Step 5: Extract certificate fields from JSON
-        let cert_type_b64 = cert_data["type"]
-            .as_str()
-            .ok_or_else(|| Error::IdentityError("Missing certificate type".to_string()))?;
-        let serial_number_b64 = cert_data["serialNumber"]
-            .as_str()
-            .ok_or_else(|| Error::IdentityError("Missing serial number".to_string()))?;
-        let subject_hex = cert_data["subject"]
-            .as_str()
-            .ok_or_else(|| Error::IdentityError("Missing subject".to_string()))?;
-        let certifier_hex = cert_data["certifier"]
-            .as_str()
-            .ok_or_else(|| Error::IdentityError("Missing certifier".to_string()))?;
-
-        // Parse the 32-byte arrays
-        let cert_type_bytes = from_base64(cert_type_b64)?;
-        let serial_number_bytes = from_base64(serial_number_b64)?;
-
-        let cert_type: [u8; 32] = cert_type_bytes
-            .try_into()
-            .map_err(|_| Error::IdentityError("Invalid certificate type length".to_string()))?;
-        let serial_number: [u8; 32] = serial_number_bytes
-            .try_into()
-            .map_err(|_| Error::IdentityError("Invalid serial number length".to_string()))?;
-
-        // Strictly, as Certificate.verify's toBinary refuses a lenient form (#498)
-        let subject = PublicKey::from_strict_hex(subject_hex)?;
         // The subject's signed revelation, or skipped (#544)
-        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &subject) {
+        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &record.subject) {
             return Ok(None);
         }
-        let certifier = PublicKey::from_strict_hex(certifier_hex)?;
 
-        // Create the base certificate
-        let mut certificate =
-            Certificate::new(cert_type, serial_number, subject.clone(), certifier);
-
-        // Parse revocation outpoint if present
-        if let Some(outpoint_str) = cert_data["revocationOutpoint"].as_str() {
-            if !outpoint_str.is_empty() {
-                certificate.revocation_outpoint = Some(revocation_outpoint_from_str(outpoint_str)?);
-            }
-        }
-
-        // Each field held as its base64 text, as BRC-52 signs it (#261), the
-        // fields and the keyring in the order of the token's text (#394)
-        let maps = super::token_maps::read(&cert_json_str);
-        certificate.set_fields(maps.fields);
-
-        // The signature is hex, as the reference's WalletCertificate carries it;
-        // one that is not skips the output below (`IdentityClient.ts:823-825`)
-        if let Some(sig_str) = cert_data["signature"].as_str() {
-            certificate.signature = from_hex(sig_str).ok();
-        }
+        // Step 5: The certificate, each field held as its base64 text, as
+        // BRC-52 signs it (#261), in the order of the token's text (#394)
+        let mut certificate = Certificate::new(
+            record.cert_type,
+            record.serial_number,
+            record.subject,
+            record.certifier,
+        );
+        certificate.revocation_outpoint = record.revocation_outpoint;
+        certificate.set_fields(record.maps.fields);
+        certificate.signature = record.signature;
 
         // Step 6: Parse the keyring from JSON, each entry held as its base64
         // text and decoded only where the wallet decrypts (#268)
-        let keyring = maps.keyring;
+        let keyring = record.maps.keyring;
 
         // Create the verifiable certificate with the keyring
         let mut verifiable_cert = VerifiableCertificate::new(certificate, keyring.clone());
@@ -1086,97 +1035,30 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             Err(_) => return Ok(None), // Failed to decode PushDrop
         };
 
-        // Step 4: Get the first field (certificate JSON)
-        let cert_json_bytes = match pushdrop.fields.first() {
-            Some(f) => f,
-            None => return Ok(None), // No fields in PushDrop
-        };
-
-        // Parse the JSON
-        let cert_json_str = match String::from_utf8(cert_json_bytes.clone()) {
-            Ok(s) => s,
-            Err(_) => return Ok(None), // Invalid UTF-8 in certificate data
-        };
-
-        let cert_data: serde_json::Value = match serde_json::from_str(&cert_json_str) {
-            Ok(v) => v,
-            Err(_) => return Ok(None), // Failed to parse certificate JSON
-        };
-
-        // Step 5: Extract certificate fields from JSON
-        let cert_type_b64 = match cert_data["type"].as_str() {
-            Some(s) => s,
-            None => return Ok(None), // Missing certificate type
-        };
-        let serial_number_b64 = match cert_data["serialNumber"].as_str() {
-            Some(s) => s,
-            None => return Ok(None), // Missing serial number
-        };
-        let subject_hex = match cert_data["subject"].as_str() {
-            Some(s) => s,
-            None => return Ok(None), // Missing subject
-        };
-        let certifier_hex = match cert_data["certifier"].as_str() {
-            Some(s) => s,
-            None => return Ok(None), // Missing certifier
-        };
-
-        // Parse the 32-byte arrays
-        let cert_type_bytes = match from_base64(cert_type_b64) {
-            Ok(b) => b,
-            Err(_) => return Ok(None), // Invalid base64 in cert type
-        };
-        let serial_number_bytes = match from_base64(serial_number_b64) {
-            Ok(b) => b,
-            Err(_) => return Ok(None), // Invalid base64 in serial number
-        };
-
-        let cert_type: [u8; 32] = match cert_type_bytes.try_into() {
-            Ok(a) => a,
-            Err(_) => return Ok(None), // Invalid certificate type length
-        };
-        let serial_number: [u8; 32] = match serial_number_bytes.try_into() {
-            Ok(a) => a,
-            Err(_) => return Ok(None), // Invalid serial number length
-        };
-
-        // Strictly, as Certificate.verify's toBinary refuses a lenient form (#498)
-        let subject = match PublicKey::from_strict_hex(subject_hex) {
-            Ok(pk) => pk,
-            Err(_) => return Ok(None), // Invalid subject pubkey
+        // Step 4: The toolbox's record checks and byte bounds, or skipped (#553)
+        let Some(record) = record::read(&pushdrop.fields) else {
+            return Ok(None);
         };
         // The subject's signed revelation, or skipped (#544)
-        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &subject) {
+        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &record.subject) {
             return Ok(None);
         }
-        let certifier = match PublicKey::from_strict_hex(certifier_hex) {
-            Ok(pk) => pk,
-            Err(_) => return Ok(None), // Invalid certifier pubkey
-        };
 
-        // Create the base certificate
-        let mut certificate = Certificate::new(cert_type, serial_number, subject, certifier);
-
-        // Parse revocation outpoint if present
-        if let Some(outpoint_str) = cert_data["revocationOutpoint"].as_str() {
-            if !outpoint_str.is_empty() {
-                certificate.revocation_outpoint = revocation_outpoint_from_str(outpoint_str).ok();
-            }
-        }
-
-        // Each field held as its base64 text, as BRC-52 signs it (#261), the
-        // fields and the keyring in the order of the token's text (#394)
-        let maps = super::token_maps::read(&cert_json_str);
-        certificate.set_fields(maps.fields);
-
-        // The signature is hex, as the reference's WalletCertificate carries it
-        if let Some(sig_str) = cert_data["signature"].as_str() {
-            certificate.signature = from_hex(sig_str).ok();
-        }
+        // The certificate, each field held as its base64 text, as
+        // BRC-52 signs it (#261), in the order of the token's text (#394)
+        let mut certificate = Certificate::new(
+            record.cert_type,
+            record.serial_number,
+            record.subject,
+            record.certifier,
+        );
+        certificate.revocation_outpoint = record.revocation_outpoint;
+        certificate.set_fields(record.maps.fields);
+        certificate.signature = record.signature;
 
         // Parse the keyring from JSON, each entry held as its base64 text and
         // decoded only where the wallet decrypts (#268)
-        let keyring = maps.keyring;
+        let keyring = record.maps.keyring;
 
         // Create the verifiable certificate with the keyring
         let verifiable_cert = VerifiableCertificate::new(certificate, keyring);
@@ -1783,3 +1665,6 @@ mod field_value_261_tests;
 
 #[path = "client_token.rs"]
 mod token;
+
+#[path = "client_record.rs"]
+mod record;

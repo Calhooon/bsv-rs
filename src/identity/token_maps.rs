@@ -3,7 +3,8 @@
 //! order they were written in (`ts-stack@edf6e03` `Certificate.ts:179`,
 //! `VerifiableCertificate.ts:87`, `:110`), where a `serde_json::Value`
 //! sorts its keys. A member that is not an object reads as empty and a value
-//! that is not a string is skipped, as the `Value` reading before it did.
+//! that is not a string is skipped, as the `Value` reading before it did; the
+//! record checks skip a token carrying either first (#553, `client_record`).
 
 use indexmap::IndexMap;
 use serde::de::IgnoredAny;

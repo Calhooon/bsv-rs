@@ -14,7 +14,7 @@
 
 use super::*;
 use crate::overlay::OutputListItem;
-use crate::primitives::to_hex;
+use crate::primitives::{from_hex, to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
@@ -204,7 +204,9 @@ fn published_with_txid_alone() -> (Certificate, OutputListItem) {
 
     let mut json = serde_json::to_value(&cert).unwrap();
     json["revocationOutpoint"] = txid.into();
-    json["keyring"] = serde_json::json!({});
+    // One keyring entry naming a field, as the reference's record check
+    // requires of a published token (#553, `identityUtils.ts:112-125`)
+    json["keyring"] = serde_json::json!({ "name": "QWxpY2U=" });
     let subject_key = PrivateKey::from_bytes(&[37u8; 32]).unwrap();
     let locking = revelation(&subject_key, &serde_json::to_vec(&json).unwrap());
     let mut tx = Transaction::new();
@@ -267,7 +269,9 @@ async fn a_published_certificate_key_in_a_lenient_form_is_skipped_498() {
     cert.set_field("name", "QWxpY2U=");
     cert.sign(&certifier).unwrap();
     let mut json = serde_json::to_value(&cert).unwrap();
-    json["keyring"] = serde_json::json!({});
+    // One keyring entry naming a field, as the reference's record check
+    // requires of a published token (#553, `identityUtils.ts:112-125`)
+    json["keyring"] = serde_json::json!({ "name": "QWxpY2U=" });
     let client = IdentityClient::new(ProtoWallet::new(None), Default::default());
     assert!(client
         .parse_output_to_verifiable_certificate(&publish_by(&json, &subject_key))

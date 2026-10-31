@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the identity parsers run the reference discovery's record checks and byte bounds (#553)
+
+The identity client's two `ls_identity` parsers (`parse_output_to_certificate`
+under `resolve_by_identity_key` and `resolve_by_attributes`,
+`parse_output_to_verifiable_certificate` under `discover_certificates`,
+`discover_certificates_by_type` and `query`) read a revelation token's
+certificate JSON for the members they need and nothing else (#544 added the
+envelope, the lock and the field signature). The reference runs more on the
+same answer: the SDK's `IdentityClient.resolveByIdentityKey` and
+`resolveByAttributes` (`ts-stack@edf6e03` `IdentityClient.ts:559-655`) ask
+their wallet's `discoverByIdentityKey` and `discoverByAttributes`, which the
+toolbox answers from the `ls_identity` lookup (`wallet-toolbox`
+`Wallet.ts:904-1010`, `parseResults`, `identityUtils.ts:671-707`) through
+`decodeIdentityOutput` (`:497-559`): two fields, the certificate 1 to 256 KiB,
+the signature 8 to 80 bytes, the canonical envelope, then `certificateRecord`
+(`:87-132`): the bytes read as `toUTF8Strict` (`TextDecoder`, a leading
+byte-order mark dropped), a plain JSON object of exactly the eight members
+`type`, `serialNumber`, `subject`, `certifier`, `revocationOutpoint`,
+`fields`, `keyring`, `signature`, `fields` and `keyring` objects of 1 to 100
+names, every keyring name a field's, every keyring value a string of at most
+2048 UTF-16 units. Every failure is caught and the output skipped (`:555-557`).
+
+Until this landing the parsers read, where the reference skips: a
+certificate over 256 KiB; a member beyond the eight; a missing `keyring` or
+`revocationOutpoint` (the latter when the signed outpoint is the zero
+sentinel the default reads); a `keyring` that is no object, empty, naming an
+absent field, or carrying a value that is no string or is over 2048 units;
+more than 100 fields. They refused, where the reference reads, a certificate
+behind a byte-order mark. And `parse_output_to_certificate` returned an
+`Err` for a record whose members did not read as a certificate (`identity
+error: Missing certificate type`, `Missing serial number`, `Missing subject`,
+`Missing certifier`, `Invalid certificate type length`, `Invalid serial
+number length`, and the base64, key and outpoint readers' errors), so one
+such output in an answer made `resolve_by_identity_key` and
+`resolve_by_attributes` fail whole, where the reference's
+`new VerifiableCertificate(...).verify()` fails and the output is skipped
+(`:540-550`). Now both parsers run the checks in `src/identity/client_record.rs`
+before the token is authenticated, and every refusal is a skip: the
+resolution goes on with the other outputs. No public shape changes; the six
+words above are no longer returned (no downstream named in `CLAUDE.md`'s list
+matches them: `bsv-wallet-cli` and `bsv-wallet-toolbox-rs` call neither
+resolver).
+
+The witness is recorded, never written by hand:
+`tests/support/identity_certificate_record_553.mjs` runs the toolbox's own
+`parseResults` (a bundle of `packages/sdk` and the toolbox's
+`identityUtils.ts` at `ts-stack@edf6e03`, its `@bsv/sdk` imports resolved to
+that SDK, under Node v22.18.0) on fifteen tokens the reference's
+`PushDrop.lock` signs for the subject (the scalar 9) over the reference's
+published certificate JSON changed in one respect, each a one-transaction
+block's proven transaction under a chain tracker that admits its root;
+`tests/vectors/identity_certificate_record_553.json` holds each outcome
+twice: under the verifier the toolbox's wallet builds, and with its evidence
+script bound raised so `decodeIdentityOutput` alone decides; the two 256 KiB
+tokens are recorded by recipe (the padding, the signature, the script's
+SHA-256; this crate's writer rebuilds them to that hash); two runs
+byte-identical. `tests/identity_certificate_record_553.rs` serves each token
+through both parsers: 12 of the 15 cases RED on `b13f07c1` (the three
+controls, the reference's token, a certificate of exactly 256 KiB and one of
+100 fields, read on both). The #261 tests' published certificates with an
+empty keyring (`src/identity/client_field_value_261_tests.rs`) now carry one
+keyring entry, as the reference's record requires.
+
+The cold review's fold: the record's skip at `:540-550` is
+`VerifiableCertificate.verify()`, `Certificate.toBinary(false)` under a catch
+(`packages/sdk/src/auth/certificates/Certificate.ts:425-440`), and its text
+rules skip a record the parsers still read: `type` and `serialNumber`
+canonical base64 of 32 bytes (`:233-238`, `assertCanonicalBase64Length`,
+`WalletByteEncoding.ts:39-64`: padded, no whitespace, no URL alphabet, the
+unused bits zero), where `from_base64` read them unpadded or with whitespace;
+the revocation outpoint a string of at most one dot, a txid of 64 hex
+characters and an index `0` or a decimal without sign or leading zero of at
+most `0xffffffff` (`:257-270`, the txid alone index 0), where `null`, `""`
+and a number read as no outpoint and `.00` and `.+0` as index 0, the
+certificate's zero sentinel verifying over either; every field value a
+string (`snapshotCertificateFields`, `:63-72`, called at `:281`), where the
+maps' reader dropped a `null` or a number and the rest verified. All ten
+shapes are now skipped (`client_record.rs`: `canonical_id`, `outpoint`, the
+field values' check). Eleven cases are added to the recorder and the vector
+(re-recorded, two runs byte-identical, the first fifteen unchanged): the ten,
+each `skipped` under both verifiers, and the txid alone, `read`, the control
+that the outpoint rule is not stricter than the reference's. 10 of the 11 RED
+on the pre-fold tip (`b13f07c1` with this entry's first commit, squashed
+since; each read, `Ok((1, 1))`; the control read on both). Two units in
+`client_record.rs` pin `outpoint` and `canonical_id` at their edges
+(`.4294967295` read, `.4294967296`, `.-0`, `.1e3`, unused bits set and the
+URL alphabet skipped). The verify step's one other text reading, the
+signature's hex (`Certificate.ts:434`, `hexToUint8Array`, `utils.ts:126-141`,
+`hex.ts:6-17`), changes no verdict: it reads upper case as `from_hex` does,
+refuses a character outside the hex alphabet as `from_hex` does, and reads
+an odd length with a leading `0`, which gives a first byte `0x0N`, never
+DER's `0x30`, so `Signature.fromDER` refuses it where `from_hex` does.
+
+### Notes: cross-SDK parity (#553)
+
+The toolbox's wallet verifies the lookup's BEEF before the record
+(`TransactionEvidenceCoordinator`, `IdentityEvidenceVerifier.parse`,
+`identityUtils.ts:600-635`) under the SDK's default evidence limits
+(`TransactionEvidence.ts:61-75`): a transaction whose scripts pass 256 KiB
+throws `Transaction evidence: limit`, and the throw refuses the whole
+discovery (`:632`, `Wallet.ts:950-955`), so under the wallet's verifier a
+certificate near or at the 256 KiB bound never reaches it (recorded:
+`certificate_at_bound` and `certificate_over_bound` refused whole). This
+crate's parsers run no evidence layer (no SPV of the lookup's BEEF, no
+evidence limits) and answer as `decodeIdentityOutput` does: the 256 KiB
+certificate read, one byte more skipped. Two residues of the same function
+stay: the anyone wallet's decryption must succeed and give a field
+(`:551-552`), where `parse_output_to_certificate` keeps an empty
+`decrypted_fields` on a failure and `parse_output_to_verifiable_certificate`
+does not decrypt (so a keyring value padded with spaces or line breaks to
+2048 units, or a keyring entry carrying another field's key, is skipped by
+the reference at its decryption and read here with an empty
+`decrypted_fields`: the review's probe, not recorded); and `JSON.parse` reads
+a lone surrogate escape that `serde_json` refuses. The signature bound is
+checked (8 to 80 bytes) but
+changes no verdict here: the field signature's DER check refuses outside it
+either way. Go's identity client at `2ca481c` delegates resolution to its
+wallet's `DiscoverByIdentityKey` and `DiscoverByAttributes`
+(`identity/client.go:240-276`), as the reference's does, and parses no
+`ls_identity` answer itself.
+
+Census (#375; current reading):
+
+- Row 88: Ours: closed by #553 at the pin: both `ls_identity` parsers run the toolbox discovery's certificateRecord checks and byte bounds (wallet-toolbox identityUtils.ts:87-132,497-559 at edf6e03, reached by the SDK's IdentityClient.ts:559-655 through its wallet's discovery) and the text rules of the verify step under them (Certificate.ts:63-72,233-238,257-270,425-440 at edf6e03), every refusal a skip; residues the evidence layer, the anyone decryption's requirement and the lone surrogate escape (the witness: tests/identity_certificate_record_553.rs; tests/vectors/identity_certificate_record_553.json).
+
 ### Fixed: PushDrop pushes the wallet's key bytes as returned, as the reference does (#545)
 
 The PushDrop template pushed its key compressed (`PushDrop::lock`,
@@ -1460,6 +1585,7 @@ checks at its counterparts.
 
 Census (#375; current reading):
 
+- Row 88: Ours: closed by #553 at the pin: both `ls_identity` parsers run the toolbox discovery's certificateRecord checks and byte bounds (wallet-toolbox identityUtils.ts:87-132,497-559 at edf6e03, reached by the SDK's IdentityClient.ts:559-655 through its wallet's discovery) and the text rules of the verify step under them (Certificate.ts:63-72,233-238,257-270,425-440 at edf6e03), every refusal a skip; residues the evidence layer, the anyone decryption's requirement and the lone surrogate escape (the witness: tests/identity_certificate_record_553.rs; tests/vectors/identity_certificate_record_553.json).
 - Row 86: Ours: closed by #544 at the pin; residues the contact's badges and member order, the toolbox certificate record and byte bounds, the interpreter's controller context and the downloader's lookup-level checks. Theirs: go-sdk, filing pending (the witness: tests/identity_contacts_envelope_544.rs; tests/vectors/token_envelope_544.json).
 
 ### Fixed: a SEC 1 tag 05 is refused as the reference refuses it (#550)
