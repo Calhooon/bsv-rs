@@ -432,7 +432,7 @@ impl<W: WalletInterface> RegistryClient<W> {
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
-        let pushdrop = PushDrop::decode(&tx_output.locking_script)
+        let pushdrop = PushDrop::decode_before(&tx_output.locking_script)
             .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
 
         if pushdrop.fields.len() != 6 {
@@ -455,7 +455,7 @@ impl<W: WalletInterface> RegistryClient<W> {
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
-        let pushdrop = PushDrop::decode(&tx_output.locking_script)
+        let pushdrop = PushDrop::decode_before(&tx_output.locking_script)
             .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
 
         if pushdrop.fields.len() != 6 {
@@ -478,7 +478,7 @@ impl<W: WalletInterface> RegistryClient<W> {
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
-        let pushdrop = PushDrop::decode(&tx_output.locking_script)
+        let pushdrop = PushDrop::decode_before(&tx_output.locking_script)
             .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
 
         if pushdrop.fields.len() != 7 {
@@ -540,8 +540,8 @@ impl<W: WalletInterface> RegistryClient<W> {
             // Parse the locking script
             if let Some(ref script_bytes) = output.locking_script {
                 if let Ok(script) = LockingScript::from_binary(script_bytes) {
-                    // Decode PushDrop
-                    if let Ok(pushdrop) = PushDrop::decode(&script) {
+                    // Lock-before alone, as registryTokenValidation.ts:28 decodes (#537)
+                    if let Ok(pushdrop) = PushDrop::decode_before(&script) {
                         // Verify field count matches expected
                         if pushdrop.fields.len() != definition_type.expected_field_count() {
                             continue;
