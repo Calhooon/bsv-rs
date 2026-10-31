@@ -20,6 +20,23 @@ comparisons through indirect helpers still require review. Test code in a
 separate file should carry its own test cfg. Each failure names a source file
 and its original line number.
 
+**An allowance dies with its line (#347).** An allowlist entry that matches no
+site its rule finds is red, and so is a ceiling above the sites it matches:
+the failure names the entry, and the fix is to delete it or lower its ceiling
+in the same change that removed the line. `arch_support::check_sites` applies
+this to every `(file, line text, ceiling)` list (rules 1, 3, 4 and 5);
+`arch_no_unwrap.rs` applies it to its `(file, ceiling)` list (rule 2), a file
+gone or without a site as red as one under its ceiling. The other lists
+already refuse a stale entry: `arch_ci_runs_every_test.rs`'s run-apart list
+(a missing file, a file a whole-suite step runs), `arch_arc_deprecated.rs`'s
+deprecated items (an item not found) and `arch_one_wallet_byte_bound.rs`'s
+other constants (the found set must equal the list).
+`arch_ci_pr_runs_the_required_set.rs`'s full-set exceptions
+(`NOT_ON_THE_FULL_SET`) refuse an entry naming no job of `ci.yml`, or a job
+that runs (or may) on an event the entry covers (#347's review). Two stale entries of
+rule 3 (`http_json.rs:912`, `http_wire.rs:209` at `953d9c00`) outlived their
+lines until #323's fold removed them by hand; that is what this refuses.
+
 ## 1. Network clients live at transport boundaries
 
 `tests/arch_network_sites.rs` permits client names only in:
@@ -60,7 +77,8 @@ this guard's scope.
 qualified calls and calls split across lines. It ignores `unwrap_or`, strings,
 comments and test-only items. A file absent from the allowlist has ceiling 0.
 When a cleanup reduces a count, reduce its ceiling in the same change; remove
-the entry at 0. Moving a site to another file requires reviewing both entries.
+the entry at 0. A ceiling above its file's count, or an entry for a file with
+no site, is red (#347). Moving a site to another file requires reviewing both entries.
 
 The executable baseline at `efe12e6` is **40 sites in 8 files**:
 
@@ -71,7 +89,7 @@ The executable baseline at `efe12e6` is **40 sites in 8 files**:
 | `src/primitives/hash.rs` | 5 | #78 tracks the remaining cleanup |
 | `src/primitives/p256.rs` | 3 | #78 tracks the remaining cleanup |
 | `src/primitives/symmetric.rs` | 1 | #78 tracks the remaining cleanup |
-| `src/transaction/beef_stream.rs` | 24 | #86, the shared BEEF reader |
+| `src/transaction/beef_stream.rs` | 23 | #86, the shared BEEF reader (24 at `efe12e6`; one site gone, lowered by #347) |
 | `src/transaction/transaction.rs` | 2 | #86, the shared BEEF reader |
 | `src/wallet/key_deriver.rs` | 1 | #78 tracks the remaining cleanup |
 
@@ -96,7 +114,9 @@ equality on either side, `Some(literal)` comparisons, and equality involving
 `error`: renaming an error to `message` must not bypass the guard.
 
 The conservative scan needs **21 protocol comparisons in 9 files** allowed
-as whole source lines, with duplicate-count ceilings:
+as whole source lines, with duplicate-count ceilings. An entry that matches no
+line, or a ceiling above its line's copies, is red (#347): delete the entry
+with its line.
 
 | File | Sites | Existing purpose |
 | --- | ---: | --- |

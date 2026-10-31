@@ -285,3 +285,29 @@ fn error_text_detection_ignores_formatting_and_operand_order() {
         );
     }
 }
+
+/// #347: an allowlist entry that matches no site is refused with the entry in
+/// its message, and so is a ceiling above the sites it matches; a matched one
+/// passes.
+#[test]
+fn an_unused_allowlist_entry_reads_red_naming_the_entry() {
+    let sites = [
+        ("src/a.rs".to_owned(), 3, "if x == \"a\" {".to_owned()),
+        ("src/b.rs".to_owned(), 9, "if y == \"b\" {".to_owned()),
+    ];
+    let allowed = [
+        ("src/a.rs", "if x == \"a\" {", 1),
+        ("src/b.rs", "if y == \"b\" {", 2),
+        ("src/gone.rs", "if z == \"gone\" {", 1),
+    ];
+    assert_eq!(
+        arch_support::site_errors("rule", &sites, &allowed),
+        [
+            "src/b.rs: allowlist entry `if y == \"b\" {` allows 2 rule sites and matches 1; lower its ceiling to 1",
+            "src/gone.rs: allowlist entry `if z == \"gone\" {` matches no rule site; delete the entry",
+        ]
+    );
+    assert!(arch_support::site_errors("rule", &sites, &allowed[..1])
+        .iter()
+        .all(|e| e.starts_with("src/b.rs:9: rule")));
+}

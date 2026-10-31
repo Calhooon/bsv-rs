@@ -329,7 +329,21 @@ pub fn is_call(tokens: &[Token<'_>], at: usize, names: &[&str]) -> bool {
 
 /// Exact source-line exceptions, with a ceiling for duplicate occurrences.
 /// Moving a line is fine; adding another copy or another token on it is not.
+/// An entry that matches no site the rule finds is red too, and so is a
+/// ceiling above the sites it matches (#347): an allowance dies with its
+/// line, so the fix is to delete the entry or lower its ceiling.
 pub fn check_sites(rule: &str, sites: &[(String, usize, String)], allowed: &[(&str, &str, usize)]) {
+    let errors = site_errors(rule, sites, allowed);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+}
+
+/// The refusals `check_sites` asserts on: each site past its entry's ceiling,
+/// then each entry no site used or used fewer times than its ceiling.
+pub fn site_errors(
+    rule: &str,
+    sites: &[(String, usize, String)],
+    allowed: &[(&str, &str, usize)],
+) -> Vec<String> {
     let mut used = vec![0; allowed.len()];
     let mut errors = Vec::new();
     for (file, line, text) in sites {
@@ -341,5 +355,16 @@ pub fn check_sites(rule: &str, sites: &[(String, usize, String)], allowed: &[(&s
         }
         errors.push(format!("{file}:{line}: {rule}"));
     }
-    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    for ((file, text, ceiling), count) in allowed.iter().zip(&used) {
+        if *count == 0 {
+            errors.push(format!(
+                "{file}: allowlist entry `{text}` matches no {rule} site; delete the entry"
+            ));
+        } else if count < ceiling {
+            errors.push(format!(
+                "{file}: allowlist entry `{text}` allows {ceiling} {rule} sites and matches {count}; lower its ceiling to {count}"
+            ));
+        }
+    }
+    errors
 }

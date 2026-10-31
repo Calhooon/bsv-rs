@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: an unused arch allowlist entry reads red (#347)
+
+The #323 CI fold's re-review found that `tests/arch_no_string_errors.rs`'s
+allowlist had carried two stale entries covering four sites
+(`http_json.rs:912` and `http_wire.rs:209` at `953d9c00`, both lines gone)
+until the fold removed them by hand: nothing refused an allowance that had
+outlived its line. `arch_support::check_sites` now refuses an entry that
+matches no site its rule finds, and an entry whose ceiling is above the sites
+it matches, naming the entry and saying to delete it or lower its ceiling. It covers the four `(file, line text,
+ceiling)` lists: `arch_no_string_errors`, `arch_network_sites`, `arch_no_env`
+and `arch_no_system_time` (the last two empty). `arch_no_unwrap.rs` applies
+the same rule in the same words to its `(file, ceiling)` list. The other
+lists already refused a stale entry (`arch_ci_runs_every_test`'s run-apart
+list, `arch_arc_deprecated`'s items, `arch_one_wallet_byte_bound`'s
+constants); `arch_secrets_scan_scope` carries none. The cold review found one
+list the rule had missed: `arch_ci_pr_runs_the_required_set`'s full-set
+exceptions (`NOT_ON_THE_FULL_SET`), where an entry naming no job, or a job
+that runs on every dispatch, passed; such an entry is now red naming it
+(`a_stale_full_set_exception_is_refused_naming_the_entry`; all five entries
+are used today).
+
+One stale allowance was on the tip: `src/transaction/beef_stream.rs`'s
+unwrap/expect ceiling was 24 with 23 sites; it is now 23. Every other entry
+matches its sites exactly. Pinned by
+`an_unused_allowlist_entry_reads_red_naming_the_entry` and
+`a_stale_ceiling_entry_reads_red_naming_the_entry`; a stale entry added to
+the real string-errors list stayed green on the base and is red here. The
+rule is in `docs/ARCH-RULES.md`. No library change.
+
 ### Changed: the local store decodes lock-before alone, as the reference does (#499)
 
 The keeper's word (2026-10-30 05:1xZ, issue #499): lock-before alone, as the
