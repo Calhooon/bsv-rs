@@ -193,7 +193,7 @@ fn action_inputs(action: &Object<'_>, call: &str, field: &str, request: &Value) 
             "source locking script",
         )?;
         required(
-            request["includeInputUnlockingScripts"] == true,
+            unlocking_requested(action, request),
             unlocking.is_some(),
             call,
             &format!("{field}.unlockingScript"),
@@ -212,6 +212,19 @@ fn action_inputs(action: &Object<'_>, call: &str, field: &str, request: &Value) 
         )?;
     }
     Ok(())
+}
+
+/// R56 under `includeInputUnlockingScripts`, narrowed by #491: an `unsigned`
+/// action's input may omit `unlockingScript`, as the reference wallet answers
+/// (`listActionsIdb.ts:77-91` at ts-stack edf6e03: no script outside the
+/// known-valid set, `StorageKnex.ts:189-209`); every other status keeps the
+/// demand of `WalletResultValidation.ts:2027-2035` (ts-stack #1451).
+fn unlocking_requested(action: &Object<'_>, request: &Value) -> bool {
+    request["includeInputUnlockingScripts"] == true
+        && member(action, "status")
+            .and_then(|v| serde_json::from_str::<String>(v.get()).ok())
+            .as_deref()
+            != Some("unsigned")
 }
 
 fn action_outputs(action: &Object<'_>, call: &str, field: &str, request: &Value) -> Result<()> {

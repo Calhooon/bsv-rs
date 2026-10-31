@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: R56 lets an unsigned action's input carry no unlockingScript, as the reference wallet answers (#491)
+
+R56 (`src/wallet/substrates/result_values/lists.rs`, `action_inputs` through
+`unlocking_requested`), the listActions input row of #432's result inventory,
+demanded `unlockingScript` under `includeInputUnlockingScripts` on every input.
+It now lets an input of an action whose `status` is exactly `unsigned` omit the
+key; every other status keeps the demand in the same words. The status is read
+from the action object the input belongs to. Nothing else in R56, or in any
+other row, changes: a present `unlockingScript` must still be even hex, and the
+`sourceLockingScript` demand under `includeInputSourceLockingScripts` is
+unchanged for every status.
+
+The word is the stack's (the keeper, 2026-10-31 05:1xZ, recorded on #491):
+form (a) in its narrow reading, at `ts-stack@edf6e03`. The reference disagrees
+with itself. Its wallet leaves the key absent when
+`getRawTxOfKnownValidTransaction` returns nothing
+(`packages/wallet/wallet-toolbox/src/storage/methods/listActionsIdb.ts:77-91`:
+`wo.unlockingScript = input?.unlockingScript?.toHex()`). That holds outside
+the known-valid set, a `proven_txs` row or a `proven_tx_reqs` row with status
+unsent, unmined, unconfirmed, sending, nosend or completed
+(`packages/wallet/wallet-toolbox/src/storage/StorageKnex.ts:189-209`). An
+unsigned transaction is outside that set and holds no unlocking script. Its
+SDK refuses any such page (`packages/sdk/src/wallet/WalletResultValidation.ts:2027-2035`),
+and runs that validator on every answer (`packages/sdk/src/wallet/WalletClient.ts:113-118`).
+The defect is ts-stack #1451 (open). Only the `unsigned` status is decidable
+from the answer: an action's status and a request row's status are different
+enumerations, so whether a signed action's transaction is known valid is a
+storage fact the answer does not show, and projecting it onto the answer would
+be this crate's invention.
+
+The toolbox's and CLI's tables change as follows:
+
+| Consumer | Answer under `includeInputUnlockingScripts` | Before | Now |
+|---|---|---|---|
+| Toolbox result table | An `unsigned` action's input without `unlockingScript` (`transactions.rs:420-426`, the reference wallet's line) | Refused: `Invalid listActions result actions[N].inputs[M].unlockingScript: expected the explicitly requested unlocking script` | Accepted |
+| Toolbox result table | An input without `unlockingScript` of an action with status completed, unprocessed, sending, unproven, nosend, nonfinal or failed | Refused in those words | Refused in those words (unchanged) |
+| CLI operator-visible table | Fixture 145 (`pin-spend`, the stored unsigned template's input) | Refused by R56 | Passes R56; refused by R51 instead, its one-byte `inputDescription` `"c"` outside 5 to 2000 bytes (`Invalid listActions result actions[5].inputs[0].inputDescription: expected 5–2000 UTF-8 bytes`), a rule the reference's validator also applies (`historyDescription`, after its R56 check) |
+| Both | An `unsigned` action's input with an `unlockingScript` | Validated as even hex | Validated as even hex (unchanged) |
+
+The residue row [D]: a signed action with status unprocessed, nonfinal or
+failed stays strict here, though the reference wallet answers its input
+without the key when the request row is outside the known-valid set. It stays
+until ts-stack #1451 answers. If the validator is amended upstream, this crate
+follows the amended text; if the wallet is amended to emit the key, R56 returns
+to strict for `unsigned` too and the toolbox's `transactions.rs:420` follows
+the wallet.
+
+Fixture 145's description: the CLI's fixture carries `inputDescription: "c"`,
+which R51 refuses on both sides; R56 ran first, so its refusal was the only
+one seen. This change does not make fixture 145 pass. The cold review ran the
+recorded body (`bsv-wallet-cli` beta `c1f7cd3`,
+`tests/wire/145-listActions.afterOverlongSpend.json`) through both: this crate
+refuses it at R51 (`Invalid listActions result actions[5].inputs[0].inputDescription:
+expected 5–2000 UTF-8 bytes`); the reference refuses it at R56 and, with a script
+supplied, at R51 in the same words (`historyDescription`,
+`WalletResultValidation.ts:2037`). The R51 refusal is recorded as its own case
+(`unsigned_fixture_145_description_with_script`), and it stands on the CLI's or
+toolbox's side.
+
+The pins, in `tests/wallet_http_json_result_values_408.rs` on the new
+`unsigned_491` group of `tests/vectors/http_json_result_values_408.json`, 13
+listActions bodies in fixture 145's shape (a funded coin and the stored
+template), recorded by `tests/support/http_json_result_values_408.mjs` under
+Node 22.18.0 against the SDK built from `edf6e03`. The reference refuses 12
+and accepts the one with a script; every earlier case re-recorded byte for
+byte. `an_unsigned_actions_input_may_omit_its_unlocking_script_as_the_reference_wallet_answers`
+asserts the reference's refusal and this crate's acceptance (the divergence,
+stated in the test). It failed on base `02abc87f` (`Err(WalletError("Invalid
+listActions result actions[1].inputs[0].unlockingScript: expected the
+explicitly requested unlocking script"))` against `Ok(())`) and passes here.
+`the_strict_rule_stays_for_every_other_status_and_returns_on_the_upstreams_answer`
+judges the other eleven cases in the reference's words: the seven other
+statuses, a present script, an odd-length script, the source-locking demand,
+and the fixture's description with a script supplied (R51). It is the strict rule kept for return. #432's
+`row_56_history_scripts` (a `completed` action's input) is unchanged.
+
+Census (#375; current reading):
+
+- Row 83: Ours: the stack's 2026-10-31 05:1xZ word relaxes the unsigned status alone, the one the answer decides. Theirs: ts-stack #1451 (the witness: tests/wallet_http_json_result_values_408.rs; tests/vectors/http_json_result_values_408.json, group unsigned_491; bsv-wallet-cli#371).
+
 ### Changed: the fixtures capture the Origin header beside Originator (#346)
 
 The #323 CI fold's re-review (Opus, 2026-10-27) found that the public-surface

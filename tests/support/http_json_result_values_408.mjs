@@ -183,6 +183,31 @@ for (const extra of [-1, 0, 1]) {
 
 extend432(cases, seeds, sdk)
 
+// #491: the shape of bsv-wallet-cli's fixture 145, a funded coin and a stored
+// unsigned template whose input the reference wallet answers without an
+// unlockingScript (listActionsIdb.ts:77-91). The reference validator refuses
+// every status here; the port accepts the unsigned input alone. The fixture's
+// one-byte inputDescription 'c' is R51's refusal on both sides: the reference
+// reaches it once a script is supplied, recorded apart below.
+const template = (status, input = {}) => ({ totalActions: 2, actions: [
+  { txid: '33'.repeat(32), satoshis: 5000, status: 'completed', isOutgoing: false,
+    description: 'a caller puzzle', version: 1, lockTime: 0, inputs: [] },
+  { txid: '00'.repeat(32), satoshis: 0, status, isOutgoing: true,
+    description: 'wire ten byte declaration', version: 1, lockTime: 0,
+    inputs: [{ sourceOutpoint: '33'.repeat(32) + '.0', sourceSatoshis: 5000,
+      inputDescription: 'the caller puzzle', sequenceNumber: 0, ...input }] }] })
+const asked = { includeInputs: true, includeInputUnlockingScripts: true, labels: [] }
+for (const status of ['unsigned', 'completed', 'unprocessed', 'sending', 'unproven', 'nosend', 'nonfinal', 'failed']) {
+  add('unsigned_491', 'listActions', `${status}_without_unlocking_script`, template(status), asked)
+}
+add('unsigned_491', 'listActions', 'unsigned_with_unlocking_script', template('unsigned', { unlockingScript: '51' }), asked)
+add('unsigned_491', 'listActions', 'unsigned_odd_unlocking_script', template('unsigned', { unlockingScript: 'a' }), asked)
+add('unsigned_491', 'listActions', 'unsigned_fixture_145_description', template('unsigned', { inputDescription: 'c' }), asked)
+add('unsigned_491', 'listActions', 'unsigned_fixture_145_description_with_script',
+  template('unsigned', { inputDescription: 'c', unlockingScript: '51' }), asked)
+add('unsigned_491', 'listActions', 'unsigned_without_source_locking_script', template('unsigned'),
+  { ...asked, includeInputSourceLockingScripts: true })
+
 for (const c of cases) {
   const expansion = c.expansion?.array
     ? JSON.stringify(Array(c.expansion.length).fill(c.expansion.item))
