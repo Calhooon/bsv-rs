@@ -11,8 +11,8 @@ use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
-    DecryptArgs, EncryptArgs, ListOutputsArgs, OutputInclude, Protocol, SecurityLevel,
-    SignActionArgs, SignActionSpend, WalletInterface,
+    DecryptArgs, EncryptArgs, ListOutputsArgs, OutputInclude, Protocol, SignActionArgs,
+    SignActionSpend, WalletInterface,
 };
 use crate::{Error, Result};
 
@@ -81,6 +81,15 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// Get the originator string for wallet calls.
     fn originator(&self) -> Option<&str> {
         self.config.originator.as_deref()
+    }
+
+    /// The contact protocol from the configuration, `[2, 'contact']` by
+    /// default, the reference's for every contact key (`ContactsManager.ts:30`,
+    /// #542).
+    fn protocol(&self) -> Result<Protocol> {
+        let (level, name) = (self.config.protocol_id.0, &self.config.protocol_id.1);
+        Protocol::from_tuple((level, name))
+            .ok_or_else(|| Error::IdentityError(format!("Invalid protocol ID: ({level}, {name})")))
     }
 
     // =========================================================================
@@ -200,7 +209,7 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// without revealing the actual identity key in the tag.
     #[allow(dead_code)]
     async fn create_identity_tag(&self, identity_key: &str) -> Result<String> {
-        let protocol = Protocol::new(SecurityLevel::App, &self.config.protocol_id.1);
+        let protocol = self.protocol()?;
 
         let result = self
             .wallet

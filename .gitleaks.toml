@@ -102,3 +102,12 @@ regexes = [
 [[allowlists]]
 description = "the #432 recorder's JSON path read as a key value by the generic-api-key rule"
 regexes = ['''^certificates\.0\.subject$''']
+
+# tests/vectors/contacts_protocol_542.json: the #542 contact's `identityKey` is the public point of the
+# private key of 32 bytes of 3 (`new PrivateKey('03'.repeat(32), 'hex').toPublicKey()` in
+# tests/support/contacts_protocol_542.mjs, the contact of #326's tests), recorded from the reference's
+# ContactsManager; a public key of a test scalar, not a key in use. Only that literal is let through,
+# never the file.
+[[allowlists]]
+description = "the 32-bytes-of-3 public point as the #542 contact's identity key"
+regexes = ['''^02531fe6068134503d2723133227c867ac8fa6c83c537e9a44c3c5bdbdcb1fe337$''']

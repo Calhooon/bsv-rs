@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the contacts manager uses the reference's contact protocol (#542)
+
+The contacts manager derived every contact key at security level 1:
+`Protocol::new(SecurityLevel::App, "contact")`, `[1, 'contact']`, at four
+sites, while `ContactsManagerConfig::protocol_id` held `(2, "contact")` and
+went unread. The reference uses `[2, 'contact']`, counterparty `'self'`, for
+every contact operation (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:30`). Each site now reads the
+protocol from the configuration (`ContactsManager::protocol`, private), so the
+default is the reference's `[2, 'contact']`:
+
+| Site (this crate) | Wallet call | Reference |
+|---|---|---|
+| `contacts.rs`, `create_identity_tag` | createHmac over the identity key, key ID the identity key (the lookup and output tag) | `#hashIdentityKey`, `:572-583` |
+| `contacts_actions.rs`, `contact_lock` | encrypt, then getPublicKey `forSelf` for the PushDrop lock, key ID the record's | `#encryptAndLock`, `:748-772` |
+| `contacts_actions.rs`, `contact_unlock` | the PushDrop spend's createSignature, the stored key ID | `#updateContactOutput`, `:821-830` |
+| `contacts_cache.rs`, `decode_cached_contact` | decrypt, the stored key ID | `#decryptContactOutputs`, `:494-501` |
+
+Before, level 1 against the reference's level 2 at every site: the
+reference's contact record did not decrypt here (dropped from
+`list_contacts_with_refresh`), this crate's ciphertext did not decrypt there
+(`Decryption failed!`), the token was locked to another key, the identity tag
+was another HMAC (so neither side's lookup by tag found the other's record),
+and a spend of the reference's token was signed by a key its lock does not
+name. Now the records are readable across implementations at the protocol:
+the reference's record is read here, and this crate's ciphertext is decrypted
+by the reference's wallet under `[2, 'contact']`. The keeper's reading
+(2026-10-31 07:1xZ, issue #542): a cross-implementation incompatibility, a
+parity row at the pin. The toolbox has no contacts path; the CLI's tables are
+unchanged. No public item changes; a caller who set `protocol_id` now gets
+the level it set (it was ignored before).
+
+The witness is recorded, never written by hand:
+`tests/support/contacts_protocol_542.mjs` runs the reference's own
+`ContactsManager.saveContact` (the bundle of `ts-stack@edf6e03`, an entry
+re-exporting `ContactsManager`, under Node v22.18.0, the ProtoWallet of the
+scalar 9, #310's randomness) and reads back with its `getContacts`; it takes
+this crate's token from the base and the tip as input (written by the ignored
+`record_this_crates_contact_token_542`) and records the reference's verdicts on
+them, in `tests/vectors/contacts_protocol_542.json` (two runs byte for byte).
+`tests/identity_contacts_protocol_542.rs`: the reference's record read here,
+the identity tag the reference's HMAC, this crate's token locked to the key the
+reference derives and its ciphertext decrypted under the reference's protocol,
+the spend of the reference's token verified under the reference's lock, each
+red on `b51cbea7`; the reference's recorded verdicts on the base's token
+(another key, `Decryption failed!`) and the tip's (its key, the record
+decrypted).
+
+### Notes: cross-SDK parity
+
+The reference's `ContactsManager` still drops this crate's token, on the base
+and the tip alike, before it decrypts: this crate writes the ciphertext as the
+one PushDrop field, where the reference writes a second field, its signature
+over the ciphertext, and refuses a one-field token (`Invalid contact PushDrop
+field count`, `ContactsManager.ts:433`; recorded in the vector's `read_back`).
+This crate's plaintext is its `Contact` JSON (`identityKey`, `name`,
+`addedAt`, `tags`), the reference's the seven display fields and `metadata`
+(`validateContact`, `:171-195`); whether the reference's parser admits this
+crate's plaintext is not measured, since the field count refuses first. Both
+are pre-existing and outside #542's protocol; the root `CLAUDE.md` row states
+them for the keeper. Go at `2ca481c` has no contacts manager.
+
 ### Changed: `PublicKey::from_hex` accepts the reference's lenient forms (#498)
 
 The keeper's word (2026-10-30 05:1xZ, on #498, under the reading of record

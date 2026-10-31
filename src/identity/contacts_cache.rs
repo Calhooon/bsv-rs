@@ -83,7 +83,7 @@ impl<W: WalletInterface> ContactsManager<W> {
             .decrypt(
                 DecryptArgs {
                     ciphertext: ciphertext.clone(),
-                    protocol_id: Protocol::new(SecurityLevel::App, &self.config.protocol_id.1),
+                    protocol_id: self.protocol()?,
                     key_id,
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
