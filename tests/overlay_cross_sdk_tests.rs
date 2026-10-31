@@ -125,10 +125,17 @@ fn load_overlay_types_vectors() -> OverlayTypesVectors {
 // Admin Token Tests
 // =================
 
+/// The deprecated writer's 4-field unsigned token for each vector is refused
+/// by the decode in the reference's words, as `OverlayAdminTokenTemplate.decode`
+/// refuses it (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:162-167`,
+/// `PushDropValidation.ts:61-63`; #544); the signed token over the vector's
+/// fields round-trips where the reference's URI rule admits its domain
+/// (`:140-160`: `http://localhost:8080` is no advertisement URI).
 #[test]
 fn test_admin_token_creation_and_decoding() {
     let vectors = load_admin_token_vectors();
     assert!(!vectors.is_empty(), "No admin token vectors loaded");
+    let root = bsv_rs::primitives::PrivateKey::from_hex(&"07".repeat(32)).unwrap();
 
     for (i, v) in vectors.iter().enumerate() {
         // Parse protocol
@@ -139,23 +146,42 @@ fn test_admin_token_creation_and_decoding() {
         let identity_key = PublicKey::from_hex(&v.identity_key_hex)
             .unwrap_or_else(|e| panic!("Vector {}: invalid identity key: {}", i, e));
 
-        // Create token
-        let script =
+        // The legacy token is refused
+        let legacy =
             create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
+        assert_eq!(
+            decode_overlay_admin_token(&legacy).unwrap_err(),
+            bsv_rs::Error::OverlayError("Unexpected PushDrop token field count".into()),
+            "Vector {}",
+            i
+        );
 
-        // Decode token
-        let decoded = decode_overlay_admin_token(&script)
-            .unwrap_or_else(|e| panic!("Vector {}: failed to decode token: {}", i, e));
-
-        // Verify fields match
+        // The signed token over the same fields
+        let script = bsv_rs::overlay::create_signed_overlay_admin_token(
+            &root,
+            protocol,
+            &v.domain,
+            &v.topic_or_service,
+        );
+        let decoded = decode_overlay_admin_token(&script);
+        if v.domain.starts_with("http://") {
+            assert_eq!(
+                decoded.unwrap_err(),
+                bsv_rs::Error::OverlayError("Discovery advertisement URI is invalid".into()),
+                "Vector {}",
+                i
+            );
+            continue;
+        }
+        let decoded = decoded.unwrap_or_else(|e| panic!("Vector {}: failed to decode: {}", i, e));
         assert_eq!(
             decoded.protocol, protocol,
             "Vector {}: protocol mismatch",
             i
         );
         assert_eq!(
-            decoded.identity_key.to_compressed(),
-            identity_key.to_compressed(),
+            decoded.identity_key_hex(),
+            root.public_key().to_hex(),
             "Vector {}: identity key mismatch",
             i
         );
@@ -165,15 +191,6 @@ fn test_admin_token_creation_and_decoding() {
             "Vector {}: topic/service mismatch",
             i
         );
-
-        // Verify identity_key_hex method
-        assert_eq!(
-            decoded.identity_key_hex(),
-            v.identity_key_hex,
-            "Vector {}: identity_key_hex mismatch",
-            i
-        );
-
         println!("Vector {}: {} - OK", i, v.description);
     }
 }
@@ -181,13 +198,30 @@ fn test_admin_token_creation_and_decoding() {
 #[test]
 fn test_admin_token_protocol_detection() {
     let vectors = load_admin_token_vectors();
+    let root = bsv_rs::primitives::PrivateKey::from_hex(&"07".repeat(32)).unwrap();
 
     for (i, v) in vectors.iter().enumerate() {
         let protocol = Protocol::parse(&v.protocol).unwrap();
         let identity_key = PublicKey::from_hex(&v.identity_key_hex).unwrap();
 
-        let script =
+        // The legacy token is no admin token since #544
+        let legacy =
             create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
+        assert!(
+            !bsv_rs::overlay::is_overlay_admin_token(&legacy),
+            "Vector {}",
+            i
+        );
+
+        if v.domain.starts_with("http://") {
+            continue;
+        }
+        let script = bsv_rs::overlay::create_signed_overlay_admin_token(
+            &root,
+            protocol,
+            &v.domain,
+            &v.topic_or_service,
+        );
 
         // Test protocol detection
         let is_ship = bsv_rs::overlay::is_ship_token(&script);

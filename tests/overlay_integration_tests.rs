@@ -4,22 +4,22 @@
 //! host reputation tracking, transaction history traversal, and admin token handling.
 //!
 //! **Historical note:** the admin-token assertions in this file were written
-//! against the legacy [`create_overlay_admin_token`] (4-field unsigned), now
+//! against the legacy `create_overlay_admin_token` (4-field unsigned), now
 //! `#[deprecated]` in favor of the 5-field signed
-//! [`create_signed_overlay_admin_token`] that matches @bsv/sdk 1.10.1. The
-//! file-level allow keeps the legacy regression coverage running while new
-//! parity assertions live in `overlay_admin_token_ts_parity_tests.rs`.
+//! [`create_signed_overlay_admin_token`] that matches @bsv/sdk 1.10.1. Since
+//! #544 the decode refuses the legacy token as the reference's does, so they
+//! build their tokens with the signed writer; parity assertions live in
+//! `overlay_admin_token_ts_parity_tests.rs`.
 //!
-//! [`create_overlay_admin_token`]: bsv_rs::overlay::create_overlay_admin_token
 //! [`create_signed_overlay_admin_token`]: bsv_rs::overlay::create_signed_overlay_admin_token
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "overlay")]
 #![allow(deprecated)]
 
 use bsv_rs::overlay::{
-    create_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token, is_ship_token,
-    is_slap_token, AdmittanceInstructions, HostReputationTracker, LookupAnswer, LookupQuestion,
-    LookupResolver, LookupResolverConfig, NetworkPreset, OutputListItem, Protocol,
+    create_signed_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token,
+    is_ship_token, is_slap_token, AdmittanceInstructions, HostReputationTracker, LookupAnswer,
+    LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset, OutputListItem, Protocol,
     ReputationConfig, ReputationStorage, RequireAck, Steak, SyncHistorian, TaggedBEEF,
     TopicBroadcaster, TopicBroadcasterConfig,
 };
@@ -792,9 +792,9 @@ fn test_create_and_decode_ship_token() {
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
 
-    let script = create_overlay_admin_token(
+    let script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Ship,
-        &public_key,
         "https://myoverlay.example.com",
         "tm_my_topic",
     );
@@ -813,11 +813,10 @@ fn test_create_and_decode_ship_token() {
 #[test]
 fn test_create_and_decode_slap_token() {
     let private_key = PrivateKey::random();
-    let public_key = private_key.public_key();
 
-    let script = create_overlay_admin_token(
+    let script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Slap,
-        &public_key,
         "https://lookup.example.com",
         "ls_my_service",
     );
@@ -832,18 +831,17 @@ fn test_create_and_decode_slap_token() {
 #[test]
 fn test_is_ship_token() {
     let private_key = PrivateKey::random();
-    let public_key = private_key.public_key();
 
-    let ship_script = create_overlay_admin_token(
+    let ship_script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Ship,
-        &public_key,
         "https://example.com",
         "tm_test",
     );
 
-    let slap_script = create_overlay_admin_token(
+    let slap_script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Slap,
-        &public_key,
         "https://example.com",
         "ls_test",
     );
@@ -855,18 +853,17 @@ fn test_is_ship_token() {
 #[test]
 fn test_is_slap_token() {
     let private_key = PrivateKey::random();
-    let public_key = private_key.public_key();
 
-    let ship_script = create_overlay_admin_token(
+    let ship_script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Ship,
-        &public_key,
         "https://example.com",
         "tm_test",
     );
 
-    let slap_script = create_overlay_admin_token(
+    let slap_script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Slap,
-        &public_key,
         "https://example.com",
         "ls_test",
     );
@@ -878,11 +875,10 @@ fn test_is_slap_token() {
 #[test]
 fn test_is_overlay_admin_token() {
     let private_key = PrivateKey::random();
-    let public_key = private_key.public_key();
 
-    let admin_script = create_overlay_admin_token(
+    let admin_script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Ship,
-        &public_key,
         "https://example.com",
         "tm_test",
     );
@@ -899,9 +895,9 @@ fn test_admin_token_identity_key_hex() {
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
 
-    let script = create_overlay_admin_token(
+    let script = create_signed_overlay_admin_token(
+        &private_key,
         Protocol::Ship,
-        &public_key,
         "https://example.com",
         "tm_test",
     );

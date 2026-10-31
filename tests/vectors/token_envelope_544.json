@@ -485,6 +485,20 @@
         "expected": "SHIP",
         "decode_words": null,
         "verify_words": "Discovery advertisement protocol mismatch"
+      },
+      {
+        "name": "slap_wrong_signer",
+        "locking_script": "2103d2d0958e34f576f20a8df23c50c2245b982cd1695678cdd9b511fa49c6ffae74ac04534c41502103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe1468747470733a2f2f736c61702e6578616d706c65076c735f74657374463044022009ad594b7554db27b861f1546ec5c24025213a724fb19dd1ce7764dff1d1d55302203caed113dd3deafa2176da451589df70d728c18afd8c38ca9656fe9c33b9b2556d6d75",
+        "expected": "SLAP",
+        "decode_words": null,
+        "verify_words": "Signature is not valid"
+      },
+      {
+        "name": "slap_wrong_lock_key",
+        "locking_script": "2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbeac04534c41502103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe1468747470733a2f2f736c61702e6578616d706c65076c735f74657374473045022100b0cd493ab547442622fd663e5638fb8872728e400fb08adff10512d1172b785d02206cdb02571b03df4e107dc5cca0e9e1a887a363e612f191328531187f2d77639b6d6d75",
+        "expected": "SLAP",
+        "decode_words": null,
+        "verify_words": "Discovery advertisement locking key is not linked to its identity"
       }
     ],
     "crate": [

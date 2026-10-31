@@ -374,6 +374,10 @@ const overlay = {}
   const d = PushDrop.decode(ship)
   const lockKey = d.lockingPublicKey.toString()
   const [protocol, identityKeyBytes, domain, topic, signature] = d.fields
+  const ds = PushDrop.decode(slap)
+  const slapKey = ds.lockingPublicKey.toString()
+  const slapData = ds.fields.slice(0, 4)
+  const slapSignature = ds.fields[4]
   const SHIP = [2, 'service host interconnect']
   const pd = new PushDrop(wallet9)
   const signedFields = async (fields) => pd.lock(fields.map((f) => [...f]), SHIP, '1', 'anyone', true, true)
@@ -396,7 +400,9 @@ const overlay = {}
     await judged('noncanonical_envelope', loose(lockKey, [protocol, identityKeyBytes, domain, topic, signature])),
     await judged('wrong_signer', signed(lockKey, [protocol, identityKeyBytes, domain, topic, otherSignature([protocol, identityKeyBytes, domain, topic].flat())])),
     await judged('wrong_lock_key', signed(key(9).toPublicKey().toString(), [protocol, identityKeyBytes, domain, topic, signature])),
-    await judged('protocol_mismatch', slap, 'SHIP')
+    await judged('protocol_mismatch', slap, 'SHIP'),
+    await judged('slap_wrong_signer', signed(slapKey, [...slapData, otherSignature(slapData.flat())]), 'SLAP'),
+    await judged('slap_wrong_lock_key', signed(key(9).toPublicKey().toString(), [...slapData, slapSignature]), 'SLAP')
   ]
   overlay.crate = []
   for (const [name, lockHex, expected] of [['ship', tokens.overlay_ship, 'SHIP'], ['slap', tokens.overlay_slap, 'SLAP']]) {
