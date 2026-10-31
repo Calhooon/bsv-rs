@@ -133,3 +133,14 @@ regexes = ['''^02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd1
 [[allowlists]]
 description = "the made-up identity key of types.rs's displayable-identity test, moved by #552"
 regexes = ['''^02abc123def456789012345678901234567890123456789012345678901234567890$''']
+# tests/vectors/contact_abbreviated_key_559.json: the #559 cases' `identityKey`s are 5G and 6G in
+# compressed form, the public keys of the private keys 5 and 6 (`new PrivateKey(5).toPublicKey()`,
+# `new PrivateKey(6).toPublicKey()` in tests/support/contact_abbreviated_key_559.mjs; the third case's
+# is 3G, allowed above), recorded from the reference's ContactsManager; public keys of test scalars,
+# not keys in use. Only those two literals are let through, never the file.
+[[allowlists]]
+description = "5G and 6G as the #559 contacts' identity keys"
+regexes = [
+  '''^022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4$''',
+  '''^03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556$''',
+]

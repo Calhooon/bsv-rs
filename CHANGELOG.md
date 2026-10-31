@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a contact update keeps the record's stored abbreviatedKey, as the reference does (#559)
+
+The reference computes a contact's `abbreviatedKey` at one site and stores
+whatever it is given everywhere else. At `ts-stack@edf6e03`, the only
+computation in `packages/sdk/src` is `IdentityClient.parseIdentity`
+(`IdentityClient.ts:1044`, the value at `:1166`,
+`subject.substring(0, 10)...`), which builds a `DisplayableIdentity` from a
+certificate; the contacts manager never computes one: `saveContact`
+(`ContactsManager.ts:527-528`) and `#encryptAndLock` (`:748-749`) write
+`validateContact`'s record, whose `abbreviatedKey` is the caller's as given
+(`:185`, `boundedString` to 256 UTF-8 bytes, empty allowed), and
+`getContacts` reads it back as stored. Until #559 this crate's record
+writer (`record_of`, `src/identity/contacts_record.rs`) wrote
+`Contact::to_displayable_identity`'s `02abcd...wxyz` on every save, and
+`Contact` held no `abbreviatedKey`, so a reference contact read here and
+saved through `update_contact` lost the value the reference had stored
+(`02f9308a01...` from `parseIdentity`, a caller's own text, or `""`).
+
+| | Before | Now |
+|---|---|---|
+| Read (`list_contacts_with_refresh`, `contact_of`) | the stored `abbreviatedKey` validated and dropped | kept in `Contact::abbreviated_key`, `Some(stored)` |
+| Write (`add_contact`, `update_contact`, `record_of`) | `to_displayable_identity`'s `02abcd...wxyz`, always | the contact's `abbreviated_key` as held when `Some`, as `saveContact` writes the caller's; `to_displayable_identity`'s form when `None` (a contact built here, unchanged) |
+| A reference contact updated here | its `abbreviatedKey` replaced by `02abcd...wxyz` | kept; the reference reads back the record it wrote with the new name |
+
+`Contact::abbreviated_key: Option<String>` and `Contact::with_abbreviated_key`
+are new, an addition: `Contact` is `#[non_exhaustive]` since #552's fold, so
+no downstream literal breaks; the field is skipped in `Contact`'s JSON when
+`None` and read as `None` when absent. `to_displayable_identity` and
+`from_identity` are unchanged (the residues #552 stated); this crate's own
+`parseIdentity` port (`IdentityClient::parse_identity`'s `subject[..10]...`)
+is unchanged. No caller in the crate or its tests relied on the
+recomputation for a contact read from a record.
+
+The witness is recorded, never written by hand:
+`tests/support/contact_abbreviated_key_559.mjs` runs the reference's own
+`ContactsManager` (the bundle of `ts-stack@edf6e03`, an entry re-exporting
+it, under Node v22.18.0, the ProtoWallet of the scalar 9 in process, a
+SHA-256 counter stream): `saveContact` of three contacts whose stored
+`abbreviatedKey` is not this crate's form (`parseIdentity`'s, a caller's
+text, the empty string), each token, plaintext and `getContacts` read-back;
+it takes this crate's update tokens from the tip and the base (the ignored
+`record_this_crates_tokens_559`) and records the reference's reading of
+each with its verdict: `tests/vectors/contact_abbreviated_key_559.json`, two
+runs byte-identical. `tests/identity_contact_abbreviated_key_559.rs`
+(hermetic: the counting wallet of #318, no network, no port): each
+reference contact read here, its name changed and saved through
+`update_contact`, the token's record the reference's with the stored
+`abbreviatedKey` kept (RED on `e215aea8`, `02f930...36f9` in place of
+`02f9308a01...`); the reference's recorded verdicts, the tip's three
+updates `equal`, the base's three with this crate's computed form (green on
+both, the recording's statement): 1 of 2 RED on the base.
+
+### Notes: cross-SDK parity (#559)
+
+The row #552's fold opened (the list's last in `CLAUDE.md`) is closed by this
+landing: the update path writes the stored value as the reference's
+`saveContact` does. Go at `2ca481c` has no contacts manager.
+
+Census (#375; current reading):
+
+- Row 89: Ours: closed by #559 at the pin; a contact built here (no stored value) still takes to_displayable_identity's form, where the reference takes the caller's, IdentityClient::save_contact's identity included (Contact::from_identity drops its abbreviated_key; IdentityClient.ts:974-978). Theirs: none (the witness: tests/identity_contact_abbreviated_key_559.rs; tests/vectors/contact_abbreviated_key_559.json).
+
 ### Fixed: the identity parsers run the reference discovery's record checks and byte bounds (#553)
 
 The identity client's two `ls_identity` parsers (`parse_output_to_certificate`

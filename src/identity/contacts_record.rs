@@ -223,11 +223,16 @@ pub(super) fn record_of(contact: &Contact) -> Result<ContactRecord> {
         meta.get_or_insert_with(Map::new)
             .insert("tags".into(), contact.tags.clone().into());
     }
-    let display = contact.to_displayable_identity();
+    // The stored value as given, as `saveContact` writes it (#559); a
+    // contact built here takes `to_displayable_identity`'s form.
+    let abbreviated_key = contact
+        .abbreviated_key
+        .clone()
+        .unwrap_or_else(|| contact.to_displayable_identity().abbreviated_key);
     let mut record = serde_json::json!({
         "name": contact.name,
         "avatarURL": contact.avatar_url.clone().unwrap_or_default(),
-        "abbreviatedKey": display.abbreviated_key,
+        "abbreviatedKey": abbreviated_key,
         "identityKey": contact.identity_key,
         "badgeIconURL": contact.badge_icon_url,
         "badgeLabel": contact.badge_label,
@@ -267,7 +272,8 @@ pub(super) fn contact_of(record: ContactRecord, added_at: u64) -> Contact {
         .with_tags(tags)
         .with_badge_icon_url(record.badge_icon_url)
         .with_badge_label(record.badge_label)
-        .with_badge_click_url(record.badge_click_url);
+        .with_badge_click_url(record.badge_click_url)
+        .with_abbreviated_key(record.abbreviated_key);
     contact.avatar_url = (!record.avatar_url.is_empty()).then_some(record.avatar_url);
     contact.notes = notes;
     contact.metadata = (!meta.is_empty()).then_some(Value::Object(meta));
