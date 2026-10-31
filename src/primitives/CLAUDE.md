@@ -119,6 +119,7 @@ pub struct Signature { ... }   // new(), from_der(), from_compact(), from_compac
 
 ### The key parser: `PublicKey::from_hex` (#498)
 - Reads a key string as the reference's `PublicKey.fromString` (`ts-stack@edf6e03` `PublicKey.ts:49-51`, `Point.ts:303-325,345-348,365-384,495-510`, `utils.ts:127-128`): an odd-length string with a leading `0`, a hybrid key (`06`/`07`) whose prefix names y's parity, a coordinate at or above p reduced. serde's `PublicKey` reading does not: it is `from_strict_hex` (hex, then `from_bytes`), as the reference's argument validators are strict. One parser, `ec/public_key_forms.rs` (`from_reference_der`, crate-visible under `overlay`, is its byte half; `script::templates::pushdrop_position::point_message` uses it for the six token readers' point words)
+- `from_bytes` refuses a SEC 1 tag `05` before k256 reads it as a compact point (#550; `Point.ts:303-325`: `Unknown point format`), in the lenient parser's words, `Invalid public key encoding: unknown point format`; pins `tests/primitives_sec1_tag_05_550.rs` (the vector `sec1_tag_05_550.json`, 14 Node 22 recordings over the sites that read a key through it)
 - The point held is the reduced one; `to_hex` writes the strict form back. `from_bytes` stays strict (compressed or uncompressed, coordinates below p): strictness returns on the upstream's answer, the keeper's word of 2026-10-30 05:1xZ. Pins: `tests/primitives_public_key_forms_498.rs` (the vector `public_key_forms_498.json`, 39 Node 22 recordings)
 
 ## Usage Examples

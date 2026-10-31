@@ -10,7 +10,7 @@
 
 use super::interpreter::validate_tags;
 use crate::primitives::{to_hex, PublicKey};
-use crate::script::templates::pushdrop_position::canonical_refusal;
+use crate::script::templates::pushdrop_position::{canonical_refusal, point_message};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::{Counterparty, KeyDeriver, ProtoWallet, Protocol, VerifySignatureArgs};
@@ -106,7 +106,10 @@ pub(crate) fn decode_and_verify(script: &LockingScript) -> Result<AuthenticatedT
     if data[3].len() != 33 {
         return Err(refused("KVStore controller is invalid"));
     }
-    let controller_key = PublicKey::from_bytes(&data[3])?;
+    // `validateKVStoreController`'s `PublicKey.fromString` (`:76-81`), in
+    // `Point.fromDER`'s words where it refuses (a `05` tag among them, #550).
+    let controller_key = PublicKey::from_bytes(&data[3])
+        .map_err(|error| point_message(&data[3]).map_or(error, refused))?;
     let tags = match data.get(4) {
         Some(field) => {
             let parsed: serde_json::Value =

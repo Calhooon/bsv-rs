@@ -162,6 +162,12 @@ impl<'a> WireReader<'a> {
                 let remaining = self.read_bytes(32)?;
                 let mut pubkey_bytes = vec![flag];
                 pubkey_bytes.extend_from_slice(remaining);
+                // `#decodeCounterparty`'s `Point.fromDER` (`WalletWireProcessor.ts:2459-2460`):
+                // a 33-byte key whose tag is not `02`/`03` (a `05` among them) is
+                // its `Unknown point format` (`Point.ts:303-325`; #550)
+                if !matches!(flag, 2 | 3) {
+                    return Err(Error::WalletError("Unknown point format".into()));
+                }
                 let pubkey = PublicKey::from_bytes(&pubkey_bytes)?;
                 Ok(Some(Counterparty::Other(pubkey)))
             }

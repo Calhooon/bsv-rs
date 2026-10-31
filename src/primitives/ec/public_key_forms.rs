@@ -66,7 +66,8 @@ pub(crate) fn from_reference_der(bytes: &[u8]) -> Result<PublicKey> {
         }
         _ => {
             // Every other shape is the reference's `Unknown point format`; the
-            // strict parser refuses it too, save a form k256 alone reads.
+            // strict parser refuses it too (the compact `05` since #550), in
+            // k256's words where it does.
             return PublicKey::from_bytes(bytes).and(Err(Error::InvalidPublicKey(
                 "Invalid public key encoding: unknown point format".to_string(),
             )));
