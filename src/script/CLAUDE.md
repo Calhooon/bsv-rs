@@ -61,7 +61,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `templates/multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
 | `templates/rpuzzle.rs` | R-Puzzle template for knowledge-based locking |
 | `templates/pushdrop.rs` | PushDrop template for data envelope scripts with P2PK lock |
-| `templates/pushdrop_position.rs` | Crate-visible: `PushDrop::decode_before`, the reference's default lock position alone (`PushDrop.ts:63-78`), called by the six #537 sites and its words helpers (`point_message`, `canonical_refusal`, `lock_after_refusal`), shared by the local kvstore and the overlay admin token; `PushDrop::decode` unchanged |
+| `templates/pushdrop_position.rs` | Crate-visible, compiled under `overlay` (every caller's feature; a slice without it would carry dead code): `PushDrop::decode_before`, the reference's default lock position alone (`PushDrop.ts:63-78`), called by the six #537 sites and its words helpers (`point_message`, `canonical_refusal`, `lock_after_refusal`), shared by the local kvstore and the overlay admin token; `PushDrop::decode` unchanged |
 
 ## Key Exports
 

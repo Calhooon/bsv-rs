@@ -92,6 +92,9 @@ pub mod multisig;
 pub mod p2pk;
 pub mod p2pkh;
 pub mod pushdrop;
+// Its six callers (#537) all stand on `overlay`; a slice without it would
+// carry dead code (`ci.yml`'s clippy on each slice alone).
+#[cfg(feature = "overlay")]
 pub(crate) mod pushdrop_position;
 pub mod rpuzzle;
 
