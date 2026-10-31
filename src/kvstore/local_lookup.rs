@@ -262,9 +262,7 @@ fn source_output<'a>(
 }
 
 fn decode_token(script: &LockingScript) -> Result<PushDrop> {
-    // Unlike the reference's lock-before-only decode at LocalKVStore.ts:278-282,
-    // our general decoder accepts lock-after, then reaches these later checks.
-    // Keep that existing acceptance difference explicit (#489 parity notes).
+    // Lock-before alone, as LocalKVStore.ts:278-282 decodes it (#499).
     let token = decode_pushdrop(script)?;
     if token.fields.len() != 2 {
         return Err(refused("Unexpected PushDrop token field count"));

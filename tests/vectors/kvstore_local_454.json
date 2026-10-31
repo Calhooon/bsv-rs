@@ -1341,46 +1341,122 @@
     },
     {
       "name": "token_lock_after_one_field",
-      "kind": "token_lock_after_one_field",
+      "kind": "token_lock_after",
       "operation": "get",
       "public_key": null,
       "locking_script": "5175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
       "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000255175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
       "parser_error": "script.chunks[0].data must have value",
-      "parser_accepted": false,
       "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
     },
     {
       "name": "token_lock_after_one_field",
-      "kind": "token_lock_after_one_field",
+      "kind": "token_lock_after",
       "operation": "set",
       "public_key": null,
       "locking_script": "5175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
       "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000255175210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
       "parser_error": "script.chunks[0].data must have value",
-      "parser_accepted": false,
       "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
     },
     {
       "name": "token_lock_after_two_fields",
-      "kind": "token_lock_after_two_fields",
+      "kind": "token_lock_after",
       "operation": "get",
       "public_key": null,
       "locking_script": "51526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
       "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002651526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
       "parser_error": "script.chunks[0].data must have value",
-      "parser_accepted": false,
       "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
     },
     {
       "name": "token_lock_after_two_fields",
-      "kind": "token_lock_after_two_fields",
+      "kind": "token_lock_after",
       "operation": "set",
       "public_key": null,
       "locking_script": "51526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
       "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002651526d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
       "parser_error": "script.chunks[0].data must have value",
-      "parser_accepted": false,
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_op0_one_field",
+      "kind": "token_lock_after",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "0075210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000250075210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_op0_one_field",
+      "kind": "token_lock_after",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "0075210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000250075210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_data_one_field",
+      "kind": "token_lock_after",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "010775210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff01010000000000000026010775210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_lock_after_data_one_field",
+      "kind": "token_lock_after",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "010775210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff01010000000000000026010775210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_lock_after_data_two_fields",
+      "kind": "token_lock_after",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "02070801096d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002902070801096d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_lock_after_data_two_fields",
+      "kind": "token_lock_after",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "02070801096d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000002902070801096d210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0000000000",
+      "parser_error": "Unknown point format",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: Unknown point format"
+    },
+    {
+      "name": "token_lock_after_uncompressed",
+      "kind": "token_lock_after",
+      "operation": "get",
+      "public_key": null,
+      "locking_script": "51526d410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000004651526d410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
+      "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
+    },
+    {
+      "name": "token_lock_after_uncompressed",
+      "kind": "token_lock_after",
+      "operation": "set",
+      "public_key": null,
+      "locking_script": "51526d410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+      "source_beef": "0100beef000101000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff0101000000000000004651526d410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac0000000000",
+      "parser_error": "script.chunks[0].data must have value",
       "error": "Invalid value found. Relinquish the corrupted output from the kvstore basket before using this key again. Original error: script.chunks[0].data must have value"
     }
   ]

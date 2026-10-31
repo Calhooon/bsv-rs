@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the local store decodes lock-before alone, as the reference does (#499)
+
+The keeper's word (2026-10-30 05:1xZ, issue #499): lock-before alone, as the
+reference decodes it. At `ts-stack@edf6e03` the local lookup decodes a token
+with `decodeCanonicalPushDrop` (`LocalKVStore.ts:278-282`), which calls
+`PushDrop.decode(lockingScript)` with its default `lockPosition = 'before'`
+(`PushDropValidation.ts:59`, `PushDrop.ts:63-77`): the first chunk's data
+(`verifyNotNull(..., 'script.chunks[0].data must have value')`) is read as the
+key by `PublicKey.fromString` before any field is counted. This crate's local
+decode called the general `PushDrop::decode`, which reads a script whose first
+chunk is not a 33- or 65-byte push as lock-after, so a lock-after token
+reached the later field-count or canonical-envelope check and told another
+refusal than the reference's. `local_parser_words.rs::decode_pushdrop` now
+reads the first chunk as the reference does and never the lock-after layout;
+the refusal is the reference's first-chunk words, `Error::KvStoreLocalError`
+in the lookup wrapper (`Invalid value found. Relinquish the corrupted output
+from the kvstore basket before using this key again. Original error: <words>`,
+`LocalKVStore.ts:340-345`), on get and set alike.
+
+| Token (`<G>` the generator's compressed push) | Before (#489's stated row) | Now, the reference's |
+|---|---|---|
+| `51 75 <G> ac` | `Unexpected PushDrop token field count` | `script.chunks[0].data must have value` |
+| `51 52 6d <G> ac` | `PushDrop token must use the canonical PushDrop envelope` | `script.chunks[0].data must have value` |
+| `00 75 <G> ac` | `Unexpected PushDrop token field count` | `script.chunks[0].data must have value` |
+| `01 07 75 <G> ac` | `Unexpected PushDrop token field count` | `Unknown point format` |
+| `02 07 08 01 09 6d <G> ac` | `PushDrop token must use the canonical PushDrop envelope` | `Unknown point format` |
+| `51 52 6d <04 Gx Gy> ac` | `PushDrop token must use the canonical PushDrop envelope` | `script.chunks[0].data must have value` |
+
+The #489 entry's note that `00 75 <G> ac` gets `Unknown point format` in the
+reference was wrong: `OP_0` carries no data there, so the reference says
+`script.chunks[0].data must have value`, as recorded. The words are recorded,
+never written by hand: the #326 recorder's `--kvstore-local-454` mode
+(`tests/support/signaction_reference_326.mjs` through
+`tests/support/kvstore_local_parser_words_489.mjs`, the bundle of
+`ts-stack@edf6e03` under Node v22.18.0) now writes the six shapes as kind
+`token_lock_after` for get and set into `tests/vectors/kvstore_local_454.json`
+(`parser_words_489`, 52 cases to 60: the two #489 lock-after inputs lose their
+`parser_accepted` flag and four are new); every other field of the vector is
+byte for byte unchanged, and the recorder reproduced the base vector byte for
+byte before the extension. `a_lock_after_token_is_refused_by_the_reference_lock_before_read_499`
+in `tests/kvstore_local_parser_words_489.rs` replaces #489's two lock-after
+pins and asserts the port's words equal the vector's for all twelve cases; it
+was red on `aa5d60db` (`Unexpected PushDrop token field count` for the first).
+
+The general `PushDrop::decode` and its lock-after path are unchanged (the test
+asserts each shape still decodes there as lock-after). Every reference call of
+`PushDrop.decode` under `packages/sdk/src` at `edf6e03` takes the lock-before
+default (`PushDropValidation.ts:59`, reached from the kvstore, registry,
+overlay admin token and UHRP validators; `ContactsManager.ts:432`;
+`IdentityClient.ts:773`) and none passes `'after'`; this crate's identity,
+registry, kvstore interpreter, overlay admin token and storage call sites keep
+the general decoder's detection, a question for a second issue, not this one.
+No public API, acceptance of a valid token or other error text changes.
+
+### Notes: cross-SDK parity
+
+The #489 row "Local token decode also tries lock-after" becomes the new
+behaviour's row: the local site now refuses as the reference does; the
+general decoder's lock-after detection at the other sites remains this
+crate's (census Row 2 of the #489 entry, rewritten). Go at `2ca481c` decodes
+lock-before alone too (`transaction/template/pushdrop/pushdrop.go:20-52`, its
+lock-after branch commented out as absent from the TypeScript), read by its
+`LocalKVStore` (`kvstore/local_kv_store.go:132`), which refuses any such token
+in its own words (`invalid pushdrop token format found for key ...`).
+
 ### Changed: the three remaining copies of the substrates' byte bound read the one definition (#532)
 
 PR #531's cold review found three constants under `src/wallet` still holding
@@ -1221,7 +1286,7 @@ fold. The RED scratch copy uses its own target directory and is removed.
 Census (#375; current reading, historical account above retained):
 
 - Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
-- Row 2: Ours: the general PushDrop decoder tries both lock positions, but the local canonical-envelope check still refuses these tokens; BRC-48 scripts/0048.md:13-18 and LocalKVStore.ts:278-282 at edf6e03 distinguish the template from this site.
+- Row 2: Ours: since #499 the local store decodes lock-before alone and refuses a lock-after token in the reference's first-chunk words (PushDropValidation.ts:59, PushDrop.ts:74-75 at edf6e03); the general PushDrop decoder elsewhere still tries both lock positions, where every reference call site under packages/sdk/src takes the lock-before default; BRC-48 scripts/0048.md:13-18 defines the template, not the decode position.
 
 ### Fixed: four older LocalKVStore request/result differences (#478)
 

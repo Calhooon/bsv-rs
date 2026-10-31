@@ -185,26 +185,6 @@ async fn assert_stricter_key(kind: &str, native: Error) {
     }
 }
 
-async fn assert_lock_after(kind: &str, fields: usize, local_message: &str) {
-    for case in divergence_cases(kind) {
-        let reference_message = "script.chunks[0].data must have value";
-        assert_eq!(
-            case["parser_accepted"], false,
-            "reference decodes lock-before"
-        );
-        assert_eq!(case["parser_error"], reference_message);
-        assert_eq!(case["error"], wrapped(reference_message));
-        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
-        let decoded = PushDrop::decode(&script).unwrap();
-        assert_eq!(decoded.lock_position, LockPosition::After);
-        assert_eq!(decoded.fields.len(), fields);
-        assert_eq!(
-            local_failure(&case).await,
-            Error::KvStoreLocalError(wrapped(local_message))
-        );
-    }
-}
-
 #[tokio::test]
 async fn non_hex_locking_key_uses_reference_words_489() {
     assert_eq!(
@@ -301,21 +281,25 @@ async fn reference_decodes_reduced_x_token_but_local_keeps_native_words_489() {
 }
 
 #[tokio::test]
-async fn lock_after_one_field_reaches_local_field_count_not_reference_decode_489() {
-    assert_lock_after(
-        "token_lock_after_one_field",
-        1,
-        "Unexpected PushDrop token field count",
-    )
-    .await;
-}
-
-#[tokio::test]
-async fn lock_after_two_fields_reaches_local_envelope_not_reference_decode_489() {
-    assert_lock_after(
-        "token_lock_after_two_fields",
-        2,
-        "PushDrop token must use the canonical PushDrop envelope",
-    )
-    .await;
+async fn a_lock_after_token_is_refused_by_the_reference_lock_before_read_499() {
+    // The general decoder still reads these as lock-after (#499 leaves it).
+    let recorded: Value =
+        serde_json::from_str(include_str!("vectors/kvstore_local_454.json")).unwrap();
+    for case in recorded["parser_words_489"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| case["kind"] == "token_lock_after")
+    {
+        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            PushDrop::decode(&script).unwrap().lock_position,
+            LockPosition::After
+        );
+        assert_eq!(
+            case["error"],
+            wrapped(case["parser_error"].as_str().unwrap())
+        );
+    }
+    assert_cases("token_lock_after", 12).await;
 }
