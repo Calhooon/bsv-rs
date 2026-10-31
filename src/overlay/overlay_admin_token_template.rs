@@ -7,6 +7,7 @@
 use crate::overlay::types::Protocol;
 use crate::primitives::hash::sha256;
 use crate::primitives::{PrivateKey, PublicKey};
+use crate::script::templates::pushdrop_position::lock_after_refusal;
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::{Counterparty, KeyDeriver, Protocol as WalletProtocol, SecurityLevel};
@@ -90,9 +91,16 @@ impl OverlayAdminTokenData {
 /// println!("Domain: {}", token.domain);
 /// ```
 pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdminTokenData> {
-    // Try to decode as PushDrop
-    let pushdrop = PushDrop::decode(script)
-        .map_err(|_| Error::OverlayError("Script is not a valid PushDrop format".into()))?;
+    // Lock-before alone, as OverlayAdminTokenTemplate.ts:164 decodes it; a
+    // lock-after token refused in that site's words, its five fields (#537).
+    let pushdrop = PushDrop::decode_before(script).map_err(|_| {
+        let words = lock_after_refusal(script, &[5]);
+        Error::OverlayError(
+            words
+                .unwrap_or("Script is not a valid PushDrop format")
+                .into(),
+        )
+    })?;
 
     let fields = &pushdrop.fields;
 

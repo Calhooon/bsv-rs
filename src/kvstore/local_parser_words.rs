@@ -1,37 +1,9 @@
 //! Local parser catches: reference words only for failures the reference also has.
 use super::lookup::refused;
-use crate::primitives::{from_hex, BigNumber, PublicKey};
-use crate::script::{op, templates::PushDrop, LockingScript};
+use crate::primitives::{from_hex, PublicKey};
+use crate::script::templates::pushdrop_position::{canonical_refusal, point_message};
+use crate::script::{templates::PushDrop, LockingScript};
 use crate::{Error, Result};
-
-// Point.fromDER at ts-stack@edf6e03 Point.ts:303-325. None means the reference
-// accepts the point, so keep the native words. Normalization here only selects
-// a diagnostic: it does not change which keys this crate accepts.
-fn point_message(bytes: &[u8]) -> Option<&'static str> {
-    match (bytes.len(), bytes.first().copied(), bytes.last().copied()) {
-        (65, Some(prefix @ (6 | 7)), Some(last)) if (prefix & 1) != (last & 1) => {
-            return Some("Point string value is wrong length");
-        }
-        (33, Some(2 | 3), _) | (65, Some(4 | 6 | 7), _) => {}
-        _ => return Some("Unknown point format"),
-    }
-    let mut canonical = bytes.to_vec();
-    if canonical.len() == 65 {
-        canonical[0] = 4;
-    }
-    // The reference checks hybrid parity before field arithmetic; both its
-    // Point constructor/validate and fromX evaluate coordinates modulo p.
-    let prime = BigNumber::secp256k1_prime();
-    for coordinate in canonical[1..].as_chunks_mut::<32>().0 {
-        let reduced = BigNumber::from_bytes_be(coordinate)
-            .modulo(&prime)
-            .to_bytes_be(32);
-        coordinate.copy_from_slice(&reduced);
-    }
-    PublicKey::from_bytes(&canonical)
-        .is_err()
-        .then_some("Invalid point")
-}
 
 pub(super) fn parse_public_key(key: &str) -> Result<PublicKey> {
     PublicKey::from_hex(key).map_err(|error| match error {
@@ -81,33 +53,6 @@ fn decode_error(error: Error, script: &LockingScript) -> Error {
     ) {
         return error;
     }
-    // PushDrop.ts:73-77: the first chunk's data, then PublicKey.fromString.
-    let chunks = script.chunks();
-    let Some(first) = chunks.first() else {
-        return refused("Cannot read properties of undefined (reading 'data')");
-    };
-    let Some(key) = &first.data else {
-        return refused("script.chunks[0].data must have value");
-    };
-    if PublicKey::from_bytes(key).is_err() {
-        return point_message(key).map_or_else(|| refused(error.to_string()), refused);
-    }
-    // A valid key can still fail the general decoder's length/CHECKSIG tests.
-    // Reference PushDrop.ts:96-115 reads fields until the *next* chunk is DROP;
-    // PushDropValidation.ts:59-74 then checks field count before the envelope.
-    let mut fields = 0;
-    for index in 2..chunks.len() {
-        fields += 1;
-        if chunks
-            .get(index + 1)
-            .is_some_and(|chunk| matches!(chunk.op, op::OP_DROP | op::OP_2DROP))
-        {
-            break;
-        }
-    }
-    refused(if fields != 2 {
-        "Unexpected PushDrop token field count"
-    } else {
-        "PushDrop token must use the canonical PushDrop envelope"
-    })
+    // PushDrop.ts:73-77, then PushDropValidation.ts:59-74 with its two fields.
+    canonical_refusal(script, &[2]).map_or_else(|| refused(error.to_string()), refused)
 }
