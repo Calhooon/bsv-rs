@@ -12,6 +12,7 @@ use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 fn request_value(request: &Request) -> Value {
     json!({"method": request.method.as_str(), "path": request.url.path(),
         "headers": {"content-type": request.headers.get("content-type").unwrap().to_str().unwrap(),
+            "origin": request.headers.get("origin").unwrap().to_str().unwrap(),
             "originator": request.headers.get("originator").unwrap().to_str().unwrap()},
         "json": serde_json::from_slice::<Value>(&request.body).unwrap()})
 }

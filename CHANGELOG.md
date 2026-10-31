@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the fixtures capture the Origin header beside Originator (#346)
+
+The #323 CI fold's re-review (Opus, 2026-10-27) found that the public-surface
+fixtures' HTTP recorder (`tests/support/fixtures/http.rs`) captured the JSON
+substrate's `originator` header alone; since #323 the substrate sends `Origin`
+and `Originator` both in the origin form, as the reference's `HTTPWalletJSON`
+does (`ts-stack@edf6e03` `HTTPWalletJSON.ts:311-314`), and `Origin` was pinned
+by `tests/wallet_http_originator_323.rs` alone. The recorder's request envelope
+gains one member, `expected.request.headers.origin`, named as `originator` is
+(the lower-case header name) and compared by the replay as every other member
+is. The 29 files under `tests/fixtures/http_json/` were re-recorded by the
+recorder (`BSV_FIXTURES_RECORD=1`): 71 insertions, one `"origin":
+"http://fixtures.invalid"` per captured request (the 56 call cases and 15 of
+the 16 error cases; `connection_error` has no request), and with that member
+removed every file equals its base JSON; the census (65 files, 913 entries) is
+unchanged. `fixtures_replay` fails on the base against the re-recorded files
+(`/cases/0[minimal]/expected/request/headers/origin: expected
+"http://fixtures.invalid", actual null`) and on a tip whose substrate stops
+sending `Origin`; `wallet_http_originator_323.rs` stays beside it.
+
 ### Changed: an unused arch allowlist entry reads red (#347)
 
 The #323 CI fold's re-review found that `tests/arch_no_string_errors.rs`'s

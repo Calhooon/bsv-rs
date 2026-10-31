@@ -25,7 +25,10 @@ originator, and status bytes. No bytes are removed before comparison.
 
 HTTP cases keep the JSON request captured by `wiremock`, the served response,
 and the client result. Their request envelope uses `method`, `path`, `headers`,
-and `json`, as does the CLI's `tests/wire/` format in its #69 lane. The adjacent
+and `json`, as does the CLI's `tests/wire/` format in its #69 lane. The
+`headers` member holds `content-type`, `origin` and `originator`: the
+substrate sends `Origin` and `Originator` both in the origin form
+(`HTTPWalletJSON.ts:311-314`; `origin` captured since #346). The adjacent
 `request_body_hex` also pins the actual outgoing bytes, including JSON member
 order and whitespace; `response_body_hex` pins the compact served success
 body. No bytes or JSON values are normalized. A wire byte, HTTP body byte,
