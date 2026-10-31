@@ -57,11 +57,7 @@ struct ContactsCache {
 /// let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 ///
 /// // Add a contact
-/// manager.add_contact(Contact {
-///     identity_key: "02abc123...".to_string(),
-///     name: "Alice".to_string(),
-///     ..Default::default()
-/// }).await?;
+/// manager.add_contact(Contact::new("Alice", "02abc123...")).await?;
 ///
 /// // List all contacts
 /// let contacts = manager.list_contacts().await?;
@@ -110,15 +106,12 @@ impl<W: WalletInterface> ContactsManager<W> {
     ///
     /// # Example
     /// ```rust,ignore
-    /// manager.add_contact(Contact {
-    ///     identity_key: "02abc123...".to_string(),
-    ///     name: "Alice".to_string(),
-    ///     avatar_url: Some("https://example.com/avatar.png".to_string()),
-    ///     added_at: chrono::Utc::now().timestamp_millis() as u64,
-    ///     notes: Some("Met at conference".to_string()),
-    ///     tags: vec!["work".to_string()],
-    ///     metadata: None,
-    /// }).await?;
+    /// manager.add_contact(
+    ///     Contact::new("Alice", "02abc123...")
+    ///         .with_avatar_url("https://example.com/avatar.png")
+    ///         .with_notes("Met at conference")
+    ///         .with_tags(["work"]),
+    /// ).await?;
     /// ```
     pub async fn add_contact(&self, contact: Contact) -> Result<()> {
         // The reference's record, validated before any wallet call

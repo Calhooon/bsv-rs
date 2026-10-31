@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: Contact carries the reference's badge fields through read and write (#552)
+
+The reference's contact record carries three badge fields beside its name
+and keys: `validateContact` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:171-192`) takes every one of
+the seven display fields (`:35-43`) through `ownData` (`:47-53`, a missing
+key refused as `must be an own data property`) and then its validator
+(`:75`, a non-string refused), so a record the reference reads carries
+`badgeIconURL`, `badgeLabel` and `badgeClickURL` as strings, empty where
+unset. After #544 this crate wrote and read that record, but its `Contact`
+had no badge members: a reference contact's badges were dropped on read,
+every save wrote them empty, and a round trip through this crate's update
+(read, change the name, save) erased the badges the reference had stored.
+The keeper's reading (2026-10-31 12:1xZ, issue #552): a user's data lost on
+an update, a parity row at the pin.
+
+| | Before | Now |
+|---|---|---|
+| Read (`list_contacts_with_refresh`, `contact_of`) | the three badge values read, validated and dropped | kept in `Contact::badge_icon_url`, `badge_label`, `badge_click_url` |
+| Write (`add_contact`, `update_contact`, `record_of`) | `badgeIconURL`, `badgeLabel`, `badgeClickURL` written `""` | written as the `Contact` holds them, `""` where unset, as the reference writes them |
+| A reference contact updated here | its badges erased in the token written | its badges kept; the reference reads back the record it wrote with the new name |
+
+For the toolbox's and the CLI's tables: the toolbox has no contacts path and
+the CLI none, so neither table changes.
+
+The witness is recorded, never written by hand:
+`tests/support/contact_badges_552.mjs` runs the reference's own
+`ContactsManager` (the bundle of `ts-stack@edf6e03`, an entry re-exporting
+it, under Node v22.18.0, the ProtoWallet of the scalar 9 in process, a
+SHA-256 counter stream for its randomness): `saveContact` of a contact with
+the three badges set, its token, plaintext and `getContacts` read-back; it
+takes this crate's tokens from the tip and the base as input (written by the
+ignored `record_this_crates_tokens_552`) and records the reference's
+`getContacts` reading of each with its verdict, `equal` to the record
+expected: `tests/vectors/contact_badges_552.json`, two runs byte-identical.
+`tests/identity_contact_badges_552.rs` (hermetic: the counting wallet of
+#318, no network, no port): the reference's badges read here; the
+reference's contact read, its name changed and saved through
+`update_contact`, the token's record the reference's with the new name and
+the badges kept, and the reference's verdict on the tip's update `equal`, on
+the base's the badges `""`; the reverse, a contact with badges saved by
+`add_contact` and read by the reference with them, the base's empty. The
+tests read `Contact`'s JSON, naming no badge member, so they compile on the
+base: 3 of 3 RED on `69d315fc`, the badges erased.
+
+`Contact` is closed (the keeper's word of 2026-10-31 13:1xZ on PR #554,
+shape (b), as #527 closed `WorkBudget`): the reference's record has grown
+and will grow again, and an open struct breaks a downstream literal at every
+field the reference adds, a closed one once. `Contact` is
+`#[non_exhaustive]`; `Contact::new(name, identity_key)` takes the two members
+`validateContact` requires non-empty (`name` with `allowEmpty` false,
+`ContactsManager.ts:183`; `identityKey` a canonical compressed key, `:186`),
+every other display member empty, `metadata` absent and `added_at` 0; a
+`with_` setter for each optional member (`with_avatar_url`, `with_added_at`,
+`with_notes`, `with_tags`, `with_metadata`, `with_badge_icon_url`,
+`with_badge_label`, `with_badge_click_url`); the fields stay `pub` to read
+and to assign. `Contact` carries no `abbreviated_key` (the record's is
+computed at the write, the row below), so there is no
+`with_abbreviated_key`. `new` judges nothing: the reference runs
+`validateContact` at the save (`saveContact`, `:527-528`) and the read
+(`#parseContactPlaintext`, `:468-472`), never at construction, so a `new`
+of an empty name or a key that is not canonical builds, and `add_contact`
+refuses it in the reference's words before any wallet call (#544's
+validation; `new_holds_its_values_and_add_contact_refuses_them_552`).
+`Contact` no longer derives `Default`: a default contact (empty name, empty
+key) is a record the reference refuses, and with `new` naming the two
+required members it was the one way past them; the in-crate uses moved to
+`new` (`from_identity`, the unit and integration tests). The serialized
+record is unchanged byte for byte: `record_of` and `contact_of` are the
+lane's, and the record of `Contact::new(..)` with the three badge setters is
+the vector's `reverse.contact`
+(`a_contact_built_by_new_writes_the_vectors_record_552`); `Contact`'s own
+JSON (serde) is unchanged too.
+
+Pins of the fold, in `tests/identity_contact_shape_552.rs` and the
+`compile_fail` doc test on `Contact` (`src/identity/types.rs`, a struct
+literal naming all ten fields from outside the crate): the doc test RED on
+the pre-fold tip `738bdfde` (`Test compiled successfully, but it's marked
+compile_fail`), green after; the three tests compile-RED there (`E0599`, no
+`Contact::new`), green after.
+
+Migration (api-break, once). `Contact` is `#[non_exhaustive]`
+(cargo-semver-checks 0.51.0: `struct_marked_non_exhaustive`, the one lint;
+`constructible_struct_adds_field` on the three badge fields no longer fires,
+the struct being unconstructible outside the crate) and no longer
+implements `Default` (no 0.51.0 lint names it; `Contact::default()` no
+longer compiles). A struct literal of `Contact` outside the crate, with or
+without `..Default::default()`, no longer compiles (E0639); write
+`Contact::new(name, key).with_avatar_url(..)` and the other setters, or
+assign a `pub` field on a contact built by `new`. A destructuring pattern
+needs `..`. Reading the fields is unchanged. No downstream named in
+`CLAUDE.md` that this lane could read builds a `Contact`
+(`bsv-wallet-cli`, `bsv-overlay-cloudflare`, `rust-message-box`,
+`rust-chaintracks`, `bsv-middleware-cloudflare-public` grepped by path; the
+captain tells the CLI on #376 at the landing). `Contact::from_identity`
+keeps writing the badges empty and `to_displayable_identity` keeps its fixed
+"Personal contact" badge: two rows of one record, filed for their own lane
+(stated below).
+
+### Notes: cross-SDK parity (#552)
+
+Residues, stated, not changed: `Contact::from_identity` does not copy a
+`DisplayableIdentity`'s badges into the contact (the reference's
+`saveContact` takes the `DisplayableIdentity` whole), and
+`Contact::to_displayable_identity` answers its fixed badges, not the stored
+ones. This crate recomputes `abbreviatedKey` from the identity key
+(`02abcd...wxyz`) on every write, so a reference record's own
+`abbreviatedKey` is replaced by an update here; the recorder writes this
+crate's form so the witness isolates the badges. The fold's reading of the
+reference at `ts-stack@edf6e03`: the reference does not recompute it.
+`IdentityClient.ts:1166` (`subject.substring(0, 10)...`) is in
+`parseIdentity` (`:1044`), which builds a `DisplayableIdentity` from a
+certificate (`resolveByIdentityKey`, `resolveByAttributes`, `:1002-1033`),
+not on the save path; `saveContact` (`ContactsManager.ts:527-528`) and
+`#encryptAndLock` (`:748`) write `validateContact`'s record, whose
+`abbreviatedKey` is the caller's as given (`:185`, `boundedString` to 256
+characters, empty allowed). So the reference keeps the stored
+`abbreviatedKey` through a read and a save, and this crate replaces it with
+its own `02abcd...wxyz`: a row, the list's last in `CLAUDE.md`, open, #559. Go at
+`2ca481c` has no contacts manager.
+
+Census (#375; current reading):
+
+- Row 87: Ours: closed by #552 at the pin; residues the badges through from_identity and to_displayable_identity; the recomputed abbreviatedKey its own row, open, #559. Theirs: none (the witness: tests/identity_contact_badges_552.rs; tests/vectors/contact_badges_552.json; tests/identity_contact_shape_552.rs).
+
 ### Fixed: the registry client unlocks a definition token as the reference does on revoke and update (#548)
 
 `revoke_own_registry_entry` and `update_definition` answered the wallet's

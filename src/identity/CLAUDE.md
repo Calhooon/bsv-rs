@@ -19,7 +19,7 @@ This module integrates with the `auth` module for certificate handling and the `
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root with re-exports (112 lines) |
-| `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (886 lines); `ContactsManagerConfig::protocol_id` `(2, "contact")`, the reference's `[2, 'contact']` (`ContactsManager.ts:30`), read by every contact site since #542 (unread before, each site hard-coding level 1) |
+| `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (741 lines; its unit tests in `types_tests.rs` since #552); `Contact` `#[non_exhaustive]` with `new` and `with_` setters, no `Default`, since #552's fold; `Contact::badge_icon_url`, `badge_label`, `badge_click_url` since #552 (the reference record's `badgeIconURL`, `badgeLabel`, `badgeClickURL`, `""` where unset; `from_identity` leaves them empty and `to_displayable_identity` keeps its fixed badges, both stated residues; pinned by `tests/identity_contact_badges_552.rs` against `tests/vectors/contact_badges_552.json`, recorded by `tests/support/contact_badges_552.mjs`); `ContactsManagerConfig::protocol_id` `(2, "contact")`, the reference's `[2, 'contact']` (`ContactsManager.ts:30`), read by every contact site since #542 (unread before, each site hard-coding level 1) |
 | `client.rs` | IdentityClient for identity resolution, revelation, and management; both `ls_identity` parsers decode a token lock-before alone (`PushDrop::decode_before`), as `IdentityClient.ts:773` does, a lock-after token skipped (#537, `tests/identity_lock_position_537.rs`); since #544 both authenticate the token before reading its certificate (`client_token.rs`) |
 | `client_token.rs` | #544: `is_authenticated_token`, the revocation's checks on a revelation token (`ts-stack@edf6e03` `IdentityClient.ts:773-815`: exactly two fields, the canonical signed envelope, the locking key, the field signature) with the key and the signature the subject's, as the toolbox's discovery reads a published token (`identityUtils.ts:497-559`: the anyone wallet's key for counterparty the subject, `verifySignature` as anyone); a token that fails skipped by both parsers; pinned by `tests/identity_envelope_544.rs` |
 | `token_envelope.rs` | `is_canonical_signed_pushdrop`, the five-chunk signed two-field envelope the reference checks for an identity token (`assertCanonicalIdentityTokenScript`, `IdentityClient.ts:123-147`) and a contact token (`assertCanonicalSignedPushDrop`, `ContactsManager.ts:218-241`); shared by `revoke.rs`, `client_token.rs` and `contacts_auth.rs` (moved from `revoke.rs` by #544) |
@@ -30,8 +30,9 @@ This module integrates with the `auth` module for certificate handling and the `
 | `contacts.rs` | ContactsManager and cached CRUD coordination (237 lines); action construction and signing are in contacts_actions.rs. `protocol()` reads `ContactsManagerConfig::protocol_id`, the reference's `[2, 'contact']` by default (`ContactsManager.ts:30`), for every contact key: the identity tag's HMAC here (`create_identity_tag`, `:572-583`), was `[1, 'contact']` until #542 (`tests/identity_contacts_protocol_542.rs`). |
 | `contacts_actions.rs` | Contact create/update/removal and the shared PushDrop data request (#454) (375 lines). The encryption and the lock's getPublicKey (`contact_lock`, `ContactsManager.ts:748-772`) and the spend's signature (`contact_unlock`, `:821-830`) under the configured protocol, `[2, 'contact']`, since #542; since #544 the token is the reference's signed two fields (`contact_lock`: `PushDrop.lock([ciphertext], protocol, keyID, 'self')`, getPublicKey `forSelf` false, createSignature over the ciphertext), and the update and removal lookups authenticate every listed output before a spend (`find_existing`, `ContactsManager.ts:587-626`; `remove_listed`, `:941-959`), refusing in the reference's words. |
 | `contacts_auth.rs` | #544: `authenticate_contact`, the reference's `#authenticateContactScript` (`ContactsManager.ts:431-466`: two fields, the ciphertext 1 to 65 KiB plus 1 KiB, the signature 8 to 80 bytes, the canonical envelope, the lock the wallet's key for the key ID and self, `verifySignature` over the ciphertext), and `open_contact` (decrypt, `#parseContactPlaintext`) |
-| `contacts_record.rs` | #544: `validateContact`'s record (`ContactsManager.ts:171-198`): the seven display fields with the reference's spellings and an optional `metadata`, any other member refused, each field's bounds and words (`boundedString`, `validateIdentityKey`, `safeResource`, `safeNavigation`, `sanitizeMetadata`); `record_of` maps a `Contact` onto it (`notes` and `tags` in `metadata`, the badges empty; `added_at` out of the token), `contact_of` back (`added_at` the cache's); `read_key_id` the reference's `#readKeyID` (`:414-429`) |
+| `contacts_record.rs` | #544: `validateContact`'s record (`ContactsManager.ts:171-198`): the seven display fields with the reference's spellings and an optional `metadata`, any other member refused, each field's bounds and words (`boundedString`, `validateIdentityKey`, `safeResource`, `safeNavigation`, `sanitizeMetadata`); `record_of` maps a `Contact` onto it (`notes` and `tags` in `metadata`, the three badges as held, empty where unset, since #552; `added_at` out of the token), `contact_of` back (the badges kept, #552; `added_at` the cache's); `read_key_id` the reference's `#readKeyID` (`:414-429`) |
 | `contacts_cache.rs` | Cache refresh, contact decoding and search, extracted without changing the public paths (180 lines); a stored contact decoded lock-before alone, as `ContactsManager.ts:432` does, a lock-after token dropped before decrypt (#537, `tests/identity_contacts_lock_position_537.rs`). The decryption (`decode_cached_contact`, `ContactsManager.ts:494-501`) under the configured protocol, `[2, 'contact']`, since #542: the reference's record decrypts here. Since #544 each listed output is read as `#decryptContactOutputs` reads it (`:480-503`: the key ID, the authentication, the record), a refused one dropped; the saved-at time kept from the cache. |
+| `types_tests.rs` | The unit tests of `types.rs`, moved out unchanged by #552 (the ratchet holding `types.rs` at its size while `Contact` gained its badge fields). |
 | `contacts_tests.rs` | Existing contact unit tests, separated from production (267 lines). |
 
 ## Feature Flag
@@ -136,20 +137,17 @@ let unknown = DisplayableIdentity::unknown();
 
 ### Contact
 
-Stored contact with identity information and metadata:
+Stored contact with identity information and metadata; the three badge fields since #552 (the reference record's, kept through read and write). Closed since #552's fold (the keeper's word of 2026-10-31 13:1xZ): `#[non_exhaustive]`, no `Default`; build with `Contact::new(name, identity_key)` and the `with_` setters, read or assign the `pub` fields. `new` judges nothing; `add_contact` refuses an empty name or a non-canonical key in the reference's words, as `saveContact` does. A struct literal outside the crate does not compile (the `compile_fail` doc test on `Contact`; `tests/identity_contact_shape_552.rs`):
 
 ```rust
 use bsv_rs::identity::{Contact, DisplayableIdentity};
 
-let contact = Contact {
-    identity_key: "02abc123...".to_string(),
-    name: "Alice".to_string(),
-    avatar_url: Some("https://example.com/avatar.png".to_string()),
-    added_at: 1706400000000,  // Unix timestamp in milliseconds
-    notes: Some("Met at conference".to_string()),
-    tags: vec!["friends".to_string(), "work".to_string()],
-    metadata: None,
-};
+let contact = Contact::new("Alice", "02abc123...")
+    .with_avatar_url("https://example.com/avatar.png")
+    .with_added_at(1706400000000) // Unix timestamp in milliseconds
+    .with_notes("Met at conference")
+    .with_tags(["friends", "work"])
+    .with_badge_label("Met in person"); // also with_metadata, with_badge_icon_url, with_badge_click_url
 
 // Convert between Contact and DisplayableIdentity
 let display = contact.to_displayable_identity();

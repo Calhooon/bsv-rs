@@ -5,7 +5,8 @@
 //! This crate's `Contact` maps onto it: `notes` and `tags` travel in
 //! `metadata` (the reference's place for them, `saveContact`'s
 //! `metadata` "ex. notes, aliases", `:519-526`); `added_at` stays out of the
-//! token, held beside it in the manager's cache.
+//! token, held beside it in the manager's cache; the three badge fields
+//! are `Contact`'s own, written and read as held (#552).
 
 use super::Contact;
 use crate::identity::reveal::is_js_whitespace;
@@ -228,9 +229,9 @@ pub(super) fn record_of(contact: &Contact) -> Result<ContactRecord> {
         "avatarURL": contact.avatar_url.clone().unwrap_or_default(),
         "abbreviatedKey": display.abbreviated_key,
         "identityKey": contact.identity_key,
-        "badgeIconURL": "",
-        "badgeLabel": "",
-        "badgeClickURL": "",
+        "badgeIconURL": contact.badge_icon_url,
+        "badgeLabel": contact.badge_label,
+        "badgeClickURL": contact.badge_click_url,
     });
     if let Some(meta) = meta {
         record["metadata"] = Value::Object(meta);
@@ -261,15 +262,16 @@ pub(super) fn contact_of(record: ContactRecord, added_at: u64) -> Contact {
         }
         None => Vec::new(),
     };
-    Contact {
-        identity_key: record.identity_key,
-        name: record.name,
-        avatar_url: (!record.avatar_url.is_empty()).then_some(record.avatar_url),
-        added_at,
-        notes,
-        tags,
-        metadata: (!meta.is_empty()).then_some(Value::Object(meta)),
-    }
+    let mut contact = Contact::new(record.name, record.identity_key)
+        .with_added_at(added_at)
+        .with_tags(tags)
+        .with_badge_icon_url(record.badge_icon_url)
+        .with_badge_label(record.badge_label)
+        .with_badge_click_url(record.badge_click_url);
+    contact.avatar_url = (!record.avatar_url.is_empty()).then_some(record.avatar_url);
+    contact.notes = notes;
+    contact.metadata = (!meta.is_empty()).then_some(Value::Object(meta));
+    contact
 }
 
 /// `#parseContactPlaintext` (`ContactsManager.ts:468-472`): 1 to 64 KiB,

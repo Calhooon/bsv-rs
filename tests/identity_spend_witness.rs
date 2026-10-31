@@ -526,15 +526,7 @@ async fn contact_token(wallet: &TokenWallet, identity_key: &str) -> LockingScrip
 }
 
 fn contact(identity_key: &str) -> Contact {
-    Contact {
-        identity_key: identity_key.to_string(),
-        name: "Alice".to_string(),
-        avatar_url: None,
-        added_at: 1_700_000_000_000,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    }
+    Contact::new("Alice", identity_key).with_added_at(1_700_000_000_000)
 }
 
 fn assert_every_spend_verifies(wallet: &TokenWallet, lock: &LockingScript, expected: usize) {
