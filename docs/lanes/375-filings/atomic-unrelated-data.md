@@ -1,10 +1,10 @@
-FILE — fifth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — fifth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/go-sdk#396 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending.
 
 # Enforce the subject dependency graph when validating parsed Atomic BEEF
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 33: The atomic rule on the subject's graph (0.8.1, BRC-95; beef_stream::atomic_unreached,…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#396 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending. Census row 33: The atomic rule on the subject's graph (0.8.1, BRC-95; beef_stream::atomic_unreached,…
 
 The unrelated-transaction witness includes a present subject and an unrelated raw entry. Go NewBeefFromAtomicBytes only binds the subject (as its comment explicitly says), and the subsequent Beef.IsValid/Verify path uses verifyValid without an atomic graph check. Keep parsing and validation separate if desired, but preserve and enforce the Atomic BEEF constraint at the validation boundary. Do not confuse this with the separately authorized Rust choice to admit raw ancestors behind proofs. Historical TS 2.1.4 behavior is evidence, not a new finding against current TypeScript.
 

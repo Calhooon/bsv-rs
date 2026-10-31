@@ -1,10 +1,10 @@
-FILE — seventh in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — seventh in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/ts-stack#1462 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending.
 
 # Reject reserved BEEF discriminators
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 36: One reader for both paths (Unreleased, bsv-rs#86): Beef::from_binary is the…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1462 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending. Census row 36: One reader for both paths (Unreleased, bsv-rs#86): Beef::from_binary is the…
 
 Mutate a V1 has-BUMP byte to 2 or a V2 format byte to 3; the decoder treats them as ordinary forms. The linked tests construct these bytes with the crate writer and pin the reserved-discriminator refusals. BUMP bit-field permissiveness is a separately documented Rust reading, not a claim that every unused flag bit is forbidden by BRC-74.
 

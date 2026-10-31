@@ -1,10 +1,10 @@
-FILE — eighth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — eighth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/go-sdk#398 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending.
 
 # Provide a canonical CompactSize reader for protocol parsing
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 15: Varint readers are canonical from 0.6.0, as node and TS…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#398 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending. Census row 15: Varint readers are canonical from 0.6.0, as node and TS…
 
 fd fc 00 encodes 252 non-minimally; fe ff ff 00 00 and ff ff ff ff ff 00 00 00 00 likewise select an unnecessarily wide representation. The Go reader accepts them. Preserve an explicitly named lenient reader if needed, but make canonical validation available to transaction/BEEF callers, matching the node and TypeScript strict reader.
 

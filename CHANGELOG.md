@@ -14707,7 +14707,7 @@ the charter (`InputNamesNoElement`); the stack records the divergence row
 
 Census (#375; current reading, historical account above retained):
 
-- Row 36: Ours: the shared reader treats reserved BEEF/BUMP forms strictly; BRC-62 transactions/0062.md:68 and BRC-74 transactions/0074.md:66-77 define the encoded flags. Theirs: ts-stack, filing pending (the witness: tests/beef_two_readers_agree.rs). Theirs: go-sdk, filing pending (the witness: tests/beef_two_readers_agree.rs). Draft: [beef-reserved-flags-ts-stack](./docs/lanes/375-filings/beef-reserved-flags-ts-stack.md). Draft: [beef-duplicate-offsets-go-sdk](./docs/lanes/375-filings/beef-duplicate-offsets-go-sdk.md).
+- Row 36: Ours: the shared reader treats reserved BEEF/BUMP forms strictly; BRC-62 transactions/0062.md:68 and BRC-74 transactions/0074.md:66-77 define the encoded flags. Theirs: ts-stack #1462 (filed 2026-10-31; answer pending; the witness: tests/beef_two_readers_agree.rs). Theirs: go-sdk #397 (filed 2026-10-31; answer pending; the witness: tests/beef_two_readers_agree.rs). Draft: [beef-reserved-flags-ts-stack](./docs/lanes/375-filings/beef-reserved-flags-ts-stack.md). Draft: [beef-duplicate-offsets-go-sdk](./docs/lanes/375-filings/beef-duplicate-offsets-go-sdk.md).
 
 ### Changed: the BIP-39 wordlists are data, not code (#89)
 
@@ -15396,7 +15396,7 @@ change above), so what this crate writes, TS 3 reads.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 33: Ours: the owner's 2026-10-22 ruling traverses every raw ancestor even behind a proof, with no positional rule; BRC-95 transactions/0095.md:41-56 explains the narrower TS cut. Theirs: go-sdk, filing pending (the witness: tests/beef_atomic_graph.rs). Draft: [atomic-unrelated-data](./docs/lanes/375-filings/atomic-unrelated-data.md).
+- Row 33: Ours: the owner's 2026-10-22 ruling traverses every raw ancestor even behind a proof, with no positional rule; BRC-95 transactions/0095.md:41-56 explains the narrower TS cut. Theirs: go-sdk #396 (filed 2026-10-31; answer pending; the witness: tests/beef_atomic_graph.rs). Draft: [atomic-unrelated-data](./docs/lanes/375-filings/atomic-unrelated-data.md).
 - Row 56: Ours: parsing locates the subject while verification judges its graph; BRC-95 transactions/0095.md:51-69 assigns the graph condition to validation, enforced by verify_stream and verify_valid here.
 
 ## [0.8.0] - 2026-10-21
@@ -15763,7 +15763,7 @@ uses the CompactSize methods. The tests are `canonical_varint`,
 Census (#375; current reading, historical account above retained):
 
 - Row 14: Ours: raw base58 follows the strict SDK entry point; bitcoin-sv v1.2.3 src/base58.cpp:25-79 intentionally also accepts whitespace and empty input, as tests/chain_encoding.rs records.
-- Row 15: Theirs: go-sdk, filing pending (the witness: tests/canonical_varint.rs). Draft: [canonical-varint-reader](./docs/lanes/375-filings/canonical-varint-reader.md).
+- Row 15: Theirs: go-sdk #398 (filed 2026-10-31; answer pending; the witness: tests/canonical_varint.rs). Draft: [canonical-varint-reader](./docs/lanes/375-filings/canonical-varint-reader.md).
 
 ## [0.5.0] - 2026-10-12
 
@@ -16071,7 +16071,7 @@ Read at the pin, not run against the reference:
 
 Census (#375; current reading, historical account above retained):
 
-- Row 31: Theirs: ts-stack, filing pending (the witness: tests/vectors/beef_of_any_size/no_input_atomic.bin; tests/vectors/beef_of_any_size/no_output_atomic.bin). Draft: [beef-empty-transactions](./docs/lanes/375-filings/beef-empty-transactions.md).
+- Row 31: Theirs: ts-stack #1461 (filed 2026-10-31; answer pending; the witness: tests/vectors/beef_of_any_size/no_input_atomic.bin; tests/vectors/beef_of_any_size/no_output_atomic.bin). Draft: [beef-empty-transactions](./docs/lanes/375-filings/beef-empty-transactions.md).
 
 ## [0.4.2] - 2026-10-10
 
@@ -16179,7 +16179,7 @@ Read at the pin, not run against the reference:
 
 Census (#375; current reading, historical account above retained):
 
-- Row 32: Ours: whole-buffer framing and the proof-based txid-only policy; BRC-62 transactions/0062.md:54-69 and BRC-95 transactions/0095.md:51-69 distinguish framing, proof and ancestry checks. Theirs: ts-stack, filing pending (the witness: tests/merkle_path_lone_leaf.rs). Draft: [merkle-lone-leaf-offset](./docs/lanes/375-filings/merkle-lone-leaf-offset.md).
+- Row 32: Ours: whole-buffer framing and the proof-based txid-only policy; BRC-62 transactions/0062.md:54-69 and BRC-95 transactions/0095.md:51-69 distinguish framing, proof and ancestry checks. Theirs: ts-stack #1460 (filed 2026-10-31; answer pending; the witness: tests/merkle_path_lone_leaf.rs). Draft: [merkle-lone-leaf-offset](./docs/lanes/375-filings/merkle-lone-leaf-offset.md).
 
 ## [0.4.1] - 2026-10-09
 
@@ -16244,7 +16244,7 @@ The posture of 0.4.0 stands: nothing is refused for a size or a count.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 31: Theirs: ts-stack, filing pending (the witness: tests/vectors/beef_of_any_size/no_input_atomic.bin; tests/vectors/beef_of_any_size/no_output_atomic.bin). Draft: [beef-empty-transactions](./docs/lanes/375-filings/beef-empty-transactions.md).
+- Row 31: Theirs: ts-stack #1461 (filed 2026-10-31; answer pending; the witness: tests/vectors/beef_of_any_size/no_input_atomic.bin; tests/vectors/beef_of_any_size/no_output_atomic.bin). Draft: [beef-empty-transactions](./docs/lanes/375-filings/beef-empty-transactions.md).
 
 ## [0.4.0] - 2026-10-09
 

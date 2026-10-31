@@ -1,10 +1,10 @@
-FILE — third in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — third in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/ts-stack#1460 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending.
 
 # Reject a one-transaction Merkle proof with a nonzero leaf offset
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 32: The whole-BEEF path follows the streaming reader where the reference…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1460 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending. Census row 32: The whole-BEEF path follows the streaming reader where the reference…
 
 A one-level path containing exactly one hashed leaf at offset 1 must not return that leaf as a root. MerklePath.ts:345,390-391 short-circuits on element count without checking offset. The same witness reaches Beef.verifyValid. Offset 0 remains the valid one-transaction-block case; the strict-vs-prefix parser and allowTxidOnly API choices are not this requested fix.
 

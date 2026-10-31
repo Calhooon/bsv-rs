@@ -1,10 +1,10 @@
-FILE — sixth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — sixth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/go-sdk#397 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending.
 
 # Reject contradictory repeated BUMP offsets
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 36: One reader for both paths (Unreleased, bsv-rs#86): Beef::from_binary is the…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#397 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending. Census row 36: One reader for both paths (Unreleased, bsv-rs#86): Beef::from_binary is the…
 
 Repeat a BUMP offset with a different hash; Go's last-wins lookup discards the contradiction. TypeScript and the Rust witness refuse the duplicate offset. The linked tests construct these bytes with the crate writer. Preserve the contradictory entries long enough to reject the proof, rather than silently accepting the later hash.
 
