@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: PushDrop pushes the wallet's key bytes as returned, as the reference does (#545)
+
+The PushDrop template pushed its key compressed (`PushDrop::lock`,
+`to_compressed()`), so the five sites that lock with a wallet's
+`getPublicKey` answer (the local store's `local_token.rs`, the global store's
+`global_actions.rs`, the contacts manager's `contacts_actions.rs`, the
+identity token's `reveal.rs`, the registry's `token.rs`) re-encoded the
+wallet's key. The reference's `lock` pushes the answer as the wallet returned
+it: `toArray(publicKey, 'hex')` under the opcode `publicKey.length / 2`
+(`ts-stack@edf6e03` `packages/sdk/src/script/templates/PushDrop.ts:158-175`;
+the unlocker signs with the wallet alone, `:206-247`, no key in it). A
+crate-visible `PushDrop::lock_with_key_bytes(&self, key_bytes: &[u8])`
+pushes the bytes given, the fields, drops and lock position `lock`'s
+(`src/script/templates/pushdrop_key_bytes.rs`); `lock` is it with the key
+compressed, unchanged. It is a port helper, not public API: the reference has
+one `lock`, taking the key as text, so no second public constructor is added
+and the public surface is unchanged. The five sites go through one crate helper,
+`wallet_key_lock`: the answer read by `PublicKey::from_hex` (its refusal
+unchanged) and pushed as the bytes the reference's `toArray(_, 'hex')` reads
+from it (an odd-length text with a leading `0`, #498's `reference_hex`).
+
+Old and new: a wallet answering a compressed key (every `ProtoWallet`, the
+toolbox's wallets, the CLI's) writes the same token as before, byte for byte,
+so the toolbox's and the CLI's tables are unchanged. A wallet answering an
+uncompressed (`04`) key or a hybrid (`06`/`07`) one, which #498's parser
+reads, wrote a token whose first field was the compressed key; it now writes
+the 65 bytes it returned, as the reference does. A token written before
+reads as before (the decoders read either length).
+
+The witness is recorded, never written by hand:
+`tests/support/pushdrop_key_bytes_545.mjs` runs the reference's own
+`PushDrop.lock` (the bundle of `ts-stack@edf6e03` under Node v22.18.0, a
+ProtoWallet of the scalar 9 whose answer is rewritten into each form) on a
+compressed, an uncompressed, a hybrid and an odd-length answer at both lock
+positions, into `tests/vectors/pushdrop_key_bytes_545.json` (8 cases, two runs
+byte for byte). The unit tests beside the helper
+(`src/script/templates/pushdrop_key_bytes_545_tests.rs`): this crate's
+template writes the reference's bytes for the compressed, uncompressed and
+hybrid cases, a compressed key's `lock` unchanged, the odd-length residue only
+at the reference's truncated opcode. `tests/script_pushdrop_key_bytes_545.rs`:
+the local store, the global store, the registry, the contacts manager and the
+identity reveal push the 65 bytes a wallet answers (the #318 counting wallet
+with #545's key form), through their public paths. On the base `69d315fc` the
+five site tests are red (the compressed key pushed; the unit file does not
+compile there, its helper absent); with the template's push reverted to
+compressed on the tip, the five site tests and one of the three unit tests
+(the one covering both non-compressed forms) are red, six of eight.
+
+### Notes: cross-SDK parity (#545)
+
+An odd-length key text is the one stated residue: the reference's opcode is
+`length / 2`, 32.5, which its script writer truncates to `0x20` before the 33
+bytes `toArray` reads, a script whose key push is cut (recorded in the
+vector's two `odd_length` cases with the opcode's offset); this crate writes
+the 33 bytes' own push, `0x21`, every other byte the reference's. A coordinate
+at or above p names no key a wallet derives and is not recorded. Go at
+`2ca481c` reads the wallet's answer as a key and pushes it compressed
+(`pub.PublicKey.Compressed()`, `transaction/template/pushdrop/pushdrop.go:124-140`),
+the base's behaviour: for a wallet answering an uncompressed or hybrid key,
+Go's token and the reference's differ. Theirs: go-sdk, filing pending (the
+witness: tests/script_pushdrop_key_bytes_545.rs;
+src/script/templates/pushdrop_key_bytes_545_tests.rs;
+tests/vectors/pushdrop_key_bytes_545.json).
+
 ## [0.9.0-beta.5] - 2026-10-31
 
 The 0.9.0 line's fifth prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (14:4xZ on 2026-10-31, the rulings page's entry of that hour, 22.6 of the brief in the one-hour shape of 19.7: bsv-rs 0.9.0-beta.5, then the toolbox's re-pin at the index hour, then the CLI's pin PR with its gate once after) at the tip after #554 landed (`e215aea8`): the beta.5 milestone's content (the per-transaction work budget #519, the public typed word resolver #520, `WorkBudget` `#[non_exhaustive]` #527, R56 for an unsigned action's input #491) and the 0.9.0 landings since beta.4 (the processor request cap #505, the #487 nits #502, the ordered certificate response #400, AuthFetch #423, the preimage witness #375, the Documentation check #515, the one byte bound #512 #526 #532, the local store's lock-before decode #499, the arch allowlist rule #347, the fixtures' Origin header #346, the six sites' lock position #537, the lenient key parser with every validator path strict #498, the contacts protocol and envelope #542 #543, the token-decode record checks #544, a SEC 1 tag `05` refused #550, the registry's definition-token unlock #548, `Contact`'s badge fields and its closing #552): 24 entries. The lenient string parser lands with every validator path strict, never alone (the keeper's 08:1xZ recommendation); `Contact`'s closing is the line's one api-break since beta.4, its migration in #552's notes.

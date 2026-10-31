@@ -1,6 +1,7 @@
 //! Contact action construction and PushDrop signing, kept separate from cache operations.
 use super::record;
 use super::*;
+use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
 use crate::script::LockingScript;
 use crate::wallet::{
     ListOutputsResult, Outpoint, SignActionResult, SignableTransaction, WalletOutput,
@@ -98,11 +99,7 @@ impl<W: WalletInterface> ContactsManager<W> {
             )
             .await?
             .signature;
-        Ok(PushDrop::new(
-            PublicKey::from_hex(&key.public_key)?,
-            vec![ciphertext, signature],
-        )
-        .lock())
+        wallet_key_lock(&key.public_key, vec![ciphertext, signature])
     }
 
     /// `#readListedSource` (`ContactsManager.ts:633-658`): the listed

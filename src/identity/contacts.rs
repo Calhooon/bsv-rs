@@ -6,8 +6,7 @@
 use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
-use crate::primitives::{to_base64, PublicKey};
-use crate::script::templates::PushDrop;
+use crate::primitives::to_base64;
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
