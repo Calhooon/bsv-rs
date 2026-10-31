@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the nightly's Mutants jobs resolve the dependency graph once before cargo-mutants (#574)
+
+The nightly's one run (`nightly.yml`, 2026-10-27, run 40474836749) failed all
+twenty Mutants jobs at the unmutated baseline, before any mutant was tested:
+`cannot create the lock file .../Cargo.lock because --locked was passed to
+prevent this`. `nightly_mutants.py` passes `--cargo-arg=--locked`, the library
+commits no `Cargo.lock` (`.gitignore`), and cargo-mutants' copy of the checkout
+had none to read. The `mutants` job now runs `cargo generate-lockfile` in the
+checkout before cargo-mutants, as `ci.yml`'s fixtures job and `bench.yml`
+already resolve before their `--locked` commands; `--locked` stays, so the
+baseline and every mutant of a shard build one graph. `docs/NIGHTLY.md` says
+so. The witness: the script's own command on the merkle shard 0/400 of a
+scratch copy with no lock fails its baseline with that text (exit 4), and the
+same command after `cargo generate-lockfile` builds the baseline and tests the
+shard's mutant (exit 0). The fuzz job passes `--locked` only to
+`cargo install`, which reads the installed crate's own lock, and needs no step.
+
 ### Fixed: an identity record with a lone surrogate escape is read as the reference's discovery reads it (#566)
 
 The reference's discovery reads a revelation token's certificate with

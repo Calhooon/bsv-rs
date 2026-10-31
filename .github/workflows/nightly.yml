@@ -120,6 +120,12 @@ jobs:
             --root "$RUNNER_TEMP/tools" --target-dir "$RUNNER_TEMP/tool-target"
           echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
 
+      # This library does not commit Cargo.lock: resolve once in the checkout,
+      # so the copy cargo-mutants makes carries the lock and the baseline and
+      # every mutant of the shard build one graph under `--locked` (#574).
+      - name: Resolve the mutation lockfile
+        run: cargo generate-lockfile
+
       - name: Run the scoped tests on every mutant
         run: |
           status=0
