@@ -17,8 +17,11 @@ use serde_json::Value;
 /// `validateWalletResult` (`WalletResultValidation.ts:632-636`, `:680-733`,
 /// `:873-879`): `bytes`' default bound here and in `result_values/bytes.rs`,
 /// and the request, response and total-byte caps of
-/// `result_values/boundary.rs`, `raw_tree.rs` and `wire.rs`.
-pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
+/// `result_values/boundary.rs`, `raw_tree.rs` and `wire.rs`; and, under their
+/// own names (#532), the HTTP wire substrate's frame cap (`http_wire.rs`), the
+/// argument validators' byte bound (`validation/crypto.rs`) and the wire
+/// processor's (`wire/validation.rs`).
+pub(crate) const MAX_BYTES: usize = 256 * 1024 * 1024;
 
 /// `walletByteFieldNames` (`BRC100ByteEncoding.ts:5-23`).
 #[cfg(feature = "http")]

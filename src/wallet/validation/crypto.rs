@@ -14,7 +14,10 @@ use crate::wallet::{
     Protocol, VerifyHmacArgs, VerifySignatureArgs,
 };
 
-const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
+/// `validateByteArray`'s default bound (`validationHelpers.ts:150`), the
+/// reference's `MAX_WALLET_WIRE_FRAME_BYTES`: the substrates' one byte bound,
+/// `byte_fields::MAX_BYTES` (#532).
+const MAX_WALLET_WIRE_FRAME_BYTES: usize = crate::wallet::substrates::byte_fields::MAX_BYTES;
 const MAX_SIGNATURE_BYTES: usize = 72;
 const GROUP_ORDER: [u8; 32] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,

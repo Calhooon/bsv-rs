@@ -3,11 +3,11 @@
 //! definition (bsv-rs#526): `MAX_BYTES` in `substrates/byte_fields.rs`, which
 //! `result_values/boundary.rs` reads rather than defining a second. Read from
 //! the source: every `.rs` file under `src/wallet`, every line that defines a
-//! `const` as `256 * 1024 * 1024` or `268435456`. The other lines of that
-//! value are four definitions outside #526's two, enumerated: one the
-//! reference's own request bound, three copies of `MAX_WALLET_WIRE_FRAME_BYTES`
-//! itself at other sites (a follow-up's); a definition that moves in or out
-//! of the list is a finding.
+//! `const` as `256 * 1024 * 1024` or `268435456`. Since bsv-rs#532 the three
+//! copies of `MAX_WALLET_WIRE_FRAME_BYTES` at other sites read `MAX_BYTES`, so
+//! one other definition remains, enumerated: the reference's own request
+//! bound, a different bound of the same value; a definition that moves in or
+//! out of the list is a finding.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::path::{Path, PathBuf};
@@ -15,29 +15,13 @@ use std::path::{Path, PathBuf};
 /// The one definition of the substrates' byte bound.
 const THE_BOUND: (&str, &str) = ("src/wallet/substrates/byte_fields.rs", "MAX_BYTES");
 
-/// `(file, name)`: the value's other definitions (not #526's two): the
-/// reference's `MAX_WALLET_JSON_REQUEST_BYTES`, a bound of its own, and three
-/// copies of the reference's `MAX_WALLET_WIRE_FRAME_BYTES`, the same bound.
+/// `(file, name)`: the value's other definition: the reference's
+/// `MAX_WALLET_JSON_REQUEST_BYTES`, a bound of its own (#532).
 const OTHER_CONSTANTS: &[(&str, &str)] = &[
     // `HTTPWalletJSON.ts:60`.
     (
         "src/wallet/substrates/http_json.rs",
         "MAX_WALLET_JSON_REQUEST_BYTES",
-    ),
-    // `WalletWire.ts:9`, the HTTP wire substrate's frame cap.
-    (
-        "src/wallet/substrates/http_wire.rs",
-        "MAX_WALLET_WIRE_FRAME_BYTES",
-    ),
-    // `validateByteArray`'s default bound (`validationHelpers.ts:150`).
-    (
-        "src/wallet/validation/crypto.rs",
-        "MAX_WALLET_WIRE_FRAME_BYTES",
-    ),
-    // The wire processor's `validateByteArray` and result `bytes` bound.
-    (
-        "src/wallet/wire/validation.rs",
-        "MAX_WALLET_WIRE_FRAME_BYTES",
     ),
 ];
 
