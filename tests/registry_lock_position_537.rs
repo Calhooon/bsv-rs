@@ -1,0 +1,90 @@
+//! #537, site 3: the registry client decodes a definition token lock-before
+//! alone, as its counterpart does (`ts-stack@edf6e03`
+//! `registryTokenValidation.ts:28`, `decodeCanonicalPushDrop` over
+//! `PushDrop.decode` at its default position): a lock-after token is
+//! skipped by the three resolvers and by `list_own_registry_entries`, as the
+//! reference's catches at `RegistryClient.ts:392` and `:445` skip it.
+#![cfg(feature = "registry")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/identity_reveal_wallet.rs"]
+mod identity_reveal_wallet;
+#[path = "support/pushdrop_lock_position_537.rs"]
+mod lock_position;
+
+use bsv_rs::registry::{
+    BasketQuery, CertificateQuery, DefinitionType, ProtocolQuery, RegistryClient,
+    RegistryClientConfig,
+};
+use bsv_rs::script::LockingScript;
+use bsv_rs::wallet::{ListOutputsResult, Outpoint, WalletOutput};
+use identity_reveal_wallet::Counting;
+use serde_json::Value;
+
+fn definition_type(case: &Value) -> DefinitionType {
+    match case["definition_type"].as_str().unwrap() {
+        "basket" => DefinitionType::Basket,
+        "protocol" => DefinitionType::Protocol,
+        _ => DefinitionType::Certificate,
+    }
+}
+
+/// How many definitions the type's resolver and the wallet listing return
+/// for `script`.
+async fn read(kind: DefinitionType, script: LockingScript) -> (usize, usize) {
+    let wallet = Counting::of_scalar(9);
+    *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
+        total_outputs: 1,
+        beef: None,
+        outputs: vec![WalletOutput {
+            outpoint: Outpoint::from_string(&format!("{}.0", "22".repeat(32))).unwrap(),
+            satoshis: 1,
+            locking_script: Some(script.to_binary()),
+            spendable: true,
+            tags: None,
+            labels: None,
+            custom_instructions: None,
+        }],
+    });
+    let resolver = lock_position::answering(kind.lookup_service(), script);
+    let client = RegistryClient::new(wallet, RegistryClientConfig::new().with_resolver(resolver));
+    let resolved = match kind {
+        DefinitionType::Basket => client
+            .resolve_basket(BasketQuery::default())
+            .await
+            .unwrap()
+            .len(),
+        DefinitionType::Protocol => client
+            .resolve_protocol(ProtocolQuery::default())
+            .await
+            .unwrap()
+            .len(),
+        DefinitionType::Certificate => client
+            .resolve_certificate(CertificateQuery::default())
+            .await
+            .unwrap()
+            .len(),
+    };
+    let listed = client.list_own_registry_entries(kind).await.unwrap().len();
+    (resolved, listed)
+}
+
+#[tokio::test]
+async fn a_lock_after_registry_token_is_skipped_as_the_reference_skips_it_537() {
+    let cases = lock_position::cases("registry_client");
+    assert_eq!(cases.len(), 6);
+    for case in &cases {
+        assert_eq!(case["outcome"], "skipped", "{}", case["name"]);
+        let kind = definition_type(case);
+        assert_eq!(
+            read(kind, lock_position::script(case)).await,
+            (0, 0),
+            "{}",
+            case["name"]
+        );
+        if case["kind"] == "lock_after_not_a_point" {
+            // The same definition locked before is read by both paths.
+            let control = lock_position::relocked_before(case);
+            assert_eq!(read(kind, control).await, (1, 1), "{}", case["name"]);
+        }
+    }
+}
