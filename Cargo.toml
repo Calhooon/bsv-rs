@@ -59,7 +59,10 @@ subtle = "2.5"
 serde = { version = "1.0", features = ["derive"] }
 # `float_roundtrip`: a JSON number reads to the correctly rounded double, as
 # `JSON.parse` does; the default reader can land a bit off (bsv-rs#285).
-serde_json = { version = "1.0", features = ["float_roundtrip", "raw_value"] }
+# 1.0.125: the first to read a lone surrogate escape into a byte string
+# whatever follows it (`\ud800\u0041`, `\ud800\ud800\udc00`), as the
+# identity record's lenient reader needs; 1.0.124 refuses them (#566).
+serde_json = { version = "1.0.125", features = ["float_roundtrip", "raw_value"] }
 # ECMAScript number formatting for the certificate-request signature (#426).
 ryu-js = { version = "1.0", optional = true }
 hex = "0.4"

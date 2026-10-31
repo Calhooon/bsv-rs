@@ -26,6 +26,9 @@ use crate::primitives::{from_hex, PublicKey};
 use crate::wallet::types::Outpoint;
 use serde_json::{Map, Value};
 
+#[path = "client_record_lenient.rs"]
+mod lenient;
+
 /// `MAX_IDENTITY_CERTIFICATE_BYTES` (`identityUtils.ts:23`).
 const MAX_CERTIFICATE_BYTES: usize = 256 * 1024;
 /// `MAX_IDENTITY_FIELDS` (`identityUtils.ts:24`).
@@ -70,13 +73,16 @@ pub(in crate::identity) fn read(fields: &[Vec<u8>]) -> Option<Record> {
         .strip_prefix(&[0xef, 0xbb, 0xbf])
         .unwrap_or(certificate);
     let text = std::str::from_utf8(bytes).ok()?;
-    let Ok(Value::Object(object)) = serde_json::from_str::<Value>(text) else {
-        return None;
+    let (object, maps) = match serde_json::from_str::<Value>(text) {
+        Ok(Value::Object(object)) => (object, token_maps::read(text)),
+        Ok(_) => return None,
+        // A lone surrogate escape `JSON.parse` keeps and a `String` cannot (#566)
+        Err(_) => lenient::read(text)?,
     };
     if !is_certificate_record(&object) {
         return None;
     }
-    members(&object, token_maps::read(text))
+    members(&object, maps)
 }
 
 /// `certificateRecord`'s member set, cardinality and keyring checks.
