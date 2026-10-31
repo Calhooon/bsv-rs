@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: an identity record with a lone surrogate escape is read as the reference's discovery reads it (#566)
+
+The reference's discovery reads a revelation token's certificate with
+`JSON.parse` (`ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:88`,
+`certificateRecord`, under `decodeIdentityOutput`, `:497-559`), which keeps
+a lone UTF-16 surrogate escape (`\ud800` without its pair) as a lone code
+unit; `certificateRecord` compares the names with those units (`:100-125`),
+and `Certificate.verify`'s `toBinary` writes every name and value through
+`TextEncoder` (`packages/sdk/src/auth/certificates/Certificate.ts:73-75`,
+`:280-296`; `primitives/UTF8.ts:1-5`), which writes a lone surrogate as
+U+FFFD's three bytes, in every engine (the WHATWG encoder's rule). Until
+#566 both `ls_identity` parsers read the text with `serde_json` into a
+`String`, which refuses the escape (`invalid unicode code point`), so a
+record the reference reads was skipped: #553's stated residue (#560's), the
+keeper's ruling (3) of 2026-10-31 17:1xZ (a JSON body census row scoped to
+the identity record fields, a lenient reader or a stated divergence).
+
+The lenient reader (`src/identity/client_record_lenient.rs`), reached only
+when the strict reading refuses the record's text: each string read as
+`serde_json` reads a byte string, in WTF-8 (its own option, no fork and no
+new dependency), the keyring names judged against the field names unit for
+unit, then each string held with every lone surrogate as U+FFFD, the bytes
+the reference signs, verifies and derives a key ID from. A keyring value
+with a lone unit is skipped, as no base64 decrypts there (`:551-552`), and
+so, since the cold review, is a revealed field's value with one
+(`VerifiableCertificate.ts:182-191`: its `canonicalBase64` throws before the
+decryption), which the lane's tip read through a failed decryption. The
+`type`, `serialNumber`, keys, outpoint and signature with one are skipped by
+the record's text rules, as the reference skips them.
+
+| Record | Before | Now |
+|---|---|---|
+| An unrevealed field value with a lone unit (high, low, high before a non-low, a reversed pair, the escape in upper case) | skipped | read, the value held with U+FFFD, the certificate verifying over the reference's bytes |
+| A field name with a lone unit, unrevealed or revealed | skipped | read; a revealed one decrypted under the key ID `TextEncoder` writes |
+| A keyring name whose lone unit differs from its field's | skipped | skipped |
+| A revealed field's value with a lone unit (the cold review's) | skipped | skipped (read at the lane's tip `130047e6`) |
+| A keyring value, a member name, `type`, `serialNumber`, `subject`, `certifier`, `revocationOutpoint` or `signature` with a lone unit | skipped | skipped |
+
+`tests/identity_lone_surrogate_566.rs` runs `tests/vectors/identity_lone_surrogate_566.json`
+(twenty-one tokens the reference's `PushDrop.lock` signs for the subject 9, each
+with `parseResults`' outcome, a read certificate's fields and decrypted
+fields as the reference holds them and as `TextEncoder` writes them; written
+by `tests/support/identity_lone_surrogate_566.mjs` under Node v22.18.0, two
+runs byte-identical) through `resolve_by_attributes` and
+`discover_certificates`: 7 of 21 cases RED on `b2531c8a` (the seven the
+reference reads, skipped there), the twenty-first (`revealed_field_value`,
+the cold review's) RED on the lane's tip `130047e6` (read there, skipped by
+the reference), 21 green on the tip, three enumerated (the
+note below). The reader's units, including an escape cut at the text's end,
+a high surrogate before a non-low unit and a low alone, refused without a
+panic: `src/identity/client_record_lenient_tests.rs`.
+
+**Dependency floor:** `serde_json` is required at `1.0.125` (was `1.0`): it
+is the first release that reads a lone surrogate escape into a byte string
+whatever follows it; 1.0.124 refuses `\ud800\u0041` and
+`\ud800\ud800\udc00`, and 1.0.60 refuses every lone high surrogate
+(measured on 1.0.40 to 1.0.154 by the cold review). The ratchet's lock
+(`tools/ratchet/library.Cargo.lock`) already resolves 1.0.154; a consumer
+whose lock holds an older `serde_json` moves to 1.0.125 or later on its
+next `cargo update -p bsv-rs`.
+
+### Notes: cross-SDK parity (#566)
+
+A read string holds U+FFFD where the reference's holds the lone unit: every
+byte derived from it is the same (`TextEncoder`), but a caller that writes
+the field back as JSON writes the character, where `JSON.stringify` writes
+the escape. Three shapes the reference reads are skipped here, enumerated in
+the test: two field names differing only in their lone units, and a name
+with a lone unit beside one with U+FFFD itself, which one `String` cannot
+hold apart (the reference's binary carries the same name bytes twice); and
+a name with a lone unit beside one with U+E000 (the recorded case), where
+ICU sorts the lone unit first (`localeCompare`, `Certificate.ts:282`, Node
+22.18.0) and this crate's collation sorts U+FFFD after U+E000, so the bytes
+rebuilt are not the bytes signed; ICU 77.1 weighs a lone unit at its code
+point among the implicit weights, so the same holds beside any private-use
+or unassigned BMP character above U+DFFF (U+E000 to U+F8FF, U+FDD0, U+FFF0,
+measured by the cold review), where ICU and this crate both sort U+FFFD
+after them. Beside an assigned supplementary character (U+10000, U+1F600)
+ICU sorts both the lone unit and U+FFFD after it and this crate U+FFFD
+before it: #249's residue of a name past U+00FF, not this one's. Go at
+`2ca481c` delegates resolution to its wallet's discovery
+(`identity/client.go:240-276`) and parses no `ls_identity` answer. Out of
+scope: the contacts record (its plaintext is the owner's own wallet's
+encryption, a row of #544's) and `IdentityClient.parseIdentity`
+(`IdentityClient.ts:1044`), which reads decrypted fields, no JSON text.
+
+Census (#375; current reading):
+
+- Row 92: Ours: closed by #566 at the pin: both `ls_identity` parsers read a certificateRecord text with a lone surrogate escape as JSON.parse and TextEncoder do (wallet-toolbox identityUtils.ts:88,100-125 and Certificate.ts:73-75,280-296 at edf6e03), the names compared unit for unit, each string held with U+FFFD; residues the held character where the reference holds the lone unit, two names one String holds and a lone unit's ICU order beside a private-use or unassigned BMP character above U+DFFF (U+E000 recorded). Theirs: none (the witness: tests/identity_lone_surrogate_566.rs; tests/vectors/identity_lone_surrogate_566.json).
+
 ### Added: `WorkBudget::charge` is public, so a host that judges inputs itself charges the one per-transaction rule (#567)
 
 Since #519 the per-transaction work rule has had one implementation,
