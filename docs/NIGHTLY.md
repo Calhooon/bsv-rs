@@ -56,7 +56,10 @@ environment disables it, so each mutation can reuse the baseline's compilation.
 
 The test command is `cargo test --features "full,http" --locked --lib`, followed
 by one `--test NAME` for every suite in the row below. The same target selection
-applies to `cargo test --no-run`. The library target is essential: it includes
+applies to `cargo test --no-run`. The library commits no `Cargo.lock`, so each
+mutation job runs `cargo generate-lockfile` in its checkout before cargo-mutants
+copies it: `--locked` then holds the baseline and every mutant to one graph
+(#574). The library target is essential: it includes
 the codec and interpreter's inline tests. Unit tests are scoped with libtest
 `--skip` arguments to keep the relevant source namespace: `script`, `transaction`
 for BEEF, `transaction::merkle_path`, `wallet::wire`, or `wallet::substrates`.
