@@ -29,6 +29,27 @@ impl PushDrop {
     }
 }
 
+/// `PublicKey.fromString`'s words (`ts-stack@edf6e03` `PublicKey.ts:49-51`,
+/// `hex.ts:28-30`, `Point.ts:303-325`) for key text the reference refuses;
+/// `None` where it accepts the key, so the caller keeps its own parse's
+/// verdict and words.
+#[cfg(any(feature = "kvstore", feature = "registry"))]
+pub(crate) fn key_text_refusal(key: &str) -> Option<&'static str> {
+    if !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Some("Invalid hex string");
+    }
+    if !matches!(key.len().div_ceil(2), 33 | 65) {
+        return Some("Unknown point format");
+    }
+    // Bound the diagnostic's allocation, then pad as hex.ts:28-30 does.
+    let bytes = if key.len().is_multiple_of(2) {
+        crate::primitives::from_hex(key)
+    } else {
+        crate::primitives::from_hex(&format!("0{key}"))
+    };
+    bytes.ok().as_deref().and_then(point_message)
+}
+
 /// `Point.fromDER`'s words (`ts-stack@edf6e03` `Point.ts:303-325`) for key
 /// bytes it refuses; `None` where the reference accepts the point, so the
 /// caller keeps its native words. The acceptance is

@@ -80,9 +80,9 @@ fn test_definition_type_wallet_basket() {
 #[test]
 fn test_definition_type_expected_field_count() {
     // Rust/Go SDK field counts (data fields only, not including OP_DROP)
-    assert_eq!(DefinitionType::Basket.expected_field_count(), 6);
-    assert_eq!(DefinitionType::Protocol.expected_field_count(), 6);
-    assert_eq!(DefinitionType::Certificate.expected_field_count(), 7);
+    assert_eq!(DefinitionType::Basket.expected_field_count(), 7);
+    assert_eq!(DefinitionType::Protocol.expected_field_count(), 7);
+    assert_eq!(DefinitionType::Certificate.expected_field_count(), 8);
 }
 
 // =================

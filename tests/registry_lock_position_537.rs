@@ -10,6 +10,8 @@
 mod identity_reveal_wallet;
 #[path = "support/pushdrop_lock_position_537.rs"]
 mod lock_position;
+#[path = "support/registry_token_fields_543.rs"]
+mod token_fields;
 
 use bsv_rs::registry::{
     BasketQuery, CertificateQuery, DefinitionType, ProtocolQuery, RegistryClient,
@@ -82,8 +84,14 @@ async fn a_lock_after_registry_token_is_skipped_as_the_reference_skips_it_537() 
             case["name"]
         );
         if case["kind"] == "lock_after_not_a_point" {
-            // The same definition locked before is read by both paths.
-            let control = lock_position::relocked_before(case);
+            // The reference's own token of the type, lock-before and signed
+            // (#543's vector; the unsigned relock of #537 is no token since
+            // #543), is read by both paths.
+            let control = token_fields::cases("tokens")
+                .into_iter()
+                .find(|token| token["definition_type"] == case["definition_type"])
+                .unwrap();
+            let control = token_fields::script(&control);
             assert_eq!(read(kind, control).await, (1, 1), "{}", case["name"]);
         }
     }

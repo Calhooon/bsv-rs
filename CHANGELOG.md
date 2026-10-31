@@ -7,6 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the registry client uses the reference's definition-token layout and locking key (#543)
+
+The registry client read and wrote a definition token of 6, 6 and 7 fields
+(basket, protocol, certificate: the data fields, the operator's identity key
+last), unsigned, locked with the operator's identity key. The reference's
+token carries one more field, the operator's signature over the data fields,
+and is locked with the operator's key linked to `anyone`
+(`ts-stack@edf6e03` `RegistryClient.ts:308-342`, `:688-722`;
+`PushDrop.ts:146-202`). A token written here was refused by the reference's
+validator (`Unexpected PushDrop token field count`), and the reference's
+token was skipped here by the field count. The keeper's reading (2026-10-31
+07:1xZ, recorded on #543): a parse divergence that dropped the reference's
+signature from the record; a parity row at the pin, the second of three
+after #537.
+
+| | Before | Now |
+|---|---|---|
+| Script fields (basket / protocol / certificate) | 6 / 6 / 7 | 7 / 7 / 8: the same data fields, then the signature (`registryTokenValidation.ts:13-17,29`) |
+| Signature | none | the wallet's `createSignature` over the data fields' bytes concatenated, protocol `[1, basketmap]`, `[1, protomap]` or `[1, certmap]`, key ID `1`, counterparty `anyone` (`PushDrop.ts:173-185`) |
+| Locking key | the identity key | the wallet's `getPublicKey` for the same protocol and key ID, counterparty `anyone`, `forSelf` true (`RegistryClient.ts:320`, `PushDrop.ts:155-163`) |
+| Protocol field | `[1, "name"]` | `[1,"name"]`, `JSON.stringify` (`RegistryClient.ts:697`) |
+| Reader | the field count alone | `decodeAndVerifyRegistryToken` (`registryTokenValidation.ts:20-64`): the canonical lock-before envelope of the type's count plus one, each field at most 16 KiB and 64 KiB in all, the data fields strict UTF-8, the operator's key a point, the locking key the one `anyone` derives for the operator, and the signature verified by the `anyone` wallet against the operator |
+| `DefinitionType::expected_field_count` | 6 / 6 / 7 | 7 / 7 / 8, the script's count as its documentation says |
+
+The reader is public as `registry::decode_and_verify_registry_token`, the
+reference's exported function, an addition. It refuses as
+`Error::RegistryError` in the reference's words: `Unexpected PushDrop token
+field count`, `PushDrop token contains an oversized field`, `PushDrop token
+payload is too large`, `PushDrop token must use the canonical PushDrop
+envelope`, `The encoded data was not valid for encoding utf-8`, the
+operator key's `Invalid hex string`, `Unknown point format` and `Invalid
+point` (`PublicKey.fromString`, `registryTokenValidation.ts:36`; `hex.ts:28-30`,
+`Point.ts:303-325`), a locking key with a `05` prefix's `Unknown point
+format` (`PushDropValidation.ts:59`, `PushDrop.ts:74-75`), `Registry token
+locking key is not linked to its operator`, the verifier's argument checks'
+`The counterparty parameter must be even length, not 65.`, `... no more than
+66 length.` and `... a valid compressed secp256k1 public key`
+(`validatePublicKey`, `validationHelpers.ts:185-196`, `:522-534`, through
+`validateEncryptionArgs`, `:228`) and `The signature parameter must be a
+canonical DER-encoded ECDSA signature` (`ProtoWallet.ts:359`,
+`validationHelpers.ts:1801`), and the verifier's own `Signature is not valid`
+(the reference's `ProtoWallet.verifySignature` throws before
+`registryTokenValidation.ts:52`'s `Registry token signature is invalid` is
+reached). The operator's text is read twice, as the reference reads it: as
+a key by `PublicKey.fromString` for the linkage (here `PublicKey::from_hex`,
+the reference's lenient forms since #498, after the reference's words for
+the forms it refuses, as k256 reads a `05`-prefixed key as a compact point),
+then as `verifySignature`'s counterparty, which admits 66 hex characters of a
+compressed valid point alone: an uncompressed, odd-length, hybrid or
+`02 || (p+1)` operator, signed by the operator's wallet over its own text and
+locked with the key derived for it, is refused there in the reference's
+words, and an upper-case one is accepted, as `validateHexString` lowercases
+it (`:533`). A `05` locking key is judged in `Point.fromDER`'s words before
+the envelope, where the canonical check would refuse it in other words. The three resolvers and `list_own_registry_entries`
+call it and skip a refused token, as `RegistryClient.ts:392` and `:445` do;
+`register_definition` and `update_definition` write the reference's token.
+`to_pushdrop_fields` and `from_pushdrop_fields` keep the data fields alone,
+as `#buildPushDropFields` does; no public struct changes.
+
+A token written before this landing is not the reference's token: the
+reference and this crate now skip it at every resolver and listing. For the
+toolbox's and the CLI's tables:
+
+| Consumer | Token | Before | Now |
+|---|---|---|---|
+| Toolbox / CLI resolving or listing a definition | written by this crate before #543 (6/6/7, unsigned, identity key) | read | skipped, as the reference skips it |
+| Toolbox / CLI resolving or listing a definition | written by the reference | skipped | read |
+| Toolbox / CLI registering or updating a definition | written now | refused by the reference's validator | the reference's bytes for the same definition, wallet and key |
+
+`list_own_registry_entries` no longer returns a pre-#543 token; a
+`RegistryRecord` built for it by hand still reaches
+`revoke_own_registry_entry` and `update_definition`, which do not read the
+token's fields.
+
+The witness is recorded, never written by hand:
+`tests/support/registry_token_fields_543.mjs` (the bundle of `ts-stack@edf6e03`
+under Node v22.18.0) runs the reference's own `registerDefinition` with a
+`ProtoWallet` of the scalar 9 up to its createAction for one definition of
+each type, and records the token (locking key, data fields, signature,
+script), the wallet calls, the validator's verdict and the reference's
+`resolve` of it; this crate's pre-#543 token of each type (its writer's
+bytes), ten one-change tokens of each type with the validator's words
+(the identity key, a signature over other data, absent or doubled, a field
+that is not UTF-8, an operator that is not hex, of an unknown format or not
+a point, a signature that is not DER, a `05` locking key) and five operator
+texts of each type, each signed and locked for its text (uncompressed,
+odd-length, hybrid, upper-case, `02 || (p+1)`), with the validator's verdict,
+in `tests/vectors/registry_token_fields_543.json` (3 tokens, 3 pre-#543
+tokens, 30 refusals, 15 counterparty cases: 12 refused, 3 accepted, 12 operator-order
+cases, the operator judged before a non-DER signature and read untrimmed; two runs
+byte for byte). `tests/registry_token_fields_543.rs` (6 tests, an injected
+resolver on `.invalid` hosts and the counting wallet of #318): the
+reference's tokens read by the three resolvers and the listing;
+`register_definition` and `update_definition` writing the reference's bytes,
+its two wallet calls with the reference's arguments; the pre-#543 tokens,
+the thirty refusals and the twelve refused operator texts skipped as the
+reference skips them, the three upper-case ones read. The first four red on
+`b51cbea7` (the reference's tokens skipped, the identity-keyed unsigned
+script written, the pre-#543 and the unsigned anyone-keyed tokens read).
+`tests/registry_token_words_543.rs` (6 tests): the public reader's fields,
+its thirty-three refusals and the fifteen operator texts in the recorded
+verdicts and words; it does not compile on
+`b51cbea7` (`E0432`, the reader absent), and
+`the_operator_key_and_signature_refusals_are_the_reference_words_through_registry_error_543`
+is red on the reader's first cut (`InvalidHex`, `InvalidPublicKey("Point not
+on curve")`, a `05` key reaching the linkage refusal, and a `WalletRefusal`
+for the non-DER signature), and
+`the_operator_text_is_checked_as_the_reference_counterparty_543`,
+`a_05_locking_key_is_refused_in_the_reference_words_543` and
+`an_operator_text_the_reference_counterparty_check_refuses_is_skipped_543`
+are red on the reader before the counterparty check (`0a187282`: the
+uncompressed operator accepted, the `05` key refused as a non-canonical
+envelope, the uncompressed operator's token resolved).
+`tests/registry_lock_position_537.rs`'s
+control becomes the reference's signed token of the type: #537's unsigned
+relock is no token since this landing.
+
+### Notes: cross-SDK parity (#543)
+
+Two residues remain at the writer, stated: a certificate definition's
+`fields` JSON is written from a `HashMap` (`CertificateDefinitionData.fields`),
+so a definition of two or more fields is written in an order the reference's
+`JSON.stringify` (insertion order) need not share, and its signature is over
+those bytes (the reader accepts either, verifying the bytes received); and
+the reference's `validateDefinitionData` normalizes a URL (`new URL(...).href`,
+`RegistryClient.ts:80-99`) before writing it, which this crate's writer does
+not, so `https://icon.example` is written as given where the reference writes
+`https://icon.example/`. The vector's definitions carry one certificate field
+and normalized URLs. Go at `2ca481c` locks its registry token signed, with
+counterparty `anyone` and `forSelf` false (`registry/methods.go:45-55`), and
+reads 6/6/7 fields with no verification (`registry/client.go:246,267,293`).
+
+One spend stays open, stated (#548): `revoke_own_registry_entry` and
+`update_definition` sign the token's input with an empty unlocking script
+(`src/registry/client.rs:653`, `:877`), where the reference unlocks it with
+the PushDrop unlocker for the type's protocol, key ID `1`, counterparty
+`anyone`, `all`, over the authenticated output's satoshis and script
+(`RegistryClient.ts:540-548`, `:630-639`), before `completeBoundAction`.
+
+Census (#375; current reading):
+
+- Row 84: Ours: closed by #543 at the pin; residues the certificate fields' map order and URL normalization at the writer. Theirs: go-sdk, filing pending (the witness: tests/registry_token_fields_543.rs; tests/vectors/registry_token_fields_543.json).
+- Row 85: Ours: open, #548: the registry's revoke and update sign the token's input with an empty unlocking script where RegistryClient.ts:540-548,630-639 at edf6e03 unlock it with the PushDrop unlocker. Theirs: none until #548 lands (the witness: src/registry/client.rs:653,877).
+
 ### Fixed: the contacts manager uses the reference's contact protocol (#542)
 
 The contacts manager derived every contact key at security level 1:

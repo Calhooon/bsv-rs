@@ -1,30 +1,14 @@
 //! Local parser catches: reference words only for failures the reference also has.
 use super::lookup::refused;
-use crate::primitives::{from_hex, PublicKey};
-use crate::script::templates::pushdrop_position::{canonical_refusal, point_message};
+use crate::primitives::PublicKey;
+use crate::script::templates::pushdrop_position::{canonical_refusal, key_text_refusal};
 use crate::script::{templates::PushDrop, LockingScript};
 use crate::{Error, Result};
 
 pub(super) fn parse_public_key(key: &str) -> Result<PublicKey> {
     PublicKey::from_hex(key).map_err(|error| match error {
-        Error::InvalidHex(_) if !key.bytes().all(|byte| byte.is_ascii_hexdigit()) => {
-            refused("Invalid hex string")
-        }
         Error::InvalidHex(_) | Error::InvalidPublicKey(_) => {
-            if !matches!(key.len().div_ceil(2), 33 | 65) {
-                return refused("Unknown point format");
-            }
-            // Bound the diagnostic's allocation, then pad as hex.ts:28-30 does.
-            let bytes = if key.len().is_multiple_of(2) {
-                from_hex(key)
-            } else {
-                from_hex(&format!("0{key}"))
-            };
-            bytes
-                .ok()
-                .as_deref()
-                .and_then(point_message)
-                .map_or_else(|| refused(error.to_string()), refused)
+            key_text_refusal(key).map_or_else(|| refused(error.to_string()), refused)
         }
         other => other,
     })
