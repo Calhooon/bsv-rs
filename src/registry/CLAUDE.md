@@ -15,7 +15,7 @@ Registry entries are stored as PushDrop tokens on-chain, allowing decentralized 
 |------|---------|
 | `mod.rs` | Module root; re-exports and constants |
 | `types.rs` | Definition types, queries, tokens, result types |
-| `client.rs` | RegistryClient implementation |
+| `client.rs` | RegistryClient implementation; the three resolvers' parsers and `list_own_registry_entries` decode a definition token lock-before alone (`PushDrop::decode_before`), as `registryTokenValidation.ts:28` does, a lock-after token skipped (#537, `tests/registry_lock_position_537.rs`) |
 
 ## Key Exports
 

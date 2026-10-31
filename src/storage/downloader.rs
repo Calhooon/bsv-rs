@@ -117,8 +117,8 @@ impl StorageDownloader {
                 None => continue,
             };
 
-            // Decode PushDrop fields
-            let pd = match PushDrop::decode(&tx_output.locking_script) {
+            // Lock-before alone, as UHRPAdvertisementValidation.ts:40 decodes (#537)
+            let pd = match PushDrop::decode_before(&tx_output.locking_script) {
                 Ok(pd) => pd,
                 Err(_) => continue,
             };

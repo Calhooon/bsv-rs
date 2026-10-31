@@ -17,7 +17,7 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | `types.rs` | Core types (Protocol, TaggedBEEF, Steak, LookupQuestion/Answer, etc.) and constants |
 | `host_reputation_tracker.rs` | Host performance tracking with exponential backoff and rank change events |
 | `facilitators.rs` | HTTP lookup/broadcast facilitators with binary/JSON response parsing |
-| `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop |
+| `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop; `decode_overlay_admin_token` decodes lock-before alone, as `OverlayAdminTokenTemplate.ts:164` does, a lock-after token refused in that site's `decodeCanonicalPushDrop` words (`lock_after_refusal`, five fields; #537, `tests/overlay_admin_token_lock_position_537.rs`) |
 | `historian.rs` | Transaction ancestry traversal for building chronological history |
 | `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing |
 | `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order) |
