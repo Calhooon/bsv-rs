@@ -36,8 +36,9 @@ const INVALID_PARAMETER: u8 = 6;
 /// `walletErrors.unknownError` (`WalletError.ts:72`).
 const UNKNOWN_ERROR: u8 = 1;
 /// `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletWire.ts:9`), `validateByteArray`'s
-/// and the result's `bytes` default bound.
-const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
+/// and the result's `bytes` default bound: the substrates' one byte bound,
+/// `byte_fields::MAX_BYTES` (#532).
+const MAX_WALLET_WIRE_FRAME_BYTES: usize = crate::wallet::substrates::byte_fields::MAX_BYTES;
 /// A refusal the processor frames with its own code and words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Refusal {

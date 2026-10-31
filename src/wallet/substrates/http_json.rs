@@ -91,7 +91,9 @@ pub struct HttpWalletJson {
     originator: Option<String>,
 }
 
-/// The reference's `MAX_WALLET_JSON_REQUEST_BYTES` (`HTTPWalletJSON.ts:60`).
+/// The reference's `MAX_WALLET_JSON_REQUEST_BYTES` (`HTTPWalletJSON.ts:60`),
+/// the JSON request's own bound: not the frame bound `byte_fields::MAX_BYTES`,
+/// though it shares the value (#532).
 const MAX_WALLET_JSON_REQUEST_BYTES: usize = 256 * 1024 * 1024;
 
 impl HttpWalletJson {

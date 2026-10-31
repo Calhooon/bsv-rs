@@ -57,8 +57,9 @@ pub struct HttpWalletWire {
     originator: Option<String>,
 }
 
-/// The reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletWire.ts:9`).
-const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
+/// The reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletWire.ts:9`): the
+/// substrates' one byte bound, `byte_fields::MAX_BYTES` (#532).
+const MAX_WALLET_WIRE_FRAME_BYTES: usize = super::byte_fields::MAX_BYTES;
 
 impl HttpWalletWire {
     /// Creates a wire to the wallet at `base_url` (default

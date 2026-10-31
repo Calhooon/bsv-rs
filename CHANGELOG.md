@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the three remaining copies of the substrates' byte bound read the one definition (#532)
+
+PR #531's cold review found three constants under `src/wallet` still holding
+the substrates' 256 MiB byte bound, the reference's
+`MAX_WALLET_WIRE_FRAME_BYTES`, under their own literal after #526 made
+`byte_fields::MAX_BYTES` its one definition: `substrates/http_wire.rs` (the
+HTTP wire substrate's frame cap, `HTTPWalletWire.ts:28`),
+`validation/crypto.rs` (`validateByteArray`'s default bound,
+`validationHelpers.ts:150`) and `wire/validation.rs` (the processor's byte
+arrays and the result's `bytes`, `WalletResultValidation.ts:873`). Each keeps
+its name and now reads `byte_fields::MAX_BYTES`, whose visibility moves from
+`pub(super)` to `pub(crate)`: the one change that reaches all three readers,
+since `byte_fields` is already a `pub(crate)` module of `substrates`, compiled
+under `wallet` alone; moving the definition would have touched every existing
+reader. `tests/arch_one_wallet_byte_bound.rs`'s enumerated list of other
+definitions shrinks from four to one (it fails on the base, five definitions
+found against two expected, and passes here): `http_json.rs`'s
+`MAX_WALLET_JSON_REQUEST_BYTES`, the reference's own request bound
+(`HTTPWalletJSON.ts:60`), a different bound of the same value, which stays its
+own constant. No behaviour change: every refusal's words and every recorded
+wire frame are unchanged.
+
 ### Changed: one definition of the wallet substrates' byte bound (#526)
 
 PR #525's cold review found the substrates' 256 MiB byte bound, the
