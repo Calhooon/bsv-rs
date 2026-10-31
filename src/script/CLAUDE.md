@@ -10,7 +10,10 @@ execution. The verifier maps its `ScriptResource::Work` decline to
 `NotJudgedCause::WorkBudgetExceeded { input, budget, work_done }`; `work_done` is
 `Spend::work_spent()`, excluding the refused charge. The transaction verifier
 adds each input's charged work to a running total in input order (#519), under
-`WorkBudget { per_input, per_transaction }`, both `Option<u64>`. Crossing the
+the `#[non_exhaustive] WorkBudget` with readable public `per_input` and
+`per_transaction` fields, both `Option<u64>`. Its `new()` and derived `Default`
+leave both unbounded; const `with_per_input` / `with_per_transaction` setters
+configure them, and external destructures use `..` (#527). Crossing the
 transaction bound is `TransactionWorkBudgetExceeded { input, limit, total }`,
 including the crossing input's work. The per-input refusal stays unchanged;
 there is no consensus work rule. Each live door chooses and documents its

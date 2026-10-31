@@ -37,7 +37,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `verify.rs` | The existing SPV graph walk and chain-parameter variants, sharing fee/value/proof/resource behavior and the per-transaction sighash cache; singular work-budget methods keep their signatures, plural `verify_with_work_budgets` / `verify_with_chain_params_and_work_budgets` accept `WorkBudget` and charge each transaction's inputs in order (#519) |
-| `work_budget.rs` | `WorkBudget { per_input: Option<u64>, per_transaction: Option<u64> }`, both `None` by default, adjacent `with_work_budget` / `with_transaction_work_budget` builders; common input accounting and transaction-total charge (#519) |
+| `work_budget.rs` | `#[non_exhaustive] WorkBudget` with readable public `per_input: Option<u64>` and `per_transaction: Option<u64>` fields, `new()` and derived `Default` both unbounded, const `with_per_input` / `with_per_transaction` setters; common input accounting and transaction-total charge (#519, #527) |
 | `verification_flags.rs` | Checks tip + 1, then calls `ChainParams::word_for_input(Word::Standard, ...)`; the public resolver owns the no-tip latest-era rule and returns `NotJudgedCause`, never a script failure (#452, #520) |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
@@ -85,10 +85,12 @@ The bound is a service door's policy, never a consensus rule. Each captain names
 its value in the door's brief beside the sibling's memory policy rows. A work
 counter cannot interrupt one arithmetic opcode, so elapsed time needs an
 external bound. Stream budgets are local configuration, absent from cursors and
-reapplied after every resume. `WorkBudget` adds `per_transaction` beside
-`per_input` (both `Option<u64>`), with `with_work_budget` and
-`with_transaction_work_budget` builders. The plural whole-transaction methods
-accept this type. Stream readers add the same transaction builder and expose
+reapplied after every resume. The `#[non_exhaustive] WorkBudget` has readable
+public `per_transaction` and `per_input` fields (both `Option<u64>`); `new()`
+and derived `Default` leave both unbounded, and const `with_per_input` and
+`with_per_transaction` setters configure them. External destructures use `..`.
+The plural whole-transaction methods accept this type. Stream readers keep
+`with_work_budget` / `with_transaction_work_budget` and expose
 `work_spent()` for the current or most recently evaluated transaction. Each
 input's spent work is charged after evaluation, in input order, and the total
 resets per transaction. A total strictly above its bound yields
