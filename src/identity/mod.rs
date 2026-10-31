@@ -81,6 +81,7 @@ pub mod client;
 pub mod contacts;
 mod reveal;
 mod revoke;
+mod token_envelope;
 mod token_maps;
 pub mod types;
 

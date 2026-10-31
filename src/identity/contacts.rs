@@ -11,16 +11,20 @@ use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
-    DecryptArgs, EncryptArgs, ListOutputsArgs, OutputInclude, Protocol, SignActionArgs,
-    SignActionSpend, WalletInterface,
+    EncryptArgs, ListOutputsArgs, OutputInclude, Protocol, SignActionArgs, SignActionSpend,
+    WalletInterface,
 };
 use crate::{Error, Result};
 
 use super::types::{Contact, ContactsManagerConfig};
 #[path = "contacts_actions.rs"]
 mod actions;
+#[path = "contacts_auth.rs"]
+mod auth;
 #[path = "contacts_cache.rs"]
 mod cache;
+#[path = "contacts_record.rs"]
+mod record;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -117,6 +121,9 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// }).await?;
     /// ```
     pub async fn add_contact(&self, contact: Contact) -> Result<()> {
+        // The reference's record, validated before any wallet call
+        // (`saveContact`, `ContactsManager.ts:527-528`; #544).
+        let record = record::record_of(&contact)?;
         let tag = self.create_identity_tag(&contact.identity_key).await.ok();
         let existing = if let Some(tag) = &tag {
             self.contact_outputs(
@@ -129,23 +136,26 @@ impl<W: WalletInterface> ContactsManager<W> {
         } else {
             None
         };
-        let key_id = self.generate_key_id();
-        let lock = self.contact_lock(&contact, &key_id).await?;
+        let found = match &existing {
+            Some(existing) => self.find_existing(existing, &record.identity_key).await?,
+            None => None,
+        };
+        let key_id = found
+            .as_ref()
+            .map_or_else(|| self.generate_key_id(), |(_, key_id)| key_id.clone());
+        let lock = self.contact_lock(&record, &key_id).await?;
         let instructions = serde_json::json!({ "keyID": key_id }).to_string();
-        if let (Some(existing), Some(tag)) = (existing.as_ref(), tag.as_ref()) {
-            if !existing.outputs.is_empty()
-                && self
-                    .update_contact_on_chain(existing, &contact, &lock, tag, &instructions)
-                    .await
-                    .is_ok()
-            {
-                return Ok(());
+        match (existing.as_ref(), tag.as_ref(), found) {
+            (Some(existing), Some(tag), Some(found)) => {
+                self.update_contact_on_chain(existing, found, &contact, &lock, tag)
+                    .await?;
             }
-        }
-        if let Some(tag) = &tag {
-            let _ = self
-                .create_contact(&contact, &lock, tag, &instructions)
-                .await;
+            (_, Some(tag), _) => {
+                let _ = self
+                    .create_contact(&contact, &lock, tag, &instructions)
+                    .await;
+            }
+            _ => {}
         }
         self.cache
             .write()

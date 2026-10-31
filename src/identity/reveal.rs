@@ -228,7 +228,7 @@ pub(super) fn base64_parameter(
 /// What JavaScript's `String.prototype.trim` removes: `WhiteSpace` and
 /// `LineTerminator` (ECMA-262), Unicode's `White_Space` with U+FEFF and
 /// without U+0085, which Rust's `char::is_whitespace` has the other way.
-fn is_js_whitespace(c: char) -> bool {
+pub(super) fn is_js_whitespace(c: char) -> bool {
     c == '\u{feff}' || (c.is_whitespace() && c != '\u{85}')
 }
 

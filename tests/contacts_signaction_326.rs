@@ -70,6 +70,17 @@ async fn manager_with_listed_contact() -> (ContactsManager<Counting>, Counting) 
 #[tokio::test]
 async fn the_contact_update_signs_with_the_reference_text_and_no_options() {
     let (manager, wallet) = manager_with_listed_contact().await;
+    // A signAction answer naming a txid: since #544 a failed update is the
+    // caller's error, as the reference's saveContact throws it.
+    wallet
+        .sign_answers
+        .lock()
+        .unwrap()
+        .push_back(Ok(bsv_rs::wallet::SignActionResult {
+            txid: Some([0xab; 32]),
+            tx: None,
+            send_with_results: None,
+        }));
     manager.add_contact(contact("Bob Updated")).await.unwrap();
     let signed = wallet.signed.lock().unwrap().clone().unwrap();
     let requests = wallet.signature_args.lock().unwrap();
