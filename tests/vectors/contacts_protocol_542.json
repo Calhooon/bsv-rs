@@ -1,0 +1,83 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk/src/identity/ContactsManager.ts",
+  "node": "v22.18.0",
+  "wallet_scalar": 9,
+  "protocol": {
+    "security_level": 2,
+    "protocol": "contact",
+    "counterparty": "self"
+  },
+  "contact": {
+    "name": "Alice Example",
+    "avatarURL": "",
+    "abbreviatedKey": "02531fe606",
+    "identityKey": "02531fe6068134503d2723133227c867ac8fa6c83c537e9a44c3c5bdbdcb1fe337",
+    "badgeIconURL": "",
+    "badgeLabel": "",
+    "badgeClickURL": ""
+  },
+  "write": {
+    "key_id": "WR/jKT0LHZItUgadyQWR5ypSRrWbcgg/HFv2ld9fTFk=",
+    "custom_instructions": "{\"keyID\":\"WR/jKT0LHZItUgadyQWR5ypSRrWbcgg/HFv2ld9fTFk=\"}",
+    "tag": "identityKey cc760192f085b535187e904cd95e25fad20851ab10943141a620579d85499422",
+    "locking_script": "2102facba6435b7a40579a20ceffc3c5111f76d38c3e60c9cb6c5855b6cfa1a9a732ac4cfd6b55f71c0b98e20fa8c00aad4c2546380bd1a40f94b864b4dac3314210211e719aae27c6a2410b7139f85200b76b6c521cd7e163d52d7b8ace8a05ef6d05278e24a40f0c3679e3b66710bd6b9fa81324afaa8a47bae3cafa1b13691322a260405f85d4c7a3a3943383001f433384be6245f21ba8d2179ade441c95041c047b09b8afe645f770e587aa9f5a1fc1c3a01be348acdf9e5f1b0cf3b8cd105a63c2a4eeb919d2d02f48dc2d521a0c6d83e1058245aee8423fc389083cc4fe30e61d06f6c99ddb3169fcbd5c854ae8287874b806615462b3f65421de13af762b4411fbf718a441b7fd89a4b731b31afa8505985378d72652451e162158ea4f6346304402204feddd812c994599a3c9514b9a4e6b541d61c94cdf21709bd1b3939df862eb3502206f19f1f5d25272ffc6ab1460ca15af9cb704820be053cfbb5e71f2e1a6c9f4156d",
+    "locking_public_key": "02facba6435b7a40579a20ceffc3c5111f76d38c3e60c9cb6c5855b6cfa1a9a732",
+    "ciphertext": "6b55f71c0b98e20fa8c00aad4c2546380bd1a40f94b864b4dac3314210211e719aae27c6a2410b7139f85200b76b6c521cd7e163d52d7b8ace8a05ef6d05278e24a40f0c3679e3b66710bd6b9fa81324afaa8a47bae3cafa1b13691322a260405f85d4c7a3a3943383001f433384be6245f21ba8d2179ade441c95041c047b09b8afe645f770e587aa9f5a1fc1c3a01be348acdf9e5f1b0cf3b8cd105a63c2a4eeb919d2d02f48dc2d521a0c6d83e1058245aee8423fc389083cc4fe30e61d06f6c99ddb3169fcbd5c854ae8287874b806615462b3f65421de13af762b4411fbf718a441b7fd89a4b731b31afa8505985378d72652451e162158ea4f63",
+    "field_signature": "304402204feddd812c994599a3c9514b9a4e6b541d61c94cdf21709bd1b3939df862eb3502206f19f1f5d25272ffc6ab1460ca15af9cb704820be053cfbb5e71f2e1a6c9f415",
+    "field_signature_verifies": true,
+    "under_contact_protocol": {
+      "locking_public_key": "02facba6435b7a40579a20ceffc3c5111f76d38c3e60c9cb6c5855b6cfa1a9a732",
+      "decrypt": {
+        "value": "{\"name\":\"Alice Example\",\"avatarURL\":\"\",\"abbreviatedKey\":\"02531fe606\",\"identityKey\":\"02531fe6068134503d2723133227c867ac8fa6c83c537e9a44c3c5bdbdcb1fe337\",\"badgeIconURL\":\"\",\"badgeLabel\":\"\",\"badgeClickURL\":\"\"}"
+      }
+    },
+    "under_level_one": {
+      "locking_public_key": "02e919d0b90316b6dba21faa1e29379da2f38675747fdc6fac8f675775b4512416",
+      "decrypt": {
+        "error": "Decryption failed!"
+      }
+    },
+    "read_back": {
+      "contacts": 1,
+      "dropped": []
+    }
+  },
+  "crate": {
+    "base": {
+      "key_id": "Cqmi2pemQGqj4OxZLa8u2BCvRqgJN3MYJPVCEuAD8oc=",
+      "locking_script": "2102391fc6ab35fc0aae4cb62975f0545cf4cae242fc9e13a79b0e4e09d7a7ced7eaac4cbdb811f9e7483993ff1aba6bd768c07c12e2df8ca2c8bff68703a2350d99d6a44cece9d4b8d542949aba5adc1670e35da03307837697cdc9568cbb6c63175d0752c4e2d2e47377e8e74aee09a019c9b8b05be01e6e24856cd59a08a5e80fc96df2e490eee38a156debf1e9cdccdff90c6b699d1dec8a924effb8a52439a47a9d6308fe4426bd890a1523ca85c2a6477b47e34a56d8dea2eaae9a0f4ee4a433c6a374bfd6075d79454e398fb73824fdec018eb93be0b03839842458ae9b4d75",
+      "token_locking_public_key": "02391fc6ab35fc0aae4cb62975f0545cf4cae242fc9e13a79b0e4e09d7a7ced7ea",
+      "token_fields": 1,
+      "under_contact_protocol": {
+        "locking_public_key": "0202a68a2febb3564482b3e63e88e7f2cb517eea74c6710d85126e6e1d256ddd79",
+        "decrypt": {
+          "error": "Decryption failed!"
+        }
+      },
+      "read_back": {
+        "contacts": 0,
+        "dropped": [
+          "ContactsManager: Failed to decrypt contact output: Invalid contact PushDrop field count"
+        ]
+      }
+    },
+    "tip": {
+      "key_id": "9ZmSmXKFpzQtaR8jJQOzqJkegdsBWw1BT6SRYDbqHv4=",
+      "locking_script": "2102e949febc6db4f8442f3b2307b29d5de1c2df921f4047140f244ee34e6b28e72eac4cbd8df6f564500c87f637a2f3754eed99b01e3c9a7d55a7146c9798e519f7ef6296c98c151e8585e35d641cad6a5f5d0417128a5560005d56c794c44f5082c75ed4ac3d13646d8de5f2bd43a68e3a69b95215209673ace4589a80b696e63497c1efdb4565589e314caab9c38d1a807635cc6160f0910522270888a2e3dcc775b07c956e4d193ea9e95f92b84636ec49d1846fdd0b66ae3f74ff4c5e051ff318dbf1c27efde61e696a795299a82acce28a20c8ca7b653c05b89f85cc57cb2375",
+      "token_locking_public_key": "02e949febc6db4f8442f3b2307b29d5de1c2df921f4047140f244ee34e6b28e72e",
+      "token_fields": 1,
+      "under_contact_protocol": {
+        "locking_public_key": "02e949febc6db4f8442f3b2307b29d5de1c2df921f4047140f244ee34e6b28e72e",
+        "decrypt": {
+          "value": "{\"identityKey\":\"02531fe6068134503d2723133227c867ac8fa6c83c537e9a44c3c5bdbdcb1fe337\",\"name\":\"Alice Example\",\"addedAt\":1700000000000,\"tags\":[]}"
+        }
+      },
+      "read_back": {
+        "contacts": 0,
+        "dropped": [
+          "ContactsManager: Failed to decrypt contact output: Invalid contact PushDrop field count"
+        ]
+      }
+    }
+  }
+}

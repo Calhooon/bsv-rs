@@ -36,7 +36,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         contact: &Contact,
         key_id: &str,
     ) -> Result<LockingScript> {
-        let protocol = Protocol::new(SecurityLevel::App, &self.config.protocol_id.1);
+        let protocol = self.protocol()?;
         let plaintext =
             serde_json::to_vec(contact).map_err(|e| Error::IdentityError(e.to_string()))?;
         let encrypted = self
@@ -327,7 +327,7 @@ impl<W: WalletInterface> ContactsManager<W> {
                 satoshis: output.satoshis,
                 scope: SIGHASH_ALL | SIGHASH_FORKID,
             },
-            Protocol::new(SecurityLevel::App, &self.config.protocol_id.1),
+            self.protocol()?,
             key_id,
             Counterparty::Self_,
             self.originator(),

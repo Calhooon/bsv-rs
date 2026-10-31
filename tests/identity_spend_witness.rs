@@ -549,7 +549,8 @@ async fn an_identity_revocation_signature_verifies_under_the_node_word() {
 #[tokio::test]
 async fn a_contact_update_signature_verifies_under_the_node_word() {
     let wallet = TokenWallet::new();
-    let protocol = Protocol::new(SecurityLevel::App, "contact");
+    // The reference's contact protocol, `[2, 'contact']` (#542).
+    let protocol = Protocol::new(SecurityLevel::Counterparty, "contact");
     let lock = token(
         wallet
             .derived_key(protocol, CONTACT_KEY_ID, Counterparty::Self_)
@@ -568,7 +569,8 @@ async fn a_contact_update_signature_verifies_under_the_node_word() {
 #[tokio::test]
 async fn a_contact_removal_signature_verifies_under_the_node_word() {
     let wallet = TokenWallet::new();
-    let protocol = Protocol::new(SecurityLevel::App, "contact");
+    // The reference's contact protocol, `[2, 'contact']` (#542).
+    let protocol = Protocol::new(SecurityLevel::Counterparty, "contact");
     let lock = token(
         wallet
             .derived_key(protocol, CONTACT_KEY_ID, Counterparty::Self_)
