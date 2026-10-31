@@ -92,6 +92,7 @@ pub mod multisig;
 pub mod p2pk;
 pub mod p2pkh;
 pub mod pushdrop;
+mod pushdrop_position;
 pub mod rpuzzle;
 
 // Re-export main types
