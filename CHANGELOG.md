@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: six call sites decode PushDrop tokens with the reference's lock position (#537)
+
+After #499 made the local store's token decode lock-before alone, six other
+call sites still called the general `PushDrop::decode`, which reads a script
+whose first chunk is not a 33- or 65-byte push as lock-after: a token written
+lock-after was read here and refused by every counterpart. The keeper's word
+(2026-10-31 06:1xZ, issue #537): parity per site. `PushDrop.decode(script,
+lockPosition = 'before')` (`ts-stack@edf6e03` `PushDrop.ts:63-78`) reads the
+key from `chunks[0]` and never tries the other position, and each
+counterpart below calls it with that default (or through
+`decodeCanonicalPushDrop`, `PushDropValidation.ts:59`); none passes
+`'after'`. Each site now calls `PushDrop::decode_before`, the lock-before
+path alone (crate-visible, `src/script/templates/pushdrop_position.rs`), and
+takes the reference's outcome for a lock-after token there.
+
+| Site (this crate) | Reference counterpart | Lock-after token, before | Now | The corner: a lock-after token whose first field is a valid point |
+|---|---|---|---|---|
+| 1 identity client: both `ls_identity` parsers (`resolve_by_identity_key`, `resolve_by_attributes`, `discover_certificates`, `discover_certificates_by_type`) | `IdentityClient.ts:773`, the output skipped by the catch at `:823` | the certificate read and returned | skipped | the reference reads the point as the key, one field, `continue` at `:774` (its revocation ends `No authenticated revelation output matches the requested certificate.`); skipped here before and after |
+| 2 contacts manager (`list_contacts_with_refresh`) | `ContactsManager.ts:432`, the output dropped by `Promise.allSettled` (`:478`, `:507-513`) | decrypted and loaded | dropped before decrypt | `Invalid contact PushDrop field count` there; skipped here before and after |
+| 3 registry client: `resolve_basket`, `resolve_protocol`, `resolve_certificate`, `list_own_registry_entries` | `registryTokenValidation.ts:28` through `RegistryClient.ts:732`, skipped by the catches at `:392`, `:445` | the definition read | skipped | `Unexpected PushDrop token field count` there (five, five and six fields for the three types); skipped here before and after |
+| 4 kvstore interpreter: `extract_fields`, `extract_value`, `is_kvstore_token` | `kvStoreTokenValidation.ts:88`, `undefined` from `kvStoreInterpreter.ts:48` | fields and value read, `true` | `None`, `None`, `false` | `Unexpected PushDrop token field count` there; `None`/`false` here before and after |
+| 5 `decode_overlay_admin_token` | `OverlayAdminTokenTemplate.ts:164`, thrown from `:237-239` | decoded | `Error::OverlayError("Unknown point format")`, the reference's words | `Unexpected PushDrop token field count` there; here `Script is not a valid PushDrop format` before, the reference's words now |
+| 6 storage downloader (`resolve`) | `UHRPAdvertisementValidation.ts:40`, skipped by the catch at `StorageDownloader.ts:121` | the host returned | no host | the advertisement's first field is the host's identity key, so this is its realistic lock-after form: `Unexpected PushDrop token field count` there; no host here before and after |
+
+For every site's first kind (the first field `Unknown point format` to the
+reference's key parse) the reference refuses at the key read. At the four
+skipping sites and the interpreter no words reach a caller. At the admin
+token, a token the general decoder reads lock-after is refused in the words
+`decodeCanonicalPushDrop` throws with the site's five fields (the key
+parse's, else the field count's, else the envelope's; `lock_after_refusal`);
+every other refusal keeps `Script is not a valid PushDrop format`. The
+helpers that choose those words (`point_message`, `canonical_refusal`) move
+from the local store's `local_parser_words.rs` into the same module, shared
+by both; the local store's words are unchanged
+(`kvstore_local_parser_words_489.rs`, `kvstore_local_454.rs`).
+
+The outcomes are recorded, never written by hand:
+`tests/support/pushdrop_lock_position_537.mjs` (the bundle of
+`ts-stack@edf6e03` under Node v22.18.0) writes the lock-after tokens from
+their fields, runs each site's counterpart on them (`revokeCertificateRevelation`,
+`getContacts`, `RegistryClient.resolve` and `StorageDownloader.resolve` with
+`LookupResolver.prototype.query` answering the token; the kvstore and admin
+token validators called), and records the decode, the site's words and its
+outcome in `tests/vectors/pushdrop_lock_position_537.json` (six sites, 16
+cases; two runs byte for byte). One test per site replays its cases and a
+control, the same fields locked before by this crate's writer and accepted:
+`tests/identity_lock_position_537.rs`,
+`tests/identity_contacts_lock_position_537.rs`,
+`tests/registry_lock_position_537.rs`,
+`tests/kvstore_interpreter_lock_position_537.rs`,
+`tests/overlay_admin_token_lock_position_537.rs`,
+`tests/storage_lock_position_537.rs`, each red on `23eea600` (the lock-after
+token read, at the registry for all three types on both paths). The general
+`PushDrop::decode` and its public shape are unchanged, for the template's own
+callers; no public item is added.
+
+### Notes: cross-SDK parity
+
+The #499 census Row 2 is rewritten: its clause that the general decoder
+elsewhere still tries both lock positions is closed by #537 for the six
+sites; the general decoder's two positions remain this crate's template
+behaviour. Go at `2ca481c` decodes lock-before alone (#499's note,
+`transaction/template/pushdrop/pushdrop.go:20-52`).
 ### Changed: R56 lets an unsigned action's input carry no unlockingScript, as the reference wallet answers (#491)
 
 R56 (`src/wallet/substrates/result_values/lists.rs`, `action_inputs` through
@@ -1415,7 +1478,7 @@ fold. The RED scratch copy uses its own target directory and is removed.
 Census (#375; current reading, historical account above retained):
 
 - Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
-- Row 2: Ours: since #499 the local store decodes lock-before alone and refuses a lock-after token in the reference's first-chunk words (PushDropValidation.ts:59, PushDrop.ts:74-75 at edf6e03); the general PushDrop decoder elsewhere still tries both lock positions, where every reference call site under packages/sdk/src takes the lock-before default; BRC-48 scripts/0048.md:13-18 defines the template, not the decode position.
+- Row 2: Ours: since #499 the local store decodes lock-before alone and refuses a lock-after token in the reference's first-chunk words (PushDropValidation.ts:59, PushDrop.ts:74-75 at edf6e03); since #537 the identity client, contacts manager, registry client, kvstore interpreter, overlay admin token and storage downloader decode lock-before alone too, as their counterparts do (IdentityClient.ts:773, ContactsManager.ts:432, registryTokenValidation.ts:28, kvStoreTokenValidation.ts:88, OverlayAdminTokenTemplate.ts:164, UHRPAdvertisementValidation.ts:40 at edf6e03), the six sites' rows closed by #537; the general PushDrop decoder still tries both lock positions for the template's own callers; BRC-48 scripts/0048.md:13-18 defines the template, not the decode position.
 
 ### Fixed: four older LocalKVStore request/result differences (#478)
 
