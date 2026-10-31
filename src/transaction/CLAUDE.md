@@ -37,7 +37,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `verify.rs` | The existing SPV graph walk and chain-parameter variants, sharing fee/value/proof/resource behavior and the per-transaction sighash cache; singular work-budget methods keep their signatures, plural `verify_with_work_budgets` / `verify_with_chain_params_and_work_budgets` accept `WorkBudget` and charge each transaction's inputs in order (#519) |
-| `work_budget.rs` | `#[non_exhaustive] WorkBudget` with readable public `per_input: Option<u64>` and `per_transaction: Option<u64>` fields, `new()` and derived `Default` both unbounded, const `with_per_input` / `with_per_transaction` setters; common input accounting and transaction-total charge (#519, #527) |
+| `work_budget.rs` | `#[non_exhaustive] WorkBudget` with readable public `per_input: Option<u64>` and `per_transaction: Option<u64>` fields, `new()` and derived `Default` both unbounded, const `with_per_input` / `with_per_transaction` setters; common input accounting and the public transaction-total `charge(self, &mut total, input, work)`, the rule's one implementation for the verifiers and a host that judges inputs itself (#519, #527, #567) |
 | `verification_flags.rs` | Checks tip + 1, then calls `ChainParams::word_for_input(Word::Standard, ...)`; the public resolver owns the no-tip latest-era rule and returns `NotJudgedCause`, never a script failure (#452, #520) |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
@@ -98,6 +98,9 @@ resets per transaction. A total strictly above its bound yields
 `Verdict::work_spent()` expose the crossing total. Other verdicts return `None`
 from that accessor; successful totals are available on the reader. A per-input
 refusal keeps its class even if its charged work also passes the total bound.
+A host that runs each input itself calls the public `WorkBudget::charge`
+(the verifiers' own method) once per input in order and gets the same cause
+(#567).
 The total is checked after an input, never inside one: the crossing input runs
 under `per_input` alone (unbounded without it), so a door passes both bounds.
 BSC5 cursors preserve charged totals; limits are still reapplied. Old unmetered

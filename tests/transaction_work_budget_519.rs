@@ -484,3 +484,28 @@ fn work_budget_construction_and_both_field_setters_are_const_527() {
     assert_eq!(BOTH.per_input, Some(1));
     assert_eq!(BOTH.per_transaction, Some(2));
 }
+
+#[tokio::test]
+async fn a_host_charging_its_own_inputs_answers_the_verifiers_cause_567() {
+    let f = Fixture::new();
+    let policy = budget(Some(68), Some(70));
+    // The host's path: each input's work, charged by hand in input order.
+    let mut total = 0;
+    let host = [68, 6, 8]
+        .into_iter()
+        .enumerate()
+        .find_map(|(vin, work)| policy.charge(&mut total, vin as u32, work).err())
+        .unwrap();
+    assert_eq!(host, cause());
+    assert_eq!(total, 74);
+    // The verifiers' paths, over inputs that spend the same work.
+    let Error::TransactionNotJudged { cause: whole, .. } =
+        f.whole(policy, false).await.unwrap_err()
+    else {
+        panic!("expected a transaction work refusal");
+    };
+    assert_eq!(whole, host);
+    let (verdict, spent) = f.sync(&f.bytes(false), policy, false);
+    assert_eq!(spent, total);
+    assert!(matches!(verdict, Verdict::NotJudged { cause, .. } if cause == host));
+}

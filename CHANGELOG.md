@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: `WorkBudget::charge` is public, so a host that judges inputs itself charges the one per-transaction rule (#567)
+
+Since #519 the per-transaction work rule has had one implementation,
+`WorkBudget::charge`, called by `Transaction::verify_with_work_budgets`, its
+chain-parameter sibling and both stream verifiers; it was `pub(super)`. A host
+that runs each input's `Spend` itself (the toolbox's `InputJudgements`, whose
+doors judge inputs under its own spend verifier) could not reach it, so the
+toolbox kept its own saturating sum and built this crate's
+`NotJudgedCause::TransactionWorkBudgetExceeded { input, limit, total }` by
+hand: two implementations of one rule. The keeper's word (the rulings page's
+entry of 2026-10-31 18:1xZ, issue #567, shape (a)): the work budget is the
+port's own rule, so neither shape is the reference's and the smaller surface
+wins; the method public, not a host-verifier hook on the stream verifier.
+
+| | Before | Now |
+|---|---|---|
+| `WorkBudget::charge(self, total: &mut u64, input: u32, work: u64) -> Result<(), NotJudgedCause>` | `pub(super)`: the verifiers alone | `pub`: a host charges each input's `Spend::work_spent()` after it runs, in input order, against its running `total`, and gets the verifiers' cause with the same fields |
+
+The signature is the one the verifiers already call, not the issue's
+`charge(&mut self, input: usize, work: u64)`: `WorkBudget` is a `Copy` policy
+with no running total (the stream keeps its total in the cursor, BSC5), so
+the caller holds `total`, and `input` is the cause's `u32`. A `&mut self`
+shape would add a field to the type #527 closed. `charge` reads
+`per_transaction` alone; a per-input crossing stays the interpreter's
+`WorkBudgetExceeded` while the input runs. Done when the toolbox deletes
+`InputJudgements::charge` and its sum at its next re-pin, its 2^31 witness
+green through this crate's charge. Pinned by
+`a_host_charging_its_own_inputs_answers_the_verifiers_cause_567` (the #519
+fixture's 68/6/8 inputs charged by hand cross 70 at input 1 with total 74,
+equal to the whole verifier's and the stream's cause; RED on `b2531c8a` as a
+compile failure, the method private) and
+`a_per_input_bound_alone_never_refuses_through_charge_567`.
+
+Semver: one public method added to an existing type, a minor addition; no
+other shape or behaviour moves.
+
 ### Fixed: Contact::from_identity carries the identity's abbreviatedKey, as the reference does (#568)
 
 The reference's contact is its identity: `Contact = DisplayableIdentity &
