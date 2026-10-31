@@ -94,12 +94,13 @@ impl DefinitionType {
         }
     }
 
-    /// Returns the expected field count in the PushDrop script.
+    /// The PushDrop script's field count, the operator's signature last
+    /// (`registryTokenValidation.ts:13-17,29`; 6/6/7 before #543).
     pub fn expected_field_count(&self) -> usize {
         match self {
-            Self::Basket => 6, // basketID, name, iconURL, description, documentationURL, registryOperator
-            Self::Protocol => 6, // protocolID(JSON), name, iconURL, description, documentationURL, registryOperator
-            Self::Certificate => 7, // type, name, iconURL, description, documentationURL, fields(JSON), registryOperator
+            Self::Basket => 7, // basketID, name, iconURL, description, documentationURL, registryOperator, signature
+            Self::Protocol => 7, // protocolID(JSON), name, iconURL, description, documentationURL, registryOperator, signature
+            Self::Certificate => 8, // type, name, iconURL, description, documentationURL, fields(JSON), registryOperator, signature
         }
     }
 }
@@ -416,12 +417,10 @@ impl ProtocolDefinitionData {
 
     /// Builds PushDrop fields for this definition.
     pub fn to_pushdrop_fields(&self, registry_operator: &str) -> crate::Result<Vec<Vec<u8>>> {
-        // Serialize protocolID as JSON array: [securityLevel, "protocolName"]
-        // Must match the format expected by deserialize_wallet_protocol()
-        let protocol_json = format!(
-            "[{}, \"{}\"]",
-            self.protocol_id.security_level as u8, self.protocol_id.protocol_name
-        );
+        // JSON.stringify(data.protocolID), `[1,"name"]` (RegistryClient.ts:697; #543)
+        let protocol = &self.protocol_id;
+        let protocol_json =
+            serde_json::json!([protocol.security_level as u8, protocol.protocol_name]).to_string();
 
         Ok(vec![
             protocol_json.as_bytes().to_vec(),
@@ -1272,9 +1271,9 @@ mod tests {
 
     #[test]
     fn test_definition_type_expected_field_count() {
-        assert_eq!(DefinitionType::Basket.expected_field_count(), 6);
-        assert_eq!(DefinitionType::Protocol.expected_field_count(), 6);
-        assert_eq!(DefinitionType::Certificate.expected_field_count(), 7);
+        assert_eq!(DefinitionType::Basket.expected_field_count(), 7);
+        assert_eq!(DefinitionType::Protocol.expected_field_count(), 7);
+        assert_eq!(DefinitionType::Certificate.expected_field_count(), 8);
     }
 
     #[test]

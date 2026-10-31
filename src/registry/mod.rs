@@ -61,6 +61,7 @@
 //! ```
 
 pub mod client;
+mod token;
 pub mod types;
 
 // Re-exports from types
@@ -73,6 +74,7 @@ pub use types::{
 
 // Re-exports from client
 pub use client::{RegistryClient, RegistryClientConfig};
+pub use token::decode_and_verify_registry_token;
 
 // Constants for registry services
 /// Lookup service for basket definitions.

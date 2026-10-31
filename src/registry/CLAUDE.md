@@ -15,7 +15,8 @@ Registry entries are stored as PushDrop tokens on-chain, allowing decentralized 
 |------|---------|
 | `mod.rs` | Module root; re-exports and constants |
 | `types.rs` | Definition types, queries, tokens, result types |
-| `client.rs` | RegistryClient implementation; the three resolvers' parsers and `list_own_registry_entries` decode a definition token lock-before alone (`PushDrop::decode_before`), as `registryTokenValidation.ts:28` does, a lock-after token skipped (#537, `tests/registry_lock_position_537.rs`) |
+| `client.rs` | RegistryClient implementation; the three resolvers' parsers and `list_own_registry_entries` read a definition token through `token::data_fields` (lock-before alone since #537, `tests/registry_lock_position_537.rs`; signed and verified since #543), a refused token skipped as `RegistryClient.ts:392,445` skip it; `register_definition` and `update_definition` write it through `token::lock_definition` |
+| `token.rs` | The reference's definition token (#543; `ts-stack@edf6e03` `registryTokenValidation.ts:13-64`, `RegistryClient.ts:308-342,688-722`, `PushDrop.ts:146-202`): `decode_and_verify_registry_token` (public, re-exported at `registry::`): the canonical lock-before envelope of 7/7/8 fields, 16 KiB a field and 64 KiB in all, strict UTF-8, a `05` locking key refused in `Point.fromDER`'s words, the operator text read as a key by `PublicKey::from_hex` (the reference's `PublicKey.fromString`, lenient since #498) for the linkage, the locking key `anyone` derives for the operator, the operator text then judged as `verifySignature`'s counterparty (`wallet::validation::crypto::public_key_hex`, `validatePublicKey` at `validationHelpers.ts:185-196,522-534`: 66 hex characters, either case, a compressed valid point; an uncompressed, odd-length, hybrid or `02 || (p+1)` operator refused), the signature verified by `ProtoWallet::anyone()`, refused as `Error::RegistryError` in the reference's words; `lock_definition`: the wallet's key for `anyone` with `for_self`, its signature over the data fields for `anyone`, appended last. Witnesses `tests/registry_token_fields_543.rs`, `tests/registry_token_words_543.rs`; vector `tests/vectors/registry_token_fields_543.json` (recorder `tests/support/registry_token_fields_543.mjs`) |
 
 ## Key Exports
 
@@ -85,7 +86,7 @@ impl DefinitionType {
     pub fn broadcast_topic(&self) -> &'static str   // tm_basketmap, etc.
     pub fn wallet_basket(&self) -> &'static str     // basketmap, etc.
     pub fn wallet_protocol(&self) -> (u8, &'static str)
-    pub fn expected_field_count(&self) -> usize     // 6 for basket/protocol, 7 for cert
+    pub fn expected_field_count(&self) -> usize     // the script's: 7 for basket/protocol, 8 for cert (the signature last; 6/6/7 before #543)
 }
 
 // Also implements Display and FromStr traits
@@ -375,11 +376,13 @@ if let Some(entry) = entries.first() {
 
 ## PushDrop Token Format
 
-Registry entries use PushDrop tokens with individual fields (not JSON blobs):
+Registry entries use PushDrop tokens with individual fields (not JSON blobs), the reference's since #543: the data fields, then the operator's signature over their bytes concatenated (`createSignature`, the type's protocol, key ID `1`, counterparty `anyone`), locked lock-before with the wallet's key for the same protocol and key ID, counterparty `anyone`, `for_self` true (the key `KeyDeriver::new(None)` derives for the operator):
 
-- **Basket (6 fields)**: basketID, name, iconURL, description, documentationURL, registryOperator
-- **Protocol (6 fields)**: protocolID (JSON: `[level, "name"]`), name, iconURL, description, documentationURL, registryOperator
-- **Certificate (7 fields)**: type, name, iconURL, description, documentationURL, fields (JSON), registryOperator
+- **Basket (7 fields)**: basketID, name, iconURL, description, documentationURL, registryOperator, signature
+- **Protocol (7 fields)**: protocolID (JSON: `[level,"name"]`, `JSON.stringify`'s, compact since #543), name, iconURL, description, documentationURL, registryOperator, signature
+- **Certificate (8 fields)**: type, name, iconURL, description, documentationURL, fields (JSON), registryOperator, signature
+
+`to_pushdrop_fields`/`from_pushdrop_fields` carry the data fields alone (6/6/7), as the reference's `#buildPushDropFields` does. A token written before #543 (6/6/7, unsigned, the identity key) is skipped by every reader. Residues (stated in the #543 changelog entry): the certificate `fields` JSON written in `HashMap` order, and no URL normalization at the writer.
 
 ## JSON Serialization
 

@@ -15,15 +15,14 @@ use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     OutputListItem, TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::{from_hex, to_hex, PublicKey};
+use crate::primitives::{from_hex, to_hex};
 use crate::registry::types::{
     BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
     CertificateDefinitionData, CertificateQuery, DefinitionData, DefinitionType,
     ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult, RegistryRecord,
     RevokeDefinitionResult, TokenData, UpdateDefinitionResult,
 };
-use crate::registry::REGISTRANT_TOKEN_AMOUNT;
-use crate::script::templates::PushDrop;
+use crate::registry::{token, REGISTRANT_TOKEN_AMOUNT};
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
 use crate::wallet::interface::WalletInterface;
@@ -174,12 +173,6 @@ impl<W: WalletInterface> RegistryClient<W> {
         Ok(result.public_key)
     }
 
-    /// Gets the identity public key for the wallet.
-    async fn get_identity_public_key(&self) -> Result<PublicKey> {
-        let hex = self.get_identity_key_hex().await?;
-        PublicKey::from_hex(&hex)
-    }
-
     // =========================================================================
     // Registration Methods
     // =========================================================================
@@ -216,15 +209,10 @@ impl<W: WalletInterface> RegistryClient<W> {
 
         let def_type = data.get_definition_type();
 
-        // Get identity public key for PushDrop locking
-        let identity_pubkey = self.get_identity_public_key().await?;
-
-        // Build PushDrop fields using the correct format (individual fields, not JSON blob)
+        // The data fields, signed and locked as RegistryClient.ts:314-320 does (#543)
         let fields = data.to_pushdrop_fields(&registry_operator)?;
-
-        // Create PushDrop locking script
-        let pushdrop = PushDrop::new(identity_pubkey, fields);
-        let locking_script = pushdrop.lock();
+        let locking_script =
+            token::lock_definition(&self.wallet, def_type, fields, self.originator()).await?;
 
         // Create the registration transaction
         let create_result = self
@@ -432,14 +420,8 @@ impl<W: WalletInterface> RegistryClient<W> {
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
-        let pushdrop = PushDrop::decode_before(&tx_output.locking_script)
-            .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
-
-        if pushdrop.fields.len() != 6 {
-            return Ok(None);
-        }
-
-        BasketDefinitionData::from_pushdrop_fields(&pushdrop.fields).map(Some)
+        let fields = token::data_fields(DefinitionType::Basket, &tx_output.locking_script)?;
+        BasketDefinitionData::from_pushdrop_fields(&fields).map(Some)
     }
 
     /// Parses a protocol definition from an overlay output.
@@ -455,14 +437,8 @@ impl<W: WalletInterface> RegistryClient<W> {
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
-        let pushdrop = PushDrop::decode_before(&tx_output.locking_script)
-            .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
-
-        if pushdrop.fields.len() != 6 {
-            return Ok(None);
-        }
-
-        ProtocolDefinitionData::from_pushdrop_fields(&pushdrop.fields).map(Some)
+        let fields = token::data_fields(DefinitionType::Protocol, &tx_output.locking_script)?;
+        ProtocolDefinitionData::from_pushdrop_fields(&fields).map(Some)
     }
 
     /// Parses a certificate definition from an overlay output.
@@ -478,14 +454,8 @@ impl<W: WalletInterface> RegistryClient<W> {
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
-        let pushdrop = PushDrop::decode_before(&tx_output.locking_script)
-            .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
-
-        if pushdrop.fields.len() != 7 {
-            return Ok(None);
-        }
-
-        CertificateDefinitionData::from_pushdrop_fields(&pushdrop.fields).map(Some)
+        let fields = token::data_fields(DefinitionType::Certificate, &tx_output.locking_script)?;
+        CertificateDefinitionData::from_pushdrop_fields(&fields).map(Some)
     }
 
     // =========================================================================
@@ -540,13 +510,8 @@ impl<W: WalletInterface> RegistryClient<W> {
             // Parse the locking script
             if let Some(ref script_bytes) = output.locking_script {
                 if let Ok(script) = LockingScript::from_binary(script_bytes) {
-                    // Lock-before alone, as registryTokenValidation.ts:28 decodes (#537)
-                    if let Ok(pushdrop) = PushDrop::decode_before(&script) {
-                        // Verify field count matches expected
-                        if pushdrop.fields.len() != definition_type.expected_field_count() {
-                            continue;
-                        }
-
+                    // registryTokenValidation.ts:57-64: lock-before (#537), signed (#543)
+                    if let Ok(fields) = token::data_fields(definition_type, &script) {
                         // Create token data
                         let token = TokenData::with_beef(
                             to_hex(&output.outpoint.txid),
@@ -559,17 +524,17 @@ impl<W: WalletInterface> RegistryClient<W> {
                         // Parse definition based on type
                         let record = match definition_type {
                             DefinitionType::Basket => {
-                                BasketDefinitionData::from_pushdrop_fields(&pushdrop.fields)
+                                BasketDefinitionData::from_pushdrop_fields(&fields)
                                     .ok()
                                     .map(|def| RegistryRecord::basket(def, token))
                             }
                             DefinitionType::Protocol => {
-                                ProtocolDefinitionData::from_pushdrop_fields(&pushdrop.fields)
+                                ProtocolDefinitionData::from_pushdrop_fields(&fields)
                                     .ok()
                                     .map(|def| RegistryRecord::protocol(def, token))
                             }
                             DefinitionType::Certificate => {
-                                CertificateDefinitionData::from_pushdrop_fields(&pushdrop.fields)
+                                CertificateDefinitionData::from_pushdrop_fields(&fields)
                                     .ok()
                                     .map(|def| RegistryRecord::certificate(def, token))
                             }
@@ -841,15 +806,10 @@ impl<W: WalletInterface> RegistryClient<W> {
         // Set registry operator on updated data
         updated_data.set_registry_operator(identity_key.clone());
 
-        // Get identity public key for PushDrop locking
-        let identity_pubkey = self.get_identity_public_key().await?;
-
-        // Build PushDrop fields for the new locking script
+        // The data fields, signed and locked as RegistryClient.ts:620-628 does (#543)
         let fields = updated_data.to_pushdrop_fields(&identity_key)?;
-
-        // Create new PushDrop locking script
-        let pushdrop = PushDrop::new(identity_pubkey, fields);
-        let new_locking_script = pushdrop.lock();
+        let new_locking_script =
+            token::lock_definition(&self.wallet, def_type, fields, self.originator()).await?;
 
         // Parse outpoint
         let txid_bytes = from_hex(record.txid())
