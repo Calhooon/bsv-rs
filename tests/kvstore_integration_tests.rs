@@ -483,6 +483,48 @@ impl WalletInterface for MockWallet {
 // Helper Functions
 // =============================================================================
 
+/// The reference's signed token (#544): `[1, protocol]` as JSON, the key,
+/// the value, the controller, the optional tags, then the controller's
+/// signature over them for `anyone`, locked with its key for `anyone`, as
+/// `GlobalKVStore.ts` writes it; the interpreter reads no other since #544
+/// (`kvStoreTokenValidation.ts:86-122`).
+fn create_signed_token(
+    protocol_id: &str,
+    key: &str,
+    value: &str,
+    controller: &PrivateKey,
+    tags: Option<Vec<String>>,
+) -> LockingScript {
+    use bsv_rs::wallet::{
+        Counterparty, CreateSignatureArgs, KeyDeriver, ProtoWallet, Protocol, SecurityLevel,
+    };
+    let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+    let mut fields = vec![
+        serde_json::to_vec(&(1, protocol_id)).unwrap(),
+        key.as_bytes().to_vec(),
+        value.as_bytes().to_vec(),
+        controller.public_key().to_compressed().to_vec(),
+    ];
+    if let Some(tags) = tags {
+        fields.push(serde_json::to_vec(&tags).unwrap());
+    }
+    let signature = ProtoWallet::new(Some(controller.clone()))
+        .create_signature(CreateSignatureArgs {
+            data: Some(fields.concat()),
+            protocol_id: protocol.clone(),
+            key_id: key.into(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    fields.push(signature);
+    let lock = KeyDeriver::new(Some(controller.clone()))
+        .derive_public_key(&protocol, key, &Counterparty::Anyone, true)
+        .unwrap();
+    PushDrop::new(lock, fields).lock()
+}
+
 /// Creates a test PushDrop token script for KVStore.
 fn create_test_token(
     protocol_id: &str,
@@ -842,9 +884,8 @@ fn test_kvstore_context_clone() {
 #[test]
 fn test_interpreter_extract_basic_token() {
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
+    let script = create_signed_token("kvstore", "my_key", "my_value", &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -852,17 +893,22 @@ fn test_interpreter_extract_basic_token() {
     let entry = entry.unwrap();
     assert_eq!(entry.key, "my_key");
     assert_eq!(entry.value, "my_value");
-    assert_eq!(entry.protocol_id, "kvstore");
+    assert_eq!(entry.protocol_id, "[1,\"kvstore\"]");
     assert!(entry.tags.is_empty());
 }
 
 #[test]
 fn test_interpreter_extract_token_with_tags() {
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     let tags = vec!["important".to_string(), "user-data".to_string()];
-    let script = create_test_token("kvstore", "tagged_key", "tagged_value", &pubkey, Some(tags));
+    let script = create_signed_token(
+        "kvstore",
+        "tagged_key",
+        "tagged_value",
+        &privkey,
+        Some(tags),
+    );
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -879,9 +925,8 @@ fn test_interpreter_extract_token_with_tags() {
 #[test]
 fn test_interpreter_with_matching_context() {
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script = create_test_token("kvstore", "ctx_key", "ctx_value", &pubkey, None);
+    let script = create_signed_token("kvstore", "ctx_key", "ctx_value", &privkey, None);
 
     let ctx = KVStoreContext::new("ctx_key", "kvstore");
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));

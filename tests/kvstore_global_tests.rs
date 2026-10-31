@@ -404,6 +404,48 @@ impl WalletInterface for MockWallet {
 // Helper Functions
 // =============================================================================
 
+/// The reference's signed token (#544): `[1, protocol]` as JSON, the key,
+/// the value, the controller, the optional tags, then the controller's
+/// signature over them for `anyone`, locked with its key for `anyone`, as
+/// `GlobalKVStore.ts` writes it; the interpreter reads no other since #544
+/// (`kvStoreTokenValidation.ts:86-122`).
+fn create_signed_token(
+    protocol_id: &str,
+    key: &str,
+    value: &str,
+    controller: &PrivateKey,
+    tags: Option<Vec<String>>,
+) -> LockingScript {
+    use bsv_rs::wallet::{
+        Counterparty, CreateSignatureArgs, KeyDeriver, ProtoWallet, Protocol, SecurityLevel,
+    };
+    let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+    let mut fields = vec![
+        serde_json::to_vec(&(1, protocol_id)).unwrap(),
+        key.as_bytes().to_vec(),
+        value.as_bytes().to_vec(),
+        controller.public_key().to_compressed().to_vec(),
+    ];
+    if let Some(tags) = tags {
+        fields.push(serde_json::to_vec(&tags).unwrap());
+    }
+    let signature = ProtoWallet::new(Some(controller.clone()))
+        .create_signature(CreateSignatureArgs {
+            data: Some(fields.concat()),
+            protocol_id: protocol.clone(),
+            key_id: key.into(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    fields.push(signature);
+    let lock = KeyDeriver::new(Some(controller.clone()))
+        .derive_public_key(&protocol, key, &Counterparty::Anyone, true)
+        .unwrap();
+    PushDrop::new(lock, fields).lock()
+}
+
 /// Creates a test PushDrop token script for KVStore.
 fn create_test_token(
     protocol_id: &str,
@@ -776,9 +818,8 @@ fn test_interpreter_global_token_basic() {
     // GlobalKVStore uses PushDrop tokens. Verify the interpreter extracts
     // key, value, controller, and protocol_id from a token.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
+    let script = create_signed_token("kvstore", "my_key", "my_value", &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some(), "Should interpret a valid KVStore token");
@@ -786,7 +827,7 @@ fn test_interpreter_global_token_basic() {
     let entry = entry.unwrap();
     assert_eq!(entry.key, "my_key");
     assert_eq!(entry.value, "my_value");
-    assert_eq!(entry.protocol_id, "kvstore");
+    assert_eq!(entry.protocol_id, "[1,\"kvstore\"]");
     // The value is stored in plaintext (not encrypted) for global tokens.
 }
 
@@ -815,14 +856,13 @@ fn test_interpreter_extract_value_is_plaintext() {
 fn test_interpreter_global_token_with_tags() {
     // GlobalKVStore supports tags. Verify the interpreter extracts them.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     let tags = vec!["important".to_string(), "user-data".to_string()];
-    let script = create_test_token(
+    let script = create_signed_token(
         "kvstore",
         "tagged_key",
         "tagged_value",
-        &pubkey,
+        &privkey,
         Some(tags.clone()),
     );
 
@@ -844,10 +884,9 @@ fn test_interpreter_global_token_with_empty_tags() {
     // When tags are an empty array, the interpreter should return an empty
     // tags vector.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     let tags: Vec<String> = vec![];
-    let script = create_test_token("kvstore", "key", "value", &pubkey, Some(tags));
+    let script = create_signed_token("kvstore", "key", "value", &privkey, Some(tags));
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -866,9 +905,8 @@ fn test_interpreter_context_key_match() {
     // When a context is provided, the interpreter should only return entries
     // that match both the key and protocol_id.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
+    let script = create_signed_token("kvstore", "my_key", "my_value", &privkey, None);
 
     // Matching context
     let ctx = KVStoreContext::new("my_key", "kvstore");
@@ -1355,9 +1393,8 @@ fn test_pushdrop_field_order_matches_global_kvstore_spec() {
 fn test_interpreter_unicode_key_in_token() {
     // GlobalKVStore should handle unicode keys in PushDrop tokens.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script = create_test_token("kvstore", "key_\u{1F4A9}", "value", &pubkey, None);
+    let script = create_signed_token("kvstore", "key_\u{1F4A9}", "value", &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -1371,9 +1408,8 @@ fn test_interpreter_unicode_key_in_token() {
 #[test]
 fn test_interpreter_unicode_value_in_token() {
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script = create_test_token("kvstore", "key", "value_\u{4E2D}\u{6587}", &pubkey, None);
+    let script = create_signed_token("kvstore", "key", "value_\u{4E2D}\u{6587}", &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -1388,10 +1424,9 @@ fn test_interpreter_unicode_value_in_token() {
 fn test_interpreter_large_value_in_token() {
     // Verify the interpreter can handle a larger value payload.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     let large_value = "x".repeat(10_000);
-    let script = create_test_token("kvstore", "key", &large_value, &pubkey, None);
+    let script = create_signed_token("kvstore", "key", &large_value, &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -1474,10 +1509,9 @@ fn test_kvstore_fields_controller_hex() {
 fn test_multiple_keys_independent_tokens() {
     // Verify that tokens for different keys are independent.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
-    let script1 = create_test_token("kvstore", "key_1", "value_1", &pubkey, None);
-    let script2 = create_test_token("kvstore", "key_2", "value_2", &pubkey, None);
+    let script1 = create_signed_token("kvstore", "key_1", "value_1", &privkey, None);
+    let script2 = create_signed_token("kvstore", "key_2", "value_2", &privkey, None);
 
     let entry1 = KVStoreInterpreter::interpret_script(&script1, None).unwrap();
     let entry2 = KVStoreInterpreter::interpret_script(&script2, None).unwrap();
@@ -1496,10 +1530,9 @@ fn test_multiple_keys_independent_tokens() {
 fn test_interpreter_old_format_without_tags() {
     // Old format has 5 fields (no tags). Verify backward compatibility.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     // Create a token without tags (old format)
-    let script = create_test_token("kvstore", "old_key", "old_value", &pubkey, None);
+    let script = create_signed_token("kvstore", "old_key", "old_value", &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -1519,14 +1552,13 @@ fn test_interpreter_old_format_without_tags() {
 fn test_interpreter_new_format_with_tags() {
     // New format has 6 fields (with tags).
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     let tags = vec!["tag_a".to_string(), "tag_b".to_string()];
-    let script = create_test_token(
+    let script = create_signed_token(
         "kvstore",
         "new_key",
         "new_value",
-        &pubkey,
+        &privkey,
         Some(tags.clone()),
     );
 
@@ -1711,12 +1743,10 @@ fn test_interpreter_different_controllers() {
     // Two tokens with the same key but different controllers should produce
     // different controller values in the entries.
     let privkey1 = PrivateKey::random();
-    let pubkey1 = privkey1.public_key();
     let privkey2 = PrivateKey::random();
-    let pubkey2 = privkey2.public_key();
 
-    let script1 = create_test_token("kvstore", "shared_key", "value1", &pubkey1, None);
-    let script2 = create_test_token("kvstore", "shared_key", "value2", &pubkey2, None);
+    let script1 = create_signed_token("kvstore", "shared_key", "value1", &privkey1, None);
+    let script2 = create_signed_token("kvstore", "shared_key", "value2", &privkey2, None);
 
     let entry1 = KVStoreInterpreter::interpret_script(&script1, None).unwrap();
     let entry2 = KVStoreInterpreter::interpret_script(&script2, None).unwrap();
@@ -1825,10 +1855,9 @@ fn test_global_kvstore_originator_config() {
 fn test_interpreter_json_value() {
     // Values can be JSON strings.
     let privkey = PrivateKey::random();
-    let pubkey = privkey.public_key();
 
     let json_value = r#"{"name":"Bob","age":30}"#;
-    let script = create_test_token("kvstore", "profile:123", json_value, &pubkey, None);
+    let script = create_signed_token("kvstore", "profile:123", json_value, &privkey, None);
 
     let entry = KVStoreInterpreter::interpret_script(&script, None).unwrap();
     assert_eq!(entry.value, json_value);
