@@ -107,16 +107,19 @@ cargo fmt --all -- --check
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) is the required set and
 the only workflow a push or a pull request starts: the tests, formatting,
-clippy, vectors, deny, the ratchet, the fixtures, the secrets scan, the
+clippy, Documentation, vectors, deny, the ratchet, the fixtures, the secrets scan, the
 combined wasm32 slice and the line checks, exactly the contexts the line's
 protection requires. The checks that judge something other than the commit
 run on dispatch and before every tag, each in its own workflow with its own
 badge above: [bench.yml](.github/workflows/bench.yml) (the benchmark
-regression check and the scoreboard), [msrv.yml](.github/workflows/msrv.yml),
+build and the scoreboard on tags; regression comparisons on branch dispatches),
+[msrv.yml](.github/workflows/msrv.yml),
 [features.yml](.github/workflows/features.yml) (each feature alone and the
 other wasm32 slices), [machete.yml](.github/workflows/machete.yml) (unused
-dependencies) and [docs.yml](.github/workflows/docs.yml) (rustdoc and the
-workflow lint). The CI badge reads `ci.yml` on `main`; a run cancelled because
+dependencies) and [docs.yml](.github/workflows/docs.yml) (workflow lint).
+`Documentation` runs `cargo doc --no-deps --all-features` with warnings denied;
+the captain adds it to each line's protection once that line's `ci.yml` runs it (#515).
+The CI badge reads `ci.yml` on `main`; a run cancelled because
 a newer push superseded it is never a red.
 `ci.yml` checks out the pinned external conformance corpus for the vector job;
 a local run without that corpus can skip those tests and is not conformance
