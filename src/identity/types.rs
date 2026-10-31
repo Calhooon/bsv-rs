@@ -396,14 +396,22 @@ impl Contact {
         self
     }
 
-    /// Create a new contact from a displayable identity.
+    /// Create a new contact from a displayable identity, its badges carried
+    /// as given: the reference's contact is the identity
+    /// (`ContactsManager.ts:28`), its `saveContact` keeping every display
+    /// field (`:171-198`; #558).
     pub fn from_identity(identity: DisplayableIdentity) -> Self {
         Self::new(identity.name, identity.identity_key)
             .with_avatar_url(identity.avatar_url)
             .with_added_at(crate::auth::current_time_ms())
+            .with_badge_icon_url(identity.badge_icon_url)
+            .with_badge_label(identity.badge_label)
+            .with_badge_click_url(identity.badge_click_url)
     }
 
-    /// Convert this contact to a displayable identity.
+    /// Convert this contact to a displayable identity, its badges the ones
+    /// stored (`""` where unset), as the reference's `resolveByIdentityKey`
+    /// returns a contact read (`IdentityClient.ts:575-576`; #558).
     pub fn to_displayable_identity(&self) -> DisplayableIdentity {
         let abbreviated = if self.identity_key.len() > 10 {
             format!(
@@ -423,9 +431,9 @@ impl Contact {
                 .unwrap_or_else(|| DefaultIdentityValues::AVATAR_URL.to_string()),
             identity_key: self.identity_key.clone(),
             abbreviated_key: abbreviated,
-            badge_icon_url: DefaultIdentityValues::BADGE_ICON_URL.to_string(),
-            badge_label: "Personal contact".to_string(),
-            badge_click_url: DefaultIdentityValues::BADGE_CLICK_URL.to_string(),
+            badge_icon_url: self.badge_icon_url.clone(),
+            badge_label: self.badge_label.clone(),
+            badge_click_url: self.badge_click_url.clone(),
         }
     }
 }

@@ -138,6 +138,8 @@ regexes = ['''^02abc123def456789012345678901234567890123456789012345678901234567
 # `new PrivateKey(6).toPublicKey()` in tests/support/contact_abbreviated_key_559.mjs; the third case's
 # is 3G, allowed above), recorded from the reference's ContactsManager; public keys of test scalars,
 # not keys in use. Only those two literals are let through, never the file.
+# tests/vectors/identity_contact_badges_558.json: the #558 `empty_badges` identity's `identityKey` is the
+# same 5G, recorded from the reference's IdentityClient (tests/support/identity_contact_badges_558.mjs).
 [[allowlists]]
 description = "5G and 6G as the #559 contacts' identity keys"
 regexes = [

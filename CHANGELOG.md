@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the identity client's contact conversions carry the badges, as the reference does (#558)
+
+The reference's contact is its identity: `Contact = DisplayableIdentity &
+{ metadata? }` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:28`). It has no conversion
+function in either direction, and both directions keep the badges:
+`IdentityClient.saveContact` (`IdentityClient.ts:974-979`) hands the
+identity to `ContactsManager.saveContact` (`ContactsManager.ts:527-528`),
+whose `validateContact` (`:171-198`) keeps all seven display fields, the
+badges as given; `resolveByIdentityKey` with contacts (`IdentityClient.ts:575-576`,
+`:588`) returns the contacts read as the identities, and
+`parseIdentitiesWithOverrides` (`:1017-1037`) returns a contact in a
+certificate's place, the stored badges as stored. The reference applies no
+default to a contact's badges: `defaultIdentity`'s (`types/index.ts:4-12`)
+are `parseIdentity`'s, for a certificate (`:1044-1172`). After #552 this
+crate's `Contact` held the three badges, but its two conversions, the
+residue #552 stated, did not carry them. The keeper's reading (2026-10-31
+13:1xZ, issue #558): two rows of one record, the reference having both
+directions (outcome (a)).
+
+| | Before | Now |
+|---|---|---|
+| `Contact::from_identity` (`IdentityClient::save_contact`) | the badges left `""`, so a saved identity's badges were not written | `badge_icon_url`, `badge_label`, `badge_click_url` copied from the identity |
+| `Contact::to_displayable_identity` (`resolve_by_identity_key` and `resolve_by_attributes` with contacts) | fixed badges: `DefaultIdentityValues::BADGE_ICON_URL`, `"Personal contact"`, `DefaultIdentityValues::BADGE_CLICK_URL` | the contact's stored badges, `""` where unset |
+
+Semver: no signature changes. Two public functions return other values:
+`Contact::from_identity`'s contact carries the identity's badges, and
+`Contact::to_displayable_identity`'s identity carries the contact's stored
+badges in place of the fixed three (cargo-semver-checks has no lint for a
+changed return value). A caller that matched on the `"Personal contact"`
+label sees the stored label, `""` for a contact saved without one.
+
+Pinned by `tests/identity_contact_badges_558.rs` against
+`tests/vectors/identity_contact_badges_558.json`, recorded by
+`tests/support/identity_contact_badges_558.mjs` under Node v22.18.0 (the
+reference's `IdentityClient` on the ProtoWallet of 9, two runs
+byte-identical): three identities (a certifier's badges, the reference's
+unknown-identity defaults, empty badges), each saved by the reference's
+client (the record its token carries) and resolved from that token with
+contacts (the identity returned). `save_contact` writes the reference's
+record and `resolve_by_identity_key` returns the reference's identity for
+all three. Both tests are RED on `e215aea8` (`badged`: the record's badges
+`""`; the identity's `Personal contact`).
+
+### Notes: cross-SDK parity (#558)
+
+Residues, stated, not changed: a contact without an avatar
+(`avatar_url: None`, which a stored `avatarURL` of `""` reads as) resolves
+to `DefaultIdentityValues::AVATAR_URL`, where the reference returns `""`;
+this crate's `resolve_by_identity_key` reads the contacts cache alone, where
+the reference's `getContacts(identityKey)` loads from the wallet
+(`IdentityClient.ts:386`; the witness loads with `get_contacts(true)`
+first); `DefaultIdentityValues::BADGE_CLICK_URL`
+(`https://projectbabbage.com/docs/unknown-identity`) is not the reference's
+`defaultIdentity.badgeClickURL`
+(`https://bsv-blockchain.github.io/ts-sdk/reference/identity/`; the icon,
+label and avatar constants are its). The recomputed `abbreviatedKey` stays #559's
+row. Go at `2ca481c` has no contacts manager.
+
+Census (#375; current reading):
+
+- Row 90: Ours: closed by #558 at the pin; residues the empty avatar's default, the uncached contact lookup and the default badge click URL. Theirs: none (the witness: tests/identity_contact_badges_558.rs; tests/vectors/identity_contact_badges_558.json).
+
 ### Fixed: a contact update keeps the record's stored abbreviatedKey, as the reference does (#559)
 
 The reference computes a contact's `abbreviatedKey` at one site and stores
