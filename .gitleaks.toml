@@ -119,3 +119,17 @@ regexes = ['''^certificates\.0\.subject$''']
 [[allowlists]]
 description = "the 32-bytes-of-3 public point as the #542 contact's identity key"
 regexes = ['''^02531fe6068134503d2723133227c867ac8fa6c83c537e9a44c3c5bdbdcb1fe337$''']
+# tests/vectors/contact_badges_552.json: the #552 reverse contact's `identityKey` is 4G in compressed
+# form, the public key of the private key 4 (`new PrivateKey(4).toPublicKey()` in
+# tests/support/contact_badges_552.mjs), recorded from the reference's ContactsManager; a public key
+# of a test scalar, not a key in use. Only that literal is let through, never the file.
+[[allowlists]]
+description = "4G as the #552 reverse contact's identity key"
+regexes = ['''^02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13$''']
+# src/identity/types_tests.rs: `test_contact_to_displayable_identity`'s identity key, a made-up
+# key-shaped literal (`02abc123def4567890...`, no point), moved unchanged out of types.rs by #552
+# (the ratchet holding types.rs at its size), so the scan reads it as new. Only that literal is let
+# through, never the file.
+[[allowlists]]
+description = "the made-up identity key of types.rs's displayable-identity test, moved by #552"
+regexes = ['''^02abc123def456789012345678901234567890123456789012345678901234567890$''']

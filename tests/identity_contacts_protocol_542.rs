@@ -76,15 +76,11 @@ async fn locking_key(protocol: &Protocol, key_id: &str) -> String {
 }
 
 fn contact(v: &Value) -> Contact {
-    Contact {
-        identity_key: v["contact"]["identityKey"].as_str().unwrap().into(),
-        name: v["contact"]["name"].as_str().unwrap().into(),
-        avatar_url: None,
-        added_at: 1_700_000_000_000,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    }
+    Contact::new(
+        v["contact"]["name"].as_str().unwrap(),
+        v["contact"]["identityKey"].as_str().unwrap(),
+    )
+    .with_added_at(1_700_000_000_000)
 }
 
 /// The token this crate writes for the vector's contact, nothing listed.

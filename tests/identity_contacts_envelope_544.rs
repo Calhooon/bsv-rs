@@ -66,15 +66,14 @@ async fn loaded(script: &str, instructions: &str) -> Vec<Contact> {
 fn contact(v: &Value) -> Contact {
     let plaintext: Value =
         serde_json::from_str(v["contacts"]["write"]["plaintext"].as_str().unwrap()).unwrap();
-    Contact {
-        identity_key: plaintext["identityKey"].as_str().unwrap().into(),
-        name: plaintext["name"].as_str().unwrap().into(),
-        avatar_url: Some(plaintext["avatarURL"].as_str().unwrap().into()),
-        added_at: 1_700_000_000_000,
-        notes: Some(plaintext["metadata"]["notes"].as_str().unwrap().into()),
-        tags: vec![plaintext["metadata"]["tags"][0].as_str().unwrap().into()],
-        metadata: None,
-    }
+    Contact::new(
+        plaintext["name"].as_str().unwrap(),
+        plaintext["identityKey"].as_str().unwrap(),
+    )
+    .with_avatar_url(plaintext["avatarURL"].as_str().unwrap())
+    .with_added_at(1_700_000_000_000)
+    .with_notes(plaintext["metadata"]["notes"].as_str().unwrap())
+    .with_tags([plaintext["metadata"]["tags"][0].as_str().unwrap()])
 }
 
 /// The token this crate writes for the vector's contact, nothing listed.

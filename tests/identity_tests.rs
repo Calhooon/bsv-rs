@@ -253,15 +253,12 @@ fn test_displayable_identity_json_deserialization() {
 
 #[test]
 fn test_contact_creation() {
-    let contact = Contact {
-        identity_key: "02abc123".to_string(),
-        name: "Alice".to_string(),
-        avatar_url: Some("https://example.com/avatar.png".to_string()),
-        added_at: 1700000000000,
-        notes: Some("Met at conference".to_string()),
-        tags: vec!["work".to_string(), "friend".to_string()],
-        metadata: Some(serde_json::json!({"source": "import"})),
-    };
+    let contact = Contact::new("Alice", "02abc123")
+        .with_avatar_url("https://example.com/avatar.png")
+        .with_added_at(1700000000000)
+        .with_notes("Met at conference")
+        .with_tags(["work", "friend"])
+        .with_metadata(serde_json::json!({"source": "import"}));
 
     assert_eq!(contact.identity_key, "02abc123");
     assert_eq!(contact.name, "Alice");
@@ -270,8 +267,8 @@ fn test_contact_creation() {
 }
 
 #[test]
-fn test_contact_default() {
-    let contact = Contact::default();
+fn test_contact_new_defaults() {
+    let contact = Contact::new("", "");
 
     assert!(contact.identity_key.is_empty());
     assert!(contact.name.is_empty());
@@ -299,16 +296,12 @@ fn test_contact_from_identity() {
 
 #[test]
 fn test_contact_to_displayable_identity() {
-    let contact = Contact {
-        identity_key: "02abc123def456789012345678901234567890123456789012345678901234567890"
-            .to_string(),
-        name: "Test User".to_string(),
-        avatar_url: Some("https://example.com/avatar.png".to_string()),
-        added_at: 1700000000000,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    };
+    let contact = Contact::new(
+        "Test User",
+        "02abc123def456789012345678901234567890123456789012345678901234567890",
+    )
+    .with_avatar_url("https://example.com/avatar.png")
+    .with_added_at(1700000000000);
 
     let identity = contact.to_displayable_identity();
 
@@ -321,15 +314,7 @@ fn test_contact_to_displayable_identity() {
 
 #[test]
 fn test_contact_to_displayable_identity_no_avatar() {
-    let contact = Contact {
-        identity_key: "02abc123".to_string(),
-        name: "No Avatar User".to_string(),
-        avatar_url: None,
-        added_at: 0,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    };
+    let contact = Contact::new("No Avatar User", "02abc123");
 
     let identity = contact.to_displayable_identity();
     assert_eq!(identity.avatar_url, DefaultIdentityValues::AVATAR_URL);
@@ -337,15 +322,11 @@ fn test_contact_to_displayable_identity_no_avatar() {
 
 #[test]
 fn test_contact_json_serialization() {
-    let contact = Contact {
-        identity_key: "02abc123".to_string(),
-        name: "Bob".to_string(),
-        avatar_url: Some("https://example.com/avatar.png".to_string()),
-        added_at: 1700000000000,
-        notes: Some("Friend".to_string()),
-        tags: vec!["work".to_string()],
-        metadata: None,
-    };
+    let contact = Contact::new("Bob", "02abc123")
+        .with_avatar_url("https://example.com/avatar.png")
+        .with_added_at(1700000000000)
+        .with_notes("Friend")
+        .with_tags(["work"]);
 
     let json = serde_json::to_string(&contact).unwrap();
 
@@ -362,15 +343,7 @@ fn test_contact_json_serialization() {
 
 #[test]
 fn test_contact_json_without_optional_fields() {
-    let contact = Contact {
-        identity_key: "02abc123".to_string(),
-        name: "Charlie".to_string(),
-        avatar_url: None,
-        added_at: 0,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    };
+    let contact = Contact::new("Charlie", "02abc123");
 
     let json = serde_json::to_string(&contact).unwrap();
 
@@ -734,15 +707,9 @@ mod contacts_manager_tests {
     use bsv_rs::wallet::ProtoWallet;
 
     fn create_test_contact(key: &str, name: &str) -> Contact {
-        Contact {
-            identity_key: key.to_string(),
-            name: name.to_string(),
-            avatar_url: Some("https://example.com/avatar.png".to_string()),
-            added_at: 1700000000000,
-            notes: None,
-            tags: Vec::new(),
-            metadata: None,
-        }
+        Contact::new(name, key)
+            .with_avatar_url("https://example.com/avatar.png")
+            .with_added_at(1700000000000)
     }
 
     #[tokio::test]
@@ -777,12 +744,7 @@ mod contacts_manager_tests {
         manager.add_contact(contact).await.unwrap();
 
         // Update the contact
-        let updated = Contact {
-            identity_key: ALICE.to_string(),
-            name: "Alice Updated".to_string(),
-            notes: Some("Updated notes".to_string()),
-            ..Default::default()
-        };
+        let updated = Contact::new("Alice Updated", ALICE).with_notes("Updated notes");
         manager.update_contact(ALICE, updated).await.unwrap();
 
         // Verify update
@@ -974,12 +936,7 @@ mod contacts_manager_tests {
         let contact1 = create_test_contact(ALICE, "Alice V1");
         manager.add_contact(contact1).await.unwrap();
 
-        let contact2 = Contact {
-            identity_key: ALICE.to_string(),
-            name: "Alice V2".to_string(),
-            notes: Some("Updated".to_string()),
-            ..Default::default()
-        };
+        let contact2 = Contact::new("Alice V2", ALICE).with_notes("Updated");
         manager.add_contact(contact2).await.unwrap();
 
         let contacts = manager.list_contacts().await.unwrap();

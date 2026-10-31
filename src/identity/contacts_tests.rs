@@ -11,15 +11,9 @@ const BOB: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c7
 const CHARLIE: &str = "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
 
 fn create_test_contact(key: &str, name: &str) -> Contact {
-    Contact {
-        identity_key: key.to_string(),
-        name: name.to_string(),
-        avatar_url: Some("https://example.com/avatar.png".to_string()),
-        added_at: 1700000000000,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    }
+    Contact::new(name, key)
+        .with_avatar_url("https://example.com/avatar.png")
+        .with_added_at(1700000000000)
 }
 
 #[tokio::test]
@@ -54,12 +48,7 @@ async fn test_update_contact() {
     manager.add_contact(contact).await.unwrap();
 
     // Update the contact
-    let updated = Contact {
-        identity_key: ALICE.to_string(),
-        name: "Alice Updated".to_string(),
-        notes: Some("Updated notes".to_string()),
-        ..Default::default()
-    };
+    let updated = Contact::new("Alice Updated", ALICE).with_notes("Updated notes");
     manager.update_contact(ALICE, updated).await.unwrap();
 
     // Verify update
@@ -257,12 +246,7 @@ async fn test_add_contact_replaces_existing() {
     let contact1 = create_test_contact(ALICE, "Alice V1");
     manager.add_contact(contact1).await.unwrap();
 
-    let contact2 = Contact {
-        identity_key: ALICE.to_string(),
-        name: "Alice V2".to_string(),
-        notes: Some("Updated".to_string()),
-        ..Default::default()
-    };
+    let contact2 = Contact::new("Alice V2", ALICE).with_notes("Updated");
     manager.add_contact(contact2).await.unwrap();
 
     let contacts = manager.list_contacts().await.unwrap();

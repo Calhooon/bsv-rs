@@ -27,18 +27,14 @@ use signaction_reference_326::{
 };
 
 fn contact(name: &str) -> Contact {
-    Contact {
-        identity_key: bsv_rs::primitives::PrivateKey::from_bytes(&[3u8; 32])
+    Contact::new(
+        name,
+        bsv_rs::primitives::PrivateKey::from_bytes(&[3u8; 32])
             .unwrap()
             .public_key()
             .to_hex(),
-        name: name.to_string(),
-        avatar_url: None,
-        added_at: 1_700_000_000_000,
-        notes: None,
-        tags: Vec::new(),
-        metadata: None,
-    }
+    )
+    .with_added_at(1_700_000_000_000)
 }
 
 /// A manager whose contact is written (the create path: nothing listed), its

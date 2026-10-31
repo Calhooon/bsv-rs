@@ -228,8 +228,46 @@ impl Default for DisplayableIdentity {
 ///
 /// A contact is a displayable identity with optional metadata and tracking
 /// information for when it was added.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+///
+/// The reference's contact record has grown and will grow again, so the type
+/// is closed (#552, the keeper's word of 2026-10-31 13:1xZ): build one with
+/// [`Contact::new`], the two members `validateContact` requires non-empty
+/// (`ts-stack@edf6e03` `ContactsManager.ts:183`, `:186`), and a `with_`
+/// setter for each optional member; the fields stay `pub` to read and to
+/// assign. `new` holds its values as given: the record is validated where
+/// the reference validates it, at the save (`add_contact`) and the read.
+///
+/// ```
+/// use bsv_rs::identity::Contact;
+///
+/// let contact = Contact::new("Alice", "02abc123")
+///     .with_avatar_url("https://example.com/alice.png")
+///     .with_badge_label("Met in person");
+/// assert_eq!(contact.name, "Alice");
+/// assert_eq!(contact.badge_label, "Met in person");
+/// ```
+///
+/// A struct literal from outside the crate does not build:
+///
+/// ```compile_fail,E0639
+/// use bsv_rs::identity::Contact;
+///
+/// let contact = Contact {
+///     identity_key: "02abc123".to_string(),
+///     name: "Alice".to_string(),
+///     avatar_url: None,
+///     added_at: 0,
+///     notes: None,
+///     tags: Vec::new(),
+///     metadata: None,
+///     badge_icon_url: String::new(),
+///     badge_label: String::new(),
+///     badge_click_url: String::new(),
+/// };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct Contact {
     /// Contact's identity key (hex-encoded compressed public key).
     pub identity_key: String,
@@ -250,20 +288,103 @@ pub struct Contact {
     /// Additional metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    /// Badge icon URL, the reference record's `badgeIconURL`, empty where
+    /// unset (#552).
+    #[serde(default)]
+    pub badge_icon_url: String,
+    /// Badge label, the reference record's `badgeLabel`, empty where unset
+    /// (#552).
+    #[serde(default)]
+    pub badge_label: String,
+    /// Badge click URL, the reference record's `badgeClickURL`, empty where
+    /// unset (#552).
+    #[serde(default)]
+    pub badge_click_url: String,
 }
 
 impl Contact {
-    /// Create a new contact from a displayable identity.
-    pub fn from_identity(identity: DisplayableIdentity) -> Self {
+    /// A contact of `name` and `identity_key`, the two members the
+    /// reference's `validateContact` requires non-empty; every other display
+    /// member empty, no metadata, `added_at` 0. Neither value is judged here:
+    /// `add_contact` refuses an empty name or a key that is not a canonical
+    /// compressed key, in the reference's words, before any wallet call.
+    #[must_use]
+    pub fn new(name: impl Into<String>, identity_key: impl Into<String>) -> Self {
         Self {
-            identity_key: identity.identity_key,
-            name: identity.name,
-            avatar_url: Some(identity.avatar_url),
-            added_at: crate::auth::current_time_ms(),
+            identity_key: identity_key.into(),
+            name: name.into(),
+            avatar_url: None,
+            added_at: 0,
             notes: None,
             tags: Vec::new(),
             metadata: None,
+            badge_icon_url: String::new(),
+            badge_label: String::new(),
+            badge_click_url: String::new(),
         }
+    }
+
+    /// The avatar URL, the record's `avatarURL`.
+    #[must_use]
+    pub fn with_avatar_url(mut self, avatar_url: impl Into<String>) -> Self {
+        self.avatar_url = Some(avatar_url.into());
+        self
+    }
+
+    /// When the contact was added (Unix milliseconds), kept beside the token.
+    #[must_use]
+    pub fn with_added_at(mut self, added_at: u64) -> Self {
+        self.added_at = added_at;
+        self
+    }
+
+    /// Notes, carried in the record's `metadata`.
+    #[must_use]
+    pub fn with_notes(mut self, notes: impl Into<String>) -> Self {
+        self.notes = Some(notes.into());
+        self
+    }
+
+    /// Tags, carried in the record's `metadata`.
+    #[must_use]
+    pub fn with_tags<T: Into<String>>(mut self, tags: impl IntoIterator<Item = T>) -> Self {
+        self.tags = tags.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// The record's `metadata`, an object.
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
+    /// The badge icon URL, the record's `badgeIconURL`.
+    #[must_use]
+    pub fn with_badge_icon_url(mut self, badge_icon_url: impl Into<String>) -> Self {
+        self.badge_icon_url = badge_icon_url.into();
+        self
+    }
+
+    /// The badge label, the record's `badgeLabel`.
+    #[must_use]
+    pub fn with_badge_label(mut self, badge_label: impl Into<String>) -> Self {
+        self.badge_label = badge_label.into();
+        self
+    }
+
+    /// The badge click URL, the record's `badgeClickURL`.
+    #[must_use]
+    pub fn with_badge_click_url(mut self, badge_click_url: impl Into<String>) -> Self {
+        self.badge_click_url = badge_click_url.into();
+        self
+    }
+
+    /// Create a new contact from a displayable identity.
+    pub fn from_identity(identity: DisplayableIdentity) -> Self {
+        Self::new(identity.name, identity.identity_key)
+            .with_avatar_url(identity.avatar_url)
+            .with_added_at(crate::auth::current_time_ms())
     }
 
     /// Convert this contact to a displayable identity.
@@ -625,262 +746,5 @@ impl BroadcastResult {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_known_certificate_type_names() {
-        assert_eq!(KnownCertificateType::IdentiCert.name(), "IdentiCert");
-        assert_eq!(KnownCertificateType::DiscordCert.name(), "DiscordCert");
-        assert_eq!(KnownCertificateType::PhoneCert.name(), "PhoneCert");
-        assert_eq!(KnownCertificateType::XCert.name(), "XCert");
-        assert_eq!(KnownCertificateType::Registrant.name(), "Registrant");
-        assert_eq!(KnownCertificateType::EmailCert.name(), "EmailCert");
-        assert_eq!(KnownCertificateType::Anyone.name(), "Anyone");
-        assert_eq!(KnownCertificateType::SelfCert.name(), "Self");
-        assert_eq!(KnownCertificateType::CoolCert.name(), "CoolCert");
-    }
-
-    #[test]
-    fn test_known_certificate_type_ids() {
-        // Verify IDs match TypeScript/Go SDKs
-        assert_eq!(
-            KnownCertificateType::IdentiCert.type_id(),
-            "z40BOInXkI8m7f/wBrv4MJ09bZfzZbTj2fJqCtONqCY="
-        );
-        assert_eq!(
-            KnownCertificateType::XCert.type_id(),
-            "vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc="
-        );
-        assert_eq!(
-            KnownCertificateType::Anyone.type_id(),
-            "mfkOMfLDQmrr3SBxBQ5WeE+6Hy3VJRFq6w4A5Ljtlis="
-        );
-        assert_eq!(
-            KnownCertificateType::SelfCert.type_id(),
-            "Hkge6X5JRxt1cWXtHLCrSTg6dCVTxjQJJ48iOYd7n3g="
-        );
-    }
-
-    #[test]
-    fn test_known_certificate_type_from_id() {
-        assert_eq!(
-            KnownCertificateType::from_type_id("z40BOInXkI8m7f/wBrv4MJ09bZfzZbTj2fJqCtONqCY="),
-            Some(KnownCertificateType::IdentiCert)
-        );
-        assert_eq!(
-            KnownCertificateType::from_type_id("vdDWvftf1H+5+ZprUw123kjHlywH+v20aPQTuXgMpNc="),
-            Some(KnownCertificateType::XCert)
-        );
-        assert_eq!(KnownCertificateType::from_type_id("unknown"), None);
-    }
-
-    #[test]
-    fn test_known_certificate_type_roundtrip() {
-        for cert_type in KnownCertificateType::all() {
-            let type_id = cert_type.type_id();
-            let parsed = KnownCertificateType::from_type_id(type_id);
-            assert_eq!(parsed, Some(*cert_type));
-        }
-    }
-
-    #[test]
-    fn test_displayable_identity_from_key() {
-        // 66 hex chars = 33 bytes compressed public key
-        let identity = DisplayableIdentity::from_key(
-            "02abc123def456789012345678901234567890123456789012345678901234abcd",
-        );
-        assert!(identity.abbreviated_key.contains("..."));
-        assert_eq!(identity.identity_key.len(), 66);
-        assert_eq!(identity.abbreviated_key, "02abc1...abcd");
-    }
-
-    #[test]
-    fn test_displayable_identity_from_short_key() {
-        let identity = DisplayableIdentity::from_key("short");
-        assert_eq!(identity.abbreviated_key, "short");
-        assert_eq!(identity.identity_key, "short");
-    }
-
-    #[test]
-    fn test_displayable_identity_serialization() {
-        let identity = DisplayableIdentity {
-            name: "Alice".to_string(),
-            avatar_url: "https://example.com/avatar.png".to_string(),
-            identity_key: "02abc123".to_string(),
-            abbreviated_key: "02ab...".to_string(),
-            badge_icon_url: "https://example.com/badge.png".to_string(),
-            badge_label: "Verified".to_string(),
-            badge_click_url: "https://example.com/verify".to_string(),
-        };
-
-        let json = serde_json::to_string(&identity).unwrap();
-        assert!(json.contains("\"name\":\"Alice\""));
-        assert!(json.contains("\"avatarUrl\":")); // camelCase
-
-        let decoded: DisplayableIdentity = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.name, "Alice");
-        assert_eq!(decoded.identity_key, "02abc123");
-    }
-
-    #[test]
-    fn test_contact_serialization() {
-        let contact = Contact {
-            identity_key: "02abc123".to_string(),
-            name: "Bob".to_string(),
-            avatar_url: Some("https://example.com/avatar.png".to_string()),
-            added_at: 1700000000000,
-            notes: Some("Friend".to_string()),
-            tags: vec!["work".to_string(), "friend".to_string()],
-            metadata: None,
-        };
-
-        let json = serde_json::to_string(&contact).unwrap();
-        assert!(json.contains("\"name\":\"Bob\""));
-        assert!(json.contains("\"identityKey\":\"02abc123\"")); // camelCase
-
-        let decoded: Contact = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.name, "Bob");
-        assert_eq!(decoded.tags.len(), 2);
-    }
-
-    #[test]
-    fn test_contact_without_optional_fields() {
-        let contact = Contact {
-            identity_key: "02abc123".to_string(),
-            name: "Charlie".to_string(),
-            avatar_url: None,
-            added_at: 0,
-            notes: None,
-            tags: Vec::new(),
-            metadata: None,
-        };
-
-        let json = serde_json::to_string(&contact).unwrap();
-        // Optional fields should not be serialized when None
-        assert!(!json.contains("avatarUrl"));
-        assert!(!json.contains("notes"));
-        assert!(!json.contains("metadata"));
-    }
-
-    #[test]
-    fn test_identity_query_default() {
-        let query = IdentityQuery::default();
-        assert!(query.identity_key.is_none());
-        assert!(query.attributes.is_none());
-        assert!(query.certificate_type.is_none());
-        assert!(query.certifier.is_none());
-        assert!(query.limit.is_none());
-    }
-
-    #[test]
-    fn test_identity_query_by_identity_key() {
-        let query = IdentityQuery::by_identity_key("02abc123");
-        assert_eq!(query.identity_key, Some("02abc123".to_string()));
-        assert!(query.attributes.is_none());
-    }
-
-    #[test]
-    fn test_identity_query_by_attributes() {
-        let mut attrs = IndexMap::new();
-        attrs.insert("email".to_string(), "test@example.com".to_string());
-
-        let query = IdentityQuery::by_attributes(attrs);
-        assert!(query.identity_key.is_none());
-        assert!(query.attributes.is_some());
-        assert_eq!(
-            query.attributes.as_ref().unwrap().get("email"),
-            Some(&"test@example.com".to_string())
-        );
-    }
-
-    #[test]
-    fn test_identity_query_builder() {
-        let query = IdentityQuery::by_attribute("email", "test@example.com")
-            .with_limit(10)
-            .with_offset(5)
-            .with_certifier("02certifier");
-
-        assert_eq!(query.limit, Some(10));
-        assert_eq!(query.offset, Some(5));
-        assert_eq!(query.certifier, Some("02certifier".to_string()));
-    }
-
-    #[test]
-    fn test_identity_query_serialization() {
-        let query = IdentityQuery::by_attribute("email", "test@example.com").with_limit(10);
-
-        let json = serde_json::to_string(&query).unwrap();
-        assert!(json.contains("test@example.com"));
-        assert!(json.contains("\"limit\":10"));
-
-        let decoded: IdentityQuery = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.limit, Some(10));
-    }
-
-    #[test]
-    fn test_identity_client_config_default() {
-        let config = IdentityClientConfig::default();
-        assert_eq!(config.network_preset, NetworkPreset::Mainnet);
-        assert_eq!(config.protocol_id, (1, "identity".to_string()));
-        assert_eq!(config.key_id, "1");
-        assert_eq!(config.token_amount, 1);
-        assert_eq!(config.output_index, 0);
-        assert!(config.originator.is_none());
-    }
-
-    #[test]
-    fn test_identity_client_config_builder() {
-        let config = IdentityClientConfig::with_originator("myapp.com")
-            .with_network(NetworkPreset::Testnet)
-            .with_token_amount(100);
-
-        assert_eq!(config.originator, Some("myapp.com".to_string()));
-        assert_eq!(config.network_preset, NetworkPreset::Testnet);
-        assert_eq!(config.token_amount, 100);
-    }
-
-    #[test]
-    fn test_contacts_manager_config_default() {
-        let config = ContactsManagerConfig::default();
-        assert_eq!(config.protocol_id, (2, "contact".to_string()));
-        assert_eq!(config.basket, "contacts");
-        assert!(config.originator.is_none());
-    }
-
-    #[test]
-    fn test_certifier_info_default() {
-        let info = CertifierInfo::default();
-        assert_eq!(info.name, "Unknown Certifier");
-        assert_eq!(info.trust, 0);
-    }
-
-    #[test]
-    fn test_contact_from_identity() {
-        let identity = DisplayableIdentity::from_key("02abc123");
-        let contact = Contact::from_identity(identity.clone());
-
-        assert_eq!(contact.identity_key, identity.identity_key);
-        assert_eq!(contact.name, identity.name);
-        assert!(contact.added_at > 0);
-    }
-
-    #[test]
-    fn test_contact_to_displayable_identity() {
-        let contact = Contact {
-            identity_key: "02abc123def456789012345678901234567890123456789012345678901234567890"
-                .to_string(),
-            name: "Test User".to_string(),
-            avatar_url: Some("https://example.com/avatar.png".to_string()),
-            added_at: 1700000000000,
-            notes: None,
-            tags: Vec::new(),
-            metadata: None,
-        };
-
-        let identity = contact.to_displayable_identity();
-        assert_eq!(identity.name, "Test User");
-        assert_eq!(identity.avatar_url, "https://example.com/avatar.png");
-        assert!(identity.abbreviated_key.contains("..."));
-    }
-}
+#[path = "types_tests.rs"]
+mod tests;
