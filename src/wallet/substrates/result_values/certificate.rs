@@ -47,7 +47,12 @@ fn canonical(certificate: &WalletCertificate) -> bool {
     }
     if ![&certificate.subject, &certificate.certifier]
         .iter()
-        .all(|key| key.len() == 66 && PublicKey::from_hex(key).is_ok())
+        // isValidCompressedPublicKey refuses an x at or above p
+        // (Secp256k1Validation.ts:15-22): the strict reader, not from_hex's (#498).
+        .all(|key| {
+            key.len() == 66
+                && hex::decode(key).is_ok_and(|bytes| PublicKey::from_bytes(&bytes).is_ok())
+        })
     {
         return false;
     }

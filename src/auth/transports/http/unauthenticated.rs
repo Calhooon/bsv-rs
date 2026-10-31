@@ -112,9 +112,11 @@ pub(super) fn refusal(
 }
 
 /// The answer's sender: the identity key it carries, which
-/// `refuse_unauthenticated` has required (#354).
+/// `refuse_unauthenticated` has required (#354), read strictly as the
+/// reference's `assertAuthIdentityKey` reads it
+/// (`AuthMessageValidation.ts:344`, `:81-89`; #498).
 pub(super) fn sender(response_headers: &HeaderMap) -> Result<PublicKey> {
-    PublicKey::from_hex(
+    PublicKey::from_strict_hex(
         response_headers
             .get(headers::IDENTITY_KEY)
             .and_then(|v| v.to_str().ok())

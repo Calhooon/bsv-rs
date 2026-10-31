@@ -209,3 +209,57 @@ async fn a_published_txid_alone_revocation_outpoint_parses_to_a_verifying_certif
     assert_eq!(parsed.revocation_outpoint, cert.revocation_outpoint);
     assert!(parsed.verify().unwrap());
 }
+
+/// #498's re-review: a published certificate's subject and certifier are read
+/// strictly, though `PublicKey::from_hex` reads the reference's lenient forms.
+/// The reference's `Certificate.verify` refuses a key that is not `02`/`03`
+/// and 64 hex digits at its `toBinary` (`ts-stack@edf6e03`
+/// `Certificate.ts:240-254`, `:425-440`), so it skips the output
+/// (`IdentityClient.ts:823`); read leniently, a hybrid or odd-length form
+/// reduced to the signed key's point and verified here.
+#[tokio::test]
+async fn a_published_certificate_key_in_a_lenient_form_is_skipped_498() {
+    let certifier = PrivateKey::from_bytes(&[31u8; 32]).unwrap();
+    let subject = PrivateKey::from_bytes(&[37u8; 32]).unwrap().public_key();
+    let mut cert = Certificate::new([6; 32], [7; 32], subject, certifier.public_key());
+    cert.revocation_outpoint =
+        Some(Outpoint::from_string(&format!("{}.0", "ab".repeat(32))).unwrap());
+    cert.set_field("name", "QWxpY2U=");
+    cert.sign(&certifier).unwrap();
+    let mut json = serde_json::to_value(&cert).unwrap();
+    json["keyring"] = serde_json::json!({});
+    let client = IdentityClient::new(ProtoWallet::new(None), Default::default());
+    assert!(client
+        .parse_output_to_verifiable_certificate(&publish(&json))
+        .await
+        .unwrap()
+        .is_some());
+
+    for member in ["subject", "certifier"] {
+        let key = PublicKey::from_hex(json[member].as_str().unwrap()).unwrap();
+        let uncompressed = to_hex(&key.to_uncompressed());
+        let odd = u8::from_str_radix(&uncompressed[128..], 16).unwrap() & 1 == 1;
+        let hybrid = format!("{}{}", if odd { "07" } else { "06" }, &uncompressed[2..]);
+        for form in [hybrid, key.to_hex()[1..].to_string()] {
+            assert_eq!(PublicKey::from_hex(&form).unwrap(), key);
+            let mut lenient = json.clone();
+            lenient[member] = form.clone().into();
+            let output = publish(&lenient);
+            assert!(
+                client
+                    .parse_output_to_verifiable_certificate(&output)
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "{member} {form}: verified leniently"
+            );
+            assert!(
+                !matches!(
+                    client.parse_output_to_certificate(&output).await,
+                    Ok(Some(_))
+                ),
+                "{member} {form}: parsed leniently"
+            );
+        }
+    }
+}

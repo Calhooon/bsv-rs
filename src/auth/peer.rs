@@ -502,8 +502,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             )
             .await?;
 
-        // Parse the public key from hex string
-        let key = PublicKey::from_hex(&result.public_key)?;
+        // Strictly, as the reference asserts its wallet's identity key
+        // (`Peer.ts:1354-1355`, `assertAuthIdentityKey`; #498)
+        let key = PublicKey::from_strict_hex(&result.public_key)?;
         let mut cached = self.identity_key.write().await;
         *cached = Some(key.clone());
         Ok(key)
@@ -626,8 +627,10 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         self.check_own_policy()?; // before a nonce or a message (#294)
 
         // The responder pinned to the identity asked for (`Peer.ts:637`), its
-        // initial response refused if another answers (`:903-908`; #353)
-        let pinned = identity_key.map(PublicKey::from_hex).transpose()?;
+        // initial response refused if another answers (`:903-908`; #353); the
+        // reference compares the pin's text with a canonical key, so a lenient
+        // form is read strictly and refused, never reduced to a match (#498)
+        let pinned = identity_key.map(PublicKey::from_strict_hex).transpose()?;
         let my_identity = self.get_identity_key().await?;
         let transport = self.transport()?;
 

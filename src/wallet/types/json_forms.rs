@@ -81,7 +81,7 @@ impl<'de> Deserialize<'de> for KeyringRevealer {
     {
         match String::deserialize(deserializer)?.as_str() {
             "certifier" => Ok(KeyringRevealer::Certifier),
-            key => PublicKey::from_hex(key)
+            key => PublicKey::from_strict_hex(key)
                 .map(KeyringRevealer::PublicKey)
                 .map_err(|e| {
                     serde::de::Error::custom(format!(

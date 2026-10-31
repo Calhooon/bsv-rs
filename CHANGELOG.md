@@ -7,6 +7,161 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `PublicKey::from_hex` accepts the reference's lenient forms (#498)
+
+The keeper's word (2026-10-30 05:1xZ, on #498, under the reading of record
+of 10-26): accept what the reference accepts, refuse what the standard
+forbids and the reference refuses, the question upstream, the pinned tests
+kept so strictness can return. A key the reference reads and this crate
+refused was two verdicts for one user. `PublicKey::from_hex` now reads a
+key string as
+`PublicKey.fromString` does at `ts-stack@edf6e03` (`PublicKey.ts:49-51`,
+`Point.fromString` at `Point.ts:345-348`), one parser
+(`src/primitives/ec/public_key_forms.rs`):
+
+| Form | Before | Now | The reference's site |
+|---|---|---|---|
+| An odd-length string (`2`+Gx, `3`+Gx, `4`+Gx+Gy, `6`+Gx+Gy, `7`+Gx+y) | `invalid hex string: Odd number of digits` | read with a leading `0` | `utils.ts:127-128` (`hexToUint8Array`; the rule of `hex.ts:27-29`) |
+| A hybrid key (`06`/`07` + x + y) whose prefix's low bit is y's last byte's | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | accepted | `Point.ts:305-321` |
+| A coordinate at or above p: a compressed x (`02`+(p+1)), an uncompressed or hybrid x or y (`04`+(p+1)+y) | `invalid public key: Point not on curve` (compressed), the encoding error (uncompressed, hybrid) | reduced modulo p | `Point.ts:365-384` (`fromX`), `:495-510` (`validate`) |
+
+Every refusal the reference makes stays a refusal, in this crate's class and
+words: a hybrid key with the wrong parity, a reduced x with no root, a point
+off the curve, a length or prefix it does not read (`05`, `00`, empty) are
+`Error::InvalidPublicKey` with the strict parser's words, a non-hex character
+`Error::InvalidHex` (an odd-length string's character named at its place in
+the string given). No new `Error` variant and no public shape change. The key
+held is the reduced point, so `to_hex`, `to_hex_uncompressed`, `to_compressed`
+and `to_uncompressed` write the strict form: a lenient form read
+and written back is the strict form. `PublicKey::from_bytes` is unchanged and
+strict (compressed or uncompressed only, x and y below p): the PushDrop decoder's key
+push, the wire's certificate keys and the HTTP JSON result validator's keys
+(`isValidCompressedPublicKey`, `Secp256k1Validation.ts:15-22`, which refuses
+an x at or above p: `result_values/scalars.rs` and `certificate.rs` now read
+through `from_bytes`, where they relied on `from_hex`'s strictness) keep it.
+
+serde's reading of a `PublicKey` and `KeyringRevealer`'s stay strict, as
+before (PR #538's cold review): the hex decoded, then `from_bytes`, in the
+base's words, through the crate-visible `PublicKey::from_strict_hex`. They
+read the argument paths where the reference validates rather than parses:
+`AuthMessage.identityKey` (`assertAuthIdentityKey`,
+`AuthMessageValidation.ts:81-89`), `KeyringRevealer`
+(`validateKeyringRevealer` → `validatePublicKey`,
+`validationHelpers.ts:185-191,1243-1246`), `auth::Certificate`'s subject and
+certifier (`Certificate.ts:240-245`), the wallet `Certificate`'s subject and
+certifier, `KeyLinkageResult`'s three keys and `PeerSession.peer_identity_key`.
+`from_hex` and the local store's point check read as the reference's
+`fromString` does; these do not. An older gap stays as it was: the
+reference's `identityKey` and `KeyringRevealer` checks also refuse an
+uncompressed `04` key and upper-case hex, which `from_bytes` reads (not
+widened here). `tests/auth_serde_key_strictness_498.rs` pins the fifteen
+recorded lenient forms of the vector refused on `AuthMessage`,
+`KeyringRevealer` and both certificate keys: green on `aa5d60db`, three of
+three RED on the pre-fold `82d0944b`, green after; and on
+`KeyLinkageResult`'s three keys, `PeerSession.peer_identity_key` and the
+wallet `Certificate`'s subject and certifier, RED with the visitor on
+`from_hex`. On a certificate key the
+reference's `Certificate.toBinary` refuses the odd and hybrid forms by its
+`02`/`03` regex (`Certificate.ts:240-254`) but reads a compressed x at or
+above p through `fromDER`, reduced, signing the unreduced bytes; this crate
+refuses that form as #183's row states, holding no unreduced bytes.
+
+Four non-serde sites read strictly too (the re-review): the Peer's identity
+pin (`initiate_handshake`), where the reference keeps the pin's text and
+refuses an initial response whose canonical identity key is another text
+(`Peer.ts:627-637,903-908`), and the three certificate intakes,
+`get_verifiable_certificates` and the identity client's two token parsers:
+the reference refuses a wallet certificate whose certifier text is none of
+the requested set's canonical keys (`getVerifiableCertificates.ts:76-81`,
+`AuthMessageValidation.ts:123-124`), and its `Certificate.toBinary` judges
+the subject and a published certificate's keys (`Certificate.ts:240-246`,
+`IdentityClient.ts:799-823`); the reference throws where
+`get_verifiable_certificates` skips the certificate, a difference older than
+#498. Read leniently, a hybrid or odd-length form reduced to the canonical
+point: a handshake pinned to it authenticated, a wallet's certificate the
+reference cannot serialize was forwarded under the canonical key, a
+published one verified. `tests/auth_key_strictness_sites_498.rs` (the pin and
+the wallet intake) and `a_published_certificate_key_in_a_lenient_form_is_skipped_498`
+(`src/identity/client_field_value_261_tests.rs`, both parsers) pin them, all
+three RED with the four sites reading through `from_hex`.
+
+Three more read strictly (the third review and its fold): the HTTP
+transport's general answer, whose `x-bsv-auth-identity-key` header is the
+message's `identityKey` (`SimplifiedFetchTransport.ts:346`), refused by
+`assertAuthIdentityKey` (`AuthMessageValidation.ts:344`, `:81-89`); the
+BRC-105 payment's counterparty, the same header handed to the wallet, whose
+validator refuses a non-compressed key (`AuthFetch.ts:735-738,873-878`,
+`validationHelpers.ts:185-196`; through `AuthFetch` the header is the
+authenticated sender's canonical hex and a fallback answer with any `x-bsv`
+header is refused, `:693-697`, so the pin calls the payment directly); and
+the Peer's own identity key, its wallet's answer, which the reference asserts
+(`Peer.ts:1354-1355`). Read leniently, a hybrid, odd-length or `02`+(p+1)
+header became a canonical sender, reached the wallet's createAction, or
+became the Peer's key. `tests/auth_header_key_strictness_498.rs`,
+`src/auth/clients/payment_key_strictness_498_tests.rs` and
+`a_wallet_identity_key_in_a_lenient_form_is_refused_by_the_peer_498` pin
+them, each RED on `6481787b`. The other `from_hex` callers read a wallet's
+derived key (the PushDrop lockers, the payment's derived key, the registry's
+identity key, the `ProtoWallet` linkage results) or the local store's
+parser, where the reference parses with `PublicKey.fromString` or keeps the
+text unvalidated, and stay lenient.
+
+For the toolbox's and the CLI's tables: the local store's lookup with a
+wallet key in one of these forms now reaches the reference's later words,
+inside the unchanged `Invalid value found. Relinquish the corrupted output
+from the kvstore basket before using this key again. Original error:` wrapper:
+
+| Wallet locking key | Old suffix | New suffix (the reference's) |
+|---|---|---|
+| `2` + Gx | `invalid hex string: Odd number of digits` | `KVStore token locking key does not belong to the wallet` |
+| `06` + Gx + Gy | `invalid public key: Invalid public key encoding: elliptic curve point encoding error` | `KVStore token locking key does not belong to the wallet` |
+| `6` + Gx + Gy | `invalid hex string: Odd number of digits` | `KVStore token locking key does not belong to the wallet` |
+| `02` + (p+1) | `invalid public key: Point not on curve` | `KVStore token locking key does not belong to the wallet` |
+
+A token whose key push is a hybrid or reduced-x key keeps #489's native
+words (the byte path is strict). The pins: `tests/primitives_public_key_forms_498.rs`
+replays `tests/vectors/public_key_forms_498.json` (39 key strings, 19 the
+reference accepts and 20 it refuses, recorded by
+`tests/support/public_key_forms_498.mjs` against the reference bundled at
+`edf6e03`, Node 22.18.0): the same verdict, the same point, the strict form
+written back; four of its six tests RED on the base `aa5d60db` (each
+accepted form refused), the two controls green there. The four #489 pins
+`reference_accepts_{odd_valid,hybrid,odd_hybrid,reduced_x}_key_but_local_keeps_native_words_489`
+are kept as `reference_and_local_accept_{..}_key_489_498`, RED on the base,
+each marked "strictness returns on the upstream's answer"; the two token pins
+are unchanged. `result_values/key_strictness_498_tests.rs` pins the validator's
+refusal of `02`+(p+1) for a result key and a certificate subject (both RED
+with `from_hex` lenient and the two sites unchanged).
+
+### Notes: cross-SDK parity (#498)
+
+The ecosystem is split; the reference is the most tolerant reader. Each form
+read by `PublicKey.fromString` (`ts-stack@edf6e03`), go-sdk's
+`PublicKeyFromString` (`2ca481c`, `primitives/ec/publickey.go:79-129,221-231`)
+and py-sdk's `PublicKey(str)` (`4c30e2e`, `bsv/keys.py:23-45`, coincurve
+20.0.0's libsecp256k1 parse), each run on the vector's inputs:
+
+| Form | TS | Go | Python | This crate |
+|---|---|---|---|---|
+| Odd-length string | accepts | refuses (`encoding/hex: odd length hex string`) | refuses (`bytes.fromhex`) | accepts |
+| Hybrid, matching parity | accepts | accepts | accepts | accepts |
+| Hybrid, wrong parity | refuses | refuses | refuses | refuses |
+| Compressed x at or above p | accepts, reduced | accepts, x kept unreduced (`Compressed()` writes `02`+(p+1) back) | refuses | accepts, reduced |
+| Uncompressed or hybrid x or y at or above p | accepts; `toString` writes the coordinate unreduced, its compressed prefix from y's unreduced parity (`04`+x+(p+1) reads as y = 1 and writes `02`+x, the negated point) | refuses (`pubkey X/Y parameter is >= to P`) | refuses | accepts, reduced; writes the point read (`03`+x) |
+
+Two differences remain. The reference's serialization of an uncompressed or
+hybrid key with a coordinate at or above p differs from this crate's (five
+recorded cases, `the_reference_writes_an_unreduced_coordinate_back_498`; for
+a y above p the reference's compressed text names the other point: for
+`04`+x+(p+1) it computes with y = 1 and writes `02`+x, the negated point,
+where this crate writes `03`+x, the point read; that `02`+x is the
+reference's defect, never parity, by the keeper's word of 2026-10-31 06:1xZ
+(`Point.ts:303-321,472-478,527-536`; a FILE draft in the #375 queue, filed at
+the owner's cadence word), and a leading space is read
+by Python's `bytes.fromhex` alone. Strictness returns on the upstream's
+answer: `PublicKey::from_bytes` is the strict reading, and flipping the
+pins back is the change. Ours: the keeper's 2026-10-30 05:1xZ word on #498 accepts the reference's key forms on the hex path (Point.ts:303-325,365-384 at edf6e03), while BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed and the byte path stays strict.
+
 ### Changed: six call sites decode PushDrop tokens with the reference's lock position (#537)
 
 After #499 made the local store's token decode lock-before alone, six other
@@ -1477,7 +1632,7 @@ fold. The RED scratch copy uses its own target directory and is removed.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 1: Ours: native key-encoding acceptance and parser words; BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed, while Point.ts:303-325,365-384 at edf6e03 deliberately accepts additional encodings.
+- Row 1: Ours: the keeper's 2026-10-30 05:1xZ word on #498 accepts the reference's key forms on the hex path (Point.ts:303-325,365-384 at edf6e03), while BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed and the byte path stays strict.
 - Row 2: Ours: since #499 the local store decodes lock-before alone and refuses a lock-after token in the reference's first-chunk words (PushDropValidation.ts:59, PushDrop.ts:74-75 at edf6e03); since #537 the identity client, contacts manager, registry client, kvstore interpreter, overlay admin token and storage downloader decode lock-before alone too, as their counterparts do (IdentityClient.ts:773, ContactsManager.ts:432, registryTokenValidation.ts:28, kvStoreTokenValidation.ts:88, OverlayAdminTokenTemplate.ts:164, UHRPAdvertisementValidation.ts:40 at edf6e03), the six sites' rows closed by #537; the general PushDrop decoder still tries both lock positions for the template's own callers; BRC-48 scripts/0048.md:13-18 defines the template, not the decode position.
 
 ### Fixed: four older LocalKVStore request/result differences (#478)

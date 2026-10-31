@@ -1,7 +1,7 @@
 //! Scalar predicates and linkage order, WalletResultValidation.ts:909-1010,2165-2306.
 
 use super::{array, bytes, invalid, member, record, Object, Result};
-use crate::primitives::PublicKey;
+use crate::primitives::{from_hex, PublicKey};
 use serde_json::{value::RawValue, Value};
 
 pub(super) fn string(
@@ -43,7 +43,13 @@ pub(super) fn hex(
 
 pub(super) fn key(raw: Option<&RawValue>, call: &str, field: &str) -> Result<String> {
     let text = hex(raw, call, field, Some(33))?;
-    if !matches!(text.get(..2), Some("02" | "03")) || PublicKey::from_hex(&text).is_err() {
+    // isValidCompressedPublicKey refuses an x at or above p
+    // (Secp256k1Validation.ts:15-22): the strict reader, not from_hex's (#498).
+    if !matches!(text.get(..2), Some("02" | "03"))
+        || from_hex(&text)
+            .and_then(|bytes| PublicKey::from_bytes(&bytes))
+            .is_err()
+    {
         return Err(invalid(
             call,
             field,

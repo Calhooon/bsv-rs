@@ -982,9 +982,9 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .try_into()
             .map_err(|_| Error::IdentityError("Invalid serial number length".to_string()))?;
 
-        // Parse public keys
-        let subject = PublicKey::from_hex(subject_hex)?;
-        let certifier = PublicKey::from_hex(certifier_hex)?;
+        // Strictly, as Certificate.verify's toBinary refuses a lenient form (#498)
+        let subject = PublicKey::from_strict_hex(subject_hex)?;
+        let certifier = PublicKey::from_strict_hex(certifier_hex)?;
 
         // Create the base certificate
         let mut certificate =
@@ -1136,12 +1136,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             Err(_) => return Ok(None), // Invalid serial number length
         };
 
-        // Parse public keys
-        let subject = match PublicKey::from_hex(subject_hex) {
+        // Strictly, as Certificate.verify's toBinary refuses a lenient form (#498)
+        let subject = match PublicKey::from_strict_hex(subject_hex) {
             Ok(pk) => pk,
             Err(_) => return Ok(None), // Invalid subject pubkey
         };
-        let certifier = match PublicKey::from_hex(certifier_hex) {
+        let certifier = match PublicKey::from_strict_hex(certifier_hex) {
             Ok(pk) => pk,
             Err(_) => return Ok(None), // Invalid certifier pubkey
         };
