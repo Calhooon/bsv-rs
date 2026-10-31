@@ -16,6 +16,7 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 | `p2pk.rs` | P2PK template for direct public key locking (simpler than P2PKH) |
 | `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
 | `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock |
+| `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; `decode()` unchanged |
 | `rpuzzle.rs` | R-Puzzle template for knowledge-based locking using ECDSA K-values |
 
 ## Key Exports
