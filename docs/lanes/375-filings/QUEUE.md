@@ -30,12 +30,21 @@ threads following answers to the earlier ones.
 | 15 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/discovery-trust-range.md](./discovery-trust-range.md) | Validate discovery certificate trust on read and write |
 | 16 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/linkage-reason-and-result-validation.md](./linkage-reason-and-result-validation.md) | Use the linkage reason width and validate returned linkage context |
 | 17 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/http-json-result-validation.md](./http-json-result-validation.md) | Validate HTTP wallet results against their requests and BRC-100 shapes |
+| 18 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/public-key-unreduced-coordinate-serialization.md](./public-key-unreduced-coordinate-serialization.md) | Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with |
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
 entries; the new draft starts with `keeper's word first` and awaits its own
 per-draft word, then the owner's cadence. The sixteen earlier FILE decisions
 stand in their shifted positions. Nothing has been filed.
+
+The keeper's word of 2026-10-31 06:1xZ, [on PR #538](https://github.com/Calhooon/bsv-rs/pull/538#issuecomment-6539950425),
+adds an eighteenth draft, FILE, eighteenth in the keeper's order: the
+reference's `Point.fromDER` keeps an unreduced coordinate and `encode`
+writes it back, so `04`+x+(p+1) is written as `02`+x, the negation of the
+point it computed with (the ask: reduce or refuse at parse, and serialize
+the point computed with). The queue now has eighteen entries, pending the
+owner's cadence word. Nothing has been filed.
 
 ## HOLD
 
