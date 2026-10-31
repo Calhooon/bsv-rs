@@ -17,7 +17,8 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | `types.rs` | Core types (Protocol, TaggedBEEF, Steak, LookupQuestion/Answer, etc.) and constants |
 | `host_reputation_tracker.rs` | Host performance tracking with exponential backoff and rank change events |
 | `facilitators.rs` | HTTP lookup/broadcast facilitators with binary/JSON response parsing |
-| `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop; `decode_overlay_admin_token` decodes lock-before alone, as `OverlayAdminTokenTemplate.ts:164` does, a lock-after token refused in that site's `decodeCanonicalPushDrop` words (`lock_after_refusal`, five fields; #537, `tests/overlay_admin_token_lock_position_537.rs`) |
+| `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop; `decode_overlay_admin_token` decodes lock-before alone, as `OverlayAdminTokenTemplate.ts:164` does, a lock-after token refused in that site's `decodeCanonicalPushDrop` words (#537, `tests/overlay_admin_token_lock_position_537.rs`); since #544 it is the reference's static decode and `decode_and_verify_overlay_admin_token` the reference's author check, both through `admin_token_validation.rs` |
+| `admin_token_validation.rs` | #544: `decodeAdvertisement` (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:159-197`; the static decode `:237-239`): the canonical five-field envelope and bounds, SHIP or SLAP, a canonical identity key, an advertisement URI (the https family with path `/`, `wss`, `js8c+bsvauth+smf`; no localhost, no punycode label, no credentials or fragment), a `tm_`/`ls_` name, a canonical DER signature of 8 to 80 bytes; `decodeAndVerifyOverlayAdvertisement` (`:199-222`): the expected protocol, the identity's linked key's signature over the four data fields, the locking key; each refusal in the reference's words. The SLAP discovery (`lookup_resolver.rs`, `LookupResolver.ts:2206`) and the SHIP discovery (`topic_broadcaster.rs`, `SHIPBroadcaster.ts:775`) read through the verifying form. Pinned by `tests/overlay_admin_token_envelope_544.rs` |
 | `historian.rs` | Transaction ancestry traversal for building chronological history |
 | `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing |
 | `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order) |
@@ -49,8 +50,8 @@ pub use topic_broadcaster::{
 
 // Admin token functions
 pub use overlay_admin_token_template::{
-    decode_overlay_admin_token, create_overlay_admin_token,
-    is_overlay_admin_token, is_ship_token, is_slap_token,
+    decode_overlay_admin_token, decode_and_verify_overlay_admin_token,
+    create_overlay_admin_token, is_overlay_admin_token, is_ship_token, is_slap_token,
     OverlayAdminTokenData,
 };
 
@@ -260,11 +261,12 @@ Both return values in **chronological order** (oldest first) and prevent cycles 
 
 ## Admin Token Template
 
-Create and decode SHIP/SLAP advertisement tokens using PushDrop format (4 fields: protocol, identity key, domain, topic/service).
+Create and decode SHIP/SLAP advertisement tokens using PushDrop format: since #544 the reference's five fields (protocol, identity key, domain, topic/service, signature), the decode the reference's static decode (structure, not author) and `decode_and_verify_overlay_admin_token` its author check; the deprecated writer's legacy 4-field unsigned token is refused (`Unexpected PushDrop token field count`), as the reference refuses it.
 
 ```rust
 pub fn create_overlay_admin_token(protocol, identity_key, domain, topic_or_service) -> LockingScript
 pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdminTokenData>
+pub fn decode_and_verify_overlay_admin_token(script, expected: Option<Protocol>) -> Result<OverlayAdminTokenData>
 pub fn is_overlay_admin_token(script) -> bool
 pub fn is_ship_token(script) -> bool
 pub fn is_slap_token(script) -> bool
@@ -319,7 +321,7 @@ Rust local store has no broadcaster. Go's `kvstore/local_kv_store.go` at
 
 ### Host Discovery
 1. `LookupResolver` queries SLAP trackers to find hosts advertising a service
-2. Responses are admin tokens decoded via `decode_overlay_admin_token`
+2. Responses are admin tokens decoded and authenticated via `decode_and_verify_overlay_admin_token` (expected `SLAP`, #544), one that fails skipped
 3. Results are cached with configurable TTL (default 5 minutes)
 4. Additional hosts can be specified via `additional_hosts` config
 

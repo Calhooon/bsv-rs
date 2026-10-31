@@ -36,10 +36,9 @@ async fn a_lock_after_advertisement_names_no_host_as_in_the_reference_537() {
         let found = hosts(case, lock_position::script(case)).await;
         assert!(found.is_empty(), "{}: {found:?}", case["name"]);
     }
-    // The same advertisement locked before names its host.
+    // The same fields locked before named their host until #544; since then
+    // the reference's reader skips them too: the first field is no host key
+    // (`UHRPAdvertisementValidation.ts:46-48`).
     let control = lock_position::relocked_before(&cases[0]);
-    assert_eq!(
-        hosts(&cases[0], control).await,
-        ["https://host.example/file"]
-    );
+    assert!(hosts(&cases[0], control).await.is_empty());
 }

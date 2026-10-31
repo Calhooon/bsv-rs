@@ -5,7 +5,7 @@
 //! `#authenticateContactScript` (`:431-466`: exactly two fields, the bounds,
 //! the canonical five chunks, the lock the wallet's key for the key ID, the
 //! signature over the ciphertext), the plaintext `validateContact`'s record
-//! (`:171-209`: the seven display fields and an optional `metadata`, any other
+//! (`:171-198`: the seven display fields and an optional `metadata`, any other
 //! member refused). Against `tests/vectors/token_envelope_544.json`, recorded
 //! by `tests/support/token_envelope_544.mjs` under Node v22.18.0: the
 //! reference's own token read here, nine one-change tokens dropped as the

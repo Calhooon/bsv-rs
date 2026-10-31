@@ -1,5 +1,5 @@
 //! `decodeAndVerifyKVStoreToken` (`ts-stack@edf6e03`
-//! `kvStoreTokenValidation.ts:86-122`), the reference interpreter's reader
+//! `kvStoreTokenValidation.ts:85-119`), the reference interpreter's reader
 //! (`kvStoreInterpreter.ts:37`; #544): the canonical lock-before envelope of
 //! five or six fields (`decodeCanonicalPushDrop`, `PushDropValidation.ts:54-79`),
 //! the protocol ID canonical JSON, the key, the value, the 33-byte
@@ -89,7 +89,7 @@ fn protocol(text: &str) -> Result<Protocol> {
         .ok_or_else(|| refused("KVStore protocol ID is invalid"))
 }
 
-/// `decodeAndVerifyKVStoreToken` (`kvStoreTokenValidation.ts:86-122`).
+/// `decodeAndVerifyKVStoreToken` (`kvStoreTokenValidation.ts:85-119`).
 pub(crate) fn decode_and_verify(script: &LockingScript) -> Result<AuthenticatedToken> {
     let token = canonical(script)?;
     let (data, signature) = token.fields.split_at(token.fields.len() - 1);

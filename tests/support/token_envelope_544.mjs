@@ -4,7 +4,7 @@
 // refusal words and its outcome from a run of the site where the site is a
 // method. The sites and their reference reads:
 //   contacts   ContactsManager.ts:414-472 (#readKeyID, #authenticateContactScript,
-//              #parseContactPlaintext, validateContact :171-209), from getContacts
+//              #parseContactPlaintext, validateContact :171-198), from getContacts
 //              (:475-514, a refused output dropped by Promise.allSettled) and
 //              saveContact (:527-528, validateContact before any wallet call)
 //   identity   IdentityClient.ts:768-824 (revokeCertificateRevelation's lookup
@@ -12,12 +12,12 @@
 //              certificate, verifySignature; a refused output skipped)
 //   registry   registryTokenValidation.ts:19-64 (decodeAndVerifyRegistryToken),
 //              from RegistryClient.resolve (a refused output skipped)
-//   kvstore    kvStoreTokenValidation.ts:86-122 (decodeAndVerifyKVStoreToken),
+//   kvstore    kvStoreTokenValidation.ts:85-119 (decodeAndVerifyKVStoreToken),
 //              from kvStoreInterpreter (kvStoreInterpreter.ts:28-50, no value)
 //   overlay    OverlayAdminTokenTemplate.ts:162-215 (decodeAdvertisement, the
 //              static decode :237-239, thrown) and decodeAndVerifyOverlayAdvertisement
-//              (:198-215, the author; LookupResolver.ts:2206, SHIPBroadcaster.ts:775)
-//   storage    UHRPAdvertisementValidation.ts:37-112 (decodeAndVerifyUHRPAdvertisement),
+//              (:199-222, the author; LookupResolver.ts:2206, SHIPBroadcaster.ts:775)
+//   storage    UHRPAdvertisementValidation.ts:37-115 (decodeAndVerifyUHRPAdvertisement),
 //              from StorageDownloader.resolve (StorageDownloader.ts:62-126: the
 //              hash binding and expiry at :117, a refused output skipped)
 //

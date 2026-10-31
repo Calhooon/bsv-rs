@@ -58,6 +58,14 @@ regexes = [
 description = "the generator point as the #105 witnesses' identity key"
 regexes = ['''^0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798$''']
 
+# tests/vectors/token_envelope_544.json: the #544 contact's identity key is 3G in compressed
+# form, the public key of the private key 3, a public constant of the curve; one copy is its
+# upper-case form, the record the reference refuses. Only that literal, in either case, is let
+# through, never the file.
+[[allowlists]]
+description = "3G as the #544 contact's identity key"
+regexes = ['''(?i)^02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9$''']
+
 # tests/wallet_http_json_shapes_105.rs: the public-key-shaped hex the old `{"publicKey": ..}` revealer
 # test sends to show the shape is refused (#105, item 9): the Go SDK's test public key, which the
 # wallet-wire vectors carry too; a test literal, not a key in use. Only that literal is let

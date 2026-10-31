@@ -6,8 +6,6 @@
 use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
 };
-use crate::primitives::Reader;
-use crate::script::templates::PushDrop;
 use crate::transaction::Transaction;
 use crate::{Error, Result};
 use std::sync::Arc;
@@ -100,9 +98,12 @@ impl StorageDownloader {
             _ => return Ok(Vec::new()),
         };
 
-        let current_time = crate::util::time::current_time_secs() as i64;
+        // The file the URL names: an advertisement for another is dropped
+        // (`StorageDownloader.ts:66`, `:117`; #544).
+        let requested_hash = super::utils::get_hash_from_url(uhrp_url)?;
+        let current_time = crate::util::time::current_time_secs();
 
-        let mut hosts = Vec::new();
+        let mut hosts: Vec<String> = Vec::new();
 
         for output in outputs {
             // Parse BEEF to get transaction
@@ -117,32 +118,18 @@ impl StorageDownloader {
                 None => continue,
             };
 
-            // Lock-before alone, as UHRPAdvertisementValidation.ts:40 decodes (#537)
-            let pd = match PushDrop::decode_before(&tx_output.locking_script) {
-                Ok(pd) => pd,
-                Err(_) => continue,
+            // The reference's reader (`UHRPAdvertisementValidation.ts:37-115`),
+            // then the hash binding, the expiry and one host per location
+            // (`StorageDownloader.ts:116-121`); a refused output is skipped (#544).
+            let Ok(token) = super::advertisement::decode_and_verify(&tx_output.locking_script)
+            else {
+                continue;
             };
-
-            // Need at least 4 fields: protocol, identity, domain, expiry
-            if pd.fields.len() < 4 {
+            if token.hash != requested_hash || token.expiry_time < current_time {
                 continue;
             }
-
-            // Check expiry time (field 3 is expiry as varint)
-            let expiry_time = match parse_expiry(&pd.fields[3]) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            if expiry_time < current_time {
-                continue; // Expired
-            }
-
-            // Field 2 is the host URL
-            if let Ok(host_url) = String::from_utf8(pd.fields[2].clone()) {
-                if !host_url.is_empty() && is_valid_host_url(&host_url) {
-                    hosts.push(host_url);
-                }
+            if !hosts.contains(&token.hosted_file_location) {
+                hosts.push(token.hosted_file_location);
             }
         }
 
@@ -279,22 +266,6 @@ impl Default for StorageDownloader {
     }
 }
 
-/// Parse expiry time from PushDrop field (varint encoding).
-fn parse_expiry(field: &[u8]) -> Option<i64> {
-    if field.is_empty() {
-        return None;
-    }
-
-    // Try to read as varint
-    let mut reader = Reader::new(field);
-    reader.read_var_int().ok().map(|v| v as i64)
-}
-
-/// Validate a host URL is well-formed.
-fn is_valid_host_url(url: &str) -> bool {
-    url.starts_with("http://") || url.starts_with("https://")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,30 +282,5 @@ mod tests {
     fn test_downloader_creation() {
         let downloader = StorageDownloader::default();
         assert!(downloader.timeout_ms.is_some());
-    }
-
-    #[test]
-    fn test_parse_expiry_valid() {
-        // Varint 0x01 = 1
-        assert_eq!(parse_expiry(&[0x01]), Some(1));
-
-        // Varint 0xFC = 252
-        assert_eq!(parse_expiry(&[0xFC]), Some(252));
-
-        // Varint 0xFD 0x00 0x01 = 256
-        assert_eq!(parse_expiry(&[0xFD, 0x00, 0x01]), Some(256));
-    }
-
-    #[test]
-    fn test_parse_expiry_empty() {
-        assert_eq!(parse_expiry(&[]), None);
-    }
-
-    #[test]
-    fn test_is_valid_host_url() {
-        assert!(is_valid_host_url("https://example.com"));
-        assert!(is_valid_host_url("http://localhost:8080"));
-        assert!(!is_valid_host_url("ftp://example.com"));
-        assert!(!is_valid_host_url("example.com"));
     }
 }

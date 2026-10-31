@@ -1,9 +1,9 @@
 //! A SHIP or SLAP advertisement read as the reference reads it (#544):
-//! `decodeAdvertisement` (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:162-196`),
+//! `decodeAdvertisement` (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:159-197`),
 //! the static decode's checks (`:237-239`: the canonical five-field envelope,
 //! the protocol, the identity key, the URI, the topic or service name, the
 //! signature's length and canonical DER), and
-//! `decodeAndVerifyOverlayAdvertisement` (`:198-215`: the author, the
+//! `decodeAndVerifyOverlayAdvertisement` (`:199-222`: the author, the
 //! signature by the identity's linked key over the four data fields and the
 //! locking key that key), each refusal in the reference's words.
 
@@ -196,7 +196,7 @@ fn canonical_name(protocol: Protocol, name: &str) -> bool {
         })
 }
 
-/// `decodeAdvertisement` (`:162-196`): the advertisement and its fields.
+/// `decodeAdvertisement` (`:159-197`): the advertisement and its fields.
 pub(super) fn decode(script: &LockingScript) -> Result<(OverlayAdminTokenData, PushDrop)> {
     let token = canonical(script)?;
     let protocol = match strict_utf8(&token.fields[0])?.as_str() {
@@ -231,7 +231,7 @@ pub(super) fn decode(script: &LockingScript) -> Result<(OverlayAdminTokenData, P
     Ok((data, token))
 }
 
-/// `decodeAndVerifyOverlayAdvertisement` (`:198-215`).
+/// `decodeAndVerifyOverlayAdvertisement` (`:199-222`).
 pub(super) fn decode_and_verify(
     script: &LockingScript,
     expected: Option<Protocol>,

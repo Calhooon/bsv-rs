@@ -51,7 +51,7 @@ impl OverlayAdminTokenData {
 
 /// Decodes a SHIP or SLAP advertisement from a locking script, as the
 /// reference's static `OverlayAdminTokenTemplate.decode` does
-/// (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:162-196`, `:237-239`;
+/// (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:159-197`, `:237-239`;
 /// #544): the canonical lock-before envelope of five fields
 ///
 ///   1. Protocol (`"SHIP"` or `"SLAP"`)
@@ -94,7 +94,7 @@ pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdmin
 
 /// Decodes and authenticates a SHIP or SLAP advertisement, as the
 /// reference's `decodeAndVerifyOverlayAdvertisement` does
-/// (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:198-215`; #544): the
+/// (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:199-222`; #544): the
 /// static decode's checks, then the protocol `expected` when given, the
 /// signature by the identity key's child for `anyone` (protocol
 /// `[2, 'service host interconnect' | 'service lookup availability']`, key
