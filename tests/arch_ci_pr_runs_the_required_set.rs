@@ -89,7 +89,9 @@ const PULL_REQUEST_ONLY: &[(&str, &str)] = &[
 ];
 
 /// Jobs a dispatch or a tag's call does not run, with the reason: (job id,
-/// event label or `*` for every one, reason). Nothing else belongs here.
+/// event label or `*` for every one, reason). Nothing else belongs here: an
+/// entry naming no job, or a job that runs (or may) on an event it covers, is
+/// refused (#347).
 const NOT_ON_THE_FULL_SET: &[(&str, &str, &str)] = &[
     (
         "semver",
@@ -647,10 +649,11 @@ fn exact_refusals(
 
 /// The refusals of the full set: every job runs (or may, by a plan's output)
 /// on a dispatch on each line and on a tag's call, save the named exceptions,
-/// and the matrix jobs run every cell.
-fn full_refusals(ci: &str) -> Vec<String> {
+/// and the matrix jobs run every cell; an exception no run needs is stale.
+fn full_refusals(ci: &str, excuses: &[(&str, &str, &str)]) -> Vec<String> {
     let all = jobs(ci);
     let mut errors = Vec::new();
+    let mut ran_anyway: Vec<Option<&str>> = vec![None; excuses.len()];
     for (event, label) in [
         (
             Event {
@@ -680,10 +683,17 @@ fn full_refusals(ci: &str) -> Vec<String> {
     ] {
         let ran = runs(&all, &event);
         for job in &all {
-            let excused = NOT_ON_THE_FULL_SET
-                .iter()
-                .any(|(id, l, _)| *id == job.id && (*l == label || *l == "*"));
-            if ran.get(&job.id) == Some(&Some(false)) && !excused {
+            let skipped = ran.get(&job.id) == Some(&Some(false));
+            let mut excused = false;
+            for (i, (id, l, _)) in excuses.iter().enumerate() {
+                if *id == job.id && (*l == label || *l == "*") {
+                    excused = true;
+                    if !skipped && ran_anyway[i].is_none() {
+                        ran_anyway[i] = Some(label);
+                    }
+                }
+            }
+            if skipped && !excused {
                 errors.push(format!(
                     "job `{}` does not run on {} ({label})",
                     job.id, event.name
@@ -698,6 +708,29 @@ fn full_refusals(ci: &str) -> Vec<String> {
                     )),
                 }
             }
+        }
+    }
+    errors.extend(stale_exceptions(&all, excuses, &ran_anyway));
+    errors
+}
+
+/// The full-set exceptions no run needs (#347): one naming no job, or one whose
+/// job runs (or may) on an event it covers (`ran_anyway`, the first such event).
+fn stale_exceptions(
+    all: &[Job],
+    excuses: &[(&str, &str, &str)],
+    ran_anyway: &[Option<&str>],
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    for ((id, l, _), ran) in excuses.iter().zip(ran_anyway) {
+        if !all.iter().any(|job| job.id == *id) {
+            errors.push(format!(
+                "full-set exception `{id}` on {l} names no job of ci.yml; delete the entry"
+            ));
+        } else if let Some(label) = ran {
+            errors.push(format!(
+                "full-set exception `{id}` on {l}: the job runs (or may) on {label}; delete or narrow the entry"
+            ));
         }
     }
     errors
@@ -800,7 +833,7 @@ fn benchmark_comparisons_skip_tags_and_allow_branch_dispatches_and_pr_callers() 
 
 #[test]
 fn a_dispatch_and_a_tags_call_run_every_job_and_the_whole_matrix() {
-    let errors = full_refusals(&read(".github/workflows/ci.yml"));
+    let errors = full_refusals(&read(".github/workflows/ci.yml"), NOT_ON_THE_FULL_SET);
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     for (id, line, reason) in NOT_ON_THE_FULL_SET {
         assert!(!reason.is_empty(), "{id} on {line} names no reason");
@@ -931,6 +964,22 @@ fn a_pull_request_only_job_on_a_push_is_refused() {
     assert_eq!(
         push_refusals(&ci, "beta", REQUIRED_ON_BETA),
         ["job `semver` may run `semver` on a push to beta, which cannot judge it"]
+    );
+}
+
+/// #347: a full-set exception naming no job, or a job that runs on an event it
+/// covers, is refused naming the entry.
+#[test]
+fn a_stale_full_set_exception_is_refused_naming_the_entry() {
+    let mut excuses = NOT_ON_THE_FULL_SET.to_vec();
+    excuses.push(("clippy", "*", "clippy runs on every full set"));
+    excuses.push(("gone", "tag", "no such job"));
+    assert_eq!(
+        full_refusals(&read(".github/workflows/ci.yml"), &excuses),
+        [
+            "full-set exception `clippy` on *: the job runs (or may) on beta-dispatch; delete or narrow the entry",
+            "full-set exception `gone` on tag names no job of ci.yml; delete the entry",
+        ]
     );
 }
 
