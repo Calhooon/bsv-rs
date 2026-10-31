@@ -107,6 +107,7 @@ pub mod global;
 pub mod interpreter;
 pub mod local;
 mod token_spends;
+mod token_validation;
 pub mod types;
 
 // Re-export main types

@@ -26,7 +26,7 @@ fn get_anyone_wallet() -> &'static ProtoWallet {
 
 /// The reference's tag checks, in its order (kvStoreTokenValidation.ts:58-74).
 /// Absence is handled by the field count, before parsing any tag JSON.
-fn validate_tags(value: &serde_json::Value) -> Result<Vec<String>> {
+pub(super) fn validate_tags(value: &serde_json::Value) -> Result<Vec<String>> {
     let tags = value
         .as_array()
         .filter(|tags| tags.len() <= 32)
@@ -112,37 +112,35 @@ impl KVStoreInterpreter {
         script: &LockingScript,
         ctx: Option<&KVStoreContext>,
     ) -> Option<KVStoreEntry> {
-        let fields = Self::extract_fields(script)?;
-        let protocol_id = fields.protocol_id_string()?;
-        let key = fields.key_string()?;
-
-        // Public tokens written by the reference carry a JSON wallet protocol.
-        // Authenticate those on the history path too. The crate's older raw
-        // protocol format keeps its separate verify_signature call.
-        if protocol_id.starts_with('[') && !Self::verify_signature(&fields, &protocol_id) {
-            return None;
-        }
+        // The reference interpreter's reader (#544): the canonical envelope,
+        // the protocol, key, value, controller and tags in their bounds, the
+        // controller-linked key and the controller's signature
+        // (`kvStoreTokenValidation.ts:86-122`); a token it refuses is no value
+        // (`kvStoreInterpreter.ts:48`).
+        let token = super::token_validation::decode_and_verify(script).ok()?;
 
         // If context provided, check for match
         if let Some(ctx) = ctx {
             // The store's string configuration denotes an App protocol;
             // the reference writes that same namespace as [1, name].
-            let protocol_matches = ctx.protocol_id == protocol_id
-                || serde_json::from_str::<(u8, String)>(&protocol_id).is_ok_and(|(level, name)| {
-                    level == SecurityLevel::App.as_u8() && name == ctx.protocol_id
-                });
-            if ctx.key != key || !protocol_matches {
+            let protocol_matches = ctx.protocol_id == token.protocol_id_text
+                || serde_json::from_str::<(u8, String)>(&token.protocol_id_text).is_ok_and(
+                    |(level, name)| level == SecurityLevel::App.as_u8() && name == ctx.protocol_id,
+                );
+            if ctx.key != token.key || !protocol_matches {
                 return None;
             }
         }
 
-        let value = fields.value_string()?;
-        let controller = if fields.controller.len() == 33 {
-            to_hex(&fields.controller)
-        } else {
-            String::from_utf8(fields.controller.clone()).ok()?
-        };
-        Some(KVStoreEntry::new(key, value, controller, protocol_id).with_tags(fields.tags_vec()))
+        Some(
+            KVStoreEntry::new(
+                token.key,
+                token.value,
+                token.controller,
+                token.protocol_id_text,
+            )
+            .with_tags(token.tags.unwrap_or_default()),
+        )
     }
 
     /// Verify that a signature field is valid.
@@ -372,6 +370,7 @@ mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
     use crate::script::templates::PushDrop;
+    use crate::wallet::KeyDeriver;
 
     #[test]
     fn malformed_reference_token_tags_use_the_reference_words_and_order() {
@@ -402,18 +401,24 @@ mod tests {
         assert_eq!(refused, 9);
     }
 
+    /// The reference's signed token (#544): `[1, protocol]` as JSON, the
+    /// key, the value, the controller, the optional tags, then the
+    /// controller's signature over them for `anyone`, locked with its key
+    /// for `anyone` (`GlobalKVStore.ts`'s `PushDrop.lock(.., 'anyone', true,
+    /// true)`).
     fn create_test_token(
         protocol_id: &str,
         key: &str,
         value: &str,
-        controller: &PublicKey,
+        controller: &PrivateKey,
         tags: Option<Vec<String>>,
     ) -> LockingScript {
+        let protocol = Protocol::new(SecurityLevel::App, protocol_id);
         let mut fields = vec![
-            protocol_id.as_bytes().to_vec(),
+            serde_json::to_vec(&(1, protocol_id)).unwrap(),
             key.as_bytes().to_vec(),
             value.as_bytes().to_vec(),
-            controller.to_compressed().to_vec(),
+            controller.public_key().to_compressed().to_vec(),
         ];
 
         if let Some(tags) = tags {
@@ -421,18 +426,29 @@ mod tests {
             fields.push(tags_json.as_bytes().to_vec());
         }
 
-        // Add signature placeholder
-        fields.push(vec![0u8; 64]);
-
-        PushDrop::new(controller.clone(), fields).lock()
+        let wallet = ProtoWallet::new(Some(controller.clone()));
+        let signature = wallet
+            .create_signature(crate::wallet::CreateSignatureArgs {
+                data: Some(fields.concat()),
+                protocol_id: protocol.clone(),
+                key_id: key.into(),
+                counterparty: Some(Counterparty::Anyone),
+                ..Default::default()
+            })
+            .unwrap()
+            .signature;
+        fields.push(signature);
+        let lock = KeyDeriver::new(Some(controller.clone()))
+            .derive_public_key(&protocol, key, &Counterparty::Anyone, true)
+            .unwrap();
+        PushDrop::new(lock, fields).lock()
     }
 
     #[test]
     fn test_interpret_basic_token() {
         let privkey = PrivateKey::random();
-        let pubkey = privkey.public_key();
 
-        let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
+        let script = create_test_token("kvstore", "my_key", "my_value", &privkey, None);
 
         let entry = KVStoreInterpreter::interpret_script(&script, None);
         assert!(entry.is_some());
@@ -440,18 +456,22 @@ mod tests {
         let entry = entry.unwrap();
         assert_eq!(entry.key, "my_key");
         assert_eq!(entry.value, "my_value");
-        assert_eq!(entry.protocol_id, "kvstore");
+        assert_eq!(entry.protocol_id, "[1,\"kvstore\"]");
         assert!(entry.tags.is_empty());
     }
 
     #[test]
     fn test_interpret_token_with_tags() {
         let privkey = PrivateKey::random();
-        let pubkey = privkey.public_key();
 
         let tags = vec!["tag1".to_string(), "tag2".to_string()];
-        let script =
-            create_test_token("kvstore", "my_key", "my_value", &pubkey, Some(tags.clone()));
+        let script = create_test_token(
+            "kvstore",
+            "my_key",
+            "my_value",
+            &privkey,
+            Some(tags.clone()),
+        );
 
         let entry = KVStoreInterpreter::interpret_script(&script, None);
         assert!(entry.is_some());
@@ -463,9 +483,8 @@ mod tests {
     #[test]
     fn test_interpret_with_context_match() {
         let privkey = PrivateKey::random();
-        let pubkey = privkey.public_key();
 
-        let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
+        let script = create_test_token("kvstore", "my_key", "my_value", &privkey, None);
 
         let ctx = KVStoreContext::new("my_key", "kvstore");
         let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
@@ -475,9 +494,8 @@ mod tests {
     #[test]
     fn test_interpret_with_context_no_match() {
         let privkey = PrivateKey::random();
-        let pubkey = privkey.public_key();
 
-        let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
+        let script = create_test_token("kvstore", "my_key", "my_value", &privkey, None);
 
         let ctx = KVStoreContext::new("other_key", "kvstore");
         let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
@@ -487,9 +505,8 @@ mod tests {
     #[test]
     fn test_extract_value() {
         let privkey = PrivateKey::random();
-        let pubkey = privkey.public_key();
 
-        let script = create_test_token("kvstore", "my_key", "the_value", &pubkey, None);
+        let script = create_test_token("kvstore", "my_key", "the_value", &privkey, None);
 
         let value = KVStoreInterpreter::extract_value(&script);
         assert_eq!(value, Some("the_value".to_string()));
@@ -500,7 +517,7 @@ mod tests {
         let privkey = PrivateKey::random();
         let pubkey = privkey.public_key();
 
-        let script = create_test_token("kvstore", "key", "value", &pubkey, None);
+        let script = create_test_token("kvstore", "key", "value", &privkey, None);
         assert!(KVStoreInterpreter::is_kvstore_token(&script));
 
         // Non-KVStore PushDrop (too few fields)
@@ -516,14 +533,22 @@ mod tests {
         let pubkey = privkey.public_key();
 
         let tags = vec!["important".to_string()];
-        let script =
-            create_test_token("kvstore", "my_key", "my_value", &pubkey, Some(tags.clone()));
+        let script = create_test_token(
+            "kvstore",
+            "my_key",
+            "my_value",
+            &privkey,
+            Some(tags.clone()),
+        );
 
         let fields = KVStoreInterpreter::extract_fields(&script);
         assert!(fields.is_some());
 
         let fields = fields.unwrap();
-        assert_eq!(fields.protocol_id_string(), Some("kvstore".to_string()));
+        assert_eq!(
+            fields.protocol_id_string(),
+            Some("[1,\"kvstore\"]".to_string())
+        );
         assert_eq!(fields.key_string(), Some("my_key".to_string()));
         assert_eq!(fields.value_string(), Some("my_value".to_string()));
         assert_eq!(
