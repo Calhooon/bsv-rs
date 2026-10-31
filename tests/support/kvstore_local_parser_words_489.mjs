@@ -1,4 +1,5 @@
-// #489: actual local authentication failures at ts-stack@edf6e03, Node 22.
+// #489: actual local authentication failures at ts-stack@edf6e03, Node 22;
+// #499 adds the lock-after tokens.
 // Mutate the wallet key or an SDK-written token; serialize with the SDK only.
 export async function recordLocalParserWords489 (c) {
   const { recording, fresh, record, stop, sourceOf, LocalKVStore, Script,
@@ -32,10 +33,20 @@ export async function recordLocalParserWords489 (c) {
     { name: 'key_reduced_x', kind: 'key_reduced_x', publicKey: reducedX, divergence: true },
     { name: 'token_hybrid_valid', kind: 'token_hybrid_valid', keyBytes: Utils.toArray(hybrid, 'hex'), divergence: true },
     { name: 'token_reduced_x', kind: 'token_reduced_x', keyBytes: Utils.toArray(reducedX, 'hex'), divergence: true },
-    { name: 'token_lock_after_one_field', kind: 'token_lock_after_one_field',
-      asm: `OP_1 OP_DROP 02${gx} OP_CHECKSIG`, divergence: true },
-    { name: 'token_lock_after_two_fields', kind: 'token_lock_after_two_fields',
-      asm: `OP_1 OP_2 OP_2DROP 02${gx} OP_CHECKSIG`, divergence: true }
+    // #499: the local decode is lock-before alone (PushDropValidation.ts:59,
+    // PushDrop.ts:74-75), so a lock-after token meets the first-chunk read.
+    { name: 'token_lock_after_one_field', kind: 'token_lock_after',
+      asm: `OP_1 OP_DROP 02${gx} OP_CHECKSIG` },
+    { name: 'token_lock_after_two_fields', kind: 'token_lock_after',
+      asm: `OP_1 OP_2 OP_2DROP 02${gx} OP_CHECKSIG` },
+    { name: 'token_lock_after_op0_one_field', kind: 'token_lock_after',
+      asm: `OP_0 OP_DROP 02${gx} OP_CHECKSIG` },
+    { name: 'token_lock_after_data_one_field', kind: 'token_lock_after',
+      asm: `07 OP_DROP 02${gx} OP_CHECKSIG` },
+    { name: 'token_lock_after_data_two_fields', kind: 'token_lock_after',
+      asm: `0708 09 OP_2DROP 02${gx} OP_CHECKSIG` },
+    { name: 'token_lock_after_uncompressed', kind: 'token_lock_after',
+      asm: `OP_1 OP_2 OP_2DROP 04${gx}${gy} OP_CHECKSIG` }
   ]
   const cases = []
   for (const definition of definitions) {

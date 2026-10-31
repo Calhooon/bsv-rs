@@ -58,7 +58,19 @@ pub(super) fn parse_public_key(key: &str) -> Result<PublicKey> {
     })
 }
 
+// The reference's local decode is lock-before alone (PushDropValidation.ts:59,
+// PushDrop.ts:74-75; #499). The general decoder reads a first chunk that is not
+// a 33- or 65-byte push as lock-after; here that token meets the first-chunk read.
 pub(super) fn decode_pushdrop(script: &LockingScript) -> Result<PushDrop> {
+    let lock_before = script
+        .chunks()
+        .first()
+        .and_then(|chunk| chunk.data.as_ref())
+        .is_some_and(|key| matches!(key.len(), 33 | 65));
+    if !lock_before {
+        let error = Error::ScriptParseError("Expected a lock-before PushDrop".into());
+        return Err(decode_error(error, script));
+    }
     PushDrop::decode(script).map_err(|error| decode_error(error, script))
 }
 
@@ -69,9 +81,7 @@ fn decode_error(error: Error, script: &LockingScript) -> Error {
     ) {
         return error;
     }
-    // The reference's LocalKVStore uses lock-before (PushDrop.ts:73-77).
-    // Rust also decodes lock-after; a success reaches decode_token's later
-    // field/envelope checks unchanged (the stated #489 parity difference).
+    // PushDrop.ts:73-77: the first chunk's data, then PublicKey.fromString.
     let chunks = script.chunks();
     let Some(first) = chunks.first() else {
         return refused("Cannot read properties of undefined (reading 'data')");

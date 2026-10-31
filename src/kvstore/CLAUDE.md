@@ -25,7 +25,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629 |
-| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches and the stated lock-after difference (#489) | 308 |
+| `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches (#489); the token decode lock-before alone, as the reference's (#499) | 308 |
 | `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489) | 103 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478) | 46 |
 | `local_outpoint.rs` | Exactly one validated completed output with the requested amount and new script; reference refusal words; amount option is this crate's addition (#478) | 24 |
@@ -708,9 +708,11 @@ are RED on `9bcbe433`, while the two lock-after pins are green there. All
 byte-identically under Node 22, preserving the original 36 cases.
 The stated #489 parity differences are also in the root and changelog:
 odd-length, on-curve hybrid and reduced-x keys accepted by the reference
-remain refused here in the native parser's own words, while lock-after
-tokens reach later field-count/envelope checks here and fail the reference's
-lock-before key read. The fold changes neither acceptance rule.
+remain refused here in the native parser's own words. Lock-after tokens
+reached later field-count/envelope checks here until #499; since #499 the
+local decode is lock-before alone (`local_parser_words.rs::decode_pushdrop`)
+and refuses them in the reference's first-chunk words (six recorded shapes,
+kind `token_lock_after`). The general `PushDrop::decode` is unchanged.
 An error injected by the wallet still uses #477's original extraction rule.
 The BEEF/transaction diagnostic differences in its parity note remain.
 
