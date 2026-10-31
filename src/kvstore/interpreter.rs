@@ -245,8 +245,10 @@ impl KVStoreInterpreter {
     /// Extract value from a PushDrop token without validation.
     ///
     /// This is a convenience method for extracting just the value field.
+    /// The three readers decode lock-before alone, as the reference's
+    /// interpreter does (`kvStoreTokenValidation.ts:88`; #537).
     pub fn extract_value(script: &LockingScript) -> Option<String> {
-        let pushdrop = PushDrop::decode(script).ok()?;
+        let pushdrop = PushDrop::decode_before(script).ok()?;
         if pushdrop.fields.len() < KvProtocolFields::MIN_FIELDS_OLD {
             return None;
         }
@@ -258,7 +260,7 @@ impl KVStoreInterpreter {
     ///
     /// Returns true if the script appears to be a valid KVStore PushDrop token.
     pub fn is_kvstore_token(script: &LockingScript) -> bool {
-        match PushDrop::decode(script) {
+        match PushDrop::decode_before(script) {
             Ok(pushdrop) => pushdrop.fields.len() >= KvProtocolFields::MIN_FIELDS_OLD,
             Err(_) => false,
         }
@@ -268,7 +270,7 @@ impl KVStoreInterpreter {
     ///
     /// Returns the raw field data for custom processing.
     pub fn extract_fields(script: &LockingScript) -> Option<KVStoreFields> {
-        let pushdrop = PushDrop::decode(script).ok()?;
+        let pushdrop = PushDrop::decode_before(script).ok()?;
 
         let has_tags = match pushdrop.fields.len() {
             KvProtocolFields::MIN_FIELDS_OLD => false,
@@ -384,7 +386,7 @@ mod tests {
                 .is_some_and(|error| error.starts_with("KVStore "))
         }) {
             let script = LockingScript::from_hex(case["script"].as_str().unwrap()).unwrap();
-            let token = PushDrop::decode(&script).unwrap();
+            let token = PushDrop::decode_before(&script).unwrap();
             let tags = serde_json::from_slice(&token.fields[KvProtocolFields::TAGS]).unwrap();
             assert_eq!(
                 validate_tags(&tags),
