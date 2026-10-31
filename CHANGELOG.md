@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: one definition of the wallet substrates' byte bound (#526)
+
+PR #525's cold review found the substrates' 256 MiB byte bound, the
+reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/substrates/WalletWire.ts:9`, read by
+`WalletResultValidation.ts:632-636,680-733,873-879`), defined twice in
+sibling modules, each `pub(super)` and neither visible to the other:
+`byte_fields.rs` (`bytes`' default bound, read by `byte_fields.rs` and
+`result_values/bytes.rs`) and `result_values/boundary.rs` (read by
+`boundary.rs`, `raw_tree.rs` and `wire.rs`, and the source of
+`MAX_WIRE_REQUEST_BYTES`). `byte_fields::MAX_BYTES` is now the one
+definition and `boundary.rs` reads it with a `use`. That site needs no
+visibility change: a `pub(super)` item of `substrates::byte_fields` is
+already visible throughout `substrates` and its descendants (so
+`result_values/bytes.rs` read it before), where `boundary.rs`'s constant
+would have needed a wider visibility and a re-export out of the private
+`mod boundary`. `tests/arch_one_wallet_byte_bound.rs` reads every `.rs` file
+under `src/wallet` and pins exactly one `MAX_BYTES` definition of the value,
+beside four other definitions, enumerated: `MAX_WALLET_JSON_REQUEST_BYTES` in
+`http_json.rs`, the reference's own request bound (`HTTPWalletJSON.ts:60`),
+and `MAX_WALLET_WIRE_FRAME_BYTES` in `http_wire.rs`, `validation/crypto.rs`
+and `wire/validation.rs`, copies of the same reference constant
+(`HTTPWalletWire.ts:28`, `validationHelpers.ts:150`,
+`WalletResultValidation.ts:873`) outside #526's two, left to a follow-up;
+the test was red on `aeb92b01` (two
+`MAX_BYTES` lines). No behaviour change: the value, every refusal's words
+and every recorded frame are unchanged, and `MAX_WIRE_REQUEST_BYTES` still
+equals the bound.
+
 ### Changed: `WorkBudget` is `#[non_exhaustive]` with a constructor and field setters (#527)
 
 `transaction::WorkBudget` previously allowed downstream struct literals, so
