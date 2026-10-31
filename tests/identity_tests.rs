@@ -309,7 +309,7 @@ fn test_contact_to_displayable_identity() {
     assert_eq!(identity.avatar_url, "https://example.com/avatar.png");
     assert_eq!(identity.identity_key, contact.identity_key);
     assert!(identity.abbreviated_key.contains("..."));
-    assert_eq!(identity.badge_label, "Personal contact");
+    assert_eq!(identity.badge_label, "");
 }
 
 #[test]

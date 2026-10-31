@@ -1,0 +1,103 @@
+{
+  "cases": [
+    {
+      "name": "badged",
+      "identity": {
+        "name": "Alice Example",
+        "avatarURL": "https://example.com/alice.png",
+        "badgeIconURL": "https://example.com/badge.png",
+        "badgeLabel": "Email certified by Example",
+        "badgeClickURL": "https://example.com/verify",
+        "abbreviatedKey": "02f930...36f9",
+        "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"
+      },
+      "key_id": "nakNh0DyQAI6epnO1e7ydMo+Or+CWq2Zj9M40loKf5Q=",
+      "custom_instructions": "{\"keyID\":\"nakNh0DyQAI6epnO1e7ydMo+Or+CWq2Zj9M40loKf5Q=\"}",
+      "locking_script": "2103a7bc438b2c68cff715123250b4f51cfe932ae8afee30d4a12283f6971fe24857ac4d6e011138ccb690f2da7c0195b2dbcc6a3e00cf47d4950c996a9b0e7eb480053ebd182d1c0d6ed7758db51a70d7103cdf0b4a3a4531e428008484d481fb7812a534b09a2e62b5fa40463a0d82c24ccf4c244e4b71b2d5983671c238a58efc8eae36a9a7c3c477af99a7787d5112bd8f990086945d899a8aea60e8699a6e3180ad80a82755b6256387c310c50f1f4d9cd70d1dae52b1260705fbf6a28e806c1a660dd3adadd3cc8899deceb3a6df2e3e2b629c418f01312a659ffca8c676fde6bf9a0f0d23c47e25064b6de2ef758e88ef8f13d691116a674f9de4740192bcd54af73fcf7abfd88b9214038b415115390116737ef2c3992b822e750887f38c5f26b82bf70297318f00acdb9fb7df2e6db97d6138a401e8973b6c2669a44be64f6e62b2453d26fb5a14847d4d969c562916631a4f4eb1bb7d25b2fd531cded808b09f0d8daada70fd5eec813089de8483394eb07c57ac12ad0c177a7b13db81a6af166cae7fbda6cd02b03454425ab80acd473045022100f7754b01cd6324d7d13eeb14f3da1db6efdf534ff619e19896924c534e4291ae02200603894f26491ceb43cbfd4bb13f398ce9661803d450dc01928d31e73e564ede6d",
+      "saved": {
+        "name": "Alice Example",
+        "avatarURL": "https://example.com/alice.png",
+        "abbreviatedKey": "02f930...36f9",
+        "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "badgeIconURL": "https://example.com/badge.png",
+        "badgeLabel": "Email certified by Example",
+        "badgeClickURL": "https://example.com/verify"
+      },
+      "resolved": {
+        "name": "Alice Example",
+        "avatarURL": "https://example.com/alice.png",
+        "abbreviatedKey": "02f930...36f9",
+        "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "badgeIconURL": "https://example.com/badge.png",
+        "badgeLabel": "Email certified by Example",
+        "badgeClickURL": "https://example.com/verify"
+      }
+    },
+    {
+      "name": "reference_defaults",
+      "identity": {
+        "name": "Bob Example",
+        "avatarURL": "XUUB8bbn9fEthk15Ge3zTQXypUShfC94vFjp65v7u5CQ8qkpxzst",
+        "badgeIconURL": "XUUV39HVPkpmMzYNTx7rpKzJvXfeiVyQWg2vfSpjBAuhunTCA9uG",
+        "badgeLabel": "Not verified by anyone you trust.",
+        "badgeClickURL": "https://bsv-blockchain.github.io/ts-sdk/reference/identity/",
+        "abbreviatedKey": "02e493...cd13",
+        "identityKey": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13"
+      },
+      "key_id": "iG0PqZPKIdXPmOetS/o1iBIKA0B6fzBswwKkPUxvd64=",
+      "custom_instructions": "{\"keyID\":\"iG0PqZPKIdXPmOetS/o1iBIKA0B6fzBswwKkPUxvd64=\"}",
+      "locking_script": "210282780bd53caf885ce47d137b18ede6e21411c83830c6c8aa746911ed384711dbac4dc2011c072e5d67bd918954efde69c9dbe2d137393184aedaccea486e717d6d80bc1db69b9d14154d48ef6d6107b782d3666b3658ce47dd24f75aa7dc3e1d31966319856e06b7e7bbee80159c4b053d768c0fabfafa97e3d3d8b8c43ee429860bd81933bf88b35f72a0ce12ee90be5ecd6bf8efc4525e7670970a8a229507c6c0230a331a8316d003ec99ea460f811fcde17abb976f1328d7fbc8f03cbaccd5038677221a8f1a770e94545ed158bd296226088afa72a84ec76fda7e4d3907832756c989d55c57e98ee161819a05646f245dc30581a7cedae376419c74e915c3ccc1de6fa4b8814d9920d3194f045c4e18bb8225c2c835df809cc6aa3bf8768d0676404cc7c99665c0f37b8921c021a586487804368eb1767661546b9436ce9f8b5168af6d56c88baef3c7c4870e91bc7a80a77ccdc1e4d3fae022ef2f1847e0f77f52bef0175889d1d5b4fdda6a9346db35c84f884535ca679a2030f576a9a8edb60422fdb77ecb8dcc6952ec01cf04f34e913178f82fba4347ea4fd97c0de9d62a26ae9ccf97f3618346585c3e6666f4b3ce9106ad85a5065cf13699a38d93d473afa0262e2082b8529910a1e080ee3410b9a7258dd367ac5dd408147a5dd8c61ea96ba74630440220290a13cfa62d6ae58cfecd35fa9752002df73e32c06340e9cb2980ac5837115802203c0ba0a1621408235e3469c8442642ec7f25da36b90d30092c1b2ad555ef47056d",
+      "saved": {
+        "name": "Bob Example",
+        "avatarURL": "XUUB8bbn9fEthk15Ge3zTQXypUShfC94vFjp65v7u5CQ8qkpxzst",
+        "abbreviatedKey": "02e493...cd13",
+        "identityKey": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
+        "badgeIconURL": "XUUV39HVPkpmMzYNTx7rpKzJvXfeiVyQWg2vfSpjBAuhunTCA9uG",
+        "badgeLabel": "Not verified by anyone you trust.",
+        "badgeClickURL": "https://bsv-blockchain.github.io/ts-sdk/reference/identity/"
+      },
+      "resolved": {
+        "name": "Bob Example",
+        "avatarURL": "XUUB8bbn9fEthk15Ge3zTQXypUShfC94vFjp65v7u5CQ8qkpxzst",
+        "abbreviatedKey": "02e493...cd13",
+        "identityKey": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
+        "badgeIconURL": "XUUV39HVPkpmMzYNTx7rpKzJvXfeiVyQWg2vfSpjBAuhunTCA9uG",
+        "badgeLabel": "Not verified by anyone you trust.",
+        "badgeClickURL": "https://bsv-blockchain.github.io/ts-sdk/reference/identity/"
+      }
+    },
+    {
+      "name": "empty_badges",
+      "identity": {
+        "name": "Carol Example",
+        "avatarURL": "https://example.com/carol.png",
+        "badgeIconURL": "",
+        "badgeLabel": "",
+        "badgeClickURL": "",
+        "abbreviatedKey": "022f8b...efe4",
+        "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      },
+      "key_id": "oCJ39kyZbKTFRkrIFUs3bbdoxgFq6PlUKx1sg8LdKZk=",
+      "custom_instructions": "{\"keyID\":\"oCJ39kyZbKTFRkrIFUs3bbdoxgFq6PlUKx1sg8LdKZk=\"}",
+      "locking_script": "21029dddecd20eff8cb2859bb11d51a1169d5a4c649afe89c3ed31f473298d3d393bac4d1d01207bfe038cd21c324114faba6ccf1ec8e108454a51df053cc55acaece65366d80f23d84ab8b7f4643ee3c26fa0758fe551b733847f872afc57c7aa57460e8e49d5640a2e4bb67fb0cbe3533150269acf954513354065ebb2a96a390a036edd4e09d1089c260367a67d29b910edebf28d46e6111004a986dc830de2c68e1795ea617a6398d13537450a7acbf269b79bc814b2f94b9b0d4bf701e2b3e88428e84e052201fcaee0832a98d663e90e053d553bc0b53b22d865e5cfe4a098d326f0436808c9c88a7d441993504708004cdee293de486b7e740c58b04d129d9d95c05808efec4bc674e0dc87f1970e25a6a8ba458baee43c370a6347c40d974e4d9e752bd8b49fb4ad527e54205fbcd646722ade263ba6dc42e7ee42c22a921e46304402203dfc00334ae474b45ed6ac5b0362bd50079a0562a07dadea6ffacc4186b3a01c02205e1e4c0671a7e86a80039c7db42a3140c825d4ef16f86a2624dd89436ab1f1076d",
+      "saved": {
+        "name": "Carol Example",
+        "avatarURL": "https://example.com/carol.png",
+        "abbreviatedKey": "022f8b...efe4",
+        "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "badgeIconURL": "",
+        "badgeLabel": "",
+        "badgeClickURL": ""
+      },
+      "resolved": {
+        "name": "Carol Example",
+        "avatarURL": "https://example.com/carol.png",
+        "abbreviatedKey": "022f8b...efe4",
+        "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "badgeIconURL": "",
+        "badgeLabel": "",
+        "badgeClickURL": ""
+      }
+    }
+  ]
+}
