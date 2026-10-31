@@ -11,6 +11,7 @@
         "request": {
           "headers": {
             "content-type": "application/json",
+            "origin": "http://fixtures.invalid",
             "originator": "http://fixtures.invalid"
           },
           "json": {
@@ -44,6 +45,7 @@
         "request": {
           "headers": {
             "content-type": "application/json",
+            "origin": "http://fixtures.invalid",
             "originator": "http://fixtures.invalid"
           },
           "json": {
