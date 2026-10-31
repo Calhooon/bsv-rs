@@ -263,6 +263,7 @@ impl Default for DisplayableIdentity {
 ///     badge_icon_url: String::new(),
 ///     badge_label: String::new(),
 ///     badge_click_url: String::new(),
+///     abbreviated_key: None,
 /// };
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -300,6 +301,13 @@ pub struct Contact {
     /// unset (#552).
     #[serde(default)]
     pub badge_click_url: String,
+    /// The record's `abbreviatedKey` as stored (#559): `Some` for a contact
+    /// read from a token, written back unchanged on an update, as the
+    /// reference's `saveContact` writes the value it is given
+    /// (`ContactsManager.ts:185,527-528,748`); `None` for a contact built
+    /// here, whose record carries `to_displayable_identity`'s form.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abbreviated_key: Option<String>,
 }
 
 impl Contact {
@@ -321,6 +329,7 @@ impl Contact {
             badge_icon_url: String::new(),
             badge_label: String::new(),
             badge_click_url: String::new(),
+            abbreviated_key: None,
         }
     }
 
@@ -377,6 +386,13 @@ impl Contact {
     #[must_use]
     pub fn with_badge_click_url(mut self, badge_click_url: impl Into<String>) -> Self {
         self.badge_click_url = badge_click_url.into();
+        self
+    }
+
+    /// The record's `abbreviatedKey`, written as given (#559).
+    #[must_use]
+    pub fn with_abbreviated_key(mut self, abbreviated_key: impl Into<String>) -> Self {
+        self.abbreviated_key = Some(abbreviated_key.into());
         self
     }
 

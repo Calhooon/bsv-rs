@@ -1,0 +1,256 @@
+{
+  "cases": [
+    {
+      "name": "parse_identity",
+      "computed_here": "02f930...36f9",
+      "reference": {
+        "save": {
+          "contact": {
+            "name": "Alice Example",
+            "avatarURL": "https://example.com/alice.png",
+            "abbreviatedKey": "02f9308a01...",
+            "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+            "badgeIconURL": "",
+            "badgeLabel": "",
+            "badgeClickURL": ""
+          },
+          "key_id": "CVRlJk7IbIGYcbeVDhDf5hrivMIwUvZO7bNJ84/gAUA=",
+          "custom_instructions": "{\"keyID\":\"CVRlJk7IbIGYcbeVDhDf5hrivMIwUvZO7bNJ84/gAUA=\"}",
+          "locking_script": "21030e28c6ad7afb0d5683d20f08fc0f47e613e153bffaa16e1a1539a75c6293292aac4d1d01e8be7d7cbcfc581206fba06d20609133df395a9377a395a9f80d173abb825ac4900a0c706390373057859cdbe20b3d35c1d47943586a1908d402172f87a8a40c1ff2ea6b7f1dfdfeef5ebffc5ba84fd56e2f79cea5334e60e435bb6bb97b0e2e39855cde0a21f816a2f1fda8a4e5aa9daac2680e57d8cf996c5f36f26786f9f5864be128e63dc8dfbc65decc7a3e3da6f649ce9071eaf2414a35896be400b5b95e34a92979d52ec28c4e03e1fbdb4f1870aa4f332a37c8d556269990e5d132641b13a814034de1c1c68e22296c6f1183e848a293194b916691bf9c858ac8f59d55d91b1f91cc1de6f9f63ce27dc7f069302ef6a327190284d6bc2905ae2de09f75094d951a7a25ab9b9067ea828cec8309d1f7f93d7e13aa5b65ba0c7446304402204fc26bce4846a10fe7feff6db29fd18753027e2f5d753c6aec7431bc1f136a9702201acb017823daebd6d41782f89c3233965de8ed3b8db32c4607914cf2124166296d",
+          "plaintext": "{\"name\":\"Alice Example\",\"avatarURL\":\"https://example.com/alice.png\",\"abbreviatedKey\":\"02f9308a01...\",\"identityKey\":\"02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9\",\"badgeIconURL\":\"\",\"badgeLabel\":\"\",\"badgeClickURL\":\"\"}",
+          "read_back": {
+            "contacts": [
+              {
+                "name": "Alice Example",
+                "avatarURL": "https://example.com/alice.png",
+                "abbreviatedKey": "02f9308a01...",
+                "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+                "badgeIconURL": "",
+                "badgeLabel": "",
+                "badgeClickURL": ""
+              }
+            ],
+            "dropped": []
+          }
+        },
+        "updated": {
+          "name": "Alice Updated",
+          "avatarURL": "https://example.com/alice.png",
+          "abbreviatedKey": "02f9308a01...",
+          "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+          "badgeIconURL": "",
+          "badgeLabel": "",
+          "badgeClickURL": ""
+        }
+      }
+    },
+    {
+      "name": "caller_text",
+      "computed_here": "022f8b...efe4",
+      "reference": {
+        "save": {
+          "contact": {
+            "name": "Alice Example",
+            "avatarURL": "https://example.com/alice.png",
+            "abbreviatedKey": "Alice (work key)",
+            "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+            "badgeIconURL": "",
+            "badgeLabel": "",
+            "badgeClickURL": ""
+          },
+          "key_id": "1RJ5/g2e0wzfwNGt56DG6APvklhewAGDmW8AoP44Muo=",
+          "custom_instructions": "{\"keyID\":\"1RJ5/g2e0wzfwNGt56DG6APvklhewAGDmW8AoP44Muo=\"}",
+          "locking_script": "21036cafc9475cc0c6cdd3e6f5134c41ac32cf9db6d183788928bb5eed46cca84c1fac4d20014e3baf6ba9f80ee71bdeddeabe7a79bee907c5cfdc0a8c482bd5e6a9f22ddc3d59c64e92f361fc68df6a1bd0c089f81463876738237f9503045fd9074d4fa7550c735c5642b6fed3851a05bdd2d942aabf676f8e3cf1ebb221cc7b3f8ae34ca774a9177e39f740bf8e2859575692ffe4aae7451e5e6693dfb9a3dc9f22f3731175098bffd0638b4f94da54e6e7f373c173af82c8a99d7ceccb97f5a8fcb20496dd67fbb2e17a6517dc8035bafe37311bc1bde4d7df519d0dc3db6fda4f98dda7bf2df0e299e62d3e935898b141b282575f3a9dbefd2356a83e95e98f3c711237857df1e2acb0be32d3befdb8265ed4ba2dcaa6a9b56869569f7ab6b02f41787ad6c0b489a0ba4ee717cc02de31925534037c65d618119b3461408d49fa1d08694730450221009ea32948182e02c080679cbdd2c2368512105d7e85e3993afd26e253ef32ef0a022029dad1f00fe718818a1835fee47d32238f91337181b85792d5b3bde3091e92cc6d",
+          "plaintext": "{\"name\":\"Alice Example\",\"avatarURL\":\"https://example.com/alice.png\",\"abbreviatedKey\":\"Alice (work key)\",\"identityKey\":\"022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4\",\"badgeIconURL\":\"\",\"badgeLabel\":\"\",\"badgeClickURL\":\"\"}",
+          "read_back": {
+            "contacts": [
+              {
+                "name": "Alice Example",
+                "avatarURL": "https://example.com/alice.png",
+                "abbreviatedKey": "Alice (work key)",
+                "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+                "badgeIconURL": "",
+                "badgeLabel": "",
+                "badgeClickURL": ""
+              }
+            ],
+            "dropped": []
+          }
+        },
+        "updated": {
+          "name": "Alice Updated",
+          "avatarURL": "https://example.com/alice.png",
+          "abbreviatedKey": "Alice (work key)",
+          "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+          "badgeIconURL": "",
+          "badgeLabel": "",
+          "badgeClickURL": ""
+        }
+      }
+    },
+    {
+      "name": "empty",
+      "computed_here": "03fff9...7556",
+      "reference": {
+        "save": {
+          "contact": {
+            "name": "Alice Example",
+            "avatarURL": "https://example.com/alice.png",
+            "abbreviatedKey": "",
+            "identityKey": "03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+            "badgeIconURL": "",
+            "badgeLabel": "",
+            "badgeClickURL": ""
+          },
+          "key_id": "nBb2rFSlo2FWwEDnkCdFVbCSRZQh8CFyR+kuX7JrYsw=",
+          "custom_instructions": "{\"keyID\":\"nBb2rFSlo2FWwEDnkCdFVbCSRZQh8CFyR+kuX7JrYsw=\"}",
+          "locking_script": "2102323259cec6a2fd75eb8b1b9c3eebaeb6482e78c287536acb77d89921b4ef9c84ac4d100138b3d0d1e226de6229039a9bacac982a61f9fa2adee98ff85c183b68c39a256e0dd0bbe3ee557d11e5ca3a9b590a79722b782a92439953f4006f4229098a015320fcc77f71c5d405fad66194407f64de8d76c34e65d06d8a37bb31e028e1d4124050d39dbe78f3c6fc1e73d662aa29868857aef7640d495686cb79ada801f09fa586ce8bf2f433483bfa8e94c7e35671f5abf34b2bb8e4817af4851de6d5a7891e9b136bb49b27dcf2045a27c7111c310a64cda6b0287d8c8ad1fdf62509a7bd1c5b157ff06fc043ba8f540a458228e195a1d73d14dee5fde89a80be8dd80807ea5a3d493817a048f4c3152841afe0f247ec6ce1d3d5a04b953634cb5c1710b62f53b2561134e2cab6f291822f2069f04630440220792cea3b803e1a767b23d7d56b9f43f285f3110258f09c6e6a0c40f96558e3d602204e2aedb707c1b5769eb7331dc9a9b983529aa9057b0ab9d8320f16bca2415aa86d",
+          "plaintext": "{\"name\":\"Alice Example\",\"avatarURL\":\"https://example.com/alice.png\",\"abbreviatedKey\":\"\",\"identityKey\":\"03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556\",\"badgeIconURL\":\"\",\"badgeLabel\":\"\",\"badgeClickURL\":\"\"}",
+          "read_back": {
+            "contacts": [
+              {
+                "name": "Alice Example",
+                "avatarURL": "https://example.com/alice.png",
+                "abbreviatedKey": "",
+                "identityKey": "03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+                "badgeIconURL": "",
+                "badgeLabel": "",
+                "badgeClickURL": ""
+              }
+            ],
+            "dropped": []
+          }
+        },
+        "updated": {
+          "name": "Alice Updated",
+          "avatarURL": "https://example.com/alice.png",
+          "abbreviatedKey": "",
+          "identityKey": "03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+          "badgeIconURL": "",
+          "badgeLabel": "",
+          "badgeClickURL": ""
+        }
+      }
+    }
+  ],
+  "crate": {
+    "tip": {
+      "parse_identity": {
+        "key_id": "CVRlJk7IbIGYcbeVDhDf5hrivMIwUvZO7bNJ84/gAUA=",
+        "locking_script": "21030e28c6ad7afb0d5683d20f08fc0f47e613e153bffaa16e1a1539a75c6293292aac4d1d01d85fa67190e9603f914e53d8a875d5d76a6c4238b2508b3a4fdeea50937db9abc0236dbed2577109b477731e4534b6e4584f43fcff7ab9052ca95be49433f892fa5589142d03feadc091d71411b7daaf50106cc251cb2ee7714241fe90539fcde9259dc98be4626ee94b59accb80888001f3829456d453a601ec8a0ea4a069f1d24d7924ef096a5fdb786e679ec99d722f1ff499950a3c0cfeb83c2809768d8638fe869543dfc0048994766e1d2b6348c431d7ab900042c8ee3ca186eadbd2a13845886c3e108df8c7c9d7c5ca85c7ccba59ca0755a09e7adff0183bec83692c36d22092cfcafdc0d81646a86fe6d31c4213700100d1f208f43b67aee2bbe0b253409b8055b5653d8104f34435136d9ca3be42c8b4f9a080cb8b054efb473045022100dbe567885199bbcad951dc9521dcba6c9bcf631dc0ea1f28069f7a0e5ca01d14022020543e7c56eb7282e988f8138f4ee55676981e81a28061e74ca1124e847b977e6d",
+        "read_back": {
+          "contacts": [
+            {
+              "name": "Alice Updated",
+              "avatarURL": "https://example.com/alice.png",
+              "abbreviatedKey": "02f9308a01...",
+              "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+              "badgeIconURL": "",
+              "badgeLabel": "",
+              "badgeClickURL": ""
+            }
+          ],
+          "dropped": []
+        },
+        "equal": true
+      },
+      "caller_text": {
+        "key_id": "1RJ5/g2e0wzfwNGt56DG6APvklhewAGDmW8AoP44Muo=",
+        "locking_script": "21036cafc9475cc0c6cdd3e6f5134c41ac32cf9db6d183788928bb5eed46cca84c1fac4d20019b808409c45619f7bf27df1938d4b4708f083ca322958a6b31bb97bf7e7839965fb89fb12d9f177a56a9fedf010be473384ef4872cb945fb8913f04310c342a03fab2c816ed6c08edda6a414ce61f3d3c21f607cbf2bd500bacb533e90896d00ec963da001fd2f6a31e4d3eb565a203406281c25bd62e32f2d76293565a36865a7c86e14528aec4d561de3e1e72f2d4c311e38e50c5774b5b950d60188b277ce3b76cb42755bcbff51a62717bbd2d8afb6cd45436c23afd51bc7fede7d7a4d5be4b53aab573dc07fb0520efaf3f6eec17d643b1482ae69439c56219c0fdb672c21e9bf7447d3c2e6f2df6e4fd834f22f129b28db894b47b127bc1a49c72fca3267fd158b0308ff00293a55d6ee3188241b7bfc2171025b1ffdfed2c14769c07946304402201ce803cd52357510852addb4e6d6d9f968e9c499027492745dcdbea13d17959202207b151d3b3c9b44efba88a87eda7edf5d82001b4514ccd88a7cb5795bcc3650836d",
+        "read_back": {
+          "contacts": [
+            {
+              "name": "Alice Updated",
+              "avatarURL": "https://example.com/alice.png",
+              "abbreviatedKey": "Alice (work key)",
+              "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+              "badgeIconURL": "",
+              "badgeLabel": "",
+              "badgeClickURL": ""
+            }
+          ],
+          "dropped": []
+        },
+        "equal": true
+      },
+      "empty": {
+        "key_id": "nBb2rFSlo2FWwEDnkCdFVbCSRZQh8CFyR+kuX7JrYsw=",
+        "locking_script": "2102323259cec6a2fd75eb8b1b9c3eebaeb6482e78c287536acb77d89921b4ef9c84ac4d1001cbc6c20ee5d2ee4113242398ebb9d939c01104eb1488b32243b10a73f3dc241c2c17ad719f45cb0e436c24901bca315164acfabcd4aa6b89913ceda0709215cf8b24fdfb6f5b7262ee2e5e4fd07aee8f2d7b327de4aaf16048d9771b0012705d7f79afd0d806bd1b7df8dcc62e114f263c720ebd608a8f55a7c4c72c754ee34266b0dcaeed080b2b1004cbec58373dc0eb854e5552c1ae8d9856b8b050c8c544bc2f0dd39a7484a60118c9947835fa05de8fb0d57bbc702e95cbba041bdb53f19363c46925fba3e3b3501b10644ecd688c81a215818d252755db5ad2c3c19ee2042a24ac217e0073130182d92786b547ea83df2b9f07c8d64c345cdb7067921a10a456efcfa1e6cc4769e3872cde6c2b4630440220738b487024624df69fe6ab29ddf8d043885e2c8ac66d96791859aec172335fad02202b0aa39394ed285d466a89ece59c545f4188a2ba7243ad13347c3e56828a6ced6d",
+        "read_back": {
+          "contacts": [
+            {
+              "name": "Alice Updated",
+              "avatarURL": "https://example.com/alice.png",
+              "abbreviatedKey": "",
+              "identityKey": "03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+              "badgeIconURL": "",
+              "badgeLabel": "",
+              "badgeClickURL": ""
+            }
+          ],
+          "dropped": []
+        },
+        "equal": true
+      }
+    },
+    "base": {
+      "parse_identity": {
+        "key_id": "CVRlJk7IbIGYcbeVDhDf5hrivMIwUvZO7bNJ84/gAUA=",
+        "locking_script": "21030e28c6ad7afb0d5683d20f08fc0f47e613e153bffaa16e1a1539a75c6293292aac4d1d01eb9a6063566d3413c58739a57a2ac5f5f78b973c0459f8035bc981bbce5e3be23f499447e5acfc1f047e2ce9d6822a2bdee4ef857b341d4ca8d1a6200b47da351ca922efaf5d3f3ac5dd3f5699d9caf068ef31faa689e90a3f806a2ad189930b51442cc9198ee033566a833e5a3d294bf7095736dec62dda6b5e04f9bbdce5be38994846c24549792446dcad845128eafd7ce9d2a774d4bd2a0812a259ecaca9be90edb3b6ca502173148a5d361f90dd7415fc54ec4fd4294b50320fe08bd1576901bdbddc302ad89852c9206a658f0cb19f964cccbdac30f315ca2ef1a677a8dcd5ef75e1cc6f4738d2d06123eff2b5827a273bfad67b5e661327f017cc28ae56306dee24e6ae6ddfce79c9fde9ba2538cae98e4625fecf6d3a244b0b473045022100ccb413dd70996c9079e48490fbfd350e60ae54b750fa05ef2741948e4584466202201cd4071655d7fdbe7af0f60e4715380280dac14f2e4feb40c58357a027655da96d",
+        "read_back": {
+          "contacts": [
+            {
+              "name": "Alice Updated",
+              "avatarURL": "https://example.com/alice.png",
+              "abbreviatedKey": "02f930...36f9",
+              "identityKey": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+              "badgeIconURL": "",
+              "badgeLabel": "",
+              "badgeClickURL": ""
+            }
+          ],
+          "dropped": []
+        },
+        "equal": false
+      },
+      "caller_text": {
+        "key_id": "1RJ5/g2e0wzfwNGt56DG6APvklhewAGDmW8AoP44Muo=",
+        "locking_script": "21036cafc9475cc0c6cdd3e6f5134c41ac32cf9db6d183788928bb5eed46cca84c1fac4d1d01e7407591d2c19fef225d65b56ed85ea6a5bfc79b50f0753d0fffeca136d41d05ccb4288bbdceb89a85182dabe230b0595271e3144141d7e9be15652a520e024ed39807406e492b3952880946d5a7635c3c0b98119cb0cef2ddc2719624b5d8ee4f5b54f4e10d0e5c7f18759464026434530e012d97c4a4cb7f1d64efa7479af0154814ce8616741d2807e601aec0c1cd24f65cc79418c179f916b84cc9491aabb7533eb14d7fd4d5bbd8693a98becd4649b156c4cfbe62b8bf5ba89046f4204da7856036a6a0e448f970d1197103d96699e4a359bd363bc7efbd754406360a751c9545ded920f83d7ae844fa52e36b80a5d153eb2e0d32ee6e63cb3b758cf95964ccb95f7fd7a826ae435f21e3f9d98ca72d9fc208a3a3b79d85ff870b46304402200372742f3c857afc23f02225d35e0df513f5f90bcb24ceff3a885ab5ed11a64d022041cf1aec2daa7e212f7039c6926345406230e5359fa4c022ba08b5faa7c9e7976d",
+        "read_back": {
+          "contacts": [
+            {
+              "name": "Alice Updated",
+              "avatarURL": "https://example.com/alice.png",
+              "abbreviatedKey": "022f8b...efe4",
+              "identityKey": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+              "badgeIconURL": "",
+              "badgeLabel": "",
+              "badgeClickURL": ""
+            }
+          ],
+          "dropped": []
+        },
+        "equal": false
+      },
+      "empty": {
+        "key_id": "nBb2rFSlo2FWwEDnkCdFVbCSRZQh8CFyR+kuX7JrYsw=",
+        "locking_script": "2102323259cec6a2fd75eb8b1b9c3eebaeb6482e78c287536acb77d89921b4ef9c84ac4d1d01e25c6e4a5c71c00134e0d5fa0372a4d8de775496fbeba79894fa3eb3c72716db4fa5f8c7813c14670902aef3bac0769424b76681a27d3392c570405cd1b0abd97c146be278c94413569e27698980db8c2f8325d37c641ea517d34b70cac55d7e81bab3e7668e6761988dc773caf2c1757cd05ced1afc741c34462519d5ed9a03b10dd4b6f72629ce35ce9122749bb8b8efdf0613b0a712bb49d470094b7e1f20f2e51e68defb530e57c2b8f749e142f374d5f2344a710855b2f3b2119fe87144dcdee97abdfc349b05d4e17f8a9ca3200e0f3756ef0114abefe7d3640ef6523ff4562efe1a76de94bdd56b68d6364a8ddaba371008a156805d7eecc4cc1de0a5d4ec2a1e342819cb39ce9d272497ce16bdbd912b24ad980247c88445c2473045022100a5846ac262b5a516ff06968ad30f859dea02a8fed1f045cd79eb5e04cc81e84d02206e0bf8b431abb104e1761024584fac26ff11b61502ab559534c6e8e699da0e5a6d",
+        "read_back": {
+          "contacts": [
+            {
+              "name": "Alice Updated",
+              "avatarURL": "https://example.com/alice.png",
+              "abbreviatedKey": "03fff9...7556",
+              "identityKey": "03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556",
+              "badgeIconURL": "",
+              "badgeLabel": "",
+              "badgeClickURL": ""
+            }
+          ],
+          "dropped": []
+        },
+        "equal": false
+      }
+    }
+  }
+}
