@@ -280,7 +280,7 @@ impl PushDrop {
 
     /// Decodes a lock-before pattern script.
     /// Pattern: <pubkey> OP_CHECKSIG <fields...> OP_2DROP... OP_DROP
-    fn decode_lock_before(chunks: &[ScriptChunk]) -> Result<Self> {
+    pub(crate) fn decode_lock_before(chunks: &[ScriptChunk]) -> Result<Self> {
         // First chunk must be pubkey data
         let pubkey_data = chunks[0]
             .data

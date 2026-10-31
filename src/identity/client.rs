@@ -934,8 +934,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             None => return Ok(None), // Output index out of range
         };
 
-        // Step 3: Decode PushDrop from the locking script
-        let pushdrop = match PushDrop::decode(&tx_output.locking_script) {
+        // Step 3: Decode lock-before alone, as IdentityClient.ts:773 does (#537)
+        let pushdrop = match PushDrop::decode_before(&tx_output.locking_script) {
             Ok(pd) => pd,
             Err(_) => return Ok(None), // Failed to decode PushDrop
         };
@@ -1076,8 +1076,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             None => return Ok(None), // Output index out of range
         };
 
-        // Step 3: Decode PushDrop from the locking script
-        let pushdrop = match PushDrop::decode(&tx_output.locking_script) {
+        // Step 3: Decode lock-before alone, as IdentityClient.ts:773 does (#537)
+        let pushdrop = match PushDrop::decode_before(&tx_output.locking_script) {
             Ok(pd) => pd,
             Err(_) => return Ok(None), // Failed to decode PushDrop
         };
