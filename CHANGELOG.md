@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: Contact::from_identity carries the identity's abbreviatedKey, as the reference does (#568)
+
+The reference's contact is its identity: `Contact = DisplayableIdentity &
+{ metadata? }` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:28`).
+`IdentityClient.saveContact` (`IdentityClient.ts:974-979`) hands the
+identity to `ContactsManager.saveContact` (`ContactsManager.ts:527-528`),
+whose `validateContact` keeps its `abbreviatedKey` as given (`:185`,
+`boundedString` to 256 UTF-8 bytes, empty allowed), and
+`resolveByIdentityKey` with contacts (`IdentityClient.ts:575-576`) returns
+the record read, its `abbreviatedKey` as stored. The value is computed at
+one site, `parseIdentity` (`:1166`, `subject.substring(0, 10)...`, for a
+certificate); the contacts path never computes one. A contact without a
+stored `abbreviatedKey` does not exist there: `validateContact` reads it
+through `ownData` (`:47-53`), which refuses an absent member
+(`Invalid contact: abbreviatedKey must be an own data property`). After
+#559 this crate's `Contact` held the stored value, but `from_identity`
+did not copy an identity's and `to_displayable_identity` ignored it, the
+residue #559 stated. The keeper's ruling (4) of 2026-10-31 17:1xZ on
+issue #568: a row.
+
+| | Before | Now |
+|---|---|---|
+| `Contact::from_identity` (`IdentityClient::save_contact`) | `abbreviated_key: None`, so the saved record carried this crate's `02abcd...wxyz` in place of the identity's (`parseIdentity`'s `02f9308a01...`, another client's text, `""`) | `abbreviated_key: Some` of the identity's, written as given |
+| `Contact::to_displayable_identity` (`resolve_by_identity_key` and `resolve_by_attributes` with contacts) | this crate's `02abcd...wxyz`, whatever was stored | the stored `abbreviated_key`; this crate's form only for a contact built here with none (`None`), the form its saved record carries |
+
+`record_of` (`src/identity/contacts_record.rs`) now writes
+`to_displayable_identity`'s value, the same bytes as before (#559's
+stored value when `Some`, the computed form when `None`).
+
+Semver: no signature changes. Two public functions return other values:
+`Contact::from_identity`'s contact carries `Some(identity.abbreviated_key)`
+in place of `None`, and `Contact::to_displayable_identity`'s identity
+carries the contact's stored `abbreviated_key` in place of the computed
+form when one is stored (cargo-semver-checks has no lint for a changed
+return value). A caller that compared a resolved contact's
+`abbreviated_key` with `02abcd...wxyz` sees the stored value.
+
+Pinned by `tests/identity_from_identity_abbreviated_key_568.rs` against
+`tests/vectors/from_identity_abbreviated_key_568.json`, recorded by
+`tests/support/from_identity_abbreviated_key_568.mjs` under Node v22.18.0
+(the reference's `IdentityClient` on the ProtoWallet of 9, two runs
+byte-identical): three identities (`parseIdentity` of an email certificate,
+its `abbreviatedKey` `02f9308a01...`; another client's text `Bob (desk 4)`;
+`""`), each saved by the reference's client (the record its token carries)
+and resolved from that token with contacts (the identity returned).
+`from_identity` holds the record's value and `to_displayable_identity`
+answers the resolved identity's; `save_contact` writes the reference's
+record; `resolve_by_identity_key` returns the reference's identity. All
+three tests are RED on `b2531c8a` (`parsed_identity`: `None`, and
+`02f930...36f9` in place of `02f9308a01...`).
+
+### Notes: cross-SDK parity (#568)
+
+The residue #559 stated for `IdentityClient::save_contact`'s identity
+through `from_identity` is closed by this landing. #559's other residue
+stays: a contact built here with no stored value (`Contact::new`, never a
+reference shape) takes this crate's computed form. Go at `2ca481c` has no
+contacts manager.
+
+Census (#375; current reading):
+
+- Row 91: Ours: closed by #568 at the pin; residue #559's computed form for a contact built with no stored value. Theirs: none (the witness: tests/identity_from_identity_abbreviated_key_568.rs; tests/vectors/from_identity_abbreviated_key_568.json).
+
 ### Fixed: the identity client's contact conversions carry the badges, as the reference does (#558)
 
 The reference's contact is its identity: `Contact = DisplayableIdentity &
@@ -130,7 +194,7 @@ landing: the update path writes the stored value as the reference's
 
 Census (#375; current reading):
 
-- Row 89: Ours: closed by #559 at the pin; a contact built here (no stored value) still takes to_displayable_identity's form, where the reference takes the caller's, IdentityClient::save_contact's identity included (Contact::from_identity drops its abbreviated_key; IdentityClient.ts:974-978). Theirs: none (the witness: tests/identity_contact_abbreviated_key_559.rs; tests/vectors/contact_abbreviated_key_559.json).
+- Row 89: Ours: closed by #559 at the pin; a contact built here (no stored value) still takes to_displayable_identity's form, where the reference takes the caller's; IdentityClient::save_contact's identity through Contact::from_identity closed by #568 (row 91). Theirs: none (the witness: tests/identity_contact_abbreviated_key_559.rs; tests/vectors/contact_abbreviated_key_559.json).
 
 ### Fixed: the identity parsers run the reference discovery's record checks and byte bounds (#553)
 
