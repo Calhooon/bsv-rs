@@ -1,10 +1,10 @@
-FILE — fourth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — fourth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/ts-stack#1461 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending.
 
 # Reject raw zero-input and zero-output transactions in BEEF structure validation
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 31: TS's Beef.verifyValid reads a BEEF carrying a raw transaction with…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1461 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending. Census row 31: TS's Beef.verifyValid reads a BEEF carrying a raw transaction with…
 
 Call Beef.verifyValid on the no-input and no-output BEEF witnesses. It sorts links but never applies the raw transaction structure checks. Transaction.verify applies those checks only on unmined transactions. A known proof does not make a malformed raw transaction structure valid. Keep parse-only entry points separate from this structural verdict.
 

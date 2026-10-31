@@ -15,12 +15,12 @@ threads following answers to the earlier ones.
 |---|---|---|---|
 | 1 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/wire-originator.md](./wire-originator.md) | Prevent originator length wrapping and normalize wallet wire originators |
 | 2 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/wire-numeric-collection-bounds.md](./wire-numeric-collection-bounds.md) | Check wallet response widths and collection counts before reading or allocating |
-| 3 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-lone-leaf-offset.md](./merkle-lone-leaf-offset.md) | Reject a one-transaction Merkle proof with a nonzero leaf offset |
-| 4 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/beef-empty-transactions.md](./beef-empty-transactions.md) | Reject raw zero-input and zero-output transactions in BEEF structure validation |
-| 5 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/atomic-unrelated-data.md](./atomic-unrelated-data.md) | Enforce the subject dependency graph when validating parsed Atomic BEEF |
-| 6 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/beef-duplicate-offsets-go-sdk.md](./beef-duplicate-offsets-go-sdk.md) | Reject contradictory repeated BUMP offsets |
-| 7 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/beef-reserved-flags-ts-stack.md](./beef-reserved-flags-ts-stack.md) | Reject reserved BEEF discriminators |
-| 8 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/canonical-varint-reader.md](./canonical-varint-reader.md) | Provide a canonical CompactSize reader for protocol parsing |
+| 3 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-lone-leaf-offset.md](./merkle-lone-leaf-offset.md) | Reject a one-transaction Merkle proof with a nonzero leaf offset (filed as bsv-blockchain/ts-stack#1460 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
+| 4 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/beef-empty-transactions.md](./beef-empty-transactions.md) | Reject raw zero-input and zero-output transactions in BEEF structure validation (filed as bsv-blockchain/ts-stack#1461 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
+| 5 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/atomic-unrelated-data.md](./atomic-unrelated-data.md) | Enforce the subject dependency graph when validating parsed Atomic BEEF (filed as bsv-blockchain/go-sdk#396 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
+| 6 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/beef-duplicate-offsets-go-sdk.md](./beef-duplicate-offsets-go-sdk.md) | Reject contradictory repeated BUMP offsets (filed as bsv-blockchain/go-sdk#397 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
+| 7 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/beef-reserved-flags-ts-stack.md](./beef-reserved-flags-ts-stack.md) | Reject reserved BEEF discriminators (filed as bsv-blockchain/ts-stack#1462 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
+| 8 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/canonical-varint-reader.md](./canonical-varint-reader.md) | Provide a canonical CompactSize reader for protocol parsing (filed as bsv-blockchain/go-sdk#398 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
 | 9 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-bounds-der.md](./certificate-bounds-der.md) | Certificate wallet conversion rewrites valid high-S signature bytes |
 | 10 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-response-preimage-go-sdk.md](./certificate-response-preimage-go-sdk.md) | Preserve certificate-response property order when signing and verifying |
 | 11 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/certificate-outpoint-bound.md](./certificate-outpoint-bound.md) | Reject certificate outpoint indexes that the writer cannot serialize |
@@ -45,6 +45,15 @@ writes it back, so `04`+x+(p+1) is written as `02`+x, the negation of the
 point it computed with (the ask: reduce or refuse at parse, and serialize
 the point computed with). The queue now has eighteen entries, pending the
 owner's cadence word. Nothing has been filed.
+
+The owner's word of 2026-10-31 16:2xZ, relayed by the keeper at 16:3xZ, is
+cadence (b). The first six drafts (third to eighth in the keeper's order) were
+filed under the owner's name on 2026-10-31 from the drafts as they stood on
+beta, the internal provenance lines dropped and a census pointer added (and,
+in go-sdk#397, the BRC-reading line's closing sentence addressed to the
+keeper); each row above carries its number. The remaining twelve are filed two a day per
+repository in this order from 2026-11-01, from the drafts as they stand on
+beta on their day. Rows 1 and 2 were neither deferred nor dropped: the owner's cadence put the six verifier rows first by consequence; rows 1 and 2 are the first go-sdk pair of 2026-11-01 and rows 11 and 12 ts-stack's (the certificate outpoint bound, the internalize output index width); then two a day per repository in queue order (the keeper, the rulings page's entry of 2026-10-31 17:1xZ).
 
 ## HOLD
 
