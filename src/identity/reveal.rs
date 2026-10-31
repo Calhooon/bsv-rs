@@ -11,8 +11,7 @@
 
 use crate::auth::certificates::Certificate;
 use crate::error::WalletRefusalClass;
-use crate::primitives::PublicKey;
-use crate::script::templates::PushDrop;
+use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
 use crate::script::LockingScript;
 use crate::wallet::{
     Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, WalletCertificate,
@@ -315,6 +314,5 @@ pub(super) async fn identity_token<W: WalletInterface + ?Sized>(
         )
         .await?
         .signature;
-    let key = PublicKey::from_hex(&key.public_key)?;
-    Ok(PushDrop::new(key, vec![json, signature]).lock())
+    wallet_key_lock(&key.public_key, vec![json, signature])
 }

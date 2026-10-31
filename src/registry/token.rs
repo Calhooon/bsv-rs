@@ -8,6 +8,7 @@
 use crate::primitives::PublicKey;
 use crate::registry::types::DefinitionType;
 use crate::registry::REGISTRANT_KEY_ID;
+use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
 use crate::script::templates::pushdrop_position::{
     canonical_refusal, key_text_refusal, point_message,
 };
@@ -189,5 +190,5 @@ pub(crate) async fn lock_definition<W: WalletInterface>(
         )
         .await?;
     fields.push(signed.signature);
-    Ok(PushDrop::new(PublicKey::from_hex(&key.public_key)?, fields).lock())
+    wallet_key_lock(&key.public_key, fields)
 }

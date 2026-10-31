@@ -21,8 +21,9 @@ use crate::primitives::BigNumber;
 
 /// Decodes `text` as the reference's `toArray(text, 'hex')` does: an
 /// odd-length string read with a leading `0`, a refused character named at its
-/// place in `text`.
-fn reference_hex(text: &str) -> Result<Vec<u8>> {
+/// place in `text`. The PushDrop sites decode a wallet's key text with it
+/// (#545).
+pub(crate) fn reference_hex(text: &str) -> Result<Vec<u8>> {
     if text.len().is_multiple_of(2) {
         return from_hex(text);
     }

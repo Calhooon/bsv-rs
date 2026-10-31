@@ -5,8 +5,9 @@ use crate::kvstore::{
     KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
 use crate::overlay::{with_wallet_double_spend_retry, LookupQuestion};
-use crate::primitives::{from_hex, to_hex, PublicKey};
-use crate::script::{templates::PushDrop, LockingScript};
+use crate::primitives::{from_hex, to_hex};
+use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
+use crate::script::LockingScript;
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionOutput, CreateActionResult, CreateSignatureArgs,
     GetPublicKeyArgs, Protocol, SecurityLevel, WalletInterface,
@@ -189,7 +190,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                 self.originator(),
             )
             .await?;
-        Ok(PushDrop::new(PublicKey::from_hex(&public_key.public_key)?, fields).lock())
+        wallet_key_lock(&public_key.public_key, fields)
     }
 
     async fn finish_action(&self, result: CreateActionResult) -> Result<String> {

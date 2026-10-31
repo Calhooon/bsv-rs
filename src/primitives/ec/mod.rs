@@ -69,7 +69,7 @@
 pub mod ecdsa;
 pub mod private_key;
 pub mod public_key;
-mod public_key_forms;
+pub(crate) mod public_key_forms;
 pub mod signature;
 
 pub use ecdsa::{calculate_recovery_id, recover_public_key, sign, verify};

@@ -1,0 +1,76 @@
+{
+  "issue": 545,
+  "reference": "ts-stack@edf6e03 packages/sdk/src/script/templates/PushDrop.ts:158-175",
+  "runtime": "node v22.18.0",
+  "fields": [
+    "6869",
+    "05",
+    ""
+  ],
+  "cases": [
+    {
+      "form": "compressed",
+      "lock_position": "before",
+      "wallet_answer": "03b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "answer_bytes": "03b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "key_push_offset": 0,
+      "locking_script": "2103b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204ac02686955006d75"
+    },
+    {
+      "form": "compressed",
+      "lock_position": "after",
+      "wallet_answer": "03b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "answer_bytes": "03b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "key_push_offset": 7,
+      "locking_script": "02686955006d752103b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204ac"
+    },
+    {
+      "form": "uncompressed",
+      "lock_position": "before",
+      "wallet_answer": "04b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "answer_bytes": "04b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "key_push_offset": 0,
+      "locking_script": "4104b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47bac02686955006d75"
+    },
+    {
+      "form": "uncompressed",
+      "lock_position": "after",
+      "wallet_answer": "04b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "answer_bytes": "04b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "key_push_offset": 7,
+      "locking_script": "02686955006d754104b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47bac"
+    },
+    {
+      "form": "hybrid",
+      "lock_position": "before",
+      "wallet_answer": "07b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "answer_bytes": "07b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "key_push_offset": 0,
+      "locking_script": "4107b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47bac02686955006d75"
+    },
+    {
+      "form": "hybrid",
+      "lock_position": "after",
+      "wallet_answer": "07b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "answer_bytes": "07b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47b",
+      "key_push_offset": 7,
+      "locking_script": "02686955006d754107b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af2046df34f8eb9e136c03383c5f2650542ea5a35547dc9134e7554dd7249c6e5c47bac"
+    },
+    {
+      "form": "odd_length",
+      "lock_position": "before",
+      "wallet_answer": "3b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "answer_bytes": "03b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "key_push_offset": 0,
+      "locking_script": "2003b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204ac02686955006d75"
+    },
+    {
+      "form": "odd_length",
+      "lock_position": "after",
+      "wallet_answer": "3b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "answer_bytes": "03b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204",
+      "key_push_offset": 7,
+      "locking_script": "02686955006d752003b8de2b367cc6c99e90db043fc54a98d75a6417987b8019e0b37d155f372af204ac"
+    }
+  ]
+}

@@ -141,46 +141,15 @@ impl PushDrop {
         self
     }
 
-    /// Creates the locking script.
+    /// Creates the locking script, the key pushed compressed; a wallet's key
+    /// is pushed as the wallet returned it by the crate's wallet sites, through
+    /// the crate-visible `lock_with_key_bytes` (#545).
     ///
     /// # Returns
     ///
     /// The locking script containing the embedded data and P2PK lock.
     pub fn lock(&self) -> LockingScript {
-        let mut chunks = Vec::new();
-
-        match self.lock_position {
-            LockPosition::Before => {
-                // <pubkey> OP_CHECKSIG <fields...> OP_2DROP... OP_DROP
-                chunks.push(ScriptChunk::new_push(
-                    self.locking_public_key.to_compressed().to_vec(),
-                ));
-                chunks.push(ScriptChunk::new_opcode(OP_CHECKSIG));
-
-                // Add fields with minimal encoding
-                for field in &self.fields {
-                    chunks.push(Self::create_minimally_encoded_chunk(field));
-                }
-
-                // Add DROP operations
-                Self::add_drop_operations(&mut chunks, self.fields.len());
-            }
-            LockPosition::After => {
-                // <fields...> OP_2DROP... OP_DROP <pubkey> OP_CHECKSIG
-                for field in &self.fields {
-                    chunks.push(Self::create_minimally_encoded_chunk(field));
-                }
-
-                Self::add_drop_operations(&mut chunks, self.fields.len());
-
-                chunks.push(ScriptChunk::new_push(
-                    self.locking_public_key.to_compressed().to_vec(),
-                ));
-                chunks.push(ScriptChunk::new_opcode(OP_CHECKSIG));
-            }
-        }
-
-        LockingScript::from_chunks(chunks)
+        self.lock_with_key_bytes(&self.locking_public_key.to_compressed())
     }
 
     /// Creates a minimally encoded script chunk for data.
@@ -190,7 +159,7 @@ impl PushDrop {
     /// - Single byte 1-16 -> OP_1 through OP_16
     /// - Single byte 0x81 (-1) -> OP_1NEGATE
     /// - Otherwise -> standard data push
-    fn create_minimally_encoded_chunk(data: &[u8]) -> ScriptChunk {
+    pub(super) fn create_minimally_encoded_chunk(data: &[u8]) -> ScriptChunk {
         // Empty or single zero byte -> OP_0
         if data.is_empty() || (data.len() == 1 && data[0] == 0) {
             return ScriptChunk::new_opcode(OP_0);
@@ -217,7 +186,7 @@ impl PushDrop {
     /// Adds appropriate DROP operations for the field count.
     ///
     /// Uses OP_2DROP for pairs of fields and OP_DROP for a remaining single field.
-    fn add_drop_operations(chunks: &mut Vec<ScriptChunk>, count: usize) {
+    pub(super) fn add_drop_operations(chunks: &mut Vec<ScriptChunk>, count: usize) {
         let mut remaining = count;
 
         // Use OP_2DROP for pairs

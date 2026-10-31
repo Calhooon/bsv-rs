@@ -11,7 +11,8 @@
 //! it, and with a source set createAction answers a signable transaction
 //! spending its output 0, so the contacts manager and the key-value stores
 //! reach signAction (#326); signAction answered by another wallet when one
-//! is set, the JSON substrate under wiremock (#339).
+//! is set, the JSON substrate under wiremock (#339); getPublicKey's answer
+//! for a derived key rewritten into another form when one is set (#545).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -60,6 +61,9 @@ fn spending_many(
     }
 }
 
+/// #545: a rewrite of getPublicKey's compressed answer into another form.
+pub type KeyForm = fn(&str) -> String;
+
 /// A ProtoWallet that records each call by name; proveCertificate answers
 /// a keyring of the names asked (or of `keyring` when set), createAction
 /// no transaction; getPublicKey's and createSignature's arguments kept.
@@ -105,6 +109,9 @@ pub struct Counting {
     /// #341: mutation applied to the owned createAction answer.
     pub create_mode: Arc<Mutex<&'static str>>,
     pub sign_mode: Arc<Mutex<&'static str>>,
+    /// #545: the form getPublicKey answers a derived key in (its compressed
+    /// text rewritten), the identity key unchanged.
+    pub key_form: Arc<Mutex<Option<KeyForm>>>,
     pending: Arc<Mutex<Option<SignableTransaction>>>,
 }
 
@@ -155,6 +162,7 @@ impl Counting {
             sign_via: None,
             create_mode: Arc::new(Mutex::new("")),
             sign_mode: Arc::new(Mutex::new("")),
+            key_form: Arc::default(),
             pending: Arc::default(),
         }
     }
@@ -300,7 +308,12 @@ macro_rules! counting {
             ) -> bsv_rs::Result<GetPublicKeyResult> {
                 self.note("get_public_key", o);
                 self.public_key_args.lock().unwrap().push(args.clone());
-                WalletInterface::get_public_key(&*self.inner, args, o).await
+                let identity = args.identity_key;
+                let mut answer = WalletInterface::get_public_key(&*self.inner, args, o).await?;
+                if let (false, Some(form)) = (identity, *self.key_form.lock().unwrap()) {
+                    answer.public_key = form(&answer.public_key);
+                }
+                Ok(answer)
             }
             async fn create_signature(
                 &self,

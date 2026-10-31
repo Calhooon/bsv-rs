@@ -15,7 +15,8 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 | `p2pkh.rs` | P2PKH template for the most common Bitcoin transaction type |
 | `p2pk.rs` | P2PK template for direct public key locking (simpler than P2PKH) |
 | `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
-| `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock |
+| `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock; `lock` pushes `locking_public_key` compressed, through the crate-visible `lock_with_key_bytes` (#545) |
+| `pushdrop_key_bytes.rs` | `PushDrop::lock_with_key_bytes`, `pub(crate)` (a port helper: the reference has one `lock`, taking the key as text; its vector tests the unit file `pushdrop_key_bytes_545_tests.rs`): the key pushed as the bytes given, the reference's `lock` pushing a wallet's answer as returned (`PushDrop.ts:158-175`, #545); crate-visible `wallet_key_lock` (under `kvstore`, `identity` or `registry`), the five wallet sites' lock: the answer read by `PublicKey::from_hex`, pushed as the bytes `toArray(_, 'hex')` reads (an odd-length text with a leading `0`) |
 | `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; `decode()` unchanged |
 | `rpuzzle.rs` | R-Puzzle template for knowledge-based locking using ECDSA K-values |
 
@@ -166,7 +167,7 @@ pub struct PushDrop {
 impl PushDrop {
     pub fn new(locking_public_key: PublicKey, fields: Vec<Vec<u8>>) -> Self
     pub fn with_position(self, position: LockPosition) -> Self  // builder pattern
-    pub fn lock(&self) -> LockingScript                          // note: no Result, infallible
+    pub fn lock(&self) -> LockingScript                          // note: no Result, infallible; the key compressed
     pub fn decode(script: &LockingScript) -> Result<Self>        // decode existing script
     pub fn unlock(private_key: &PrivateKey, sign_outputs: SignOutputs, anyone_can_pay: bool) -> ScriptTemplateUnlock
     pub fn sign_with_sighash(private_key: &PrivateKey, sighash: &[u8; 32], sign_outputs: SignOutputs, anyone_can_pay: bool) -> Result<UnlockingScript>

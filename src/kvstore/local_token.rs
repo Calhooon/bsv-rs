@@ -1,7 +1,7 @@
 //! Local signed value envelope (TS PushDrop.lock, LocalKVStore.ts:486-492).
 use super::LocalKVStore;
-use crate::primitives::PublicKey;
-use crate::script::{templates::PushDrop, LockingScript};
+use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
+use crate::script::LockingScript;
 use crate::wallet::{Counterparty, CreateSignatureArgs, GetPublicKeyArgs, WalletInterface};
 use crate::Result;
 
@@ -37,10 +37,9 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 self.originator(),
             )
             .await?;
-        Ok(PushDrop::new(
-            PublicKey::from_hex(&public_key.public_key)?,
+        wallet_key_lock(
+            &public_key.public_key,
             vec![value.to_vec(), signature.signature],
         )
-        .lock())
     }
 }
