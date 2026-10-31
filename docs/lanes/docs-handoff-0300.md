@@ -1,0 +1,18 @@
+Do every edit and every gate yourself, in the foreground, in your turn: no background job, no subagent; the REPORT is the last thing you write, and a turn that ends with a command still running is a stopped lane.
+
+# The docs fold of the evening: the 03:1xZ HANDOFF record, the day's briefs filed (docs only)
+
+Branch `lane/docs-handoff-0300` from `origin/beta`'s tip after PR #528 (#527) has landed (name the base sha in your REPORT). Docs only: `HANDOFF.md`, `docs/lanes/`. Nothing is filed on any tracker.
+
+## What to do
+
+1. `HANDOFF.md`: insert the record in `/private/tmp/claude-501/-Users-johncalhoun-bsv-bsv-rs/c300881a-6191-471b-892e-9ec2735c8425/scratchpad/handoff-0300-record.md` above the 11:3xZ record (its own heading `## Where it stands (2026-10-31, 03:1xZ)` kept; the 11:3xZ record's heading becomes `## Where it stood (2026-10-30, 11:3xZ)`, as every older record reads; every placeholder of the form `<...>` has been replaced by the captain before you start: check none remains); check every sha and time it names against `git log origin/beta` and the issues and PRs it names (`gh issue view`, `gh pr view`); say in the REPORT any line you could not verify, and do not change the record's words except to fix a sha or a time you verified.
+2. The briefs under `docs/lanes/`: copy byte for byte, without the `brief-` prefix, every `/private/tmp/claude-501/-Users-johncalhoun-bsv-bsv-rs/c300881a-6191-471b-892e-9ec2735c8425/scratchpad/brief-fix-*.md` and `/private/tmp/claude-501/-Users-johncalhoun-bsv-bsv-rs/c300881a-6191-471b-892e-9ec2735c8425/scratchpad/brief-docs-*.md` whose counterpart is absent on beta (compute the list; the review briefs are not filed; `.draft.md` files are not filed; expected at least: fix-515-ci-required-docs, fix-512-raw-tree-bound, fix-519-transaction-work-budget, fix-520-public-word-resolver, fix-527-work-budget-non-exhaustive, docs-handoff-0300).
+3. The `[Unreleased]` entries' order on the tip: read `git log origin/beta` for the landings since the beta.4 tag and check the entries stand newest first (#527, #512, #515, #519, #520, the preimage witness #518 as its entry is titled, #423, #400, #502, #505: the landing order after the tag read from `git log`, newest first); if one is out of order, `/private/tmp/claude-501/-Users-johncalhoun-bsv-bsv-rs/c300881a-6191-471b-892e-9ec2735c8425/scratchpad/changelog-reorder.py CHANGELOG.md <keys newest first>` and say so; if the order holds, change nothing and say so (then `CHANGELOG.md` is not in the commit).
+4. The gate, in the foreground: `cargo test --features "full,http"` with one `--test` per file matching `arch_*` and `fixtures_replay*` (the `.rs` files; `arch_support` is a directory); `cargo test --doc --all-features`; `tools/ratchet/run --check --against <base sha>` with `CARGO_TARGET_DIR` outside the checkout; `gitleaks git --redact --no-banner --exit-code 1 --log-opts="origin/beta..HEAD" .` from the repo root; every relative link in the inserted record resolving. One commit, no push.
+
+Rules: never end your turn with a command running in the background; commit on the branch, never push; no test or probe on a default URL or port (a MetaNet Client listens on 3301, 3321 and 2121 on this machine; another session's process on 3390); do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole (the references are read by their named paths); no filing on any tracker (the captain files); scratch copies under `$TMPDIR` with their own `CARGO_TARGET_DIR`, removed at the end; never `rustup default` or `rustup override` (use `cargo +1.99.0`).
+
+## Report
+
+The base sha and the tip; the record's lines verified or not; the briefs copied; the entry order as read; the gate table; anything unverified; nothing else.
