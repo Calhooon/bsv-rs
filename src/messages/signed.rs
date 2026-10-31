@@ -202,12 +202,13 @@ pub fn verify(message: &[u8], sig: &[u8], recipient: Option<&PrivateKey>) -> Res
         expected_pubkey_bytes[0] = recipient_first_byte;
         expected_pubkey_bytes[1..].copy_from_slice(expected_pubkey_rest);
 
-        let expected_pubkey = PublicKey::from_bytes(&expected_pubkey_bytes)?;
-
-        // Verify the recipient matches
-        if verifier_pubkey.to_compressed() != expected_pubkey.to_compressed() {
+        // Verify the recipient matches: the bytes against the verifier's
+        // compressed key, as the reference compares their hex
+        // (`SignedMessage.ts:85-97`), so bytes that are no key are a mismatch
+        // there and here (#550)
+        if verifier_pubkey.to_compressed() != expected_pubkey_bytes {
             return Err(Error::MessageRecipientMismatch {
-                expected: hex::encode(expected_pubkey.to_compressed()),
+                expected: hex::encode(expected_pubkey_bytes),
                 actual: hex::encode(verifier_pubkey.to_compressed()),
             });
         }

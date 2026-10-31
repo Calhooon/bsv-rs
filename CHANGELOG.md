@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a SEC 1 tag 05 is refused as the reference refuses it (#550)
+
+k256 (sec1 0.8.1, `src/point.rs:521-533`) reads a SEC 1 tag `05` as a compact
+point, so `PublicKey::from_bytes(05 || Gx)` returned the key `02 || Gx`, and
+every site that reads a key through `from_bytes` without a prefix check took
+the compact form as a key. The reference's `Point.fromDER` reads the prefixes
+`02`, `03`, `04`, `06`, `07` and refuses every other as `Unknown point format`
+(`ts-stack@edf6e03` `Point.ts:303-325`). `from_bytes` now refuses a `05` tag
+before k256 reads it, as `Error::InvalidPublicKey("Invalid public key encoding:
+unknown point format")`, the words `from_hex`'s lenient parser (#498,
+`src/primitives/ec/public_key_forms.rs`) already used for every shape the
+reference does not read; `from_hex` refused `05` on the base already (its
+`unknown point format` arm; `public_key_forms_498.json` records the reference
+refusing `compressed_prefix_05` and `compact_prefix_05_odd_length`), unchanged.
+Other tags k256 refuses keep k256's words.
+
+| Site | Before (base `69d315fc`) | Now | The reference (`ts-stack@edf6e03`) |
+|---|---|---|---|
+| `PublicKey::from_bytes` | `05 \|\| Gx` read as `02 \|\| Gx` | refused, `InvalidPublicKey` | `Unknown point format` |
+| `PublicKey::from_hex` | refused (#498) | unchanged | `Unknown point format` |
+| `PushDrop::decode`, both positions (`pushdrop.rs:289,335`) | the token read with the compact key | refused, `InvalidPublicKey` | `PushDrop.decode`: `Unknown point format` |
+| The kvstore token reader and interpreter (`kvstore/token_validation.rs`, #544) | a `05` locking key: `PushDrop token must use the canonical PushDrop envelope`; a `05` controller field: read as the compact key, so a token signed by `02 \|\| x` read to its value | `Unknown point format` for both (`point_message` at the controller, as `validateKVStoreController` reads it, `kvStoreTokenValidation.ts:76-81`); no value | the same words; no value |
+| `KVStoreInterpreter::verify_signature` (`interpreter.rs:168`) | `true` for that token | `false` | (its reader refuses the controller) |
+| `messages::verify`, the signer (`signed.rs:170`) | read as the compact key: `Ok(true)` on the recorded message | refused, `InvalidPublicKey` | `Unknown point format` |
+| `messages::verify` and `messages::decrypt`, the recipient (`signed.rs:205`, `encrypted.rs:184`) | parsed, then compared as keys: a mismatch naming `02 \|\| x` (or a match when the recipient's key is `02 \|\| x`) | the bytes compared with the recipient's compressed key, as the reference compares their hex (`SignedMessage.ts:85-97`, `EncryptedMessage.ts:88-94`): `MessageRecipientMismatch` naming the `05` bytes | the mismatch naming the `05` bytes |
+| `messages::decrypt`, the sender (`encrypted.rs:177`) | decrypted | refused, `InvalidPublicKey` | `Unknown point format` |
+| `Certificate::from_binary`, subject and certifier | parsed | refused, `InvalidPublicKey` | `Invalid certificate subject` (`certifier`)`: expected a compressed secp256k1 public key` |
+| `compat::ecies::bitcore_decrypt`, the sender | decrypted | refused, `InvalidPublicKey` | `Unknown point format` |
+| The wire processor's counterparty (`wallet/wire/encoding.rs:165`) | getPublicKey answered with a key derived for the compact point | a key whose tag is not `02`/`03` is `#decodeCounterparty`'s `Point.fromDER` (`WalletWireProcessor.ts:2459-2460`): the error frame `01`, `Unknown point format`, an empty stack, byte for byte | the same frame |
+| `validate_requested_certificate_set`, a certifier text | accepted | refused, `Certifier '05…' is not a valid public key` | (this crate's checker; the `Peer` does not call it) |
+
+Guarded already and unchanged: the script interpreter
+(`src/script/spend/crypto.rs:397-407`, every mode), the registry reader
+(`point_message` since #543), the overlay admin token (`from_reference_der`),
+the wire's linkage keys (`require_compressed_key`), `wallet/validation/crypto.rs`
+and `wallet/wire/mod.rs:381-384`; `auth/utils/validation.rs:353,364` re-parse a
+held key's compressed bytes, which never open with `05`.
+
+Pinned by `tests/primitives_sec1_tag_05_550.rs` (10 tests, 9 RED on the base;
+the kvstore interpreter's reference-token test answers no value on both) and
+`a_tag_05_key_is_refused_in_the_reference_words_550` in
+`src/kvstore/token_validation_tests.rs` (RED on the base in the envelope
+words), against `tests/vectors/sec1_tag_05_550.json`: 14 cases recorded by
+`tests/support/sec1_tag_05_550.mjs` from the edf6e03 bundle under Node
+v22.18.0 (`node tests/support/sec1_tag_05_550.mjs <sdk.mjs>
+tests/vectors/token_envelope_544.json`; two runs byte-identical).
+
+### Notes: cross-SDK parity (#550)
+
+The verdict is the reference's at every site above. The words are the
+reference's where the site hands them on (the wire frame, the kvstore
+reader; the recipient mismatch carries the reference's hex, not its words); elsewhere the refusal keeps this crate's
+`InvalidPublicKey` class and its `Invalid public key encoding: unknown point
+format` words, as each site words every other key it refuses. Go at
+`2ca481c` refuses a 33-byte `05` key too (`ParsePubKey`,
+`primitives/ec/publickey.go:87-89,115-121`: the low bit cleared, `04` is not
+the compressed format). Not pinned: the wallet result validators' key reads (`wallet/substrates/result_values/certificate.rs:54`, the one unpinned verdict change, and `scalars.rs`), now refusing `05` through `from_bytes` as the reference's `isValidCompressedPublicKey` does; a parser fuzz target does not cover `from_bytes`.
+
 ### Fixed: the six token-decode sites run the reference's envelope, signature and hash-binding checks (#544)
 
 After #537 the six sites decoded a PushDrop token at the reference's lock

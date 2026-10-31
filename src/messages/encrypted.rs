@@ -181,13 +181,14 @@ pub fn decrypt(ciphertext: &[u8], recipient: &PrivateKey) -> Result<Vec<u8>> {
     let expected_recipient_bytes = &ciphertext[offset..offset + 33];
     offset += 33;
 
-    let expected_recipient_pubkey = PublicKey::from_bytes(expected_recipient_bytes)?;
     let actual_recipient_pubkey = recipient.public_key();
 
-    // Verify recipient matches
-    if expected_recipient_pubkey.to_compressed() != actual_recipient_pubkey.to_compressed() {
+    // Verify recipient matches: the bytes against the recipient's compressed
+    // key, as the reference compares their hex (`EncryptedMessage.ts:88-94`),
+    // so bytes that are no key are a mismatch there and here (#550)
+    if expected_recipient_bytes != actual_recipient_pubkey.to_compressed() {
         return Err(Error::MessageRecipientMismatch {
-            expected: hex::encode(expected_recipient_pubkey.to_compressed()),
+            expected: hex::encode(expected_recipient_bytes),
             actual: hex::encode(actual_recipient_pubkey.to_compressed()),
         });
     }
