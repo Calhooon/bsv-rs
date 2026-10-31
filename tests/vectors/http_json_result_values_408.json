@@ -26385,6 +26385,189 @@
       "reference": {
         "error": "Wallet result request records must contain only safe string keys"
       }
+    },
+    {
+      "name": "listActions_unsigned_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unsigned\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_completed_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"completed\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_unprocessed_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unprocessed\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_sending_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"sending\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_unproven_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unproven\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_nosend_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"nosend\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_nonfinal_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"nonfinal\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_failed_without_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"failed\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_unsigned_with_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unsigned\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0,\"unlockingScript\":\"51\"}]}]}",
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "listActions_unsigned_odd_unlocking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unsigned\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0,\"unlockingScript\":\"a\"}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected an even-length hex string"
+      }
+    },
+    {
+      "name": "listActions_unsigned_fixture_145_description",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unsigned\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"c\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].unlockingScript: expected the explicitly requested unlocking script"
+      }
+    },
+    {
+      "name": "listActions_unsigned_fixture_145_description_with_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": []
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unsigned\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"c\",\"sequenceNumber\":0,\"unlockingScript\":\"51\"}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].inputDescription: expected 5–2000 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "listActions_unsigned_without_source_locking_script",
+      "group": "unsigned_491",
+      "call": "listActions",
+      "args": {
+        "includeInputs": true,
+        "includeInputUnlockingScripts": true,
+        "labels": [],
+        "includeInputSourceLockingScripts": true
+      },
+      "bodyText": "{\"totalActions\":2,\"actions\":[{\"txid\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"satoshis\":5000,\"status\":\"completed\",\"isOutgoing\":false,\"description\":\"a caller puzzle\",\"version\":1,\"lockTime\":0,\"inputs\":[]},{\"txid\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"satoshis\":0,\"status\":\"unsigned\",\"isOutgoing\":true,\"description\":\"wire ten byte declaration\",\"version\":1,\"lockTime\":0,\"inputs\":[{\"sourceOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.0\",\"sourceSatoshis\":5000,\"inputDescription\":\"the caller puzzle\",\"sequenceNumber\":0}]}]}",
+      "reference": {
+        "error": "Invalid listActions result actions[1].inputs[0].sourceLockingScript: expected the explicitly requested source locking script"
+      }
     }
   ]
 }

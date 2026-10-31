@@ -193,6 +193,7 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
   `auth/clients/authhttp` at `2ca481c` has context/goroutine semantics and different
   payment options/texts. The six reviewed sites and the fallback safeguard are
   stated in #423's CHANGELOG parity note; tests/auth_fetch_423*.rs are the witnesses.
+- R56 under `includeInputUnlockingScripts` (#491, the stack's word of 2026-10-31 05:1xZ): an `unsigned` action's input may omit `unlockingScript`, as the reference wallet answers (`ts-stack@edf6e03` `listActionsIdb.ts:77-91`, the key absent outside `StorageKnex.ts:189-209`'s known-valid set), where the reference validator refuses it (`WalletResultValidation.ts:2027-2035`, run on every answer by `WalletClient.ts:113-118`); every other status keeps the demand in the reference's words. [D] residue: a signed action with status unprocessed, nonfinal or failed stays strict here, though the reference wallet can answer it without the key: whether its request row is known valid is a storage fact the answer does not show. Ours: the stack's 2026-10-31 05:1xZ word relaxes the unsigned status alone, the one the answer decides. Theirs: ts-stack #1451 (the witness: tests/wallet_http_json_result_values_408.rs; tests/vectors/http_json_result_values_408.json, group unsigned_491; bsv-wallet-cli#371).
 
 ## Where the numbers come from
 

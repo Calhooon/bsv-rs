@@ -104,6 +104,22 @@ async fn call(wallet: &HttpWalletJson, c: &Case) -> Result<(), Error> {
     }
 }
 
+async fn answer(c: &Case) -> Result<(), Error> {
+    let body = match &c.expansion {
+        Some(e) => c.body_text.replace(&e.marker, &e.text()),
+        None => c.body_text.clone(),
+    };
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path(format!("/{}", c.call)))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let wallet = HttpWalletJson::new(Some("fixtures.invalid".into()), Some(server.uri())).unwrap();
+    call(&wallet, c).await
+}
+
 async fn check(group: &str) {
     let cases: Vec<_> = cases().into_iter().filter(|c| c.group == group).collect();
     let (count, accepted) = match group {
@@ -123,20 +139,7 @@ async fn check(group: &str) {
     );
     let mut mismatches = Vec::new();
     for c in cases {
-        let body = match &c.expansion {
-            Some(e) => c.body_text.replace(&e.marker, &e.text()),
-            None => c.body_text.clone(),
-        };
-        let server = MockServer::start().await;
-        Mock::given(method("POST"))
-            .and(path(format!("/{}", c.call)))
-            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
-            .expect(1)
-            .mount(&server)
-            .await;
-        let wallet =
-            HttpWalletJson::new(Some("fixtures.invalid".into()), Some(server.uri())).unwrap();
-        let ours = call(&wallet, &c).await;
+        let ours = answer(&c).await;
         let matches = match &ours {
             Ok(()) => c.reference["accepted"] == true,
             Err(Error::WalletError(words)) => c.reference["error"].as_str() == Some(words),
@@ -167,4 +170,66 @@ async fn null_and_wrong_containers_are_never_absent_optional_fields() {
 #[tokio::test]
 async fn every_certificate_result_requires_canonical_encoding_and_the_size_bound() {
     check("certificate").await;
+}
+
+fn case_491(name: &str) -> Case {
+    let name = format!("listActions_{name}");
+    cases()
+        .into_iter()
+        .find(|c| c.group == "unsigned_491" && c.name == name)
+        .unwrap_or_else(|| panic!("no recorded case {name}"))
+}
+
+const STRICT_491: &str = "Invalid listActions result actions[1].inputs[0].unlockingScript: \
+                          expected the explicitly requested unlocking script";
+
+#[tokio::test]
+async fn an_unsigned_actions_input_may_omit_its_unlocking_script_as_the_reference_wallet_answers() {
+    // #491, bsv-wallet-cli#371's fixture 145: the reference wallet answers an
+    // unsigned action's input with no unlockingScript (listActionsIdb.ts:77-91
+    // at ts-stack edf6e03) and the reference validator refuses its own wallet's
+    // page (WalletResultValidation.ts:2027-2035): the divergence, stated. The
+    // vector keeps the reference's refusal; this crate accepts the page.
+    let c = case_491("unsigned_without_unlocking_script");
+    assert_eq!(c.reference["error"], STRICT_491);
+    assert_eq!(answer(&c).await, Ok(()));
+    // The fixture's own one-byte inputDescription stays R51's refusal here:
+    // the reference's second refusal, recorded where a script is supplied.
+    let c = case_491("unsigned_fixture_145_description");
+    assert_eq!(c.reference["error"], STRICT_491);
+    let r51 = case_491("unsigned_fixture_145_description_with_script");
+    let words = r51.reference["error"].as_str().unwrap();
+    assert!(words.ends_with("inputs[0].inputDescription: expected 5\u{2013}2000 UTF-8 bytes"));
+    assert_eq!(answer(&c).await, Err(Error::WalletError(words.into())));
+}
+
+#[tokio::test]
+async fn the_strict_rule_stays_for_every_other_status_and_returns_on_the_upstreams_answer() {
+    // #491 relaxes R56 for an unsigned action's input alone; ts-stack #1451
+    // asks the reference which side moves, and strictness returns on the
+    // upstream's answer: the unsigned case is then judged with the rest below.
+    // The signed statuses unprocessed, nonfinal and failed are the [D] residue.
+    let cases: Vec<_> = cases()
+        .into_iter()
+        .filter(|c| c.group == "unsigned_491")
+        .collect();
+    assert_eq!(cases.len(), 13);
+    let mut mismatches = Vec::new();
+    for c in &cases {
+        if c.name.ends_with("unsigned_without_unlocking_script")
+            || c.name.ends_with("unsigned_fixture_145_description")
+        {
+            continue;
+        }
+        let ours = answer(c).await;
+        let matches = match &ours {
+            Ok(()) => c.reference["accepted"] == true,
+            Err(Error::WalletError(words)) => c.reference["error"].as_str() == Some(words),
+            _ => false,
+        };
+        if !matches {
+            mismatches.push(format!("{}: {ours:?}; reference {}", c.name, c.reference));
+        }
+    }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }
