@@ -984,6 +984,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
         // Strictly, as Certificate.verify's toBinary refuses a lenient form (#498)
         let subject = PublicKey::from_strict_hex(subject_hex)?;
+        // The subject's signed revelation, or skipped (#544)
+        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &subject) {
+            return Ok(None);
+        }
         let certifier = PublicKey::from_strict_hex(certifier_hex)?;
 
         // Create the base certificate
@@ -1141,6 +1145,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             Ok(pk) => pk,
             Err(_) => return Ok(None), // Invalid subject pubkey
         };
+        // The subject's signed revelation, or skipped (#544)
+        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &subject) {
+            return Ok(None);
+        }
         let certifier = match PublicKey::from_strict_hex(certifier_hex) {
             Ok(pk) => pk,
             Err(_) => return Ok(None), // Invalid certifier pubkey
@@ -1772,3 +1780,6 @@ mod tests {
 #[cfg(test)]
 #[path = "client_field_value_261_tests.rs"]
 mod field_value_261_tests;
+
+#[path = "client_token.rs"]
+mod token;

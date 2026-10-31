@@ -23,11 +23,14 @@ use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, OutputListItem,
     OverlayLookupFacilitator,
 };
-use bsv_rs::primitives::{to_hex, PrivateKey};
+use bsv_rs::primitives::{to_hex, PrivateKey, PublicKey};
 use bsv_rs::script::templates::PushDrop;
+use bsv_rs::script::LockingScript;
 use bsv_rs::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::types::Outpoint;
-use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::wallet::{
+    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, ProtoWallet, Protocol, SecurityLevel,
+};
 use bsv_rs::Error;
 use std::sync::Arc;
 
@@ -346,13 +349,46 @@ impl OverlayLookupFacilitator for Outputs {
     }
 }
 
+/// The subject's signed revelation of `json` (#544), as the reference's
+/// `publiclyRevealAttributes` locks it (`IdentityClient.ts:502-509`:
+/// `PushDrop.lock([json], [1, 'identity'], '1', 'anyone', true, true)`).
+fn revelation(subject: &PrivateKey, json: &[u8]) -> LockingScript {
+    let wallet = ProtoWallet::new(Some(subject.clone()));
+    let protocol = Protocol::new(SecurityLevel::App, "identity");
+    let key = wallet
+        .get_public_key(GetPublicKeyArgs {
+            protocol_id: Some(protocol.clone()),
+            key_id: Some("1".into()),
+            counterparty: Some(Counterparty::Anyone),
+            for_self: Some(true),
+            ..Default::default()
+        })
+        .unwrap()
+        .public_key;
+    let signature = wallet
+        .create_signature(CreateSignatureArgs {
+            data: Some(json.to_vec()),
+            protocol_id: protocol,
+            key_id: "1".into(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    PushDrop::new(
+        PublicKey::from_hex(&key).unwrap(),
+        vec![json.to_vec(), signature],
+    )
+    .lock()
+}
+
 /// One output whose PushDrop carries `json`, a certificate's text.
 fn published(json: &str) -> OutputListItem {
-    let locking = PushDrop::new(
-        PrivateKey::from_bytes(&[3u8; 32]).unwrap().public_key(),
-        vec![json.as_bytes().to_vec()],
-    )
-    .lock();
+    // The subject's (key 43's) signed revelation (#544).
+    let locking = revelation(
+        &PrivateKey::from_bytes(&[43u8; 32]).unwrap(),
+        json.as_bytes(),
+    );
     let mut tx = Transaction::new();
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();

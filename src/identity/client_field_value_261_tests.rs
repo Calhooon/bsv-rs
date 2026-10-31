@@ -16,8 +16,12 @@ use super::*;
 use crate::overlay::OutputListItem;
 use crate::primitives::to_hex;
 use crate::script::templates::PushDrop;
+use crate::script::LockingScript;
 use crate::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
 use crate::wallet::types::Outpoint;
+use crate::wallet::{
+    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, ProtoWallet, Protocol, SecurityLevel,
+};
 
 fn reference_issued() -> serde_json::Value {
     let v: serde_json::Value = serde_json::from_str(include_str!(
@@ -35,13 +39,18 @@ fn published(r: &serde_json::Value) -> OutputListItem {
     publish(&json)
 }
 
-/// One output whose PushDrop carries `json`.
+/// One output whose PushDrop carries `json`, signed by the reference
+/// certificate's subject (the scalar 37).
 fn publish(json: &serde_json::Value) -> OutputListItem {
-    let locking = PushDrop::new(
-        PrivateKey::from_bytes(&[3u8; 32]).unwrap().public_key(),
-        vec![serde_json::to_vec(json).unwrap()],
-    )
-    .lock();
+    let mut scalar = [0u8; 32];
+    scalar[31] = 37;
+    publish_by(json, &PrivateKey::from_bytes(&scalar).unwrap())
+}
+
+/// One output whose PushDrop carries `json`, the subject's signed
+/// revelation (#544).
+fn publish_by(json: &serde_json::Value, subject: &PrivateKey) -> OutputListItem {
+    let locking = revelation(subject, &serde_json::to_vec(json).unwrap());
     let mut tx = Transaction::new();
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
@@ -53,6 +62,39 @@ fn publish(json: &serde_json::Value) -> OutputListItem {
         output_index: 0,
         context: None,
     }
+}
+
+/// The subject's signed revelation of `json` (#544), as the reference's
+/// `publiclyRevealAttributes` locks it (`IdentityClient.ts:502-509`:
+/// `PushDrop.lock([json], [1, 'identity'], '1', 'anyone', true, true)`).
+fn revelation(subject: &PrivateKey, json: &[u8]) -> LockingScript {
+    let wallet = ProtoWallet::new(Some(subject.clone()));
+    let protocol = Protocol::new(SecurityLevel::App, "identity");
+    let key = wallet
+        .get_public_key(GetPublicKeyArgs {
+            protocol_id: Some(protocol.clone()),
+            key_id: Some("1".into()),
+            counterparty: Some(Counterparty::Anyone),
+            for_self: Some(true),
+            ..Default::default()
+        })
+        .unwrap()
+        .public_key;
+    let signature = wallet
+        .create_signature(CreateSignatureArgs {
+            data: Some(json.to_vec()),
+            protocol_id: protocol,
+            key_id: "1".into(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    PushDrop::new(
+        PublicKey::from_hex(&key).unwrap(),
+        vec![json.to_vec(), signature],
+    )
+    .lock()
 }
 
 fn plaintexts(r: &serde_json::Value) -> IndexMap<String, String> {
@@ -163,11 +205,8 @@ fn published_with_txid_alone() -> (Certificate, OutputListItem) {
     let mut json = serde_json::to_value(&cert).unwrap();
     json["revocationOutpoint"] = txid.into();
     json["keyring"] = serde_json::json!({});
-    let locking = PushDrop::new(
-        PrivateKey::from_bytes(&[3u8; 32]).unwrap().public_key(),
-        vec![serde_json::to_vec(&json).unwrap()],
-    )
-    .lock();
+    let subject_key = PrivateKey::from_bytes(&[37u8; 32]).unwrap();
+    let locking = revelation(&subject_key, &serde_json::to_vec(&json).unwrap());
     let mut tx = Transaction::new();
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
@@ -220,7 +259,8 @@ async fn a_published_txid_alone_revocation_outpoint_parses_to_a_verifying_certif
 #[tokio::test]
 async fn a_published_certificate_key_in_a_lenient_form_is_skipped_498() {
     let certifier = PrivateKey::from_bytes(&[31u8; 32]).unwrap();
-    let subject = PrivateKey::from_bytes(&[37u8; 32]).unwrap().public_key();
+    let subject_key = PrivateKey::from_bytes(&[37u8; 32]).unwrap();
+    let subject = subject_key.public_key();
     let mut cert = Certificate::new([6; 32], [7; 32], subject, certifier.public_key());
     cert.revocation_outpoint =
         Some(Outpoint::from_string(&format!("{}.0", "ab".repeat(32))).unwrap());
@@ -230,7 +270,7 @@ async fn a_published_certificate_key_in_a_lenient_form_is_skipped_498() {
     json["keyring"] = serde_json::json!({});
     let client = IdentityClient::new(ProtoWallet::new(None), Default::default());
     assert!(client
-        .parse_output_to_verifiable_certificate(&publish(&json))
+        .parse_output_to_verifiable_certificate(&publish_by(&json, &subject_key))
         .await
         .unwrap()
         .is_some());
@@ -244,7 +284,7 @@ async fn a_published_certificate_key_in_a_lenient_form_is_skipped_498() {
             assert_eq!(PublicKey::from_hex(&form).unwrap(), key);
             let mut lenient = json.clone();
             lenient[member] = form.clone().into();
-            let output = publish(&lenient);
+            let output = publish_by(&lenient, &subject_key);
             assert!(
                 client
                     .parse_output_to_verifiable_certificate(&output)
