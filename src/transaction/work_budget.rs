@@ -56,12 +56,41 @@ impl WorkBudget {
             .or_else(|| self.per_transaction.map(|_| u64::MAX))
     }
 
-    pub(super) fn charge(
-        self,
-        total: &mut u64,
-        input: u32,
-        work: u64,
-    ) -> Result<(), NotJudgedCause> {
+    /// Charges one input's work to a transaction's running total: the
+    /// per-transaction rule's one implementation (#567).
+    ///
+    /// `total` is the caller's running sum for one transaction, starting at
+    /// zero; `input` is the input's index in that transaction; `work` is what
+    /// the input spent, in [`crate::script::Spend::work_spent`]'s units. Call
+    /// it once per judged input, after the input runs, in the transaction's
+    /// input order. The work is added (saturating at `u64::MAX`) before the
+    /// bound is read, so `total` holds the charged sum even on a refusal. A
+    /// total above [`Self::per_transaction`], or a sum past `u64::MAX` under
+    /// any bound, is [`NotJudgedCause::TransactionWorkBudgetExceeded`] naming
+    /// this `input`, the `limit` and the `total`; with no transaction bound it
+    /// always answers `Ok(())`.
+    ///
+    /// [`Self::per_input`] is not read here: an input over its own bound is
+    /// refused by the interpreter while it runs
+    /// ([`NotJudgedCause::WorkBudgetExceeded`]), before its work reaches the
+    /// total. [`crate::transaction::Transaction::verify_with_work_budgets`] and
+    /// both stream verifiers call this method, so a host that runs each input
+    /// itself charges the same rule and answers the same cause.
+    ///
+    /// ```
+    /// use bsv_rs::script::NotJudgedCause;
+    /// use bsv_rs::transaction::WorkBudget;
+    ///
+    /// let budget = WorkBudget::new().with_per_transaction(Some(70));
+    /// let mut total = 0;
+    /// assert_eq!(budget.charge(&mut total, 0, 68), Ok(()));
+    /// assert_eq!(
+    ///     budget.charge(&mut total, 1, 6),
+    ///     Err(NotJudgedCause::TransactionWorkBudgetExceeded { input: 1, limit: 70, total: 74 })
+    /// );
+    /// assert_eq!(total, 74);
+    /// ```
+    pub fn charge(self, total: &mut u64, input: u32, work: u64) -> Result<(), NotJudgedCause> {
         let next = total.checked_add(work);
         *total = next.unwrap_or(u64::MAX);
         if let Some(limit) = self.per_transaction {
@@ -94,5 +123,14 @@ mod tests {
                 total: u64::MAX,
             })
         );
+    }
+
+    #[test]
+    fn a_per_input_bound_alone_never_refuses_through_charge_567() {
+        let policy = WorkBudget::new().with_per_input(Some(1));
+        let mut total = 0;
+        assert_eq!(policy.charge(&mut total, 0, 68), Ok(()));
+        assert_eq!(policy.charge(&mut total, 1, u64::MAX), Ok(()));
+        assert_eq!(total, u64::MAX);
     }
 }
