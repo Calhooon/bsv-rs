@@ -59,41 +59,39 @@ impl<W: WalletInterface> ContactsManager<W> {
         Ok(contacts)
     }
 
+    /// `#decryptContactOutputs`' read of one output (`ContactsManager.ts:480-503`):
+    /// the script and the custom instructions present, the script bounded,
+    /// the key ID read, the token authenticated, decrypted and read as the
+    /// reference's record; any refusal drops the output, as the reference's
+    /// `Promise.allSettled` does (`:507-513`). The saved-at time is the
+    /// cache's, never the token's (#544).
     async fn decode_cached_contact(
         &self,
         output: crate::wallet::WalletOutput,
     ) -> Result<Option<Contact>> {
-        let Some(key_id) = super::actions::stored_key_id(&output) else {
+        let (Some(bytes), Some(_)) = (&output.locking_script, &output.custom_instructions) else {
             return Ok(None);
         };
-        let Some(bytes) = output.locking_script else {
+        if bytes.len() > super::record::MAX_CIPHERTEXT + 2048 {
+            return Ok(None);
+        }
+        let Ok(key_id) = super::record::read_key_id(output.custom_instructions.as_deref()) else {
             return Ok(None);
         };
-        let script = crate::script::LockingScript::from_binary(&bytes)
-            .map_err(|e| Error::IdentityError(format!("Failed to parse locking script: {e}")))?;
-        // Lock-before alone, as ContactsManager.ts:432 decodes it (#537).
-        let Ok(decoded) = PushDrop::decode_before(&script) else {
+        let Ok(script) = crate::script::LockingScript::from_binary(bytes) else {
             return Ok(None);
         };
-        let Some(ciphertext) = decoded.fields.first() else {
+        let Ok(record) = self.open_contact(&script, &key_id).await else {
             return Ok(None);
         };
-        let plaintext = self
-            .wallet
-            .decrypt(
-                DecryptArgs {
-                    ciphertext: ciphertext.clone(),
-                    protocol_id: self.protocol()?,
-                    key_id,
-                    counterparty: Some(Counterparty::Self_),
-                    ..Default::default()
-                },
-                self.originator(),
-            )
-            .await;
-        Ok(plaintext
-            .ok()
-            .and_then(|r| serde_json::from_slice(&r.plaintext).ok()))
+        let added_at = self
+            .cache
+            .read()
+            .await
+            .contacts
+            .get(&record.identity_key)
+            .map_or(0, |cached| cached.added_at);
+        Ok(Some(super::record::contact_of(record, added_at)))
     }
 
     // =========================================================================

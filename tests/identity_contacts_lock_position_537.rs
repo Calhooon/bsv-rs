@@ -117,7 +117,9 @@ async fn a_lock_after_contact_token_is_dropped_as_the_reference_drops_it_537() {
             case["name"]
         );
     }
-    // The same ciphertext locked before is loaded.
+    // The same fields locked before were loaded until #544; since then the
+    // reference's authentication drops them too: the key is not the
+    // wallet's for the key ID (`ContactsManager.ts:447-449`).
     let control = lock_position::relocked_before(&cases[0]);
-    assert_eq!(contacts(&cases[0], control).await, 1);
+    assert_eq!(contacts(&cases[0], control).await, 0);
 }

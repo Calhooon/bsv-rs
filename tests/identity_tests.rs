@@ -724,6 +724,12 @@ fn test_default_socialcert_certifier() {
 
 mod contacts_manager_tests {
     use super::*;
+
+    // Canonical compressed keys (1G, 2G, 3G): the reference's record admits
+    // no other identity key (`ContactsManager.ts:83-94`; #544).
+    const ALICE: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    const BOB: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
+    const CHARLIE: &str = "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
     use bsv_rs::identity::ContactsManager;
     use bsv_rs::wallet::ProtoWallet;
 
@@ -744,10 +750,10 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let contact = create_test_contact("02abc123", "Alice");
+        let contact = create_test_contact(ALICE, "Alice");
         manager.add_contact(contact.clone()).await.unwrap();
 
-        let retrieved = manager.get_contact("02abc123").await.unwrap();
+        let retrieved = manager.get_contact(ALICE).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "Alice");
     }
@@ -767,20 +773,20 @@ mod contacts_manager_tests {
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         // Add initial contact
-        let contact = create_test_contact("02abc123", "Alice");
+        let contact = create_test_contact(ALICE, "Alice");
         manager.add_contact(contact).await.unwrap();
 
         // Update the contact
         let updated = Contact {
-            identity_key: "02abc123".to_string(),
+            identity_key: ALICE.to_string(),
             name: "Alice Updated".to_string(),
             notes: Some("Updated notes".to_string()),
             ..Default::default()
         };
-        manager.update_contact("02abc123", updated).await.unwrap();
+        manager.update_contact(ALICE, updated).await.unwrap();
 
         // Verify update
-        let retrieved = manager.get_contact("02abc123").await.unwrap().unwrap();
+        let retrieved = manager.get_contact(ALICE).await.unwrap().unwrap();
         assert_eq!(retrieved.name, "Alice Updated");
         assert_eq!(retrieved.notes, Some("Updated notes".to_string()));
     }
@@ -790,7 +796,7 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let contact = create_test_contact("02abc123", "Alice");
+        let contact = create_test_contact(ALICE, "Alice");
         let result = manager.update_contact("nonexistent", contact).await;
         assert!(result.is_err());
     }
@@ -800,17 +806,17 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let contact = create_test_contact("02abc123", "Alice");
+        let contact = create_test_contact(ALICE, "Alice");
         manager.add_contact(contact).await.unwrap();
 
         // Verify contact exists
-        assert!(manager.get_contact("02abc123").await.unwrap().is_some());
+        assert!(manager.get_contact(ALICE).await.unwrap().is_some());
 
         // Remove contact
-        manager.remove_contact("02abc123").await.unwrap();
+        manager.remove_contact(ALICE).await.unwrap();
 
         // Verify contact is removed
-        assert!(manager.get_contact("02abc123").await.unwrap().is_none());
+        assert!(manager.get_contact(ALICE).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -829,15 +835,15 @@ mod contacts_manager_tests {
 
         // Add multiple contacts
         manager
-            .add_contact(create_test_contact("02abc123", "Alice"))
+            .add_contact(create_test_contact(ALICE, "Alice"))
             .await
             .unwrap();
         manager
-            .add_contact(create_test_contact("02def456", "Bob"))
+            .add_contact(create_test_contact(BOB, "Bob"))
             .await
             .unwrap();
         manager
-            .add_contact(create_test_contact("02ghi789", "Charlie"))
+            .add_contact(create_test_contact(CHARLIE, "Charlie"))
             .await
             .unwrap();
 
@@ -851,15 +857,15 @@ mod contacts_manager_tests {
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         manager
-            .add_contact(create_test_contact("02abc123", "Alice Smith"))
+            .add_contact(create_test_contact(ALICE, "Alice Smith"))
             .await
             .unwrap();
         manager
-            .add_contact(create_test_contact("02def456", "Bob Jones"))
+            .add_contact(create_test_contact(BOB, "Bob Jones"))
             .await
             .unwrap();
         manager
-            .add_contact(create_test_contact("02ghi789", "Alice Johnson"))
+            .add_contact(create_test_contact(CHARLIE, "Alice Johnson"))
             .await
             .unwrap();
 
@@ -873,7 +879,7 @@ mod contacts_manager_tests {
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         manager
-            .add_contact(create_test_contact("02abc123", "ALICE"))
+            .add_contact(create_test_contact(ALICE, "ALICE"))
             .await
             .unwrap();
 
@@ -888,10 +894,10 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let mut contact1 = create_test_contact("02abc123", "Alice");
+        let mut contact1 = create_test_contact(ALICE, "Alice");
         contact1.tags = vec!["work".to_string(), "engineering".to_string()];
 
-        let mut contact2 = create_test_contact("02def456", "Bob");
+        let mut contact2 = create_test_contact(BOB, "Bob");
         contact2.tags = vec!["personal".to_string()];
 
         manager.add_contact(contact1).await.unwrap();
@@ -907,7 +913,7 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let mut contact = create_test_contact("02abc123", "Alice");
+        let mut contact = create_test_contact(ALICE, "Alice");
         contact.notes = Some("Met at the blockchain conference".to_string());
 
         manager.add_contact(contact).await.unwrap();
@@ -922,10 +928,10 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let mut contact1 = create_test_contact("02abc123", "Alice");
+        let mut contact1 = create_test_contact(ALICE, "Alice");
         contact1.tags = vec!["work".to_string()];
 
-        let mut contact2 = create_test_contact("02def456", "Bob");
+        let mut contact2 = create_test_contact(BOB, "Bob");
         contact2.tags = vec!["personal".to_string()];
 
         manager.add_contact(contact1).await.unwrap();
@@ -950,7 +956,7 @@ mod contacts_manager_tests {
         assert_eq!(manager.cached_count().await, 0);
 
         manager
-            .add_contact(create_test_contact("02abc123", "Alice"))
+            .add_contact(create_test_contact(ALICE, "Alice"))
             .await
             .unwrap();
         assert_eq!(manager.cached_count().await, 1);
@@ -965,11 +971,11 @@ mod contacts_manager_tests {
         let wallet = ProtoWallet::new(None);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
-        let contact1 = create_test_contact("02abc123", "Alice V1");
+        let contact1 = create_test_contact(ALICE, "Alice V1");
         manager.add_contact(contact1).await.unwrap();
 
         let contact2 = Contact {
-            identity_key: "02abc123".to_string(),
+            identity_key: ALICE.to_string(),
             name: "Alice V2".to_string(),
             notes: Some("Updated".to_string()),
             ..Default::default()
@@ -979,7 +985,7 @@ mod contacts_manager_tests {
         let contacts = manager.list_contacts().await.unwrap();
         assert_eq!(contacts.len(), 1);
 
-        let retrieved = manager.get_contact("02abc123").await.unwrap().unwrap();
+        let retrieved = manager.get_contact(ALICE).await.unwrap().unwrap();
         assert_eq!(retrieved.name, "Alice V2");
     }
 
@@ -989,7 +995,7 @@ mod contacts_manager_tests {
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         manager
-            .add_contact(create_test_contact("02abc123", "Alice"))
+            .add_contact(create_test_contact(ALICE, "Alice"))
             .await
             .unwrap();
 

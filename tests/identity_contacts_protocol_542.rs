@@ -241,6 +241,17 @@ async fn the_spend_of_a_reference_token_is_signed_by_its_locking_key_542() {
     let wallet = Counting::of_scalar(9);
     *wallet.listed.lock().unwrap() = Some(listed);
     *wallet.spending.lock().unwrap() = Some(source);
+    // A signAction answer naming a txid: since #544 a failed update is the
+    // caller's error, as the reference's saveContact throws it.
+    wallet
+        .sign_answers
+        .lock()
+        .unwrap()
+        .push_back(Ok(bsv_rs::wallet::SignActionResult {
+            txid: Some([0xab; 32]),
+            tx: None,
+            send_with_results: None,
+        }));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     manager.add_contact(contact(&v)).await.unwrap();
     let signed = wallet.signed.lock().unwrap().clone().unwrap();

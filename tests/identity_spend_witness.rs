@@ -52,7 +52,13 @@ use bsv_rs::{Error, Result};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-const CONTACT_KEY_ID: &str = "contact-key-1";
+/// Base64 of 32 bytes, as the reference's `#readKeyID` demands
+/// (`ContactsManager.ts:414-429`; #544).
+const CONTACT_KEY_ID: &str = "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=";
+/// Canonical compressed keys (1G, 2G): the reference's record admits no
+/// other identity key (`ContactsManager.ts:83-94`; #544).
+const ALICE: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const BOB: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
 
 /// A transaction input the test can name: the source's own input spends a
 /// made-up outpoint, the source's output 0 is the token.
@@ -476,8 +482,47 @@ fn node_verdict(
 }
 
 /// A PushDrop token locked to `key`, as the identity paths lock theirs.
-fn token(key: PublicKey) -> LockingScript {
-    PushDrop::new(key, vec![b"token".to_vec()]).lock()
+/// The reference's contact token for `identity_key` (#544): the record
+/// encrypted under `[2, 'contact']`, the key ID and self, the wallet's
+/// signature over the ciphertext second, locked with the derived key.
+async fn contact_token(wallet: &TokenWallet, identity_key: &str) -> LockingScript {
+    let protocol = Protocol::new(SecurityLevel::Counterparty, "contact");
+    let record = serde_json::json!({
+        "name": "Alice", "avatarURL": "", "abbreviatedKey": "", "identityKey": identity_key,
+        "badgeIconURL": "", "badgeLabel": "", "badgeClickURL": "",
+    });
+    let ciphertext = WalletInterface::encrypt(
+        wallet.keys.as_ref(),
+        bsv_rs::wallet::EncryptArgs {
+            plaintext: record.to_string().into_bytes(),
+            protocol_id: protocol.clone(),
+            key_id: CONTACT_KEY_ID.into(),
+            counterparty: Some(Counterparty::Self_),
+            ..Default::default()
+        },
+        None,
+    )
+    .await
+    .unwrap()
+    .ciphertext;
+    let signature = WalletInterface::create_signature(
+        wallet.keys.as_ref(),
+        bsv_rs::wallet::CreateSignatureArgs {
+            data: Some(ciphertext.clone()),
+            protocol_id: protocol.clone(),
+            key_id: CONTACT_KEY_ID.into(),
+            counterparty: Some(Counterparty::Self_),
+            ..Default::default()
+        },
+        None,
+    )
+    .await
+    .unwrap()
+    .signature;
+    let key = wallet
+        .derived_key(protocol, CONTACT_KEY_ID, Counterparty::Self_)
+        .await;
+    PushDrop::new(key, vec![ciphertext, signature]).lock()
 }
 
 fn contact(identity_key: &str) -> Contact {
@@ -549,36 +594,25 @@ async fn an_identity_revocation_signature_verifies_under_the_node_word() {
 #[tokio::test]
 async fn a_contact_update_signature_verifies_under_the_node_word() {
     let wallet = TokenWallet::new();
-    // The reference's contact protocol, `[2, 'contact']` (#542).
-    let protocol = Protocol::new(SecurityLevel::Counterparty, "contact");
-    let lock = token(
-        wallet
-            .derived_key(protocol, CONTACT_KEY_ID, Counterparty::Self_)
-            .await,
-    );
+    // The reference's contact token under `[2, 'contact']` (#542), signed
+    // and carrying the reference's record (#544).
+    let lock = contact_token(&wallet, ALICE).await;
     wallet.set_source(source_transaction(&lock));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
 
-    manager
-        .add_contact(contact(&"02".repeat(33)))
-        .await
-        .unwrap();
+    manager.add_contact(contact(ALICE)).await.unwrap();
     assert_every_spend_verifies(&wallet, &lock, 1);
 }
 
 #[tokio::test]
 async fn a_contact_removal_signature_verifies_under_the_node_word() {
     let wallet = TokenWallet::new();
-    // The reference's contact protocol, `[2, 'contact']` (#542).
-    let protocol = Protocol::new(SecurityLevel::Counterparty, "contact");
-    let lock = token(
-        wallet
-            .derived_key(protocol, CONTACT_KEY_ID, Counterparty::Self_)
-            .await,
-    );
+    // The reference's contact token under `[2, 'contact']` (#542), signed
+    // and carrying the reference's record (#544).
+    let identity_key = BOB.to_string();
+    let lock = contact_token(&wallet, &identity_key).await;
     wallet.set_source(source_transaction(&lock));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
-    let identity_key = "03".repeat(33);
     // the contact enters the cache through an update of the listed token
     manager.add_contact(contact(&identity_key)).await.unwrap();
 

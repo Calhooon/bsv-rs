@@ -24,7 +24,6 @@ use crate::primitives::bsv::sighash::{
 };
 use crate::primitives::{to_base64, to_hex};
 use crate::script::templates::PushDrop;
-use crate::script::LockingScript;
 use crate::transaction::{Transaction, TransactionOutput};
 use crate::wallet::{
     AbortActionArgs, Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions,
@@ -189,7 +188,12 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
         let tx = Transaction::from_beef(&output.beef, None).ok()?;
         let source = tx.outputs.get(output.output_index as usize)?;
         let token = PushDrop::decode(&source.locking_script).ok()?;
-        if token.fields.len() != 2 || !is_canonical_token(&source.locking_script, &token.fields) {
+        if token.fields.len() != 2
+            || !super::token_envelope::is_canonical_signed_pushdrop(
+                &source.locking_script,
+                &token.fields,
+            )
+        {
             return None;
         }
         if token.locking_public_key.to_hex() != locking_key {
@@ -441,31 +445,6 @@ fn certificate_verifies(parsed: &serde_json::Map<String, serde_json::Value>) -> 
         .collect();
     serde_json::from_value::<Certificate>(certificate.into())
         .is_ok_and(|certificate| matches!(certificate.verify(), Ok(true)))
-}
-
-/// The opcode a canonical push of `len` bytes opens with
-/// (`identityPushOpcode`, `IdentityClient.ts:123-128`).
-fn push_opcode(len: usize) -> u8 {
-    match len {
-        0..=75 => len as u8,
-        76..=0xff => 0x4c,
-        0x100..=0xffff => 0x4d,
-        _ => 0x4e,
-    }
-}
-
-/// `assertCanonicalIdentityTokenScript` (`IdentityClient.ts:130-147`): the
-/// key pushed, `OP_CHECKSIG`, the two fields each pushed by its canonical
-/// opcode, `OP_2DROP`, and nothing else.
-fn is_canonical_token(script: &LockingScript, fields: &[Vec<u8>]) -> bool {
-    let chunks = script.chunks();
-    chunks.len() == 5
-        && chunks[0].op == 33
-        && chunks[0].data.as_ref().is_some_and(|d| d.len() == 33)
-        && chunks[1].op == 0xac
-        && chunks[2].op == push_opcode(fields[0].len())
-        && chunks[3].op == push_opcode(fields[1].len())
-        && chunks[4].op == 0x6d
 }
 
 /// `revelationInputOutpoint` (`IdentityClient.ts:149-172`): an input's
