@@ -117,6 +117,10 @@ pub struct Signature { ... }   // new(), from_der(), from_compact(), from_compac
 - Always returns `true` for successfully parsed keys (matches Go `Validate()` / TS `validate()`)
 - Invalid keys fail at parse time (`from_bytes()` / `from_hex()`)
 
+### The key parser: `PublicKey::from_hex` (#498)
+- Reads a key string as the reference's `PublicKey.fromString` (`ts-stack@edf6e03` `PublicKey.ts:49-51`, `Point.ts:303-325,345-348,365-384,495-510`, `utils.ts:127-128`): an odd-length string with a leading `0`, a hybrid key (`06`/`07`) whose prefix names y's parity, a coordinate at or above p reduced. serde's `PublicKey` reading does not: it is `from_strict_hex` (hex, then `from_bytes`), as the reference's argument validators are strict. One parser, `ec/public_key_forms.rs` (`from_reference_der`, crate-visible under `overlay`, is its byte half; `script::templates::pushdrop_position::point_message` uses it for the six token readers' point words)
+- The point held is the reduced one; `to_hex` writes the strict form back. `from_bytes` stays strict (compressed or uncompressed, coordinates below p): strictness returns on the upstream's answer, the keeper's word of 2026-10-30 05:1xZ. Pins: `tests/primitives_public_key_forms_498.rs` (the vector `public_key_forms_498.json`, 39 Node 22 recordings)
+
 ## Usage Examples
 
 ### Hashing and Encryption
@@ -245,7 +249,8 @@ assert_eq!(key.to_bytes(), recovered.to_bytes());
 |------|-------|---------|
 | `mod.rs` | 77 | Module exports |
 | `private_key.rs` | 564 | PrivateKey: random generation, WIF, signing, BRC-42 derivation, ECDH |
-| `public_key.rs` | 679 | PublicKey: verification, addresses, BRC-42 derivation, ECDH, point math |
+| `public_key.rs` | 696 | PublicKey: verification, addresses, BRC-42 derivation, ECDH, point math |
+| `public_key_forms.rs` | 116 | `from_hex`'s reading: the reference's lenient key forms (#498) |
 | `signature.rs` | 531 | Signature: DER/compact encoding, low-S normalization, standalone verify |
 | `ecdsa.rs` | 306 | Core ECDSA sign/verify/recover functions |
 

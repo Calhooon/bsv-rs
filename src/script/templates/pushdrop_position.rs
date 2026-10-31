@@ -2,7 +2,7 @@
 //! the reference's words where that read refuses a token.
 
 use super::PushDrop;
-use crate::primitives::{BigNumber, PublicKey};
+use crate::primitives::PublicKey;
 use crate::script::{op, LockingScript};
 use crate::{Error, Result};
 
@@ -31,8 +31,8 @@ impl PushDrop {
 
 /// `Point.fromDER`'s words (`ts-stack@edf6e03` `Point.ts:303-325`) for key
 /// bytes it refuses; `None` where the reference accepts the point, so the
-/// caller keeps its native words. Normalization here only selects a
-/// diagnostic: it does not change which keys this crate accepts.
+/// caller keeps its native words. The acceptance is
+/// `PublicKey::from_reference_der`, `PublicKey::from_hex`'s reading (#498).
 pub(crate) fn point_message(bytes: &[u8]) -> Option<&'static str> {
     match (bytes.len(), bytes.first().copied(), bytes.last().copied()) {
         (65, Some(prefix @ (6 | 7)), Some(last)) if (prefix & 1) != (last & 1) => {
@@ -41,20 +41,7 @@ pub(crate) fn point_message(bytes: &[u8]) -> Option<&'static str> {
         (33, Some(2 | 3), _) | (65, Some(4 | 6 | 7), _) => {}
         _ => return Some("Unknown point format"),
     }
-    let mut canonical = bytes.to_vec();
-    if canonical.len() == 65 {
-        canonical[0] = 4;
-    }
-    // The reference checks hybrid parity before field arithmetic; both its
-    // Point constructor/validate and fromX evaluate coordinates modulo p.
-    let prime = BigNumber::secp256k1_prime();
-    for coordinate in canonical[1..].as_chunks_mut::<32>().0 {
-        let reduced = BigNumber::from_bytes_be(coordinate)
-            .modulo(&prime)
-            .to_bytes_be(32);
-        coordinate.copy_from_slice(&reduced);
-    }
-    PublicKey::from_bytes(&canonical)
+    PublicKey::from_reference_der(bytes)
         .is_err()
         .then_some("Invalid point")
 }

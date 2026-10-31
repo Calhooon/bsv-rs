@@ -187,7 +187,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> AuthFetch<W, T> {
                 GetPublicKeyArgs {
                     protocol_id: Some(Protocol::new(SecurityLevel::Counterparty, "3241645161d8")),
                     key_id: Some(format!("{prefix} {suffix}")),
-                    counterparty: Some(Counterparty::Other(PublicKey::from_hex(server)?)),
+                    // Strict, as the reference's wallet validates a counterparty
+                    // (`validationHelpers.ts:185-196`; #498).
+                    counterparty: Some(Counterparty::Other(PublicKey::from_strict_hex(server)?)),
                     ..Default::default()
                 },
                 self.originator.as_deref(),
@@ -308,3 +310,7 @@ fn failed(url: &str, payment: &PaymentData) -> crate::Error {
         payment.server
     ))
 }
+
+#[cfg(test)]
+#[path = "payment_key_strictness_498_tests.rs"]
+mod key_strictness_498_tests;

@@ -26,7 +26,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | 629; since #537 its three readers (`extract_fields`, `extract_value`, `is_kvstore_token`) decode lock-before alone, as `kvStoreTokenValidation.ts:88` does, a lock-after token no value (`tests/kvstore_interpreter_lock_position_537.rs`) |
 | `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches (#489); the token decode lock-before alone, as the reference's (#499) | 308 |
-| `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489); the point and envelope words come from `script::templates::pushdrop_position` since #537 | 58 |
+| `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489); the point and envelope words come from `script::templates::pushdrop_position` since #537, its point check `PublicKey::from_reference_der` (#498) | 58 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478) | 46 |
 | `local_outpoint.rs` | Exactly one validated completed output with the requested amount and new script; reference refusal words; amount option is this crate's addition (#478) | 24 |
 | `local_outpoint_tests.rs` | Recorded one-satoshi search: nonzero index, no match and two matches (#478) | 28 |
@@ -707,9 +707,12 @@ are RED on `9bcbe433`, while the two lock-after pins are green there. All
 13 pass after the fold; the extended #326 mode writes the vectors twice
 byte-identically under Node 22, preserving the original 36 cases.
 The stated #489 parity differences are also in the root and changelog:
-odd-length, on-curve hybrid and reduced-x keys accepted by the reference
-remain refused here in the native parser's own words. Lock-after tokens
-reached later field-count/envelope checks here until #499; since #499 the
+since #498 a wallet key in an odd-length, on-curve hybrid or reduced-x form is
+accepted by `PublicKey::from_hex` as by the reference, so the lookup reaches
+the reference's `KVStore token locking key does not belong to the wallet`
+(four `*_489_498` pins, marked for return); a token whose key push is one of
+those keeps the native parser's words (the byte path is strict). Lock-after
+tokens reached later field-count/envelope checks here until #499; since #499 the
 local decode is lock-before alone (`local_parser_words.rs::decode_pushdrop`)
 and refuses them in the reference's first-chunk words (six recorded shapes,
 kind `token_lock_after`). The general `PushDrop::decode` is unchanged; since

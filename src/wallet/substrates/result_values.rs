@@ -14,6 +14,8 @@ mod bytes;
 mod certificate;
 mod certificates;
 mod identity;
+#[cfg(test)]
+mod key_strictness_498_tests;
 mod lists;
 mod raw_tree;
 #[cfg(feature = "http")]

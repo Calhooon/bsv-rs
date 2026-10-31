@@ -4,7 +4,7 @@
 //! including serialization, address generation, signature verification, and BRC-42 key derivation.
 
 use crate::error::{Error, Result};
-use crate::primitives::encoding::{from_hex, to_base58_check, to_hex};
+use crate::primitives::encoding::{to_base58_check, to_hex};
 use crate::primitives::hash::{hash160, sha256_hmac};
 use crate::primitives::BigNumber;
 use k256::elliptic_curve::group::CurveAffine;
@@ -51,7 +51,14 @@ impl PublicKey {
         Ok(Self { inner })
     }
 
-    /// Parses a public key from a hex string.
+    /// Parses a public key from a hex string, as the reference's
+    /// `PublicKey.fromString` reads it (#498).
+    ///
+    /// Beyond the compressed and uncompressed forms `from_bytes` reads, it
+    /// accepts an odd-length string read with a leading `0`, a hybrid key
+    /// (`06`/`07` + x + y) whose prefix names y's parity, and coordinates at or
+    /// above the field prime reduced modulo it. The key held is the reduced
+    /// point, so `to_hex` writes the strict compressed form back.
     ///
     /// # Arguments
     ///
@@ -61,8 +68,27 @@ impl PublicKey {
     ///
     /// The parsed public key, or an error if the format is invalid
     pub fn from_hex(hex: &str) -> Result<Self> {
-        let bytes = from_hex(hex)?;
-        Self::from_bytes(&bytes)
+        super::public_key_forms::from_reference_hex(hex)
+    }
+
+    /// Parses a public key from hex strictly, as `from_hex` read it before
+    /// #498: even-length hex, then `from_bytes`. The serde reading and
+    /// `KeyringRevealer` use it, where the reference's argument validators
+    /// are strict (`AuthMessageValidation.ts:81-89`, `validationHelpers.ts:185-191`),
+    /// and so do the Peer's identity pin (compared as text, `Peer.ts:903-908`),
+    /// the three certificate intakes (`Certificate.toBinary`, `Certificate.ts:240-254`;
+    /// the requested set's certifiers, `getVerifiableCertificates.ts:76-81`) and
+    /// the HTTP answer's `x-bsv-auth-identity-key` header, read by the transport
+    /// and by the payment (`AuthMessageValidation.ts:344`, `validationHelpers.ts:185-196`).
+    pub(crate) fn from_strict_hex(hex: &str) -> Result<Self> {
+        Self::from_bytes(&crate::primitives::encoding::from_hex(hex)?)
+    }
+
+    /// Reads key bytes as the reference's `Point.fromDER` does: `from_hex`'s
+    /// reading after the hex is decoded (#498).
+    #[cfg(feature = "overlay")]
+    pub(crate) fn from_reference_der(bytes: &[u8]) -> Result<Self> {
+        super::public_key_forms::from_reference_der(bytes)
     }
 
     /// Creates a public key from a private key.
@@ -432,7 +458,7 @@ impl<'de> serde::Deserialize<'de> for PublicKey {
             where
                 E: serde::de::Error,
             {
-                PublicKey::from_hex(v).map_err(serde::de::Error::custom)
+                PublicKey::from_strict_hex(v).map_err(serde::de::Error::custom)
             }
         }
 

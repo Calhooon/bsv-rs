@@ -1,0 +1,415 @@
+{
+  "issue": 498,
+  "reference": "ts-stack@edf6e03 packages/sdk PublicKey.fromString",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "compressed_even",
+      "input": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "compressed_odd",
+      "input": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": true,
+      "reference_compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "point": {
+        "compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+      },
+      "error": null
+    },
+    {
+      "name": "uncompressed",
+      "input": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "compressed_upper_case",
+      "input": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "odd_length_compressed_even",
+      "input": "279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "odd_length_compressed_odd",
+      "input": "379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": true,
+      "reference_compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "point": {
+        "compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+      },
+      "error": null
+    },
+    {
+      "name": "odd_length_uncompressed",
+      "input": "479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "odd_length_hybrid_even",
+      "input": "679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "odd_length_hybrid_odd",
+      "input": "779be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "accepted": true,
+      "reference_compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "point": {
+        "compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+      },
+      "error": null
+    },
+    {
+      "name": "hybrid_even",
+      "input": "0679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "accepted": true,
+      "reference_compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "point": {
+        "compressed": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+      },
+      "error": null
+    },
+    {
+      "name": "hybrid_odd",
+      "input": "0779be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "accepted": true,
+      "reference_compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "reference_uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "point": {
+        "compressed": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "uncompressed": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+      },
+      "error": null
+    },
+    {
+      "name": "x_above_p_compressed_even",
+      "input": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "accepted": true,
+      "reference_compressed": "020000000000000000000000000000000000000000000000000000000000000001",
+      "reference_uncompressed": "0400000000000000000000000000000000000000000000000000000000000000014218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee",
+      "point": {
+        "compressed": "020000000000000000000000000000000000000000000000000000000000000001",
+        "uncompressed": "0400000000000000000000000000000000000000000000000000000000000000014218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee"
+      },
+      "error": null
+    },
+    {
+      "name": "x_above_p_compressed_odd",
+      "input": "03fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "accepted": true,
+      "reference_compressed": "030000000000000000000000000000000000000000000000000000000000000001",
+      "reference_uncompressed": "040000000000000000000000000000000000000000000000000000000000000001bde70df51939b94c9c24979fa7dd04ebd9b3572da7802290438af2a681895441",
+      "point": {
+        "compressed": "030000000000000000000000000000000000000000000000000000000000000001",
+        "uncompressed": "040000000000000000000000000000000000000000000000000000000000000001bde70df51939b94c9c24979fa7dd04ebd9b3572da7802290438af2a681895441"
+      },
+      "error": null
+    },
+    {
+      "name": "x_above_p_odd_length",
+      "input": "2fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "accepted": true,
+      "reference_compressed": "020000000000000000000000000000000000000000000000000000000000000001",
+      "reference_uncompressed": "0400000000000000000000000000000000000000000000000000000000000000014218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee",
+      "point": {
+        "compressed": "020000000000000000000000000000000000000000000000000000000000000001",
+        "uncompressed": "0400000000000000000000000000000000000000000000000000000000000000014218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee"
+      },
+      "error": null
+    },
+    {
+      "name": "x_above_p_uncompressed",
+      "input": "04fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc304218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee",
+      "accepted": true,
+      "reference_compressed": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "reference_uncompressed": "04fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc304218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee",
+      "point": {
+        "compressed": "020000000000000000000000000000000000000000000000000000000000000001",
+        "uncompressed": "0400000000000000000000000000000000000000000000000000000000000000014218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee"
+      },
+      "error": null
+    },
+    {
+      "name": "x_above_p_hybrid_even",
+      "input": "06fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc304218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee",
+      "accepted": true,
+      "reference_compressed": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "reference_uncompressed": "04fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc304218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee",
+      "point": {
+        "compressed": "020000000000000000000000000000000000000000000000000000000000000001",
+        "uncompressed": "0400000000000000000000000000000000000000000000000000000000000000014218f20ae6c646b363db68605822fb14264ca8d2587fdd6fbc750d587e76a7ee"
+      },
+      "error": null
+    },
+    {
+      "name": "x_above_p_hybrid_odd",
+      "input": "07fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30bde70df51939b94c9c24979fa7dd04ebd9b3572da7802290438af2a681895441",
+      "accepted": true,
+      "reference_compressed": "03fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "reference_uncompressed": "04fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30bde70df51939b94c9c24979fa7dd04ebd9b3572da7802290438af2a681895441",
+      "point": {
+        "compressed": "030000000000000000000000000000000000000000000000000000000000000001",
+        "uncompressed": "040000000000000000000000000000000000000000000000000000000000000001bde70df51939b94c9c24979fa7dd04ebd9b3572da7802290438af2a681895441"
+      },
+      "error": null
+    },
+    {
+      "name": "y_above_p_uncompressed",
+      "input": "041fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "accepted": true,
+      "reference_compressed": "021fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507",
+      "reference_uncompressed": "041fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "point": {
+        "compressed": "031fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507",
+        "uncompressed": "041fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff5070000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "error": null
+    },
+    {
+      "name": "y_above_p_hybrid_even",
+      "input": "061fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "accepted": true,
+      "reference_compressed": "021fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507",
+      "reference_uncompressed": "041fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "point": {
+        "compressed": "031fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507",
+        "uncompressed": "041fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff5070000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "error": null
+    },
+    {
+      "name": "y_above_p_hybrid_odd",
+      "input": "071fe1e5ef3fceb5c135ab7741333ce5a6e80d68167653f6b2b24bcbcfaaaff507fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Point string value is wrong length"
+    },
+    {
+      "name": "hybrid_even_prefix_odd_y",
+      "input": "0679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Point string value is wrong length"
+    },
+    {
+      "name": "hybrid_odd_prefix_even_y",
+      "input": "0779be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Point string value is wrong length"
+    },
+    {
+      "name": "odd_length_hybrid_wrong_parity",
+      "input": "779be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Point string value is wrong length"
+    },
+    {
+      "name": "x_equal_p_compressed",
+      "input": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid point"
+    },
+    {
+      "name": "x_above_p_off_curve",
+      "input": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc34",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid point"
+    },
+    {
+      "name": "uncompressed_off_curve",
+      "input": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b9",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid point"
+    },
+    {
+      "name": "compressed_prefix_05",
+      "input": "0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "compact_prefix_05_odd_length",
+      "input": "579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "infinity",
+      "input": "00",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "empty",
+      "input": "",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "prefix_alone",
+      "input": "02",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "odd_length_one_digit",
+      "input": "2",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "odd_length_short",
+      "input": "29be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "compressed_too_long",
+      "input": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179800",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Unknown point format"
+    },
+    {
+      "name": "non_hex",
+      "input": "zz",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid hex string"
+    },
+    {
+      "name": "non_hex_odd_length",
+      "input": "not-hex",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid hex string"
+    },
+    {
+      "name": "non_hex_odd_length_tail",
+      "input": "279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179g",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid hex string"
+    },
+    {
+      "name": "leading_space",
+      "input": " 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid hex string"
+    },
+    {
+      "name": "hex_prefix",
+      "input": "0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "reference_compressed": null,
+      "reference_uncompressed": null,
+      "point": null,
+      "error": "Invalid hex string"
+    }
+  ]
+}

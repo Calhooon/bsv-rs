@@ -185,6 +185,25 @@ async fn assert_stricter_key(kind: &str, native: Error) {
     }
 }
 
+/// #498: the reference's parser and `PublicKey::from_hex` both accept the key,
+/// and the local store refuses it in the reference's later words.
+async fn assert_accepted_key(kind: &str) {
+    for case in divergence_cases(kind) {
+        assert_eq!(case["parser_accepted"], true, "reference accepts this key");
+        assert!(case["parser_error"].is_null());
+        PublicKey::from_hex(case["public_key"].as_str().unwrap()).unwrap();
+        let reference = wrapped("KVStore token locking key does not belong to the wallet");
+        assert_eq!(case["error"], reference);
+        assert_eq!(
+            local_failure(&case).await,
+            Error::KvStoreLocalError(reference),
+            "{} {}: the reference's words now the key parses",
+            case["name"],
+            case["operation"]
+        );
+    }
+}
+
 #[tokio::test]
 async fn non_hex_locking_key_uses_reference_words_489() {
     assert_eq!(
@@ -223,41 +242,35 @@ async fn non_pushdrop_token_uses_reference_words_489() {
 }
 
 #[tokio::test]
-async fn reference_accepts_odd_valid_key_but_local_keeps_native_words_489() {
-    assert_stricter_key(
-        "key_odd_valid",
-        Error::InvalidHex("Odd number of digits".into()),
-    )
-    .await;
+async fn reference_and_local_accept_odd_valid_key_489_498() {
+    // #498: from_hex reads this key as the reference does, so the local lookup
+    // reaches the reference's later words; strictness returns on the upstream's
+    // answer (this test's #489 form was assert_stricter_key with native words).
+    assert_accepted_key("key_odd_valid").await;
 }
 
 #[tokio::test]
-async fn reference_accepts_hybrid_key_but_local_keeps_native_words_489() {
-    assert_stricter_key(
-        "key_hybrid_valid",
-        Error::InvalidPublicKey(
-            "Invalid public key encoding: elliptic curve point encoding error".into(),
-        ),
-    )
-    .await;
+async fn reference_and_local_accept_hybrid_key_489_498() {
+    // #498: from_hex reads this key as the reference does, so the local lookup
+    // reaches the reference's later words; strictness returns on the upstream's
+    // answer (this test's #489 form was assert_stricter_key with native words).
+    assert_accepted_key("key_hybrid_valid").await;
 }
 
 #[tokio::test]
-async fn reference_accepts_odd_hybrid_key_but_local_keeps_native_words_489() {
-    assert_stricter_key(
-        "key_odd_hybrid_valid",
-        Error::InvalidHex("Odd number of digits".into()),
-    )
-    .await;
+async fn reference_and_local_accept_odd_hybrid_key_489_498() {
+    // #498: from_hex reads this key as the reference does, so the local lookup
+    // reaches the reference's later words; strictness returns on the upstream's
+    // answer (this test's #489 form was assert_stricter_key with native words).
+    assert_accepted_key("key_odd_hybrid_valid").await;
 }
 
 #[tokio::test]
-async fn reference_accepts_reduced_x_key_but_local_keeps_native_words_489() {
-    assert_stricter_key(
-        "key_reduced_x",
-        Error::InvalidPublicKey("Point not on curve".into()),
-    )
-    .await;
+async fn reference_and_local_accept_reduced_x_key_489_498() {
+    // #498: from_hex reads this key as the reference does, so the local lookup
+    // reaches the reference's later words; strictness returns on the upstream's
+    // answer (this test's #489 form was assert_stricter_key with native words).
+    assert_accepted_key("key_reduced_x").await;
 }
 
 #[tokio::test]

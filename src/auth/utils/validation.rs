@@ -215,12 +215,12 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         type_arr.copy_from_slice(&cert_type);
         serial_arr.copy_from_slice(&serial_number);
 
-        // Parse subject and certifier from hex strings
-        let subject = match PublicKey::from_hex(&cert_result.certificate.subject) {
+        // Strictly (#498), as getVerifiableCertificates.ts:76-81 and Certificate.ts:240-246 refuse
+        let subject = match PublicKey::from_strict_hex(&cert_result.certificate.subject) {
             Ok(pk) => pk,
             Err(_) => continue, // Skip if invalid
         };
-        let certifier = match PublicKey::from_hex(&cert_result.certificate.certifier) {
+        let certifier = match PublicKey::from_strict_hex(&cert_result.certificate.certifier) {
             Ok(pk) => pk,
             Err(_) => continue, // Skip if invalid
         };

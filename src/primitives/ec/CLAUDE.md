@@ -12,6 +12,7 @@ This module provides secp256k1 elliptic curve operations for Bitcoin SV, includi
 | `mod.rs` | Module root; re-exports `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
 | `private_key.rs` | secp256k1 private key: generation, WIF encoding, signing, ECDH, BRC-42 child derivation |
 | `public_key.rs` | secp256k1 public key: serialization, address generation, verification, point arithmetic, BRC-42 child derivation |
+| `public_key_forms.rs` | `PublicKey::from_hex`'s reading: the reference's `PublicKey.fromString` forms (odd length, hybrid, coordinates at or above p reduced; #498) |
 | `signature.rs` | ECDSA signature: DER/compact encoding, low-S normalization (BIP 62) |
 | `ecdsa.rs` | Standalone ECDSA functions: `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
 
@@ -52,7 +53,7 @@ A point on the secp256k1 curve. Supports compressed (33 bytes) and uncompressed 
 pub struct PublicKey {
     // Construction
     pub fn from_bytes(bytes: &[u8]) -> Result<Self>   // 33 or 65 bytes
-    pub fn from_hex(hex: &str) -> Result<Self>        // Compressed or uncompressed
+    pub fn from_hex(hex: &str) -> Result<Self>        // The reference's forms: also odd length, hybrid, x/y >= p reduced (#498)
     pub fn from_private_key(private_key: &PrivateKey) -> Self
     pub fn from_scalar_mul_generator(scalar: &[u8; 32]) -> Result<Self>  // G * scalar
 
@@ -291,7 +292,7 @@ The HMAC uses compressed shared secret as the key and invoice number bytes as th
 
 `PublicKey` implements serde `Serialize` and `Deserialize`:
 - Serializes as a compressed hex string (66 characters)
-- Deserializes from any valid hex public key (compressed or uncompressed)
+- Deserializes strictly (`from_strict_hex`: the hex decoded, then `from_bytes`), not through the lenient `from_hex` (#498's fold: the reference's argument validators are strict)
 
 ```rust
 use bsv_rs::primitives::ec::{PrivateKey, PublicKey};
