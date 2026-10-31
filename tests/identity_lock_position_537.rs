@@ -40,7 +40,9 @@ async fn a_lock_after_identity_token_is_skipped_as_the_reference_skips_it_537() 
             case["name"]
         );
     }
-    // The same certificate locked before is read by both parsers.
+    // The same fields locked before were read by both parsers until #544;
+    // since then the reference's authentication skips them too: the key and
+    // the signature are not the subject's (`IdentityClient.ts:776-815`).
     let control = lock_position::relocked_before(&cases[0]);
-    assert_eq!(read(control).await, (1, 1));
+    assert_eq!(read(control).await, (0, 0));
 }
