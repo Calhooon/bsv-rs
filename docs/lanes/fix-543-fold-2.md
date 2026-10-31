@@ -1,0 +1,25 @@
+Every gate and every test runs in the foreground, in your turn: no background job, no subagent; the REPORT is the last thing you write, and a turn that ends with a command still running is a stopped lane.
+
+# #543 fold 2: the operator key checked as the reference's `verifySignature` checks it (the counterparty check, strict), with the recorder extended and a test RED first; then the rebase onto beta's tip
+
+You are on the lane's worktree `lane/fix-543-registry-token-fields` at `9e4fe456` (one commit on `b51cbea7`). PR #547. Never push. Nothing is filed on any tracker.
+
+## The scoped read's finding (Opus; read PR #547's comments: `gh pr view 547 --comments`)
+
+The operator text is not checked as the reference's `verifySignature` checks it (`~/bsv/ts-stack/packages/sdk/src/wallet/validationHelpers.ts:185-196` (`validatePublicKey`: a lower-case compressed key, 66 hex) and `:522-534` at edf6e03, the counterparty check of the signature verification the registry validator runs): on the tip a signed token whose operator field is an uncompressed key is accepted; after the rebase onto #498's lenient `from_hex` (landed at ebd02b64) odd-length and hybrid operators would be too. The fold's claim that "a key only the reference accepts keeps the native words" (`src/registry/token.rs:46-48,84-86` and the entry) is false here: the reference refuses those forms at this site. Minor: a `05` locking key is refused in different words than the reference's (`src/script/templates/pushdrop.rs:289,335`); say whether the registry's path reaches it and record the reference's words if it does.
+
+## The fold
+
+1. The operator field is validated as the reference validates a counterparty at `validationHelpers.ts:185-196,522-534`: a compressed key of 66 lower-case hex characters and a valid point, refused otherwise in the reference's words through `RegistryError`; the claim at `token.rs:46-48,84-86` and in the entry rewritten to the truth.
+2. The recorder `tests/support/registry_token_fields_543.mjs` extended with the counterparty cases (an uncompressed `04` operator, an odd-length operator, a hybrid `06`/`07` operator, an upper-case compressed operator, a `02`+(p+1) operator) recording the reference's verdict and words (Node 22 against the edf6e03 bundle; the vector `tests/vectors/registry_token_fields_543.json` re-recorded, never by hand); a test RED on the current tip (the uncompressed operator accepted) and green after; the `05` locking-key words recorded if the path reaches `pushdrop.rs:289,335`.
+3. Then `git fetch origin beta` and `git rebase origin/beta` (beta carries #498 at ebd02b64, #542 at 72f83617 and, if landed, #549): the three textual doc conflicts (`CHANGELOG.md` head: this PR's entry above the newer ones, every beta line kept; the root `CLAUDE.md` list's end: #491's, #542's and this PR's rows all appended, keep all in landing order with this PR's last; `tests/CLAUDE.md` both sides' rows); then the counterparty test under #498's lenient `from_hex` still green (the registry's read of the operator must not go through `from_hex`'s leniency: say which path it uses). Two commits at the end (the rebased lane commit and the fold on top); the captain squashes.
+
+## Gate (foreground, on the rebased tip, each result in the REPORT)
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http" --lib registry`; one `--test` per file matching `registry_*`, `arch_*` (the `.rs` files) and `fixtures_replay`; `cargo test --doc --all-features`; `cargo build --target wasm32-unknown-unknown --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm"` (`CC_wasm32_unknown_unknown` to LLVM clang if ring asks); `cargo semver-checks check-release --baseline-rev <beta tip> --release-type minor` (the reference-shaped public reader an addition); `tools/ratchet/run --check --against <beta tip>` with `CARGO_TARGET_DIR` outside the checkout; `gitleaks git --redact --no-banner --exit-code 1 --log-opts="origin/beta..HEAD" .` from the repo root.
+
+## REPORT
+
+The base (beta's tip) and the two tips; the counterparty cases (input, the reference's words and line, the port's before and after); the recorder's command and the vector's count; the RED evidence; the rebase's resolutions by file; the operator's parse path; the gate's results in a table; anything unverified; nothing else.
+
+Rules: never end your turn with a command running in the background; commit on the branch, never push; no test or probe on a default URL or port (a MetaNet Client listens on 3301, 3321 and 2121 on this machine; another session's process on 3390); do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole (the reference and the downstreams are read by their named paths); vectors are written by recorders, never by hand; scratch copies under `$TMPDIR` with their own `CARGO_TARGET_DIR`, removed at the end; never `rustup default` or `rustup override` (use `cargo +1.99.0`); a new dependency needs the captain's word first.

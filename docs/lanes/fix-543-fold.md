@@ -1,0 +1,20 @@
+Every gate and every test runs in the foreground, in your turn: no background job, no subagent; the REPORT is the last thing you write, and a turn that ends with a command still running is a stopped lane.
+
+# #543 fold: the operator-key and signature refusals in the reference's words through `RegistryError`, recorded; the empty unlocking script on revoke and update stated as a row (#548)
+
+You are on the lane's worktree `lane/fix-543-registry-token-fields` at `47274545` (one commit on `b51cbea7`). PR #547. Never push. Nothing is filed on any tracker (the captain filed #548).
+
+## The review's two FIX points (Opus, PR #547's comments: `gh pr view 547 --comments`)
+
+1. `src/registry/token.rs:80` and `:102-105`: an operator that is not a key is refused with the native `InvalidHex`/`InvalidPublicKey` words and a non-DER signature with `WalletRefusal`, against the claim at `token.rs:39-45` and the entry (`CHANGELOG.md:30-34`) that the reader refuses in the reference's words through `RegistryError`. The fix: map those refusals to `RegistryError` with the reference's words (`Invalid hex string`, `Invalid point`, and the reference's words for a bad signature: read `registryTokenValidation.ts:20-64` and the functions it calls at `~/bsv/ts-stack/packages/sdk/src` at edf6e03 to find each), the cases added to the recorder `tests/support/registry_token_fields_543.mjs` (an operator field that is not hex, one that is hex but not a point, a signature that is not DER) with the reference's recorded words, the vector re-recorded (Node 22 against the edf6e03 bundle, never by hand), and a test RED on the current tip (the native words) and green after. If a native refusal word is right because the reference's own parse throws it first (the key parse's words), state the native key words in the entry instead, with the reference line: the review's "state the native key words" alternative.
+2. `src/registry/client.rs:652-653` (revoke) and `:876-877` (update) send an empty unlocking script where `RegistryClient.ts:540-548` and `:633-641` unlock with the PushDrop unlocker: STATE it, do not fix it here: a row in the root `CLAUDE.md` divergence list (at the END of the list, open, pointing at #548) with its census line under the entry, and a sentence in the entry.
+
+## Gate (foreground, each result in the REPORT)
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http" --lib registry`; one `--test` per file matching `registry_*`, `arch_*` (the `.rs` files) and `fixtures_replay`; `cargo test --doc --all-features`; `cargo build --target wasm32-unknown-unknown --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm"` (`CC_wasm32_unknown_unknown` to LLVM clang if ring asks); `tools/ratchet/run --check --against b51cbea7` with `CARGO_TARGET_DIR` outside the checkout; `gitleaks git --redact --no-banner --exit-code 1 --log-opts="origin/beta..HEAD" .` from the repo root. Two commits at the end (the lane's and the fold's); the captain squashes and rebases (beta has moved: do not rebase here).
+
+## REPORT
+
+The tip; the refusal cases (each: the input, the reference's words and line, the port's words before and after); the recorder's command and the vector's new cases; the RED evidence; the row and sentence for #548; the gate's results in a table; anything unverified; nothing else.
+
+Rules: never end your turn with a command running in the background; commit on the branch, never push; no test or probe on a default URL or port (a MetaNet Client listens on 3301, 3321 and 2121 on this machine; another session's process on 3390); do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole (the reference and the downstreams are read by their named paths); vectors are written by recorders, never by hand; scratch copies under `$TMPDIR` with their own `CARGO_TARGET_DIR`, removed at the end; never `rustup default` or `rustup override` (use `cargo +1.99.0`); a new dependency needs the captain's word first.
