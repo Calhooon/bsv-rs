@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the registry client unlocks a definition token as the reference does on revoke and update (#548)
+
+`revoke_own_registry_entry` and `update_definition` answered the wallet's
+signable transaction with an empty unlocking script for the definition
+token's input, keyed by the token's output index, not its input index in
+the transaction (`src/registry/client.rs:653`, `:877` at `69d315fc`). The
+reference unlocks the token with `PushDrop.unlock(protocol, '1', 'anyone',
+'all', false, satoshis, lockingScript)` (`ts-stack@edf6e03`
+`RegistryClient.ts:540-548` for `removeDefinition`, `:630-639` for
+`updateDefinition`; `PushDrop.ts:217-262`): the BIP-143 preimage under
+SIGHASH_ALL | FORKID over the authenticated record's satoshis and locking
+script, its SHA-256 signed by the wallet's `createSignature` under the
+type's protocol (`[1, basketmap|protomap|certmap]`), key ID `1`,
+counterparty `anyone`, one push of the checksig signature, at the token's
+index in the signable transaction (`completeBoundAction`). Since #543 the
+token is locked with the operator's `anyone`-linked key, which only that
+signature opens. Both sites now build the spend through the one PushDrop
+signer the key-value stores and the identity client use
+(`wallet::pushdrop::sign`, now compiled under `registry` too), from
+`src/registry/unlock.rs`: the token's input found in the signable
+transaction by its outpoint, the createAction input still declaring
+`unlockingScriptLength: 74` as the reference's does. Their signAction now
+carries the signable transaction's `reference` as the base64 text the
+wallet answered (`to_base64`, as the key-value stores and the contacts
+manager send it; `completeBoundAction.ts:1044-1051`, `:1118`, BRC-100's
+`Base64String`), where it sent the UTF-8 reading of its bytes
+(`String::from_utf8(..).unwrap_or_default()`, `src/registry/client.rs:657`,
+`:877` at `20b0fcae`): an empty text for bytes that are not UTF-8, another
+reference for bytes that are, so no wallet found the action to sign.
+
+For the toolbox's and the CLI's tables: a revoke or an update built by this
+crate before this landing did not spend the definition token: its input
+carried an empty unlocking script (at the wrong index when the wallet put
+the token anywhere but at its own output index), which does not satisfy the
+token's lock, so the revocation or update was not a valid spend unless the
+wallet replaced the script itself; one built now carries the reference's
+script.
+
+The witness is recorded, never written by hand:
+`tests/support/registry_unlocking_548.mjs` runs the reference's own
+`registerDefinition`, `removeDefinition` and `updateDefinition` (the bundle
+of `ts-stack@edf6e03` under Node v22.18.0) with a `ProtoWallet` of the
+scalar 9 for each definition type, its createAction answered with a
+signable transaction spending a made-up funding input at index 0 and the
+token at index 1, its signAction recorded and answered with no transaction;
+`tests/vectors/registry_unlocking_548.json` holds six cases (basket,
+protocol, certificate; revoke, update): the signable transaction, the spend
+index, the unlocking script, the unlocker's createSignature arguments and
+the reference interpreter's verdict (`Spend.validate`: valid for all six).
+The `ProtoWallet`'s signatures are RFC 6979's, deterministic, so the bytes
+are compared; two runs byte-identical.
+`tests/registry_unlocking_548.rs` builds the same spends here over the
+recorded signable transaction (the #318 counting wallet, nothing broadcast)
+and compares the spends (index and script) and the createSignature
+arguments to the reference's, and runs this crate's spend under the node's
+block word after Chronicle; both tests RED on `69d315fc` (`[(0, "")]`
+against the reference's `[(1, 4830...)]`); a third,
+`a_revoke_and_an_update_send_sign_action_the_base64_reference_548`, compares
+the reference signAction carries with the recorded `signable_reference`,
+RED on `20b0fcae` (`"RRRRRRRR"` against `"UlJSUlJSUlI="`).
+
+### Notes: cross-SDK parity (#548)
+
+Residues at these two sites, stated: the registry client does not run
+`completeBoundAction`'s bindings (the requested inputs and outputs in the
+signable transaction, the signed template and scripts checked after
+signing), does not abort a failed action, and sends signAction no options
+where the reference sends `{ acceptDelayedBroadcast, returnTXIDOnly: false,
+noSend, sendWith }`; the key-value stores' port of that boundary
+(`src/kvstore/bound/`) is module-private. Nor does it run
+`authenticateRegistryRecord` (`RegistryClient.ts:453-513`, called first by
+`removeDefinition` and `updateDefinition`): the reference reads the record's
+transaction from its BEEF, requires the output to be a one-satoshi token
+whose satoshis and locking script equal the record's, parses the definition
+from that script and checks its operator, before any wallet call; this crate
+checks the operator of the record's own definition and signs over the
+record's satoshis and locking script as given, so a record whose metadata
+does not match its BEEF reaches createAction here and is refused there.
+go-sdk at `2ca481c` unlocks the
+token with the same PushDrop unlocker but signs it at, and keys the spend by,
+the token's output index (`registry/methods.go:416-441`), right only when the
+wallet places the token's input at that index.
+
+Census (#375; current reading):
+
+- Row 85: Ours: closed by #548 at the pin: revoke and update unlock the definition token as RegistryClient.ts:540-548,630-639 and PushDrop.ts:217-262 at edf6e03 do (the type's protocol, key ID 1, counterparty anyone, SIGHASH_ALL | FORKID over the record's satoshis and locking script, keyed by the token's input index); residues completeBoundAction's bindings, abort and signAction options and authenticateRegistryRecord's checks (RegistryClient.ts:453-513) at these two sites. Theirs: go-sdk, filing pending: its revoke signs and keys the spend at the token's output index, not its input index (the witness: tests/registry_unlocking_548.rs; tests/vectors/registry_unlocking_548.json).
+
 ### Fixed: a SEC 1 tag 05 is refused as the reference refuses it (#550)
 
 k256 (sec1 0.8.1, `src/point.rs:521-533`) reads a SEC 1 tag `05` as a compact
@@ -304,13 +391,14 @@ One spend stays open, stated (#548): `revoke_own_registry_entry` and
 `update_definition` sign the token's input with an empty unlocking script
 (`src/registry/client.rs:653`, `:877`), where the reference unlocks it with
 the PushDrop unlocker for the type's protocol, key ID `1`, counterparty
+Closed by #548 (its entry above).
 `anyone`, `all`, over the authenticated output's satoshis and script
 (`RegistryClient.ts:540-548`, `:630-639`), before `completeBoundAction`.
 
 Census (#375; current reading):
 
 - Row 84: Ours: closed by #543 at the pin; residues the certificate fields' map order and URL normalization at the writer. Theirs: go-sdk, filing pending (the witness: tests/registry_token_fields_543.rs; tests/vectors/registry_token_fields_543.json).
-- Row 85: Ours: open, #548: the registry's revoke and update sign the token's input with an empty unlocking script where RegistryClient.ts:540-548,630-639 at edf6e03 unlock it with the PushDrop unlocker. Theirs: none until #548 lands (the witness: src/registry/client.rs:653,877).
+- Row 85: Ours: closed by #548 at the pin: revoke and update unlock the definition token as RegistryClient.ts:540-548,630-639 and PushDrop.ts:217-262 at edf6e03 do (the type's protocol, key ID 1, counterparty anyone, SIGHASH_ALL | FORKID over the record's satoshis and locking script, keyed by the token's input index); residues completeBoundAction's bindings, abort and signAction options and authenticateRegistryRecord's checks (RegistryClient.ts:453-513) at these two sites. Theirs: go-sdk, filing pending: its revoke signs and keys the spend at the token's output index, not its input index (the witness: tests/registry_unlocking_548.rs; tests/vectors/registry_unlocking_548.json).
 
 ### Fixed: the contacts manager uses the reference's contact protocol (#542)
 

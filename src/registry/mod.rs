@@ -63,6 +63,7 @@
 pub mod client;
 mod token;
 pub mod types;
+mod unlock;
 
 // Re-exports from types
 pub use types::{

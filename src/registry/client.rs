@@ -15,23 +15,22 @@ use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     OutputListItem, TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::{from_hex, to_hex};
+use crate::primitives::{from_hex, to_base64, to_hex};
 use crate::registry::types::{
     BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
     CertificateDefinitionData, CertificateQuery, DefinitionData, DefinitionType,
     ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult, RegistryRecord,
     RevokeDefinitionResult, TokenData, UpdateDefinitionResult,
 };
-use crate::registry::{token, REGISTRANT_TOKEN_AMOUNT};
+use crate::registry::{token, unlock, REGISTRANT_TOKEN_AMOUNT};
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::{
     CreateActionArgs, CreateActionInput, CreateActionOutput, GetPublicKeyArgs, ListOutputsArgs,
-    Outpoint, OutputInclude, SignActionArgs, SignActionSpend,
+    Outpoint, OutputInclude, SignActionArgs,
 };
 use crate::{Error, Result};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 // =============================================================================
@@ -646,21 +645,16 @@ impl<W: WalletInterface> RegistryClient<W> {
 
         // Sign the transaction
         if let Some(ref signable_tx) = create_result.signable_transaction {
-            let mut spends = HashMap::new();
-            spends.insert(
-                record.output_index(),
-                SignActionSpend {
-                    unlocking_script: vec![],
-                    sequence_number: None,
-                },
-            );
+            // The token's spend, unlocked as RegistryClient.ts:540-548 and :630-639 do (#548)
+            let spends =
+                unlock::token_spends(&self.wallet, &signable_tx.tx, record, self.originator())
+                    .await?;
 
             let sign_result = self
                 .wallet
                 .sign_action(
                     SignActionArgs {
-                        reference: String::from_utf8(signable_tx.reference.clone())
-                            .unwrap_or_default(),
+                        reference: to_base64(&signable_tx.reference),
                         spends,
                         options: None,
                     },
@@ -870,21 +864,16 @@ impl<W: WalletInterface> RegistryClient<W> {
 
         // Sign the transaction
         if let Some(ref signable_tx) = create_result.signable_transaction {
-            let mut spends = HashMap::new();
-            spends.insert(
-                record.output_index(),
-                SignActionSpend {
-                    unlocking_script: vec![],
-                    sequence_number: None,
-                },
-            );
+            // The token's spend, unlocked as RegistryClient.ts:540-548 and :630-639 do (#548)
+            let spends =
+                unlock::token_spends(&self.wallet, &signable_tx.tx, record, self.originator())
+                    .await?;
 
             let sign_result = self
                 .wallet
                 .sign_action(
                     SignActionArgs {
-                        reference: String::from_utf8(signable_tx.reference.clone())
-                            .unwrap_or_default(),
+                        reference: to_base64(&signable_tx.reference),
                         spends,
                         options: None,
                     },

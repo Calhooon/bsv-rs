@@ -116,7 +116,7 @@ pub mod interface;
 mod key_args;
 mod key_deriver;
 mod proto_wallet;
-#[cfg(any(feature = "kvstore", feature = "identity"))]
+#[cfg(any(feature = "kvstore", feature = "identity", feature = "registry"))]
 pub(crate) mod pushdrop;
 mod review_actions;
 pub mod substrates;
