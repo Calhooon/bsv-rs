@@ -11,7 +11,13 @@
 use crate::Error;
 use serde_json::Value;
 
-/// `MAX_WALLET_WIRE_FRAME_BYTES`, `bytes`'s default bound.
+/// The wallet substrates' one byte bound (#526): the reference's
+/// `MAX_WALLET_WIRE_FRAME_BYTES` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/substrates/WalletWire.ts:9`), read by
+/// `validateWalletResult` (`WalletResultValidation.ts:632-636`, `:680-733`,
+/// `:873-879`): `bytes`' default bound here and in `result_values/bytes.rs`,
+/// and the request, response and total-byte caps of
+/// `result_values/boundary.rs`, `raw_tree.rs` and `wire.rs`.
 pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
 
 /// `walletByteFieldNames` (`BRC100ByteEncoding.ts:5-23`).

@@ -6,7 +6,7 @@ use crate::Error;
 use num_traits::ToPrimitive;
 use serde_json::{value::RawValue, Value};
 
-pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
+pub(super) use crate::wallet::substrates::byte_fields::MAX_BYTES;
 /// The complete outgoing frame's bound, beside the response/byte-field cap.
 const MAX_WIRE_REQUEST_BYTES: usize = MAX_BYTES;
 const MAX_NODES: usize = 1_000_000;
