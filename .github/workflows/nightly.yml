@@ -224,10 +224,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-    env:
-      # #81: each file defaults to 80%. A lower measured floor must name its
-      # own improvement issue here, and is the complete score rounded down.
-      MUTATION_FLOORS: '{}'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -240,11 +236,17 @@ jobs:
           path: ${{ runner.temp }}/mutation-results
           merge-multiple: true
 
+      # #602: 80% on the gate paths (src/script/**, src/transaction/beef*.rs,
+      # src/transaction/merkle_path.rs); elsewhere the floor is the checked-out
+      # ratchet record's `mutation_floors` member, the measured score rounded
+      # down with its improvement issue, which `tools/ratchet/run --check
+      # --against` refuses to lower or remove.
       - name: Publish every file's score and enforce its floor
         if: always()
         run: |
           python3 .github/scripts/nightly_mutants.py report \
             --input "$RUNNER_TEMP/mutation-results" --expected-shards 4 \
+            --floors docs/ratchets.json \
             --output "$RUNNER_TEMP/mutation-summary.json"
 
       - name: Upload the scoreboard

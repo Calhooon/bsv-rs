@@ -150,7 +150,8 @@ lines, `unwrap`/`expect` calls, functions over 60 lines, cognitive complexity,
 missing docs, duplicate token windows, pedantic warnings) and compares with
 `docs/ratchets.json`; an increase fails with the counter and the excess, a
 recorded baseline is compared against the PR base so a raised limit cannot hide
-code. [RATCHETS.md](RATCHETS.md).
+code, and a mutation floor in the record's `mutation_floors` member (#602) can
+be raised but never lowered or removed. [RATCHETS.md](RATCHETS.md).
 
 **Deny.** `cargo deny check` on all features, the Cloudflare wasm32 slice and
 the defaults, `--locked` against one audit lockfile: RustSec findings and
