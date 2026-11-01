@@ -156,13 +156,57 @@ class ScoreTests(unittest.TestCase):
         }})
         self.assertTrue(result["passed"])
 
+    def test_floors_are_read_from_the_ratchets_record(self):
+        self.fixture(["CaughtMutant", "MissedMutant"])
+        record = self.root.parent / f"{self.root.name}-ratchets.json"
+        self.addCleanup(record.unlink)
+        record.write_text(json.dumps({"schema": 1, "mutation_floors": {self.file: {
+            "percent": 50, "issue": "https://github.com/Calhooon/bsv-rs/issues/602"}}}))
+        output = self.root.parent / f"{self.root.name}-score.json"
+        self.addCleanup(output.unlink)
+        self.addCleanup(output.with_suffix(".md").unlink)
+        with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}):
+            args = argparse.Namespace(input=self.root, output=output,
+                                      expected_shards=None, floors=record)
+            # merkle_path.rs is a gate path: the record cannot lower it.
+            self.assertEqual(nightly.report(args), 1)
+            self.assertIn("a gate path carries no floor of its own",
+                          json.loads(output.read_text())["errors"][0])
+        self.assertTrue(nightly.is_gate_path("src/script/spend/bitwise.rs"))
+        self.assertTrue(nightly.is_gate_path("src/transaction/beef_stream.rs"))
+        self.assertFalse(nightly.is_gate_path("src/transaction/broadcaster.rs"))
+        self.assertFalse(nightly.is_gate_path("src/wallet/wire/reader.rs"))
+        record.write_text(json.dumps({"schema": 1}))
+        self.assertEqual(nightly.load_floors(record), {})
+
+    def test_a_file_whose_mutants_are_all_unviable_has_no_score(self):
+        path = self.fixture(["CaughtMutant", "Unviable"])
+        other = "src/transaction/merkle_path_extra.rs"
+        def split(data):
+            data[1]["file"] = other
+        self.change(path, "candidates.json", split)
+        self.change(path, "outcomes.json", lambda d: d["outcomes"][2]["scenario"]["Mutant"]
+                    .update(file=other))
+        self.change(path, "run.json", lambda d: d["files"].append(other))
+        result = self.collect()
+        row = {r["file"]: r for r in result["files"]}[other]
+        self.assertTrue(result["passed"], result["errors"])
+        self.assertIsNone(row["passed"])
+        self.assertTrue(row["no_viable"])
+        # A floor cannot be set on a file with nothing a test can catch.
+        result = self.collect(floors={other: {
+            "percent": 0, "issue": "https://github.com/Calhooon/bsv-rs/issues/602"}})
+        self.assertIn(f"floor has no measured file: {other}", result["errors"])
+
     def test_corrupt_evidence_still_publishes_a_failure_report(self):
         path = self.fixture(["CaughtMutant"])
         (path / "outcomes.json").write_text("incomplete JSON")
         output = self.root / "score.json"
-        with patch.dict(os.environ, {"MUTATION_FLOORS": "{}", "GITHUB_STEP_SUMMARY": ""}):
+        record = self.root / "ratchets.json"
+        record.write_text("{}")
+        with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}):
             status = nightly.report(argparse.Namespace(
-                input=self.root, output=output, expected_shards=None))
+                input=self.root, output=output, expected_shards=None, floors=record))
         self.assertEqual(status, 1)
         self.assertFalse(json.loads(output.read_text())["complete"])
         self.assertTrue(output.with_suffix(".md").is_file())
@@ -191,6 +235,29 @@ class ScoreTests(unittest.TestCase):
     def test_existing_output_cannot_reuse_stale_evidence(self):
         with self.assertRaises(FileExistsError):
             nightly.run(argparse.Namespace(output=self.root))
+
+
+class DerivedFloorsOnlyRise(unittest.TestCase):
+    def test_floors_are_the_score_rounded_down_outside_the_gate_and_never_lowered(self):
+        import mutants_record as record
+        def row(file, caught, viable):
+            return {"file": file, "caught": caught, "viable": viable}
+        result = {"files": [
+            row("src/wallet/wire/reader.rs", 29, 40),     # 72.5 -> 72
+            row("src/wallet/wire/mod.rs", 50, 155),       # 32.3, recorded 60: kept
+            row("src/wallet/wire/calls.rs", 32, 33),      # at or above 80: no entry
+            row("src/wallet/wire/bounds.rs", 45, 47),     # recorded 68, now 95: raised
+            row("src/script/script.rs", 1, 10),           # gate path: never an entry
+            row("src/wallet/substrates/http_json/answer.rs", 0, 0),  # nothing viable
+        ]}
+        issue = "https://github.com/Calhooon/bsv-rs/issues/602"
+        recorded = {"src/wallet/wire/mod.rs": {"percent": 60, "issue": issue},
+                    "src/wallet/wire/bounds.rs": {"percent": 68, "issue": issue}}
+        floors = record.derived_floors(result, recorded)
+        self.assertEqual({k: v["percent"] for k, v in floors.items()}, {
+            "src/wallet/wire/bounds.rs": 95, "src/wallet/wire/mod.rs": 60,
+            "src/wallet/wire/reader.rs": 72})
+        self.assertEqual(recorded["src/wallet/wire/bounds.rs"]["percent"], 68)
 
 
 if __name__ == "__main__":

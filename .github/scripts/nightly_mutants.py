@@ -32,6 +32,11 @@ SURFACES = {
         "wallet_tests", "wallet_http_json_busy_tests",
     ]),
 }
+# #602: 80 percent caught on the interpreter and the BEEF and Merkle readers,
+# never lowered; elsewhere the floor is the ratchet's record, the measured value.
+GATE_FLOOR = 80
+FLOORS_RECORD = Path("docs/ratchets.json")
+ISSUE_PREFIX = "https://github.com/Calhooon/bsv-rs/issues/"
 OUTCOMES = {
     "CaughtMutant": "caught", "MissedMutant": "missed",
     "Timeout": "timeout", "Unviable": "unviable",
@@ -75,6 +80,23 @@ def test_skips(surface):
         # library gate, not repeated for every mutation in the nightly loop.
         skip.append("transaction::merkle_path::linear_root_equivalence_tests::")
     return sorted(set(skip))
+
+
+def is_gate_path(file):
+    """True for a file the owner's word holds at 80 percent, whatever the record says."""
+    return file.startswith("src/script/") or Path(file).match("src/transaction/beef*.rs") \
+        or file == "src/transaction/merkle_path.rs"
+
+
+def load_floors(path):
+    """The ratchet's record's `mutation_floors` member (#602); absent reads as none."""
+    floors = json.loads(Path(path).read_text()).get("mutation_floors", {})
+    if not isinstance(floors, dict):
+        raise ValueError("mutation_floors must be an object")
+    for file in floors:
+        if is_gate_path(file):
+            raise ValueError(f"a gate path carries no floor of its own: {file}")
+    return floors
 
 
 def write_json(path, value):
@@ -259,31 +281,43 @@ def collect(root, expected_shards, floors):
     if len(commits) != 1:
         errors.append("results must describe exactly one source commit")
     complete = not errors
+    surface_viable = Counter()
+    for file, counts in rows.items():
+        for surface in file_surfaces.get(file, ()):
+            surface_viable[surface] += counts["caught"] + counts["missed"] + counts["timeout"]
     files = []
     for file, counts in sorted(rows.items()):
         scope_complete = file_surfaces.get(file, set()) <= complete_surfaces
         viable = counts["caught"] + counts["missed"] + counts["timeout"]
         override = floors.get(file, {})
-        floor = override.get("percent", 80)
+        floor = override.get("percent", GATE_FLOOR)
         if type(floor) is not int or not 0 <= floor <= 100:
             raise ValueError(f"invalid floor for {file}")
-        if floor < 80 and not override.get("issue", "").startswith("https://github.com/Calhooon/bsv-rs/issues/"):
+        if floor < GATE_FLOOR and not override.get("issue", "").startswith(ISSUE_PREFIX):
             raise ValueError(f"lower floor for {file} needs its improvement issue")
         score = 100 * counts["caught"] / viable if viable else None
         passed = viable > 0 and 100 * counts["caught"] >= floor * viable
         if counts["generated"] == 0:
+            passed = None
+        # Every generated mutant unviable (a replacement the compiler refuses):
+        # nothing a test can catch, so no score, unless the file's surface has
+        # no viable mutant at all, which reads as a broken build and fails.
+        vacuous = (counts["generated"] > 0 and viable == 0 and file not in floors
+                   and all(surface_viable[s] > 0 for s in file_surfaces.get(file, ())))
+        if vacuous:
             passed = None
         if not scope_complete:
             passed = None
         row = {"file": file, **{k: counts[k] for k in ("generated", *OUTCOMES.values())},
                "viable": viable, "score_percent": score, "floor_percent": floor,
                "issue": override.get("issue"), "passed": passed,
-               "scope_complete": scope_complete}
+               "scope_complete": scope_complete, "no_viable": vacuous}
         files.append(row)
         if passed is False:
             errors.append(f"{file}: below {floor}% or no viable mutants")
     for file in floors:
         if (file not in rows or rows[file]["generated"] == 0
+                or rows[file]["caught"] + rows[file]["missed"] + rows[file]["timeout"] == 0
                 or not file_surfaces.get(file, set()) <= complete_surfaces):
             errors.append(f"floor has no measured file: {file}")
     return {"schema_version": 1, "cargo_mutants_version": "27.1.0",
@@ -293,14 +327,16 @@ def collect(root, expected_shards, floors):
 
 def report(args):
     try:
-        floors = json.loads(os.environ.get("MUTATION_FLOORS", "{}"))
+        floors = load_floors(args.floors)
         result = collect(args.input, args.expected_shards, floors)
     except (OSError, KeyError, ValueError, TypeError) as error:
         result = {"schema_version": 1, "complete": False, "passed": False,
                   "files": [], "errors": [f"invalid mutation evidence: {error}"]}
     write_json(args.output, result)
     lines = ["## Mutation scores (#81)", "",
-             "Score = caught / (caught + missed + timeout); unviable mutants are excluded.", "",
+             "Score = caught / (caught + missed + timeout); unviable mutants are excluded.",
+             f"Floors: {GATE_FLOOR}% on the gate paths; elsewhere `mutation_floors` "
+             f"in `{args.floors}` (#602).", "",
              "| File | Caught | Missed | Timeout | Unviable | Score | Floor | Result |",
              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"]
     for row in result["files"]:
@@ -311,6 +347,8 @@ def report(args):
         status = "PASS" if row["passed"] else "FAIL"
         if row["passed"] is None:
             status = "NO MUTANTS" if row["scope_complete"] else "PARTIAL"
+            if row["scope_complete"] and row.get("no_viable"):
+                status = "NO VIABLE MUTANTS"
         lines.append(f"| `{row['file']}` | {row['caught']} | {row['missed']} | "
                      f"{row['timeout']} | {row['unviable']} | {score} | {floor} | "
                      f"{status} |")
@@ -341,6 +379,8 @@ def main():
     reporter.add_argument("--input", type=Path, required=True)
     reporter.add_argument("--output", type=Path, required=True)
     reporter.add_argument("--expected-shards", type=int)
+    reporter.add_argument("--floors", type=Path, default=FLOORS_RECORD,
+                          help="the record whose mutation_floors member holds the floors (#602)")
     reporter.set_defaults(func=report)
     args = parser.parse_args()
     return args.func(args)

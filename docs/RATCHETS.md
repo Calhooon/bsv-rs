@@ -63,6 +63,19 @@ exemption or dependency-lock change
 also needs an explicit review of the changed census; do not refresh a
 baseline just to turn a red check green.
 
+## Mutation floors (#602)
+
+The record's `mutation_floors` member holds the nightly mutation gate's floors
+outside the gate paths (`docs/NIGHTLY.md`): a map from a file under `src/` to
+`{"percent": N, "issue": URL}`, N the file's complete measured score rounded
+down. It is never measured here: `--record` carries the recorded member over
+unchanged, and `--check --against COMMIT` refuses a floor lowered or removed
+from the base's record (`mutation floor lowered: PATH: N% < M% (-K; a floor is
+never lowered)`, `mutation floor removed: PATH was M% ...`); a raised floor or
+a new entry passes (`a_lowered_or_removed_mutation_floor_is_refused_602`).
+The entries are written by `.github/scripts/mutants_record.py floors --write`
+from a complete run's artifacts, which only raises.
+
 The bootstrap baseline is measured from `origin/beta` at
 `4e4b40c6ad3c71359384580347be888a699f6f8b` (the tip at landing: v0.8.2 plus
 #116's `script` gate in `sighash.rs` and the k256 0.14 move of #125, which

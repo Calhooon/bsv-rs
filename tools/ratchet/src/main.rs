@@ -17,7 +17,8 @@ const HELP: &str =
     --check: fail on increases against docs/ratchets.json.\n\
     --record: deliberately replace docs/ratchets.json.\n\
     --revision: measure a Git commit instead of the working tree.\n\
-    --against: with --check, also refuse increases to the recorded baseline.\n\
+    --against: with --check, also refuse increases to the recorded baseline\n\
+    and a mutation floor lowered or removed from it.\n\
     Build output requires CARGO_TARGET_DIR outside the checkout.\n\
     Temporary files require TMPDIR (or RUNNER_TEMP) outside the checkout.";
 
@@ -79,6 +80,7 @@ fn run() -> Result<bool> {
             baseline_increases = proposed
                 .increases(&previous)
                 .into_iter()
+                .chain(proposed.lowered_floors(&previous))
                 .map(|increase| format!("recorded baseline: {increase}"))
                 .collect();
         } else {
@@ -88,10 +90,18 @@ fn run() -> Result<bool> {
     if mode == Mode::Record && revision.is_none() {
         tree::require_clean_sources(&root)?;
     }
+    // The floors are the nightly's record, never measured here: a recording
+    // carries the recorded member over unchanged (#602).
+    let recorded_floors = if mode == Mode::Record && baseline_path.try_exists()? {
+        serde_json::from_slice::<Snapshot>(&std::fs::read(&baseline_path)?)?.mutation_floors
+    } else {
+        Default::default()
+    };
     let measured = tree::materialize(&root, revision.as_deref())?;
     eprintln!("ratchet: source counters");
     let mut snapshot = source::measure(&measured.path, &measured.commit)?;
     compiler::measure(&measured.path, &root, &mut snapshot.metrics)?;
+    snapshot.mutation_floors = recorded_floors;
     let json = serde_json::to_string_pretty(&snapshot)? + "\n";
     if mode == Mode::Record {
         std::fs::write(&baseline_path, &json)?;
@@ -108,7 +118,7 @@ fn run() -> Result<bool> {
             eprintln!("ratchet: {increase}");
         }
         if increases.is_empty() {
-            eprintln!("ratchet: all 7 counters and oversized-file limits pass");
+            eprintln!("ratchet: all 7 counters, oversized-file limits and mutation floors pass");
         }
         return Ok(increases.is_empty());
     }

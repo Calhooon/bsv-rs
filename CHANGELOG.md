@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the mutation gate's floors live in the ratchet's record, 80 on the interpreter and the BEEF and Merkle readers and the measured widened value elsewhere, never lowered (#602)
+
+On the owner's word of 2026-11-01 14:1xZ through the keeper (23.5 (c)): the
+nightly's mutation gate is 80 percent caught on `src/script/**`,
+`src/transaction/beef*.rs` and `src/transaction/merkle_path.rs`, and the
+ratchet elsewhere (`src/wallet/wire/**`, `src/wallet/substrates/**`): the
+measured value is the floor, never lowered, raised by a landing that raises the
+score; on the 14:3xZ word and the keeper's 14:4xZ reading, the floors come from
+the widened figure (the oracle with the conformance corpus), never the narrow
+one. The floors move from `nightly.yml`'s `MUTATION_FLOORS` string (removed) to
+`docs/ratchets.json`'s new `mutation_floors` member, 29 files at their widened
+score rounded down with #602 as their issue, read by `nightly_mutants.py report
+--floors` (default `docs/ratchets.json`) from the measured commit; a gate-path
+entry is refused. `tools/ratchet/run --check --against <base>` refuses a floor
+lowered or removed from the base's record, a raise or a new entry passing, and
+`--record` carries the member over unchanged
+(`a_lowered_or_removed_mutation_floor_is_refused_602`, RED on a copy with the
+refusal's body removed). A file whose generated mutants are all unviable is
+`NO VIABLE MUTANTS`, unscored, when its surface has viable mutants, and still
+fails when the surface has none (`src/wallet/substrates/http_json/answer.rs`:
+two `Default::default()` replacements of a type without `Default`;
+`test_a_file_whose_mutants_are_all_unviable_has_no_score`).
+
+The two figures: the narrow run 41294262955 at `ab155018` (no corpus) scored
+31 PASS, 46 FAIL and 15 NO MUTANTS at 80 everywhere; the widened run
+41327640129 at `b8d0a008` (corpus at ts-stack `edf6e03`) 33 PASS, 44 FAIL and
+15 NO MUTANTS at 80 everywhere, and 62 PASS, 14 FAIL, 15 NO MUTANTS and 1 NO
+VIABLE MUTANTS under the record's floors: the fourteen failures are the
+gate-path files below 80, red until #603's lanes land. The survivors' record,
+both runs side by side with the gate paths' 548 widened survivors by
+`file:line:column` and the 97 the corpus killed, is
+`docs/census/mutants-2026-11-01.md` and `.json`, written from the artifacts by
+`.github/scripts/mutants_record.py` (`fetch`, `floors`, `write`). No crate code
+moves.
+
 ### Changed: the nightly's Mutants oracle runs the conformance corpus, so the mutation scores are measured against the sibling's vectors (#602, #31)
 
 On the owner's word of 2026-11-01 14:3xZ through the keeper (the stack's brief,

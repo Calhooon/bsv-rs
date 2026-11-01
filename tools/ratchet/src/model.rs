@@ -1,5 +1,6 @@
 use crate::{Result, TOOLCHAIN};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +38,15 @@ pub struct LargeFile {
     pub lines: usize,
 }
 
+/// A file's mutation floor outside the gate paths (#602): the measured
+/// percentage caught, rounded down, and the issue that raises it.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MutationFloor {
+    pub percent: u32,
+    pub issue: String,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Snapshot {
@@ -45,6 +55,10 @@ pub struct Snapshot {
     pub toolchain: String,
     pub metrics: Metrics,
     pub files_over_800: Vec<LargeFile>,
+    /// Read by the nightly's score job; never measured, so `--record` carries
+    /// the recorded member over unchanged and `--against` refuses a lowered one.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub mutation_floors: BTreeMap<String, MutationFloor>,
 }
 
 impl Snapshot {
@@ -55,6 +69,7 @@ impl Snapshot {
             toolchain: TOOLCHAIN.into(),
             metrics: Metrics::default(),
             files_over_800: Vec::new(),
+            mutation_floors: BTreeMap::new(),
         }
     }
 
@@ -78,7 +93,39 @@ impl Snapshot {
         {
             return Err("invalid baseline provenance or oversized-file inventory".into());
         }
+        if self.mutation_floors.iter().any(|(path, floor)| {
+            floor.percent > 100
+                || !path.starts_with("src/")
+                || !path.ends_with(".rs")
+                || !floor
+                    .issue
+                    .starts_with("https://github.com/Calhooon/bsv-rs/issues/")
+        }) {
+            return Err("invalid mutation floor: a src/**.rs path, 0 to 100, an issue URL".into());
+        }
         Ok(())
+    }
+
+    /// Every floor of `base` this record lowers or removes (#602); a raised
+    /// floor or a new entry passes.
+    pub fn lowered_floors(&self, base: &Self) -> Vec<String> {
+        let mut failures = Vec::new();
+        for (path, old) in &base.mutation_floors {
+            match self.mutation_floors.get(path) {
+                None => failures.push(format!(
+                    "mutation floor removed: {path} was {}% (a floor is never lowered)",
+                    old.percent
+                )),
+                Some(new) if new.percent < old.percent => failures.push(format!(
+                    "mutation floor lowered: {path}: {}% < {}% (-{}; a floor is never lowered)",
+                    new.percent,
+                    old.percent,
+                    old.percent - new.percent
+                )),
+                Some(_) => {}
+            }
+        }
+        failures
     }
 
     pub fn increases(&self, baseline: &Self) -> Vec<String> {
@@ -161,6 +208,66 @@ mod tests {
             current.increases(&baseline),
             ["src/new.rs: 850 lines > 800 (+50)"]
         );
+    }
+
+    fn floors(entries: &[(&str, u32)]) -> Snapshot {
+        let mut snapshot = Snapshot::new(&"a".repeat(40));
+        for (path, percent) in entries {
+            snapshot.mutation_floors.insert(
+                (*path).into(),
+                MutationFloor {
+                    percent: *percent,
+                    issue: "https://github.com/Calhooon/bsv-rs/issues/602".into(),
+                },
+            );
+        }
+        snapshot
+    }
+
+    #[test]
+    fn a_lowered_or_removed_mutation_floor_is_refused_602() {
+        let base = floors(&[
+            ("src/wallet/wire/mod.rs", 60),
+            ("src/wallet/wire/reader.rs", 72),
+        ]);
+        let lowered = floors(&[
+            ("src/wallet/wire/mod.rs", 59),
+            ("src/wallet/wire/reader.rs", 72),
+        ]);
+        assert_eq!(
+            lowered.lowered_floors(&base),
+            ["mutation floor lowered: src/wallet/wire/mod.rs: 59% < 60% (-1; a floor is never lowered)"]
+        );
+        let removed = floors(&[("src/wallet/wire/mod.rs", 60)]);
+        assert_eq!(
+            removed.lowered_floors(&base),
+            ["mutation floor removed: src/wallet/wire/reader.rs was 72% (a floor is never lowered)"]
+        );
+        let raised = floors(&[
+            ("src/wallet/wire/mod.rs", 61),
+            ("src/wallet/wire/reader.rs", 72),
+            ("src/wallet/wire/linkage.rs", 0),
+        ]);
+        assert!(raised.lowered_floors(&base).is_empty());
+        assert!(base
+            .lowered_floors(&Snapshot::new(&"a".repeat(40)))
+            .is_empty());
+    }
+
+    #[test]
+    fn a_record_without_floors_is_written_as_before_and_floors_round_trip() -> Result<()> {
+        let empty = serde_json::to_string_pretty(&Snapshot::new(&"a".repeat(40)))?;
+        assert!(!empty.contains("mutation_floors"));
+        let record = floors(&[("src/wallet/wire/mod.rs", 60)]);
+        let text = serde_json::to_string_pretty(&record)?;
+        let read: Snapshot = serde_json::from_str(&text)?;
+        read.validate()?;
+        assert_eq!(read.mutation_floors["src/wallet/wire/mod.rs"].percent, 60);
+        let mut bad = floors(&[("src/wallet/wire/mod.rs", 101)]);
+        assert!(bad.validate().is_err());
+        bad = floors(&[("docs/x.rs", 1)]);
+        assert!(bad.validate().is_err());
+        Ok(())
     }
 
     #[test]

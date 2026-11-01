@@ -128,7 +128,11 @@ files below 80 and their 517 survivors, #603; the floors table on #602) are the
 landing, the same selection with the corpus read. Floors are set from the
 widened figure, never the narrow one, and the census record carries both
 side by side, so a moved score says it moved because the corpus caught what the
-narrow suites did not.
+narrow suites did not. The widened figure is run 41327640129 at `b8d0a008`
+(2026-11-01 16:41Z): ten gate-path files moved (`spend/bitwise.rs` 36.36% to
+85.71%, `merkle_path.rs` 53.93% to 71.91%, `spend/splice.rs` 77.67% to 82.04%
+among them), none elsewhere; the floors and the record are below
+("The floors (#602)").
 
 The local witness on one file (`src/script/not_judged.rs`, three viable
 mutants, the script surface's selection, cargo-mutants 27.1.0, macOS, 2026-11-01).
@@ -180,11 +184,51 @@ successful baselines, matching tool versions, matching source commits and all
 20 shards. Duplicate, missing, corrupt or unfinished evidence fails closed.
 The integer comparison avoids accepting a displayed percentage rounded upward.
 
-The default floor is 80% per file. `MUTATION_FLOORS` in the workflow contains
-only explicit exceptions, with that file's complete measured score rounded
-down and a link to its improvement issue. Partial samples cannot establish or
-lower a floor. Raising a floor follows a complete run with the same test command;
-an unexpected failure is investigated, never automatically ratcheted downward.
+A file whose generated mutants are all unviable (each replacement refused by
+the compiler, so nothing a test can catch) is listed as `NO VIABLE MUTANTS`,
+without a score, when its surface has viable mutants elsewhere; if a surface
+has no viable mutant at all, the build is read as broken and every such file
+fails (#81's fail-closed intent, kept). `src/wallet/substrates/http_json/answer.rs`
+is the one such file in both 2026-11-01 runs: its two mutants replace
+`refusal -> Error` and `success -> Result<R, Error>` with `Default::default()`,
+and `Error` has no `Default`. A floor cannot be set on such a file.
+
+### The floors (#602)
+
+On the owner's word of 2026-11-01 14:1xZ through the keeper: 80% caught on
+the gate paths (`src/script/**`, `src/transaction/beef*.rs`,
+`src/transaction/merkle_path.rs`), and elsewhere (`src/wallet/wire/**`,
+`src/wallet/substrates/**`) the measured value is the floor, never lowered,
+raised by a landing that raises the score. The floors live in the ratchet's
+record, `docs/ratchets.json`'s `mutation_floors` member (`{"percent": N,
+"issue": URL}` per file), which the score job reads from the measured commit
+(`nightly_mutants.py report --floors docs/ratchets.json`, the default; the
+workflow's former `MUTATION_FLOORS` string is gone) and which
+`tools/ratchet/run --check --against <base>` refuses to lower or remove
+([RATCHETS.md](RATCHETS.md)). A gate-path file carries no entry (the report
+refuses one); a file elsewhere at or above 80 carries none until a raise needs
+one. A floor under 80 names its improvement issue. Partial samples cannot
+establish or lower a floor; an unexpected failure is investigated, never
+ratcheted downward.
+
+The 29 entries are the widened run's scores rounded down (run 41327640129,
+written by `.github/scripts/mutants_record.py floors --write`); every file
+elsewhere scored the same in both runs, so they equal #602's narrow table.
+The record of both runs, every measured file side by side, the gate paths'
+survivors by `file:line:column` and the survivors the corpus killed, is
+`docs/census/mutants-2026-11-01.md` (and `.json`), written by
+`mutants_record.py write` from the artifacts (the commands are in the record).
+
+| Figure | Run | Scoreboard as it ran (80 everywhere) | Under the record's floors |
+| --- | --- | --- | --- |
+| narrow, no corpus | 41294262955 at `ab155018` | 31 PASS, 46 FAIL, 15 NO MUTANTS | |
+| widened, corpus at `edf6e03` | 41327640129 at `b8d0a008` | 33 PASS, 44 FAIL, 15 NO MUTANTS | 62 PASS, 14 FAIL, 15 NO MUTANTS, 1 NO VIABLE MUTANTS |
+
+The fourteen failures are the gate-path files below 80 (548 gate-path
+survivors under the widened oracle, 396 of them on those fourteen; 97 of the
+narrow run's 643 killed by the corpus, all in the script and BEEF/Merkle
+surfaces; two timeouts new to the widened run, both caught in the narrow
+one). They stay red until #603's lanes land: that is the gate.
 
 ## Local replay
 
@@ -203,7 +247,7 @@ python3 .github/scripts/nightly_mutants.py run --surface wire \
   --file src/wallet/wire/encoding.rs \
   --output "$RUN_ROOT/encoding"
 python3 .github/scripts/nightly_mutants.py report \
-  --input "$RUN_ROOT" --output "$RUN_ROOT/scores.json"
+  --input "$RUN_ROOT" --output "$RUN_ROOT/scores.json"  # floors: docs/ratchets.json
 python3 -B -m unittest discover -s .github/scripts -p 'test_nightly_mutants.py' -v
 ```
 
