@@ -19,7 +19,6 @@
 
 use super::encoding::WireReader;
 use super::requests::{RevealCounterpartyRequest, RevealSpecificRequest};
-use crate::primitives::PublicKey;
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
 use crate::wallet::validation::crypto;
 use crate::wallet::{
@@ -176,12 +175,6 @@ pub(super) fn verify_signature_args(args: &VerifySignatureArgs) -> Checked {
     crypto::verify_signature_args(args).map_err(Into::into)
 }
 
-/// `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`): a `02` or
-/// `03` prefix, x below the field prime, a point on the curve.
-fn compressed_key(bytes: &[u8]) -> Option<PublicKey> {
-    crypto::public_key(bytes, "publicKey").ok()
-}
-
 /// `validateRevealCounterpartyKeyLinkageArgs` (`:1734-1741`): the
 /// counterparty, the verifier, then the privilege without seekPermission;
 /// the args the wallet is called with (#226).
@@ -265,31 +258,12 @@ pub(super) fn bytes_result(bytes: &[u8], call: &str, field: &str) -> Checked {
 }
 
 /// getPublicKey's key (`:2207-2209`, `publicKey` `:928-933` over `hex`
-/// `:917-926`): an even-length hex string of 33 bytes that is a valid
-/// compressed key; the 33 bytes the frame carries.
+/// `:917-926`): `wallet::validate_result_public_key`, the one reading of the
+/// rule (#588); the 33 bytes the frame carries.
 pub(super) fn public_key_result(public_key: &str) -> Checked<Vec<u8>> {
-    const CALL: &str = "getPublicKey";
-    let is_hex =
-        public_key.len().is_multiple_of(2) && public_key.bytes().all(|b| b.is_ascii_hexdigit());
-    if !is_hex {
-        return Err(invalid_result(
-            CALL,
-            "publicKey",
-            "an even-length hex string",
-        ));
-    }
-    if public_key.len() != 66 {
-        return Err(invalid_result(CALL, "publicKey", "33 hexadecimal bytes"));
-    }
-    let bytes = crate::primitives::from_hex(public_key)?;
-    if compressed_key(&bytes).is_none() {
-        return Err(invalid_result(
-            CALL,
-            "publicKey",
-            "a valid compressed secp256k1 public key",
-        ));
-    }
-    Ok(bytes)
+    crate::wallet::validate_result_public_key(public_key, "getPublicKey", "publicKey")
+        .map(|key| key.to_compressed().to_vec())
+        .map_err(Into::into)
 }
 
 /// createSignature's signature (`:2219-2225`): at most 72 bytes, canonical DER.

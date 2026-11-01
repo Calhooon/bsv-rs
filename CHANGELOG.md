@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the two private copies of the result validator's key rule read through `validate_result_public_key` (#588)
+
+`wallet::validate_result_public_key(value, call, field)` (#582's fold, #584)
+carries the result validator's `publicKey` rule (`ts-stack@edf6e03`
+`WalletResultValidation.ts:917-933`): hex of either case, nothing trimmed, 33
+bytes, a valid compressed point, the three refusal sentences. Two private copies
+of the rule remained: the wire processor's getPublicKey result check
+(`wallet::wire::validation::public_key_result`, `:2207-2209`) and the HTTP JSON
+result validator's key (`wallet::substrates::result_values::scalars::key`, read
+for getPublicKey's `publicKey`, the two linkage results' `prover`, `verifier` and
+`counterparty`, and the certificate results' `verifier`). Both now read through
+the helper with the call and field names they passed, the JSON site after its
+string check (`a string`, unchanged); the wire's private `compressed_key` went
+with its one caller. The ground is #505's: one definition of the reference's rule
+for every host. No verdict or text changes: on the recorder's 15 cases
+(`tests/vectors/public_key_validation_579.json`, canonical, the other parity,
+upper case, space-padded, odd length, uncompressed, hybrid, x above and at p, x
+zero, empty, non-hex, short, `04` at 33 bytes) each site gave the recorded
+`result` outcome in the recorded words before the change and gives it after,
+pinned by `the_get_public_key_result_check_is_the_result_validators_outcome_588`
+(`src/wallet/wire/public_key_result_588_tests.rs`, the frame's 33 bytes or code
+1) and `the_result_key_check_is_the_result_validators_outcome_588`
+(`src/wallet/substrates/result_values/public_key_588_tests.rs`, through the
+getPublicKey dispatch and under `listCertificates`' `certificates[0].verifier`),
+both green on the pre-change code (a refactor, no RED). No parity row names the
+two sites (the CLAUDE.md list and the census rows read for `public_key_result`
+and `scalars`).
+
 ### Fixed: the `get_verifiable_certificates` certifier is checked against the requested set as the reference checks it (#587)
 
 `get_verifiable_certificates` proved and forwarded every certificate its

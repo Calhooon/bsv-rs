@@ -25,7 +25,7 @@ This module provides transport substrates for communicating with BSV wallets ove
 | `result_values/certificates.rs`, `identity.rs` | #432 certificate proofs and identity search; #495 enables all discovery predicates under `wallet`, including on wasm without `http` (`url` WHATWG parsing, `regex` with only `std`, `unicode-bool`, `unicode-gencat`, and NFD via `unicode-normalization`). The list pages, filters and output commitments are `lists.rs` above | <500 each |
 | `result_values/wire.rs` | Typed byte-slice projections for the eleven wire result sites (#487, #495); metadata alone enters the shared JSON predicates (#487) | <300 |
 | `result_values/timestamp.rs` | Dependency-free ISO shape/date predicate shared by HTTP, wire client and processor (#487) | ~100 |
-| `result_values/scalars.rs`, `boundary.rs`, `raw_tree.rs` | #432 scalar words, request/body bounds (the byte cap `byte_fields::MAX_BYTES`, read in by `boundary.rs`'s `use` and shared from there by `raw_tree.rs` and `wire.rs`, and the source of `MAX_WIRE_REQUEST_BYTES`; #526), a flat JSON container index and raw normalization, graph budgets and unsafe keys | <500 each |
+| `result_values/scalars.rs`, `boundary.rs`, `raw_tree.rs` | #432 scalar words (the result key, `scalars::key`, a string then `wallet::validate_result_public_key`, #588; pinned by `public_key_588_tests.rs`), request/body bounds (the byte cap `byte_fields::MAX_BYTES`, read in by `boundary.rs`'s `use` and shared from there by `raw_tree.rs` and `wire.rs`, and the source of `MAX_WIRE_REQUEST_BYTES`; #526), a flat JSON container index and raw normalization, graph budgets and unsafe keys | <500 each |
 | `CLAUDE.md` | This documentation | ~260 |
 
 ## Available Substrates
