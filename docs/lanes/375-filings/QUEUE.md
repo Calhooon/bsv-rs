@@ -31,6 +31,7 @@ threads following answers to the earlier ones.
 | 16 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/linkage-reason-and-result-validation.md](./linkage-reason-and-result-validation.md) | Use the linkage reason width and validate returned linkage context |
 | 17 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/http-json-result-validation.md](./http-json-result-validation.md) | Validate HTTP wallet results against their requests and BRC-100 shapes |
 | 18 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/public-key-unreduced-coordinate-serialization.md](./public-key-unreduced-coordinate-serialization.md) | Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with |
+| 19 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/decode-outpoints-count-bound-go-sdk.md](./decode-outpoints-count-bound-go-sdk.md) | Bound the outpoint count read off the wire by the body's remaining bytes before allocating |
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
@@ -58,6 +59,13 @@ the same way, and ts-stack#1463 and #1464 also omit their drafts' line
 scope before opening a duplicate." The remaining twelve are filed two a day per
 repository in this order from 2026-11-01, from the drafts as they stand on
 beta on their day. Rows 1 and 2 were neither deferred nor dropped: the owner's cadence put the six verifier rows first by consequence; rows 1 and 2 are the first go-sdk pair of 2026-11-01 and rows 11 and 12 ts-stack's (the certificate outpoint bound, the internalize output index width); then two a day per repository in queue order (the keeper, the rulings page's entry of 2026-10-31 17:1xZ).
+
+The keeper's word of 2026-11-01 02:1xZ adds a nineteenth draft, FILE,
+nineteenth in the keeper's order: go-sdk PR #392 (the fix of #387, merged
+2026-10-30 as `9f4c4a658`) names `decodeOutpoints`' `make(..., 0, count)` from
+an unbounded wire count as a hazard it leaves (census row 10). The queue now has
+nineteen entries; the new draft is filed on its day of cadence (b), from the
+draft as it stands on beta. Nothing new has been filed.
 
 ## HOLD
 
