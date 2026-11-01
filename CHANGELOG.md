@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/unlocking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 8 of the file's 26 viable mutants
+alive (69.23 percent): `into_script`, `to_asm` (twice), `len` (twice),
+`is_empty` (twice) and `From<Script>::from`. Killed by tests: 8. Declared
+equivalent: 0. Remaining: 0. Re-measured with the script surface's selection
+(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03`): 26 caught, 0 missed, 0 timed out, 0 unviable, 100 percent.
+
+The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
+of the eight: the harness builds its scriptSig with `from_binary` and the
+interpreter reads it through `chunks`, `as_script` and `is_push_only`. Each
+mutant is observable, so each is a hand vector, not an equivalent:
+`tests/script_unlocking_script_603.rs` takes three public corpus entries by id
+with their recorded verdicts (flow-01013, scriptSig `000000`, valid;
+flow-01059, `5150`, `SCRIPT_ERR_BAD_OPCODE`; seed-000013, empty,
+`SCRIPT_ERR_INVALID_STACK_OPERATION`), run under the post-Chronicle block word:
+`len` and `is_empty` count `getOpTail`'s instructions
+(`lean/BsvScript/Machine.lean:29-50`, the empty script `:55`; four mutants);
+`into_script` and `From<Script>` hand `verifyScript` the scriptSig's own bytes
+(`:499-509`), flow-01059 round-tripped through `Script` still refused as
+recorded (two); `to_asm` is `Script`'s, as the reference's `UnlockingScript`
+overrides no serializer (`ts-stack@edf6e03`
+`packages/sdk/src/script/UnlockingScript.ts:12-30`), and reads back to
+flow-01059's refused bytes (two). Each test RED on its mutants in a scratch
+copy, all three green on the tree. No vector revealed a divergence.
+
 ### Added: src/transaction/beef_tx.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
