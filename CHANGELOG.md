@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/beef_tx.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 17 of the file's 54 viable mutants alive (68.52 percent): the surface's
+selection (`nightly_mutants.py`'s `beef`: the library's `transaction::` tests,
+`transaction_tests`, `beef_stream`, `beef_limits`, `beef_atomic_graph`,
+`conformance_beef` with the corpus) never named `tx_mut`, `refresh`,
+`has_txid`, `raw_tx_or_compute`, `has_no_inputs`, `has_no_outputs` or the
+input list's dedup directly. Seven tests in the file's own module now do, each
+named for its rule: the node's first two transaction checks from
+bsv-script-lean@387dab3 `lean/BsvScript/TxRules.lean:88-89`
+(`checkTransactionCommon_vinEmpty`, `_voutEmpty`, `:220-231`) on the vectors
+`regular-empty-inputs` and `regular-empty-outputs` of its
+`corpus/chain/mempool/mempool.jsonl` (recorded `bad-txns-vin-empty`,
+`bad-txns-vout-empty`), each read from its bytes and from its parse; and the
+reference's `BeefTx.ts` at `ts-stack@edf6e03` (`txid` `:105-116`,
+`getRawTxBytes` `:144-151`, `syncRawTxFromTransaction` `:160-177`,
+`updateInputTxids`' set `:218-233`) on block 170's spend and an entry the
+crate's writer builds. Killed by tests: 17; declared equivalent: 0;
+remaining: 0. Re-measured with the surface's selection and
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`: 54 caught, 0 missed, 0 timed
+out, 7 unviable, 100 percent of viable. No vector revealed a divergence from
+the reference.
+
 ### Added: src/script/transaction.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened run 41327640129 left seven survivors in `src/script/transaction.rs`
