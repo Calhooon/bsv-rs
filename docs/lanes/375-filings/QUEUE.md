@@ -33,6 +33,7 @@ threads following answers to the earlier ones.
 | 18 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/public-key-unreduced-coordinate-serialization.md](./public-key-unreduced-coordinate-serialization.md) | Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with |
 | 19 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/decode-outpoints-count-bound-go-sdk.md](./decode-outpoints-count-bound-go-sdk.md) | Bound the outpoint count read off the wire by the body's remaining bytes before allocating |
 | 20 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/no-send-change-framing-go-sdk.md](./no-send-change-framing-go-sdk.md) | createAction's noSendChange is framed behind an extra byte length, so a Go wallet and a TypeScript client cannot read each other's list |
+| 21 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/send-with-results-marker-go-sdk.md](./send-with-results-marker-go-sdk.md) | createAction and signAction results: an absent sendWithResults panics on the wire's absent marker, and a nil one is written as a zero count instead of the marker |
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
@@ -76,6 +77,16 @@ wallet and a TypeScript client refuse each other's list. It is go-sdk's
 divergence from the wire, not a stated row. The queue now has twenty entries;
 the new draft is filed in the go-sdk pairs' turn of cadence (b), from the draft
 as it stands on beta. Nothing new has been filed.
+
+The keeper's word of 2026-11-01 04:1xZ (the rulings page) adds a twenty-first
+draft, FILE, against go-sdk, filed ahead of row 20 in the go-sdk turn: go-sdk's
+`readTxidSliceWithStatus` sizes the createAction and signAction results'
+`sendWithResults` from the wire's absent marker (nine `ff`) and panics
+(`makeslice: cap out of range`, `status.go:54`) on every reference result that
+carries no `sendWithResults`, and its writer writes a nil list as `00` where the
+marker is nine `ff` (one field, one issue). The queue now has twenty-one
+entries; the new draft is filed in the go-sdk pairs' turn of cadence (b), ahead
+of row 20, from the draft as it stands on beta. Nothing new has been filed.
 
 ## HOLD
 
