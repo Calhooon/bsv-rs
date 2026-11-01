@@ -7,7 +7,8 @@
 //! `validateKeyringRevealer` -> `validatePublicKey` (`validationHelpers.ts:185-191,
 //! 1243-1246`) and the certificate's `assertCompressedPublicKey`
 //! (`Certificate.ts:240-245`). The inputs are the recorded lenient forms of
-//! `vectors/public_key_forms_498.json`.
+//! `vectors/public_key_forms_498.json`. Since #582 `KeyringRevealer` reads
+//! through `wallet::validate_public_key` (#579), in its words.
 #![cfg(feature = "auth")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -84,12 +85,49 @@ fn a_keyring_revealer_in_a_lenient_form_is_refused_498() {
         let error = serde_json::from_value::<KeyringRevealer>(json!(input))
             .err()
             .unwrap_or_else(|| panic!("{name}: a keyringRevealer read leniently"));
+        // In `validatePublicKey`'s words since #582
         assert!(
             error
                 .to_string()
-                .starts_with("keyringRevealer is 'certifier' or a public key: "),
+                .starts_with("The keyringRevealer parameter must be "),
             "{name}: {error}"
         );
+    }
+}
+
+/// #582: `validateKeyringRevealer` is `validatePublicKey` (`ts-stack@edf6e03`
+/// `validationHelpers.ts:1243-1246,185-191`), which refuses an uncompressed
+/// key and reads a space-padded one trimmed; the strict reading
+/// (`from_strict_hex`) read the first and refused the second until #582. The
+/// verdicts are the 579 recorder's, its parameter renamed.
+#[test]
+fn a_keyring_revealer_is_read_as_the_reference_validate_public_key_reads_it_582() {
+    let recorded: Value =
+        serde_json::from_str(include_str!("vectors/public_key_validation_579.json")).unwrap();
+    let parameter = recorded["wallet_parameter"].as_str().unwrap();
+    for name in ["uncompressed_498", "surrounding_space", "upper_case"] {
+        let case = recorded["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == name)
+            .unwrap();
+        let read = serde_json::from_value::<KeyringRevealer>(case["text"].clone());
+        let wallet = &case["wallet"];
+        if wallet["ok"] == true {
+            match read {
+                Ok(KeyringRevealer::PublicKey(key)) => {
+                    assert_eq!(key.to_hex(), wallet["returned"].as_str().unwrap(), "{name}")
+                }
+                other => panic!("{name}: {other:?}"),
+            }
+        } else {
+            let words = wallet["message"]
+                .as_str()
+                .unwrap()
+                .replace(&format!("The {parameter} "), "The keyringRevealer ");
+            assert_eq!(read.unwrap_err().to_string(), words, "{name}");
+        }
     }
 }
 

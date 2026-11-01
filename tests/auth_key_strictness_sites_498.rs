@@ -15,6 +15,12 @@
 //! Read leniently, a hybrid or odd-length form reduces to the canonical point:
 //! a pinned handshake the reference refuses authenticated, and a wallet's
 //! certificate the reference cannot serialize forwarded under the canonical key.
+//!
+//! Since #582 the pin, the Peer's own key and the certifier read through
+//! `assert_auth_identity_key` (#579), the reference's rule at each: a lenient
+//! form at the pin or the own key is refused in its words, and the tests
+//! named `_582` pin the input the strict reading judged otherwise (upper-case
+//! hex, `tests/vectors/public_key_validation_579.json`'s `upper_case`).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg(feature = "auth")]
 
@@ -22,7 +28,7 @@ use async_trait::async_trait;
 use bsv_rs::auth::transports::{Transport, TransportCallback};
 use bsv_rs::auth::types::RequestedCertificateSet;
 use bsv_rs::auth::utils::get_verifiable_certificates;
-use bsv_rs::auth::{AuthMessage, Peer, PeerOptions};
+use bsv_rs::auth::{assert_auth_identity_key, AuthMessage, Peer, PeerOptions};
 use bsv_rs::primitives::{to_base64, to_hex, PrivateKey, PublicKey};
 use bsv_rs::wallet::*;
 use bsv_rs::{Error, Result};
@@ -47,10 +53,6 @@ fn lenient_forms(key: &PublicKey) -> Vec<(&'static str, String)> {
         ("odd_length", compressed[1..].to_string()),
         ("x_above_p", format!("02{X_ABOVE_P}")),
     ]
-}
-
-fn strict_refusal(error: &Error) -> bool {
-    matches!(error, Error::InvalidPublicKey(_) | Error::InvalidHex(_))
 }
 
 // ---------------------------------------------------------------------------
@@ -236,8 +238,16 @@ fn route(mut sent: mpsc::UnboundedReceiver<AuthMessage>, to: Callback) {
 
 /// A client pinned to `pin` against the server of scalar 42: the verdict.
 async fn pinned_handshake(pin: &str) -> Result<bsv_rs::auth::PeerSession> {
+    pinned_handshake_with(&key(42), pin).await
+}
+
+/// A client pinned to `pin` against the server `server`: the verdict.
+async fn pinned_handshake_with(
+    server: &PrivateKey,
+    pin: &str,
+) -> Result<bsv_rs::auth::PeerSession> {
     let (client, client_callback, client_sent) = end(&key(41), false);
-    let (_server, server_callback, server_sent) = end(&key(42), true);
+    let (_server, server_callback, server_sent) = end(server, true);
     route(client_sent, server_callback);
     route(server_sent, client_callback);
     client
@@ -252,8 +262,10 @@ async fn a_peer_pin_in_a_lenient_form_is_refused_before_the_handshake_498() {
     assert!(session.is_authenticated);
     assert_eq!(session.peer_identity_key, Some(server.clone()));
     for (name, pin) in lenient_forms(&server) {
+        // In `assertAuthIdentityKey`'s words since #582
+        let refusal = assert_auth_identity_key(&pin).unwrap_err();
         match pinned_handshake(&pin).await {
-            Err(error) if strict_refusal(&error) => {}
+            Err(error) if error == refusal => {}
             other => panic!("{name}: a pin read leniently: {other:?}"),
         }
     }
@@ -337,7 +349,131 @@ async fn a_wallet_identity_key_in_a_lenient_form_is_refused_by_the_peer_498() {
     let answered = peer(Some(canonical.to_hex())).get_identity_key().await;
     assert_eq!(answered.unwrap(), canonical);
     for (name, form) in lenient_forms(&canonical) {
+        // In `assertAuthIdentityKey`'s words since #582
+        let refusal = assert_auth_identity_key(&form).unwrap_err();
         let error = peer(Some(form)).get_identity_key().await.unwrap_err();
-        assert!(strict_refusal(&error), "{name}: {error}");
+        assert_eq!(error, refusal, "{name}");
     }
+}
+
+// ---------------------------------------------------------------------------
+// #582: the reference's rule at each site, `assertAuthIdentityKey`
+// ---------------------------------------------------------------------------
+
+/// The 579 recorder's case `name`: its text and the reference's auth verdict
+/// (`None` accepted, `Some(message)` refused).
+fn recorded_579(name: &str) -> (String, Option<String>) {
+    let recorded: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/public_key_validation_579.json")).unwrap();
+    let case = recorded["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == name)
+        .unwrap_or_else(|| panic!("the vector has no case {name}"));
+    let auth = &case["auth"];
+    let verdict = (auth["ok"] != true).then(|| auth["message"].as_str().unwrap().to_owned());
+    (case["text"].as_str().unwrap().to_owned(), verdict)
+}
+
+/// The generator: the key the 579 vector's texts name.
+fn g() -> PrivateKey {
+    PrivateKey::from_hex(&format!("{:064x}", 1)).unwrap()
+}
+
+/// An upper-case pin cannot equal the canonical identity key the reference's
+/// initial response carries (`Peer.ts:903-908`, `AuthMessageValidation.ts:344`);
+/// read strictly it matched and the handshake authenticated.
+#[tokio::test]
+async fn an_upper_case_peer_pin_is_refused_in_the_reference_words_582() {
+    let session = pinned_handshake_with(&g(), &g().public_key().to_hex())
+        .await
+        .unwrap();
+    assert!(session.is_authenticated);
+    let (pin, verdict) = recorded_579("upper_case");
+    let words = verdict.expect("the reference refuses it");
+    match pinned_handshake_with(&g(), &pin).await {
+        Err(Error::AuthError(message)) if message == words => {}
+        other => panic!("an upper-case pin: {other:?}"),
+    }
+}
+
+/// The reference asserts its wallet's identity key (`Peer.ts:1354-1355`);
+/// read strictly, an upper-case or uncompressed answer became the key.
+#[tokio::test]
+async fn an_upper_case_or_uncompressed_wallet_identity_key_is_refused_582() {
+    for name in ["upper_case", "uncompressed_498"] {
+        let (text, verdict) = recorded_579(name);
+        let words = verdict.expect("the reference refuses it");
+        let mut wallet = wallet(&g(), None);
+        wallet.identity = Some(text);
+        let peer = Peer::new(PeerOptions {
+            wallet,
+            transport: bsv_rs::auth::transports::MockTransport::new(),
+            certificates_to_request: None,
+            session_manager: None,
+            auto_persist_last_session: false,
+            originator: None,
+        });
+        match peer.get_identity_key().await {
+            Err(Error::AuthError(message)) if message == words => {}
+            other => panic!("{name}: {other:?}"),
+        }
+    }
+}
+
+/// The reference refuses a wallet certificate whose certifier text is none
+/// of the requested set's canonical texts (`getVerifiableCertificates.ts:76-81`);
+/// read strictly, an upper-case certifier was forwarded. This crate skips it
+/// where the reference throws (older than #498).
+#[tokio::test]
+async fn an_upper_case_wallet_certificate_certifier_is_not_forwarded_582() {
+    let (upper, verdict) = recorded_579("upper_case");
+    assert!(verdict.is_some(), "the reference's assertion refuses it");
+    let subject = key(42).public_key().to_hex();
+    let count = |certifier: &str| {
+        let listed = listed(&subject, certifier);
+        async move {
+            let mut requested = RequestedCertificateSet::new();
+            requested.add_certifier(g().public_key().to_hex());
+            requested.add_type(to_base64(&[1; 32]), Vec::new());
+            get_verifiable_certificates(
+                &wallet(&key(41), Some(listed)),
+                &requested,
+                &key(44).public_key(),
+                Some("test"),
+            )
+            .await
+            .unwrap()
+            .len()
+        }
+    };
+    assert_eq!(count(&g().public_key().to_hex()).await, 1);
+    assert_eq!(count(&upper).await, 0);
+}
+
+/// The reference judges a wallet certificate's subject at the listCertificates
+/// result validator (`WalletResultValidation.ts:1489-1493`, `publicKey` at
+/// `:928-933`), before proveCertificate (`getVerifiableCertificates.ts:57-90`);
+/// read through `from_strict_hex` after proveCertificate, an uncompressed
+/// subject the reference refuses was forwarded (#582, the read's FIX). Each
+/// recorded text is forwarded exactly when the result validator accepts it.
+#[tokio::test]
+async fn a_subject_the_reference_result_validator_refuses_is_not_forwarded_582() {
+    let recorded: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/public_key_validation_579.json")).unwrap();
+    let certifier = key(43).public_key().to_hex();
+    for case in recorded["cases"].as_array().unwrap() {
+        let text = case["text"].as_str().unwrap();
+        let accepted = case["result"]["ok"].as_bool().unwrap();
+        assert_eq!(
+            verifiable(listed(text, &certifier)).await,
+            usize::from(accepted),
+            "{}: the reference's result validator {}",
+            case["name"],
+            if accepted { "accepts it" } else { "refuses it" }
+        );
+    }
+    let (uncompressed, _) = recorded_579("uncompressed_498");
+    assert_eq!(verifiable(listed(&uncompressed, &certifier)).await, 0);
 }

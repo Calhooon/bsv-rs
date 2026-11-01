@@ -12,7 +12,7 @@ use crate::auth::{
         AUTH_VERSION,
     },
     utils::{
-        assert_requested_certificate_set, check_received_message,
+        assert_auth_identity_key, assert_requested_certificate_set, check_received_message,
         check_received_requested_certificates, create_nonce, get_verifiable_certificates,
         verify_nonce, MAX_CERTIFICATES,
     },
@@ -502,9 +502,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             )
             .await?;
 
-        // Strictly, as the reference asserts its wallet's identity key
-        // (`Peer.ts:1354-1355`, `assertAuthIdentityKey`; #498)
-        let key = PublicKey::from_strict_hex(&result.public_key)?;
+        // As the reference asserts its wallet's identity key
+        // (`Peer.ts:1354-1355`, `assertAuthIdentityKey`; #498, #582)
+        let key = assert_auth_identity_key(&result.public_key)?;
         let mut cached = self.identity_key.write().await;
         *cached = Some(key.clone());
         Ok(key)
@@ -628,9 +628,11 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         // The responder pinned to the identity asked for (`Peer.ts:637`), its
         // initial response refused if another answers (`:903-908`; #353); the
-        // reference compares the pin's text with a canonical key, so a lenient
-        // form is read strictly and refused, never reduced to a match (#498)
-        let pinned = identity_key.map(PublicKey::from_strict_hex).transpose()?;
+        // reference compares the pin's text with a key `assertAuthIdentityKey`
+        // has held canonical (`AuthMessageValidation.ts:344`), so only a text
+        // that assertion admits can match: refused here before the handshake,
+        // in its words, never reduced to a match (#498, #582)
+        let pinned = identity_key.map(assert_auth_identity_key).transpose()?;
         let my_identity = self.get_identity_key().await?;
         let transport = self.transport()?;
 

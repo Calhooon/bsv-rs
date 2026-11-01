@@ -175,6 +175,54 @@ pub fn validate_public_key(value: &str, name: &str) -> Result<PublicKey> {
     public_key(&bytes, name)
 }
 
+/// The reference's result validator's `publicKey` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/WalletResultValidation.ts:928-933`, over `hex` at
+/// `:917-926`), as `validateCertificate` applies it to a wallet certificate's
+/// `subject` and `certifier` (`:1489-1493`) on a listCertificates or discovery
+/// answer: the wallet's key read as the reference's client reads a result,
+/// where [`validate_public_key`] reads it as an argument (#582).
+///
+/// In the reference's order: hexadecimal digits of either case in pairs
+/// (`/^(?:[0-9a-fA-F]{2})*$/`, nothing trimmed, so a space-padded text is
+/// refused where [`validate_public_key`] trims and reads it), exactly 33
+/// bytes, then `02` or `03` and an x below the field prime that is a point's
+/// (`isValidCompressedPublicKey`, `Secp256k1Validation.ts:15-22`). Returns the
+/// parsed key. `validateCertificate` catches the refusal and throws its own,
+/// `Invalid <call> result <field>: expected a canonical signed wallet
+/// certificate` (`:1534-1536`); this helper answers the inner words.
+///
+/// # Errors
+///
+/// [`Error::WalletError`](crate::Error::WalletError) in the result
+/// validator's words (`:510-512`), `Invalid <call> result <field>: expected `
+/// followed by `an even-length hex string`, `33 hexadecimal bytes` or
+/// `a valid compressed secp256k1 public key`.
+///
+/// ```
+/// use bsv_rs::wallet::validate_result_public_key;
+///
+/// let g = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+/// let read = validate_result_public_key(g, "listCertificates", "certificates[0].subject");
+/// assert_eq!(read.unwrap().to_hex(), g);
+/// let padded = format!(" {g}");
+/// assert!(validate_result_public_key(&padded, "listCertificates", "subject").is_err());
+/// ```
+pub fn validate_result_public_key(value: &str, call: &str, field: &str) -> Result<PublicKey> {
+    let invalid = |expected: &str| {
+        crate::Error::WalletError(format!(
+            "Invalid {call} result {field}: expected {expected}"
+        ))
+    };
+    if !value.len().is_multiple_of(2) || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(invalid("an even-length hex string"));
+    }
+    if value.len() != 66 {
+        return Err(invalid("33 hexadecimal bytes"));
+    }
+    let bytes = hex::decode(value).map_err(|_| invalid("an even-length hex string"))?;
+    public_key(&bytes, field).map_err(|_| invalid("a valid compressed secp256k1 public key"))
+}
+
 /// `isValidCompressedPublicKey`, including the 02/03 prefix before parsing.
 pub(crate) fn public_key(bytes: &[u8], name: &str) -> Result<PublicKey> {
     let invalid = || invalid_parameter(name, "a valid compressed secp256k1 public key");

@@ -187,9 +187,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> AuthFetch<W, T> {
                 GetPublicKeyArgs {
                     protocol_id: Some(Protocol::new(SecurityLevel::Counterparty, "3241645161d8")),
                     key_id: Some(format!("{prefix} {suffix}")),
-                    // Strict, as the reference's wallet validates a counterparty
-                    // (`validationHelpers.ts:185-196`; #498).
-                    counterparty: Some(Counterparty::Other(PublicKey::from_strict_hex(server)?)),
+                    // As the reference's wallet validates a counterparty
+                    // (`validationHelpers.ts:185-196`; #498, #582).
+                    counterparty: Some(Counterparty::Other(crate::wallet::validate_public_key(
+                        server,
+                        "counterparty",
+                    )?)),
                     ..Default::default()
                 },
                 self.originator.as_deref(),

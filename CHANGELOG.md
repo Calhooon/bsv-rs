@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the crate's own key-reading sites follow the reference's validator at each site through the #579 helpers (#582)
+
+#579 left nine sites reading a key through the crate-private
+`PublicKey::from_strict_hex` (even-length hex, then `from_bytes`), which reads
+an uncompressed key and upper-case hex and refuses a space-padded text, so it
+equals neither reference rule. Each site was read against the reference at
+`ts-stack@edf6e03`; the six whose reference reading is one of the two
+validators now read through its #579 helper, in its words; the certificate
+subject at `get_verifiable_certificates`, whose reference reading is the
+result validator's (the cold read's FIX), through a third helper,
+`wallet::validate_result_public_key`; and the two whose reference reading is
+none of the three stay on `from_strict_hex`, its doc listing them with the
+reason.
+
+| Site | Reference reading | Now | Input judged otherwise until #582 |
+|---|---|---|---|
+| `KeyringRevealer`'s serde reading (`src/wallet/types/json_forms.rs`) | `validateKeyringRevealer` -> `validatePublicKey` (`validationHelpers.ts:1243-1246,185-191`) | `wallet::validate_public_key(text, "keyringRevealer")` | an uncompressed key, read, now refused (`The keyringRevealer parameter must be no more than 66 length.`); a space-padded key, refused, now read trimmed |
+| the Peer's own identity key, its wallet's answer (`Peer::get_identity_key`) | `assertAuthIdentityKey` (`Peer.ts:1354-1355`) | `auth::assert_auth_identity_key` | upper-case hex and an uncompressed key, read, now refused (`Authentication identityKey must be a canonical compressed public key.`) |
+| the Peer's identity pin (`initiate_handshake`, through `get_authenticated_session`, `to_peer`, `request_certificates`) | the pin's text compared with an initial response's `identityKey` (`Peer.ts:903-908`), which `assertAuthIdentityKey` has held canonical (`AuthMessageValidation.ts:344`): only a text that assertion admits can match | `auth::assert_auth_identity_key`, before the handshake | an upper-case pin, read and matched (the handshake authenticated), now refused before the handshake in the assertion's words; the reference refuses it before the handshake at `requestCertificates` in the same words (`Peer.ts:435`), at `toPeer` in `assertAuthPeerTarget`'s session-nonce words (`Peer.ts:189`, `AuthMessageValidation.ts:64-80,99-105`: no key pattern, so read as a nonce), and only through `getAuthenticatedSession` after the round trip as `initialResponse identity does not match the requested peer identity.` (`Peer.ts:508-520,903-908`) |
+| the HTTP answer's `x-bsv-auth-identity-key` at the transport (`SimplifiedFetchTransport`'s sender) | `assertAuthIdentityKey` on the folded message (`SimplifiedFetchTransport.ts:346`, `AuthMessageValidation.ts:344`) | `auth::assert_auth_identity_key` | an upper-case header, read as the sender, now refused |
+| the 402's `x-bsv-auth-identity-key` as the payment's counterparty (`AuthFetch`) | the wallet's `validateCounterparty` -> `validatePublicKey` (`AuthFetch.ts:735-738,873-878`, `validationHelpers.ts:185-196`) | `wallet::validate_public_key(text, "counterparty")` | an uncompressed key, read and handed to the wallet, now refused before it (`The counterparty parameter must be no more than 66 length.`) |
+| a wallet certificate's certifier at `get_verifiable_certificates` | the text must be one of the requested set's (`getVerifiableCertificates.ts:76-81`), each held canonical by `assertAuthIdentityKey` (`AuthMessageValidation.ts:124`) | `auth::assert_auth_identity_key`, a refusal skipping the certificate as before | an upper-case certifier, forwarded, now skipped (the reference throws; that difference is older than #498) |
+| serde's `PublicKey` reading | none at the parse: the reference's JSON holds a `PubKeyHex` text, judged (if at all) by the site that uses it | stays `from_strict_hex` (#498's fold) | none moved |
+| a wallet certificate's subject at `get_verifiable_certificates` | the listCertificates result validator's `publicKey` (`WalletResultValidation.ts:1489-1493`, `:917-933`: even-length hex of either case, nothing trimmed, 33 bytes, a compressed point), run by the reference's client on the answer before `getVerifiableCertificates` calls proveCertificate (`getVerifiableCertificates.ts:57-90`), whose `validatePublicKey(certificate.subject)` (`validationHelpers.ts:1494-1497`) would refuse it next | `wallet::validate_result_public_key(text, "listCertificates", "certificates[N].subject")`, before proveCertificate as the reference's order is, a refusal skipping the certificate (the reference throws, as at the certifier) | an uncompressed subject, forwarded, now skipped; upper case read and a space-padded text refused, as before (the wallet rule would trim it) |
+| the identity client's two token parsers' subject and certifier (`src/identity/client_record.rs`) | `Certificate.verify` -> `toBinary` (`Certificate.ts:240-254`: `02`/`03` and 64 hex digits of either case, then `fromDER`) | stays `from_strict_hex` | no helper is that rule (the wallet's trims, the auth's refuses upper case, the result validator's reads an x at or above p as no point where `fromDER` reduces it); `from_strict_hex` reads an uncompressed key `toBinary` refuses and refuses an x at or above p it reduces (#183's refusal): a stated residue |
+
+Pinned, each RED on `804e66f9` with the new test file overlaid and GREEN on
+the tip, the verdicts read from `tests/vectors/public_key_validation_579.json`
+(the #579 recorder's; for the subject the recorder now also takes the result
+validator's `publicKey` on the same 15 texts, through the exported
+`validateWalletResult('getPublicKey', ..)` (`WalletResultValidation.ts:2179`,
+`:2207-2209`), as each case's `result`, two runs byte-identical, the `wallet`
+and `auth` outcomes unchanged):
+`a_keyring_revealer_is_read_as_the_reference_validate_public_key_reads_it_582`
+(`tests/auth_serde_key_strictness_498.rs`),
+`an_upper_case_or_uncompressed_wallet_identity_key_is_refused_582`,
+`an_upper_case_peer_pin_is_refused_in_the_reference_words_582` and
+`an_upper_case_wallet_certificate_certifier_is_not_forwarded_582`
+(`tests/auth_key_strictness_sites_498.rs`),
+`a_subject_the_reference_result_validator_refuses_is_not_forwarded_582`
+(the same file; RED on `07b562ca` with the file and the re-recorded vector
+overlaid: `"uncompressed_498": the reference's result validator refuses it`,
+`left: 1`, `right: 0`; each of the 15 recorded texts forwarded exactly when the
+result validator accepts it),
+`a_general_answer_with_an_upper_case_identity_key_header_is_refused_582`
+(`tests/auth_header_key_strictness_498.rs`) and
+`an_uncompressed_payment_identity_key_is_refused_before_the_wallet_582`
+(`src/auth/clients/payment_key_strictness_498_tests.rs`). #498's tests at the
+moved sites, which pinned the strict reading's class or words for the lenient
+forms, now expect the helper's refusal of the same forms (the verdict
+unchanged, the words the reference's), and #353's
+`a_handshake_named_by_a_string_that_is_no_identity_key_is_refused_353`
+expects the assertion's words for a pin that is no key (`Peer.ts:903-908`).
+
+Texts: the moved sites' refusals change from `Error::InvalidPublicKey` /
+`Error::InvalidHex` (and `KeyringRevealer`'s
+`keyringRevealer is 'certifier' or a public key: ...`) to the helpers'
+`Error::WalletRefusal` (`The <name> parameter must be ...`) or
+`Error::AuthError` (`Authentication identityKey must be ...`). No dependent
+matches on the old texts (bsv-wallet-cli `src`, bsv-wallet-toolbox-rs `src`,
+rust-message-box `src` grepped for the `KeyringRevealer` prefix,
+`InvalidPublicKey` and the moved entry points: no hit). Semver: one public
+addition, below; no public shape moves; the error variants at these sites are
+behaviour, not API.
+
+Added: `wallet::validate_result_public_key(value, call, field) -> Result<PublicKey>`
+(`src/wallet/validation/crypto.rs`, re-exported as `bsv_rs::wallet::validate_result_public_key`),
+the reference's result validator's `publicKey` (`WalletResultValidation.ts:928-933`
+over `hex` at `:917-926`, applied to a certificate's subject and certifier at
+`:1489-1493`), beside #579's two helpers on the keeper's shape (2): no trim,
+even-length hex of either case, 33 bytes, then `02`/`03` and a point, refused as
+`Error::WalletError` in its words (`Invalid <call> result <field>: expected `
+`an even-length hex string`, `33 hexadecimal bytes` or
+`a valid compressed secp256k1 public key`; `validateCertificate`'s catch,
+`:1534-1536`, rethrows those as `a canonical signed wallet certificate`). It
+differs from `validate_public_key` by the trim alone in verdict (a space-padded
+key read there, refused here; the 15 recorded texts agree otherwise) and in its
+words and class. Pinned by `every_recorded_case_is_the_result_validators_outcome_582`
+(`tests/public_key_validation.rs`, compile-RED on `07b562ca`: the helper absent).
+Migration: none for the dependents; no dependent copies this check
+(bsv-wallet-cli `src` and bsv-wallet-toolbox-rs `src` grepped for the result
+validator's words and a compressed-key check: no hit; rust-message-box's
+`is_valid_pubkey`, `src/validation.rs:483-487`, judges a send's recipient
+argument, not a wallet's answer, and stays its own).
+
+### Notes: cross-SDK parity (#582)
+
+Go at `2ca481c` reads every one of these keys through `PublicKeyFromString`
+(`primitives/ec/publickey.go:221-231`): the `KeyringRevealer` JSON
+(`wallet/encoding_json.go:657-675`), the transport's header
+(`auth/transports/simplified_http_transport.go:209`) and the payment's
+(`auth/clients/authhttp/authhttp.go:742`), and its Peer takes the pin and its
+own key as `*ec.PublicKey` (`auth/peer.go:235-261,308-344`), so it reads the
+upper-case and uncompressed keys both reference validators (or the auth one)
+refuse here. This is #498's and #579's key-form row; no new divergence is stated.
+No census row names these sites (`grep -n 'KeyringRevealer\|identity key\|identityKey' CHANGELOG.md | grep -i row`
+finds only R20 of #432, the specific-linkage counterparty result, untouched).
+
 ### Added: the reference's public-key validators as public helpers, each named for its site (#579)
 
 bsv-wallet-cli#377 found the lenient `PublicKey::from_hex` (#498, the

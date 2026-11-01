@@ -7,7 +7,6 @@
 //! (`ts-stack@edf6e03` `Wallet.interfaces.ts:233`, `:340-356`, `:439`).
 
 use super::KeyringRevealer;
-use crate::primitives::PublicKey;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Serde helper for an optional transaction id as BRC-100's `TXIDHexString`.
@@ -81,13 +80,11 @@ impl<'de> Deserialize<'de> for KeyringRevealer {
     {
         match String::deserialize(deserializer)?.as_str() {
             "certifier" => Ok(KeyringRevealer::Certifier),
-            key => PublicKey::from_strict_hex(key)
+            // `validateKeyringRevealer` -> `validatePublicKey` (`ts-stack@edf6e03`
+            // `validationHelpers.ts:1243-1246,185-191`), in its words (#582)
+            key => crate::wallet::validate_public_key(key, "keyringRevealer")
                 .map(KeyringRevealer::PublicKey)
-                .map_err(|e| {
-                    serde::de::Error::custom(format!(
-                        "keyringRevealer is 'certifier' or a public key: {e}"
-                    ))
-                }),
+                .map_err(serde::de::Error::custom),
         }
     }
 }
