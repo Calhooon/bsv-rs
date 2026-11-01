@@ -146,3 +146,14 @@ regexes = [
   '''^022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4$''',
   '''^03fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556$''',
 ]
+# tests/vectors/certificate_to_binary_key_585.json: the #585 cases' `key` (the bytes the reference's
+# `Certificate.toBinary` writes) is 37G or 31G in compressed form, the public keys of the private keys
+# 37 and 31 (the subject and certifier in tests/support/certificate_to_binary_key_585.mjs), recorded
+# from the reference's Certificate; public keys of test scalars, not keys in use. Only those two
+# literals are let through, never the file.
+[[allowlists]]
+description = "37G and 31G as the #585 certificate's subject and certifier"
+regexes = [
+  '''^0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d$''',
+  '''^026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4$''',
+]

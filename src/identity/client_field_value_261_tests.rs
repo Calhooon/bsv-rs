@@ -307,3 +307,6 @@ async fn a_published_certificate_key_in_a_lenient_form_is_skipped_498() {
         }
     }
 }
+
+#[path = "client_to_binary_key_585_tests.rs"]
+mod to_binary_key_585;

@@ -31,11 +31,15 @@ mod bounds;
 mod certificate;
 mod certificate_json;
 mod master;
+#[cfg(feature = "identity")]
+mod to_binary_key;
 mod verifiable;
 
 pub use certificate::Certificate;
 pub(crate) use certificate_json::revocation_outpoint_from_str;
 pub use master::MasterCertificate;
+#[cfg(feature = "identity")]
+pub(crate) use to_binary_key::read_to_binary_key;
 pub use verifiable::VerifiableCertificate;
 
 /// Protocol name for certificate field encryption.

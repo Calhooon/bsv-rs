@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the identity parsers' subject and certifier read a key as `Certificate.toBinary` reads it (#585)
+
+The two `ls_identity` token parsers (`parse_output_to_certificate` and
+`parse_output_to_verifiable_certificate`, through `src/identity/client_record.rs`)
+read a published certificate's `subject` and `certifier` through
+`PublicKey::from_strict_hex` (even-length hex, then `from_bytes`), which reads an
+uncompressed key. The reference reads them where its discovery verifies the
+record: `Certificate.verify` runs `toBinary` first (`ts-stack@edf6e03`
+`Certificate.ts:425-427`), which takes the text untrimmed and requires
+`/^(02|03)[0-9a-fA-F]{64}$/` (`:240-254`, else `Invalid certificate <field>:
+expected compressed public key hex`), then the 33 bytes read as a point
+(`assertCompressedPublicKey`, `:136-143`, else `Invalid certificate <field>:
+expected a compressed secp256k1 public key`); a refusal there is `verify`'s
+`false`, and the toolbox's discovery skips the token (`identityUtils.ts:497-559`).
+An uncompressed subject or certifier was read here, the certificate verified
+over its compressed bytes and returned; it is now skipped by both parsers, as
+the reference skips it. Closed by #585: the residue #582's entry states for these
+two sites.
+
+One definition: `auth::certificates::read_to_binary_key(text, field)`
+(`src/auth/certificates/to_binary_key.rs`, crate-private, under `identity`),
+`toBinary`'s rule in its two sentences as `Error::CertificateValidationError`.
+It is none of the #579 helpers' rules: `wallet::validate_public_key` trims a
+space-padded text `toBinary` refuses, `auth::assert_auth_identity_key` refuses
+upper-case hex `toBinary` reads, and `wallet::validate_result_public_key`
+judges the same texts in the result validator's words. A compressed x at or
+above p, which `fromDER` reduces and `toBinary` writes unreduced, stays #183's
+refusal at the read: a stated residue. The vector's certificate, signed over
+the canonical subject, fails `verify` with it on both sides; a certificate its
+certifier signed over those unreduced bytes verifies there (`verify` `true`, a
+probe under Node v22.18.0 in #592's cold read, not pinned) and is skipped here.
+
+Pinned against `tests/vectors/certificate_to_binary_key_585.json`, written by
+`tests/support/certificate_to_binary_key_585.mjs` (a bun bundle of
+`Certificate`, `ProtoWallet` and `PrivateKey` at `ts-stack@edf6e03` under Node
+v22.18.0; two runs byte-identical): a certificate the certifier 31 signs for the
+subject 37 (this crate's signature equal to the reference's), and for each of
+the subject and the certifier eight texts (canonical, upper case, space-padded,
+uncompressed, hybrid, odd length, x above p, x no point's) with `toBinary(false)`'s
+outcome (the key bytes written or the words) and `verify`'s verdict (`true` for
+the canonical and upper-case texts alone). Tests in
+`src/identity/client_to_binary_key_585_tests.rs`:
+`an_uncompressed_published_key_is_skipped_by_the_certificate_parser_585` and
+`an_uncompressed_published_key_is_skipped_by_the_verifiable_certificate_parser_585`,
+each of the sixteen tokens read exactly when the reference's `verify` answers
+`true`, both RED on `76bbe036` with the test files, the reader and the vector
+overlaid and `client_record.rs` the base's (`assertion left == right failed:
+subject uncompressed`, `left: true`, `right: false`; with the subject cases
+filtered out, `certifier uncompressed`, the same), GREEN on the tip;
+`the_reader_refuses_in_the_reference_to_binary_words_585`, the reader's key or
+words equal to `toBinary`'s on every case but the enumerated `x_above_p`. #498's
+`a_published_certificate_key_in_a_lenient_form_is_skipped_498` (hybrid and odd
+length) agrees with the recorded verdicts and is unchanged.
+
+Texts: none a caller reads; the parsers skip a refused token as before (an
+`Option`), so the reader's words surface nowhere public. No dependent calls the
+parsers' resolution paths or matches the words (bsv-wallet-cli `src`,
+bsv-wallet-toolbox-rs `src`, rust-message-box `src` grepped for both sentences,
+`discover_certificates`, `resolve_by_attributes`, `resolve_by_identity_key`: no
+hit). `from_strict_hex` stays for serde's `PublicKey` reading alone, its doc
+saying so. No public API moves. No census row records these sites (`Row N:`
+lines of `CHANGELOG.md` and `docs/` grepped for `toBinary`, the identity
+parsers, `from_strict_hex` and the subject and certifier: no hit).
+
+### Notes: cross-SDK parity (#585)
+
+Go at `2ca481c` has no `ls_identity` parser (it resolves through its wallet,
+`identity/client.go:240-276`), and its certificate holds the subject and
+certifier as `ec.PublicKey` (`auth/certificates/certificate.go:40,43`), read from
+JSON through `PublicKeyFromString` (`primitives/ec/publickey.go:148-157,221-231`:
+hex, then `ParsePubKey`, which reads the uncompressed and hybrid forms) and
+written compressed (`wallet/serializer/certificate.go:36-37`): a certificate
+whose JSON carries an uncompressed key verifies there over its compressed
+bytes, as it did here until #585, where the reference's `toBinary` refuses it.
+This is #498's key-form row; no new divergence is stated.
+
 ### Fixed: the wallet wire's sendWithResults status codes are BRC-100's and the reference's, 1/2/3 (#590)
 
 A createAction or signAction result's `sendWithResults` entry carries its
