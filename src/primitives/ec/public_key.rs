@@ -80,18 +80,19 @@ impl PublicKey {
     }
 
     /// Parses a public key from hex strictly, as `from_hex` read it before
-    /// #498: even-length hex, then `from_bytes`. The serde reading and
-    /// `KeyringRevealer` use it, where the reference's argument validators
-    /// are strict (`AuthMessageValidation.ts:81-89`, `validationHelpers.ts:185-191`),
-    /// and so do the Peer's identity pin (compared as text, `Peer.ts:903-908`),
-    /// the three certificate intakes (`Certificate.toBinary`, `Certificate.ts:240-254`;
-    /// the requested set's certifiers, `getVerifiableCertificates.ts:76-81`) and
-    /// the HTTP answer's `x-bsv-auth-identity-key` header, read by the transport
-    /// and by the payment (`AuthMessageValidation.ts:344`, `validationHelpers.ts:185-196`).
-    /// The reference's rules themselves are public as
-    /// `wallet::validate_public_key` and `auth::assert_auth_identity_key`
-    /// (#579); this reader also reads an uncompressed key and upper-case hex
-    /// the auth rule refuses, and the uncompressed key the wallet rule refuses.
+    /// #498: even-length hex, then `from_bytes`. Since #582 two sites read
+    /// through it, where the reference applies none of the three helpers'
+    /// rules (`wallet::validate_public_key`, `auth::assert_auth_identity_key`,
+    /// `wallet::validate_result_public_key`, the sites that do now read through
+    /// those): the serde reading of a `PublicKey` field (the reference's JSON
+    /// holds a `PubKeyHex` text and judges it, if at all, at the site that
+    /// uses it; strict by #498's fold), and the subject and certifier at the
+    /// identity client's two token parsers, whose reference reading is
+    /// `Certificate.verify`'s through `Certificate.toBinary`
+    /// (`Certificate.ts:240-254`: `02`/`03` and 64 hex digits of either case,
+    /// then `fromDER`). This reader also reads an uncompressed key there,
+    /// which `toBinary` refuses, and refuses an x at or above p, which
+    /// `toBinary` reduces (#183's refusal).
     pub(crate) fn from_strict_hex(hex: &str) -> Result<Self> {
         Self::from_bytes(&crate::primitives::encoding::from_hex(hex)?)
     }

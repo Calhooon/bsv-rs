@@ -112,11 +112,11 @@ pub(super) fn refusal(
 }
 
 /// The answer's sender: the identity key it carries, which
-/// `refuse_unauthenticated` has required (#354), read strictly as the
-/// reference's `assertAuthIdentityKey` reads it
-/// (`AuthMessageValidation.ts:344`, `:81-89`; #498).
+/// `refuse_unauthenticated` has required (#354), read as the reference's
+/// `assertAuthIdentityKey` reads it (`AuthMessageValidation.ts:344`, `:81-90`;
+/// #498, #582).
 pub(super) fn sender(response_headers: &HeaderMap) -> Result<PublicKey> {
-    PublicKey::from_strict_hex(
+    crate::auth::assert_auth_identity_key(
         response_headers
             .get(headers::IDENTITY_KEY)
             .and_then(|v| v.to_str().ok())

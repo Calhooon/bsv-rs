@@ -5,6 +5,11 @@
 //           reached through the exported `validateDiscoverByIdentityKeyArgs`
 //           (`:1535-1546`), whose `identityKey` it judges first under that name
 //   auth    `assertAuthIdentityKey` (`packages/sdk/src/auth/AuthMessageValidation.ts:81-90`)
+//   result  the result validator's `publicKey` (`packages/sdk/src/wallet/WalletResultValidation.ts:928-933`,
+//           over `hex` at `:917-926`; #582), the rule `validateCertificate` applies to a
+//           certificate's subject and certifier (`:1489-1493`), reached through the exported
+//           `validateWalletResult` (`:2179`) on a getPublicKey answer (`:2207-2209`), whose
+//           `publicKey` it judges under that name without `validateCertificate`'s catch
 // Each case records `{ ok, returned }` (the text the validator returns, the wallet's
 // trimmed and lower-cased; the auth's the text as given) or `{ ok: false,
 // message }` (the thrown error's message). The texts are #498's lenient forms,
@@ -15,13 +20,15 @@
 //   W=/Volumes/Lanes/out/bsv-rs/fix-579/ref
 //   git -C ~/bsv/ts-stack archive edf6e03 packages/sdk | tar -x -C "$W"
 //   (cd "$W/packages/sdk" && bun build src/wallet/validationHelpers.ts --target node --format esm --outfile "$W/vh.mjs" \
-//     && bun build src/auth/AuthMessageValidation.ts --target node --format esm --outfile "$W/amv.mjs")
-//   node tests/support/public_key_validation_579.mjs "$W/vh.mjs" "$W/amv.mjs" > tests/vectors/public_key_validation_579.json
+//     && bun build src/auth/AuthMessageValidation.ts --target node --format esm --outfile "$W/amv.mjs" \
+//     && bun build src/wallet/WalletResultValidation.ts --target node --format esm --outfile "$W/wrv.mjs")
+//   node tests/support/public_key_validation_579.mjs "$W/vh.mjs" "$W/amv.mjs" "$W/wrv.mjs" > tests/vectors/public_key_validation_579.json
 import { pathToFileURL } from 'url'
 
-const [walletBundle, authBundle] = process.argv.slice(2)
+const [walletBundle, authBundle, resultBundle] = process.argv.slice(2)
 const { validateDiscoverByIdentityKeyArgs } = await import(pathToFileURL(walletBundle).href)
 const { assertAuthIdentityKey } = await import(pathToFileURL(authBundle).href)
+const { validateWalletResult } = await import(pathToFileURL(resultBundle).href)
 
 const P = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn
 const hex64 = n => n.toString(16).padStart(64, '0')
@@ -61,12 +68,14 @@ const vectors = cases.map(([name, text]) => ({
   auth: outcome(() => {
     assertAuthIdentityKey(text)
     return text
-  })
+  }),
+  result: outcome(() => validateWalletResult('getPublicKey', { publicKey: text }).publicKey)
 }))
 
 process.stdout.write(JSON.stringify({
   reference: 'ts-stack@edf6e03',
   node: process.version,
   wallet_parameter: 'identityKey',
+  result_call: 'getPublicKey',
   cases: vectors
 }, null, 2) + '\n')

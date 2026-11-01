@@ -518,16 +518,23 @@ async fn two_peers_on_start_handshake_and_exchange_messages_353() {
     assert_eq!(authenticated_sessions(&server).await, 1);
 }
 
+/// The reference pins the text and refuses the answer whose canonical
+/// `identityKey` is another (`Peer.ts:903-908`, `AuthMessageValidation.ts:344`);
+/// since #582 the pin is read by `assertAuthIdentityKey` before the handshake,
+/// in its words (until then `from_strict_hex`'s).
 #[tokio::test]
 async fn a_handshake_named_by_a_string_that_is_no_identity_key_is_refused_353() {
     let (client, _server) = pair("proto", false).await;
-    assert!(matches!(
+    assert_eq!(
         client
             .peer
             .get_authenticated_session(Some("not-a-key"), Some(500))
-            .await,
-        Err(Error::InvalidPublicKey(_) | Error::InvalidHex(_))
-    ));
+            .await
+            .unwrap_err(),
+        Error::AuthError(
+            "Authentication identityKey must be a canonical compressed public key.".into()
+        )
+    );
     assert!(client.peer.session_manager().read().await.is_empty());
 }
 

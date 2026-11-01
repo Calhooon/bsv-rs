@@ -10,15 +10,19 @@
 //!
 //! The three forms are `tests/vectors/public_key_forms_498.json`'s: a hybrid
 //! key, an odd-length key and a compressed x at p+1, each one `from_hex`
-//! accepts; each is refused in the strict reading's words and class.
+//! accepts; each is refused in `assertAuthIdentityKey`'s words since #582
+//! (`bsv_rs::auth::assert_auth_identity_key`, #579), where the strict reading
+//! also read an upper-case header the reference refuses (the `_582` test).
 #![cfg(all(feature = "auth", feature = "http"))]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test assertions.
 
 use std::sync::{Arc, Mutex};
 
 use bsv_rs::auth::transports::HttpRequest;
-use bsv_rs::auth::{AuthMessage, MessageType, SimplifiedFetchTransport, Transport};
-use bsv_rs::primitives::{from_hex, PrivateKey, PublicKey};
+use bsv_rs::auth::{
+    assert_auth_identity_key, AuthMessage, MessageType, SimplifiedFetchTransport, Transport,
+};
+use bsv_rs::primitives::{PrivateKey, PublicKey};
 use bsv_rs::{Error, Result};
 use serde_json::Value;
 use wiremock::matchers::{method, path};
@@ -30,8 +34,8 @@ const LENIENT: [&str; 3] = [
     "x_above_p_compressed_even",
 ];
 
-/// The named case's input, which `from_hex` accepts, and the strict
-/// reading's refusal of it.
+/// The named case's input, which `from_hex` accepts, and the reference's
+/// refusal of it (`assertAuthIdentityKey`, #582).
 fn lenient(name: &str) -> (String, Error) {
     let recorded: Value =
         serde_json::from_str(include_str!("vectors/public_key_forms_498.json")).unwrap();
@@ -50,9 +54,7 @@ fn lenient(name: &str) -> (String, Error) {
         PublicKey::from_hex(&input).is_ok(),
         "{name}: from_hex reads it"
     );
-    let refusal = from_hex(&input)
-        .and_then(|bytes| PublicKey::from_bytes(&bytes))
-        .unwrap_err();
+    let refusal = assert_auth_identity_key(&input).unwrap_err();
     (input, refusal)
 }
 
@@ -110,4 +112,25 @@ async fn a_general_answer_with_a_lenient_identity_key_header_is_refused_498() {
         assert_eq!(result.unwrap_err(), refusal, "{name}");
         assert!(seen.is_empty(), "{name}: no message from a lenient sender");
     }
+}
+
+/// The reference refuses an upper-case `x-bsv-auth-identity-key`
+/// (`AuthMessageValidation.ts:81-90`, applied at `:344` to the header folded
+/// into the message, `SimplifiedFetchTransport.ts:346`); read strictly
+/// (`from_strict_hex`), it reached the callback as the sender until #582.
+#[tokio::test]
+async fn a_general_answer_with_an_upper_case_identity_key_header_is_refused_582() {
+    let recorded: Value =
+        serde_json::from_str(include_str!("vectors/public_key_validation_579.json")).unwrap();
+    let case = recorded["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "upper_case")
+        .unwrap();
+    assert_eq!(case["auth"]["ok"], false, "the reference refuses it");
+    let words = case["auth"]["message"].as_str().unwrap();
+    let (result, seen) = general_answer(case["text"].as_str().unwrap()).await;
+    assert_eq!(result.unwrap_err(), Error::AuthError(words.into()));
+    assert!(seen.is_empty(), "no message from an upper-case sender");
 }

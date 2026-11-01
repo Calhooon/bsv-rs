@@ -12,7 +12,7 @@
 
 use bsv_rs::auth::assert_auth_identity_key;
 use bsv_rs::primitives::PublicKey;
-use bsv_rs::wallet::validate_public_key;
+use bsv_rs::wallet::{validate_public_key, validate_result_public_key};
 use bsv_rs::{Error, WalletRefusalClass};
 use serde_json::Value;
 
@@ -138,4 +138,33 @@ fn every_recorded_case_is_the_references_outcome_579() {
         assert_wallet(case);
         assert_auth(case);
     }
+}
+
+/// #582: the result validator's `publicKey` (`WalletResultValidation.ts:928-933`)
+/// as `wallet::validate_result_public_key`, against the `result` outcome the
+/// recorder takes through `validateWalletResult('getPublicKey', ..)`: upper case
+/// read, surrounding space refused (nothing trimmed), every other form as the
+/// wallet rule judges it, in the result validator's words.
+#[test]
+fn every_recorded_case_is_the_result_validators_outcome_582() {
+    let cases = cases();
+    assert_eq!(cases.len(), 15);
+    for case in &cases {
+        let text = case["text"].as_str().unwrap();
+        let recorded = &case["result"];
+        let outcome = validate_result_public_key(text, "getPublicKey", "publicKey");
+        if recorded["ok"].as_bool().unwrap() {
+            let key = outcome.unwrap_or_else(|e| panic!("{}: {e}", case["name"]));
+            assert_eq!(key, PublicKey::from_hex(text).unwrap(), "{}", case["name"]);
+        } else {
+            assert_eq!(
+                outcome.unwrap_err(),
+                Error::WalletError(recorded["message"].as_str().unwrap().to_string()),
+                "{}",
+                case["name"]
+            );
+        }
+    }
+    assert!(case("upper_case")["result"]["ok"].as_bool().unwrap());
+    assert!(!case("surrounding_space")["result"]["ok"].as_bool().unwrap());
 }

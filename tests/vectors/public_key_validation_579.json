@@ -2,6 +2,7 @@
   "reference": "ts-stack@edf6e03",
   "node": "v22.18.0",
   "wallet_parameter": "identityKey",
+  "result_call": "getPublicKey",
   "cases": [
     {
       "name": "compressed",
@@ -11,6 +12,10 @@
         "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
       },
       "auth": {
+        "ok": true,
+        "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "result": {
         "ok": true,
         "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
       }
@@ -25,6 +30,10 @@
       "auth": {
         "ok": true,
         "returned": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "result": {
+        "ok": true,
+        "returned": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
       }
     },
     {
@@ -37,6 +46,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": true,
+        "returned": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
       }
     },
     {
@@ -49,6 +62,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected an even-length hex string"
       }
     },
     {
@@ -61,6 +78,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected an even-length hex string"
       }
     },
     {
@@ -73,6 +94,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes"
       }
     },
     {
@@ -85,6 +110,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes"
       }
     },
     {
@@ -97,6 +126,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a valid compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected a valid compressed secp256k1 public key"
       }
     },
     {
@@ -109,6 +142,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a valid compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected a valid compressed secp256k1 public key"
       }
     },
     {
@@ -121,6 +158,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes"
       }
     },
     {
@@ -133,6 +174,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes"
       }
     },
     {
@@ -145,6 +190,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a valid compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected a valid compressed secp256k1 public key"
       }
     },
     {
@@ -157,6 +206,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected an even-length hex string"
       }
     },
     {
@@ -169,6 +222,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected 33 hexadecimal bytes"
       }
     },
     {
@@ -181,6 +238,10 @@
       "auth": {
         "ok": false,
         "message": "Authentication identityKey must be a canonical compressed public key."
+      },
+      "result": {
+        "ok": false,
+        "message": "Invalid getPublicKey result publicKey: expected a valid compressed secp256k1 public key"
       }
     }
   ]

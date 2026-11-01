@@ -155,7 +155,9 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
     verifier_identity_key: &PublicKey,
     originator: Option<&str>,
 ) -> Result<Vec<VerifiableCertificate>> {
-    use crate::wallet::{ListCertificatesArgs, ProveCertificateArgs};
+    use crate::wallet::{
+        validate_result_public_key as result_key, ListCertificatesArgs, ProveCertificateArgs,
+    };
 
     // Build certifiers list for query
     let certifiers: Vec<String> = requested.certifiers.clone();
@@ -180,7 +182,11 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
 
     let mut verifiable_certs = Vec::new();
 
-    for cert_result in list_result.certificates {
+    for (index, cert_result) in list_result.certificates.into_iter().enumerate() {
+        // Subject: the result validator's `publicKey` (WalletResultValidation.ts:1489-1493,928-933), before proveCertificate as the reference's client judges it (#582)
+        let field = format!("certificates[{index}].subject");
+        let subject = result_key(&cert_result.certificate.subject, "listCertificates", &field);
+        let Ok(subject) = subject else { continue };
         // Get fields to reveal for this certificate type
         let fields_to_reveal = requested
             .types
@@ -215,15 +221,9 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         type_arr.copy_from_slice(&cert_type);
         serial_arr.copy_from_slice(&serial_number);
 
-        // Strictly (#498), as getVerifiableCertificates.ts:76-81 and Certificate.ts:240-246 refuse
-        let subject = match PublicKey::from_strict_hex(&cert_result.certificate.subject) {
-            Ok(pk) => pk,
-            Err(_) => continue, // Skip if invalid
-        };
-        let certifier = match PublicKey::from_strict_hex(&cert_result.certificate.certifier) {
-            Ok(pk) => pk,
-            Err(_) => continue, // Skip if invalid
-        };
+        // Certifier: getVerifiableCertificates.ts:76-81 via AuthMessageValidation.ts:124 (#582)
+        let certifier = super::assert_auth_identity_key(&cert_result.certificate.certifier);
+        let Ok(certifier) = certifier else { continue }; // Skip if invalid
 
         // Parse revocation outpoint
         let revocation_outpoint = if cert_result.certificate.revocation_outpoint.is_empty() {
