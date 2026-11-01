@@ -1,10 +1,10 @@
-FILE — twelfth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; pending the owner's cadence word.
+FILE — twelfth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; filed as bsv-blockchain/ts-stack#1464 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending.
 
 # Bound internalizeAction outputIndex consistently with PositiveIntegerOrZero
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 44: Three wallet wire readers the reference bounds only after the…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1464 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending. Census row 44: Three wallet wire readers the reference bounds only after the…
 
 Use an internalizeAction outputIndex of 4294967296 with an otherwise valid selected remittance. The wire reads a safe JS integer, and validatePositiveIntegerOrZero checks only the lower bound; the BRC-100 type has an upper bound of 2^32-1. SignAction already applies MAX_UINT32 after decoding; align the internalize path. The Go truncating reader is already covered by go-sdk #387.
 

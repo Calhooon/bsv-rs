@@ -2277,7 +2277,7 @@ executions, `fuzz_script_spend_default` 4,014, no crash. No public change.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+- Row 10: Theirs: go-sdk #400 for the wire bounds (filed 2026-11-01; answer pending; the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
 
 ### Fixed: discovery wire answers receive the reference's result validation (#495)
 
@@ -3178,7 +3178,7 @@ including Go's absent-string convention and full-wallet processor stubs, remain.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+- Row 10: Theirs: go-sdk #400 for the wire bounds (filed 2026-11-01; answer pending; the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
 
 ### Fixed: HTTP JSON result scalars, bindings and global bounds (#432)
 
@@ -3648,8 +3648,8 @@ checks are filed separately and unchanged by this fold.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
-- Row 10: Theirs: go-sdk, filing pending for the wire bounds (the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
+- Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk #399 (filed 2026-11-01; answer pending; the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
+- Row 10: Theirs: go-sdk #400 for the wire bounds (filed 2026-11-01; answer pending; the witness: tests/wallet_wire_bounds_473.rs; tests/vectors/wallet_wire/bounds_473.json); the request-frame cap held as a stated row on the keeper's word of 2026-10-30 08:1xZ (a frame cap is the reference's own resource safeguard, not a BRC number, Go's choice to make; the witness: tests/wallet_wire_request_frame_cap_496.rs; this crate's processor cap, #505, runs as hardening). Draft: [wire-numeric-collection-bounds](./docs/lanes/375-filings/wire-numeric-collection-bounds.md).
 
 ### Fixed: short ECIES envelopes use the reference's bounded words (#463)
 
@@ -4453,7 +4453,7 @@ remains: Rust dispatches `None`, TypeScript dispatches `''`.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk, filing pending (the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
+- Row 9: Ours: length-zero originators remain None by the owner's optional-originator reading (#329); named originators follow WalletWireProcessor.ts:286-294 at edf6e03. Theirs: go-sdk #399 (filed 2026-11-01; answer pending; the witness: tests/wallet_wire_originator_338.rs; tests/wallet_wire_originator_bom_471.rs). Draft: [wire-originator](./docs/lanes/375-filings/wire-originator.md).
 
 ### Verified: handshake refusal words and signed-header order (#366, #369)
 
@@ -11238,7 +11238,7 @@ so the bound meets the north star's "accept what the reference accepts".
 
 Census (#375; current reading, historical account above retained):
 
-- Row 47: Ours: native u32 index types and bound-error wording follow the transaction outpoint width (BRC-100 wallet/0100.md:274). Theirs: go-sdk #387. Theirs: ts-stack, filing pending (the witness: tests/auth_reader_bounds.rs). Draft: [certificate-outpoint-bound](./docs/lanes/375-filings/certificate-outpoint-bound.md).
+- Row 47: Ours: native u32 index types and bound-error wording follow the transaction outpoint width (BRC-100 wallet/0100.md:274). Theirs: go-sdk #387. Theirs: ts-stack #1463 (filed 2026-11-01; answer pending; the witness: tests/auth_reader_bounds.rs). Draft: [certificate-outpoint-bound](./docs/lanes/375-filings/certificate-outpoint-bound.md).
 
 ### Removed: the processor's `with_config`, `network()` and `version()` (#222)
 
@@ -11642,7 +11642,7 @@ refused it in #122's.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 44: Ours: early u32 bounds and native read-site diagnostics; BRC-100 wallet/0100.md:274 defines the widths. Theirs: go-sdk #387. Theirs: ts-stack, filing pending (the witness: tests/wire_method_roundtrip_tests.rs; tests/wire_u32_field_bounds_tests.rs). Draft: [wire-input-index-width](./docs/lanes/375-filings/wire-input-index-width.md).
+- Row 44: Ours: early u32 bounds and native read-site diagnostics; BRC-100 wallet/0100.md:274 defines the widths. Theirs: go-sdk #387. Theirs: ts-stack #1464 (filed 2026-11-01; answer pending; the witness: tests/wire_method_roundtrip_tests.rs; tests/wire_u32_field_bounds_tests.rs). Draft: [wire-input-index-width](./docs/lanes/375-filings/wire-input-index-width.md).
 
 ### Fixed: `read_identity_certificate` refuses a trust outside 1 to 10 in the reference's words (#247)
 
