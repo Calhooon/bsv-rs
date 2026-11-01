@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the `get_verifiable_certificates` certifier is checked against the requested set as the reference checks it (#587)
+
+`get_verifiable_certificates` proved and forwarded every certificate its
+wallet listed whose subject and certifier read: a valid, lowercase certifier
+outside the requested set was proved and returned, and a type the set does not
+request was proved with no fields to reveal. The reference checks each listed
+certificate before `proveCertificate` (`ts-stack@edf6e03`
+`packages/sdk/src/auth/utils/getVerifiableCertificates.ts:76-81`):
+`requestedCertificates.certifiers.includes(certificate.certifier)`, a text
+comparison with the set's certifiers, which `assertAuthIdentityKey` holds
+canonical (`AuthMessageValidation.ts:124`), and `Array.isArray` of the type's
+requested fields; either failing throws `Wallet returned a certificate outside
+the requested certifier/type set`, which rejects the `Promise.all` and so the
+whole call, and its three `Peer` callers propagate it (`Peer.ts:845,1016,1109`).
+This crate now does the same, in that order: the subject's result-validator
+check (#582, a skip as before), then the certifier's text and the type against
+the requested set, the whole call refused as `Error::AuthError` in the
+reference's words, then `prove_certificate`. The refusal is the reference's
+verdict, not a skip as the site's other refusals are: the reference throws at
+this line, and the Peer, the AuthFetch callback and the initial-request path
+here return the error as the reference's callers throw it. A lenient or
+upper-case certifier text, none of a canonical set's, is now this refusal where
+#498 and #582 skipped it. The certifier's `assert_auth_identity_key` read stays
+after the membership, a skip, reached only by a caller's own non-canonical set
+(the Peer validates its sets). `get_verifiable_certificates` moved, unchanged in
+signature, to `src/auth/utils/verifiable.rs` (the ratchet's bounds on
+`validation.rs`).
+
+Pinned against `tests/vectors/verifiable_certificates_membership_587.json`,
+written by `tests/support/verifiable_certificates_membership_587.mjs` (a bun
+bundle of `getVerifiableCertificates` and `PrivateKey` at `ts-stack@edf6e03`
+under Node v22.18.0, a fake wallet counting proveCertificate calls): six cases
+(in the set; a certifier outside it; an upper-case certifier; a type outside
+it; an outside certificate after and before an in-set one), each verdict and
+count of proofs. Tests in `tests/auth_verifiable_certificates_membership_587.rs`:
+`a_valid_certifier_outside_the_requested_set_refuses_the_call_587` (every
+recorded verdict in the reference's words and its proofs, one count the stated
+residue) and `a_lowercase_certifier_outside_the_set_is_not_proved_or_forwarded_587`,
+both RED on `cf1c13bb` with the test and the vector overlaid (`assertion left ==
+right failed`, `left: Ok(1)`, `right: Err(AuthError("Wallet returned a
+certificate outside the requested certifier/type set"))`), GREEN on the tip.
+`tests/auth_key_strictness_sites_498.rs`'s
+`a_wallet_certificate_key_in_a_lenient_form_is_not_forwarded_498` and
+`an_upper_case_wallet_certificate_certifier_is_not_forwarded_582` re-read
+against the reference: their certifier cases now assert the refusal.
+
+Texts: one new error text, the reference's. No dependent calls
+`get_verifiable_certificates` or matches the text (bsv-overlay-cloudflare,
+rust-message-box, bsv-wallet-cli and bsv-wallet-toolbox-rs grepped, `*.rs`
+outside `target`: no hit). No public API moves. No census row names the
+site (`Row N:` lines of `CHANGELOG.md` and `docs/` grepped for
+`getVerifiableCertificates`, `get_verifiable_certificates` and the requested
+certifier: no hit).
+
+### Notes: cross-SDK parity (#587)
+
+One residue, stated: the reference's `matchingCertificates.certificates.map`
+starts every callback before `Promise.all` rejects, so an in-set certificate
+listed after an outside one is still proved there (`proveCalls` 1 in the
+recorded `outside_before_inside`) and not here, where the loop stops at the
+refusal (0); the verdict is the same. Likewise a wallet's proveCertificate
+error on an earlier certificate is returned here before a later certificate's
+membership refusal, where the reference's synchronous throw rejects first.
+A second residue, older than #587 (#582's): a direct caller's own set whose
+certifier text is not canonical (`02` and 64 upper-case hex digits, say) and a
+listed certificate carrying the same text pass the membership in both; the
+reference proves and returns it (the function asserts no key, its
+`Certificate` constructor stores the text, `Certificate.ts:197-213`; probed
+under Node v22.18.0: one certificate, one proof), where this crate skips it at
+`assert_auth_identity_key` before `prove_certificate`. The `Peer` never reaches
+it: its sets are validated (`assert_requested_certificate_set`, #294).
+go-sdk at `2ca481c` has no certifier membership check and skips an unrequested
+type or one with no requested fields (`auth/utils/get_verifiable_certificates.go:60-71`),
+so it proves and returns a certificate of any certifier the wallet lists.
+
 ### Fixed: the nightly's Mutants oracle runs its test binaries under a memory ceiling (#577)
 
 Run 41252901741 lost four Mutants shards' hosted runners (script 1/4, 2/4,

@@ -10,8 +10,9 @@
 //! each of which `assertAuthIdentityKey` holds canonical
 //! (`AuthMessageValidation.ts:123-124`), and keeps the subject's text, which
 //! `Certificate.toBinary` refuses unless it is `02`/`03` and 64 hex digits
-//! (`Certificate.ts:240-246`). The reference throws where this crate skips the
-//! certificate, a difference older than #498.
+//! (`Certificate.ts:240-246`). The reference throws where this crate skipped
+//! the certificate, a difference older than #498; since #587 a certifier
+//! outside the set refuses the call here too, in the reference's words.
 //! Read leniently, a hybrid or odd-length form reduces to the canonical point:
 //! a pinned handshake the reference refuses authenticated, and a wallet's
 //! certificate the reference cannot serialize forwarded under the canonical key.
@@ -285,6 +286,14 @@ fn listed(subject: &str, certifier: &str) -> WalletCertificate {
 }
 
 async fn verifiable(listed: WalletCertificate) -> usize {
+    verdict(listed).await.unwrap()
+}
+
+/// The reference's refusal of a certifier outside the requested set
+/// (`getVerifiableCertificates.ts:76-81`; here since #587).
+const OUTSIDE_SET: &str = "Wallet returned a certificate outside the requested certifier/type set";
+
+async fn verdict(listed: WalletCertificate) -> Result<usize> {
     let mut requested = RequestedCertificateSet::new();
     requested.add_certifier(key(43).public_key().to_hex());
     requested.add_type(to_base64(&[1; 32]), Vec::new());
@@ -295,8 +304,7 @@ async fn verifiable(listed: WalletCertificate) -> usize {
         Some("test"),
     )
     .await
-    .unwrap()
-    .len()
+    .map(|certificates| certificates.len())
 }
 
 #[tokio::test]
@@ -314,10 +322,11 @@ async fn a_wallet_certificate_key_in_a_lenient_form_is_not_forwarded_498() {
             "{name}: a subject read leniently"
         );
     }
+    // None of the set's texts: the call refused since #587
     for (name, form) in lenient_forms(&certifier) {
         assert_eq!(
-            verifiable(listed(&subject.to_hex(), &form)).await,
-            0,
+            verdict(listed(&subject.to_hex(), &form)).await,
+            Err(Error::AuthError(OUTSIDE_SET.into())),
             "{name}: a certifier read leniently"
         );
     }
@@ -424,8 +433,9 @@ async fn an_upper_case_or_uncompressed_wallet_identity_key_is_refused_582() {
 
 /// The reference refuses a wallet certificate whose certifier text is none
 /// of the requested set's canonical texts (`getVerifiableCertificates.ts:76-81`);
-/// read strictly, an upper-case certifier was forwarded. This crate skips it
-/// where the reference throws (older than #498).
+/// read strictly, an upper-case certifier was forwarded. This crate skipped it
+/// where the reference throws (older than #498); since #587 the call is
+/// refused in the reference's words.
 #[tokio::test]
 async fn an_upper_case_wallet_certificate_certifier_is_not_forwarded_582() {
     let (upper, verdict) = recorded_579("upper_case");
@@ -444,12 +454,12 @@ async fn an_upper_case_wallet_certificate_certifier_is_not_forwarded_582() {
                 Some("test"),
             )
             .await
-            .unwrap()
-            .len()
+            .map(|certificates| certificates.len())
         }
     };
-    assert_eq!(count(&g().public_key().to_hex()).await, 1);
-    assert_eq!(count(&upper).await, 0);
+    assert_eq!(count(&g().public_key().to_hex()).await, Ok(1));
+    let refused = Err(Error::AuthError(OUTSIDE_SET.into()));
+    assert_eq!(count(&upper).await, refused);
 }
 
 /// The reference judges a wallet certificate's subject at the listCertificates

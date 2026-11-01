@@ -1,0 +1,105 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk/src/auth/utils/getVerifiableCertificates.ts:76-81",
+  "node": "v22.18.0",
+  "requested": {
+    "certifiers": [
+      "02bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2"
+    ],
+    "types": {
+      "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=": [
+        "name"
+      ]
+    }
+  },
+  "verifier": "028f5304e2373e56ee7d774cb89e9f1afecf0ee7e3e3757f189908f069daa36c60",
+  "cases": [
+    {
+      "name": "in_set",
+      "certifiers": [
+        "02bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2"
+      ],
+      "types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "verdict": {
+        "ok": true,
+        "count": 1
+      },
+      "proveCalls": 1
+    },
+    {
+      "name": "certifier_outside_set",
+      "certifiers": [
+        "03948b53da97fdf674c0877315acbcc8761aa3b9a582b439982fbafac99f97210f"
+      ],
+      "types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "verdict": {
+        "ok": false,
+        "message": "Wallet returned a certificate outside the requested certifier/type set"
+      },
+      "proveCalls": 0
+    },
+    {
+      "name": "certifier_upper_case",
+      "certifiers": [
+        "02BB58B5FECA505C74EDC000D8282FC556E51A1024FC8E7D7E56C6F887C5C8D5F2"
+      ],
+      "types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "verdict": {
+        "ok": false,
+        "message": "Wallet returned a certificate outside the requested certifier/type set"
+      },
+      "proveCalls": 0
+    },
+    {
+      "name": "type_outside_set",
+      "certifiers": [
+        "02bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2"
+      ],
+      "types": [
+        "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM="
+      ],
+      "verdict": {
+        "ok": false,
+        "message": "Wallet returned a certificate outside the requested certifier/type set"
+      },
+      "proveCalls": 0
+    },
+    {
+      "name": "outside_after_inside",
+      "certifiers": [
+        "02bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2",
+        "03948b53da97fdf674c0877315acbcc8761aa3b9a582b439982fbafac99f97210f"
+      ],
+      "types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "verdict": {
+        "ok": false,
+        "message": "Wallet returned a certificate outside the requested certifier/type set"
+      },
+      "proveCalls": 1
+    },
+    {
+      "name": "outside_before_inside",
+      "certifiers": [
+        "03948b53da97fdf674c0877315acbcc8761aa3b9a582b439982fbafac99f97210f",
+        "02bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2"
+      ],
+      "types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "verdict": {
+        "ok": false,
+        "message": "Wallet returned a certificate outside the requested certifier/type set"
+      },
+      "proveCalls": 1
+    }
+  ]
+}

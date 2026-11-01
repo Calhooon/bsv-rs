@@ -9,6 +9,7 @@ mod nonce;
 mod received_message;
 mod requested_set;
 mod validation;
+mod verifiable;
 
 pub use identity_key::assert_auth_identity_key;
 pub use nonce::{
@@ -18,9 +19,10 @@ pub(crate) use received_message::{check_received_message, MAX_CERTIFICATES};
 pub use requested_set::assert_requested_certificate_set;
 pub(crate) use requested_set::check_received_requested_certificates;
 pub use validation::{
-    certificates_match_request, get_verifiable_certificates, validate_certificate,
-    validate_certificate_encoding, validate_certificates, validate_requested_certificate_set,
+    certificates_match_request, validate_certificate, validate_certificate_encoding,
+    validate_certificates, validate_requested_certificate_set,
 };
+pub use verifiable::get_verifiable_certificates;
 
 /// One Promise continuation turn without a runtime or timer. Certificate
 /// checks and wallet decryptions retain the reference's await boundaries,
