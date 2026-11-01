@@ -230,7 +230,7 @@ impl ProtoWallet {
     /// The symmetric key is derived using the protocol, key ID, and counterparty.
     /// Uses AES-256-GCM encryption.
     pub fn encrypt(&self, args: EncryptArgs) -> Result<EncryptResult> {
-        crypto::encrypt_args(&args)?;
+        crypto::validate_wallet_encrypt_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -247,7 +247,7 @@ impl ProtoWallet {
     ///
     /// The symmetric key is derived using the protocol, key ID, and counterparty.
     pub fn decrypt(&self, args: DecryptArgs) -> Result<DecryptResult> {
-        crypto::decrypt_args(&args)?;
+        crypto::validate_wallet_decrypt_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -266,7 +266,7 @@ impl ProtoWallet {
     /// minimal-length unsigned big-endian form (amended BRC-56, #379).
     /// Encryption and keyring keys retain BRC-2's fixed 32-byte form.
     pub fn create_hmac(&self, args: CreateHmacArgs) -> Result<CreateHmacResult> {
-        crypto::create_hmac_args(&args)?;
+        crypto::validate_create_hmac_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -302,7 +302,7 @@ impl ProtoWallet {
     /// If `hash_to_directly_sign` is provided, it will be signed directly.
     /// Exactly one must be provided. Arguments are validated before hashing.
     pub fn create_signature(&self, args: CreateSignatureArgs) -> Result<CreateSignatureResult> {
-        crypto::create_signature_args(&args)?;
+        crypto::validate_create_signature_args(&args)?;
         let hash = args
             .hash_to_directly_sign
             .unwrap_or_else(|| sha256(args.data.as_deref().unwrap_or_default()));
@@ -327,7 +327,7 @@ impl ProtoWallet {
     /// Exactly one must be provided. Arguments are validated before hashing,
     /// key derivation or DER parsing, as the reference's ProtoWallet does.
     pub fn verify_signature(&self, args: VerifySignatureArgs) -> Result<VerifySignatureResult> {
-        crypto::verify_signature_args(&args)?;
+        crypto::validate_verify_signature_args(&args)?;
         let hash = args
             .hash_to_directly_verify
             .unwrap_or_else(|| sha256(args.data.as_deref().unwrap_or_default()));

@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the seven key calls' argument validators as public helpers, each named for its reference site (#609)
+
+#609, the CLI's ask filed from bsv-wallet-toolbox-rs's #186/#142 lane
+(the owner's word of 2026-11-01 14:1xZ: the seven key calls route a
+privileged request to the wallet's privileged key manager, as the
+reference's `Wallet.ts:455-570` does): the toolbox must judge the arguments
+before it routes, so a refusal keeps its words and its place (`The
+privilegedReason parameter must be a value when 'privileged' is true`, pinned
+by the toolbox's `tests/proto_validator_pin.rs`), and the validators were
+crate-private, so it called `ProtoWallet` once only to validate. The
+keeper's word of 2026-11-01 20:1xZ: shape (2) of the 01:1xZ word on #579,
+one public helper per reference validator, named for its site; never an
+internal reader as public API.
+
+The reference has seven validators, one per call, over shared rules (one
+view for all seven would hide getPublicKey's identity branch and the
+signature calls' exclusivity), so there are seven helpers, re-exported at
+`wallet::`, each `fn(&<Call>Args) -> Result<()>`:
+
+| Helper | Reference (`ts-stack@edf6e03`, `packages/sdk/src/wallet/validationHelpers.ts`) | Rules after the shared ones |
+|---|---|---|
+| `validate_get_public_key_args(&GetPublicKeyArgs)` | `validateGetPublicKeyArgs`, `:1717-1732` | without `identity_key` the protocol and key ID required (`The protocolID parameter must be a [securityLevel, protocolName] tuple`, `The keyID parameter must be a string`); with it, each supplied field judged and the privilege always |
+| `validate_wallet_encrypt_args(&EncryptArgs)` | `validateWalletEncryptArgs`, `:1752-1756` | `plaintext` at most 268,435,456 bytes |
+| `validate_wallet_decrypt_args(&DecryptArgs)` | `validateWalletDecryptArgs`, `:1758-1762` | `ciphertext` at most 268,435,456 bytes |
+| `validate_create_hmac_args(&CreateHmacArgs)` | `validateCreateHmacArgs`, `:1764-1768` | `data` at most 268,435,456 bytes |
+| `validate_verify_hmac_args(&VerifyHmacArgs)` | `validateVerifyHmacArgs`, `:1770-1775` | `data` at most 268,435,456 bytes (the HMAC's 32 bytes are its type's) |
+| `validate_create_signature_args(&CreateSignatureArgs)` | `validateCreateSignatureArgs`, `:1789-1793` | exactly one of `data` and `hash_to_directly_sign` (`validateExclusiveDataAndHash`, `:1777-1787`), `data` bounded |
+| `validate_verify_signature_args(&VerifySignatureArgs)` | `validateVerifySignatureArgs`, `:1795-1804` | exactly one of `data` and `hash_to_directly_verify`, then the signature at most 72 bytes, then canonical DER (`isCanonicalDERSignature`, `Secp256k1Validation.ts:33-53`) |
+
+The shared rules, in the reference's order (`validateEncryptionArgs`,
+`:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+`:198-205`), `keyID` 1 to 800, then `validatePrivilege` (`:207-222`): a
+present `privilegedReason` 5 to 50 UTF-8 bytes whether or not `privileged`,
+and `privileged: Some(true)` without one refused in the words above. Every
+refusal is `Error::WalletRefusal` of class `InvalidParameter`, code 6, `The
+<name> parameter must be <rule>`. The names are the reference's
+(`validateWalletEncryptArgs` gives `validate_wallet_encrypt_args`, where the
+Rust type is `EncryptArgs`). The helpers are the #415/#420 validators made
+public under those names, the definitions `ProtoWallet`'s seven calls and
+the wire processor already ran; `ProtoWallet` and the processor call them
+(getPublicKey through the crate-private reader the helper wraps, which also
+hands back the protocol and key ID), so no refusal text or verdict moves:
+nothing refused is accepted, nothing accepted refused.
+The counterparty is not judged by the helpers: `Counterparty` is typed, and a
+text is judged where it is read, by `Counterparty::from_hex` through #579's
+`validate_public_key`, so a host reading a counterparty text refuses a bad one
+before the call exists, ahead of a bad protocol the reference would name first
+(the order `src/wallet/CLAUDE.md` has stated since #420).
+
+Pinned by `tests/wallet_key_args_validators_609.rs` against
+`tests/vectors/key_args_validators_609.json` (222 cases, 26 shared rules on
+each of the seven calls and 40 call-specific, recorded from the seven
+exported reference validators at `ts-stack@edf6e03` under Node v22.18.0 by
+`tests/support/key_args_validators_609.mjs`, two runs byte-identical; 102
+accepted, 120 refused): every case through its helper, and every refusal
+through `ProtoWallet` to the same `Error`; one test per rule. RED on
+`9640eaa7` as a compile failure (`E0432`, the seven helpers absent), and each
+of the nine rules (the privilege required, the reason's bounds, the
+protocol name's, the key ID's, getPublicKey's required fields, the byte
+bound, the exclusivity, the signature's length, its DER) red on a scratch
+copy of the tip with that rule removed. `tests/wallet_proto_args_415.rs`
+and `tests/wallet_proto_args_420.rs` green unchanged.
+
+The reference's own order, for the hosts: its `Wallet` routes on
+`args.privileged` before any validator
+(`packages/wallet/wallet-toolbox/src/Wallet.ts:455-570` at the pin), and
+its `PrivilegedKeyManager` asks `getPrivilegedKey(args.privilegedReason)`
+before the inner `ProtoWallet` validates (`PrivilegedKeyManager.ts:343-383`),
+so there a privileged request without a reason reaches the key manager's
+fetch first and is refused by the validator after it; a host that calls the
+helper before routing refuses before the fetch, with the same words.
+
+Migration: bsv-wallet-toolbox-rs (#186) and bsv-wallet-cli replace the
+validating `ProtoWallet` call ahead of a privileged route with
+`bsv_rs::wallet::validate_<site>_args(&args)?` at the pin that carries this,
+then route; the texts are unchanged. Semver: seven public functions added, a
+minor addition on the beta line; no shape or behaviour moves.
+
+### Notes: cross-SDK parity (#609)
+
+Go at `2ca481c` has no argument-validation layer for the seven calls: its
+`ProtoWallet` judges no protocol name, key ID, byte length, signature or
+privilege (`wallet/proto_wallet.go:63-135` and the five calls after it), and
+`PrivilegedReason` is a plain `string` (`wallet/interfaces.go:449`), so an
+absent reason and an empty one are one value there; its one check is
+getPublicKey's, in its own words (`protocolID and keyID are required if
+identityKey is false`, `:72-74`). This crate follows the reference, so no new
+divergence is stated; the two typed-representation residues (`identity_key:
+false` for the absent flag, a counterparty text judged at
+`Counterparty::from_hex` before the protocol) are #420's, unchanged and
+stated in `src/wallet/CLAUDE.md`.
+
 ### Added: src/script/templates/pushdrop_position.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened run 41327640129 left 25 of the file's 26 viable mutants missed

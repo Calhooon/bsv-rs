@@ -1,4 +1,6 @@
-//! All nine ProtoWallet argument validators, shared with the wire (#415, #420).
+//! All nine ProtoWallet argument validators, shared with the wire (#415, #420);
+//! the seven key calls' public since #609 (`validate_<site>_args`, re-exported
+//! at `wallet::`, each named for its reference validator).
 //!
 //! `ts-stack@edf6e03`, `validationHelpers.ts:146-230,1717-1804`.
 //! Encoded keys are bounded before parsing; typed keys already hold points.
@@ -103,8 +105,92 @@ pub(crate) fn get_public_key_args(args: &GetPublicKeyArgs) -> Result<Option<(&Pr
     Ok(protocol_id.zip(key_id).filter(|_| !args.identity_key))
 }
 
-/// `validateWalletEncryptArgs`: encryption arguments, then plaintext.
-pub(crate) fn encrypt_args(args: &EncryptArgs) -> Result<()> {
+/// The reference's `validateGetPublicKeyArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1717-1732`), public since
+/// #609: the argument rule of getPublicKey, so a host that routes a
+/// privileged request elsewhere (the reference's `Wallet.ts:455-466`) judges
+/// it first by the one definition [`ProtoWallet::get_public_key`](crate::wallet::ProtoWallet::get_public_key) runs.
+///
+/// Without `identity_key` the protocol and key ID are required
+/// (`The protocolID parameter must be a [securityLevel, protocolName] tuple`,
+/// `The keyID parameter must be a string`) and judged as the shared rules
+/// judge them; with it, each one supplied is still judged, and the privilege
+/// always. `identity_key: false` is the reference's absent flag (its
+/// `identityKey: false`, refused there as `true or undefined`, cannot be
+/// written in this type).
+///
+/// The shared rules (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_get_public_key_args, GetPublicKeyArgs};
+///
+/// let identity = GetPublicKeyArgs { identity_key: true, ..Default::default() };
+/// assert!(validate_get_public_key_args(&identity).is_ok());
+/// let privileged = GetPublicKeyArgs { privileged: Some(true), ..identity };
+/// assert_eq!(
+///     validate_get_public_key_args(&privileged).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_get_public_key_args(args: &GetPublicKeyArgs) -> Result<()> {
+    get_public_key_args(args).map(|_| ())
+}
+
+/// The reference's `validateWalletEncryptArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1752-1756`), public since #609:
+/// the argument rule of encrypt, so a host that routes a privileged request
+/// elsewhere (the reference's `Wallet.ts:455-570`) judges it first by the one
+/// definition [`ProtoWallet::encrypt`](crate::wallet::ProtoWallet::encrypt) runs.
+///
+/// The shared rules, in the reference's order (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+/// Then `plaintext` at most 268,435,456 bytes (`validateByteArray`, `:146-177`).
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_wallet_encrypt_args, EncryptArgs, Protocol, SecurityLevel};
+///
+/// let args = EncryptArgs { protocol_id: Protocol::new(SecurityLevel::App, "wallet tests"), key_id: "key".into(), privileged: Some(true), ..Default::default() };
+/// assert_eq!(
+///     validate_wallet_encrypt_args(&args).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_wallet_encrypt_args(args: &EncryptArgs) -> Result<()> {
     encryption(
         &args.protocol_id,
         &args.key_id,
@@ -114,8 +200,44 @@ pub(crate) fn encrypt_args(args: &EncryptArgs) -> Result<()> {
     byte_array(args.plaintext.len(), "plaintext")
 }
 
-/// `validateWalletDecryptArgs`: encryption arguments, then ciphertext.
-pub(crate) fn decrypt_args(args: &DecryptArgs) -> Result<()> {
+/// The reference's `validateWalletDecryptArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1758-1762`), public since #609:
+/// the argument rule of decrypt, so a host that routes a privileged request
+/// elsewhere (the reference's `Wallet.ts:455-570`) judges it first by the one
+/// definition [`ProtoWallet::decrypt`](crate::wallet::ProtoWallet::decrypt) runs.
+///
+/// The shared rules, in the reference's order (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+/// Then `ciphertext` at most 268,435,456 bytes; an empty or unauthentic
+/// ciphertext passes here and fails at the cipher.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_wallet_decrypt_args, DecryptArgs, Protocol, SecurityLevel};
+///
+/// let args = DecryptArgs { protocol_id: Protocol::new(SecurityLevel::App, "wallet tests"), key_id: "key".into(), privileged: Some(true), ..Default::default() };
+/// assert_eq!(
+///     validate_wallet_decrypt_args(&args).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_wallet_decrypt_args(args: &DecryptArgs) -> Result<()> {
     encryption(
         &args.protocol_id,
         &args.key_id,
@@ -265,8 +387,43 @@ pub(crate) fn reveal_specific_args<'a>(
     Ok((counterparty, verifier))
 }
 
-/// `validateCreateHmacArgs`, before derivation or hashing.
-pub(crate) fn create_hmac_args(args: &CreateHmacArgs) -> Result<()> {
+/// The reference's `validateCreateHmacArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1764-1768`), public since #609:
+/// the argument rule of createHmac, so a host that routes a privileged request
+/// elsewhere (the reference's `Wallet.ts:455-570`) judges it first by the one
+/// definition [`ProtoWallet::create_hmac`](crate::wallet::ProtoWallet::create_hmac) runs.
+///
+/// The shared rules, in the reference's order (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+/// Then `data` at most 268,435,456 bytes.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_create_hmac_args, CreateHmacArgs, Protocol, SecurityLevel};
+///
+/// let args = CreateHmacArgs { protocol_id: Protocol::new(SecurityLevel::App, "wallet tests"), key_id: "key".into(), privileged: Some(true), ..Default::default() };
+/// assert_eq!(
+///     validate_create_hmac_args(&args).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_create_hmac_args(args: &CreateHmacArgs) -> Result<()> {
     encryption(
         &args.protocol_id,
         &args.key_id,
@@ -276,8 +433,43 @@ pub(crate) fn create_hmac_args(args: &CreateHmacArgs) -> Result<()> {
     byte_array(args.data.len(), "data")
 }
 
-/// `validateVerifyHmacArgs`: the HMAC's exact length is carried by its type.
-pub(crate) fn verify_hmac_args(args: &VerifyHmacArgs) -> Result<()> {
+/// The reference's `validateVerifyHmacArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1770-1775`), public since #609:
+/// the argument rule of verifyHmac, so a host that routes a privileged request
+/// elsewhere (the reference's `Wallet.ts:455-570`) judges it first by the one
+/// definition [`ProtoWallet::verify_hmac`](crate::wallet::ProtoWallet::verify_hmac) runs.
+///
+/// The shared rules, in the reference's order (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+/// Then `data` at most 268,435,456 bytes; the HMAC's 32 bytes are its type's.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_verify_hmac_args, VerifyHmacArgs, Protocol, SecurityLevel};
+///
+/// let args = VerifyHmacArgs { protocol_id: Protocol::new(SecurityLevel::App, "wallet tests"), key_id: "key".into(), privileged: Some(true), ..Default::default() };
+/// assert_eq!(
+///     validate_verify_hmac_args(&args).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_verify_hmac_args(args: &VerifyHmacArgs) -> Result<()> {
     encryption(
         &args.protocol_id,
         &args.key_id,
@@ -301,8 +493,45 @@ fn exclusive_data_and_hash(data: Option<&[u8]>, has_hash: bool, hash_field: &str
     Ok(())
 }
 
-/// `validateCreateSignatureArgs`, before derivation or hashing.
-pub(crate) fn create_signature_args(args: &CreateSignatureArgs) -> Result<()> {
+/// The reference's `validateCreateSignatureArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1789-1793`), public since #609:
+/// the argument rule of createSignature, so a host that routes a privileged request
+/// elsewhere (the reference's `Wallet.ts:455-570`) judges it first by the one
+/// definition [`ProtoWallet::create_signature`](crate::wallet::ProtoWallet::create_signature) runs.
+///
+/// The shared rules, in the reference's order (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+/// Then exactly one of `data` and `hash_to_directly_sign`
+/// (`validateExclusiveDataAndHash`, `:1777-1787`: `The data, hashToDirectlySign
+/// parameter must be exactly one value`), `data` at most 268,435,456 bytes.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_create_signature_args, CreateSignatureArgs, Protocol, SecurityLevel};
+///
+/// let args = CreateSignatureArgs { protocol_id: Protocol::new(SecurityLevel::App, "wallet tests"), key_id: "key".into(), data: Some(vec![1]), privileged: Some(true), ..Default::default() };
+/// assert_eq!(
+///     validate_create_signature_args(&args).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_create_signature_args(args: &CreateSignatureArgs) -> Result<()> {
     encryption(
         &args.protocol_id,
         &args.key_id,
@@ -316,9 +545,47 @@ pub(crate) fn create_signature_args(args: &CreateSignatureArgs) -> Result<()> {
     )
 }
 
-/// `validateVerifySignatureArgs`, before any DER parsing. The final forSelf
-/// boolean check is guaranteed by `Option<bool>`.
-pub(crate) fn verify_signature_args(args: &VerifySignatureArgs) -> Result<()> {
+/// The reference's `validateVerifySignatureArgs` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:1795-1804`), public since #609:
+/// the argument rule of verifySignature, so a host that routes a privileged request
+/// elsewhere (the reference's `Wallet.ts:455-570`) judges it first by the one
+/// definition [`ProtoWallet::verify_signature`](crate::wallet::ProtoWallet::verify_signature) runs.
+///
+/// The shared rules, in the reference's order (`validateEncryptionArgs`,
+/// `:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+/// `:198-205`; the security level is [`SecurityLevel`](crate::wallet::SecurityLevel)'s
+/// own), `keyID` 1 to 800 UTF-8 bytes, then `validatePrivilege` (`:207-222`):
+/// a present `privilegedReason` 5 to 50 UTF-8 bytes whether or not
+/// `privileged`, and `privileged: Some(true)` without a reason refused,
+/// `The privilegedReason parameter must be a value when 'privileged' is true`.
+/// The counterparty, `seekPermission` and the booleans are their types' own
+/// (a key text is judged where it is read, [`Counterparty::from_hex`]
+/// through [`validate_public_key`]). Nothing is trimmed or normalized.
+/// Then exactly one of `data` and `hash_to_directly_verify` (`The data,
+/// hashToDirectlyVerify parameter must be exactly one value`), `data` at most
+/// 268,435,456 bytes, then the signature: at most 72 bytes, then canonical
+/// DER with each scalar in 1..n, high S accepted (`isCanonicalDERSignature`,
+/// `Secp256k1Validation.ts:33-53`), all before any DER parsing.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be <rule>`,
+/// the first rule broken in the reference's order; byte for byte the refusal
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) and the wire processor make,
+/// since both call this helper.
+///
+/// ```
+/// use bsv_rs::wallet::{validate_verify_signature_args, VerifySignatureArgs, Protocol, SecurityLevel};
+///
+/// let args = VerifySignatureArgs { protocol_id: Protocol::new(SecurityLevel::App, "wallet tests"), key_id: "key".into(), data: Some(vec![1]), privileged: Some(true), ..Default::default() };
+/// assert_eq!(
+///     validate_verify_signature_args(&args).unwrap_err().to_string(),
+///     "The privilegedReason parameter must be a value when 'privileged' is true"
+/// );
+/// ```
+pub fn validate_verify_signature_args(args: &VerifySignatureArgs) -> Result<()> {
     encryption(
         &args.protocol_id,
         &args.key_id,
