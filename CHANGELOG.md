@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the key bytes Certificate.toBinary writes for a subject or certifier key, as a public helper named for the operation (#610)
+
+On the keeper's word of 2026-11-01 20:1xZ on the toolbox's ask (shape (2)):
+`auth::certificates::certificate_key_bytes(text, field) -> Result<[u8; 33]>`
+(`src/auth/certificates/to_binary_key.rs`, under `auth`) is the reference's
+`Certificate.toBinary` on a `subject` or `certifier` text (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts:240-254`): the text taken as
+given, never trimmed, `/^(02|03)[0-9a-fA-F]{64}$/` in either case, else
+`Invalid certificate <field>: expected compressed public key hex`; the decoded
+bytes a key to `PublicKey.fromDER` (`assertCompressedPublicKey`, `:136-143`),
+else `Invalid certificate <field>: expected a compressed secp256k1 public key`;
+both `Error::CertificateValidationError`. It returns the 33 bytes `toBinary`
+writes, so a compressed x at or above p that `fromDER` reduces to a point is
+returned unreduced, as the reference writes it; a caller that needs the key
+reads the bytes with `PublicKey::from_bytes`, which refuses that x (#183).
+`read_to_binary_key` (#585) keeps its name and visibility, crate-private under
+`identity`, and is the helper followed by `from_bytes` in the second sentence:
+one definition, the identity parsers' reading and words unchanged.
+
+Pinned against `tests/vectors/certificate_key_bytes_610.json`, written by
+`tests/support/certificate_key_bytes_610.mjs` (a bun bundle of `mod.ts` at
+`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical): for each of
+the subject (an `03` key) and the certifier (an `02` key) 23 texts, #585's eight
+and the shapes around them (the other prefix, mixed case, a leading space, a
+trailing line break, empty, 64 and 68 digits, `0x`, the prefixes `04`, `05` and
+`00` at compressed length, a non-hex and a non-ASCII character, x at p and the
+largest x), each with the 33 bytes `toBinary(false)` writes or the words it
+throws. `tests/auth_certificate_key_bytes_610.rs`: the helper's bytes equal the
+reference's for the 12 accepted texts and its error the reference's for the 34
+refused, and the same for the 16 `to_binary` outcomes of #585's vector, none
+enumerated apart; an x above p and the largest x written unreduced and refused
+by `from_bytes`. Compile-RED on `9640eaa7` (`E0432`, the helper absent); on a
+scratch copy, 1 of 3 RED with the text rule cut to the length, 3 of 3 with the
+point read by `from_bytes`; #585's three pins green unchanged.
+
+Migration (bsv-wallet-toolbox-rs): drop `internalize_args::compressed_key` and
+call `bsv_rs::auth::certificates::certificate_key_bytes(text, "subject")` (or
+`"certifier"`) at the key sites, `PublicKey::from_bytes` on its bytes where a
+key is held; the texts are unchanged. One input to read at those sites: a
+compressed x at or above p whose reduction is a point is written, as `toBinary`
+writes it, and `from_bytes` refuses its bytes.
+
 ### Changed: the mutation gate's floors live in the ratchet's record, 80 on the interpreter and the BEEF and Merkle readers and the measured widened value elsewhere, never lowered (#602)
 
 On the owner's word of 2026-11-01 14:1xZ through the keeper (23.5 (c)): the

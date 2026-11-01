@@ -1,0 +1,420 @@
+{
+  "reference": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "field": "subject",
+      "name": "compressed",
+      "text": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": true,
+        "key": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "other_prefix",
+      "text": "0262d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": true,
+        "key": "0262d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "upper_case",
+      "text": "0362D14DAB4150BF497402FDC45A215E10DCB01C354959B10CFE31C7E9D87FF33D",
+      "to_binary": {
+        "ok": true,
+        "key": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "mixed_case",
+      "text": "0362d14DaB4150bF497402fDc45A215E10dCb01C354959b10CfE31c7e9d87Ff33D",
+      "to_binary": {
+        "ok": true,
+        "key": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "surrounding_space",
+      "text": " 0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d ",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "leading_space",
+      "text": " 0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "trailing_newline",
+      "text": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d\n",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "uncompressed",
+      "text": "0462d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d80fc06bd8cc5b01098088a1950eed0db01aa132967ab472235f5642483b25eaf",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "hybrid",
+      "text": "0762d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d80fc06bd8cc5b01098088a1950eed0db01aa132967ab472235f5642483b25eaf",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "odd_length",
+      "text": "362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "empty",
+      "text": "",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "short_64",
+      "text": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff3",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "long_68",
+      "text": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d00",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "hex_prefix",
+      "text": "0x0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "prefix_04",
+      "text": "0462d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "prefix_05",
+      "text": "0562d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "prefix_00",
+      "text": "0062d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "non_hex",
+      "text": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33g",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "non_ascii",
+      "text": "0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33é",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "x_above_p",
+      "text": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "to_binary": {
+        "ok": true,
+        "key": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "x_at_p",
+      "text": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected a compressed secp256k1 public key"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "x_max",
+      "text": "03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "to_binary": {
+        "ok": true,
+        "key": "03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    {
+      "field": "subject",
+      "name": "x_no_point",
+      "text": "020000000000000000000000000000000000000000000000000000000000000000",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate subject: expected a compressed secp256k1 public key"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "compressed",
+      "text": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": true,
+        "key": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "other_prefix",
+      "text": "036a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": true,
+        "key": "036a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "upper_case",
+      "text": "026A245BF6DC698504C89A20CFDED60853152B695336C28063B61C65CBD269E6B4",
+      "to_binary": {
+        "ok": true,
+        "key": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "mixed_case",
+      "text": "026A245Bf6dC698504c89A20cFdEd60853152B695336c28063b61C65cBd269e6b4",
+      "to_binary": {
+        "ok": true,
+        "key": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "surrounding_space",
+      "text": " 026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4 ",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "leading_space",
+      "text": " 026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "trailing_newline",
+      "text": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\n",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "uncompressed",
+      "text": "046a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4e022cf42c2bd4a708b3f5126f16a24ad8b33ba48d0423b6efd5e6348100d8a82",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "hybrid",
+      "text": "066a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4e022cf42c2bd4a708b3f5126f16a24ad8b33ba48d0423b6efd5e6348100d8a82",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "odd_length",
+      "text": "26a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "empty",
+      "text": "",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "short_64",
+      "text": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "long_68",
+      "text": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b400",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "hex_prefix",
+      "text": "0x026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "prefix_04",
+      "text": "046a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "prefix_05",
+      "text": "056a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "prefix_00",
+      "text": "006a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "non_hex",
+      "text": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6bg",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "non_ascii",
+      "text": "026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6bé",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected compressed public key hex"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "x_above_p",
+      "text": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "to_binary": {
+        "ok": true,
+        "key": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "x_at_p",
+      "text": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected a compressed secp256k1 public key"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "x_max",
+      "text": "03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "to_binary": {
+        "ok": true,
+        "key": "03ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    },
+    {
+      "field": "certifier",
+      "name": "x_no_point",
+      "text": "020000000000000000000000000000000000000000000000000000000000000000",
+      "to_binary": {
+        "ok": false,
+        "message": "Invalid certificate certifier: expected a compressed secp256k1 public key"
+      }
+    }
+  ]
+}
