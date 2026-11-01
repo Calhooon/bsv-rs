@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the nightly's Mutants oracle runs its test binaries under a memory ceiling (#577)
+
+Run 41252901741 lost four Mutants shards' hosted runners (script 1/4, 2/4,
+3/4 and substrates 1/4: `The runner has received a shutdown signal`) after
+their baselines passed, and the rerun lost script 3/4 again after the same
+seven logged mutants: a deterministic loss at one mutant, not the runners'.
+Each shard's culprit, measured on a scratch copy of beta with the job's own
+oracle (`nightly_mutants.py`'s command, one mutant at a time) under a watchdog,
+is a mutant that stops a parser's position advancing, so its loop pushes on
+every pass: script 3/4 `src/script/script.rs:79:19` (`+=` to `*=` in
+`Script::from_asm`, 16 GB in 16 seconds), script 2/4 `script.rs:120:23` (the
+same, 12.6 GB in 17 seconds), script 1/4 `script.rs:210:17` (`+=` to `*=` in
+`Script::parse_chunks`, 13.6 GB in 7 seconds), substrates 1/4
+`src/wallet/substrates/result_values/raw_tree.rs:168:28` (`+=` to `*=` in
+`Snapshot::read`, 14.7 GB in 10 seconds), each far inside the 120-second test
+timeout. The `mutants` job now sets cargo's target runner
+(`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER`) to
+`.github/scripts/test-runner-memory-ceiling.sh`, which execs each test binary
+under `ulimit -v` at 12,000,000 KB (`MUTANTS_TEST_VMEM_KB`): the allocation
+past the ceiling aborts the binary and the mutant is caught; rustc and the
+build scripts do not run through the runner. `docs/NIGHTLY.md` says so. The
+local witness, in a Linux container (Rust 1.99.1, the aarch64 runner
+variable): under the runner, `script.rs:79:19` is `CaughtMutant` (`memory
+allocation of 4294967296 bytes failed`, SIGABRT, a 40-second test phase) and
+`raw_tree.rs:168:28` the same (`memory allocation of 15032385536 bytes
+failed`); without it, `script.rs:79:19`'s test binary passed 12 GB resident
+in 24 seconds before the guard killed it; the five surfaces' baselines pass
+under the ceiling (script 491, substrates 96, wire 288, merkle 124, BEEF 392
+tests), their largest binary peaking at 805 MB of address space; a build with
+the runner set at a 200 MB ceiling compiles, where the same limit in the shell
+stops rustc. The CI witness is the dispatch of `nightly.yml` after the landing.
+
 ### Fixed: the identity parsers' subject and certifier read a key as `Certificate.toBinary` reads it (#585)
 
 The two `ls_identity` token parsers (`parse_output_to_certificate` and

@@ -126,6 +126,22 @@ jobs:
       - name: Resolve the mutation lockfile
         run: cargo generate-lockfile
 
+      # A mutant that stops a parser's position advancing (`+=` to `*=` in
+      # `Script::from_asm`, `Script::parse_chunks`, the HTTP substrate's
+      # `Snapshot::read`) pushes on every pass and grew past 12 GB within
+      # 25 seconds, well inside the test timeout: the 16 GB hosted runner ran
+      # out and was shut down, deterministically at one mutant (#577). Cargo
+      # runs every test binary through this runner, under `ulimit -v`, so the
+      # allocation past the ceiling aborts the binary and the mutant is caught;
+      # rustc and the build scripts are not run through it. The ceiling: the
+      # five surfaces' baselines peak at 805 MB of address space (one test
+      # binary), well under 12,000,000 KB, which leaves the runner about 4 GB
+      # for cargo, cargo-mutants and the system.
+      - name: Hold the test binaries under a memory ceiling
+        run: |
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=$GITHUB_WORKSPACE/.github/scripts/test-runner-memory-ceiling.sh" >> "$GITHUB_ENV"
+          echo "MUTANTS_TEST_VMEM_KB=12000000" >> "$GITHUB_ENV"
+
       - name: Run the scoped tests on every mutant
         run: |
           status=0
