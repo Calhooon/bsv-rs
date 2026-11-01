@@ -7,821 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed: the Mutants oracle's memory ceiling at 4,000,000 KB, and a step proving the runner hook is live (#577)
-
-The witness of #595's ceiling, run 41288213777 at `94862392`, lost Mutants
-(script, 1/4)'s hosted runner again 21 minutes in, with the runner variable in
-the run step's environment and the baseline passed under it, where the shard's
-next entries reach the culprit `src/script/script.rs:210:17` (`+=` to `*=` in
-`Script::parse_chunks`). Two readings, both closed here. (a) The ceiling was
-too high: an unbounded Vec doubles, so under a ceiling of C the process touches
-up to about C before its next reserve fails; the 8 GiB reserve fit under
-12,000,000 KB and the 16 GB runner, with the system, cargo and cargo-mutants
-resident, ran out before any allocation was refused. `MUTANTS_TEST_VMEM_KB` is
-now 4,000,000 KB (3.8 GiB), well under half the runner: the five surfaces'
-baselines peak at 805 MB of address space in one test binary (#595's
-measurement), fivefold room, and the culprits fail their first reserve past
-3.8 GiB. (b) Nothing in the job's log proved the hook reached the test binaries
-on x86_64: `test-runner-memory-ceiling.sh` now writes the limit in force to
-`MUTANTS_CEILING_MARKER` when that names a file, and the new step "Prove the
-memory ceiling reaches the test binaries" runs `cargo test --features full,http
---locked --lib -- --list` through the hook (the job's target directory) and
-fails the job unless the marker holds `MUTANTS_TEST_VMEM_KB`; the variable is
-that step's alone, so no mutant writes it. A platform refusing `ulimit -v`
-(macOS) gets a warning and an unbounded run, and the marker then records
-`unlimited`, so the proof fails rather than passing silently. `docs/NIGHTLY.md`
-says so. The CI witness is a dispatch of `nightly.yml` after the landing.
-
-### Changed: the two private copies of the result validator's key rule read through `validate_result_public_key` (#588)
-
-`wallet::validate_result_public_key(value, call, field)` (#582's fold, #584)
-carries the result validator's `publicKey` rule (`ts-stack@edf6e03`
-`WalletResultValidation.ts:917-933`): hex of either case, nothing trimmed, 33
-bytes, a valid compressed point, the three refusal sentences. Two private copies
-of the rule remained: the wire processor's getPublicKey result check
-(`wallet::wire::validation::public_key_result`, `:2207-2209`) and the HTTP JSON
-result validator's key (`wallet::substrates::result_values::scalars::key`, read
-for getPublicKey's `publicKey`, the two linkage results' `prover`, `verifier` and
-`counterparty`, and the certificate results' `verifier`). Both now read through
-the helper with the call and field names they passed, the JSON site after its
-string check (`a string`, unchanged); the wire's private `compressed_key` went
-with its one caller. The ground is #505's: one definition of the reference's rule
-for every host. No verdict or text changes: on the recorder's 15 cases
-(`tests/vectors/public_key_validation_579.json`, canonical, the other parity,
-upper case, space-padded, odd length, uncompressed, hybrid, x above and at p, x
-zero, empty, non-hex, short, `04` at 33 bytes) each site gave the recorded
-`result` outcome in the recorded words before the change and gives it after,
-pinned by `the_get_public_key_result_check_is_the_result_validators_outcome_588`
-(`src/wallet/wire/public_key_result_588_tests.rs`, the frame's 33 bytes or code
-1) and `the_result_key_check_is_the_result_validators_outcome_588`
-(`src/wallet/substrates/result_values/public_key_588_tests.rs`, through the
-getPublicKey dispatch and under `listCertificates`' `certificates[0].verifier`),
-both green on the pre-change code (a refactor, no RED). No parity row names the
-two sites (the CLAUDE.md list and the census rows read for `public_key_result`
-and `scalars`).
-
-### Fixed: the `get_verifiable_certificates` certifier is checked against the requested set as the reference checks it (#587)
-
-`get_verifiable_certificates` proved and forwarded every certificate its
-wallet listed whose subject and certifier read: a valid, lowercase certifier
-outside the requested set was proved and returned, and a type the set does not
-request was proved with no fields to reveal. The reference checks each listed
-certificate before `proveCertificate` (`ts-stack@edf6e03`
-`packages/sdk/src/auth/utils/getVerifiableCertificates.ts:76-81`):
-`requestedCertificates.certifiers.includes(certificate.certifier)`, a text
-comparison with the set's certifiers, which `assertAuthIdentityKey` holds
-canonical (`AuthMessageValidation.ts:124`), and `Array.isArray` of the type's
-requested fields; either failing throws `Wallet returned a certificate outside
-the requested certifier/type set`, which rejects the `Promise.all` and so the
-whole call, and its three `Peer` callers propagate it (`Peer.ts:845,1016,1109`).
-This crate now does the same, in that order: the subject's result-validator
-check (#582, a skip as before), then the certifier's text and the type against
-the requested set, the whole call refused as `Error::AuthError` in the
-reference's words, then `prove_certificate`. The refusal is the reference's
-verdict, not a skip as the site's other refusals are: the reference throws at
-this line, and the Peer, the AuthFetch callback and the initial-request path
-here return the error as the reference's callers throw it. A lenient or
-upper-case certifier text, none of a canonical set's, is now this refusal where
-#498 and #582 skipped it. The certifier's `assert_auth_identity_key` read stays
-after the membership, a skip, reached only by a caller's own non-canonical set
-(the Peer validates its sets). `get_verifiable_certificates` moved, unchanged in
-signature, to `src/auth/utils/verifiable.rs` (the ratchet's bounds on
-`validation.rs`).
-
-Pinned against `tests/vectors/verifiable_certificates_membership_587.json`,
-written by `tests/support/verifiable_certificates_membership_587.mjs` (a bun
-bundle of `getVerifiableCertificates` and `PrivateKey` at `ts-stack@edf6e03`
-under Node v22.18.0, a fake wallet counting proveCertificate calls): six cases
-(in the set; a certifier outside it; an upper-case certifier; a type outside
-it; an outside certificate after and before an in-set one), each verdict and
-count of proofs. Tests in `tests/auth_verifiable_certificates_membership_587.rs`:
-`a_valid_certifier_outside_the_requested_set_refuses_the_call_587` (every
-recorded verdict in the reference's words and its proofs, one count the stated
-residue) and `a_lowercase_certifier_outside_the_set_is_not_proved_or_forwarded_587`,
-both RED on `cf1c13bb` with the test and the vector overlaid (`assertion left ==
-right failed`, `left: Ok(1)`, `right: Err(AuthError("Wallet returned a
-certificate outside the requested certifier/type set"))`), GREEN on the tip.
-`tests/auth_key_strictness_sites_498.rs`'s
-`a_wallet_certificate_key_in_a_lenient_form_is_not_forwarded_498` and
-`an_upper_case_wallet_certificate_certifier_is_not_forwarded_582` re-read
-against the reference: their certifier cases now assert the refusal.
-
-Texts: one new error text, the reference's. No dependent calls
-`get_verifiable_certificates` or matches the text (bsv-overlay-cloudflare,
-rust-message-box, bsv-wallet-cli and bsv-wallet-toolbox-rs grepped, `*.rs`
-outside `target`: no hit). No public API moves. No census row names the
-site (`Row N:` lines of `CHANGELOG.md` and `docs/` grepped for
-`getVerifiableCertificates`, `get_verifiable_certificates` and the requested
-certifier: no hit).
-
-### Notes: cross-SDK parity (#587)
-
-One residue, stated: the reference's `matchingCertificates.certificates.map`
-starts every callback before `Promise.all` rejects, so an in-set certificate
-listed after an outside one is still proved there (`proveCalls` 1 in the
-recorded `outside_before_inside`) and not here, where the loop stops at the
-refusal (0); the verdict is the same. Likewise a wallet's proveCertificate
-error on an earlier certificate is returned here before a later certificate's
-membership refusal, where the reference's synchronous throw rejects first.
-A second residue, older than #587 (#582's): a direct caller's own set whose
-certifier text is not canonical (`02` and 64 upper-case hex digits, say) and a
-listed certificate carrying the same text pass the membership in both; the
-reference proves and returns it (the function asserts no key, its
-`Certificate` constructor stores the text, `Certificate.ts:197-213`; probed
-under Node v22.18.0: one certificate, one proof), where this crate skips it at
-`assert_auth_identity_key` before `prove_certificate`. The `Peer` never reaches
-it: its sets are validated (`assert_requested_certificate_set`, #294).
-go-sdk at `2ca481c` has no certifier membership check and skips an unrequested
-type or one with no requested fields (`auth/utils/get_verifiable_certificates.go:60-71`),
-so it proves and returns a certificate of any certifier the wallet lists.
-
-### Fixed: the nightly's Mutants oracle runs its test binaries under a memory ceiling (#577)
-
-Run 41252901741 lost four Mutants shards' hosted runners (script 1/4, 2/4,
-3/4 and substrates 1/4: `The runner has received a shutdown signal`) after
-their baselines passed, and the rerun lost script 3/4 again after the same
-seven logged mutants: a deterministic loss at one mutant, not the runners'.
-Each shard's culprit, measured on a scratch copy of beta with the job's own
-oracle (`nightly_mutants.py`'s command, one mutant at a time) under a watchdog,
-is a mutant that stops a parser's position advancing, so its loop pushes on
-every pass: script 3/4 `src/script/script.rs:79:19` (`+=` to `*=` in
-`Script::from_asm`, 16 GB in 16 seconds), script 2/4 `script.rs:120:23` (the
-same, 12.6 GB in 17 seconds), script 1/4 `script.rs:210:17` (`+=` to `*=` in
-`Script::parse_chunks`, 13.6 GB in 7 seconds), substrates 1/4
-`src/wallet/substrates/result_values/raw_tree.rs:168:28` (`+=` to `*=` in
-`Snapshot::read`, 14.7 GB in 10 seconds), each far inside the 120-second test
-timeout. The `mutants` job now sets cargo's target runner
-(`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER`) to
-`.github/scripts/test-runner-memory-ceiling.sh`, which execs each test binary
-under `ulimit -v` at 12,000,000 KB (`MUTANTS_TEST_VMEM_KB`): the allocation
-past the ceiling aborts the binary and the mutant is caught; rustc and the
-build scripts do not run through the runner. `docs/NIGHTLY.md` says so. The
-local witness, in a Linux container (Rust 1.99.1, the aarch64 runner
-variable): under the runner, `script.rs:79:19` is `CaughtMutant` (`memory
-allocation of 4294967296 bytes failed`, SIGABRT, a 40-second test phase) and
-`raw_tree.rs:168:28` the same (`memory allocation of 15032385536 bytes
-failed`); without it, `script.rs:79:19`'s test binary passed 12 GB resident
-in 24 seconds before the guard killed it; the five surfaces' baselines pass
-under the ceiling (script 491, substrates 96, wire 288, merkle 124, BEEF 392
-tests), their largest binary peaking at 805 MB of address space; a build with
-the runner set at a 200 MB ceiling compiles, where the same limit in the shell
-stops rustc. The CI witness is the dispatch of `nightly.yml` after the landing.
-
-### Fixed: the identity parsers' subject and certifier read a key as `Certificate.toBinary` reads it (#585)
-
-The two `ls_identity` token parsers (`parse_output_to_certificate` and
-`parse_output_to_verifiable_certificate`, through `src/identity/client_record.rs`)
-read a published certificate's `subject` and `certifier` through
-`PublicKey::from_strict_hex` (even-length hex, then `from_bytes`), which reads an
-uncompressed key. The reference reads them where its discovery verifies the
-record: `Certificate.verify` runs `toBinary` first (`ts-stack@edf6e03`
-`Certificate.ts:425-427`), which takes the text untrimmed and requires
-`/^(02|03)[0-9a-fA-F]{64}$/` (`:240-254`, else `Invalid certificate <field>:
-expected compressed public key hex`), then the 33 bytes read as a point
-(`assertCompressedPublicKey`, `:136-143`, else `Invalid certificate <field>:
-expected a compressed secp256k1 public key`); a refusal there is `verify`'s
-`false`, and the toolbox's discovery skips the token (`identityUtils.ts:497-559`).
-An uncompressed subject or certifier was read here, the certificate verified
-over its compressed bytes and returned; it is now skipped by both parsers, as
-the reference skips it. Closed by #585: the residue #582's entry states for these
-two sites.
-
-One definition: `auth::certificates::read_to_binary_key(text, field)`
-(`src/auth/certificates/to_binary_key.rs`, crate-private, under `identity`),
-`toBinary`'s rule in its two sentences as `Error::CertificateValidationError`.
-It is none of the #579 helpers' rules: `wallet::validate_public_key` trims a
-space-padded text `toBinary` refuses, `auth::assert_auth_identity_key` refuses
-upper-case hex `toBinary` reads, and `wallet::validate_result_public_key`
-judges the same texts in the result validator's words. A compressed x at or
-above p, which `fromDER` reduces and `toBinary` writes unreduced, stays #183's
-refusal at the read: a stated residue. The vector's certificate, signed over
-the canonical subject, fails `verify` with it on both sides; a certificate its
-certifier signed over those unreduced bytes verifies there (`verify` `true`, a
-probe under Node v22.18.0 in #592's cold read, not pinned) and is skipped here.
-
-Pinned against `tests/vectors/certificate_to_binary_key_585.json`, written by
-`tests/support/certificate_to_binary_key_585.mjs` (a bun bundle of
-`Certificate`, `ProtoWallet` and `PrivateKey` at `ts-stack@edf6e03` under Node
-v22.18.0; two runs byte-identical): a certificate the certifier 31 signs for the
-subject 37 (this crate's signature equal to the reference's), and for each of
-the subject and the certifier eight texts (canonical, upper case, space-padded,
-uncompressed, hybrid, odd length, x above p, x no point's) with `toBinary(false)`'s
-outcome (the key bytes written or the words) and `verify`'s verdict (`true` for
-the canonical and upper-case texts alone). Tests in
-`src/identity/client_to_binary_key_585_tests.rs`:
-`an_uncompressed_published_key_is_skipped_by_the_certificate_parser_585` and
-`an_uncompressed_published_key_is_skipped_by_the_verifiable_certificate_parser_585`,
-each of the sixteen tokens read exactly when the reference's `verify` answers
-`true`, both RED on `76bbe036` with the test files, the reader and the vector
-overlaid and `client_record.rs` the base's (`assertion left == right failed:
-subject uncompressed`, `left: true`, `right: false`; with the subject cases
-filtered out, `certifier uncompressed`, the same), GREEN on the tip;
-`the_reader_refuses_in_the_reference_to_binary_words_585`, the reader's key or
-words equal to `toBinary`'s on every case but the enumerated `x_above_p`. #498's
-`a_published_certificate_key_in_a_lenient_form_is_skipped_498` (hybrid and odd
-length) agrees with the recorded verdicts and is unchanged.
-
-Texts: none a caller reads; the parsers skip a refused token as before (an
-`Option`), so the reader's words surface nowhere public. No dependent calls the
-parsers' resolution paths or matches the words (bsv-wallet-cli `src`,
-bsv-wallet-toolbox-rs `src`, rust-message-box `src` grepped for both sentences,
-`discover_certificates`, `resolve_by_attributes`, `resolve_by_identity_key`: no
-hit). `from_strict_hex` stays for serde's `PublicKey` reading alone, its doc
-saying so. No public API moves. No census row records these sites (`Row N:`
-lines of `CHANGELOG.md` and `docs/` grepped for `toBinary`, the identity
-parsers, `from_strict_hex` and the subject and certifier: no hit).
-
-### Notes: cross-SDK parity (#585)
-
-Go at `2ca481c` has no `ls_identity` parser (it resolves through its wallet,
-`identity/client.go:240-276`), and its certificate holds the subject and
-certifier as `ec.PublicKey` (`auth/certificates/certificate.go:40,43`), read from
-JSON through `PublicKeyFromString` (`primitives/ec/publickey.go:148-157,221-231`:
-hex, then `ParsePubKey`, which reads the uncompressed and hybrid forms) and
-written compressed (`wallet/serializer/certificate.go:36-37`): a certificate
-whose JSON carries an uncompressed key verifies there over its compressed
-bytes, as it did here until #585, where the reference's `toBinary` refuses it.
-This is #498's key-form row; no new divergence is stated.
-
-### Fixed: the wallet wire's sendWithResults status codes are BRC-100's and the reference's, 1/2/3 (#590)
-
-A createAction or signAction result's `sendWithResults` entry carries its
-status as one byte. This crate wrote and read 0 `unproven`, 1 `sending`, 2
-`failed`; BRC-100 at `5119a9b` names 1, 2, 3 (`wallet/0100.md:1724-1726`),
-the reference writes them (`ts-stack@edf6e03`
-`WalletWireProcessor.ts:151-156`, called at `:624` and `:775`) and reads them
-back (`WalletWireTransceiver.ts:1226-1234`), refusing another byte in its
-words, `Unknown sendWith result status code: N`, the byte read signed
-(`readInt8`). So a TypeScript wallet's `sending` (`02`) read here as
-`Failed`, its `failed` (`03`) was refused (`invalid send with result status:
-3`), and on a TypeScript client this crate's `unproven` (`00`) was refused,
-its `sending` (`01`) read as `unproven` and its `failed` (`02`) as `sending`.
-`WireWriter::write_send_with_result_status` now writes 1/2/3 and
-`WireReader::read_send_with_result_status` reads them, any other byte refused
-as `Error::WalletError` in the reference's words with the byte signed (`0`,
-`4`, `127`, `-128`, `-1` for `0xff`).
-
-Pinned by `tests/wire_send_with_status_590.rs` against
-`tests/vectors/wallet_wire/send_with_status_590.json`, written by the #338
-recorder's new `--send-with-status-590` mode
-(`tests/support/wire_send_with_status_590.mjs`, `ts-stack@edf6e03` under Node
-v22.18.0, two runs byte-identical): the reference's transceiver and processor
-exchange a createAction and a signAction whose wallet answers three entries,
-one per status, the response the reference's writer's bytes and its reader's
-names (`a_reference_sending_and_failed_status_reads_as_its_name_590`; RED on
-`e8f324eb`: `"createAction": wallet error: invalid send with result status:
-3`); this crate's writer's bytes for the same entries equal the reference's
-(`this_crate_writes_the_reference_status_bytes_590`; RED: `...1111...00 2222...01
-3333...02...` where the reference writes `01`, `02`, `03`); the bytes this
-crate wrote at `e8f324eb` (from a one-off run of its writer, pasted into the
-recorder as data) read by the reference: `00` refused, `01` `unproven`, `02`
-`sending`, and read the same here
-(`the_old_status_bytes_read_here_as_the_reference_reads_them_590`); five
-bytes outside 1 to 3 refused in the reference's recorded words
-(`an_unknown_status_byte_is_refused_in_the_reference_words_590`; RED:
-`Ok(.. "unproven" ..)` for `00`). The unit roundtrip in `encoding.rs` now pins
-each status's byte too, since a roundtrip through a wrong mapping passes.
-
-Two of this crate's own recordings moved, one byte each, re-recorded with
-`BSV_FIXTURES_RECORD=1` (`docs/FIXTURES.md` F10, which listed the 0/1/2
-mapping as a known difference, is resolved): `tests/fixtures/wire/createAction.json`
-(the `full` case's response, `unproven` `00` to `01`) and
-`tests/fixtures/wire/signAction.json` (the `full` case's response, `sending`
-`01` to `02`); the wire_codec bench reads these frames. No shared vector
-carries a status entry.
-
-Dependents: none matches on the wire byte. `bsv-wallet-cli` at `3ff6fdb`
-matches `SendWithResultStatus::Unproven` and `Sending` by name
-(`src/server/broadcast_follow_up.rs:87,275`); `bsv-wallet-toolbox-rs` at
-`63172222` maps the names to the type (`src/wallet/wallet.rs:1499-1501,2190-2192`);
-`rust-message-box` at `419bf18` names neither. A host on the binary wire
-between this crate and a TypeScript wallet or client reads the right status
-after its next `cargo update -p bsv-rs`; two hosts both on this crate before
-and after the update disagree on the byte until both take it. Semver: no
-public shape moves.
-
-### Notes: cross-SDK parity (#590)
-
-Go at `2ca481c` uses the same codes (`wallet/serializer/status.go:14-18`,
-written at `:29-40`, read at `:70-80`), so the three SDKs now agree on the
-byte. Go refuses another byte in its own words, `invalid status code: N`,
-read unsigned (`:79`), where the reference and this crate say `Unknown
-sendWith result status code: N` with the byte signed. Go also writes an
-absent list as the count 0 and reads 0 as absent (`:21-23`, `:50-52`), where
-the reference writes -1 (`WalletWireProcessor.ts:619`, `:770`) and this
-crate writes nine `0xFF`, which the reference reads as -1; that framing is
-the list's, not the status byte's, and unchanged here.
-
-Census (#375; current reading):
-
-- None: no census row or `CLAUDE.md` divergence named the status byte; the
-  0/1/2 mapping was listed only as `docs/FIXTURES.md` F10, so the divergence
-  was unstated in the census until this landing closed it. #432's rows judge
-  the HTTP JSON statuses by name and #473's the list's count, neither the
-  byte.
-
-### Fixed: the crate's own key-reading sites follow the reference's validator at each site through the #579 helpers (#582)
-
-#579 left nine sites reading a key through the crate-private
-`PublicKey::from_strict_hex` (even-length hex, then `from_bytes`), which reads
-an uncompressed key and upper-case hex and refuses a space-padded text, so it
-equals neither reference rule. Each site was read against the reference at
-`ts-stack@edf6e03`; the six whose reference reading is one of the two
-validators now read through its #579 helper, in its words; the certificate
-subject at `get_verifiable_certificates`, whose reference reading is the
-result validator's (the cold read's FIX), through a third helper,
-`wallet::validate_result_public_key`; and the two whose reference reading is
-none of the three stay on `from_strict_hex`, its doc listing them with the
-reason.
-
-| Site | Reference reading | Now | Input judged otherwise until #582 |
-|---|---|---|---|
-| `KeyringRevealer`'s serde reading (`src/wallet/types/json_forms.rs`) | `validateKeyringRevealer` -> `validatePublicKey` (`validationHelpers.ts:1243-1246,185-191`) | `wallet::validate_public_key(text, "keyringRevealer")` | an uncompressed key, read, now refused (`The keyringRevealer parameter must be no more than 66 length.`); a space-padded key, refused, now read trimmed |
-| the Peer's own identity key, its wallet's answer (`Peer::get_identity_key`) | `assertAuthIdentityKey` (`Peer.ts:1354-1355`) | `auth::assert_auth_identity_key` | upper-case hex and an uncompressed key, read, now refused (`Authentication identityKey must be a canonical compressed public key.`) |
-| the Peer's identity pin (`initiate_handshake`, through `get_authenticated_session`, `to_peer`, `request_certificates`) | the pin's text compared with an initial response's `identityKey` (`Peer.ts:903-908`), which `assertAuthIdentityKey` has held canonical (`AuthMessageValidation.ts:344`): only a text that assertion admits can match | `auth::assert_auth_identity_key`, before the handshake | an upper-case pin, read and matched (the handshake authenticated), now refused before the handshake in the assertion's words; the reference refuses it before the handshake at `requestCertificates` in the same words (`Peer.ts:435`), at `toPeer` in `assertAuthPeerTarget`'s session-nonce words (`Peer.ts:189`, `AuthMessageValidation.ts:64-80,99-105`: no key pattern, so read as a nonce), and only through `getAuthenticatedSession` after the round trip as `initialResponse identity does not match the requested peer identity.` (`Peer.ts:508-520,903-908`) |
-| the HTTP answer's `x-bsv-auth-identity-key` at the transport (`SimplifiedFetchTransport`'s sender) | `assertAuthIdentityKey` on the folded message (`SimplifiedFetchTransport.ts:346`, `AuthMessageValidation.ts:344`) | `auth::assert_auth_identity_key` | an upper-case header, read as the sender, now refused |
-| the 402's `x-bsv-auth-identity-key` as the payment's counterparty (`AuthFetch`) | the wallet's `validateCounterparty` -> `validatePublicKey` (`AuthFetch.ts:735-738,873-878`, `validationHelpers.ts:185-196`) | `wallet::validate_public_key(text, "counterparty")` | an uncompressed key, read and handed to the wallet, now refused before it (`The counterparty parameter must be no more than 66 length.`) |
-| a wallet certificate's certifier at `get_verifiable_certificates` | the text must be one of the requested set's (`getVerifiableCertificates.ts:76-81`), each held canonical by `assertAuthIdentityKey` (`AuthMessageValidation.ts:124`) | `auth::assert_auth_identity_key`, a refusal skipping the certificate as before | an upper-case certifier, forwarded, now skipped (the reference throws; that difference is older than #498) |
-| serde's `PublicKey` reading | none at the parse: the reference's JSON holds a `PubKeyHex` text, judged (if at all) by the site that uses it | stays `from_strict_hex` (#498's fold) | none moved |
-| a wallet certificate's subject at `get_verifiable_certificates` | the listCertificates result validator's `publicKey` (`WalletResultValidation.ts:1489-1493`, `:917-933`: even-length hex of either case, nothing trimmed, 33 bytes, a compressed point), run by the reference's client on the answer before `getVerifiableCertificates` calls proveCertificate (`getVerifiableCertificates.ts:57-90`), whose `validatePublicKey(certificate.subject)` (`validationHelpers.ts:1494-1497`) would refuse it next | `wallet::validate_result_public_key(text, "listCertificates", "certificates[N].subject")`, before proveCertificate as the reference's order is, a refusal skipping the certificate (the reference throws, as at the certifier) | an uncompressed subject, forwarded, now skipped; upper case read and a space-padded text refused, as before (the wallet rule would trim it) |
-| the identity client's two token parsers' subject and certifier (`src/identity/client_record.rs`) | `Certificate.verify` -> `toBinary` (`Certificate.ts:240-254`: `02`/`03` and 64 hex digits of either case, then `fromDER`) | stays `from_strict_hex` | no helper is that rule (the wallet's trims, the auth's refuses upper case, the result validator's reads an x at or above p as no point where `fromDER` reduces it); `from_strict_hex` reads an uncompressed key `toBinary` refuses and refuses an x at or above p it reduces (#183's refusal): a stated residue |
-
-Pinned, each RED on `804e66f9` with the new test file overlaid and GREEN on
-the tip, the verdicts read from `tests/vectors/public_key_validation_579.json`
-(the #579 recorder's; for the subject the recorder now also takes the result
-validator's `publicKey` on the same 15 texts, through the exported
-`validateWalletResult('getPublicKey', ..)` (`WalletResultValidation.ts:2179`,
-`:2207-2209`), as each case's `result`, two runs byte-identical, the `wallet`
-and `auth` outcomes unchanged):
-`a_keyring_revealer_is_read_as_the_reference_validate_public_key_reads_it_582`
-(`tests/auth_serde_key_strictness_498.rs`),
-`an_upper_case_or_uncompressed_wallet_identity_key_is_refused_582`,
-`an_upper_case_peer_pin_is_refused_in_the_reference_words_582` and
-`an_upper_case_wallet_certificate_certifier_is_not_forwarded_582`
-(`tests/auth_key_strictness_sites_498.rs`),
-`a_subject_the_reference_result_validator_refuses_is_not_forwarded_582`
-(the same file; RED on `07b562ca` with the file and the re-recorded vector
-overlaid: `"uncompressed_498": the reference's result validator refuses it`,
-`left: 1`, `right: 0`; each of the 15 recorded texts forwarded exactly when the
-result validator accepts it),
-`a_general_answer_with_an_upper_case_identity_key_header_is_refused_582`
-(`tests/auth_header_key_strictness_498.rs`) and
-`an_uncompressed_payment_identity_key_is_refused_before_the_wallet_582`
-(`src/auth/clients/payment_key_strictness_498_tests.rs`). #498's tests at the
-moved sites, which pinned the strict reading's class or words for the lenient
-forms, now expect the helper's refusal of the same forms (the verdict
-unchanged, the words the reference's), and #353's
-`a_handshake_named_by_a_string_that_is_no_identity_key_is_refused_353`
-expects the assertion's words for a pin that is no key (`Peer.ts:903-908`).
-
-Texts: the moved sites' refusals change from `Error::InvalidPublicKey` /
-`Error::InvalidHex` (and `KeyringRevealer`'s
-`keyringRevealer is 'certifier' or a public key: ...`) to the helpers'
-`Error::WalletRefusal` (`The <name> parameter must be ...`) or
-`Error::AuthError` (`Authentication identityKey must be ...`). No dependent
-matches on the old texts (bsv-wallet-cli `src`, bsv-wallet-toolbox-rs `src`,
-rust-message-box `src` grepped for the `KeyringRevealer` prefix,
-`InvalidPublicKey` and the moved entry points: no hit). Semver: one public
-addition, below; no public shape moves; the error variants at these sites are
-behaviour, not API.
-
-Added: `wallet::validate_result_public_key(value, call, field) -> Result<PublicKey>`
-(`src/wallet/validation/crypto.rs`, re-exported as `bsv_rs::wallet::validate_result_public_key`),
-the reference's result validator's `publicKey` (`WalletResultValidation.ts:928-933`
-over `hex` at `:917-926`, applied to a certificate's subject and certifier at
-`:1489-1493`), beside #579's two helpers on the keeper's shape (2): no trim,
-even-length hex of either case, 33 bytes, then `02`/`03` and a point, refused as
-`Error::WalletError` in its words (`Invalid <call> result <field>: expected `
-`an even-length hex string`, `33 hexadecimal bytes` or
-`a valid compressed secp256k1 public key`; `validateCertificate`'s catch,
-`:1534-1536`, rethrows those as `a canonical signed wallet certificate`). It
-differs from `validate_public_key` by the trim alone in verdict (a space-padded
-key read there, refused here; the 15 recorded texts agree otherwise) and in its
-words and class. Pinned by `every_recorded_case_is_the_result_validators_outcome_582`
-(`tests/public_key_validation.rs`, compile-RED on `07b562ca`: the helper absent).
-Migration: none for the dependents; no dependent copies this check
-(bsv-wallet-cli `src` and bsv-wallet-toolbox-rs `src` grepped for the result
-validator's words and a compressed-key check: no hit; rust-message-box's
-`is_valid_pubkey`, `src/validation.rs:483-487`, judges a send's recipient
-argument, not a wallet's answer, and stays its own).
-
-### Notes: cross-SDK parity (#582)
-
-Go at `2ca481c` reads every one of these keys through `PublicKeyFromString`
-(`primitives/ec/publickey.go:221-231`): the `KeyringRevealer` JSON
-(`wallet/encoding_json.go:657-675`), the transport's header
-(`auth/transports/simplified_http_transport.go:209`) and the payment's
-(`auth/clients/authhttp/authhttp.go:742`), and its Peer takes the pin and its
-own key as `*ec.PublicKey` (`auth/peer.go:235-261,308-344`), so it reads the
-upper-case and uncompressed keys both reference validators (or the auth one)
-refuse here. This is #498's and #579's key-form row; no new divergence is stated.
-No census row names these sites (`grep -n 'KeyringRevealer\|identity key\|identityKey' CHANGELOG.md | grep -i row`
-finds only R20 of #432, the specific-linkage counterparty result, untouched).
-
-### Added: the reference's public-key validators as public helpers, each named for its site (#579)
-
-bsv-wallet-cli#377 found the lenient `PublicKey::from_hex` (#498, the
-reference's `PublicKey.fromString`) at four of the CLI's served doors, where
-the reference's validators read a caller's key strictly; the CLI then wrote a
-host copy of this crate's crate-private `PublicKey::from_strict_hex`. The
-keeper's word (the rulings page's entry of 2026-11-01 01:1xZ, issue #579,
-shape (2)): one public helper per reference validator, named for the
-reference's site, each returning the parsed key or the reference's refusal;
-`from_strict_hex` stays private and `from_hex` is untouched. Not shape (1),
-`from_strict_hex` made public: an internal reader as public API names the
-port's mechanism, not the reference's rule. The ground is #505's: one
-definition of the reference's rule for every host.
-
-| Helper | Reference (`ts-stack@edf6e03`) | Rule | Refusal |
-|---|---|---|---|
-| `wallet::validate_public_key(value: &str, name: &str) -> Result<PublicKey>` (in `wallet::validation`, `src/wallet/validation/crypto.rs`) | `validatePublicKey`, `packages/sdk/src/wallet/validationHelpers.ts:185-191`, through `validateHexString` (`:522-534`) and `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`) | the text trimmed as JavaScript trims it, an even UTF-16 length, hex digits of either case, exactly 66 characters, `02`/`03`, x below p and a point's | `Error::WalletRefusal` of class `InvalidParameter` (code 6): `The <name> parameter must be ` then `even length, not N.`, `hexadecimal string.`, `at least 66 length.`, `no more than 66 length.` or `a valid compressed secp256k1 public key` |
-| `auth::assert_auth_identity_key(value: &str) -> Result<PublicKey>` (in `auth::utils`, `src/auth/utils/identity_key.rs`) | `assertAuthIdentityKey`, `packages/sdk/src/auth/AuthMessageValidation.ts:81-90`, applied to a received message's `identityKey` (`:344`, the HTTP answer's `x-bsv-auth-identity-key` folded into it, `SimplifiedFetchTransport.ts:346`) and a requested set's certifiers (`:124`) | the text as given, `02`/`03` and 64 lowercase hex digits, then the key read by `PublicKey.fromString` writing the same text back | `Error::AuthError`: `Authentication identityKey must be a canonical compressed public key.` for the form, `Authentication identityKey must be a valid compressed public key.` for the point |
-
-The auth rule is not the wallet rule at another site: it trims nothing and
-reads lowercase alone (an upper-case or space-padded key the wallet reads is
-refused), and its words are its own. Both return a key equal to `from_hex`
-of the same text (the wallet's of the trimmed text, since `from_hex` trims
-nothing) and refuse every lenient form #498's reader accepts (an
-odd-length key, an uncompressed or hybrid key, an x at or above p). The
-wallet helper is the crate-private `public_key_hex` of #420 renamed and made
-public, the one definition `Counterparty::from_hex` and the registry's
-operator check (#543) already call; the auth helper is #294's private
-`assert_auth_identity_key` moved to its own file, returning the key, the
-one the requested set's certifiers call. No site is rewired: the
-`from_strict_hex` sites (serde's `PublicKey` reading, `KeyringRevealer`, the
-Peer's identity pin and own key, the three certificate intakes, the HTTP
-answer's identity header at the transport and the payment) equal neither
-helper, since `from_strict_hex` reads an uncompressed key and upper-case hex
-(the older gap CLAUDE.md states); moving any of them is a follow-up.
-
-Pinned by `tests/public_key_validation.rs` against
-`tests/vectors/public_key_validation_579.json` (15 key texts, each with both
-reference validators' outcome at `ts-stack@edf6e03` under Node v22.18.0,
-written by `tests/support/public_key_validation_579.mjs`, two runs
-byte-identical; the reference's own inputs from
-`WalletNarrowValidation.test.ts:48-54` and `validationHelpers.test.ts:1258,1451`
-among them): the canonical key accepted by both and equal to `from_hex`'s
-(`the_canonical_compressed_key_is_the_lenient_readers_key_579`), #498's four
-lenient forms refused in the recorded words
-(`every_lenient_form_the_498_reader_accepts_is_refused_in_the_reference_words_579`),
-the case and trim difference
-(`the_auth_identity_key_rule_refuses_the_case_and_space_the_wallet_rule_reads_579`),
-every case. RED on `fd686dfe` as a compile failure (`E0432`, neither helper
-in `wallet` or `auth`).
-
-Migration: bsv-wallet-cli drops its host strict reader at its four served
-doors (after its #377) for `bsv_rs::wallet::validate_public_key(text, name)`
-at its next pin, the reference's rule at a wallet door (stricter than the
-copy it replaces: an uncompressed key is refused, surrounding whitespace
-trimmed); the toolbox replaces its site copies with the helper of the site
-they copy at its next pin. Semver: two public functions added, a minor
-addition on the beta line; no shape or behaviour moves.
-
-### Notes: cross-SDK parity (#579)
-
-Go at `2ca481c` has neither validator. Its wallet and auth types read a key
-through `PublicKeyFromString` (`primitives/ec/publickey.go:221-231`, its JSON
-reading at `:148-160`; the auth message's `identityKey` at
-`auth/types.go:216`), `hex.DecodeString` then `ParsePubKey` (`:79-134`): it
-accepts an uncompressed or hybrid key, upper-case hex and a compressed x at
-or above p (kept unreduced), and refuses an odd length and surrounding
-whitespace in its own words, where both reference validators refuse the
-uncompressed, hybrid and x-at-or-above-p forms, the auth validator upper-case
-hex too, and the wallet's trims the whitespace. Its key-form row is #498's; this
-crate follows the reference, so no new divergence is stated.
-
-### Fixed: the nightly's Mutants jobs resolve the dependency graph once before cargo-mutants (#574)
-
-The nightly's one run (`nightly.yml`, 2026-10-27, run 40474836749) failed all
-twenty Mutants jobs at the unmutated baseline, before any mutant was tested:
-`cannot create the lock file .../Cargo.lock because --locked was passed to
-prevent this`. `nightly_mutants.py` passes `--cargo-arg=--locked`, the library
-commits no `Cargo.lock` (`.gitignore`), and cargo-mutants' copy of the checkout
-had none to read. The `mutants` job now runs `cargo generate-lockfile` in the
-checkout before cargo-mutants, as `ci.yml`'s fixtures job and `bench.yml`
-already resolve before their `--locked` commands; `--locked` stays, so the
-baseline and every mutant of a shard build one graph. `docs/NIGHTLY.md` says
-so. The witness: the script's own command on the merkle shard 0/400 of a
-scratch copy with no lock fails its baseline with that text (exit 4), and the
-same command after `cargo generate-lockfile` builds the baseline and tests the
-shard's mutant (exit 0). The fuzz job passes `--locked` only to
-`cargo install`, which reads the installed crate's own lock, and needs no step.
-
-### Fixed: an identity record with a lone surrogate escape is read as the reference's discovery reads it (#566)
-
-The reference's discovery reads a revelation token's certificate with
-`JSON.parse` (`ts-stack@edf6e03`
-`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:88`,
-`certificateRecord`, under `decodeIdentityOutput`, `:497-559`), which keeps
-a lone UTF-16 surrogate escape (`\ud800` without its pair) as a lone code
-unit; `certificateRecord` compares the names with those units (`:100-125`),
-and `Certificate.verify`'s `toBinary` writes every name and value through
-`TextEncoder` (`packages/sdk/src/auth/certificates/Certificate.ts:73-75`,
-`:280-296`; `primitives/UTF8.ts:1-5`), which writes a lone surrogate as
-U+FFFD's three bytes, in every engine (the WHATWG encoder's rule). Until
-#566 both `ls_identity` parsers read the text with `serde_json` into a
-`String`, which refuses the escape (`invalid unicode code point`), so a
-record the reference reads was skipped: #553's stated residue (#560's), the
-keeper's ruling (3) of 2026-10-31 17:1xZ (a JSON body census row scoped to
-the identity record fields, a lenient reader or a stated divergence).
-
-The lenient reader (`src/identity/client_record_lenient.rs`), reached only
-when the strict reading refuses the record's text: each string read as
-`serde_json` reads a byte string, in WTF-8 (its own option, no fork and no
-new dependency), the keyring names judged against the field names unit for
-unit, then each string held with every lone surrogate as U+FFFD, the bytes
-the reference signs, verifies and derives a key ID from. A keyring value
-with a lone unit is skipped, as no base64 decrypts there (`:551-552`), and
-so, since the cold review, is a revealed field's value with one
-(`VerifiableCertificate.ts:182-191`: its `canonicalBase64` throws before the
-decryption), which the lane's tip read through a failed decryption. The
-`type`, `serialNumber`, keys, outpoint and signature with one are skipped by
-the record's text rules, as the reference skips them.
-
-| Record | Before | Now |
-|---|---|---|
-| An unrevealed field value with a lone unit (high, low, high before a non-low, a reversed pair, the escape in upper case) | skipped | read, the value held with U+FFFD, the certificate verifying over the reference's bytes |
-| A field name with a lone unit, unrevealed or revealed | skipped | read; a revealed one decrypted under the key ID `TextEncoder` writes |
-| A keyring name whose lone unit differs from its field's | skipped | skipped |
-| A revealed field's value with a lone unit (the cold review's) | skipped | skipped (read at the lane's tip `130047e6`) |
-| A keyring value, a member name, `type`, `serialNumber`, `subject`, `certifier`, `revocationOutpoint` or `signature` with a lone unit | skipped | skipped |
-
-`tests/identity_lone_surrogate_566.rs` runs `tests/vectors/identity_lone_surrogate_566.json`
-(twenty-one tokens the reference's `PushDrop.lock` signs for the subject 9, each
-with `parseResults`' outcome, a read certificate's fields and decrypted
-fields as the reference holds them and as `TextEncoder` writes them; written
-by `tests/support/identity_lone_surrogate_566.mjs` under Node v22.18.0, two
-runs byte-identical) through `resolve_by_attributes` and
-`discover_certificates`: 7 of 21 cases RED on `b2531c8a` (the seven the
-reference reads, skipped there), the twenty-first (`revealed_field_value`,
-the cold review's) RED on the lane's tip `130047e6` (read there, skipped by
-the reference), 21 green on the tip, three enumerated (the
-note below). The reader's units, including an escape cut at the text's end,
-a high surrogate before a non-low unit and a low alone, refused without a
-panic: `src/identity/client_record_lenient_tests.rs`.
-
-**Dependency floor:** `serde_json` is required at `1.0.125` (was `1.0`): it
-is the first release that reads a lone surrogate escape into a byte string
-whatever follows it; 1.0.124 refuses `\ud800\u0041` and
-`\ud800\ud800\udc00`, and 1.0.60 refuses every lone high surrogate
-(measured on 1.0.40 to 1.0.154 by the cold review). The ratchet's lock
-(`tools/ratchet/library.Cargo.lock`) already resolves 1.0.154; a consumer
-whose lock holds an older `serde_json` moves to 1.0.125 or later on its
-next `cargo update -p bsv-rs`.
-
-### Notes: cross-SDK parity (#566)
-
-A read string holds U+FFFD where the reference's holds the lone unit: every
-byte derived from it is the same (`TextEncoder`), but a caller that writes
-the field back as JSON writes the character, where `JSON.stringify` writes
-the escape. Three shapes the reference reads are skipped here, enumerated in
-the test: two field names differing only in their lone units, and a name
-with a lone unit beside one with U+FFFD itself, which one `String` cannot
-hold apart (the reference's binary carries the same name bytes twice); and
-a name with a lone unit beside one with U+E000 (the recorded case), where
-ICU sorts the lone unit first (`localeCompare`, `Certificate.ts:282`, Node
-22.18.0) and this crate's collation sorts U+FFFD after U+E000, so the bytes
-rebuilt are not the bytes signed; ICU 77.1 weighs a lone unit at its code
-point among the implicit weights, so the same holds beside any private-use
-or unassigned BMP character above U+DFFF (U+E000 to U+F8FF, U+FDD0, U+FFF0,
-measured by the cold review), where ICU and this crate both sort U+FFFD
-after them. Beside an assigned supplementary character (U+10000, U+1F600)
-ICU sorts both the lone unit and U+FFFD after it and this crate U+FFFD
-before it: #249's residue of a name past U+00FF, not this one's. Go at
-`2ca481c` delegates resolution to its wallet's discovery
-(`identity/client.go:240-276`) and parses no `ls_identity` answer. Out of
-scope: the contacts record (its plaintext is the owner's own wallet's
-encryption, a row of #544's) and `IdentityClient.parseIdentity`
-(`IdentityClient.ts:1044`), which reads decrypted fields, no JSON text.
-
-Census (#375; current reading):
-
-- Row 92: Ours: closed by #566 at the pin: both `ls_identity` parsers read a certificateRecord text with a lone surrogate escape as JSON.parse and TextEncoder do (wallet-toolbox identityUtils.ts:88,100-125 and Certificate.ts:73-75,280-296 at edf6e03), the names compared unit for unit, each string held with U+FFFD; residues the held character where the reference holds the lone unit, two names one String holds and a lone unit's ICU order beside a private-use or unassigned BMP character above U+DFFF (U+E000 recorded). Theirs: none (the witness: tests/identity_lone_surrogate_566.rs; tests/vectors/identity_lone_surrogate_566.json).
-
-### Added: `WorkBudget::charge` is public, so a host that judges inputs itself charges the one per-transaction rule (#567)
-
-Since #519 the per-transaction work rule has had one implementation,
-`WorkBudget::charge`, called by `Transaction::verify_with_work_budgets`, its
-chain-parameter sibling and both stream verifiers; it was `pub(super)`. A host
-that runs each input's `Spend` itself (the toolbox's `InputJudgements`, whose
-doors judge inputs under its own spend verifier) could not reach it, so the
-toolbox kept its own saturating sum and built this crate's
-`NotJudgedCause::TransactionWorkBudgetExceeded { input, limit, total }` by
-hand: two implementations of one rule. The keeper's word (the rulings page's
-entry of 2026-10-31 18:1xZ, issue #567, shape (a)): the work budget is the
-port's own rule, so neither shape is the reference's and the smaller surface
-wins; the method public, not a host-verifier hook on the stream verifier.
-
-| | Before | Now |
-|---|---|---|
-| `WorkBudget::charge(self, total: &mut u64, input: u32, work: u64) -> Result<(), NotJudgedCause>` | `pub(super)`: the verifiers alone | `pub`: a host charges each input's `Spend::work_spent()` after it runs, in input order, against its running `total`, and gets the verifiers' cause with the same fields |
-
-The signature is the one the verifiers already call, not the issue's
-`charge(&mut self, input: usize, work: u64)`: `WorkBudget` is a `Copy` policy
-with no running total (the stream keeps its total in the cursor, BSC5), so
-the caller holds `total`, and `input` is the cause's `u32`. A `&mut self`
-shape would add a field to the type #527 closed. `charge` reads
-`per_transaction` alone; a per-input crossing stays the interpreter's
-`WorkBudgetExceeded` while the input runs. Done when the toolbox deletes
-`InputJudgements::charge` and its sum at its next re-pin, its 2^31 witness
-green through this crate's charge. Pinned by
-`a_host_charging_its_own_inputs_answers_the_verifiers_cause_567` (the #519
-fixture's 68/6/8 inputs charged by hand cross 70 at input 1 with total 74,
-equal to the whole verifier's and the stream's cause; RED on `b2531c8a` as a
-compile failure, the method private) and
-`a_per_input_bound_alone_never_refuses_through_charge_567`.
-
-Semver: one public method added to an existing type, a minor addition; no
-other shape or behaviour moves.
-
-### Fixed: Contact::from_identity carries the identity's abbreviatedKey, as the reference does (#568)
-
-The reference's contact is its identity: `Contact = DisplayableIdentity &
-{ metadata? }` (`ts-stack@edf6e03`
-`packages/sdk/src/identity/ContactsManager.ts:28`).
-`IdentityClient.saveContact` (`IdentityClient.ts:974-979`) hands the
-identity to `ContactsManager.saveContact` (`ContactsManager.ts:527-528`),
-whose `validateContact` keeps its `abbreviatedKey` as given (`:185`,
-`boundedString` to 256 UTF-8 bytes, empty allowed), and
-`resolveByIdentityKey` with contacts (`IdentityClient.ts:575-576`) returns
-the record read, its `abbreviatedKey` as stored. The value is computed at
-one site, `parseIdentity` (`:1166`, `subject.substring(0, 10)...`, for a
-certificate); the contacts path never computes one. A contact without a
-stored `abbreviatedKey` does not exist there: `validateContact` reads it
-through `ownData` (`:47-53`), which refuses an absent member
-(`Invalid contact: abbreviatedKey must be an own data property`). After
-#559 this crate's `Contact` held the stored value, but `from_identity`
-did not copy an identity's and `to_displayable_identity` ignored it, the
-residue #559 stated. The keeper's ruling (4) of 2026-10-31 17:1xZ on
-issue #568: a row.
-
-| | Before | Now |
-|---|---|---|
-| `Contact::from_identity` (`IdentityClient::save_contact`) | `abbreviated_key: None`, so the saved record carried this crate's `02abcd...wxyz` in place of the identity's (`parseIdentity`'s `02f9308a01...`, another client's text, `""`) | `abbreviated_key: Some` of the identity's, written as given |
-| `Contact::to_displayable_identity` (`resolve_by_identity_key` and `resolve_by_attributes` with contacts) | this crate's `02abcd...wxyz`, whatever was stored | the stored `abbreviated_key`; this crate's form only for a contact built here with none (`None`), the form its saved record carries |
-
-`record_of` (`src/identity/contacts_record.rs`) now writes
-`to_displayable_identity`'s value, the same bytes as before (#559's
-stored value when `Some`, the computed form when `None`).
-
-Semver: no signature changes. Two public functions return other values:
-`Contact::from_identity`'s contact carries `Some(identity.abbreviated_key)`
-in place of `None`, and `Contact::to_displayable_identity`'s identity
-carries the contact's stored `abbreviated_key` in place of the computed
-form when one is stored (cargo-semver-checks has no lint for a changed
-return value). A caller that compared a resolved contact's
-`abbreviated_key` with `02abcd...wxyz` sees the stored value.
-
-Pinned by `tests/identity_from_identity_abbreviated_key_568.rs` against
-`tests/vectors/from_identity_abbreviated_key_568.json`, recorded by
-`tests/support/from_identity_abbreviated_key_568.mjs` under Node v22.18.0
-(the reference's `IdentityClient` on the ProtoWallet of 9, two runs
-byte-identical): three identities (`parseIdentity` of an email certificate,
-its `abbreviatedKey` `02f9308a01...`; another client's text `Bob (desk 4)`;
-`""`), each saved by the reference's client (the record its token carries)
-and resolved from that token with contacts (the identity returned).
-`from_identity` holds the record's value and `to_displayable_identity`
-answers the resolved identity's; `save_contact` writes the reference's
-record; `resolve_by_identity_key` returns the reference's identity. All
-three tests are RED on `b2531c8a` (`parsed_identity`: `None`, and
-`02f930...36f9` in place of `02f9308a01...`).
-
-### Notes: cross-SDK parity (#568)
-
-The residue #559 stated for `IdentityClient::save_contact`'s identity
-through `from_identity` is closed by this landing. #559's other residue
-stays: a contact built here with no stored value (`Contact::new`, never a
-reference shape) takes this crate's computed form. Go at `2ca481c` has no
-contacts manager.
-
-Census (#375; current reading):
-
-- Row 91: Ours: closed by #568 at the pin; residue #559's computed form for a contact built with no stored value. Theirs: none (the witness: tests/identity_from_identity_abbreviated_key_568.rs; tests/vectors/from_identity_abbreviated_key_568.json).
-
-### Fixed: the identity client's contact conversions carry the badges, as the reference does (#558)
-
-The reference's contact is its identity: `Contact = DisplayableIdentity &
-{ metadata? }` (`ts-stack@edf6e03`
-`packages/sdk/src/identity/ContactsManager.ts:28`). It has no conversion
-function in either direction, and both directions keep the badges:
-`IdentityClient.saveContact` (`IdentityClient.ts:974-979`) hands the
-identity to `ContactsManager.saveContact` (`ContactsManager.ts:527-528`),
-whose `validateContact` (`:171-198`) keeps all seven display fields, the
-badges as given; `resolveByIdentityKey` with contacts (`IdentityClient.ts:575-576`,
-`:588`) returns the contacts read as the identities, and
-`parseIdentitiesWithOverrides` (`:1017-1037`) returns a contact in a
-certificate's place, the stored badges as stored. The reference applies no
-default to a contact's badges: `defaultIdentity`'s (`types/index.ts:4-12`)
-are `parseIdentity`'s, for a certificate (`:1044-1172`). After #552 this
-crate's `Contact` held the three badges, but its two conversions, the
-residue #552 stated, did not carry them. The keeper's reading (2026-10-31
-13:1xZ, issue #558): two rows of one record, the reference having both
-directions (outcome (a)).
-
-| | Before | Now |
-|---|---|---|
-| `Contact::from_identity` (`IdentityClient::save_contact`) | the badges left `""`, so a saved identity's badges were not written | `badge_icon_url`, `badge_label`, `badge_click_url` copied from the identity |
-| `Contact::to_displayable_identity` (`resolve_by_identity_key` and `resolve_by_attributes` with contacts) | fixed badges: `DefaultIdentityValues::BADGE_ICON_URL`, `"Personal contact"`, `DefaultIdentityValues::BADGE_CLICK_URL` | the contact's stored badges, `""` where unset |
-
-Semver: no signature changes. Two public functions return other values:
-`Contact::from_identity`'s contact carries the identity's badges, and
-`Contact::to_displayable_identity`'s identity carries the contact's stored
-badges in place of the fixed three (cargo-semver-checks has no lint for a
-changed return value). A caller that matched on the `"Personal contact"`
-label sees the stored label, `""` for a contact saved without one.
-
-Pinned by `tests/identity_contact_badges_558.rs` against
-`tests/vectors/identity_contact_badges_558.json`, recorded by
-`tests/support/identity_contact_badges_558.mjs` under Node v22.18.0 (the
-reference's `IdentityClient` on the ProtoWallet of 9, two runs
-byte-identical): three identities (a certifier's badges, the reference's
-unknown-identity defaults, empty badges), each saved by the reference's
-client (the record its token carries) and resolved from that token with
-contacts (the identity returned). `save_contact` writes the reference's
-record and `resolve_by_identity_key` returns the reference's identity for
-all three. Both tests are RED on `e215aea8` (`badged`: the record's badges
-`""`; the identity's `Personal contact`).
-
-### Notes: cross-SDK parity (#558)
-
-Residues, stated, not changed: a contact without an avatar
-(`avatar_url: None`, which a stored `avatarURL` of `""` reads as) resolves
-to `DefaultIdentityValues::AVATAR_URL`, where the reference returns `""`;
-this crate's `resolve_by_identity_key` reads the contacts cache alone, where
-the reference's `getContacts(identityKey)` loads from the wallet
-(`IdentityClient.ts:386`; the witness loads with `get_contacts(true)`
-first); `DefaultIdentityValues::BADGE_CLICK_URL`
-(`https://projectbabbage.com/docs/unknown-identity`) is not the reference's
-`defaultIdentity.badgeClickURL`
-(`https://bsv-blockchain.github.io/ts-sdk/reference/identity/`; the icon,
-label and avatar constants are its). The recomputed `abbreviatedKey` stays #559's
-row. Go at `2ca481c` has no contacts manager.
-
-Census (#375; current reading):
-
-- Row 90: Ours: closed by #558 at the pin; residues the empty avatar's default, the uncached contact lookup and the default badge click URL. Theirs: none (the witness: tests/identity_contact_badges_558.rs; tests/vectors/identity_contact_badges_558.json).
-
-### Fixed: a contact update keeps the record's stored abbreviatedKey, as the reference does (#559)
-
-The reference computes a contact's `abbreviatedKey` at one site and stores
-whatever it is given everywhere else. At `ts-stack@edf6e03`, the only
-computation in `packages/sdk/src` is `IdentityClient.parseIdentity`
-(`IdentityClient.ts:1044`, the value at `:1166`,
-`subject.substring(0, 10)...`), which builds a `DisplayableIdentity` from a
-certificate; the contacts manager never computes one: `saveContact`
-(`ContactsManager.ts:527-528`) and `#encryptAndLock` (`:748-749`) write
-`validateContact`'s record, whose `abbreviatedKey` is the caller's as given
-(`:185`, `boundedString` to 256 UTF-8 bytes, empty allowed), and
-`getContacts` reads it back as stored. Until #559 this crate's record
-writer (`record_of`, `src/identity/contacts_record.rs`) wrote
-`Contact::to_displayable_identity`'s `02abcd...wxyz` on every save, and
-`Contact` held no `abbreviatedKey`, so a reference contact read here and
-saved through `update_contact` lost the value the reference had stored
-(`02f9308a01...` from `parseIdentity`, a caller's own text, or `""`).
-
-| | Before | Now |
-|---|---|---|
-| Read (`list_contacts_with_refresh`, `contact_of`) | the stored `abbreviatedKey` validated and dropped | kept in `Contact::abbreviated_key`, `Some(stored)` |
-| Write (`add_contact`, `update_contact`, `record_of`) | `to_displayable_identity`'s `02abcd...wxyz`, always | the contact's `abbreviated_key` as held when `Some`, as `saveContact` writes the caller's; `to_displayable_identity`'s form when `None` (a contact built here, unchanged) |
-| A reference contact updated here | its `abbreviatedKey` replaced by `02abcd...wxyz` | kept; the reference reads back the record it wrote with the new name |
-
-`Contact::abbreviated_key: Option<String>` and `Contact::with_abbreviated_key`
-are new, an addition: `Contact` is `#[non_exhaustive]` since #552's fold, so
-no downstream literal breaks; the field is skipped in `Contact`'s JSON when
-`None` and read as `None` when absent. `to_displayable_identity` and
-`from_identity` are unchanged (the residues #552 stated); this crate's own
-`parseIdentity` port (`IdentityClient::parse_identity`'s `subject[..10]...`)
-is unchanged. No caller in the crate or its tests relied on the
-recomputation for a contact read from a record.
+## [0.9.0-beta.6] - 2026-11-01
+
+The 0.9.0 line's sixth prerelease (RELEASING.md point 14), cut from `beta` under the owner's standing word through the keeper (the stack's rulings page, 22.8 (5); the keeper's naming of 2026-11-01 14:2xZ: bsv-rs 0.9.0-beta.6 at its beta head, bsv-tracker beside it once the tag is on crates.io, then the toolbox's re-pin and the CLI's pin PR once the gate funder's top-up lands) at the tip after #600 landed (`86d118fc`): warranted by the wallet wire's sendWithResults status codes (#590, a defect in the version both dependents pin), with the identity and contact fixes held behind the beta.5 tag (PushDrop's key bytes #545, the discovery's record checks #553, the contact conversions' badges #558, the stored abbreviatedKey #559, the lone surrogate escape #566, from_identity's abbreviatedKey #568), the reference's public-key validators as public helpers (#579) and the crate's own sites on them (#582, #585, #587, #588), `WorkBudget::charge` public (#567), and the nightly's Mutants oracle made whole (#574, #577, two entries): 16 entries. No api-break since beta.5; the additions are #579's three helpers and #567's method, their migration lines on the dependents' intakes (bsv-wallet-cli#386, bsv-wallet-toolbox-rs#533).
+
+### Fixed: PushDrop pushes the wallet's key bytes as returned, as the reference does (#545)
+
+The PushDrop template pushed its key compressed (`PushDrop::lock`,
+`to_compressed()`), so the five sites that lock with a wallet's
+`getPublicKey` answer (the local store's `local_token.rs`, the global store's
+`global_actions.rs`, the contacts manager's `contacts_actions.rs`, the
+identity token's `reveal.rs`, the registry's `token.rs`) re-encoded the
+wallet's key. The reference's `lock` pushes the answer as the wallet returned
+it: `toArray(publicKey, 'hex')` under the opcode `publicKey.length / 2`
+(`ts-stack@edf6e03` `packages/sdk/src/script/templates/PushDrop.ts:158-175`;
+the unlocker signs with the wallet alone, `:206-247`, no key in it). A
+crate-visible `PushDrop::lock_with_key_bytes(&self, key_bytes: &[u8])`
+pushes the bytes given, the fields, drops and lock position `lock`'s
+(`src/script/templates/pushdrop_key_bytes.rs`); `lock` is it with the key
+compressed, unchanged. It is a port helper, not public API: the reference has
+one `lock`, taking the key as text, so no second public constructor is added
+and the public surface is unchanged. The five sites go through one crate helper,
+`wallet_key_lock`: the answer read by `PublicKey::from_hex` (its refusal
+unchanged) and pushed as the bytes the reference's `toArray(_, 'hex')` reads
+from it (an odd-length text with a leading `0`, #498's `reference_hex`).
+
+Old and new: a wallet answering a compressed key (every `ProtoWallet`, the
+toolbox's wallets, the CLI's) writes the same token as before, byte for byte,
+so the toolbox's and the CLI's tables are unchanged. A wallet answering an
+uncompressed (`04`) key or a hybrid (`06`/`07`) one, which #498's parser
+reads, wrote a token whose first field was the compressed key; it now writes
+the 65 bytes it returned, as the reference does. A token written before
+reads as before (the decoders read either length).
 
 The witness is recorded, never written by hand:
-`tests/support/contact_abbreviated_key_559.mjs` runs the reference's own
-`ContactsManager` (the bundle of `ts-stack@edf6e03`, an entry re-exporting
-it, under Node v22.18.0, the ProtoWallet of the scalar 9 in process, a
-SHA-256 counter stream): `saveContact` of three contacts whose stored
-`abbreviatedKey` is not this crate's form (`parseIdentity`'s, a caller's
-text, the empty string), each token, plaintext and `getContacts` read-back;
-it takes this crate's update tokens from the tip and the base (the ignored
-`record_this_crates_tokens_559`) and records the reference's reading of
-each with its verdict: `tests/vectors/contact_abbreviated_key_559.json`, two
-runs byte-identical. `tests/identity_contact_abbreviated_key_559.rs`
-(hermetic: the counting wallet of #318, no network, no port): each
-reference contact read here, its name changed and saved through
-`update_contact`, the token's record the reference's with the stored
-`abbreviatedKey` kept (RED on `e215aea8`, `02f930...36f9` in place of
-`02f9308a01...`); the reference's recorded verdicts, the tip's three
-updates `equal`, the base's three with this crate's computed form (green on
-both, the recording's statement): 1 of 2 RED on the base.
+`tests/support/pushdrop_key_bytes_545.mjs` runs the reference's own
+`PushDrop.lock` (the bundle of `ts-stack@edf6e03` under Node v22.18.0, a
+ProtoWallet of the scalar 9 whose answer is rewritten into each form) on a
+compressed, an uncompressed, a hybrid and an odd-length answer at both lock
+positions, into `tests/vectors/pushdrop_key_bytes_545.json` (8 cases, two runs
+byte for byte). The unit tests beside the helper
+(`src/script/templates/pushdrop_key_bytes_545_tests.rs`): this crate's
+template writes the reference's bytes for the compressed, uncompressed and
+hybrid cases, a compressed key's `lock` unchanged, the odd-length residue only
+at the reference's truncated opcode. `tests/script_pushdrop_key_bytes_545.rs`:
+the local store, the global store, the registry, the contacts manager and the
+identity reveal push the 65 bytes a wallet answers (the #318 counting wallet
+with #545's key form), through their public paths. On the base `69d315fc` the
+five site tests are red (the compressed key pushed; the unit file does not
+compile there, its helper absent); with the template's push reverted to
+compressed on the tip, the five site tests and one of the three unit tests
+(the one covering both non-compressed forms) are red, six of eight.
 
-### Notes: cross-SDK parity (#559)
+### Notes: cross-SDK parity (#545)
 
-The row #552's fold opened (the list's last in `CLAUDE.md`) is closed by this
-landing: the update path writes the stored value as the reference's
-`saveContact` does. Go at `2ca481c` has no contacts manager.
-
-Census (#375; current reading):
-
-- Row 89: Ours: closed by #559 at the pin; a contact built here (no stored value) still takes to_displayable_identity's form, where the reference takes the caller's; IdentityClient::save_contact's identity through Contact::from_identity closed by #568 (row 91). Theirs: none (the witness: tests/identity_contact_abbreviated_key_559.rs; tests/vectors/contact_abbreviated_key_559.json).
+An odd-length key text is the one stated residue: the reference's opcode is
+`length / 2`, 32.5, which its script writer truncates to `0x20` before the 33
+bytes `toArray` reads, a script whose key push is cut (recorded in the
+vector's two `odd_length` cases with the opcode's offset); this crate writes
+the 33 bytes' own push, `0x21`, every other byte the reference's. A coordinate
+at or above p names no key a wallet derives and is not recorded. Go at
+`2ca481c` reads the wallet's answer as a key and pushes it compressed
+(`pub.PublicKey.Compressed()`, `transaction/template/pushdrop/pushdrop.go:124-140`),
+the base's behaviour: for a wallet answering an uncompressed or hybrid key,
+Go's token and the reference's differ. Theirs: go-sdk, filing pending (the
+witness: tests/script_pushdrop_key_bytes_545.rs;
+src/script/templates/pushdrop_key_bytes_545_tests.rs;
+tests/vectors/pushdrop_key_bytes_545.json).
 
 ### Fixed: the identity parsers run the reference discovery's record checks and byte bounds (#553)
 
@@ -948,69 +200,821 @@ Census (#375; current reading):
 
 - Row 88: Ours: closed by #553 at the pin: both `ls_identity` parsers run the toolbox discovery's certificateRecord checks and byte bounds (wallet-toolbox identityUtils.ts:87-132,497-559 at edf6e03, reached by the SDK's IdentityClient.ts:559-655 through its wallet's discovery) and the text rules of the verify step under them (Certificate.ts:63-72,233-238,257-270,425-440 at edf6e03), every refusal a skip; residues the evidence layer, the anyone decryption's requirement and the lone surrogate escape (the witness: tests/identity_certificate_record_553.rs; tests/vectors/identity_certificate_record_553.json).
 
-### Fixed: PushDrop pushes the wallet's key bytes as returned, as the reference does (#545)
+### Fixed: a contact update keeps the record's stored abbreviatedKey, as the reference does (#559)
 
-The PushDrop template pushed its key compressed (`PushDrop::lock`,
-`to_compressed()`), so the five sites that lock with a wallet's
-`getPublicKey` answer (the local store's `local_token.rs`, the global store's
-`global_actions.rs`, the contacts manager's `contacts_actions.rs`, the
-identity token's `reveal.rs`, the registry's `token.rs`) re-encoded the
-wallet's key. The reference's `lock` pushes the answer as the wallet returned
-it: `toArray(publicKey, 'hex')` under the opcode `publicKey.length / 2`
-(`ts-stack@edf6e03` `packages/sdk/src/script/templates/PushDrop.ts:158-175`;
-the unlocker signs with the wallet alone, `:206-247`, no key in it). A
-crate-visible `PushDrop::lock_with_key_bytes(&self, key_bytes: &[u8])`
-pushes the bytes given, the fields, drops and lock position `lock`'s
-(`src/script/templates/pushdrop_key_bytes.rs`); `lock` is it with the key
-compressed, unchanged. It is a port helper, not public API: the reference has
-one `lock`, taking the key as text, so no second public constructor is added
-and the public surface is unchanged. The five sites go through one crate helper,
-`wallet_key_lock`: the answer read by `PublicKey::from_hex` (its refusal
-unchanged) and pushed as the bytes the reference's `toArray(_, 'hex')` reads
-from it (an odd-length text with a leading `0`, #498's `reference_hex`).
+The reference computes a contact's `abbreviatedKey` at one site and stores
+whatever it is given everywhere else. At `ts-stack@edf6e03`, the only
+computation in `packages/sdk/src` is `IdentityClient.parseIdentity`
+(`IdentityClient.ts:1044`, the value at `:1166`,
+`subject.substring(0, 10)...`), which builds a `DisplayableIdentity` from a
+certificate; the contacts manager never computes one: `saveContact`
+(`ContactsManager.ts:527-528`) and `#encryptAndLock` (`:748-749`) write
+`validateContact`'s record, whose `abbreviatedKey` is the caller's as given
+(`:185`, `boundedString` to 256 UTF-8 bytes, empty allowed), and
+`getContacts` reads it back as stored. Until #559 this crate's record
+writer (`record_of`, `src/identity/contacts_record.rs`) wrote
+`Contact::to_displayable_identity`'s `02abcd...wxyz` on every save, and
+`Contact` held no `abbreviatedKey`, so a reference contact read here and
+saved through `update_contact` lost the value the reference had stored
+(`02f9308a01...` from `parseIdentity`, a caller's own text, or `""`).
 
-Old and new: a wallet answering a compressed key (every `ProtoWallet`, the
-toolbox's wallets, the CLI's) writes the same token as before, byte for byte,
-so the toolbox's and the CLI's tables are unchanged. A wallet answering an
-uncompressed (`04`) key or a hybrid (`06`/`07`) one, which #498's parser
-reads, wrote a token whose first field was the compressed key; it now writes
-the 65 bytes it returned, as the reference does. A token written before
-reads as before (the decoders read either length).
+| | Before | Now |
+|---|---|---|
+| Read (`list_contacts_with_refresh`, `contact_of`) | the stored `abbreviatedKey` validated and dropped | kept in `Contact::abbreviated_key`, `Some(stored)` |
+| Write (`add_contact`, `update_contact`, `record_of`) | `to_displayable_identity`'s `02abcd...wxyz`, always | the contact's `abbreviated_key` as held when `Some`, as `saveContact` writes the caller's; `to_displayable_identity`'s form when `None` (a contact built here, unchanged) |
+| A reference contact updated here | its `abbreviatedKey` replaced by `02abcd...wxyz` | kept; the reference reads back the record it wrote with the new name |
+
+`Contact::abbreviated_key: Option<String>` and `Contact::with_abbreviated_key`
+are new, an addition: `Contact` is `#[non_exhaustive]` since #552's fold, so
+no downstream literal breaks; the field is skipped in `Contact`'s JSON when
+`None` and read as `None` when absent. `to_displayable_identity` and
+`from_identity` are unchanged (the residues #552 stated); this crate's own
+`parseIdentity` port (`IdentityClient::parse_identity`'s `subject[..10]...`)
+is unchanged. No caller in the crate or its tests relied on the
+recomputation for a contact read from a record.
 
 The witness is recorded, never written by hand:
-`tests/support/pushdrop_key_bytes_545.mjs` runs the reference's own
-`PushDrop.lock` (the bundle of `ts-stack@edf6e03` under Node v22.18.0, a
-ProtoWallet of the scalar 9 whose answer is rewritten into each form) on a
-compressed, an uncompressed, a hybrid and an odd-length answer at both lock
-positions, into `tests/vectors/pushdrop_key_bytes_545.json` (8 cases, two runs
-byte for byte). The unit tests beside the helper
-(`src/script/templates/pushdrop_key_bytes_545_tests.rs`): this crate's
-template writes the reference's bytes for the compressed, uncompressed and
-hybrid cases, a compressed key's `lock` unchanged, the odd-length residue only
-at the reference's truncated opcode. `tests/script_pushdrop_key_bytes_545.rs`:
-the local store, the global store, the registry, the contacts manager and the
-identity reveal push the 65 bytes a wallet answers (the #318 counting wallet
-with #545's key form), through their public paths. On the base `69d315fc` the
-five site tests are red (the compressed key pushed; the unit file does not
-compile there, its helper absent); with the template's push reverted to
-compressed on the tip, the five site tests and one of the three unit tests
-(the one covering both non-compressed forms) are red, six of eight.
+`tests/support/contact_abbreviated_key_559.mjs` runs the reference's own
+`ContactsManager` (the bundle of `ts-stack@edf6e03`, an entry re-exporting
+it, under Node v22.18.0, the ProtoWallet of the scalar 9 in process, a
+SHA-256 counter stream): `saveContact` of three contacts whose stored
+`abbreviatedKey` is not this crate's form (`parseIdentity`'s, a caller's
+text, the empty string), each token, plaintext and `getContacts` read-back;
+it takes this crate's update tokens from the tip and the base (the ignored
+`record_this_crates_tokens_559`) and records the reference's reading of
+each with its verdict: `tests/vectors/contact_abbreviated_key_559.json`, two
+runs byte-identical. `tests/identity_contact_abbreviated_key_559.rs`
+(hermetic: the counting wallet of #318, no network, no port): each
+reference contact read here, its name changed and saved through
+`update_contact`, the token's record the reference's with the stored
+`abbreviatedKey` kept (RED on `e215aea8`, `02f930...36f9` in place of
+`02f9308a01...`); the reference's recorded verdicts, the tip's three
+updates `equal`, the base's three with this crate's computed form (green on
+both, the recording's statement): 1 of 2 RED on the base.
 
-### Notes: cross-SDK parity (#545)
+### Notes: cross-SDK parity (#559)
 
-An odd-length key text is the one stated residue: the reference's opcode is
-`length / 2`, 32.5, which its script writer truncates to `0x20` before the 33
-bytes `toArray` reads, a script whose key push is cut (recorded in the
-vector's two `odd_length` cases with the opcode's offset); this crate writes
-the 33 bytes' own push, `0x21`, every other byte the reference's. A coordinate
-at or above p names no key a wallet derives and is not recorded. Go at
-`2ca481c` reads the wallet's answer as a key and pushes it compressed
-(`pub.PublicKey.Compressed()`, `transaction/template/pushdrop/pushdrop.go:124-140`),
-the base's behaviour: for a wallet answering an uncompressed or hybrid key,
-Go's token and the reference's differ. Theirs: go-sdk, filing pending (the
-witness: tests/script_pushdrop_key_bytes_545.rs;
-src/script/templates/pushdrop_key_bytes_545_tests.rs;
-tests/vectors/pushdrop_key_bytes_545.json).
+The row #552's fold opened (the list's last in `CLAUDE.md`) is closed by this
+landing: the update path writes the stored value as the reference's
+`saveContact` does. Go at `2ca481c` has no contacts manager.
+
+Census (#375; current reading):
+
+- Row 89: Ours: closed by #559 at the pin; a contact built here (no stored value) still takes to_displayable_identity's form, where the reference takes the caller's; IdentityClient::save_contact's identity through Contact::from_identity closed by #568 (row 91). Theirs: none (the witness: tests/identity_contact_abbreviated_key_559.rs; tests/vectors/contact_abbreviated_key_559.json).
+
+### Fixed: the identity client's contact conversions carry the badges, as the reference does (#558)
+
+The reference's contact is its identity: `Contact = DisplayableIdentity &
+{ metadata? }` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:28`). It has no conversion
+function in either direction, and both directions keep the badges:
+`IdentityClient.saveContact` (`IdentityClient.ts:974-979`) hands the
+identity to `ContactsManager.saveContact` (`ContactsManager.ts:527-528`),
+whose `validateContact` (`:171-198`) keeps all seven display fields, the
+badges as given; `resolveByIdentityKey` with contacts (`IdentityClient.ts:575-576`,
+`:588`) returns the contacts read as the identities, and
+`parseIdentitiesWithOverrides` (`:1017-1037`) returns a contact in a
+certificate's place, the stored badges as stored. The reference applies no
+default to a contact's badges: `defaultIdentity`'s (`types/index.ts:4-12`)
+are `parseIdentity`'s, for a certificate (`:1044-1172`). After #552 this
+crate's `Contact` held the three badges, but its two conversions, the
+residue #552 stated, did not carry them. The keeper's reading (2026-10-31
+13:1xZ, issue #558): two rows of one record, the reference having both
+directions (outcome (a)).
+
+| | Before | Now |
+|---|---|---|
+| `Contact::from_identity` (`IdentityClient::save_contact`) | the badges left `""`, so a saved identity's badges were not written | `badge_icon_url`, `badge_label`, `badge_click_url` copied from the identity |
+| `Contact::to_displayable_identity` (`resolve_by_identity_key` and `resolve_by_attributes` with contacts) | fixed badges: `DefaultIdentityValues::BADGE_ICON_URL`, `"Personal contact"`, `DefaultIdentityValues::BADGE_CLICK_URL` | the contact's stored badges, `""` where unset |
+
+Semver: no signature changes. Two public functions return other values:
+`Contact::from_identity`'s contact carries the identity's badges, and
+`Contact::to_displayable_identity`'s identity carries the contact's stored
+badges in place of the fixed three (cargo-semver-checks has no lint for a
+changed return value). A caller that matched on the `"Personal contact"`
+label sees the stored label, `""` for a contact saved without one.
+
+Pinned by `tests/identity_contact_badges_558.rs` against
+`tests/vectors/identity_contact_badges_558.json`, recorded by
+`tests/support/identity_contact_badges_558.mjs` under Node v22.18.0 (the
+reference's `IdentityClient` on the ProtoWallet of 9, two runs
+byte-identical): three identities (a certifier's badges, the reference's
+unknown-identity defaults, empty badges), each saved by the reference's
+client (the record its token carries) and resolved from that token with
+contacts (the identity returned). `save_contact` writes the reference's
+record and `resolve_by_identity_key` returns the reference's identity for
+all three. Both tests are RED on `e215aea8` (`badged`: the record's badges
+`""`; the identity's `Personal contact`).
+
+### Notes: cross-SDK parity (#558)
+
+Residues, stated, not changed: a contact without an avatar
+(`avatar_url: None`, which a stored `avatarURL` of `""` reads as) resolves
+to `DefaultIdentityValues::AVATAR_URL`, where the reference returns `""`;
+this crate's `resolve_by_identity_key` reads the contacts cache alone, where
+the reference's `getContacts(identityKey)` loads from the wallet
+(`IdentityClient.ts:386`; the witness loads with `get_contacts(true)`
+first); `DefaultIdentityValues::BADGE_CLICK_URL`
+(`https://projectbabbage.com/docs/unknown-identity`) is not the reference's
+`defaultIdentity.badgeClickURL`
+(`https://bsv-blockchain.github.io/ts-sdk/reference/identity/`; the icon,
+label and avatar constants are its). The recomputed `abbreviatedKey` stays #559's
+row. Go at `2ca481c` has no contacts manager.
+
+Census (#375; current reading):
+
+- Row 90: Ours: closed by #558 at the pin; residues the empty avatar's default, the uncached contact lookup and the default badge click URL. Theirs: none (the witness: tests/identity_contact_badges_558.rs; tests/vectors/identity_contact_badges_558.json).
+
+### Fixed: Contact::from_identity carries the identity's abbreviatedKey, as the reference does (#568)
+
+The reference's contact is its identity: `Contact = DisplayableIdentity &
+{ metadata? }` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:28`).
+`IdentityClient.saveContact` (`IdentityClient.ts:974-979`) hands the
+identity to `ContactsManager.saveContact` (`ContactsManager.ts:527-528`),
+whose `validateContact` keeps its `abbreviatedKey` as given (`:185`,
+`boundedString` to 256 UTF-8 bytes, empty allowed), and
+`resolveByIdentityKey` with contacts (`IdentityClient.ts:575-576`) returns
+the record read, its `abbreviatedKey` as stored. The value is computed at
+one site, `parseIdentity` (`:1166`, `subject.substring(0, 10)...`, for a
+certificate); the contacts path never computes one. A contact without a
+stored `abbreviatedKey` does not exist there: `validateContact` reads it
+through `ownData` (`:47-53`), which refuses an absent member
+(`Invalid contact: abbreviatedKey must be an own data property`). After
+#559 this crate's `Contact` held the stored value, but `from_identity`
+did not copy an identity's and `to_displayable_identity` ignored it, the
+residue #559 stated. The keeper's ruling (4) of 2026-10-31 17:1xZ on
+issue #568: a row.
+
+| | Before | Now |
+|---|---|---|
+| `Contact::from_identity` (`IdentityClient::save_contact`) | `abbreviated_key: None`, so the saved record carried this crate's `02abcd...wxyz` in place of the identity's (`parseIdentity`'s `02f9308a01...`, another client's text, `""`) | `abbreviated_key: Some` of the identity's, written as given |
+| `Contact::to_displayable_identity` (`resolve_by_identity_key` and `resolve_by_attributes` with contacts) | this crate's `02abcd...wxyz`, whatever was stored | the stored `abbreviated_key`; this crate's form only for a contact built here with none (`None`), the form its saved record carries |
+
+`record_of` (`src/identity/contacts_record.rs`) now writes
+`to_displayable_identity`'s value, the same bytes as before (#559's
+stored value when `Some`, the computed form when `None`).
+
+Semver: no signature changes. Two public functions return other values:
+`Contact::from_identity`'s contact carries `Some(identity.abbreviated_key)`
+in place of `None`, and `Contact::to_displayable_identity`'s identity
+carries the contact's stored `abbreviated_key` in place of the computed
+form when one is stored (cargo-semver-checks has no lint for a changed
+return value). A caller that compared a resolved contact's
+`abbreviated_key` with `02abcd...wxyz` sees the stored value.
+
+Pinned by `tests/identity_from_identity_abbreviated_key_568.rs` against
+`tests/vectors/from_identity_abbreviated_key_568.json`, recorded by
+`tests/support/from_identity_abbreviated_key_568.mjs` under Node v22.18.0
+(the reference's `IdentityClient` on the ProtoWallet of 9, two runs
+byte-identical): three identities (`parseIdentity` of an email certificate,
+its `abbreviatedKey` `02f9308a01...`; another client's text `Bob (desk 4)`;
+`""`), each saved by the reference's client (the record its token carries)
+and resolved from that token with contacts (the identity returned).
+`from_identity` holds the record's value and `to_displayable_identity`
+answers the resolved identity's; `save_contact` writes the reference's
+record; `resolve_by_identity_key` returns the reference's identity. All
+three tests are RED on `b2531c8a` (`parsed_identity`: `None`, and
+`02f930...36f9` in place of `02f9308a01...`).
+
+### Notes: cross-SDK parity (#568)
+
+The residue #559 stated for `IdentityClient::save_contact`'s identity
+through `from_identity` is closed by this landing. #559's other residue
+stays: a contact built here with no stored value (`Contact::new`, never a
+reference shape) takes this crate's computed form. Go at `2ca481c` has no
+contacts manager.
+
+Census (#375; current reading):
+
+- Row 91: Ours: closed by #568 at the pin; residue #559's computed form for a contact built with no stored value. Theirs: none (the witness: tests/identity_from_identity_abbreviated_key_568.rs; tests/vectors/from_identity_abbreviated_key_568.json).
+
+### Added: `WorkBudget::charge` is public, so a host that judges inputs itself charges the one per-transaction rule (#567)
+
+Since #519 the per-transaction work rule has had one implementation,
+`WorkBudget::charge`, called by `Transaction::verify_with_work_budgets`, its
+chain-parameter sibling and both stream verifiers; it was `pub(super)`. A host
+that runs each input's `Spend` itself (the toolbox's `InputJudgements`, whose
+doors judge inputs under its own spend verifier) could not reach it, so the
+toolbox kept its own saturating sum and built this crate's
+`NotJudgedCause::TransactionWorkBudgetExceeded { input, limit, total }` by
+hand: two implementations of one rule. The keeper's word (the rulings page's
+entry of 2026-10-31 18:1xZ, issue #567, shape (a)): the work budget is the
+port's own rule, so neither shape is the reference's and the smaller surface
+wins; the method public, not a host-verifier hook on the stream verifier.
+
+| | Before | Now |
+|---|---|---|
+| `WorkBudget::charge(self, total: &mut u64, input: u32, work: u64) -> Result<(), NotJudgedCause>` | `pub(super)`: the verifiers alone | `pub`: a host charges each input's `Spend::work_spent()` after it runs, in input order, against its running `total`, and gets the verifiers' cause with the same fields |
+
+The signature is the one the verifiers already call, not the issue's
+`charge(&mut self, input: usize, work: u64)`: `WorkBudget` is a `Copy` policy
+with no running total (the stream keeps its total in the cursor, BSC5), so
+the caller holds `total`, and `input` is the cause's `u32`. A `&mut self`
+shape would add a field to the type #527 closed. `charge` reads
+`per_transaction` alone; a per-input crossing stays the interpreter's
+`WorkBudgetExceeded` while the input runs. Done when the toolbox deletes
+`InputJudgements::charge` and its sum at its next re-pin, its 2^31 witness
+green through this crate's charge. Pinned by
+`a_host_charging_its_own_inputs_answers_the_verifiers_cause_567` (the #519
+fixture's 68/6/8 inputs charged by hand cross 70 at input 1 with total 74,
+equal to the whole verifier's and the stream's cause; RED on `b2531c8a` as a
+compile failure, the method private) and
+`a_per_input_bound_alone_never_refuses_through_charge_567`.
+
+Semver: one public method added to an existing type, a minor addition; no
+other shape or behaviour moves.
+
+### Fixed: an identity record with a lone surrogate escape is read as the reference's discovery reads it (#566)
+
+The reference's discovery reads a revelation token's certificate with
+`JSON.parse` (`ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:88`,
+`certificateRecord`, under `decodeIdentityOutput`, `:497-559`), which keeps
+a lone UTF-16 surrogate escape (`\ud800` without its pair) as a lone code
+unit; `certificateRecord` compares the names with those units (`:100-125`),
+and `Certificate.verify`'s `toBinary` writes every name and value through
+`TextEncoder` (`packages/sdk/src/auth/certificates/Certificate.ts:73-75`,
+`:280-296`; `primitives/UTF8.ts:1-5`), which writes a lone surrogate as
+U+FFFD's three bytes, in every engine (the WHATWG encoder's rule). Until
+#566 both `ls_identity` parsers read the text with `serde_json` into a
+`String`, which refuses the escape (`invalid unicode code point`), so a
+record the reference reads was skipped: #553's stated residue (#560's), the
+keeper's ruling (3) of 2026-10-31 17:1xZ (a JSON body census row scoped to
+the identity record fields, a lenient reader or a stated divergence).
+
+The lenient reader (`src/identity/client_record_lenient.rs`), reached only
+when the strict reading refuses the record's text: each string read as
+`serde_json` reads a byte string, in WTF-8 (its own option, no fork and no
+new dependency), the keyring names judged against the field names unit for
+unit, then each string held with every lone surrogate as U+FFFD, the bytes
+the reference signs, verifies and derives a key ID from. A keyring value
+with a lone unit is skipped, as no base64 decrypts there (`:551-552`), and
+so, since the cold review, is a revealed field's value with one
+(`VerifiableCertificate.ts:182-191`: its `canonicalBase64` throws before the
+decryption), which the lane's tip read through a failed decryption. The
+`type`, `serialNumber`, keys, outpoint and signature with one are skipped by
+the record's text rules, as the reference skips them.
+
+| Record | Before | Now |
+|---|---|---|
+| An unrevealed field value with a lone unit (high, low, high before a non-low, a reversed pair, the escape in upper case) | skipped | read, the value held with U+FFFD, the certificate verifying over the reference's bytes |
+| A field name with a lone unit, unrevealed or revealed | skipped | read; a revealed one decrypted under the key ID `TextEncoder` writes |
+| A keyring name whose lone unit differs from its field's | skipped | skipped |
+| A revealed field's value with a lone unit (the cold review's) | skipped | skipped (read at the lane's tip `130047e6`) |
+| A keyring value, a member name, `type`, `serialNumber`, `subject`, `certifier`, `revocationOutpoint` or `signature` with a lone unit | skipped | skipped |
+
+`tests/identity_lone_surrogate_566.rs` runs `tests/vectors/identity_lone_surrogate_566.json`
+(twenty-one tokens the reference's `PushDrop.lock` signs for the subject 9, each
+with `parseResults`' outcome, a read certificate's fields and decrypted
+fields as the reference holds them and as `TextEncoder` writes them; written
+by `tests/support/identity_lone_surrogate_566.mjs` under Node v22.18.0, two
+runs byte-identical) through `resolve_by_attributes` and
+`discover_certificates`: 7 of 21 cases RED on `b2531c8a` (the seven the
+reference reads, skipped there), the twenty-first (`revealed_field_value`,
+the cold review's) RED on the lane's tip `130047e6` (read there, skipped by
+the reference), 21 green on the tip, three enumerated (the
+note below). The reader's units, including an escape cut at the text's end,
+a high surrogate before a non-low unit and a low alone, refused without a
+panic: `src/identity/client_record_lenient_tests.rs`.
+
+**Dependency floor:** `serde_json` is required at `1.0.125` (was `1.0`): it
+is the first release that reads a lone surrogate escape into a byte string
+whatever follows it; 1.0.124 refuses `\ud800\u0041` and
+`\ud800\ud800\udc00`, and 1.0.60 refuses every lone high surrogate
+(measured on 1.0.40 to 1.0.154 by the cold review). The ratchet's lock
+(`tools/ratchet/library.Cargo.lock`) already resolves 1.0.154; a consumer
+whose lock holds an older `serde_json` moves to 1.0.125 or later on its
+next `cargo update -p bsv-rs`.
+
+### Notes: cross-SDK parity (#566)
+
+A read string holds U+FFFD where the reference's holds the lone unit: every
+byte derived from it is the same (`TextEncoder`), but a caller that writes
+the field back as JSON writes the character, where `JSON.stringify` writes
+the escape. Three shapes the reference reads are skipped here, enumerated in
+the test: two field names differing only in their lone units, and a name
+with a lone unit beside one with U+FFFD itself, which one `String` cannot
+hold apart (the reference's binary carries the same name bytes twice); and
+a name with a lone unit beside one with U+E000 (the recorded case), where
+ICU sorts the lone unit first (`localeCompare`, `Certificate.ts:282`, Node
+22.18.0) and this crate's collation sorts U+FFFD after U+E000, so the bytes
+rebuilt are not the bytes signed; ICU 77.1 weighs a lone unit at its code
+point among the implicit weights, so the same holds beside any private-use
+or unassigned BMP character above U+DFFF (U+E000 to U+F8FF, U+FDD0, U+FFF0,
+measured by the cold review), where ICU and this crate both sort U+FFFD
+after them. Beside an assigned supplementary character (U+10000, U+1F600)
+ICU sorts both the lone unit and U+FFFD after it and this crate U+FFFD
+before it: #249's residue of a name past U+00FF, not this one's. Go at
+`2ca481c` delegates resolution to its wallet's discovery
+(`identity/client.go:240-276`) and parses no `ls_identity` answer. Out of
+scope: the contacts record (its plaintext is the owner's own wallet's
+encryption, a row of #544's) and `IdentityClient.parseIdentity`
+(`IdentityClient.ts:1044`), which reads decrypted fields, no JSON text.
+
+Census (#375; current reading):
+
+- Row 92: Ours: closed by #566 at the pin: both `ls_identity` parsers read a certificateRecord text with a lone surrogate escape as JSON.parse and TextEncoder do (wallet-toolbox identityUtils.ts:88,100-125 and Certificate.ts:73-75,280-296 at edf6e03), the names compared unit for unit, each string held with U+FFFD; residues the held character where the reference holds the lone unit, two names one String holds and a lone unit's ICU order beside a private-use or unassigned BMP character above U+DFFF (U+E000 recorded). Theirs: none (the witness: tests/identity_lone_surrogate_566.rs; tests/vectors/identity_lone_surrogate_566.json).
+
+### Fixed: the nightly's Mutants jobs resolve the dependency graph once before cargo-mutants (#574)
+
+The nightly's one run (`nightly.yml`, 2026-10-27, run 40474836749) failed all
+twenty Mutants jobs at the unmutated baseline, before any mutant was tested:
+`cannot create the lock file .../Cargo.lock because --locked was passed to
+prevent this`. `nightly_mutants.py` passes `--cargo-arg=--locked`, the library
+commits no `Cargo.lock` (`.gitignore`), and cargo-mutants' copy of the checkout
+had none to read. The `mutants` job now runs `cargo generate-lockfile` in the
+checkout before cargo-mutants, as `ci.yml`'s fixtures job and `bench.yml`
+already resolve before their `--locked` commands; `--locked` stays, so the
+baseline and every mutant of a shard build one graph. `docs/NIGHTLY.md` says
+so. The witness: the script's own command on the merkle shard 0/400 of a
+scratch copy with no lock fails its baseline with that text (exit 4), and the
+same command after `cargo generate-lockfile` builds the baseline and tests the
+shard's mutant (exit 0). The fuzz job passes `--locked` only to
+`cargo install`, which reads the installed crate's own lock, and needs no step.
+
+### Added: the reference's public-key validators as public helpers, each named for its site (#579)
+
+bsv-wallet-cli#377 found the lenient `PublicKey::from_hex` (#498, the
+reference's `PublicKey.fromString`) at four of the CLI's served doors, where
+the reference's validators read a caller's key strictly; the CLI then wrote a
+host copy of this crate's crate-private `PublicKey::from_strict_hex`. The
+keeper's word (the rulings page's entry of 2026-11-01 01:1xZ, issue #579,
+shape (2)): one public helper per reference validator, named for the
+reference's site, each returning the parsed key or the reference's refusal;
+`from_strict_hex` stays private and `from_hex` is untouched. Not shape (1),
+`from_strict_hex` made public: an internal reader as public API names the
+port's mechanism, not the reference's rule. The ground is #505's: one
+definition of the reference's rule for every host.
+
+| Helper | Reference (`ts-stack@edf6e03`) | Rule | Refusal |
+|---|---|---|---|
+| `wallet::validate_public_key(value: &str, name: &str) -> Result<PublicKey>` (in `wallet::validation`, `src/wallet/validation/crypto.rs`) | `validatePublicKey`, `packages/sdk/src/wallet/validationHelpers.ts:185-191`, through `validateHexString` (`:522-534`) and `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`) | the text trimmed as JavaScript trims it, an even UTF-16 length, hex digits of either case, exactly 66 characters, `02`/`03`, x below p and a point's | `Error::WalletRefusal` of class `InvalidParameter` (code 6): `The <name> parameter must be ` then `even length, not N.`, `hexadecimal string.`, `at least 66 length.`, `no more than 66 length.` or `a valid compressed secp256k1 public key` |
+| `auth::assert_auth_identity_key(value: &str) -> Result<PublicKey>` (in `auth::utils`, `src/auth/utils/identity_key.rs`) | `assertAuthIdentityKey`, `packages/sdk/src/auth/AuthMessageValidation.ts:81-90`, applied to a received message's `identityKey` (`:344`, the HTTP answer's `x-bsv-auth-identity-key` folded into it, `SimplifiedFetchTransport.ts:346`) and a requested set's certifiers (`:124`) | the text as given, `02`/`03` and 64 lowercase hex digits, then the key read by `PublicKey.fromString` writing the same text back | `Error::AuthError`: `Authentication identityKey must be a canonical compressed public key.` for the form, `Authentication identityKey must be a valid compressed public key.` for the point |
+
+The auth rule is not the wallet rule at another site: it trims nothing and
+reads lowercase alone (an upper-case or space-padded key the wallet reads is
+refused), and its words are its own. Both return a key equal to `from_hex`
+of the same text (the wallet's of the trimmed text, since `from_hex` trims
+nothing) and refuse every lenient form #498's reader accepts (an
+odd-length key, an uncompressed or hybrid key, an x at or above p). The
+wallet helper is the crate-private `public_key_hex` of #420 renamed and made
+public, the one definition `Counterparty::from_hex` and the registry's
+operator check (#543) already call; the auth helper is #294's private
+`assert_auth_identity_key` moved to its own file, returning the key, the
+one the requested set's certifiers call. No site is rewired: the
+`from_strict_hex` sites (serde's `PublicKey` reading, `KeyringRevealer`, the
+Peer's identity pin and own key, the three certificate intakes, the HTTP
+answer's identity header at the transport and the payment) equal neither
+helper, since `from_strict_hex` reads an uncompressed key and upper-case hex
+(the older gap CLAUDE.md states); moving any of them is a follow-up.
+
+Pinned by `tests/public_key_validation.rs` against
+`tests/vectors/public_key_validation_579.json` (15 key texts, each with both
+reference validators' outcome at `ts-stack@edf6e03` under Node v22.18.0,
+written by `tests/support/public_key_validation_579.mjs`, two runs
+byte-identical; the reference's own inputs from
+`WalletNarrowValidation.test.ts:48-54` and `validationHelpers.test.ts:1258,1451`
+among them): the canonical key accepted by both and equal to `from_hex`'s
+(`the_canonical_compressed_key_is_the_lenient_readers_key_579`), #498's four
+lenient forms refused in the recorded words
+(`every_lenient_form_the_498_reader_accepts_is_refused_in_the_reference_words_579`),
+the case and trim difference
+(`the_auth_identity_key_rule_refuses_the_case_and_space_the_wallet_rule_reads_579`),
+every case. RED on `fd686dfe` as a compile failure (`E0432`, neither helper
+in `wallet` or `auth`).
+
+Migration: bsv-wallet-cli drops its host strict reader at its four served
+doors (after its #377) for `bsv_rs::wallet::validate_public_key(text, name)`
+at its next pin, the reference's rule at a wallet door (stricter than the
+copy it replaces: an uncompressed key is refused, surrounding whitespace
+trimmed); the toolbox replaces its site copies with the helper of the site
+they copy at its next pin. Semver: two public functions added, a minor
+addition on the beta line; no shape or behaviour moves.
+
+### Notes: cross-SDK parity (#579)
+
+Go at `2ca481c` has neither validator. Its wallet and auth types read a key
+through `PublicKeyFromString` (`primitives/ec/publickey.go:221-231`, its JSON
+reading at `:148-160`; the auth message's `identityKey` at
+`auth/types.go:216`), `hex.DecodeString` then `ParsePubKey` (`:79-134`): it
+accepts an uncompressed or hybrid key, upper-case hex and a compressed x at
+or above p (kept unreduced), and refuses an odd length and surrounding
+whitespace in its own words, where both reference validators refuse the
+uncompressed, hybrid and x-at-or-above-p forms, the auth validator upper-case
+hex too, and the wallet's trims the whitespace. Its key-form row is #498's; this
+crate follows the reference, so no new divergence is stated.
+
+### Fixed: the crate's own key-reading sites follow the reference's validator at each site through the #579 helpers (#582)
+
+#579 left nine sites reading a key through the crate-private
+`PublicKey::from_strict_hex` (even-length hex, then `from_bytes`), which reads
+an uncompressed key and upper-case hex and refuses a space-padded text, so it
+equals neither reference rule. Each site was read against the reference at
+`ts-stack@edf6e03`; the six whose reference reading is one of the two
+validators now read through its #579 helper, in its words; the certificate
+subject at `get_verifiable_certificates`, whose reference reading is the
+result validator's (the cold read's FIX), through a third helper,
+`wallet::validate_result_public_key`; and the two whose reference reading is
+none of the three stay on `from_strict_hex`, its doc listing them with the
+reason.
+
+| Site | Reference reading | Now | Input judged otherwise until #582 |
+|---|---|---|---|
+| `KeyringRevealer`'s serde reading (`src/wallet/types/json_forms.rs`) | `validateKeyringRevealer` -> `validatePublicKey` (`validationHelpers.ts:1243-1246,185-191`) | `wallet::validate_public_key(text, "keyringRevealer")` | an uncompressed key, read, now refused (`The keyringRevealer parameter must be no more than 66 length.`); a space-padded key, refused, now read trimmed |
+| the Peer's own identity key, its wallet's answer (`Peer::get_identity_key`) | `assertAuthIdentityKey` (`Peer.ts:1354-1355`) | `auth::assert_auth_identity_key` | upper-case hex and an uncompressed key, read, now refused (`Authentication identityKey must be a canonical compressed public key.`) |
+| the Peer's identity pin (`initiate_handshake`, through `get_authenticated_session`, `to_peer`, `request_certificates`) | the pin's text compared with an initial response's `identityKey` (`Peer.ts:903-908`), which `assertAuthIdentityKey` has held canonical (`AuthMessageValidation.ts:344`): only a text that assertion admits can match | `auth::assert_auth_identity_key`, before the handshake | an upper-case pin, read and matched (the handshake authenticated), now refused before the handshake in the assertion's words; the reference refuses it before the handshake at `requestCertificates` in the same words (`Peer.ts:435`), at `toPeer` in `assertAuthPeerTarget`'s session-nonce words (`Peer.ts:189`, `AuthMessageValidation.ts:64-80,99-105`: no key pattern, so read as a nonce), and only through `getAuthenticatedSession` after the round trip as `initialResponse identity does not match the requested peer identity.` (`Peer.ts:508-520,903-908`) |
+| the HTTP answer's `x-bsv-auth-identity-key` at the transport (`SimplifiedFetchTransport`'s sender) | `assertAuthIdentityKey` on the folded message (`SimplifiedFetchTransport.ts:346`, `AuthMessageValidation.ts:344`) | `auth::assert_auth_identity_key` | an upper-case header, read as the sender, now refused |
+| the 402's `x-bsv-auth-identity-key` as the payment's counterparty (`AuthFetch`) | the wallet's `validateCounterparty` -> `validatePublicKey` (`AuthFetch.ts:735-738,873-878`, `validationHelpers.ts:185-196`) | `wallet::validate_public_key(text, "counterparty")` | an uncompressed key, read and handed to the wallet, now refused before it (`The counterparty parameter must be no more than 66 length.`) |
+| a wallet certificate's certifier at `get_verifiable_certificates` | the text must be one of the requested set's (`getVerifiableCertificates.ts:76-81`), each held canonical by `assertAuthIdentityKey` (`AuthMessageValidation.ts:124`) | `auth::assert_auth_identity_key`, a refusal skipping the certificate as before | an upper-case certifier, forwarded, now skipped (the reference throws; that difference is older than #498) |
+| serde's `PublicKey` reading | none at the parse: the reference's JSON holds a `PubKeyHex` text, judged (if at all) by the site that uses it | stays `from_strict_hex` (#498's fold) | none moved |
+| a wallet certificate's subject at `get_verifiable_certificates` | the listCertificates result validator's `publicKey` (`WalletResultValidation.ts:1489-1493`, `:917-933`: even-length hex of either case, nothing trimmed, 33 bytes, a compressed point), run by the reference's client on the answer before `getVerifiableCertificates` calls proveCertificate (`getVerifiableCertificates.ts:57-90`), whose `validatePublicKey(certificate.subject)` (`validationHelpers.ts:1494-1497`) would refuse it next | `wallet::validate_result_public_key(text, "listCertificates", "certificates[N].subject")`, before proveCertificate as the reference's order is, a refusal skipping the certificate (the reference throws, as at the certifier) | an uncompressed subject, forwarded, now skipped; upper case read and a space-padded text refused, as before (the wallet rule would trim it) |
+| the identity client's two token parsers' subject and certifier (`src/identity/client_record.rs`) | `Certificate.verify` -> `toBinary` (`Certificate.ts:240-254`: `02`/`03` and 64 hex digits of either case, then `fromDER`) | stays `from_strict_hex` | no helper is that rule (the wallet's trims, the auth's refuses upper case, the result validator's reads an x at or above p as no point where `fromDER` reduces it); `from_strict_hex` reads an uncompressed key `toBinary` refuses and refuses an x at or above p it reduces (#183's refusal): a stated residue |
+
+Pinned, each RED on `804e66f9` with the new test file overlaid and GREEN on
+the tip, the verdicts read from `tests/vectors/public_key_validation_579.json`
+(the #579 recorder's; for the subject the recorder now also takes the result
+validator's `publicKey` on the same 15 texts, through the exported
+`validateWalletResult('getPublicKey', ..)` (`WalletResultValidation.ts:2179`,
+`:2207-2209`), as each case's `result`, two runs byte-identical, the `wallet`
+and `auth` outcomes unchanged):
+`a_keyring_revealer_is_read_as_the_reference_validate_public_key_reads_it_582`
+(`tests/auth_serde_key_strictness_498.rs`),
+`an_upper_case_or_uncompressed_wallet_identity_key_is_refused_582`,
+`an_upper_case_peer_pin_is_refused_in_the_reference_words_582` and
+`an_upper_case_wallet_certificate_certifier_is_not_forwarded_582`
+(`tests/auth_key_strictness_sites_498.rs`),
+`a_subject_the_reference_result_validator_refuses_is_not_forwarded_582`
+(the same file; RED on `07b562ca` with the file and the re-recorded vector
+overlaid: `"uncompressed_498": the reference's result validator refuses it`,
+`left: 1`, `right: 0`; each of the 15 recorded texts forwarded exactly when the
+result validator accepts it),
+`a_general_answer_with_an_upper_case_identity_key_header_is_refused_582`
+(`tests/auth_header_key_strictness_498.rs`) and
+`an_uncompressed_payment_identity_key_is_refused_before_the_wallet_582`
+(`src/auth/clients/payment_key_strictness_498_tests.rs`). #498's tests at the
+moved sites, which pinned the strict reading's class or words for the lenient
+forms, now expect the helper's refusal of the same forms (the verdict
+unchanged, the words the reference's), and #353's
+`a_handshake_named_by_a_string_that_is_no_identity_key_is_refused_353`
+expects the assertion's words for a pin that is no key (`Peer.ts:903-908`).
+
+Texts: the moved sites' refusals change from `Error::InvalidPublicKey` /
+`Error::InvalidHex` (and `KeyringRevealer`'s
+`keyringRevealer is 'certifier' or a public key: ...`) to the helpers'
+`Error::WalletRefusal` (`The <name> parameter must be ...`) or
+`Error::AuthError` (`Authentication identityKey must be ...`). No dependent
+matches on the old texts (bsv-wallet-cli `src`, bsv-wallet-toolbox-rs `src`,
+rust-message-box `src` grepped for the `KeyringRevealer` prefix,
+`InvalidPublicKey` and the moved entry points: no hit). Semver: one public
+addition, below; no public shape moves; the error variants at these sites are
+behaviour, not API.
+
+Added: `wallet::validate_result_public_key(value, call, field) -> Result<PublicKey>`
+(`src/wallet/validation/crypto.rs`, re-exported as `bsv_rs::wallet::validate_result_public_key`),
+the reference's result validator's `publicKey` (`WalletResultValidation.ts:928-933`
+over `hex` at `:917-926`, applied to a certificate's subject and certifier at
+`:1489-1493`), beside #579's two helpers on the keeper's shape (2): no trim,
+even-length hex of either case, 33 bytes, then `02`/`03` and a point, refused as
+`Error::WalletError` in its words (`Invalid <call> result <field>: expected `
+`an even-length hex string`, `33 hexadecimal bytes` or
+`a valid compressed secp256k1 public key`; `validateCertificate`'s catch,
+`:1534-1536`, rethrows those as `a canonical signed wallet certificate`). It
+differs from `validate_public_key` by the trim alone in verdict (a space-padded
+key read there, refused here; the 15 recorded texts agree otherwise) and in its
+words and class. Pinned by `every_recorded_case_is_the_result_validators_outcome_582`
+(`tests/public_key_validation.rs`, compile-RED on `07b562ca`: the helper absent).
+Migration: none for the dependents; no dependent copies this check
+(bsv-wallet-cli `src` and bsv-wallet-toolbox-rs `src` grepped for the result
+validator's words and a compressed-key check: no hit; rust-message-box's
+`is_valid_pubkey`, `src/validation.rs:483-487`, judges a send's recipient
+argument, not a wallet's answer, and stays its own).
+
+### Notes: cross-SDK parity (#582)
+
+Go at `2ca481c` reads every one of these keys through `PublicKeyFromString`
+(`primitives/ec/publickey.go:221-231`): the `KeyringRevealer` JSON
+(`wallet/encoding_json.go:657-675`), the transport's header
+(`auth/transports/simplified_http_transport.go:209`) and the payment's
+(`auth/clients/authhttp/authhttp.go:742`), and its Peer takes the pin and its
+own key as `*ec.PublicKey` (`auth/peer.go:235-261,308-344`), so it reads the
+upper-case and uncompressed keys both reference validators (or the auth one)
+refuse here. This is #498's and #579's key-form row; no new divergence is stated.
+No census row names these sites (`grep -n 'KeyringRevealer\|identity key\|identityKey' CHANGELOG.md | grep -i row`
+finds only R20 of #432, the specific-linkage counterparty result, untouched).
+
+### Fixed: the wallet wire's sendWithResults status codes are BRC-100's and the reference's, 1/2/3 (#590)
+
+A createAction or signAction result's `sendWithResults` entry carries its
+status as one byte. This crate wrote and read 0 `unproven`, 1 `sending`, 2
+`failed`; BRC-100 at `5119a9b` names 1, 2, 3 (`wallet/0100.md:1724-1726`),
+the reference writes them (`ts-stack@edf6e03`
+`WalletWireProcessor.ts:151-156`, called at `:624` and `:775`) and reads them
+back (`WalletWireTransceiver.ts:1226-1234`), refusing another byte in its
+words, `Unknown sendWith result status code: N`, the byte read signed
+(`readInt8`). So a TypeScript wallet's `sending` (`02`) read here as
+`Failed`, its `failed` (`03`) was refused (`invalid send with result status:
+3`), and on a TypeScript client this crate's `unproven` (`00`) was refused,
+its `sending` (`01`) read as `unproven` and its `failed` (`02`) as `sending`.
+`WireWriter::write_send_with_result_status` now writes 1/2/3 and
+`WireReader::read_send_with_result_status` reads them, any other byte refused
+as `Error::WalletError` in the reference's words with the byte signed (`0`,
+`4`, `127`, `-128`, `-1` for `0xff`).
+
+Pinned by `tests/wire_send_with_status_590.rs` against
+`tests/vectors/wallet_wire/send_with_status_590.json`, written by the #338
+recorder's new `--send-with-status-590` mode
+(`tests/support/wire_send_with_status_590.mjs`, `ts-stack@edf6e03` under Node
+v22.18.0, two runs byte-identical): the reference's transceiver and processor
+exchange a createAction and a signAction whose wallet answers three entries,
+one per status, the response the reference's writer's bytes and its reader's
+names (`a_reference_sending_and_failed_status_reads_as_its_name_590`; RED on
+`e8f324eb`: `"createAction": wallet error: invalid send with result status:
+3`); this crate's writer's bytes for the same entries equal the reference's
+(`this_crate_writes_the_reference_status_bytes_590`; RED: `...1111...00 2222...01
+3333...02...` where the reference writes `01`, `02`, `03`); the bytes this
+crate wrote at `e8f324eb` (from a one-off run of its writer, pasted into the
+recorder as data) read by the reference: `00` refused, `01` `unproven`, `02`
+`sending`, and read the same here
+(`the_old_status_bytes_read_here_as_the_reference_reads_them_590`); five
+bytes outside 1 to 3 refused in the reference's recorded words
+(`an_unknown_status_byte_is_refused_in_the_reference_words_590`; RED:
+`Ok(.. "unproven" ..)` for `00`). The unit roundtrip in `encoding.rs` now pins
+each status's byte too, since a roundtrip through a wrong mapping passes.
+
+Two of this crate's own recordings moved, one byte each, re-recorded with
+`BSV_FIXTURES_RECORD=1` (`docs/FIXTURES.md` F10, which listed the 0/1/2
+mapping as a known difference, is resolved): `tests/fixtures/wire/createAction.json`
+(the `full` case's response, `unproven` `00` to `01`) and
+`tests/fixtures/wire/signAction.json` (the `full` case's response, `sending`
+`01` to `02`); the wire_codec bench reads these frames. No shared vector
+carries a status entry.
+
+Dependents: none matches on the wire byte. `bsv-wallet-cli` at `3ff6fdb`
+matches `SendWithResultStatus::Unproven` and `Sending` by name
+(`src/server/broadcast_follow_up.rs:87,275`); `bsv-wallet-toolbox-rs` at
+`63172222` maps the names to the type (`src/wallet/wallet.rs:1499-1501,2190-2192`);
+`rust-message-box` at `419bf18` names neither. A host on the binary wire
+between this crate and a TypeScript wallet or client reads the right status
+after its next `cargo update -p bsv-rs`; two hosts both on this crate before
+and after the update disagree on the byte until both take it. Semver: no
+public shape moves.
+
+### Notes: cross-SDK parity (#590)
+
+Go at `2ca481c` uses the same codes (`wallet/serializer/status.go:14-18`,
+written at `:29-40`, read at `:70-80`), so the three SDKs now agree on the
+byte. Go refuses another byte in its own words, `invalid status code: N`,
+read unsigned (`:79`), where the reference and this crate say `Unknown
+sendWith result status code: N` with the byte signed. Go also writes an
+absent list as the count 0 and reads 0 as absent (`:21-23`, `:50-52`), where
+the reference writes -1 (`WalletWireProcessor.ts:619`, `:770`) and this
+crate writes nine `0xFF`, which the reference reads as -1; that framing is
+the list's, not the status byte's, and unchanged here.
+
+Census (#375; current reading):
+
+- None: no census row or `CLAUDE.md` divergence named the status byte; the
+  0/1/2 mapping was listed only as `docs/FIXTURES.md` F10, so the divergence
+  was unstated in the census until this landing closed it. #432's rows judge
+  the HTTP JSON statuses by name and #473's the list's count, neither the
+  byte.
+
+### Fixed: the identity parsers' subject and certifier read a key as `Certificate.toBinary` reads it (#585)
+
+The two `ls_identity` token parsers (`parse_output_to_certificate` and
+`parse_output_to_verifiable_certificate`, through `src/identity/client_record.rs`)
+read a published certificate's `subject` and `certifier` through
+`PublicKey::from_strict_hex` (even-length hex, then `from_bytes`), which reads an
+uncompressed key. The reference reads them where its discovery verifies the
+record: `Certificate.verify` runs `toBinary` first (`ts-stack@edf6e03`
+`Certificate.ts:425-427`), which takes the text untrimmed and requires
+`/^(02|03)[0-9a-fA-F]{64}$/` (`:240-254`, else `Invalid certificate <field>:
+expected compressed public key hex`), then the 33 bytes read as a point
+(`assertCompressedPublicKey`, `:136-143`, else `Invalid certificate <field>:
+expected a compressed secp256k1 public key`); a refusal there is `verify`'s
+`false`, and the toolbox's discovery skips the token (`identityUtils.ts:497-559`).
+An uncompressed subject or certifier was read here, the certificate verified
+over its compressed bytes and returned; it is now skipped by both parsers, as
+the reference skips it. Closed by #585: the residue #582's entry states for these
+two sites.
+
+One definition: `auth::certificates::read_to_binary_key(text, field)`
+(`src/auth/certificates/to_binary_key.rs`, crate-private, under `identity`),
+`toBinary`'s rule in its two sentences as `Error::CertificateValidationError`.
+It is none of the #579 helpers' rules: `wallet::validate_public_key` trims a
+space-padded text `toBinary` refuses, `auth::assert_auth_identity_key` refuses
+upper-case hex `toBinary` reads, and `wallet::validate_result_public_key`
+judges the same texts in the result validator's words. A compressed x at or
+above p, which `fromDER` reduces and `toBinary` writes unreduced, stays #183's
+refusal at the read: a stated residue. The vector's certificate, signed over
+the canonical subject, fails `verify` with it on both sides; a certificate its
+certifier signed over those unreduced bytes verifies there (`verify` `true`, a
+probe under Node v22.18.0 in #592's cold read, not pinned) and is skipped here.
+
+Pinned against `tests/vectors/certificate_to_binary_key_585.json`, written by
+`tests/support/certificate_to_binary_key_585.mjs` (a bun bundle of
+`Certificate`, `ProtoWallet` and `PrivateKey` at `ts-stack@edf6e03` under Node
+v22.18.0; two runs byte-identical): a certificate the certifier 31 signs for the
+subject 37 (this crate's signature equal to the reference's), and for each of
+the subject and the certifier eight texts (canonical, upper case, space-padded,
+uncompressed, hybrid, odd length, x above p, x no point's) with `toBinary(false)`'s
+outcome (the key bytes written or the words) and `verify`'s verdict (`true` for
+the canonical and upper-case texts alone). Tests in
+`src/identity/client_to_binary_key_585_tests.rs`:
+`an_uncompressed_published_key_is_skipped_by_the_certificate_parser_585` and
+`an_uncompressed_published_key_is_skipped_by_the_verifiable_certificate_parser_585`,
+each of the sixteen tokens read exactly when the reference's `verify` answers
+`true`, both RED on `76bbe036` with the test files, the reader and the vector
+overlaid and `client_record.rs` the base's (`assertion left == right failed:
+subject uncompressed`, `left: true`, `right: false`; with the subject cases
+filtered out, `certifier uncompressed`, the same), GREEN on the tip;
+`the_reader_refuses_in_the_reference_to_binary_words_585`, the reader's key or
+words equal to `toBinary`'s on every case but the enumerated `x_above_p`. #498's
+`a_published_certificate_key_in_a_lenient_form_is_skipped_498` (hybrid and odd
+length) agrees with the recorded verdicts and is unchanged.
+
+Texts: none a caller reads; the parsers skip a refused token as before (an
+`Option`), so the reader's words surface nowhere public. No dependent calls the
+parsers' resolution paths or matches the words (bsv-wallet-cli `src`,
+bsv-wallet-toolbox-rs `src`, rust-message-box `src` grepped for both sentences,
+`discover_certificates`, `resolve_by_attributes`, `resolve_by_identity_key`: no
+hit). `from_strict_hex` stays for serde's `PublicKey` reading alone, its doc
+saying so. No public API moves. No census row records these sites (`Row N:`
+lines of `CHANGELOG.md` and `docs/` grepped for `toBinary`, the identity
+parsers, `from_strict_hex` and the subject and certifier: no hit).
+
+### Notes: cross-SDK parity (#585)
+
+Go at `2ca481c` has no `ls_identity` parser (it resolves through its wallet,
+`identity/client.go:240-276`), and its certificate holds the subject and
+certifier as `ec.PublicKey` (`auth/certificates/certificate.go:40,43`), read from
+JSON through `PublicKeyFromString` (`primitives/ec/publickey.go:148-157,221-231`:
+hex, then `ParsePubKey`, which reads the uncompressed and hybrid forms) and
+written compressed (`wallet/serializer/certificate.go:36-37`): a certificate
+whose JSON carries an uncompressed key verifies there over its compressed
+bytes, as it did here until #585, where the reference's `toBinary` refuses it.
+This is #498's key-form row; no new divergence is stated.
+
+### Fixed: the nightly's Mutants oracle runs its test binaries under a memory ceiling (#577)
+
+Run 41252901741 lost four Mutants shards' hosted runners (script 1/4, 2/4,
+3/4 and substrates 1/4: `The runner has received a shutdown signal`) after
+their baselines passed, and the rerun lost script 3/4 again after the same
+seven logged mutants: a deterministic loss at one mutant, not the runners'.
+Each shard's culprit, measured on a scratch copy of beta with the job's own
+oracle (`nightly_mutants.py`'s command, one mutant at a time) under a watchdog,
+is a mutant that stops a parser's position advancing, so its loop pushes on
+every pass: script 3/4 `src/script/script.rs:79:19` (`+=` to `*=` in
+`Script::from_asm`, 16 GB in 16 seconds), script 2/4 `script.rs:120:23` (the
+same, 12.6 GB in 17 seconds), script 1/4 `script.rs:210:17` (`+=` to `*=` in
+`Script::parse_chunks`, 13.6 GB in 7 seconds), substrates 1/4
+`src/wallet/substrates/result_values/raw_tree.rs:168:28` (`+=` to `*=` in
+`Snapshot::read`, 14.7 GB in 10 seconds), each far inside the 120-second test
+timeout. The `mutants` job now sets cargo's target runner
+(`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER`) to
+`.github/scripts/test-runner-memory-ceiling.sh`, which execs each test binary
+under `ulimit -v` at 12,000,000 KB (`MUTANTS_TEST_VMEM_KB`): the allocation
+past the ceiling aborts the binary and the mutant is caught; rustc and the
+build scripts do not run through the runner. `docs/NIGHTLY.md` says so. The
+local witness, in a Linux container (Rust 1.99.1, the aarch64 runner
+variable): under the runner, `script.rs:79:19` is `CaughtMutant` (`memory
+allocation of 4294967296 bytes failed`, SIGABRT, a 40-second test phase) and
+`raw_tree.rs:168:28` the same (`memory allocation of 15032385536 bytes
+failed`); without it, `script.rs:79:19`'s test binary passed 12 GB resident
+in 24 seconds before the guard killed it; the five surfaces' baselines pass
+under the ceiling (script 491, substrates 96, wire 288, merkle 124, BEEF 392
+tests), their largest binary peaking at 805 MB of address space; a build with
+the runner set at a 200 MB ceiling compiles, where the same limit in the shell
+stops rustc. The CI witness is the dispatch of `nightly.yml` after the landing.
+
+### Fixed: the `get_verifiable_certificates` certifier is checked against the requested set as the reference checks it (#587)
+
+`get_verifiable_certificates` proved and forwarded every certificate its
+wallet listed whose subject and certifier read: a valid, lowercase certifier
+outside the requested set was proved and returned, and a type the set does not
+request was proved with no fields to reveal. The reference checks each listed
+certificate before `proveCertificate` (`ts-stack@edf6e03`
+`packages/sdk/src/auth/utils/getVerifiableCertificates.ts:76-81`):
+`requestedCertificates.certifiers.includes(certificate.certifier)`, a text
+comparison with the set's certifiers, which `assertAuthIdentityKey` holds
+canonical (`AuthMessageValidation.ts:124`), and `Array.isArray` of the type's
+requested fields; either failing throws `Wallet returned a certificate outside
+the requested certifier/type set`, which rejects the `Promise.all` and so the
+whole call, and its three `Peer` callers propagate it (`Peer.ts:845,1016,1109`).
+This crate now does the same, in that order: the subject's result-validator
+check (#582, a skip as before), then the certifier's text and the type against
+the requested set, the whole call refused as `Error::AuthError` in the
+reference's words, then `prove_certificate`. The refusal is the reference's
+verdict, not a skip as the site's other refusals are: the reference throws at
+this line, and the Peer, the AuthFetch callback and the initial-request path
+here return the error as the reference's callers throw it. A lenient or
+upper-case certifier text, none of a canonical set's, is now this refusal where
+#498 and #582 skipped it. The certifier's `assert_auth_identity_key` read stays
+after the membership, a skip, reached only by a caller's own non-canonical set
+(the Peer validates its sets). `get_verifiable_certificates` moved, unchanged in
+signature, to `src/auth/utils/verifiable.rs` (the ratchet's bounds on
+`validation.rs`).
+
+Pinned against `tests/vectors/verifiable_certificates_membership_587.json`,
+written by `tests/support/verifiable_certificates_membership_587.mjs` (a bun
+bundle of `getVerifiableCertificates` and `PrivateKey` at `ts-stack@edf6e03`
+under Node v22.18.0, a fake wallet counting proveCertificate calls): six cases
+(in the set; a certifier outside it; an upper-case certifier; a type outside
+it; an outside certificate after and before an in-set one), each verdict and
+count of proofs. Tests in `tests/auth_verifiable_certificates_membership_587.rs`:
+`a_valid_certifier_outside_the_requested_set_refuses_the_call_587` (every
+recorded verdict in the reference's words and its proofs, one count the stated
+residue) and `a_lowercase_certifier_outside_the_set_is_not_proved_or_forwarded_587`,
+both RED on `cf1c13bb` with the test and the vector overlaid (`assertion left ==
+right failed`, `left: Ok(1)`, `right: Err(AuthError("Wallet returned a
+certificate outside the requested certifier/type set"))`), GREEN on the tip.
+`tests/auth_key_strictness_sites_498.rs`'s
+`a_wallet_certificate_key_in_a_lenient_form_is_not_forwarded_498` and
+`an_upper_case_wallet_certificate_certifier_is_not_forwarded_582` re-read
+against the reference: their certifier cases now assert the refusal.
+
+Texts: one new error text, the reference's. No dependent calls
+`get_verifiable_certificates` or matches the text (bsv-overlay-cloudflare,
+rust-message-box, bsv-wallet-cli and bsv-wallet-toolbox-rs grepped, `*.rs`
+outside `target`: no hit). No public API moves. No census row names the
+site (`Row N:` lines of `CHANGELOG.md` and `docs/` grepped for
+`getVerifiableCertificates`, `get_verifiable_certificates` and the requested
+certifier: no hit).
+
+### Notes: cross-SDK parity (#587)
+
+One residue, stated: the reference's `matchingCertificates.certificates.map`
+starts every callback before `Promise.all` rejects, so an in-set certificate
+listed after an outside one is still proved there (`proveCalls` 1 in the
+recorded `outside_before_inside`) and not here, where the loop stops at the
+refusal (0); the verdict is the same. Likewise a wallet's proveCertificate
+error on an earlier certificate is returned here before a later certificate's
+membership refusal, where the reference's synchronous throw rejects first.
+A second residue, older than #587 (#582's): a direct caller's own set whose
+certifier text is not canonical (`02` and 64 upper-case hex digits, say) and a
+listed certificate carrying the same text pass the membership in both; the
+reference proves and returns it (the function asserts no key, its
+`Certificate` constructor stores the text, `Certificate.ts:197-213`; probed
+under Node v22.18.0: one certificate, one proof), where this crate skips it at
+`assert_auth_identity_key` before `prove_certificate`. The `Peer` never reaches
+it: its sets are validated (`assert_requested_certificate_set`, #294).
+go-sdk at `2ca481c` has no certifier membership check and skips an unrequested
+type or one with no requested fields (`auth/utils/get_verifiable_certificates.go:60-71`),
+so it proves and returns a certificate of any certifier the wallet lists.
+
+### Changed: the two private copies of the result validator's key rule read through `validate_result_public_key` (#588)
+
+`wallet::validate_result_public_key(value, call, field)` (#582's fold, #584)
+carries the result validator's `publicKey` rule (`ts-stack@edf6e03`
+`WalletResultValidation.ts:917-933`): hex of either case, nothing trimmed, 33
+bytes, a valid compressed point, the three refusal sentences. Two private copies
+of the rule remained: the wire processor's getPublicKey result check
+(`wallet::wire::validation::public_key_result`, `:2207-2209`) and the HTTP JSON
+result validator's key (`wallet::substrates::result_values::scalars::key`, read
+for getPublicKey's `publicKey`, the two linkage results' `prover`, `verifier` and
+`counterparty`, and the certificate results' `verifier`). Both now read through
+the helper with the call and field names they passed, the JSON site after its
+string check (`a string`, unchanged); the wire's private `compressed_key` went
+with its one caller. The ground is #505's: one definition of the reference's rule
+for every host. No verdict or text changes: on the recorder's 15 cases
+(`tests/vectors/public_key_validation_579.json`, canonical, the other parity,
+upper case, space-padded, odd length, uncompressed, hybrid, x above and at p, x
+zero, empty, non-hex, short, `04` at 33 bytes) each site gave the recorded
+`result` outcome in the recorded words before the change and gives it after,
+pinned by `the_get_public_key_result_check_is_the_result_validators_outcome_588`
+(`src/wallet/wire/public_key_result_588_tests.rs`, the frame's 33 bytes or code
+1) and `the_result_key_check_is_the_result_validators_outcome_588`
+(`src/wallet/substrates/result_values/public_key_588_tests.rs`, through the
+getPublicKey dispatch and under `listCertificates`' `certificates[0].verifier`),
+both green on the pre-change code (a refactor, no RED). No parity row names the
+two sites (the CLAUDE.md list and the census rows read for `public_key_result`
+and `scalars`).
+
+### Fixed: the Mutants oracle's memory ceiling at 4,000,000 KB, and a step proving the runner hook is live (#577)
+
+The witness of #595's ceiling, run 41288213777 at `94862392`, lost Mutants
+(script, 1/4)'s hosted runner again 21 minutes in, with the runner variable in
+the run step's environment and the baseline passed under it, where the shard's
+next entries reach the culprit `src/script/script.rs:210:17` (`+=` to `*=` in
+`Script::parse_chunks`). Two readings, both closed here. (a) The ceiling was
+too high: an unbounded Vec doubles, so under a ceiling of C the process touches
+up to about C before its next reserve fails; the 8 GiB reserve fit under
+12,000,000 KB and the 16 GB runner, with the system, cargo and cargo-mutants
+resident, ran out before any allocation was refused. `MUTANTS_TEST_VMEM_KB` is
+now 4,000,000 KB (3.8 GiB), well under half the runner: the five surfaces'
+baselines peak at 805 MB of address space in one test binary (#595's
+measurement), fivefold room, and the culprits fail their first reserve past
+3.8 GiB. (b) Nothing in the job's log proved the hook reached the test binaries
+on x86_64: `test-runner-memory-ceiling.sh` now writes the limit in force to
+`MUTANTS_CEILING_MARKER` when that names a file, and the new step "Prove the
+memory ceiling reaches the test binaries" runs `cargo test --features full,http
+--locked --lib -- --list` through the hook (the job's target directory) and
+fails the job unless the marker holds `MUTANTS_TEST_VMEM_KB`; the variable is
+that step's alone, so no mutant writes it. A platform refusing `ulimit -v`
+(macOS) gets a warning and an unbounded run, and the marker then records
+`unlimited`, so the proof fails rather than passing silently. `docs/NIGHTLY.md`
+says so. The CI witness is a dispatch of `nightly.yml` after the landing.
 
 ## [0.9.0-beta.5] - 2026-10-31
 

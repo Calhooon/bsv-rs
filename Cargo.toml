@@ -1,6 +1,6 @@
 [package]
 name = "bsv-rs"
-version = "0.9.0-beta.5"
+version = "0.9.0-beta.6"
 edition = "2021"
 # the lowest toolchain the library builds on (1.87 refuses slice::as_chunks); the gate's msrv job (bsv-stack-lean #139)
 rust-version = "1.88"
