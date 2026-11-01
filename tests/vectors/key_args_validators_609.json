@@ -1,0 +1,6098 @@
+{
+  "reference": "ts-stack@edf6e03",
+  "source": "packages/sdk/src/wallet/validationHelpers.ts",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "call": "getPublicKey",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "identity_alone",
+      "args": {
+        "identityKey": true
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "identity_with_fields",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "identityKey": true
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "identity_protocol_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "identityKey": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "identity_key_id_empty",
+      "args": {
+        "keyID": "",
+        "counterparty": "self",
+        "identityKey": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "identity_privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "identityKey": true,
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "identity_reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "identityKey": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_absent",
+      "args": {
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID parameter must be a [securityLevel, protocolName] tuple",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "key_id_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be a string",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "protocol_absent_before_privilege",
+      "args": {
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID parameter must be a [securityLevel, protocolName] tuple",
+        "code": 6
+      }
+    },
+    {
+      "call": "getPublicKey",
+      "name": "for_self",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "forSelf": true
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "plaintext_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": []
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "plaintext_over_bound",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": {
+          "length": 268435457,
+          "byte": 0
+        }
+      },
+      "expected": {
+        "ok": false,
+        "message": "The plaintext parameter must be at most 268435456 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "encrypt",
+      "name": "privilege_before_plaintext",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "plaintext": {
+          "length": 268435457,
+          "byte": 0
+        },
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "ciphertext": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "ciphertext_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": []
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "ciphertext_over_bound",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": {
+          "length": 268435457,
+          "byte": 0
+        }
+      },
+      "expected": {
+        "ok": false,
+        "message": "The ciphertext parameter must be at most 268435456 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "decrypt",
+      "name": "privilege_before_ciphertext",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "ciphertext": {
+          "length": 268435457,
+          "byte": 0
+        },
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "data_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": []
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "data_over_bound",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": {
+          "length": 268435457,
+          "byte": 0
+        }
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data parameter must be at most 268435456 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "createHmac",
+      "name": "privilege_before_data",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": {
+          "length": 268435457,
+          "byte": 0
+        },
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "data_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [],
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "data_over_bound",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": {
+          "length": 268435457,
+          "byte": 0
+        },
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data parameter must be at most 268435456 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifyHmac",
+      "name": "privilege_before_data",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": {
+          "length": 268435457,
+          "byte": 0
+        },
+        "hmac": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "hash_alone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "hashToDirectlySign": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "data_and_hash",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "hashToDirectlySign": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data, hashToDirectlySign parameter must be exactly one value",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "neither_data_nor_hash",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data, hashToDirectlySign parameter must be exactly one value",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "data_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": []
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "data_over_bound",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": {
+          "length": 268435457,
+          "byte": 0
+        }
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data parameter must be at most 268435456 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "createSignature",
+      "name": "privilege_before_exclusivity",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "valid",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "counterparty_anyone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "anyone",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "counterparty_key",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "counterparty_absent",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "protocol_level_0",
+      "args": {
+        "protocolID": [
+          0,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "protocol_name_short",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "protocol_name_minimum",
+      "args": {
+        "protocolID": [
+          2,
+          "fives"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "protocol_name_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "protocol_name_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "protocol_name_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be no more than 400 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "key_id_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "key_id_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be no more than 800 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "key_id_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "privileged_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "privileged_with_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": true,
+        "privilegedReason": "short"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "privileged_false_without_reason",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_short",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": true,
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_maximum",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": true,
+        "privilegedReason": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_utf8_long",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privilegedReason": "éééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be no more than 50 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_short_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privilegedReason": "four"
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_empty_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privilegedReason": ""
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "reason_unprivileged",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": false,
+        "privilegedReason": "a reason"
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "seek_permission_false",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "seekPermission": false
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "order_protocol_before_key_id",
+      "args": {
+        "protocolID": [
+          2,
+          "four"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The protocolID[1] parameter must be at least 5 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "order_key_id_before_privilege",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The keyID parameter must be at least 1 length.",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "hash_alone",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "hashToDirectlyVerify": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": true
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "data_and_hash",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "hashToDirectlyVerify": [
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data, hashToDirectlyVerify parameter must be exactly one value",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "neither_data_nor_hash",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data, hashToDirectlyVerify parameter must be exactly one value",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "data_over_bound",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": {
+          "length": 268435457,
+          "byte": 0
+        },
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data parameter must be at most 268435456 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "exclusivity_before_signature",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "signature": []
+      },
+      "expected": {
+        "ok": false,
+        "message": "The data, hashToDirectlyVerify parameter must be exactly one value",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "signature_empty",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": []
+      },
+      "expected": {
+        "ok": false,
+        "message": "The signature parameter must be a canonical DER-encoded ECDSA signature",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "signature_over_72",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48,
+          48
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The signature parameter must be at most 72 bytes",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "signature_not_der",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          129
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The signature parameter must be a canonical DER-encoded ECDSA signature",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "signature_s_zero",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          0
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The signature parameter must be a canonical DER-encoded ECDSA signature",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "signature_trailing_byte",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1,
+          0
+        ]
+      },
+      "expected": {
+        "ok": false,
+        "message": "The signature parameter must be a canonical DER-encoded ECDSA signature",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "privilege_before_signature",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [],
+        "privileged": true
+      },
+      "expected": {
+        "ok": false,
+        "message": "The privilegedReason parameter must be a value when 'privileged' is true",
+        "code": 6
+      }
+    },
+    {
+      "call": "verifySignature",
+      "name": "for_self",
+      "args": {
+        "protocolID": [
+          2,
+          "wallet tests"
+        ],
+        "keyID": "key",
+        "counterparty": "self",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "forSelf": true
+      },
+      "expected": {
+        "ok": true
+      }
+    }
+  ]
+}

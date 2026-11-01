@@ -141,7 +141,7 @@ impl ProtoWallet {
     /// for a legacy tag under the strict policy, or [`Error::WalletError`]
     /// when neither tag matches.
     pub fn verify_hmac_encoding(&self, args: VerifyHmacArgs) -> Result<HmacKeyEncoding> {
-        super::validation::crypto::verify_hmac_args(&args)?;
+        super::validation::crypto::validate_verify_hmac_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver().derive_symmetric_key(
             &args.protocol_id,

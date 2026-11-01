@@ -150,29 +150,29 @@ pub(super) fn get_public_key_args(args: &GetPublicKeyArgs) -> Checked {
 
 /// `validateWalletEncryptArgs` (`:1752-1756`).
 pub(super) fn encrypt_args(args: &EncryptArgs) -> Checked {
-    crypto::encrypt_args(args).map_err(Into::into)
+    crypto::validate_wallet_encrypt_args(args).map_err(Into::into)
 }
 
 /// `validateWalletDecryptArgs` (`:1758-1762`).
 pub(super) fn decrypt_args(args: &DecryptArgs) -> Checked {
-    crypto::decrypt_args(args).map_err(Into::into)
+    crypto::validate_wallet_decrypt_args(args).map_err(Into::into)
 }
 
 /// The four signature/HMAC validators shared with ProtoWallet (#415).
 pub(super) fn create_hmac_args(args: &CreateHmacArgs) -> Checked {
-    crypto::create_hmac_args(args).map_err(Into::into)
+    crypto::validate_create_hmac_args(args).map_err(Into::into)
 }
 
 pub(super) fn verify_hmac_args(args: &VerifyHmacArgs) -> Checked {
-    crypto::verify_hmac_args(args).map_err(Into::into)
+    crypto::validate_verify_hmac_args(args).map_err(Into::into)
 }
 
 pub(super) fn create_signature_args(args: &CreateSignatureArgs) -> Checked {
-    crypto::create_signature_args(args).map_err(Into::into)
+    crypto::validate_create_signature_args(args).map_err(Into::into)
 }
 
 pub(super) fn verify_signature_args(args: &VerifySignatureArgs) -> Checked {
-    crypto::verify_signature_args(args).map_err(Into::into)
+    crypto::validate_verify_signature_args(args).map_err(Into::into)
 }
 
 /// `validateRevealCounterpartyKeyLinkageArgs` (`:1734-1741`): the

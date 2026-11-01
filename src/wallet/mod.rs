@@ -245,6 +245,12 @@ pub use types::{
     MAX_SATOSHIS,
 };
 pub use validation::{crypto::validate_result_public_key, validate_public_key};
+// The seven key calls' argument validators, each named for its reference site (#609).
+pub use validation::crypto::{
+    validate_create_hmac_args, validate_create_signature_args, validate_get_public_key_args,
+    validate_verify_hmac_args, validate_verify_signature_args, validate_wallet_decrypt_args,
+    validate_wallet_encrypt_args,
+};
 
 // Re-export the substrate-agnostic client core (wallet feature).
 pub use client::{SubstrateType, WalletClient};
