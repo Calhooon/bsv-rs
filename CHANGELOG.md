@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the Mutants oracle's memory ceiling at 4,000,000 KB, and a step proving the runner hook is live (#577)
+
+The witness of #595's ceiling, run 41288213777 at `94862392`, lost Mutants
+(script, 1/4)'s hosted runner again 21 minutes in, with the runner variable in
+the run step's environment and the baseline passed under it, where the shard's
+next entries reach the culprit `src/script/script.rs:210:17` (`+=` to `*=` in
+`Script::parse_chunks`). Two readings, both closed here. (a) The ceiling was
+too high: an unbounded Vec doubles, so under a ceiling of C the process touches
+up to about C before its next reserve fails; the 8 GiB reserve fit under
+12,000,000 KB and the 16 GB runner, with the system, cargo and cargo-mutants
+resident, ran out before any allocation was refused. `MUTANTS_TEST_VMEM_KB` is
+now 4,000,000 KB (3.8 GiB), well under half the runner: the five surfaces'
+baselines peak at 805 MB of address space in one test binary (#595's
+measurement), fivefold room, and the culprits fail their first reserve past
+3.8 GiB. (b) Nothing in the job's log proved the hook reached the test binaries
+on x86_64: `test-runner-memory-ceiling.sh` now writes the limit in force to
+`MUTANTS_CEILING_MARKER` when that names a file, and the new step "Prove the
+memory ceiling reaches the test binaries" runs `cargo test --features full,http
+--locked --lib -- --list` through the hook (the job's target directory) and
+fails the job unless the marker holds `MUTANTS_TEST_VMEM_KB`; the variable is
+that step's alone, so no mutant writes it. A platform refusing `ulimit -v`
+(macOS) gets a warning and an unbounded run, and the marker then records
+`unlimited`, so the proof fails rather than passing silently. `docs/NIGHTLY.md`
+says so. The CI witness is a dispatch of `nightly.yml` after the landing.
+
 ### Changed: the two private copies of the result validator's key rule read through `validate_result_public_key` (#588)
 
 `wallet::validate_result_public_key(value, call, field)` (#582's fold, #584)

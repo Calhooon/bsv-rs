@@ -133,14 +133,42 @@ jobs:
       # out and was shut down, deterministically at one mutant (#577). Cargo
       # runs every test binary through this runner, under `ulimit -v`, so the
       # allocation past the ceiling aborts the binary and the mutant is caught;
-      # rustc and the build scripts are not run through it. The ceiling: the
-      # five surfaces' baselines peak at 805 MB of address space (one test
-      # binary), well under 12,000,000 KB, which leaves the runner about 4 GB
-      # for cargo, cargo-mutants and the system.
+      # rustc and the build scripts are not run through it. The ceiling: an
+      # unbounded Vec doubles, so a ceiling of C lets the process touch up to
+      # about C before its next reserve fails; with the system, cargo and
+      # cargo-mutants resident, C must sit well under half the runner's 16 GB.
+      # 12,000,000 KB did not (run 41288213777 lost script 1/4 at
+      # `script.rs:210:17` under it: the 8 GiB reserve succeeded and was
+      # touched). 4,000,000 KB (3.8 GiB) leaves the five surfaces' baselines,
+      # which peak at 805 MB of address space in one test binary, fivefold room,
+      # and the culprits fail their first reserve past it.
       - name: Hold the test binaries under a memory ceiling
         run: |
           echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=$GITHUB_WORKSPACE/.github/scripts/test-runner-memory-ceiling.sh" >> "$GITHUB_ENV"
-          echo "MUTANTS_TEST_VMEM_KB=12000000" >> "$GITHUB_ENV"
+          echo "MUTANTS_TEST_VMEM_KB=4000000" >> "$GITHUB_ENV"
+
+      # The hook must be seen to reach a test binary before any mutant runs:
+      # the runner writes the limit in force to MUTANTS_CEILING_MARKER, and one
+      # cheap test run through cargo (the library's test list, the oracle's
+      # features and lock, the job's target directory) must leave the marker
+      # holding MUTANTS_TEST_VMEM_KB. The variable is this step's alone, so no
+      # mutant's run writes it.
+      - name: Prove the memory ceiling reaches the test binaries
+        env:
+          MUTANTS_CEILING_MARKER: ${{ runner.temp }}/ceiling-live
+        run: |
+          rm -f "$MUTANTS_CEILING_MARKER"
+          cargo test --features full,http --locked --lib -- --list > /dev/null
+          if [[ ! -f "$MUTANTS_CEILING_MARKER" ]]; then
+            echo "::error::the test runner hook did not run: no test binary went through test-runner-memory-ceiling.sh"
+            exit 1
+          fi
+          limit=$(cat "$MUTANTS_CEILING_MARKER")
+          if [[ "$limit" != "$MUTANTS_TEST_VMEM_KB" ]]; then
+            echo "::error::the test binaries ran under ulimit -v $limit, not $MUTANTS_TEST_VMEM_KB"
+            exit 1
+          fi
+          echo "the test binaries run under ulimit -v $limit KB"
 
       - name: Run the scoped tests on every mutant
         run: |

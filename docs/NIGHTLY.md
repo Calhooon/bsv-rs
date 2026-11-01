@@ -62,10 +62,13 @@ copies it: `--locked` then holds the baseline and every mutant to one graph
 (#574). Cargo runs every test binary through
 `.github/scripts/test-runner-memory-ceiling.sh`
 (`CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER`), which sets `ulimit -v` to
-12,000,000 KB (`MUTANTS_TEST_VMEM_KB`): a mutant whose loop allocates without
-bound aborts on the refused allocation and is caught, where it once exhausted
-the 16 GB hosted runner before its test timeout; the baselines peak at 805 MB
-of address space (#577). The library target is essential: it includes
+4,000,000 KB (`MUTANTS_TEST_VMEM_KB`), well under half the 16 GB hosted runner,
+since a doubling Vec touches up to the ceiling before its next reserve fails: a
+mutant whose loop allocates without bound aborts on the refused allocation and
+is caught, where it once exhausted the runner before its test timeout; the
+baselines peak at 805 MB of address space, and a step before the mutants runs
+the library's test list through cargo and fails unless the runner's marker
+(`MUTANTS_CEILING_MARKER`) records that limit (#577). The library target is essential: it includes
 the codec and interpreter's inline tests. Unit tests are scoped with libtest
 `--skip` arguments to keep the relevant source namespace: `script`, `transaction`
 for BEEF, `transaction::merkle_path`, `wallet::wire`, or `wallet::substrates`.
