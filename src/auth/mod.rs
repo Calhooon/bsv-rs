@@ -88,6 +88,7 @@ pub use types::{
     RequestedCertificateTypes, AUTH_PROTOCOL_ID, AUTH_VERSION,
 };
 pub use utils::{
-    assert_requested_certificate_set, create_nonce, validate_certificate_encoding,
-    validate_certificates, validate_requested_certificate_set, verify_nonce,
+    assert_auth_identity_key, assert_requested_certificate_set, create_nonce,
+    validate_certificate_encoding, validate_certificates, validate_requested_certificate_set,
+    verify_nonce,
 };

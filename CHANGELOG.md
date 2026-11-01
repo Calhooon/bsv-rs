@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the reference's public-key validators as public helpers, each named for its site (#579)
+
+bsv-wallet-cli#377 found the lenient `PublicKey::from_hex` (#498, the
+reference's `PublicKey.fromString`) at four of the CLI's served doors, where
+the reference's validators read a caller's key strictly; the CLI then wrote a
+host copy of this crate's crate-private `PublicKey::from_strict_hex`. The
+keeper's word (the rulings page's entry of 2026-11-01 01:1xZ, issue #579,
+shape (2)): one public helper per reference validator, named for the
+reference's site, each returning the parsed key or the reference's refusal;
+`from_strict_hex` stays private and `from_hex` is untouched. Not shape (1),
+`from_strict_hex` made public: an internal reader as public API names the
+port's mechanism, not the reference's rule. The ground is #505's: one
+definition of the reference's rule for every host.
+
+| Helper | Reference (`ts-stack@edf6e03`) | Rule | Refusal |
+|---|---|---|---|
+| `wallet::validate_public_key(value: &str, name: &str) -> Result<PublicKey>` (in `wallet::validation`, `src/wallet/validation/crypto.rs`) | `validatePublicKey`, `packages/sdk/src/wallet/validationHelpers.ts:185-191`, through `validateHexString` (`:522-534`) and `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`) | the text trimmed as JavaScript trims it, an even UTF-16 length, hex digits of either case, exactly 66 characters, `02`/`03`, x below p and a point's | `Error::WalletRefusal` of class `InvalidParameter` (code 6): `The <name> parameter must be ` then `even length, not N.`, `hexadecimal string.`, `at least 66 length.`, `no more than 66 length.` or `a valid compressed secp256k1 public key` |
+| `auth::assert_auth_identity_key(value: &str) -> Result<PublicKey>` (in `auth::utils`, `src/auth/utils/identity_key.rs`) | `assertAuthIdentityKey`, `packages/sdk/src/auth/AuthMessageValidation.ts:81-90`, applied to a received message's `identityKey` (`:344`, the HTTP answer's `x-bsv-auth-identity-key` folded into it, `SimplifiedFetchTransport.ts:346`) and a requested set's certifiers (`:124`) | the text as given, `02`/`03` and 64 lowercase hex digits, then the key read by `PublicKey.fromString` writing the same text back | `Error::AuthError`: `Authentication identityKey must be a canonical compressed public key.` for the form, `Authentication identityKey must be a valid compressed public key.` for the point |
+
+The auth rule is not the wallet rule at another site: it trims nothing and
+reads lowercase alone (an upper-case or space-padded key the wallet reads is
+refused), and its words are its own. Both return a key equal to `from_hex`
+of the same text (the wallet's of the trimmed text, since `from_hex` trims
+nothing) and refuse every lenient form #498's reader accepts (an
+odd-length key, an uncompressed or hybrid key, an x at or above p). The
+wallet helper is the crate-private `public_key_hex` of #420 renamed and made
+public, the one definition `Counterparty::from_hex` and the registry's
+operator check (#543) already call; the auth helper is #294's private
+`assert_auth_identity_key` moved to its own file, returning the key, the
+one the requested set's certifiers call. No site is rewired: the
+`from_strict_hex` sites (serde's `PublicKey` reading, `KeyringRevealer`, the
+Peer's identity pin and own key, the three certificate intakes, the HTTP
+answer's identity header at the transport and the payment) equal neither
+helper, since `from_strict_hex` reads an uncompressed key and upper-case hex
+(the older gap CLAUDE.md states); moving any of them is a follow-up.
+
+Pinned by `tests/public_key_validation.rs` against
+`tests/vectors/public_key_validation_579.json` (15 key texts, each with both
+reference validators' outcome at `ts-stack@edf6e03` under Node v22.18.0,
+written by `tests/support/public_key_validation_579.mjs`, two runs
+byte-identical; the reference's own inputs from
+`WalletNarrowValidation.test.ts:48-54` and `validationHelpers.test.ts:1258,1451`
+among them): the canonical key accepted by both and equal to `from_hex`'s
+(`the_canonical_compressed_key_is_the_lenient_readers_key_579`), #498's four
+lenient forms refused in the recorded words
+(`every_lenient_form_the_498_reader_accepts_is_refused_in_the_reference_words_579`),
+the case and trim difference
+(`the_auth_identity_key_rule_refuses_the_case_and_space_the_wallet_rule_reads_579`),
+every case. RED on `fd686dfe` as a compile failure (`E0432`, neither helper
+in `wallet` or `auth`).
+
+Migration: bsv-wallet-cli drops its host strict reader at its four served
+doors (after its #377) for `bsv_rs::wallet::validate_public_key(text, name)`
+at its next pin, the reference's rule at a wallet door (stricter than the
+copy it replaces: an uncompressed key is refused, surrounding whitespace
+trimmed); the toolbox replaces its site copies with the helper of the site
+they copy at its next pin. Semver: two public functions added, a minor
+addition on the beta line; no shape or behaviour moves.
+
+### Notes: cross-SDK parity (#579)
+
+Go at `2ca481c` has neither validator. Its wallet and auth types read a key
+through `PublicKeyFromString` (`primitives/ec/publickey.go:221-231`, its JSON
+reading at `:148-160`; the auth message's `identityKey` at
+`auth/types.go:216`), `hex.DecodeString` then `ParsePubKey` (`:79-134`): it
+accepts an uncompressed or hybrid key, upper-case hex and a compressed x at
+or above p (kept unreduced), and refuses an odd length and surrounding
+whitespace in its own words, where both reference validators refuse the
+uncompressed, hybrid and x-at-or-above-p forms, the auth validator upper-case
+hex too, and the wallet's trims the whitespace. Its key-form row is #498's; this
+crate follows the reference, so no new divergence is stated.
+
 ### Fixed: the nightly's Mutants jobs resolve the dependency graph once before cargo-mutants (#574)
 
 The nightly's one run (`nightly.yml`, 2026-10-27, run 40474836749) failed all

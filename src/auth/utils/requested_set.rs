@@ -2,7 +2,6 @@
 //! on its own policy and on a received message (#294).
 
 use crate::auth::types::{AuthMessage, RequestedCertificateSet};
-use crate::primitives::PublicKey;
 use crate::{Error, Result};
 
 /// The reference's limits on a requested certificate set
@@ -47,7 +46,7 @@ pub fn assert_requested_certificate_set(requested: &RequestedCertificateSet) -> 
     }
     let mut certifiers = std::collections::HashSet::new();
     for certifier in &requested.certifiers {
-        assert_auth_identity_key(certifier)?;
+        super::assert_auth_identity_key(certifier)?;
         if !certifiers.insert(certifier.as_str()) {
             return refuse("requestedCertificates.certifiers must be unique.");
         }
@@ -78,28 +77,6 @@ pub fn assert_requested_certificate_set(requested: &RequestedCertificateSet) -> 
         }
     }
     Ok(())
-}
-
-/// `assertAuthIdentityKey` (`AuthMessageValidation.ts:81-91`): `02` or `03`
-/// and 64 lowercase hex digits, a point on the curve.
-fn assert_auth_identity_key(value: &str) -> Result<()> {
-    let bytes = value.as_bytes();
-    let form = bytes.len() == 66
-        && (value.starts_with("02") || value.starts_with("03"))
-        && bytes[2..]
-            .iter()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b));
-    if !form {
-        return Err(Error::AuthError(
-            "Authentication identityKey must be a canonical compressed public key.".into(),
-        ));
-    }
-    match PublicKey::from_hex(value) {
-        Ok(key) if key.to_hex() == value => Ok(()),
-        _ => Err(Error::AuthError(
-            "Authentication identityKey must be a valid compressed public key.".into(),
-        )),
-    }
 }
 
 /// `assertCanonicalBase64` (`AuthMessageValidation.ts:64-79`): at most 128
