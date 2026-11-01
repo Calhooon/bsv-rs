@@ -40,3 +40,6 @@ fuzz/corpus-gen/Cargo.lock
 /LOOP_GOAL.md
 /LOOP_LOG.md
 /examples/brc29_32byte_repro.rs
+
+# Python bytecode (importing .github/scripts/*.py writes it)
+__pycache__/

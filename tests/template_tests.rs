@@ -612,3 +612,164 @@ fn test_multisig_hex_roundtrip() {
     assert_eq!(parsed.to_hex(), hex);
     assert_eq!(parsed.as_script().is_multisig(), Some((1, 2)));
 }
+
+// #603: the reference's `RPuzzle` (`ts-stack@edf6e03`
+// `packages/sdk/src/script/templates/RPuzzle.ts`), recorded under Node
+// v22.18.0 by `tests/support/rpuzzle_lock_and_spend_603.mjs` into
+// `tests/vectors/rpuzzle_lock_and_spend_603.json`.
+#[cfg(feature = "transaction")]
+mod rpuzzle_reference_603 {
+    use bsv_rs::primitives::ec::PrivateKey;
+    use bsv_rs::primitives::BigNumber;
+    use bsv_rs::script::templates::{RPuzzle, RPuzzleType};
+    use bsv_rs::script::{LockingScript, ScriptTemplate, SignOutputs, Spend, SpendParams};
+    use bsv_rs::transaction::{Transaction, TransactionOutput};
+    use serde_json::Value;
+
+    fn vectors() -> Value {
+        serde_json::from_str(include_str!("vectors/rpuzzle_lock_and_spend_603.json")).unwrap()
+    }
+
+    /// The value's byte i is (7i + 1) mod 256, as the recorder writes it.
+    fn value(length: usize) -> Vec<u8> {
+        (0..length).map(|i| ((7 * i + 1) % 256) as u8).collect()
+    }
+
+    /// `lock` pushes the value as the reference's minimal push of it
+    /// (`Script.writeBin`, `Script.ts:340-352`): the value's length as the opcode
+    /// below 76 (`RPuzzle.ts:65`), `OP_PUSHDATA1` from 76 to 255, `OP_PUSHDATA2`
+    /// from 256. Up to 76 bytes that is the reference's `lock` byte for byte; from
+    /// 77 the reference's `{ op: value.length, data: value }` is not the minimal
+    /// push (77 an `OP_PUSHDATA2` whose length is 77, 78 an `OP_PUSHDATA4`, from 79
+    /// the opcode alone, its data dropped, `Script.ts:539-562`), and this crate keeps
+    /// the minimal push (CLAUDE.md's divergence list). Kills the `<` replacements
+    /// at `rpuzzle.rs:350` (`==`, `>`: a 32-byte value as `OP_PUSHDATA1`) and at
+    /// `rpuzzle.rs:352` (`==`, `>`: a 76-byte value as `OP_PUSHDATA2`; `<=`: a
+    /// 256-byte value as `OP_PUSHDATA1` with a length byte of 0).
+    #[test]
+    fn the_lock_pushes_the_value_minimally_rpuzzle_lock_and_spend_603_lock() {
+        let vectors = vectors();
+        let cases = vectors["lock"].as_array().unwrap();
+        // The length-0 case frames the push: the prefix, `OP_0`, the suffix.
+        let empty = &cases[0];
+        assert_eq!(empty["length"], 0);
+        assert_eq!(empty["push"], "00");
+        let empty_lock = empty["lock"].as_str().unwrap();
+        let at = empty_lock.find("7500").unwrap() + 2;
+        let (prefix, suffix) = (&empty_lock[..at], &empty_lock[at + 2..]);
+        assert_eq!(cases.len(), 10);
+        for case in cases {
+            let length = case["length"].as_u64().unwrap() as usize;
+            let reference_lock = case["lock"].as_str().unwrap();
+            let push = case["push"].as_str().unwrap();
+            let lock = RPuzzle::new(RPuzzleType::Raw)
+                .lock(&value(length))
+                .unwrap()
+                .to_hex();
+            assert_eq!(lock, format!("{prefix}{push}{suffix}"), "length {length}");
+            if length <= 76 {
+                assert_eq!(lock, reference_lock, "length {length}");
+            } else {
+                assert_ne!(lock, reference_lock, "length {length}");
+            }
+        }
+    }
+
+    /// `unlock(k, key, scope)` signs the sighash with the K value given, low-S
+    /// (`RPuzzle.ts:113`: `privateKey.sign(sha256(preimage), undefined, true, k)`),
+    /// as the reference's own test builds the spend (`__tests/RPuzzle.test.ts:19-51`:
+    /// k = 12345678, the private key 1, the R value with a 0 byte before a high
+    /// first byte), for each puzzle type and the six scopes: the signed
+    /// transaction is the reference's byte for byte and the spend valid. Kills the
+    /// four replacements in `sign_with_k`'s `s = k⁻¹ (z + r d)` at `rpuzzle.rs:403`.
+    #[tokio::test]
+    async fn the_unlock_signs_with_the_given_k_rpuzzle_lock_and_spend_603_spend() {
+        let vectors = vectors();
+        let k = BigNumber::from_i64(vectors["k"].as_i64().unwrap());
+        let key = PrivateKey::from_hex(&format!(
+            "{:064x}",
+            vectors["private_key"].as_u64().unwrap()
+        ))
+        .unwrap();
+        let r = hex::decode(vectors["r"].as_str().unwrap()).unwrap();
+        assert_eq!(r.len(), 33);
+        assert_eq!(r[0], 0);
+        assert_eq!(RPuzzle::compute_r_from_k(&k).unwrap().as_slice(), &r[1..]);
+        let cases = vectors["spend"].as_array().unwrap();
+        assert_eq!(cases.len(), 36);
+        for case in cases {
+            let label = format!(
+                "{} {} {}",
+                case["type"], case["signOutputs"], case["anyoneCanPay"]
+            );
+            let puzzle_type = match case["type"].as_str().unwrap() {
+                "raw" => RPuzzleType::Raw,
+                "SHA1" => RPuzzleType::Sha1,
+                "SHA256" => RPuzzleType::Sha256,
+                "HASH256" => RPuzzleType::Hash256,
+                "RIPEMD160" => RPuzzleType::Ripemd160,
+                "HASH160" => RPuzzleType::Hash160,
+                other => panic!("{other}"),
+            };
+            let sign_outputs = match case["signOutputs"].as_str().unwrap() {
+                "all" => SignOutputs::All,
+                "none" => SignOutputs::None,
+                "single" => SignOutputs::Single,
+                other => panic!("{other}"),
+            };
+            let anyone_can_pay = case["anyoneCanPay"].as_bool().unwrap();
+
+            let locking = RPuzzle::new(puzzle_type)
+                .lock(&puzzle_type.hash(&r))
+                .unwrap();
+            assert_eq!(locking.to_hex(), case["locking"], "{label}");
+            let mut source = Transaction::new();
+            source
+                .add_output(TransactionOutput::new(1, locking.clone()))
+                .unwrap();
+            assert_eq!(source.to_hex(), case["source"], "{label}");
+            let source_txid = source.hash();
+
+            let mut spending = Transaction::new();
+            spending
+                .add_input_from_tx(
+                    source,
+                    0,
+                    RPuzzle::unlock(&k, &key, sign_outputs, anyone_can_pay),
+                )
+                .unwrap();
+            spending
+                .add_output(TransactionOutput::new(
+                    1,
+                    LockingScript::from_asm("OP_1").unwrap(),
+                ))
+                .unwrap();
+            spending.sign().await.unwrap();
+            let unlocking = spending.inputs[0].unlocking_script.clone().unwrap();
+            assert_eq!(unlocking.to_hex(), case["unlocking"], "{label}");
+            assert_eq!(spending.to_hex(), case["spending"], "{label}");
+
+            let valid = Spend::new(SpendParams {
+                source_txid,
+                source_output_index: 0,
+                source_satoshis: 1,
+                locking_script: locking,
+                transaction_version: 1,
+                other_inputs: vec![],
+                outputs: vec![bsv_rs::primitives::bsv::sighash::TxOutput {
+                    satoshis: 1,
+                    script: LockingScript::from_asm("OP_1").unwrap().to_binary(),
+                }],
+                input_index: 0,
+                unlocking_script: unlocking,
+                input_sequence: 0xffff_ffff,
+                lock_time: 0,
+                memory_limit: None,
+                work_limit: None,
+            })
+            .validate()
+            .map_err(|e| e.message);
+            assert_eq!(valid, Ok(case["valid"].as_bool().unwrap()), "{label}");
+        }
+    }
+}

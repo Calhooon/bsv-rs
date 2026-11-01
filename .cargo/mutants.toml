@@ -1,0 +1,16 @@
+# Equivalent mutants, declared under the owner's rule of 2026-11-01 ("each a test or a stated
+# equivalent mutant"): a mutant enters this list only with the rule that makes it unobservable
+# (the node's source at the pin, the sibling bsv-script-lean's definition, the reference's
+# operation) and after three independent reads accept it (the ensemble rule). A line shift makes
+# the entry stop matching and the mutant reappear as a survivor, which is the safe failure.
+exclude_re = [
+  # src/script/templates/rpuzzle.rs:350:34, `<` to `<=` (#603, PR #615). The comparison bounds a
+  # direct push against OP_PUSHDATA1 (76 bytes): at the one length where the two branches differ,
+  # 76, both write the opcode byte 0x4c (bitcoin-sv v1.2.3 script.h:106-113 and
+  # interpreter.cpp:344-351; bsv-script-lean lean/BsvScript/Sighash.lean:277-281 and
+  # Machine.lean:78; RPuzzle.ts:65 at ts-stack@edf6e03 and its recording at 76 in
+  # tests/vectors/rpuzzle_lock_and_spend_603.json). Three reads: the cold read (0.86), the
+  # adversarial read with every length 0 to 80 and the PUSHDATA edges probed (0.98), the rule
+  # read (0.97).
+  '^src/script/templates/rpuzzle\.rs:350:34: replace < with <= in <impl ScriptTemplate for RPuzzle>::lock$',
+]
