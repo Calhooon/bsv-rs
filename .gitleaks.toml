@@ -157,3 +157,14 @@ regexes = [
   '''^0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d$''',
   '''^026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4$''',
 ]
+# tests/vectors/certificate_key_bytes_610.json: the #610 `other_prefix` cases' `key` (the bytes the
+# reference's `Certificate.toBinary` writes) is 37G's and 31G's x under the other parity prefix, the
+# points -37G and -31G (tests/support/certificate_key_bytes_610.mjs), recorded from the reference's
+# Certificate; public keys of test scalars, not keys in use. Only those two literals are let through,
+# never the file.
+[[allowlists]]
+description = "-37G and -31G as the #610 other-prefix keys"
+regexes = [
+  '''^0262d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d$''',
+  '''^036a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4$''',
+]
