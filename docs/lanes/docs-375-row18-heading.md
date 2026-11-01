@@ -1,0 +1,22 @@
+Do every edit and every gate yourself, in the foreground, in your turn: no background job, no subagent; the REPORT is the last thing you write, and a turn that ends with a command still running is a stopped lane. Your logs and evidence live under `/Volumes/Lanes/out/bsv-rs/docs-375-row18-heading/`, never the shared `$TMPDIR` or `/tmp`.
+
+# Row 18's draft heading completed before its filing (docs only): the H1 of `public-key-unreduced-coordinate-serialization.md` and the queue's row 18 title cell, identically, from the draft's own first paragraph
+
+Branch `lane/docs-375-row18-heading` from `origin/beta`'s tip (name the base sha in your REPORT). Docs only: two lines, the draft's H1 and `docs/lanes/375-filings/QUEUE.md`'s row 18 title cell. Nothing is filed on any tracker by you (the keeper's script files the draft from beta at 00:00Z 2026-11-02, the H1 as the issue's title); nothing else changes. Never push.
+
+## The word (the keeper, captain-bsv-stack-lean, 2026-11-01 10:1xZ)
+
+Row 18's H1 reads "Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with" and stops there (the queue's title cell the same, cut at the same words); the filing script takes the H1 as the title. The keeper's fallback, if beta is not amended by midnight: "...and serialize the point the SDK computes with". The captain's word: amend it on beta, by this lane, in the maintainers' form the other drafts carry.
+
+## What to do
+
+1. Read the draft whole (`docs/lanes/375-filings/public-key-unreduced-coordinate-serialization.md`): its first paragraph says `PublicKey.fromString` accepts an uncompressed or hybrid key whose x or y is at or above the field prime, computes with the coordinate reduced in the field, and writes it back unreduced, so the bytes written are not the point computed with. Read two other drafts' H1s for the form (`wire-originator.md`, `wire-numeric-collection-bounds.md`: an imperative sentence in the maintainers' words, no trailing clause left open).
+2. The H1 becomes: `# Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with rather than the bytes given` (if the draft's body argues a better closing clause, say so in the REPORT and use the body's words; the sentence must be complete and true to the body). The queue's row 18 title cell becomes the same words, byte for byte, after the pipe in the rows' form (read how rows 1, 2, 11 and 12 carry their titles).
+3. Nothing else: no other line of the draft (the `FILE` line, the "Prepared for filing" line, the body, the "Existing related filing(s)" and "Evidence status" lines stay as they are: the filing script drops its bookkeeping sentences itself), no other queue row, no `[Unreleased]` entry.
+4. The gate, in the foreground: `cargo test --features "full,http"` with one `--test` per file matching `arch_*` and `fixtures_replay*` (the `.rs` files); `cargo test --doc --all-features`; `tools/ratchet/run --check --against <base>` with `CARGO_TARGET_DIR` outside the checkout; `gitleaks git --redact --no-banner --exit-code 1 --log-opts="origin/beta..HEAD" .` from the repo root; `git diff --name-only <base> HEAD` names only the draft and `QUEUE.md`, and `git diff --stat` shows two lines changed. One commit: `docs(375): row 18's heading completed before its filing (the draft's H1 and the queue's title cell)`.
+
+## REPORT
+
+The base sha and the tip; the H1 before and after; the queue cell before and after; the gate table; anything unverified; nothing else.
+
+Rules: no VM and no container on this machine (a Linux witness is CI's, a dispatch after the landing); never end your turn with a command running in the background; commit on the branch, never push; no test or probe on a default URL or port (a MetaNet Client listens on 3301, 3321 and 2121 on this machine; another session's process on 3390); do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole (the reference and the downstreams are read by their named paths); vectors are written by recorders, never by hand; scratch copies under `$TMPDIR` with their own `CARGO_TARGET_DIR`, removed at the end; never `rustup default` or `rustup override` (use `cargo +1.99.0`); a new dependency needs the captain's word first; your logs, scratch copies and evidence live under your own folder on the lane volume, `/Volumes/Lanes/out/bsv-rs/<lane name>/`, never the shared `$TMPDIR` or `/tmp`, and no command of yours globs or lists a shared folder (the captains' channel line 1082, 2026-10-31).
