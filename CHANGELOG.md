@@ -11238,7 +11238,7 @@ so the bound meets the north star's "accept what the reference accepts".
 
 Census (#375; current reading, historical account above retained):
 
-- Row 47: Ours: native u32 index types and bound-error wording follow the transaction outpoint width (BRC-100 wallet/0100.md:274). Theirs: go-sdk #387. Theirs: ts-stack #1463 (filed 2026-11-01; answer pending; the witness: tests/auth_reader_bounds.rs). Draft: [certificate-outpoint-bound](./docs/lanes/375-filings/certificate-outpoint-bound.md).
+- Row 47: Ours: native u32 index types and bound-error wording follow the transaction outpoint width (BRC-100 wallet/0100.md:274). Theirs: go-sdk #387, fixed on master at 9f4c4a658 (PR #392, merged 2026-10-30: `decodeOutpoint` reads the revocation outpoint's index through `ReadVarInt32` and refuses one above `u32::MAX` where it cast it, Go's words its own) after the 2ca481c pin, in no release through v1.7.3; the divergence stands at the pin and for every released go-sdk until a release carries it (the keeper's word of 2026-10-30 08:1xZ: held, re-read at the monthly recon, closed when a release names it). Theirs: ts-stack #1463 (filed 2026-11-01; answer pending; the witness: tests/auth_reader_bounds.rs). Draft: [certificate-outpoint-bound](./docs/lanes/375-filings/certificate-outpoint-bound.md).
 
 ### Removed: the processor's `with_config`, `network()` and `version()` (#222)
 
@@ -11642,7 +11642,7 @@ refused it in #122's.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 44: Ours: early u32 bounds and native read-site diagnostics; BRC-100 wallet/0100.md:274 defines the widths. Theirs: go-sdk #387. Theirs: ts-stack #1464 (filed 2026-11-01; answer pending; the witness: tests/wire_method_roundtrip_tests.rs; tests/wire_u32_field_bounds_tests.rs). Draft: [wire-input-index-width](./docs/lanes/375-filings/wire-input-index-width.md).
+- Row 44: Ours: early u32 bounds and native read-site diagnostics; BRC-100 wallet/0100.md:274 defines the widths. Theirs: go-sdk #387, fixed on master at 9f4c4a658 (PR #392, merged 2026-10-30: `ReadVarInt32` refuses a varint above `u32::MAX` where it truncated, so the signAction input index and the internalizeAction output index are refused as here, Go's words its own; the sequence number refused already by `ReadOptionalUint32` at `2ca481c`) after the 2ca481c pin, in no release through v1.7.3; the divergence stands at the pin and for every released go-sdk until a release carries it (the keeper's word of 2026-10-30 08:1xZ: held, re-read at the monthly recon, closed when a release names it). Theirs: ts-stack #1464 (filed 2026-11-01; answer pending; the witness: tests/wire_method_roundtrip_tests.rs; tests/wire_u32_field_bounds_tests.rs). Draft: [wire-input-index-width](./docs/lanes/375-filings/wire-input-index-width.md).
 
 ### Fixed: `read_identity_certificate` refuses a trust outside 1 to 10 in the reference's words (#247)
 
@@ -12781,7 +12781,7 @@ page limit. This crate follows the reference.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 43: Theirs: go-sdk #387.
+- Row 43: Theirs: go-sdk #387, its first clause fixed on master at 9f4c4a658 (PR #392, merged 2026-10-30: the declared total read through `ReadVarInt32`, refused above `u32::MAX`) after the 2ca481c pin, in no release through v1.7.3; its second clause, this row's, left by the PR (read there as covered by `CheckComplete`): Go reads exactly the declared total's entries and refuses the bytes after them, where the reference and this crate read to the end of the frame, and checks no requested limit, so this row stands.
 
 ### Fixed: two residual leniencies of the wire readers: a repeated keyring key, a length cut on wasm32 (#192)
 

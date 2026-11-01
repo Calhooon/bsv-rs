@@ -21,4 +21,4 @@ BRC reading: [BRCs@5119a9b51 peer-to-peer/0052.md:85-103](https://github.com/bsv
 
 Evidence status: source-read at the pins in this lane; the linked Rust tests/recorded fixtures are the reproducible witness, not a claim that Go or TypeScript was rerun here. Any new upstream regression test should construct its keys using a deterministic fixture helper; this draft contains no private-key literal.
 
-Existing related filing(s): go-sdk #387. Keep these numbers; confirm their scope before opening a duplicate.
+Existing related filing(s): go-sdk #387, fixed on master at 9f4c4a658 (PR #392, merged 2026-10-30), in no release through v1.7.3. Keep these numbers; confirm their scope before opening a duplicate.
