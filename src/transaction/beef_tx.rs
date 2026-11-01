@@ -528,4 +528,177 @@ mod tests {
         assert_eq!(TxDataFormat::from_u8(2), Some(TxDataFormat::TxidOnly));
         assert_eq!(TxDataFormat::from_u8(3), None);
     }
+
+    // #603: the surviving mutants of the widened oracle (run 41327640129),
+    // each killed from the sibling's rule and vector or the reference's.
+
+    /// The sibling's `corpus/chain/mempool/mempool.jsonl` row
+    /// `regular-empty-inputs` (bsv-script-lean@387dab3), recorded
+    /// `bad-txns-vin-empty` against the node: version 2, no input, one
+    /// output.
+    const REGULAR_EMPTY_INPUTS: &str = "0200000000018403000000000000015100000000";
+
+    /// The same file's row `regular-empty-outputs`, recorded
+    /// `bad-txns-vout-empty`: version 2, one input, no output.
+    const REGULAR_EMPTY_OUTPUTS: &str = "020000000101010101010101010101010101010101010101010101010101010101010101010000000000ffffffff0000000000";
+
+    /// `TEST_TX_HEX` is block 170's spend, the first transaction between two
+    /// keys; its txid is a recorded chain fact.
+    const TEST_TX_ID: &str = "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16";
+
+    /// An entry of `hex`'s bytes as the BEEF reader holds them: raw bytes
+    /// alone under a BUMP index (the proven entry is not parsed), and the
+    /// bytes parsed without one.
+    fn raw_and_parsed(hex: &str) -> [BeefTx; 2] {
+        let raw = from_hex(hex).unwrap();
+        let proven = BeefTx::from_raw_tx(raw.clone(), Some(0));
+        assert!(
+            proven.tx().is_none(),
+            "a proven entry keeps its bytes alone"
+        );
+        let unproven = BeefTx::from_raw_tx(raw, None);
+        assert!(unproven.tx().is_some(), "an unproven entry is parsed");
+        [proven, unproven]
+    }
+
+    /// bsv-script-lean@387dab3 `lean/BsvScript/TxRules.lean:88`
+    /// (`checkTransactionCommon`: `if tx.inputs.isEmpty then throw .vinEmpty`,
+    /// before the output check at `:89`; `checkTransactionCommon_vinEmpty`,
+    /// `:220-224`), the vector `regular-empty-inputs` of `corpus/chain/mempool`
+    /// recorded `bad-txns-vin-empty`: the entry has no input and is not the
+    /// no-output case, read from its bytes and from its parse.
+    #[test]
+    fn vin_empty_is_has_no_inputs_txrules_chain_mempool_regular_empty_inputs() {
+        for entry in raw_and_parsed(REGULAR_EMPTY_INPUTS) {
+            assert!(entry.has_no_inputs(), "bad-txns-vin-empty");
+            assert!(!entry.has_no_outputs(), "vin-empty is judged first");
+        }
+    }
+
+    /// bsv-script-lean@387dab3 `lean/BsvScript/TxRules.lean:89`
+    /// (`if tx.outputs.isEmpty then throw .voutEmpty`, behind the input
+    /// check; `checkTransactionCommon_voutEmpty`, `:227-231`), the vector
+    /// `regular-empty-outputs` of `corpus/chain/mempool` recorded
+    /// `bad-txns-vout-empty`: one input, so not `has_no_inputs`, and no
+    /// output, read from its bytes and from its parse.
+    #[test]
+    fn vout_empty_is_has_no_outputs_txrules_chain_mempool_regular_empty_outputs() {
+        for entry in raw_and_parsed(REGULAR_EMPTY_OUTPUTS) {
+            assert!(!entry.has_no_inputs(), "one input");
+            assert!(entry.has_no_outputs(), "bad-txns-vout-empty");
+        }
+    }
+
+    /// The same rule on a transaction it accepts at both checks
+    /// (`TxRules.lean:88-89`): one input and two outputs, so neither; and a
+    /// txid-only entry, which has no bytes for the rule to read.
+    #[test]
+    fn a_transaction_with_inputs_and_outputs_is_neither_txrules_check_transaction_common() {
+        for entry in raw_and_parsed(TEST_TX_HEX) {
+            assert!(!entry.has_no_inputs());
+            assert!(!entry.has_no_outputs());
+        }
+        let known = BeefTx::from_txid(TEST_TX_ID.to_string());
+        assert!(!known.has_no_inputs());
+        assert!(!known.has_no_outputs());
+    }
+
+    /// `ts-stack@edf6e03` `BeefTx.ts:105-116`: an entry's txid is the held one
+    /// or the hash of its transaction; `has_txid` answers that comparison
+    /// whether the txid is held (a txid-only entry, a read entry) or not (an
+    /// entry built from a transaction or bytes).
+    #[test]
+    fn has_txid_is_the_entry_txid_beef_tx_ts_105_116() {
+        let tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
+        let other = "00".repeat(32);
+        let entries = [
+            BeefTx::from_tx(tx, None),
+            BeefTx::from_raw_tx(from_hex(TEST_TX_HEX).unwrap(), Some(0)),
+            BeefTx::from_txid(TEST_TX_ID.to_string()),
+        ];
+        for entry in entries {
+            assert_eq!(entry.txid(), TEST_TX_ID);
+            assert!(entry.has_txid(TEST_TX_ID));
+            assert!(!entry.has_txid(&other));
+        }
+    }
+
+    /// `ts-stack@edf6e03` `BeefTx.ts:144-151` (`getRawTxBytes`): the bytes
+    /// held, else the parsed transaction's serialization, kept; a txid-only
+    /// entry has none.
+    #[test]
+    fn raw_tx_or_compute_is_the_held_bytes_or_the_serialization_beef_tx_ts_144_151() {
+        let raw = from_hex(TEST_TX_HEX).unwrap();
+        let mut read = BeefTx::from_raw_tx(raw.clone(), Some(0));
+        assert_eq!(read.raw_tx_or_compute(), Some(raw.clone()));
+
+        let mut built = BeefTx::from_tx(Transaction::from_hex(TEST_TX_HEX).unwrap(), None);
+        assert_eq!(built.raw_tx(), None);
+        assert_eq!(built.raw_tx_or_compute(), Some(raw.clone()));
+        assert_eq!(built.raw_tx(), Some(raw.as_slice()), "kept");
+
+        let mut known = BeefTx::from_txid(TEST_TX_ID.to_string());
+        assert_eq!(known.raw_tx_or_compute(), None);
+    }
+
+    /// `ts-stack@edf6e03` `BeefTx.ts:218-233` (`updateInputTxids`, a `Set` of
+    /// the inputs' source txids) and `:31-33` (the reader's scan, the same
+    /// `Set`): two inputs spending two outputs of one parent name it once.
+    /// The entry is the crate's writer's bytes, read as the BEEF reader reads
+    /// an unproven entry.
+    #[test]
+    fn two_inputs_of_one_parent_name_it_once_beef_tx_ts_218_233() {
+        use crate::script::{LockingScript, UnlockingScript};
+        use crate::transaction::{TransactionInput, TransactionOutput};
+        let parent = "e5".repeat(32);
+        let mut tx = Transaction::new();
+        for vout in 0..2 {
+            let mut input = TransactionInput::new(parent.clone(), vout);
+            input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
+            tx.inputs.push(input);
+        }
+        tx.outputs.push(TransactionOutput::new(
+            1_000,
+            LockingScript::from_binary(&[0x51]).unwrap(),
+        ));
+        let mut bytes = tx.to_binary();
+        bytes.push(0); // V1: no BUMP index
+        let entry = BeefTx::from_reader(&mut Reader::new(&bytes), BEEF_V1).unwrap();
+        assert_eq!(entry.input_txids, vec![parent.clone()]);
+        assert_eq!(BeefTx::from_tx(tx, None).input_txids, vec![parent]);
+    }
+
+    /// `ts-stack@edf6e03` `BeefTx.ts:160-177` (`syncRawTxFromTransaction`):
+    /// a transaction mutated in place is the entry's reading, its txid the
+    /// mutated one's hash and its input list read again, the sync true when
+    /// they changed and false when nothing did (`:164`, `:176`). Here the
+    /// mutation goes through `tx_mut` and the sync is `refresh` (bsv-rs#171).
+    #[test]
+    fn a_transaction_mutated_through_tx_mut_is_the_entry_reading_beef_tx_ts_160_177() {
+        let raw = from_hex(TEST_TX_HEX).unwrap();
+        let mut entry = BeefTx::from_raw_tx(raw, None);
+        assert!(!entry.refresh(), "nothing mutated, nothing to sync");
+        let before = entry.input_txids.clone();
+        assert_eq!(before.len(), 1);
+
+        let parent = "e6".repeat(32);
+        let mutated = {
+            let tx = entry
+                .tx_mut()
+                .expect("a parsed entry yields its transaction");
+            tx.inputs[0].source_txid = Some(parent.clone());
+            tx.invalidate_caches();
+            tx.clone()
+        };
+        assert_ne!(mutated.id(), TEST_TX_ID);
+        assert_eq!(entry.txid(), mutated.id(), "named by the mutated hash");
+        assert!(entry.has_txid(&mutated.id()));
+        assert!(!entry.has_txid(TEST_TX_ID));
+        assert_eq!(entry.raw_tx_or_compute(), Some(mutated.to_binary()));
+        assert_eq!(entry.input_txids, before, "until the sync");
+
+        assert!(entry.refresh(), "the identity and the inputs moved");
+        assert_eq!(entry.input_txids, vec![parent]);
+        assert!(!entry.refresh(), "synced once");
+    }
 }
