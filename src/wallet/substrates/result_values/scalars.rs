@@ -1,7 +1,6 @@
 //! Scalar predicates and linkage order, WalletResultValidation.ts:909-1010,2165-2306.
 
 use super::{array, bytes, invalid, member, record, Object, Result};
-use crate::primitives::{from_hex, PublicKey};
 use serde_json::{value::RawValue, Value};
 
 pub(super) fn string(
@@ -41,21 +40,11 @@ pub(super) fn hex(
     Ok(text)
 }
 
+/// The result validator's `publicKey` (`:917-933`): a string, then
+/// `wallet::validate_result_public_key`, the one reading of the rule (#588).
 pub(super) fn key(raw: Option<&RawValue>, call: &str, field: &str) -> Result<String> {
-    let text = hex(raw, call, field, Some(33))?;
-    // isValidCompressedPublicKey refuses an x at or above p
-    // (Secp256k1Validation.ts:15-22): the strict reader, not from_hex's (#498).
-    if !matches!(text.get(..2), Some("02" | "03"))
-        || from_hex(&text)
-            .and_then(|bytes| PublicKey::from_bytes(&bytes))
-            .is_err()
-    {
-        return Err(invalid(
-            call,
-            field,
-            "a valid compressed secp256k1 public key",
-        ));
-    }
+    let text = string(raw, call, field, 0, None)?;
+    crate::wallet::validate_result_public_key(&text, call, field)?;
     Ok(text)
 }
 

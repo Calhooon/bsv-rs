@@ -17,6 +17,8 @@ mod identity;
 #[cfg(test)]
 mod key_strictness_498_tests;
 mod lists;
+#[cfg(test)]
+mod public_key_588_tests;
 mod raw_tree;
 #[cfg(feature = "http")]
 mod review_projection;

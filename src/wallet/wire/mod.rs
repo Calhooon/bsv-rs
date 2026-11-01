@@ -81,6 +81,8 @@ mod encoding;
 mod linkage;
 mod originator;
 mod processor;
+#[cfg(test)]
+mod public_key_result_588_tests;
 mod requests;
 mod result_validation;
 mod results;
