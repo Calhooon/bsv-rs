@@ -145,7 +145,7 @@ The eleven `read_var_int_u32` callers check `readVarIntNumStrict(false)` precisi
 | Action status | `i8(1-8 or -1=unknown)` |
 | Query mode | `0=any, 1=all` |
 | Output include | `0=locking scripts, 1=entire transactions` |
-| SendWithResultStatus | `0=unproven, 1=sending, 2=failed` |
+| SendWithResultStatus | `1=unproven, 2=sending, 3=failed`, another byte refused `Unknown sendWith result status code: N` (N signed, the reference's `readInt8`; BRC-100 `wallet/0100.md:1726`, #590) |
 
 ### Counterparty Encoding
 
