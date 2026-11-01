@@ -14,9 +14,10 @@ These utilities are used internally by the `Peer` implementation but are also ex
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports and a runtime-independent certificate continuation turn; preserves Promise await boundaries for Peer validation and wallet decryption (#445) | 38 |
+| `mod.rs` | Module root with re-exports and a runtime-independent certificate continuation turn; preserves Promise await boundaries for Peer validation and wallet decryption (#445) | 41 |
 | `nonce.rs` | Cryptographic nonce creation and verification | ~201 |
-| `validation.rs` | Public certificate validation, encoding checks, and retrieval; Peer uses its own shared validator | 964 |
+| `validation.rs` | Public certificate validation and encoding checks; Peer uses its own shared validator | 839 |
+| `verifiable.rs` | `get_verifiable_certificates`, the reference's `getVerifiableCertificates`: the subject (#582), the certifier's and type's requested-set membership before proveCertificate, the call refused outside it (#587) | 133 |
 | `requested_set.rs` | Requested-policy validation and canonical-base64 text/length checks | 292 |
 | `received_message.rs` | #445: received certificate bound and every required nonce, checked before handlers | 76 |
 
@@ -259,9 +260,9 @@ Retrieves certificates from wallet matching a request and creates verifiable ver
 
 **Process:**
 1. Queries wallet via `list_certificates()` with certifiers and types from request
-2. For each matching certificate, calls `prove_certificate()` to create keyring
-3. Converts wallet certificate format to `VerifiableCertificate` with keyring
-4. Skips malformed certificates (invalid type/serial length, invalid keys)
+2. For each listed certificate: skips a subject the listCertificates result validator refuses (#582); refuses the whole call with `Error::AuthError("Wallet returned a certificate outside the requested certifier/type set")` when its certifier text is none of the set's or its type is not requested, before `prove_certificate()` (`getVerifiableCertificates.ts:76-81`, #587)
+3. Calls `prove_certificate()` to create the keyring and converts the wallet certificate to a `VerifiableCertificate`
+4. Skips malformed certificates (invalid type/serial length, a certifier `assert_auth_identity_key` refuses in a caller's non-canonical set)
 
 **Parameters:**
 - `wallet` - Wallet containing certificates to retrieve
