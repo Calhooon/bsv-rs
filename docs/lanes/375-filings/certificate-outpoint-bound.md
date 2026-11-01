@@ -1,10 +1,10 @@
-FILE — eleventh in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; pending the owner's cadence word.
+FILE — eleventh in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; filed as bsv-blockchain/ts-stack#1463 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending.
 
 # Reject certificate outpoint indexes that the writer cannot serialize
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 47: A certificate's revocation outpoint index above u32::MAX is refused (Unreleased,…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1463 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending. Census row 47: A certificate's revocation outpoint index above u32::MAX is refused (Unreleased,…
 
 Read a binary certificate whose revocation output index is 4294967296. Certificate.fromBinary accepts it up to the JS safe-integer ceiling, whereas toBinary refuses the outpoint. Apply the u32 bound on input and preserve the explicit bound refusal. The analogous Go narrowing is already covered by go-sdk #387.
 

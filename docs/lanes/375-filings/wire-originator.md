@@ -1,10 +1,10 @@
-FILE — first in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — first in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/go-sdk#399 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending.
 
 # Prevent originator length wrapping and normalize wallet wire originators
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 9: The wallet wire bounds an originator at 250 bytes and…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#399 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending. Census row 9: The wallet wire bounds an originator at 250 bytes and…
 
 A 256-byte originator is written with length zero by the byte cast, leaving its bytes to become parameters. Refuse above 250 before writing or dispatch; validate and normalize a named hostname, and strip the leading UTF-8 BOM consistently with TextDecoder. The 251/256-byte and BOM witnesses are in the linked tests.
 

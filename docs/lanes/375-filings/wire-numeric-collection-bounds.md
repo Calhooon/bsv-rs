@@ -1,10 +1,10 @@
-FILE — second in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); pending the owner's cadence word.
+FILE — second in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6517160425); filed as bsv-blockchain/go-sdk#400 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending.
 
 # Check wallet response widths and collection counts before reading or allocating
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 10: The wallet wire's client-side bounds (#473) are the reference's (WalletWireTransceiver.ts…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#400 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending. Census row 10: The wallet wire's client-side bounds (#473) are the reference's (WalletWireTransceiver.ts…
 
 The recorded getHeight case above u32 wraps through ReadVarInt32. The corpus also covers satoshis above 2100000000000000, over-cap collections, impossible counts versus remaining bytes, and pages beyond their limit/total. Enforce the declared widths and pre-allocation bounds; do not narrow a successfully read u64 silently.
 
