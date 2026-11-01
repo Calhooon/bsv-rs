@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/not_judged.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 1 of the file's 3 viable mutants missed
+(66.67%): `<impl fmt::Display for NotJudgedCause>::fmt` replaced with
+`Ok(Default::default())` (`src/script/not_judged.rs:90:9`), the empty
+sentence. The cause's sentences were pinned only through the verifiers
+(`tests/beef_not_judged_452.rs`, `tests/transaction_work_budget_519.rs`,
+`src/transaction/beef_stream/not_judged_tests.rs`), outside the script
+surface's selection. The file is off the interpreter's verdict path: the
+sibling's spec verdict is `valid | invalid reason`
+(`bsv-script-lean@5dc337e1` `lean/BsvScript/Machine.lean:418-425`) and its
+harness reads an input an engine does not judge as `undecided`, apart from
+both (`docs/DESIGN.md:140-150`); the harness calls `Spend::validate`, which
+never builds a `NotJudgedCause`, so the corpus step does not apply.
+`tests/script_not_judged_text_603.rs`,
+`every_not_judged_cause_renders_its_own_sentence_603`, pins every cause's
+sentence at the cause itself, the four height causes produced by
+`ChainParams::word_for_input` on mainnet's heights, the others at their
+witnesses' values; RED on the mutant (`left: ""`), GREEN on the tree.
+Killed by tests 1, declared equivalent 0, remaining 0; re-measured with the
+script surface's selection and the corpus set: 3 caught, 0 missed, 0
+timeout, 0 unviable, 100% of viable. No `src/` behaviour changed; no parity
+note.
+
 ### Added: src/script/unlocking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129) left 8 of the file's 26 viable mutants
