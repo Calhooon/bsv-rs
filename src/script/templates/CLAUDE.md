@@ -17,7 +17,7 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 | `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
 | `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock; `lock` pushes `locking_public_key` compressed, through the crate-visible `lock_with_key_bytes` (#545) |
 | `pushdrop_key_bytes.rs` | `PushDrop::lock_with_key_bytes`, `pub(crate)` (a port helper: the reference has one `lock`, taking the key as text; its vector tests the unit file `pushdrop_key_bytes_545_tests.rs`): the key pushed as the bytes given, the reference's `lock` pushing a wallet's answer as returned (`PushDrop.ts:158-175`, #545); crate-visible `wallet_key_lock` (under `kvstore`, `identity` or `registry`), the five wallet sites' lock: the answer read by `PublicKey::from_hex`, pushed as the bytes `toArray(_, 'hex')` reads (an odd-length text with a leading `0`) |
-| `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; `decode()` unchanged |
+| `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; `decode()` unchanged; its vector tests the unit file `pushdrop_position_603_tests.rs`, inside the script surface's mutation selection (#603) |
 | `rpuzzle.rs` | R-Puzzle template for knowledge-based locking using ECDSA K-values |
 
 ## Key Exports

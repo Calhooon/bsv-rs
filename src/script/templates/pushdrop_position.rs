@@ -100,3 +100,7 @@ pub(crate) fn canonical_refusal(script: &LockingScript, counts: &[usize]) -> Opt
         "Unexpected PushDrop token field count"
     })
 }
+
+#[cfg(test)]
+#[path = "pushdrop_position_603_tests.rs"]
+mod mutants_603_tests;
