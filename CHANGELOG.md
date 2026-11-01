@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/templates/rpuzzle.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The template sits outside the sibling's Lean definition, so its rule source
+is the reference's `RPuzzle.ts` at `ts-stack@edf6e03`
+(`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`) and its `__tests`. The widened
+run 41327640129 left 10 survivors (50.00%). 9 are killed by tests and none is
+declared equivalent, so 1 remains. The tests are two in `tests/template_tests.rs`
+(`rpuzzle_reference_603`) against `tests/vectors/rpuzzle_lock_and_spend_603.json`,
+which `tests/support/rpuzzle_lock_and_spend_603.mjs` records under Node v22.18.0.
+`the_lock_pushes_the_value_minimally_rpuzzle_lock_and_spend_603_lock` pins `lock`'s
+push at ten lengths and kills the `<` replacements at `rpuzzle.rs:350:34`
+(`==`, `>`) and `rpuzzle.rs:352:32` (`<=`, `==`, `>`).
+`the_unlock_signs_with_the_given_k_rpuzzle_lock_and_spend_603_spend` checks 36
+spends (six puzzle types by six scopes, k = 12345678, the private key 1, as
+`__tests/RPuzzle.test.ts:19-51` builds them): each signed transaction matches the
+reference byte for byte and each spend is valid. It kills the four
+replacements in `sign_with_k`'s `s = k⁻¹ (z + r d)` at `rpuzzle.rs:403`. The one that
+remains is `rpuzzle.rs:350:34` `<` → `<=`. It changes the opcode only for a
+76-byte value, where the length and `OP_PUSHDATA1` are the same byte, so the
+chunk and its serialization do not change. The reference's own `{ op:
+value.length }` (`RPuzzle.ts:65`, `Script.ts:544-547`) writes those same bytes. It is
+not declared in `exclude_re` until three independent reads accept it.
+Re-measured with the script surface's selection and the corpus:
+19 caught, 1 missed, 0 timeouts, 8 unviable: 95.00% of viable.
+
+### Notes: cross-SDK parity (#603)
+
+The reference's `RPuzzle.lock` writes the value as `{ op: value.length, data:
+value }` (`RPuzzle.ts:65`). Up to 76 bytes that is a minimal push, and this
+crate's bytes are the same. From 77 bytes it is not the minimal push: at 77
+the reference writes the value under an `OP_PUSHDATA2` whose length is 77 and at
+78 under an `OP_PUSHDATA4` (non-minimal pushes of the value; 78 is read from
+`Script.ts:553-560` and is not among the vector's lengths), and from 79 no push
+at all, the opcode byte alone with the data dropped (`Script.ts:539-562`; at 256
+the single byte `00`). This crate keeps the minimal push at every length,
+`OP_PUSHDATA1` from 76 to 255 and `OP_PUSHDATA2` from 256, as the reference's
+`Script.writeBin` does (`Script.ts:340-352`). The recorded vector pins both
+answers at 0, 20, 32, 33, 75, 76, 77, 100, 255 and 256. An R value or its hash
+is 20 to 33 bytes, so no puzzle that either SDK can spend crosses the gap.
+The line is in CLAUDE.md's divergence list.
+
 ### Added: the key bytes Certificate.toBinary writes for a subject or certifier key, as a public helper named for the operation (#610)
 
 On the keeper's word of 2026-11-01 20:1xZ on the toolbox's ask (shape (2)):
