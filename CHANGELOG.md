@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the nightly's Mutants oracle runs the conformance corpus, so the mutation scores are measured against the sibling's vectors (#602, #31)
+
+On the owner's word of 2026-11-01 14:3xZ through the keeper (the stack's brief,
+23.9): the first complete scoreboard (run 41294262955 at `ab155018`) was
+measured without the ts-stack corpus. `conformance_scripts` and
+`conformance_beef` sit in the script, BEEF and Merkle selections, but skip when
+`BSV_CONFORMANCE_DIR` is unset, and the `mutants` job never checked the corpus
+out, so the 517 gate-path survivors (#603) and #602's floors table are the
+narrow figure. `nightly.yml`'s `mutants` job now checks the corpus out exactly
+as `ci.yml`'s `vectors` job does (`bsv-blockchain/ts-stack` at
+`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`, sparse `conformance`, no
+credentials, `path: ts-stack`), sets `BSV_CONFORMANCE_DIR` in the job's
+environment and asserts `META.json` before the baseline. The floors are set
+from the widened figure (the first dispatch after this landing), never the
+narrow one; `docs/NIGHTLY.md` carries both. No crate code moves.
+
+The witness, `src/script/not_judged.rs` under the script surface's selection
+(cargo-mutants 27.1.0, local): unset, the baseline's `conformance_scripts`
+passes its three tests in 0.00 s (the suites return at the missing
+`META.json`), 2 caught and 1 missed; set, in 1.44 s, in the baseline and in the
+surviving mutant's run alike, 2 caught and 1 missed (the `Display::fmt`
+replacement at `not_judged.rs:90:9`, which no conformance verdict observes);
+set to a copy of the corpus without `evaluation.json`, the unmutated baseline
+fails at `conformance_scripts_evaluation`. libtest captures a passing test's
+output, so the suite's `SKIP` and `total=5116 ...` lines are not in
+`mutants.out/log/`; the time and the red baseline are the reading. The
+environment reaches cargo-mutants' test runs; the other files' movement is the
+widened dispatch's to measure.
+
 ## [0.9.0-beta.6] - 2026-11-01
 
 The 0.9.0 line's sixth prerelease (RELEASING.md point 14), cut from `beta` under the owner's standing word through the keeper (the stack's rulings page, 22.8 (5); the keeper's naming of 2026-11-01 14:2xZ: bsv-rs 0.9.0-beta.6 at its beta head, bsv-tracker beside it once the tag is on crates.io, then the toolbox's re-pin and the CLI's pin PR once the gate funder's top-up lands) at the tip after #600 landed (`86d118fc`): warranted by the wallet wire's sendWithResults status codes (#590, a defect in the version both dependents pin), with the identity and contact fixes held behind the beta.5 tag (PushDrop's key bytes #545, the discovery's record checks #553, the contact conversions' badges #558, the stored abbreviatedKey #559, the lone surrogate escape #566, from_identity's abbreviatedKey #568), the reference's public-key validators as public helpers (#579) and the crate's own sites on them (#582, #585, #587, #588), `WorkBudget::charge` public (#567), and the nightly's Mutants oracle made whole (#574, #577, two entries): 16 entries. No api-break since beta.5; the additions are #579's three helpers and #567's method, their migration lines on the dependents' intakes (bsv-wallet-cli#386, bsv-wallet-toolbox-rs#533).
