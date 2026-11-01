@@ -34,6 +34,7 @@ threads following answers to the earlier ones.
 | 19 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/decode-outpoints-count-bound-go-sdk.md](./decode-outpoints-count-bound-go-sdk.md) | Bound the outpoint count read off the wire by the body's remaining bytes before allocating |
 | 20 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/no-send-change-framing-go-sdk.md](./no-send-change-framing-go-sdk.md) | createAction's noSendChange is framed behind an extra byte length, so a Go wallet and a TypeScript client cannot read each other's list |
 | 21 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/send-with-results-marker-go-sdk.md](./send-with-results-marker-go-sdk.md) | createAction and signAction results: an absent sendWithResults panics on the wire's absent marker, and a nil one is written as a zero count instead of the marker |
+| 22 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/create-action-result-success-byte-go-sdk.md](./create-action-result-success-byte-go-sdk.md) | createAction's result carries an extra success byte inside the frame that the wire does not define, so a Go client refuses every TypeScript result that carries a txid and a TypeScript client misreads Go's |
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
@@ -87,6 +88,19 @@ carries no `sendWithResults`, and its writer writes a nil list as `00` where the
 marker is nine `ff` (one field, one issue). The queue now has twenty-one
 entries; the new draft is filed in the go-sdk pairs' turn of cadence (b), ahead
 of row 20, from the draft as it stands on beta. Nothing new has been filed.
+
+The keeper's words of 2026-11-01 05:1xZ (the rulings page) add a
+twenty-second draft, FILE, against go-sdk: go-sdk's `SerializeCreateActionResult`
+writes a success byte of its own inside the result frame (`create_action_result.go:15-16`),
+and `DeserializeCreateActionResult` expects it (`:58-61`). BRC-100 and the
+reference do not write that byte, so go-sdk's own client refuses every reference
+createAction result that carries a txid (`response indicates failure: 1`), and
+the reference's client reads go-sdk's inner byte as the txid flag. One frame per issue, so a
+maintainer's thread stays one fix. Its consequence is the same as row 20's, and
+it is filed in the go-sdk turn beside row 20, from the draft as it stands on beta. The same words
+ask row 20's evidence line to state its probe method (bytes handed straight
+to go-sdk's serializer functions), and it now does. The queue now has
+twenty-two entries. Nothing new has been filed.
 
 ## HOLD
 
