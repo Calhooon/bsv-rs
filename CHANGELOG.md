@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the wallet wire's sendWithResults status codes are BRC-100's and the reference's, 1/2/3 (#590)
+
+A createAction or signAction result's `sendWithResults` entry carries its
+status as one byte. This crate wrote and read 0 `unproven`, 1 `sending`, 2
+`failed`; BRC-100 at `5119a9b` names 1, 2, 3 (`wallet/0100.md:1724-1726`),
+the reference writes them (`ts-stack@edf6e03`
+`WalletWireProcessor.ts:151-156`, called at `:624` and `:775`) and reads them
+back (`WalletWireTransceiver.ts:1226-1234`), refusing another byte in its
+words, `Unknown sendWith result status code: N`, the byte read signed
+(`readInt8`). So a TypeScript wallet's `sending` (`02`) read here as
+`Failed`, its `failed` (`03`) was refused (`invalid send with result status:
+3`), and on a TypeScript client this crate's `unproven` (`00`) was refused,
+its `sending` (`01`) read as `unproven` and its `failed` (`02`) as `sending`.
+`WireWriter::write_send_with_result_status` now writes 1/2/3 and
+`WireReader::read_send_with_result_status` reads them, any other byte refused
+as `Error::WalletError` in the reference's words with the byte signed (`0`,
+`4`, `127`, `-128`, `-1` for `0xff`).
+
+Pinned by `tests/wire_send_with_status_590.rs` against
+`tests/vectors/wallet_wire/send_with_status_590.json`, written by the #338
+recorder's new `--send-with-status-590` mode
+(`tests/support/wire_send_with_status_590.mjs`, `ts-stack@edf6e03` under Node
+v22.18.0, two runs byte-identical): the reference's transceiver and processor
+exchange a createAction and a signAction whose wallet answers three entries,
+one per status, the response the reference's writer's bytes and its reader's
+names (`a_reference_sending_and_failed_status_reads_as_its_name_590`; RED on
+`e8f324eb`: `"createAction": wallet error: invalid send with result status:
+3`); this crate's writer's bytes for the same entries equal the reference's
+(`this_crate_writes_the_reference_status_bytes_590`; RED: `...1111...00 2222...01
+3333...02...` where the reference writes `01`, `02`, `03`); the bytes this
+crate wrote at `e8f324eb` (from a one-off run of its writer, pasted into the
+recorder as data) read by the reference: `00` refused, `01` `unproven`, `02`
+`sending`, and read the same here
+(`the_old_status_bytes_read_here_as_the_reference_reads_them_590`); five
+bytes outside 1 to 3 refused in the reference's recorded words
+(`an_unknown_status_byte_is_refused_in_the_reference_words_590`; RED:
+`Ok(.. "unproven" ..)` for `00`). The unit roundtrip in `encoding.rs` now pins
+each status's byte too, since a roundtrip through a wrong mapping passes.
+
+Two of this crate's own recordings moved, one byte each, re-recorded with
+`BSV_FIXTURES_RECORD=1` (`docs/FIXTURES.md` F10, which listed the 0/1/2
+mapping as a known difference, is resolved): `tests/fixtures/wire/createAction.json`
+(the `full` case's response, `unproven` `00` to `01`) and
+`tests/fixtures/wire/signAction.json` (the `full` case's response, `sending`
+`01` to `02`); the wire_codec bench reads these frames. No shared vector
+carries a status entry.
+
+Dependents: none matches on the wire byte. `bsv-wallet-cli` at `3ff6fdb`
+matches `SendWithResultStatus::Unproven` and `Sending` by name
+(`src/server/broadcast_follow_up.rs:87,275`); `bsv-wallet-toolbox-rs` at
+`63172222` maps the names to the type (`src/wallet/wallet.rs:1499-1501,2190-2192`);
+`rust-message-box` at `419bf18` names neither. A host on the binary wire
+between this crate and a TypeScript wallet or client reads the right status
+after its next `cargo update -p bsv-rs`; two hosts both on this crate before
+and after the update disagree on the byte until both take it. Semver: no
+public shape moves.
+
+### Notes: cross-SDK parity (#590)
+
+Go at `2ca481c` uses the same codes (`wallet/serializer/status.go:14-18`,
+written at `:29-40`, read at `:70-80`), so the three SDKs now agree on the
+byte. Go refuses another byte in its own words, `invalid status code: N`,
+read unsigned (`:79`), where the reference and this crate say `Unknown
+sendWith result status code: N` with the byte signed. Go also writes an
+absent list as the count 0 and reads 0 as absent (`:21-23`, `:50-52`), where
+the reference writes -1 (`WalletWireProcessor.ts:619`, `:770`) and this
+crate writes nine `0xFF`, which the reference reads as -1; that framing is
+the list's, not the status byte's, and unchanged here.
+
+Census (#375; current reading):
+
+- None: no census row or `CLAUDE.md` divergence named the status byte; the
+  0/1/2 mapping was listed only as `docs/FIXTURES.md` F10, so the divergence
+  was unstated in the census until this landing closed it. #432's rows judge
+  the HTTP JSON statuses by name and #473's the list's count, neither the
+  byte.
+
 ### Fixed: the crate's own key-reading sites follow the reference's validator at each site through the #579 helpers (#582)
 
 #579 left nine sites reading a key through the crate-private

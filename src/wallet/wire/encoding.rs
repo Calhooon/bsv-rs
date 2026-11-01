@@ -332,16 +332,18 @@ impl<'a> WireReader<'a> {
         Ok(Some(map))
     }
 
-    /// Reads a SendWithResultStatus.
+    /// Reads a SendWithResultStatus: 1 `unproven`, 2 `sending`, 3 `failed`
+    /// (BRC-100 `wallet/0100.md:1726`; `WalletWireTransceiver.ts:1226-1234` at
+    /// `ts-stack@edf6e03`, another byte refused in its words, read as `readInt8`
+    /// reads it, signed; #590).
     pub fn read_send_with_result_status(&mut self) -> Result<SendWithResultStatus, Error> {
-        let val = self.read_u8()?;
+        let val = self.read_i8()?;
         match val {
-            0 => Ok(SendWithResultStatus::Unproven),
-            1 => Ok(SendWithResultStatus::Sending),
-            2 => Ok(SendWithResultStatus::Failed),
+            1 => Ok(SendWithResultStatus::Unproven),
+            2 => Ok(SendWithResultStatus::Sending),
+            3 => Ok(SendWithResultStatus::Failed),
             _ => Err(Error::WalletError(format!(
-                "invalid send with result status: {}",
-                val
+                "Unknown sendWith result status code: {val}"
             ))),
         }
     }
@@ -1006,12 +1008,14 @@ impl WireWriter {
         self
     }
 
-    /// Writes a SendWithResultStatus.
+    /// Writes a SendWithResultStatus: 1 `unproven`, 2 `sending`, 3 `failed`
+    /// (BRC-100 `wallet/0100.md:1726`; `WalletWireProcessor.ts:151-156` at
+    /// `ts-stack@edf6e03`; #590).
     pub fn write_send_with_result_status(&mut self, status: SendWithResultStatus) -> &mut Self {
         let val = match status {
-            SendWithResultStatus::Unproven => 0,
-            SendWithResultStatus::Sending => 1,
-            SendWithResultStatus::Failed => 2,
+            SendWithResultStatus::Unproven => 1,
+            SendWithResultStatus::Sending => 2,
+            SendWithResultStatus::Failed => 3,
         };
         self.write_u8(val)
     }
@@ -1022,7 +1026,10 @@ impl WireWriter {
         self.write_send_with_result_status(result.status)
     }
 
-    /// Writes an optional array of SendWithResults (Go-compatible: VarInt(MaxUint64) for None).
+    /// Writes an optional array of SendWithResults, `None` as the absent marker
+    /// VarInt -1, nine `0xFF` (BRC-100 `wallet/0100.md:1719`;
+    /// `WalletWireProcessor.ts:619`, `:770` at `ts-stack@edf6e03`); go-sdk at
+    /// `2ca481c` writes an absent list as `00` (`wallet/serializer/status.go:21-23`).
     pub fn write_send_with_result_array(
         &mut self,
         results: Option<&[SendWithResult]>,
@@ -1706,13 +1713,15 @@ mod tests {
 
     #[test]
     fn test_send_with_result_status_roundtrip() {
-        for status in [
-            SendWithResultStatus::Unproven,
-            SendWithResultStatus::Sending,
-            SendWithResultStatus::Failed,
+        // The byte is the reference's (#590), not only a roundtrip.
+        for (status, byte) in [
+            (SendWithResultStatus::Unproven, 1),
+            (SendWithResultStatus::Sending, 2),
+            (SendWithResultStatus::Failed, 3),
         ] {
             let mut writer = WireWriter::new();
             writer.write_send_with_result_status(status);
+            assert_eq!(writer.as_bytes(), [byte]);
             let mut reader = WireReader::new(writer.as_bytes());
             assert_eq!(reader.read_send_with_result_status().unwrap(), status);
         }

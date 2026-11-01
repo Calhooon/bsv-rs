@@ -66,6 +66,14 @@ if (process.argv[2] === '--bounds-473') {
   writeFileSync(process.argv[4], JSON.stringify(await recordBounds473(sdk), null, 2) + '\n')
 }
 
+if (process.argv[2] === '--send-with-status-590') {
+  const { pathToFileURL } = await import('node:url')
+  const { writeFileSync } = await import('node:fs')
+  const { recordSendWithStatus590 } = await import('./wire_send_with_status_590.mjs')
+  const sdk = await import(pathToFileURL(process.argv[3]).href)
+  writeFileSync(process.argv[4], JSON.stringify(await recordSendWithStatus590(sdk), null, 2) + '\n')
+}
+
 export async function recordOriginators(sdk) {
   const processor = []
   const transceiver = []
