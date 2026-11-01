@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/templates/pushdrop_position.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 25 of the file's 26 viable mutants missed
+(3.85%): the helpers' witnesses lived in the kvstore, registry, storage and
+overlay tests, outside the script surface's selection. The file is a template,
+outside the sibling's Lean definition (`bsv-script-lean@5dc337e1`; the corpus
+step does not apply), so its rule source is the reference, `PushDrop.ts` and
+`PushDropValidation.ts` at `ts-stack@edf6e03`. Six unit tests in
+`src/script/templates/pushdrop_position_603_tests.rs`, each expectation a Node
+v22.18.0 recording already in the tree: `public_key_forms_498.json` (39 key
+texts through `PublicKey.fromString`: `key_text_refusal`, and the 34 hex ones
+as bytes through `Point.fromDER`: `point_message`), `sec1_tag_05_550.json`'s
+`PublicKey.fromDER` case, and `kvstore_local_454.json`'s `parser_words_489`
+(16 tokens: `PushDrop.decode`'s verdict for `decode_before`, and
+`decodeCanonicalPushDrop`'s words with `fieldCount: 2` for
+`canonical_refusal`); the one token no recording carries, a key and a
+CHECKSIG with no field, is this crate's writer in `PushDrop.lock`'s shape
+(`PushDrop.ts:164-171,185-193`), which `PushDrop.decode` reads as zero fields
+(`:73-77,97`). Killed by tests 25, declared equivalent 0, remaining 0;
+re-measured with the script surface's selection and the corpus set: 26
+caught, 0 missed, 0 timeout, 1 unviable, 100% of viable. No `src/` behaviour
+changed and no vector moved; the recording the tests read states one
+difference, below.
+
+### Notes: cross-SDK parity (#603)
+
+`parser_words_489` records two tokens the reference's `PushDrop.decode` reads
+at its default position (no `parser_error`) and this crate's `PushDrop::decode`
+and `decode_before` refuse: `token_key_only`, the key push alone, which the
+reference reads as the key and no field (`ts-stack@edf6e03`
+`PushDrop.ts:73-78,97`) and `pushdrop.rs:229` refuses as `Script too short for
+PushDrop`; and `token_no_checksig`, `OP_1` in the CHECKSIG's place, whose
+second chunk the reference never reads (its two fields returned) and
+`pushdrop.rs:261` refuses as `Expected OP_CHECKSIG after pubkey`. The public
+verdict that differs is the template's `PushDrop::decode`. At every caller of
+`decode_before` the reference refuses both as well: `decodeCanonicalPushDrop`
+on the field count or the envelope (`PushDropValidation.ts:54-79`; the local
+store, the kvstore interpreter, the registry, the overlay admin token and the
+storage downloader, in the recorded words through `canonical_refusal`), and
+the identity client and the contacts manager on their field count and
+canonical script (`IdentityClient.ts:130-147,773-776`,
+`ContactsManager.ts:225-242,431-441`; a skip or a wrapped refusal on both
+sides). Go at `2ca481c` refuses both, as this crate does
+(`transaction/template/pushdrop/pushdrop.go:20-53`: two chunks at least,
+`OpCHECKSIG` second). A residue the cold read found, derived from the
+reference's code and not recorded: a no-CHECKSIG token with the site's field
+count and a field over the site's bound is refused here in the envelope's
+words, where `decodeCanonicalPushDrop` checks the bounds before the envelope
+(`PushDropValidation.ts:63-73`) and says `PushDrop token contains an oversized
+field` or `PushDrop token payload is too large`; the verdict is the same.
+
+Census (#375; current reading):
+
+- Row 93: Ours: `PushDrop::decode` and `decode_before` refuse a key-only script and a token without CHECKSIG second, which `PushDrop.decode` at its default position reads (PushDrop.ts:73-78,97 at edf6e03; `token_key_only` and `token_no_checksig` in tests/vectors/kvstore_local_454.json's `parser_words_489`), as go-sdk at 2ca481c refuses them (pushdrop.go:20-53); every site that reads a token through `decode_before` refuses as its counterpart does (PushDropValidation.ts:54-79, IdentityClient.ts:130-147, ContactsManager.ts:225-242); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73). Theirs: the reference's decode does not read the second chunk, no filing made.
+
 ### Added: src/script/templates/rpuzzle.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The template sits outside the sibling's Lean definition, so its rule source
