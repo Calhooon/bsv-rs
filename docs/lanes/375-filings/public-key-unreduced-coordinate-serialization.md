@@ -1,6 +1,6 @@
 FILE — eighteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/pull/538#issuecomment-6539950425); pending the owner's cadence word.
 
-# Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with
+# Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with rather than the coordinates given
 
 Repository: bsv-blockchain/ts-stack
 
