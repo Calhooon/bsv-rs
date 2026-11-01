@@ -13,6 +13,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Tests | Feature Gate | Description |
 |------|------:|-------------|-------------|
+| `script_transaction_context_603.rs` | 4 | `transaction` | #603: `script::transaction`'s default methods against the sibling's Lean rules (`bsv-script-lean@387dab35`): `input` and `output` at an index and past the last (`Sighash.lean:127-128,164-170`) and both counts (`Sighash.lean:134-137,259-263`, `Tx.lean:88-98`) on `TX_VALID_2`; `validate_all_inputs` over a two-input P2PKH spend this crate's writer signs, valid, then refused at input 1 with input 1's own error (`BsvChain/Utxo.lean:149-165`). Each of the seven survivors of run 41327640129 RED on its mutant; no corpus entry reaches the traits |
 | `script_word_for_input_520.rs` | 2 (+3 streaming) | `script,block` (`transaction` for streaming) | Public typed signature compile-RED on the base; 102 rows under both words match the legacy flags/texts, 97 rows through each synchronous stream path, four conversion-priority cases and seven independent spend/coin execution witnesses; no-tip fallback stays in the resolver |
 | `auth_fetch_423.rs` | 7 | `auth,http` | Node-recorded request bytes, correlation, timeout, retry counter, header and body rules; RED is the absent API on base |
 | `auth_fetch_423_certificates.rs` | 4 | `auth,http` | Handshake certificate queue/grace, #416 intake refusal, handler/explicit retry, receipt/drain |

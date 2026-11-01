@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/transaction.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left seven survivors in `src/script/transaction.rs`
+(3 caught of 10 viable, 30 percent): `TransactionContext`'s four default
+methods (`input` and `output` as `None`, `input_count` and `output_count` as 0
+and 1) and `SpendValidation::validate_all_inputs` as `Ok(())`. No implementor of
+the traits exists in the crate or in the sibling's harness, so under each
+survivor no entry of the sibling's nine corpora (`bsv-script-lean` at
+`387dab35`: seed, flow, arith, stack, crypto, bytes, eras, gen, tx) moves its
+verdict; each is killed by a hand test over this crate's own transactions,
+`tests/script_transaction_context_603.rs`, every rule cited from the sibling's
+Lean definition: `input` by `Sighash.lean:127-128` (`inputAt`) on
+`TX_VALID_2`'s second input, `output` by `Sighash.lean:164-170`
+(`bip143Outputs`' `tx.outputs[nIn]?`) on its two outputs, the counts by
+`Sighash.lean:134-137,259-263` and `Tx.lean:88-98`, and `validate_all_inputs`
+by `BsvChain/Utxo.lean:149-165` (`checkInputScripts`: every input judged in
+order, the first refusal the transaction's) on a two-input P2PKH spend built and
+signed by this crate's writer, refused at input 1 with its second unlocking
+script replaced. Killed by tests 7, declared equivalent 0, remaining 0;
+re-measured under the script surface's selection with the conformance corpus at
+`ts-stack@edf6e03`: 10 caught, 0 missed, 0 timed out, 2 unviable, 100 percent.
+No behaviour changes; no parity note (no vector revealed a divergence).
+
 ### Added: the seven key calls' argument validators as public helpers, each named for its reference site (#609)
 
 #609, the CLI's ask filed from bsv-wallet-toolbox-rs's #186/#142 lane
