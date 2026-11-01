@@ -88,6 +88,10 @@ impl PublicKey {
     /// the requested set's certifiers, `getVerifiableCertificates.ts:76-81`) and
     /// the HTTP answer's `x-bsv-auth-identity-key` header, read by the transport
     /// and by the payment (`AuthMessageValidation.ts:344`, `validationHelpers.ts:185-196`).
+    /// The reference's rules themselves are public as
+    /// `wallet::validate_public_key` and `auth::assert_auth_identity_key`
+    /// (#579); this reader also reads an uncompressed key and upper-case hex
+    /// the auth rule refuses, and the uncompressed key the wallet rule refuses.
     pub(crate) fn from_strict_hex(hex: &str) -> Result<Self> {
         Self::from_bytes(&crate::primitives::encoding::from_hex(hex)?)
     }

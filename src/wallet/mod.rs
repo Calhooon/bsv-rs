@@ -244,6 +244,7 @@ pub use types::{
     WalletPayment,
     MAX_SATOSHIS,
 };
+pub use validation::validate_public_key;
 
 // Re-export the substrate-agnostic client core (wallet feature).
 pub use client::{SubstrateType, WalletClient};

@@ -125,9 +125,39 @@ pub(crate) fn decrypt_args(args: &DecryptArgs) -> Result<()> {
     byte_array(args.ciphertext.len(), "ciphertext")
 }
 
-/// `validatePublicKey`: JavaScript trim, even hex, length, then curve point.
-/// Used at encoded-counterparty intake before its encoding is lost (#420).
-pub(crate) fn public_key_hex(value: &str, name: &str) -> Result<PublicKey> {
+/// The reference's `validatePublicKey` (`ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/validationHelpers.ts:185-191`), public since #579:
+/// the canonical compressed form of `isValidCompressedPublicKey`
+/// (`Secp256k1Validation.ts:15-22`), read as the reference's wallet argument
+/// validators read a key, so a host judging a caller's key at its own door
+/// holds the one definition (#579).
+///
+/// In the reference's order: the text trimmed as JavaScript's `trim` trims it,
+/// an even UTF-16 length, hexadecimal digits (either case, `validateHexString`,
+/// `:522-534`), exactly 66 characters, then `02` or `03` and an x below the
+/// field prime that is a point's. Returns the parsed key, equal to
+/// [`PublicKey::from_hex`] of the trimmed text (that reader trims nothing,
+/// so it refuses the padded text this helper reads); the lenient forms it
+/// accepts (#498: an odd-length key, an uncompressed or hybrid key, an x at or
+/// above p) are refused here.
+///
+/// # Errors
+///
+/// [`Error::WalletRefusal`](crate::Error::WalletRefusal) of class
+/// [`InvalidParameter`](crate::WalletRefusalClass::InvalidParameter), code 6,
+/// in `WERR_INVALID_PARAMETER`'s words, `The <name> parameter must be `
+/// followed by `even length, not N.`, `hexadecimal string.`,
+/// `at least 66 length.`, `no more than 66 length.` or
+/// `a valid compressed secp256k1 public key`.
+///
+/// ```
+/// use bsv_rs::wallet::validate_public_key;
+///
+/// let g = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+/// assert_eq!(validate_public_key(g, "counterparty").unwrap().to_hex(), g);
+/// assert!(validate_public_key(&g[1..], "counterparty").is_err());
+/// ```
+pub fn validate_public_key(value: &str, name: &str) -> Result<PublicKey> {
     let value = super::originator::trim_js(value);
     let length = value.encode_utf16().count();
     if !length.is_multiple_of(2) {

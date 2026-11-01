@@ -87,6 +87,7 @@ Utility functions:
 - `mod.rs` - Re-exports
 - `nonce.rs` - Nonce creation and verification
 - `validation.rs` - Certificate validation, matching, encoding validation, and request set validation
+- `identity_key.rs` - `assert_auth_identity_key`, the reference's `assertAuthIdentityKey` (`AuthMessageValidation.ts:81-90`), public since #579 and re-exported at `auth::`: the text as given (no trim), `02`/`03` and 64 lowercase hex digits, the key written back the same, the parsed key or the reference's two sentences; the requested set's certifiers use it (#294)
 - `requested_set.rs` - `assert_requested_certificate_set`, the reference's `assertRequestedCertificateSet` in its words, and the receipt check `Peer` calls before any handler (#294); `assert_canonical_base64` and `canonical_base64`, the required-length and text checks of `assertCanonicalBase64` (#445)
 - `received_message.rs` - `check_received_message` (#445): the 100-certificate bound, then required canonical nonces and decoded lengths in reference order (`AuthMessageValidation.ts:348-389`). Session nonces are 48 bytes; later per-message nonces 32. Missing/noncanonical text and wrong lengths retain the reference's words. The 0.3.6 legacy acceptance window is deliberately closed at Peer intake.
 

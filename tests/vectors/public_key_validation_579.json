@@ -1,0 +1,187 @@
+{
+  "reference": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "wallet_parameter": "identityKey",
+  "cases": [
+    {
+      "name": "compressed",
+      "text": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "wallet": {
+        "ok": true,
+        "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "auth": {
+        "ok": true,
+        "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      }
+    },
+    {
+      "name": "compressed_other_parity",
+      "text": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "wallet": {
+        "ok": true,
+        "returned": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "auth": {
+        "ok": true,
+        "returned": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      }
+    },
+    {
+      "name": "upper_case",
+      "text": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "wallet": {
+        "ok": true,
+        "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "surrounding_space",
+      "text": " 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 ",
+      "wallet": {
+        "ok": true,
+        "returned": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "odd_length_498",
+      "text": "279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be even length, not 65."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "uncompressed_498",
+      "text": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be no more than 66 length."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "hybrid_498",
+      "text": "0679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be no more than 66 length."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "x_above_p_498",
+      "text": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a valid compressed public key."
+      }
+    },
+    {
+      "name": "x_at_p",
+      "text": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a valid compressed public key."
+      }
+    },
+    {
+      "name": "empty",
+      "text": "",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be hexadecimal string."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "uncompressed_zero",
+      "text": "0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be no more than 66 length."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "x_zero",
+      "text": "020000000000000000000000000000000000000000000000000000000000000000",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a valid compressed public key."
+      }
+    },
+    {
+      "name": "non_hex",
+      "text": "02gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be hexadecimal string."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "short",
+      "text": "0234",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be at least 66 length."
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    },
+    {
+      "name": "prefix_04_compressed_length",
+      "text": "040000000000000000000000000000000000000000000000000000000000000000",
+      "wallet": {
+        "ok": false,
+        "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+      },
+      "auth": {
+        "ok": false,
+        "message": "Authentication identityKey must be a canonical compressed public key."
+      }
+    }
+  ]
+}

@@ -15,7 +15,7 @@ use crate::script::templates::pushdrop_position::{
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::interface::WalletInterface;
-use crate::wallet::validation::crypto::public_key_hex;
+use crate::wallet::validation::validate_public_key;
 use crate::wallet::{
     Counterparty, CreateSignatureArgs, GetPublicKeyArgs, KeyDeriver, ProtoWallet, Protocol,
     SecurityLevel, VerifySignatureArgs,
@@ -116,7 +116,7 @@ pub fn decode_and_verify_registry_token(
     }
     // `validateVerifySignatureArgs`' counterparty (`ProtoWallet.ts:359`,
     // `validationHelpers.ts:1797`, `:228`), judged before the signature.
-    public_key_hex(operator_text, "counterparty").map_err(|error| match error {
+    validate_public_key(operator_text, "counterparty").map_err(|error| match error {
         Error::WalletRefusal { message, .. } => refused(message),
         other => other,
     })?;

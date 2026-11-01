@@ -24,7 +24,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `proto_wallet.rs` | ProtoWallet core; all nine methods validate before cryptography (#415, #420); specific linkage returns compressed counterparty keys for self, anyone and other (#427); one keyring, no permission prompts | ~584 |
 | `proto_wallet/interface.rs` | WalletInterface forwarding, linkage privilege validation, unsupported operations; both linkage adapters read the inherent result's keys, without a separate counterparty mapping (#427) | ~350 |
 | `proto_wallet/tests.rs` | Crypto and linkage unit tests, the proof test split without changing its assertions; specific linkage expects the identity key for self (#427) | ~361 |
-| `validation/crypto.rs` | All nine shared argument validators; encoded counterparty bounds before parsing; protocol, key ID, privilege, byte bounds (256 MiB, `substrates::byte_fields::MAX_BYTES`, the one definition, #532), data/hash exclusivity, canonical DER (#415, #420); specific linkage returns the required counterparty and checked verifier, eliminating the wire's dead second missing-key check (#427) | ~309 |
+| `validation/crypto.rs` | All nine shared argument validators; encoded counterparty bounds before parsing; protocol, key ID, privilege, byte bounds (256 MiB, `substrates::byte_fields::MAX_BYTES`, the one definition, #532), data/hash exclusivity, canonical DER (#415, #420); `validate_public_key`, the reference's `validatePublicKey`, public and re-exported at `wallet::` (#579); specific linkage returns the required counterparty and checked verifier, eliminating the wire's dead second missing-key check (#427) | ~341 |
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/client.rs` (#487 argument-side BEEF/limit/field-key refusals), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 A JSON `null` remittance is refused at JSON intake as present (#393: the one-remittance refusal when crossed, `must be a plain object` when alone), as the reference reads it. |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
@@ -229,7 +229,9 @@ validators moved into `validation/crypto.rs`; wire wrappers only adapt the
 error class and construct typed linkage arguments. Their existing serialized
 refusal texts are unchanged. Canonical DER is shared with wire result checks.
 
-`Counterparty::from_hex` uses `crypto::public_key_hex`: JavaScript trim,
+`Counterparty::from_hex` uses `crypto::validate_public_key` (public since
+#579 as `wallet::validate_public_key`, the reference's `validatePublicKey`,
+`validationHelpers.ts:185-191`; the registry's operator check uses it too): JavaScript trim,
 even length, hex syntax, exactly 66 characters, then compressed-curve parsing.
 Thus a valid 130-character uncompressed key fails with
 `The counterparty parameter must be no more than 66 length.` before its

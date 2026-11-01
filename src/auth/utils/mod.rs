@@ -4,11 +4,13 @@
 //! - Nonce creation and verification
 //! - Certificate validation
 
+mod identity_key;
 mod nonce;
 mod received_message;
 mod requested_set;
 mod validation;
 
+pub use identity_key::assert_auth_identity_key;
 pub use nonce::{
     create_nonce, get_nonce_random, validate_nonce_format, verify_nonce, NONCE_PROTOCOL,
 };
