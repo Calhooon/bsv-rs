@@ -98,12 +98,61 @@ credentials and makes no live wallet call.
 | wallet substrates | `src/wallet/substrates/**/*.rs` | `wallet_tests`, `wallet_http_json_busy_tests` |
 
 The globs include files directly in each directory and its descendants.
-`tests/CLAUDE.md` documents these suites. The conformance targets also exercise
-the committed vectors; their external ts-stack corpus portions skip unless
-`BSV_CONFORMANCE_DIR` is supplied. The dispatched job does not claim those skipped
-portions as evidence. CI's separate vector job supplies its pinned corpus.
+`tests/CLAUDE.md` documents these suites. The conformance targets read the
+ts-stack corpus and skip, passing vacuously, when `BSV_CONFORMANCE_DIR` names
+no `META.json`. Since #602 each mutation job checks the corpus out as `ci.yml`'s
+`vectors` job does (`bsv-blockchain/ts-stack` at
+`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`, the commit the pinned totals were
+audited against, sparse `conformance`, no credentials, `path: ts-stack`), sets
+`BSV_CONFORMANCE_DIR` to `$GITHUB_WORKSPACE/ts-stack/conformance` in the job's
+environment and asserts `META.json` before the baseline, so `conformance_scripts`
+(script surface) and `conformance_beef` (BEEF and Merkle surfaces) run the
+corpus's script evaluation (5,116 vectors) and BEEF vectors against every
+mutant. The runner passes its environment to cargo-mutants, which passes it to
+each test run in its copy of the tree; the variable names the checkout's corpus,
+not the copy's (cargo-mutants also copies the `ts-stack/` directory, about
+10 MB, since it is not ignored: harmless). Unset, the suites' default
+`../ts-stack/conformance` resolves against that copy under `TMPDIR`, never the
+checkout, so a mutation run without the variable reads the narrow figure even
+with ts-stack checked out beside bsv-rs.
 The sibling script harness remains the other oracle; production edits under
 `src/script/` or `src/transaction/` still require its before/after seed run.
+
+### The narrow figure and the widened one (#602)
+
+The first complete scoreboard, run 41294262955 at `ab155018` (2026-11-01,
+artifact 13083854460), was measured without the corpus: the conformance suites
+skipped in every baseline and every mutant, so its scores (the sixteen gate-path
+files below 80 and their 517 survivors, #603; the floors table on #602) are the
+**narrow** figure. The **widened** figure is the first dispatch after #602's
+landing, the same selection with the corpus read. Floors are set from the
+widened figure, never the narrow one, and the census record carries both
+side by side, so a moved score says it moved because the corpus caught what the
+narrow suites did not.
+
+The local witness on one file (`src/script/not_judged.rs`, three viable
+mutants, the script surface's selection, cargo-mutants 27.1.0, macOS, 2026-11-01).
+libtest captures a passing test's output, so neither the suite's `SKIP` line nor
+its summary line reaches `mutants.out/log/`; the logs show the corpus by the
+`conformance_scripts` binary's time, and a corpus that cannot be read shows it
+by failing the baseline:
+
+| Reading | `conformance_scripts` in the baseline's log | Caught | Missed | Score |
+| --- | --- | ---: | ---: | ---: |
+| narrow (corpus unset) | 3 passed in 0.00 s (the suites return at the missing `META.json`) | 2 | 1 | 66.67% |
+| widened (corpus at `edf6e03`) | 3 passed in 1.44 s (the corpus's 5,116 vectors run) | 2 | 1 | 66.67% |
+| broken (the copy at `edf6e03` without `vectors/sdk/scripts/evaluation.json`) | `conformance_scripts_evaluation ... FAILED`: the unmutated baseline fails, no mutant runs | | | |
+
+On this file the corpus changes no outcome: the two `flags_message` mutants are
+caught by earlier suites, and the surviving `Display::fmt` replacement is not
+observed by the corpus either (`conformance_scripts` judges verdicts and never
+names `NotJudgedCause`). The witness shows that the variable reaches the mutants'
+test runs (the binary's time in the baseline's and the surviving mutant's log,
+and the broken corpus's red baseline) and what the oracle now runs; the score
+movement on the other files is the widened dispatch's to measure. Run directly
+with `--nocapture`, the suite prints its summary, `total=5116 run=4120
+passed=4109 unsupported=959 skipped=37 known_failures=11 failures=0
+panics=0`.
 
 ## Score and evidence
 
@@ -146,6 +195,8 @@ all generated mutants for the named file, with the workflow's test selection:
 
 ```sh
 RUN_ROOT="/Volumes/Lanes/out/bsv-rs/oracle-nightly/$(date -u +%Y%m%dT%H%M%SZ)"
+# The widened figure (#602): the corpus at the pinned commit, an absolute path.
+export BSV_CONFORMANCE_DIR=/absolute/path/to/ts-stack/conformance
 python3 .github/scripts/nightly_mutants.py run --surface merkle \
   --output "$RUN_ROOT/merkle"
 python3 .github/scripts/nightly_mutants.py run --surface wire \

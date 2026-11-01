@@ -97,11 +97,29 @@ jobs:
     env:
       SURFACE: ${{ matrix.surface }}
       SHARD: ${{ matrix.shard }}
+      # The conformance suites in the script, BEEF and Merkle selections skip
+      # without the corpus, so the oracle reads it as ci.yml's vectors job does,
+      # at the commit the pinned totals were audited against (#602, #31). The
+      # runner hands its environment to cargo-mutants, which hands it to every
+      # test run in its copy of the tree; the path is the checkout's, not the copy's.
+      BSV_CONFORMANCE_DIR: ${{ github.workspace }}/ts-stack/conformance
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.source.outputs.commit }}
           persist-credentials: false
+
+      - name: Check out the ts-stack conformance corpus
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: bsv-blockchain/ts-stack
+          ref: edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9
+          path: ts-stack
+          sparse-checkout: conformance
+          persist-credentials: false
+
+      - name: Assert the corpus is present
+        run: test -f "$BSV_CONFORMANCE_DIR/META.json"
 
       - name: Prepare external build directories
         run: |
