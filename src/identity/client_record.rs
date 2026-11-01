@@ -21,7 +21,7 @@
 //! (`:257-270`), every field value a string (`:281`, `:63-72`).
 
 use super::super::token_maps::{self, TokenMaps};
-use crate::auth::certificates::revocation_outpoint_from_str;
+use crate::auth::certificates::{read_to_binary_key, revocation_outpoint_from_str};
 use crate::primitives::{from_hex, PublicKey};
 use crate::wallet::types::Outpoint;
 use serde_json::{Map, Value};
@@ -117,9 +117,10 @@ fn members(object: &Map<String, Value>, maps: TokenMaps) -> Option<Record> {
     Some(Record {
         cert_type: id("type")?,
         serial_number: id("serialNumber")?,
-        // Strictly, as Certificate.verify's toBinary refuses a lenient form (#498)
-        subject: PublicKey::from_strict_hex(text("subject")?).ok()?,
-        certifier: PublicKey::from_strict_hex(text("certifier")?).ok()?,
+        // As Certificate.verify's toBinary reads them (Certificate.ts:240-254;
+        // #498's lenient forms, #585's uncompressed key refused)
+        subject: read_to_binary_key(text("subject")?, "subject").ok()?,
+        certifier: read_to_binary_key(text("certifier")?, "certifier").ok()?,
         revocation_outpoint: Some(outpoint(text("revocationOutpoint")?)?),
         // Hex, as the reference's WalletCertificate carries it; one that is
         // not fails the verification after (`IdentityClient.ts:823-825`)

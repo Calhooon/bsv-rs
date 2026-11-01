@@ -80,19 +80,15 @@ impl PublicKey {
     }
 
     /// Parses a public key from hex strictly, as `from_hex` read it before
-    /// #498: even-length hex, then `from_bytes`. Since #582 two sites read
-    /// through it, where the reference applies none of the three helpers'
+    /// #498: even-length hex, then `from_bytes`. Since #585 one site reads
+    /// through it: the serde reading of a `PublicKey` field (the reference's
+    /// JSON holds a `PubKeyHex` text and judges it, if at all, at the site
+    /// that uses it; strict by #498's fold), where none of the #579 helpers'
     /// rules (`wallet::validate_public_key`, `auth::assert_auth_identity_key`,
-    /// `wallet::validate_result_public_key`, the sites that do now read through
-    /// those): the serde reading of a `PublicKey` field (the reference's JSON
-    /// holds a `PubKeyHex` text and judges it, if at all, at the site that
-    /// uses it; strict by #498's fold), and the subject and certifier at the
-    /// identity client's two token parsers, whose reference reading is
-    /// `Certificate.verify`'s through `Certificate.toBinary`
-    /// (`Certificate.ts:240-254`: `02`/`03` and 64 hex digits of either case,
-    /// then `fromDER`). This reader also reads an uncompressed key there,
-    /// which `toBinary` refuses, and refuses an x at or above p, which
-    /// `toBinary` reduces (#183's refusal).
+    /// `wallet::validate_result_public_key`) nor `Certificate.toBinary`'s
+    /// (`auth::certificates::read_to_binary_key`, the identity parsers'
+    /// subject and certifier since #585) is the reference's reading of that
+    /// text.
     pub(crate) fn from_strict_hex(hex: &str) -> Result<Self> {
         Self::from_bytes(&crate::primitives::encoding::from_hex(hex)?)
     }
