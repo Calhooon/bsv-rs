@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: MerklePath's constructors refuse a level 0 of duplicate flags alone, as the reference's constructor does (#641)
+
+`MerklePath::new` and `MerklePath::new_unchecked` accepted a path whose level
+0 carries only duplicate-flagged leaves (no txid leaf, no hash leaf): the
+root check walks from each hashed leaf of level 0, there was none, and the
+path came back `Ok`. The reference's constructor refuses it
+(`ts-stack@edf6e03` `MerklePath.ts:241-263`): after the offset checks
+(`:213-236`) it asks `computeRootCached` for a root from each level-0 leaf,
+which looks for a leaf with a hash and throws (`:342-343`):
+
+```ts
+if (typeof txid !== 'string') txid = this.path[0].find(leaf => Boolean(leaf.hash))?.hash
+if (typeof txid !== 'string') throw new TypeError('Transaction ID is undefined')
+```
+
+with `legalOffsetsOnly` true or false, so both constructors refuse it now, in
+those words (`MerklePathError("Transaction ID is undefined")`, after the offset
+checks as there: `[[dup 0], [hash at 1]]` is still `Invalid offset: 1, at
+height: 1, with legal offsets: ` from `new`; `src/transaction/merkle_path_legal.rs`,
+`rooted`). The issue took `new` for a door that already refused; it did not
+(RED below). `new_unchecked` is the reference's constructor with
+`legalOffsetsOnly` false (`merkle_path_603.json`'s `unchecked` verdicts are
+recorded so), its contract the checks of `new` but the legal offsets above
+level 0, so it refuses too rather than being stated as a wider door; its
+rustdoc says so. Its one `src/` caller, the wallet's BEEF result reader
+(`src/wallet/substrates/result_values/beef.rs`), already refused such a level
+ahead of it. `from_binary`, `from_hex`, `from_reader`, the streaming reader,
+`Beef::from_binary` and `verify_structure` already refused it, in the
+stream's words (`NoTxidAtLevelZero` at the BUMP, #167), where the reference's
+`fromHex` throws from the same constructor; they are unchanged and now pinned.
+`compute_root` on such a path held through the public fields refuses it in the
+reference's `computeRoot()` words (`No valid leaf found in the Merkle Path`,
+`:375-381`), no panic and no walk.
+
+The witnesses are `tests/merkle_path_641.rs`:
+`a_level_zero_of_duplicates_alone_is_refused_at_new`,
+`…_at_new_unchecked`, `…_at_from_binary`, `…_at_the_stream`,
+`a_level_zero_of_duplicates_alone_held_unchecked_is_refused_by_compute_root`
+and `the_shapes_bytes_are_this_crates_writers`, against five shapes in
+`tests/vectors/merkle_path_641.json` (a duplicate at 0, at 1, at 0 and 1,
+under an empty level, under a hash at level 1), recorded by
+`tests/support/merkle_path_641.mjs` from `@bsv/sdk` at `ts-stack@edf6e03`
+bundled with bun under Node v22.18.0: the constructor with its defaults and
+with `legalOffsetsOnly` false, `fromHex` of the bytes and `computeRoot()`, the
+words and the error class; each shape's bytes are this crate's writer's. RED
+on `7b44110e` (a scratch copy with the `src/` change removed): the `new` and
+`new_unchecked` tests, `left: None, right: Some(MerklePathError("Transaction
+ID is undefined"))`; the other four green there and after. The 0.3.34
+root-check equivalence keeps its legacy copy verbatim and maps its answer
+through the #641 rule (`with_a_hashed_leaf`), as it maps #631's words.
+
+Go (`go-sdk@2ca481c`, v1.7.2) checks nothing at construction
+(`NewMerklePath`, `transaction/merklepath.go:149-154`;
+`NewMerklePathFromReader`, `:197-276`) and refuses such a path only at
+`ComputeRoot` (`no valid leaf found in the Merkle Path`, `:350-353`); this
+crate follows the reference.
+
+Semver: no type changed. A caller that built a level 0 of duplicates alone
+through `new` or `new_unchecked` gets `Err` where it got a path no root could
+be computed from. The `MerklePath::new` calls of `bsv-overlay-cloudflare`
+(`overlay-integration-tests`) and `rust-message-box` (`src/payments.rs`) build
+a txid leaf; `bsv-middleware-cloudflare-public` and `rust-chaintracks` are not
+on this host, and the `bsv-low` workers were not read by this lane.
+
 ### Added: src/transaction/beef_stream.rs's surviving mutants, shard S3 (the index's sizes, roots and finish), killed from the sibling's rules and vectors (#603)
 
 The widened run 41327640129 (`docs/census/mutants-2026-11-01.md`) left 32
