@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/script.rs's surviving mutants, shard B (the chunk parser), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 28 mutants alive in
+`Script::parse_chunks`. Killed by tests: 24. Declared equivalent: 4.
+Remaining: 0. Re-measured on the function alone (`cargo mutants --file
+src/script/script.rs --re parse_chunks --jobs 1`, the script surface's
+selection, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`): 91 caught, 0 missed,
+3 timed out (`210:17` `*=`, `245:28` `-`, `258:28` `-`, each a parse that no
+longer advances; none of this shard's survivors), 0 unviable, 96.81 percent
+of viable.
+
+The rule is the node's `GetOp` as the sibling states it
+(`bsv-script-lean@5dc337e1` `lean/BsvScript/Machine.lean:29-50`, bitcoin-sv
+`script.h:165-200`). The sibling's harness (`harness/run --impl bsv-rs
+--corpus all --spec recorded`, then `road`, `million`, `xsig-144`) moved the
+recorded verdicts of 18 mutants, each a panic on a short size word (flow-00751
+to 00754, seed-000397, 001993, 003106, 006614, 009101, 009276); the others
+moved no verdict. `tests/script_script_603_b.rs` takes those entries by id
+with their recorded verdicts, the node's own decoder vectors from the
+sibling's `corpus/cpp` (`cscript_tests.cpp` `GetOp2`,
+`instruction_iterator_tests.cpp`, cpp-sighash-00018's scriptCode
+`656a6a00ab` with its recorded original digest), seed-009157 (a size word's
+third byte set), bytes-00107 (a bare `OP_RETURN`, valid), and the ts-stack
+vectors `script-001` and `node.script.bitcoin-sv.0074`; the 2^24-byte push
+of `280:62` is built by this crate's writer (no corpus entry carries a size
+word with its fourth byte set and anything after it). Each test RED on its
+mutants in a scratch copy, all ten green on the tree. The four `|` to `^`
+mutants of the size reads (`257:30`, `280:31`, `280:43`, `280:56`) are
+declared in `.cargo/mutants.toml`: the size bytes occupy disjoint 8-bit
+lanes (`Machine.lean:39,43`), where `|` and `^` agree. No `src/` behaviour
+changed.
+
+### Notes: cross-SDK parity (#603, shard B)
+
+The kill of `215:35` pins a reading the reference does not share: a bare
+`OP_RETURN` (no byte after it) is a chunk without data that prints
+`OP_RETURN` here, as the node reads and prints it (`GetOp`, bitcoin-sv v1.2.3
+`script.h:173-198`; `ScriptToAsmStr`, `core_write.cpp:115-173`, the opcode's
+name). `ts-stack@edf6e03` `Script.ts:608-610` gives it `data: []`, and its
+`toASM` prints the empty string, which `fromASM` reads back as `OP_0` (`00`),
+a different script (run under Node 22.23.3 from the source at the pin:
+`fromHex('6a')` gives `[{op:106,data:[]}]` and `''`; `fromASM('')` gives
+`00`; `fromASM('OP_RETURN')` gives `6a`, whose `fromHex` is the empty-data
+chunk again). go-sdk at `2ca481c` gives it an empty `Data` too
+(`script/script_chunk.go:258-270`). The mutant is the reference's reading;
+the node's is kept, the reference's round trip losing the opcode. Stated, not
+filed.
+
 ### Added: src/transaction/beef.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
