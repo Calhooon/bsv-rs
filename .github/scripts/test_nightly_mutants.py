@@ -179,6 +179,12 @@ class ScoreTests(unittest.TestCase):
         record.write_text(json.dumps({"schema": 1}))
         self.assertEqual(nightly.load_floors(record), {})
 
+    def test_the_beef_selection_runs_the_streams_603_files(self):
+        args = nightly.mutation_args("beef", "0/4")
+        self.assertIn("--cargo-arg=--test=beef_stream_603_s3", args)
+        self.assertIn("--cargo-arg=--test=beef_stream", args)
+        self.assertNotIn("--cargo-arg=--test=beef_stream_603_s3", nightly.mutation_args("merkle", "0/4"))
+
     def test_a_file_whose_mutants_are_all_unviable_has_no_score(self):
         path = self.fixture(["CaughtMutant", "Unviable"])
         other = "src/transaction/merkle_path_extra.rs"

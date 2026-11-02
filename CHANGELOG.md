@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S3 (the index's sizes, roots and finish), killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 (`docs/census/mutants-2026-11-01.md`) left 32
+survivors in this shard's functions of `src/transaction/beef_stream.rs`:
+`BeefIndex::spec_size` (12), `BeefIndex::finish`'s work line (8),
+`BeefIndex::deferred` (4), `BeefIndex::roots` (3) and `bump_root` (5). The
+accessors are read by no harness and no in-crate caller, and the BEEF
+surface's selection never ran the files that assert them
+(`tests/beef_stream_deep.rs`, `tests/beef_order_held.rs`,
+`tests/merkle_path_even_offset_duplicate.rs`). Under each `bump_root`
+survivor no entry of the sibling's corpora moves (`bsv-script-lean` at
+`5dc337e1`: the nine corpora of `harness/run --corpus all`, every one GREEN,
+and the 150 rows of `corpus/wire` through `run_wire`, each identical to the
+base column; a root-order edit at line 497, the loop's control, moves 92 wire
+lines). Six tests in `tests/beef_stream_603_s3.rs` kill 29:
+`index_size_counts_a_txid_two_bumps_carry_twice_beef_of_any_size_two_bumps_one_txid`
+(the 12 of `spec_size`) and
+`finish_adds_one_pass_and_three_times_the_walks_fuel_beef_of_any_size_two_bumps_one_txid_atomic`
+(the 8 of `finish`, and `spec_size`'s 12) against
+`tests/vectors/beef_stream_603_s3.json`, a row of two BUMPs carrying one txid
+recorded from the stack's definition (`bsv-stack-lean@9a69056`
+`lean/BeefOfAnySize.lean`, `Index.size` :860-861, `finish` :990-1002,
+`budget` :982; `readBytes` 14 entries, work 405 plain and 428 atomic) by
+`tests/support/beef_stream_603_s3.lean`, its bytes this crate's writers' at
+the Lean's length; `the_leans_atomic_chain_of_10000_has_the_leans_counts_beef_of_any_size_chain_10000_atomic`
+(the sibling's own `#guard_msgs` summary, `Scenarios.lean:148-150`: 10,002
+steps, work 740,145, 20,005 entries; all of `finish`'s and 10 of
+`spec_size`'s); `the_roots_are_each_bumps_height_and_root_in_wire_order_beef_of_any_size_two_bumps_one_txid`
+(the 3 of `roots`, the Lean index's `bumps`, :838-850);
+`every_unproven_link_is_held_until_the_funding_arrives_beef_order_240_reversed_chain_40`
+(the 4 of `deferred`: 39 held at the peak, none at the verdict, the
+reference's `verifyValid` valid, `tests/vectors/beef_order_240.json`); and
+`a_node_computed_from_a_left_duplicate_is_no_node_bump_nodeat_even_offset_duplicate_167`
+(`bump_root`'s `476:27` `|=` and `476:32` `/`: the sibling's `Bump.nodeAt`
+computes a node only from a word on the left,
+`lean/BsvChain/Views/Wire/BUMP.lean:295-306`, on #167's recorded shapes, the
+duplicate at offset 2 the one that separates `/`). Each RED on its mutant in a
+scratch copy, green on the tip. Killed by tests 29, declared equivalent 3,
+remaining 0: `bump_root`'s `502:28` (the guard `*p == parent` to `true`) and
+`507:42` (`level + 1` to `level * 1` and `level - 1`, the level that arm's
+refusal names), candidates at `6b566305`, now in `.cargo/mutants.toml`'s
+`exclude_re` on three accepting reads (the ensemble rule): the cold read
+(MERGE, 0.9, the three accepted at 0.9 each), the adversarial read
+(EQUIVALENT x3, 0.96: `bump_root` is `pub(crate)`, its only callers the
+decoder and `beef/in_memory.rs`, each refusing the repeated offset first; with
+the arm a panic, 9.65 million exhaustive height-2 BUMPs, 2 million random to
+height 5 and the ts-stack corpus never reached it, the callers' pre-checks
+removed too) and the rule read (EQUIVALENT x3, 0.95: one value per offset,
+`beef_stream.rs:444-447`; the agreement check before the parent comparison,
+`:458-470`; one node per parent offset, `:513-519`; the stack's Lean in the
+same order; `MerklePath.ts:42, 56-62, 221` at `edf6e03` and bitcoin-sv v1.2.3
+`merkleblock.cpp:146-192` state no order that reaches the arm). The arm is
+unreachable: both callers refuse a second
+leaf at an offset before the walk (`DuplicateOffset`; the stack's `levelMap`,
+`BeefOfAnySize.lean:503-507`), so the path nodes of a level hold distinct
+offsets, and each node's agreement check against what the level carries
+(`climb`'s `agree`, :522-526) runs before its parent is compared (:547-550),
+so the two children of one parent pair the same two hashes in either order of
+the walk. No entry moves (the corpora above, the ts-stack conformance BEEF
+families at `edf6e03`), and with the arm replaced by a panic none of
+`merkle_path_two_readers_agree` (every byte of every BUMP the tree holds
+changed), `beef_two_readers_agree`, `beef_stream`, `beef_atomic_graph`,
+`transaction_tests`, `conformance_beef` or 300,000 random BUMPs from
+consistent trees with duplicates and corruptions (the equal arm reached
+315,548 times) reaches it; the random probe ran in the lane, outside the
+tree, a statement and not a pin (the cold read's exhaustive probe, every
+BUMP of tree height 1 to 3 over absent, duplicate, true and wrong leaves,
+2,127,069 shapes, reached the equal arm 702,099 times and the refusal
+never, also outside the tree). The BEEF surface's selection runs every
+`tests/beef_stream_603_*.rs` since #643 (`mutation_args`, `.github/scripts/nightly_mutants.py`);
+this entry pins it by `test_the_beef_selection_runs_the_streams_603_files`. Re-measured with
+that selection, `--re 'BeefIndex::deferred|BeefIndex::finish|BeefIndex::roots|BeefIndex::spec_size|bump_root'`
+and the conformance corpus at `ts-stack@edf6e03`, in twelve shards: before
+the declaration (`6b566305`) 53 listed (the shard's 52 and `780:13`, a
+struct-field deletion in `BeefDecoder::collecting` cargo-mutants 27.1.0 lists
+without its name filter, caught), 50 caught, 3 missed, 0 timed out, 0
+unviable; after it 50 listed (the three absent), 50 caught, 0 missed, 0 timed
+out, 0 unviable; the shard's functions 49 of 49 tested, 100 percent. No
+behaviour changes.
+
 ### Added: src/transaction/beef_stream.rs's surviving mutants, shard S2 (the index's folds), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)

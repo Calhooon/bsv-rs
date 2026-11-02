@@ -98,4 +98,20 @@ exclude_re = [
   '^src/script/script\.rs:488:27: replace < with > in Script::write_number$',
   '^src/script/script\.rs:488:27: replace < with <= in Script::write_number$',
   '^src/script/script\.rs:507:28: replace < with <= in Script::encode_script_number$',
+  # src/transaction/beef_stream.rs:502:28 (the guard `*p == parent` replaced by true), 507:42 (`+`
+  # to `-`) and 507:42 (`+` to `*`), the mismatch arm of bump_root's walk (#603, PR #644). The arm
+  # is dead: each level keeps one value per offset, each node is agreement-checked before its own
+  # parent comparison, and one node is pushed per parent offset, so sibling parents agree by
+  # construction (beef_stream.rs:444-447, 458-470, 513-519; bsv-stack-lean@9a69056
+  # lean/BeefOfAnySize.lean:503-507, 522-526, 547-550, the same order; MerklePath.ts:42, 56-62,
+  # 221 at ts-stack@edf6e03, parent-first through its cache, the repeat refused; bitcoin-sv v1.2.3
+  # merkleblock.cpp:146-192, each node computed once). Three reads: the cold read (MERGE, 0.9, the
+  # three accepted at 0.9 each; every BUMP of height 1 to 3 over absent, duplicate, true and wrong
+  # leaves, 2,127,069 shapes, the equal arm 702,099 times, the refusal never), the adversarial read
+  # (EQUIVALENT x3, 0.96; with the arm a panic, 9.65 million height-2 BUMPs, 2 million random to
+  # height 5 and the ts-stack corpus never reached it, the callers' pre-checks removed too), the
+  # rule read (EQUIVALENT x3, 0.95).
+  '^src/transaction/beef_stream\.rs:502:28: replace match guard \*p == parent with true in bump_root$',
+  '^src/transaction/beef_stream\.rs:507:42: replace \+ with - in bump_root$',
+  '^src/transaction/beef_stream\.rs:507:42: replace \+ with \* in bump_root$',
 ]
