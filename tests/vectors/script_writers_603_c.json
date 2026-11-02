@@ -1,0 +1,737 @@
+{
+  "source": "ts-stack@edf6e03 packages/sdk/src/script/Script.ts under Node v22.18.0, on bsv-script-lean@5dc337e1 corpus entries copied by id",
+  "scripts": [
+    {
+      "id": "bytes-00076",
+      "corpus": "bytes/cases.jsonl",
+      "family": "bytes/4b",
+      "where": "prevout 0",
+      "note": "a direct push of 75 bytes (0x4b), the last direct push",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "02000000015f08623d24325601cbb04fac1fe5b0e7505ac5685c046b621d552b94dd23c2270000000006515253545556ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4b010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+      },
+      "reference_rewritten": {
+        "hex": "4b010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+      }
+    },
+    {
+      "id": "bytes-00077",
+      "corpus": "bytes/cases.jsonl",
+      "family": "bytes/4c",
+      "where": "prevout 0",
+      "note": "OP_PUSHDATA1 of one byte",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "020000000151816383fde71777f16086f0721bcede7fbe5833347f01d6c713a985ee06eb350000000006515253545556ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4c0101"
+      },
+      "reference_rewritten": {
+        "hex": "4c0101"
+      }
+    },
+    {
+      "id": "bytes-00078",
+      "corpus": "bytes/cases.jsonl",
+      "family": "bytes/4d",
+      "where": "prevout 0",
+      "note": "OP_PUSHDATA2 of one byte",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "02000000015f167463f7336b090a5923c7b6eeb1adb43ffb902ff7af861ca408e94f59034d0000000006515253545556ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4d010001"
+      },
+      "reference_rewritten": {
+        "hex": "4d010001"
+      }
+    },
+    {
+      "id": "bytes-00079",
+      "corpus": "bytes/cases.jsonl",
+      "family": "bytes/4e",
+      "where": "prevout 0",
+      "note": "OP_PUSHDATA4 of one byte",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "02000000014ae48f820bf1f329c43b1338c893c3b119a3d9cea959130921f081b9077a3f350000000006515253545556ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4e0100000001"
+      },
+      "reference_rewritten": {
+        "hex": "4e0100000001"
+      }
+    },
+    {
+      "id": "arith-00011",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/and",
+      "where": "prevout 0",
+      "note": "two OP_PUSHDATA1 pushes of 80 bytes around OP_AND, then OP_EQUAL",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "020000000117d34683c287d6fba7ad2815622bef5bc0796490a304ad1dca918431511b148d00000000524c50c08eff64fe50383f28165fbe9264b9fa5d53e4e42c846603a9eb094426ba55d737d45b7c95eac98b868b391f29f3090270e5f3d56732b9cdc3b2bfc4c8cc2d5b6b0ffbfd17202becd0e7990a0a7eb44effffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4c501376b5ffc9c2de2b702f8299b6d75abc441eeef2b276795be03edbdca78280406d5b3e85a17396c5ef0c565b88a94f13326bfa0a6a03af81a6e7cd95fbc1a975c7ce1c06f347f2624f734c9c1f58ba9d844c500006b564c840182b20060298924418b84412e4e020046003a02a09442682004025501a04816280818608101b08a109023061f2006202a98182a28d84c8c02951430e180413002260406308080a58b00c87"
+      },
+      "reference_rewritten": {
+        "hex": "4c501376b5ffc9c2de2b702f8299b6d75abc441eeef2b276795be03edbdca78280406d5b3e85a17396c5ef0c565b88a94f13326bfa0a6a03af81a6e7cd95fbc1a975c7ce1c06f347f2624f734c9c1f58ba9d844c500006b564c840182b20060298924418b84412e4e020046003a02a09442682004025501a04816280818608101b08a109023061f2006202a98182a28d84c8c02951430e180413002260406308080a58b00c87"
+      }
+    },
+    {
+      "id": "arith-00013",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/and",
+      "where": "prevout 0",
+      "note": "two OP_PUSHDATA2 pushes of 520 bytes around OP_AND, then OP_EQUAL",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "0200000001a1a234b957d7be6cabb6a0952624975c46e43393de9d1eb9f7661aa73a3632c000000000fd0b024d08025359f9f56074fb8a50ec0c9ebe8525e02cde68daddd52e43266c038e1e19f866a4f3de0e232e9c3ada77e79b9b5feedd0eb970a08a7277c38ac1428766ec832048362825721cef4b251831eeaaf355738cf14520db93e8aa3c525c1132e4ce1809029fd0d28fe8fb79b06e86a48094ea349832f480b988805136c020adfb7c96fa1ff7097cd165c919778cb715cf4af9f39c309d736bc8d0ba499fa65baed9a672cca83a92b8bf7a1bcfa7e9013d07ef29e3d103afbf89d9043c50655c2a70b7b9e8557c7c266e43f4fb372063cf4b4f3b8a799ab1a4b2033d2517a32da2df2616e4e5063e1f9e527a1e33066485fc24be724229d015828a707e3b632fb9577b4788d038690bf66918b247a626f56429b63884c32e41e6e743d794cc5798b26312e8e3228df75c3fca9f1f45f86757e98ca856fa67d76ad8c64b11853bab58f0a9bc1b39881176602c55cd9ed73dabad2b80b5e37ca0a3a82f4fcec3303ec7f9723e0c702a317e6aa173dc54285681527230a69566f0fda6de0d8eaa8267b4095ba43c300f21544224c526abd0c68afe1b27dd81d239bbbfdf94f3e6019808101371265d053401a78ea0ddcdbf86cb1d1077dab63adc9c94c7ccbfd04d256157f9389bab8b7883f52222e2693d14de530f7ed3a7e301d66f5149df13a5dad5279cac22ab1b971f830cd757be54710413111f2fdfdf8e113bc25a6c1d680ef9b1765e2259290e6783ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4d0802e67d470d5a903461eb6d524e381bebef667918341ea5303e79b35a66f7a9dc1cb35391c928a2671d55f79d104fd6cd242c18f19247b41f275c87dacca97138f986f03af9c5b663daae7e598cb74f421bd4b66a51c618aba2e310c72466402d722655da4b4b55ffd6ca62cd0d840672dc620b56cc4f9236da56f55b424fcd4141f1b3a14799e2b60604c1ed24ecf761d53c3fcbacf28c52fd9bc9238a681063b70fab198d8346477231caedfa5cecf60e4d003266214ee138d7e3c4d794514f08e814dd29d48bec0a656a40b16affcd32040f3e75481c637528dc541ff312c8406580c059e8f0e087d859a12fa6c046a1b07104f49cb14d4b789753e1cdd29dd4692ba98aa06e718e265c239b148b4310fb06f5f2fc42c3b363cfc9272e749344c326324fe83f0df279094a6ba772f7bb0de3bc09a0cd30b16987240dff7d81ea804a1666aec72a1a0454fea20f62bd62bbc8ca52d5bf07a26fc0cc880073e4c77524ace96a51f3322aaad590d750ba624b81359ee90c1be27938d72e14510fb05f98157cfd4d734a2ba49eea48cb346cf81c5596fffdb1402ca65f598ad4973b66ba64a446b66457281f8d66b745dbc573f2f26200a47fd7ab237d0e9853cb11c3a9d65b77155a583f33f69d45f77e43aa4e4e8b3ded2d91c1ededd2a6b15d1e92600a3a3e90da791aa9b0349786a610f9859f0a8095efcbc4d3f54f12dde34f3e18d0bcb712aede844d08024259410540103000406c000e380121e0245808101c852002202002061609d804a053900820220418507785100b56cc040c187080023017030881428420600020003028214014634a2418118ca243401384b04000c210a8a22010440022400c1000009a404205e8d248204c04840010c8200812c400900080503440000dc94000f013a10118c0240000418c2404c740d1301c008c720840d09a490382480041a6028808088200077211caa5e8002c060e09001002210e81180420404514004000a800552854026c02646a002062cf4902000a381000042201280414032102c8000480c000281080025818210624804420b07000209011000a701613610d90155041088008200a70080010038204814000b20084c22c40c2a343c78004061092400220220288370c3248090a41a06257a90ca0140820c52090400300053b2900e080081220880122000454cc820720a9202b80804254a003a02f40cc800032c4c170240c602a1172222022d4100050804242002494600019a25808862a004104005b8014300d015042208406aa40c2006c18045580d239b1000c84534000900010023024040434000708008d44b704cb051072d22200841c9483003d0008014111c128920b031002502222e20905145e430a4e4283210104014149cd12a49055069020022a1a901a01088110341400041011050f0a8084010bc052640d000ce101361800182102268287"
+      },
+      "reference_rewritten": {
+        "hex": "4d0802e67d470d5a903461eb6d524e381bebef667918341ea5303e79b35a66f7a9dc1cb35391c928a2671d55f79d104fd6cd242c18f19247b41f275c87dacca97138f986f03af9c5b663daae7e598cb74f421bd4b66a51c618aba2e310c72466402d722655da4b4b55ffd6ca62cd0d840672dc620b56cc4f9236da56f55b424fcd4141f1b3a14799e2b60604c1ed24ecf761d53c3fcbacf28c52fd9bc9238a681063b70fab198d8346477231caedfa5cecf60e4d003266214ee138d7e3c4d794514f08e814dd29d48bec0a656a40b16affcd32040f3e75481c637528dc541ff312c8406580c059e8f0e087d859a12fa6c046a1b07104f49cb14d4b789753e1cdd29dd4692ba98aa06e718e265c239b148b4310fb06f5f2fc42c3b363cfc9272e749344c326324fe83f0df279094a6ba772f7bb0de3bc09a0cd30b16987240dff7d81ea804a1666aec72a1a0454fea20f62bd62bbc8ca52d5bf07a26fc0cc880073e4c77524ace96a51f3322aaad590d750ba624b81359ee90c1be27938d72e14510fb05f98157cfd4d734a2ba49eea48cb346cf81c5596fffdb1402ca65f598ad4973b66ba64a446b66457281f8d66b745dbc573f2f26200a47fd7ab237d0e9853cb11c3a9d65b77155a583f33f69d45f77e43aa4e4e8b3ded2d91c1ededd2a6b15d1e92600a3a3e90da791aa9b0349786a610f9859f0a8095efcbc4d3f54f12dde34f3e18d0bcb712aede844d08024259410540103000406c000e380121e0245808101c852002202002061609d804a053900820220418507785100b56cc040c187080023017030881428420600020003028214014634a2418118ca243401384b04000c210a8a22010440022400c1000009a404205e8d248204c04840010c8200812c400900080503440000dc94000f013a10118c0240000418c2404c740d1301c008c720840d09a490382480041a6028808088200077211caa5e8002c060e09001002210e81180420404514004000a800552854026c02646a002062cf4902000a381000042201280414032102c8000480c000281080025818210624804420b07000209011000a701613610d90155041088008200a70080010038204814000b20084c22c40c2a343c78004061092400220220288370c3248090a41a06257a90ca0140820c52090400300053b2900e080081220880122000454cc820720a9202b80804254a003a02f40cc800032c4c170240c602a1172222022d4100050804242002494600019a25808862a004104005b8014300d015042208406aa40c2006c18045580d239b1000c84534000900010023024040434000708008d44b704cb051072d22200841c9483003d0008014111c128920b031002502222e20905145e430a4e4283210104014149cd12a49055069020022a1a901a01088110341400041011050f0a8084010bc052640d000ce101361800182102268287"
+      }
+    },
+    {
+      "id": "arith-00687",
+      "corpus": "arith/cases.jsonl",
+      "family": "arith/wide",
+      "where": "prevout 0",
+      "note": "two OP_PUSHDATA1 pushes of 100 bytes around OP_ADD, then OP_EQUAL",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "02000000017e81e4195bdd6465a4af748011a45c02675521f1861d33ebb8e583c635ced42600000000664c641af5ac9ca06b43cf51c5956f08a6a2edbf5272e8d5a27cba8a245e0386f3d1f38006f2074ad7e3c44291a1a1a5a9a4148a3c7d3445731e09c19d739bd1baffe394c204fb129357f8f82b56984a0aa3b2ef4a70c2942b72e2bd2bd608a55db59d9038ff09ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "4c6465103c008242d8375ade362af2f0353167b8fe49e154157dcbb9a376b2bb93fd4cfbeac46684cacf31203212fc4036d77c4ed2a8c50a578170ac7874075f634aa460cf9f0f430cf7c7a68f285c6ed9b33ef3f94276a67f64917601a21751a35049800362934c647f05e99c22ae1b07aca3cc99fa96d81e270b7132b7f7913756de017a38af65f1cd01ddccb05bae9474b1d3b3a1eadaeb068b4fdd0a7e758a314aec0fd919632e3923d49a22d663efc0d2e5c0a6787c662e3e6a050bd2f1464fa2d7aabcae58eed9b8026c87"
+      },
+      "reference_rewritten": {
+        "hex": "4c6465103c008242d8375ade362af2f0353167b8fe49e154157dcbb9a376b2bb93fd4cfbeac46684cacf31203212fc4036d77c4ed2a8c50a578170ac7874075f634aa460cf9f0f430cf7c7a68f285c6ed9b33ef3f94276a67f64917601a21751a35049800362934c647f05e99c22ae1b07aca3cc99fa96d81e270b7132b7f7913756de017a38af65f1cd01ddccb05bae9474b1d3b3a1eadaeb068b4fdd0a7e758a314aec0fd919632e3923d49a22d663efc0d2e5c0a6787c662e3e6a050bd2f1464fa2d7aabcae58eed9b8026c87"
+      }
+    },
+    {
+      "id": "seed-000647",
+      "corpus": "seed/seed.jsonl",
+      "family": "mutation/lock",
+      "where": "prevout 0",
+      "note": "OP_9, then a top-level OP_RETURN and six bytes of data",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "0200000001baa870d0cd3d75db2f49a5ae447402a5e31b53d3f1ccbb47b8a8ec9547a8d3e3000000000403baac05ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "596a808103ba0579"
+      },
+      "reference_rewritten": {
+        "hex": "596a808103ba0579"
+      }
+    },
+    {
+      "id": "gen-00999",
+      "corpus": "gen/gen.jsonl",
+      "family": "sighash/original/truncated-push/pushdata1/short-payload",
+      "where": "prevout 0",
+      "note": "a 33-byte key push, OP_CHECKSIG, then a top-level OP_RETURN and four bytes",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "tx": "0200000001f81e0cf3c931477cbe57a9388d22c15466688974e66c7a7fae77a5623925265d0000000049483045022100e7bd08a7cf0a1bda318923e1e931e83070adb546eed21d79fbc92ef12966f958022071a9fada8e08eafc1758a8dc47501e4999ea89774872a3d96d0611d5aab7548761ffffffff010100000000000000015100000000",
+      "prevout_satoshis": 1000,
+      "script": {
+        "hex": "2103913a7b50432835163ebc6aa9cad8c3f52e6a37df35be520213a2fa5c0be9b353ac6a4c05aabb"
+      },
+      "reference_rewritten": {
+        "hex": "2103913a7b50432835163ebc6aa9cad8c3f52e6a37df35be520213a2fa5c0be9b353ac6a4c05aabb"
+      }
+    },
+    {
+      "id": "seed-000785",
+      "corpus": "seed/seed.jsonl",
+      "family": "elem/size",
+      "where": "input 0",
+      "note": "OP_PUSHDATA2 of 65535 bytes, the last OP_PUSHDATA2 length",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 967896,
+        "era": "post-chronicle",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "script": {
+        "len": 65538,
+        "head": "4dffffababababababababababababab",
+        "sha256": "cd296e41626f544ed610c41fc23bd93ff3a3ca7602a1c7eba9eb9c26e270dfe5"
+      },
+      "reference_rewritten": {
+        "len": 65538,
+        "head": "4dffffababababababababababababab",
+        "sha256": "cd296e41626f544ed610c41fc23bd93ff3a3ca7602a1c7eba9eb9c26e270dfe5"
+      }
+    },
+    {
+      "id": "tx-00040",
+      "corpus": "tx/tx.jsonl",
+      "family": "tx/policy/tx-size/over",
+      "where": "output 0",
+      "note": "OP_0, a top-level OP_RETURN and 10000034 bytes (an OP_PUSHDATA4 of 10000029 zeros)",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      },
+      "params": {
+        "spend_height": 620600,
+        "era": "post-genesis",
+        "consensus": true,
+        "tx_version": 2
+      },
+      "script": {
+        "len": 10000036,
+        "head": "006a4e9d969800000000000000000000",
+        "sha256": "f124b0979629bae733cb229c32e4244c22fa09036b1d13011cc9d8ed0d13aa6e"
+      },
+      "reference_rewritten": {
+        "len": 10000036,
+        "head": "006a4e9d969800000000000000000000",
+        "sha256": "f124b0979629bae733cb229c32e4244c22fa09036b1d13011cc9d8ed0d13aa6e"
+      }
+    }
+  ],
+  "pushes": [
+    {
+      "len": 75,
+      "from": "bytes-00076 prevout 0 chunk 0",
+      "op": 75,
+      "reference": {
+        "hex": "4b010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+      },
+      "data": {
+        "fill": 1
+      }
+    },
+    {
+      "len": 80,
+      "from": "arith-00011 prevout 0 chunk 0",
+      "op": 76,
+      "reference": {
+        "hex": "4c501376b5ffc9c2de2b702f8299b6d75abc441eeef2b276795be03edbdca78280406d5b3e85a17396c5ef0c565b88a94f13326bfa0a6a03af81a6e7cd95fbc1a975c7ce1c06f347f2624f734c9c1f58ba9d"
+      },
+      "data": {
+        "hex": "1376b5ffc9c2de2b702f8299b6d75abc441eeef2b276795be03edbdca78280406d5b3e85a17396c5ef0c565b88a94f13326bfa0a6a03af81a6e7cd95fbc1a975c7ce1c06f347f2624f734c9c1f58ba9d"
+      }
+    },
+    {
+      "len": 100,
+      "from": "arith-00687 prevout 0 chunk 0",
+      "op": 76,
+      "reference": {
+        "hex": "4c6465103c008242d8375ade362af2f0353167b8fe49e154157dcbb9a376b2bb93fd4cfbeac46684cacf31203212fc4036d77c4ed2a8c50a578170ac7874075f634aa460cf9f0f430cf7c7a68f285c6ed9b33ef3f94276a67f64917601a21751a35049800362"
+      },
+      "data": {
+        "hex": "65103c008242d8375ade362af2f0353167b8fe49e154157dcbb9a376b2bb93fd4cfbeac46684cacf31203212fc4036d77c4ed2a8c50a578170ac7874075f634aa460cf9f0f430cf7c7a68f285c6ed9b33ef3f94276a67f64917601a21751a35049800362"
+      }
+    },
+    {
+      "len": 520,
+      "from": "arith-00013 prevout 0 chunk 0",
+      "op": 77,
+      "reference": {
+        "hex": "4d0802e67d470d5a903461eb6d524e381bebef667918341ea5303e79b35a66f7a9dc1cb35391c928a2671d55f79d104fd6cd242c18f19247b41f275c87dacca97138f986f03af9c5b663daae7e598cb74f421bd4b66a51c618aba2e310c72466402d722655da4b4b55ffd6ca62cd0d840672dc620b56cc4f9236da56f55b424fcd4141f1b3a14799e2b60604c1ed24ecf761d53c3fcbacf28c52fd9bc9238a681063b70fab198d8346477231caedfa5cecf60e4d003266214ee138d7e3c4d794514f08e814dd29d48bec0a656a40b16affcd32040f3e75481c637528dc541ff312c8406580c059e8f0e087d859a12fa6c046a1b07104f49cb14d4b789753e1cdd29dd4692ba98aa06e718e265c239b148b4310fb06f5f2fc42c3b363cfc9272e749344c326324fe83f0df279094a6ba772f7bb0de3bc09a0cd30b16987240dff7d81ea804a1666aec72a1a0454fea20f62bd62bbc8ca52d5bf07a26fc0cc880073e4c77524ace96a51f3322aaad590d750ba624b81359ee90c1be27938d72e14510fb05f98157cfd4d734a2ba49eea48cb346cf81c5596fffdb1402ca65f598ad4973b66ba64a446b66457281f8d66b745dbc573f2f26200a47fd7ab237d0e9853cb11c3a9d65b77155a583f33f69d45f77e43aa4e4e8b3ded2d91c1ededd2a6b15d1e92600a3a3e90da791aa9b0349786a610f9859f0a8095efcbc4d3f54f12dde34f3e18d0bcb712aede"
+      },
+      "data": {
+        "hex": "e67d470d5a903461eb6d524e381bebef667918341ea5303e79b35a66f7a9dc1cb35391c928a2671d55f79d104fd6cd242c18f19247b41f275c87dacca97138f986f03af9c5b663daae7e598cb74f421bd4b66a51c618aba2e310c72466402d722655da4b4b55ffd6ca62cd0d840672dc620b56cc4f9236da56f55b424fcd4141f1b3a14799e2b60604c1ed24ecf761d53c3fcbacf28c52fd9bc9238a681063b70fab198d8346477231caedfa5cecf60e4d003266214ee138d7e3c4d794514f08e814dd29d48bec0a656a40b16affcd32040f3e75481c637528dc541ff312c8406580c059e8f0e087d859a12fa6c046a1b07104f49cb14d4b789753e1cdd29dd4692ba98aa06e718e265c239b148b4310fb06f5f2fc42c3b363cfc9272e749344c326324fe83f0df279094a6ba772f7bb0de3bc09a0cd30b16987240dff7d81ea804a1666aec72a1a0454fea20f62bd62bbc8ca52d5bf07a26fc0cc880073e4c77524ace96a51f3322aaad590d750ba624b81359ee90c1be27938d72e14510fb05f98157cfd4d734a2ba49eea48cb346cf81c5596fffdb1402ca65f598ad4973b66ba64a446b66457281f8d66b745dbc573f2f26200a47fd7ab237d0e9853cb11c3a9d65b77155a583f33f69d45f77e43aa4e4e8b3ded2d91c1ededd2a6b15d1e92600a3a3e90da791aa9b0349786a610f9859f0a8095efcbc4d3f54f12dde34f3e18d0bcb712aede"
+      }
+    },
+    {
+      "len": 600,
+      "from": "arith-00643 prevout 0 chunk 0",
+      "op": 77,
+      "reference": {
+        "hex": "4d5802197c8c5f4b604f909be6c5d9e0e0d767305e678ae12ed3e8f27c6254e62458d7008d7f0f04fbcca3dc7c358693c484355e043b40735c7e1a72c747cced91f90bb3ed285beead23b124ad0af9ec54809d0b9af2d3a9bbb72a90605201b336df3d3abd39140615a41a02efab821cc7d77f9e6915792609d4a3126078a717221f24810b5bf16614f6250d66777b0c88b982d69507868200500c14f23fa6b60d72375b36061734ad6b9d9a6721eae024771eab5d71056b68c31899581a1dedc351877cd230ae47acb1be853f6934adfd4bbd1a6232a33effdc8bea35454e4f84a24df816ef5c17c36f329ab8d95d7f5ee2305bccd76daab07091a9eaeba850d676eefebf3b4006ff85c8569214304796ac41be88462956f0fc08cc210f59f0349497bfc779e7a48a3a514f3fcf05793d702b01ee14f08c54a52207672e3d533adb3ebcf6321baabd076989f2ba9a724338e15363a15ef030b0f4ca82f2c4b3b81111aa3aafbfe48bdf4d394ed3d2b2f95e06f1f1857f712c4034c222e6b687600ab354d00586f0062bedf661d0e8e3cb7006a5c25bc2aa718ae47cb9d53ce8d4086fdbe558017aa91df83043e5ad615272455bef644ce8542a61a6264569ee5886571d74309a0b30e833fca59acda4880bebfee20415021f6daf05bd24fe3764d87af6800c552a911b9b5f96a1f530a93d5b8f1e44f17515122725c430ce6801dfdb50651770dfe4e8915e67e5ecf690db9fe17d6e056bb36e1b33cc8ac039787b4b9f69534d9746e5e2d13badb00a0e35a8e1e1d57439b5825bb1d710c36baa0d7d4d3c252262f9de94da9cc2e8aefc263ad50b2d1bca0d1782"
+      },
+      "data": {
+        "hex": "197c8c5f4b604f909be6c5d9e0e0d767305e678ae12ed3e8f27c6254e62458d7008d7f0f04fbcca3dc7c358693c484355e043b40735c7e1a72c747cced91f90bb3ed285beead23b124ad0af9ec54809d0b9af2d3a9bbb72a90605201b336df3d3abd39140615a41a02efab821cc7d77f9e6915792609d4a3126078a717221f24810b5bf16614f6250d66777b0c88b982d69507868200500c14f23fa6b60d72375b36061734ad6b9d9a6721eae024771eab5d71056b68c31899581a1dedc351877cd230ae47acb1be853f6934adfd4bbd1a6232a33effdc8bea35454e4f84a24df816ef5c17c36f329ab8d95d7f5ee2305bccd76daab07091a9eaeba850d676eefebf3b4006ff85c8569214304796ac41be88462956f0fc08cc210f59f0349497bfc779e7a48a3a514f3fcf05793d702b01ee14f08c54a52207672e3d533adb3ebcf6321baabd076989f2ba9a724338e15363a15ef030b0f4ca82f2c4b3b81111aa3aafbfe48bdf4d394ed3d2b2f95e06f1f1857f712c4034c222e6b687600ab354d00586f0062bedf661d0e8e3cb7006a5c25bc2aa718ae47cb9d53ce8d4086fdbe558017aa91df83043e5ad615272455bef644ce8542a61a6264569ee5886571d74309a0b30e833fca59acda4880bebfee20415021f6daf05bd24fe3764d87af6800c552a911b9b5f96a1f530a93d5b8f1e44f17515122725c430ce6801dfdb50651770dfe4e8915e67e5ecf690db9fe17d6e056bb36e1b33cc8ac039787b4b9f69534d9746e5e2d13badb00a0e35a8e1e1d57439b5825bb1d710c36baa0d7d4d3c252262f9de94da9cc2e8aefc263ad50b2d1bca0d1782"
+      }
+    },
+    {
+      "len": 65535,
+      "from": "seed-000785 input 0 chunk 0",
+      "op": 77,
+      "reference": {
+        "len": 65538,
+        "head": "4dffffababababababababababababab",
+        "sha256": "cd296e41626f544ed610c41fc23bd93ff3a3ca7602a1c7eba9eb9c26e270dfe5"
+      },
+      "data": {
+        "fill": 171
+      }
+    },
+    {
+      "len": 1,
+      "from": null,
+      "op": 1,
+      "reference": {
+        "hex": "0101"
+      },
+      "data": {
+        "pattern": "(7i + 1) mod 256"
+      }
+    },
+    {
+      "len": 76,
+      "from": null,
+      "op": 76,
+      "reference": {
+        "hex": "4c4c01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e"
+      },
+      "data": {
+        "pattern": "(7i + 1) mod 256"
+      }
+    },
+    {
+      "len": 255,
+      "from": null,
+      "op": 76,
+      "reference": {
+        "hex": "4cff01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3"
+      },
+      "data": {
+        "pattern": "(7i + 1) mod 256"
+      }
+    },
+    {
+      "len": 256,
+      "from": null,
+      "op": 77,
+      "reference": {
+        "hex": "4d000101080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa"
+      },
+      "data": {
+        "pattern": "(7i + 1) mod 256"
+      }
+    },
+    {
+      "len": 65536,
+      "from": null,
+      "op": 78,
+      "reference": {
+        "len": 65541,
+        "head": "4e0000010001080f161d242b32394047",
+        "sha256": "dcffac44304290bbbd82c12e0e9f9d4e82c7f42149780528d8141c6a762d0d8c"
+      },
+      "data": {
+        "pattern": "(7i + 1) mod 256"
+      }
+    },
+    {
+      "len": 16777216,
+      "from": null,
+      "op": 78,
+      "reference": {
+        "len": 16777221,
+        "head": "4e0000000101080f161d242b32394047",
+        "sha256": "7dcfda17d267da68dabc3ea46e80c109c0655be1f8d5bbc55f9e082c435358e9"
+      },
+      "data": {
+        "pattern": "(7i + 1) mod 256"
+      }
+    }
+  ],
+  "op_return_push": {
+    "id": "tx-00040",
+    "where": "output 0",
+    "data_len": 10000029,
+    "fill": 0,
+    "reference": {
+      "len": 10000036,
+      "head": "006a4e9d969800000000000000000000",
+      "sha256": "f124b0979629bae733cb229c32e4244c22fa09036b1d13011cc9d8ed0d13aa6e"
+    }
+  },
+  "bound": [
+    {
+      "len": 4294967295,
+      "op": 78
+    },
+    {
+      "len": 4294967296,
+      "throws": "You can't push that much data"
+    }
+  ],
+  "numbers": [
+    {
+      "value": "-2",
+      "reference": "0182",
+      "id": "seed-000040",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/1ADD",
+      "where": "input 0",
+      "corpus_push": "0182",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "17",
+      "reference": "0111",
+      "id": "arith-00101",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/lshift",
+      "where": "prevout 0",
+      "corpus_push": "0111",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "127",
+      "reference": "017f",
+      "id": "seed-000126",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/ADD",
+      "where": "input 0",
+      "corpus_push": "017f",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-127",
+      "reference": "01ff",
+      "id": "seed-000092",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/1ADD",
+      "where": "prevout 0",
+      "corpus_push": "01ff",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "128",
+      "reference": "028000",
+      "id": "arith-00005",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/and",
+      "where": "prevout 0",
+      "corpus_push": "028000",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-128",
+      "reference": "028080",
+      "id": "seed-000092",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/1ADD",
+      "where": "input 0",
+      "corpus_push": "028080",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-129",
+      "reference": "028180",
+      "id": "seed-000001",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/ABS",
+      "where": "input 0",
+      "corpus_push": "028180",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "255",
+      "reference": "02ff00",
+      "id": "seed-000101",
+      "corpus": "seed/seed.jsonl",
+      "family": "elem/size",
+      "where": "prevout 0",
+      "corpus_push": "02ff00",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-255",
+      "reference": "02ff80",
+      "id": "seed-000824",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/DIV",
+      "where": "prevout 0",
+      "corpus_push": "02ff80",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "256",
+      "reference": "020001",
+      "id": "seed-000159",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/MIN",
+      "where": "input 0",
+      "corpus_push": "020001",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-256",
+      "reference": "020081",
+      "id": "seed-005218",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/NEGATE",
+      "where": "prevout 0",
+      "corpus_push": "020081",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "32767",
+      "reference": "02ff7f",
+      "id": "seed-000195",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/ABS",
+      "where": "input 0",
+      "corpus_push": "02ff7f",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-32767",
+      "reference": "02ffff",
+      "id": "seed-000050",
+      "corpus": "seed/seed.jsonl",
+      "family": "num/nonminimal",
+      "where": "prevout 0",
+      "corpus_push": "02ffff",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "32768",
+      "reference": "03008000",
+      "id": "seed-000020",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/ADD",
+      "where": "input 0",
+      "corpus_push": "03008000",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-32768",
+      "reference": "03008080",
+      "id": "seed-000030",
+      "corpus": "seed/seed.jsonl",
+      "family": "splice/num2bin/toonarrow",
+      "where": "input 0",
+      "corpus_push": "03008080",
+      "verdicts": {
+        "bsv-rs@0.7.0": "invalid",
+        "sv-node@v1.2.3": "invalid"
+      }
+    },
+    {
+      "value": "65535",
+      "reference": "03ffff00",
+      "id": "arith-00117",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/lshift",
+      "where": "prevout 0",
+      "corpus_push": "03ffff00",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "65536",
+      "reference": "03000001",
+      "id": "arith-00119",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/lshift",
+      "where": "prevout 0",
+      "corpus_push": "03000001",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "2147483647",
+      "reference": "04ffffff7f",
+      "id": "arith-00121",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/lshift",
+      "where": "prevout 0",
+      "corpus_push": "04ffffff7f",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "2147483648",
+      "reference": "050000008000",
+      "id": "arith-00123",
+      "corpus": "arith/cases.jsonl",
+      "family": "bitwise/lshift",
+      "where": "prevout 0",
+      "corpus_push": "050000008000",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-2147483648",
+      "reference": "050000008080",
+      "id": "seed-000027",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/NUMEQUAL",
+      "where": "input 0",
+      "corpus_push": "050000008080",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "9223372036854775807",
+      "reference": "08ffffffffffffff7f",
+      "id": "seed-000044",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/NUMNOTEQUAL",
+      "where": "input 0",
+      "corpus_push": "08ffffffffffffff7f",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-9223372036854775807",
+      "reference": "08ffffffffffffffff",
+      "id": "seed-000133",
+      "corpus": "seed/seed.jsonl",
+      "family": "arith/SUB",
+      "where": "input 0",
+      "corpus_push": "08ffffffffffffffff",
+      "verdicts": {
+        "bsv-rs@0.7.0": "valid",
+        "sv-node@v1.2.3": "valid"
+      }
+    },
+    {
+      "value": "-9223372036854775808",
+      "reference": "09000000000000008080"
+    }
+  ]
+}

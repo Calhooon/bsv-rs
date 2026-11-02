@@ -69,6 +69,8 @@ mod not_judged;
 pub mod op;
 #[allow(clippy::module_inception)]
 pub mod script;
+#[cfg(test)]
+mod script_length_603_tests;
 pub mod script_num;
 pub mod spend;
 pub mod template;
