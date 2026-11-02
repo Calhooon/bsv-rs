@@ -145,11 +145,18 @@ impl Beef {
         self.bumps.iter().find(|b| b.contains(txid))
     }
 
-    /// Finds a transaction and populates its input source transactions from this BEEF.
+    /// Finds a transaction and links each input that has no source
+    /// transaction to the one this BEEF holds under its txid, as
+    /// `Beef.findTransactionForSigning` does (`Beef.ts:615-631` at
+    /// `ts-stack@edf6e03`); until #603 the inputs were left unlinked.
     pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction> {
-        let beef_tx = self.find_txid(txid)?;
-        let tx = beef_tx.tx()?.clone();
-        // Would need to populate source transactions - simplified for now
+        let mut tx = self.find_txid(txid)?.tx()?.clone();
+        for input in &mut tx.inputs {
+            if input.source_transaction.is_none() {
+                let held = input.source_txid.as_deref().and_then(|t| self.find_txid(t));
+                input.source_transaction = held.and_then(BeefTx::tx).cloned().map(Box::new);
+            }
+        }
         Some(tx)
     }
 
@@ -1158,51 +1165,42 @@ impl Beef {
         }
     }
 
-    /// Returns a summary string of this BEEF.
+    /// A summary of this BEEF in `Beef.toLogString`'s text (`Beef.ts:1698-1733`
+    /// at `ts-stack@edf6e03`; until #603 `BUMPs`, no list separators and no
+    /// txids list for a BUMP that flags none).
     pub fn to_log_string(&mut self) -> String {
         let mut log = format!(
-            "BEEF with {} BUMPs and {} Transactions, isValid {}\n",
+            "BEEF with {} BUMPS and {} Transactions, isValid {}\n",
             self.bumps.len(),
             self.txs.len(),
             self.is_valid(false)
         );
-
+        let listed = |txids: &[String]| {
+            let lines: Vec<String> = txids.iter().map(|t| format!("      '{t}'")).collect();
+            lines.join(",\n")
+        };
         for (i, bump) in self.bumps.iter().enumerate() {
-            log.push_str(&format!("  BUMP {}\n", i));
-            log.push_str(&format!("    block: {}\n", bump.block_height));
-            let txids: Vec<String> = bump.txids();
-            if !txids.is_empty() {
-                log.push_str("    txids: [\n");
-                for txid in txids {
-                    log.push_str(&format!("      '{}'\n", txid));
-                }
-                log.push_str("    ]\n");
-            }
+            log.push_str(&format!("  BUMP {i}\n    block: {}\n", bump.block_height));
+            log.push_str(&format!("    txids: [\n{}\n    ]\n", listed(&bump.txids())));
         }
-
         for (i, tx) in self.txs.iter().enumerate() {
-            log.push_str(&format!("  TX {}\n", i));
-            log.push_str(&format!("    txid: {}\n", tx.txid()));
+            log.push_str(&format!("  TX {}\n    txid: {}\n", i, tx.txid()));
             if let Some(bump_idx) = tx.bump_index() {
                 log.push_str(&format!("    bumpIndex: {}\n", bump_idx));
             }
             if tx.is_txid_only() {
                 log.push_str("    txidOnly\n");
             } else {
-                log.push_str(&format!(
-                    "    rawTx length={}\n",
-                    tx.raw_tx().map(|r| r.len()).unwrap_or(0)
-                ));
+                let length = tx.raw_tx().map(|r| r.len()).unwrap_or(0);
+                log.push_str(&format!("    rawTx length={length}\n"));
             }
             if !tx.input_txids.is_empty() {
-                log.push_str("    inputs: [\n");
-                for input_txid in &tx.input_txids {
-                    log.push_str(&format!("      '{}'\n", input_txid));
-                }
-                log.push_str("    ]\n");
+                log.push_str(&format!(
+                    "    inputs: [\n{}\n    ]\n",
+                    listed(&tx.input_txids)
+                ));
             }
         }
-
         log
     }
 }
@@ -1212,6 +1210,9 @@ impl Default for Beef {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod reference_603_tests;
 
 #[cfg(test)]
 mod tests {
