@@ -9,6 +9,11 @@ name: Nightly oracles
 # for a prerelease.
 on:
   workflow_dispatch:
+    inputs:
+      commit:
+        description: The commit to measure, a full sha on the dispatched line (empty for the line's commit at the dispatch, #629)
+        required: false
+        default: ''
 
 # Every job names its own permissions; only the fuzz job, which files its
 # crashes, may write issues.
@@ -62,14 +67,20 @@ jobs:
     outputs:
       commit: ${{ steps.source.outputs.commit }}
     steps:
+      # #629: the pin is the dispatch's commit (the input's, else github.sha,
+      # which GitHub fixes when it creates the run), never the line's tip when
+      # this job dequeues; the line is only asked whether it holds the commit.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # GitHub loads schedules from the default branch; judge beta's sources.
-          ref: ${{ github.event_name == 'schedule' && 'beta' || github.ref }}
+          ref: ${{ inputs.commit || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - id: source
-        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          COMMIT: ${{ inputs.commit || github.sha }}
+          LINE: ${{ github.ref_name }}
+        run: python3 .github/scripts/nightly_mutants.py pin --commit "$COMMIT" --line "$LINE"
 
       - name: Check the scoreboard's failure cases
         run: python3 -B -m unittest discover -s .github/scripts -p 'test_nightly_mutants.py' -v
@@ -97,6 +108,7 @@ jobs:
     env:
       SURFACE: ${{ matrix.surface }}
       SHARD: ${{ matrix.shard }}
+      SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
       # The conformance suites in the script, BEEF and Merkle selections skip
       # without the corpus, so the oracle reads it as ci.yml's vectors job does,
       # at the commit the pinned totals were audited against (#602, #31). The
@@ -192,7 +204,7 @@ jobs:
         run: |
           status=0
           python3 .github/scripts/nightly_mutants.py run \
-            --surface "$SURFACE" --shard "$SHARD/4" \
+            --surface "$SURFACE" --shard "$SHARD/4" --commit "$SOURCE_COMMIT" \
             --output "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" || status=$?
           # Misses (2) and timeouts (3) are judged by the per-file floor below.
           # Baseline, setup and runner failures remain failures of this job.
@@ -243,10 +255,12 @@ jobs:
       # --against` refuses to lower or remove.
       - name: Publish every file's score and enforce its floor
         if: always()
+        env:
+          SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
         run: |
           python3 .github/scripts/nightly_mutants.py report \
             --input "$RUNNER_TEMP/mutation-results" --expected-shards 4 \
-            --floors docs/ratchets.json \
+            --floors docs/ratchets.json --commit "$SOURCE_COMMIT" \
             --output "$RUNNER_TEMP/mutation-summary.json"
 
       - name: Upload the scoreboard

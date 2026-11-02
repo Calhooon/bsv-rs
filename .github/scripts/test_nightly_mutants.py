@@ -243,6 +243,80 @@ class ScoreTests(unittest.TestCase):
             nightly.run(argparse.Namespace(output=self.root))
 
 
+class PinIsTheDispatchCommit(unittest.TestCase):
+    """#629: a run dispatched at A whose pin job dequeues after B lands measures A."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.repo = Path(self.temp.name)
+        environment = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                       "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                       "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+        self.git_env = dict(os.environ, **environment)
+        self.git("init", "-q", "-b", "beta")
+        self.dispatched = self.commit("A")
+        # The line moves on (B lands) after the dispatch and before the pin job.
+        self.landed = self.commit("B")
+        self.git("update-ref", "refs/remotes/origin/beta", self.landed)
+        self.git("checkout", "-q", "-b", "side", self.dispatched)
+        self.off_line = self.commit("C")
+        self.output = self.repo / "github_output"
+        patcher = patch.dict(os.environ, {"GITHUB_OUTPUT": str(self.output)})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def git(self, *args):
+        return nightly.subprocess.check_output(["git", *args], cwd=self.repo, text=True,
+                                               env=self.git_env).strip()
+
+    def commit(self, message):
+        self.git("commit", "-q", "--allow-empty", "-m", message)
+        return self.git("rev-parse", "HEAD")
+
+    def pin(self, commit):
+        return nightly.pin(argparse.Namespace(commit=commit, line="beta", repo=self.repo))
+
+    def test_a_queued_run_pins_the_dispatch_commit_not_the_line_tip_at_dequeue(self):
+        self.assertEqual(self.pin(self.dispatched), 0)
+        self.assertEqual(self.output.read_text(), f"commit={self.dispatched}\n")
+        self.assertNotIn(self.landed, self.output.read_text())
+
+    def test_a_dispatch_naming_a_commit_not_on_the_line_is_refused(self):
+        self.assertEqual(self.pin(self.off_line), 1)
+        self.assertFalse(self.output.exists())
+
+    def test_a_pin_that_is_not_a_full_sha_is_refused(self):
+        for name in ("beta", "origin/beta", "HEAD", self.dispatched[:12]):
+            self.assertEqual(self.pin(name), 1, name)
+        self.assertFalse(self.output.exists())
+
+    def test_a_shard_records_the_pin_and_refuses_another_checkout(self):
+        pinned = "a" * 40
+        with patch.object(nightly.subprocess, "check_output", return_value=pinned + "\n"):
+            self.assertEqual(nightly.checkout_commit(pinned), pinned)
+        with patch.object(nightly.subprocess, "check_output", return_value="b" * 40 + "\n"):
+            with self.assertRaises(SystemExit):
+                nightly.checkout_commit(pinned)
+
+    def test_the_report_names_the_pin_and_refuses_another_commit(self):
+        scores = ScoreTests("test_exact_floor_and_unviable_exclusion")
+        scores.setUp()
+        self.addCleanup(scores.doCleanups)
+        scores.fixture(["CaughtMutant"] * 4, commit=self.landed)
+        output = self.repo / "summary.json"
+        floors = self.repo / "ratchets.json"
+        floors.write_text("{}")
+        with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}):
+            status = nightly.report(argparse.Namespace(
+                input=scores.root, output=output, expected_shards=None,
+                floors=floors, commit=self.dispatched))
+        self.assertEqual(status, 1)
+        self.assertIn(f"not the pinned commit {self.dispatched}",
+                      json.loads(output.read_text())["errors"][-1])
+        self.assertIn(f"Source commit: `{self.dispatched}`", output.with_suffix(".md").read_text())
+
+
 class DerivedFloorsOnlyRise(unittest.TestCase):
     def test_floors_are_the_score_rounded_down_outside_the_gate_and_never_lowered(self):
         import mutants_record as record

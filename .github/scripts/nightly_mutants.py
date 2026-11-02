@@ -37,6 +37,7 @@ SURFACES = {
 GATE_FLOOR = 80
 FLOORS_RECORD = Path("docs/ratchets.json")
 ISSUE_PREFIX = "https://github.com/Calhooon/bsv-rs/issues/"
+FULL_SHA = re.compile(r"[0-9a-f]{40}")
 OUTCOMES = {
     "CaughtMutant": "caught", "MissedMutant": "missed",
     "Timeout": "timeout", "Unviable": "unviable",
@@ -127,6 +128,33 @@ def mutation_args(surface, shard, files=()):
     return args
 
 
+def pin(args):
+    """The run's source commit: the dispatch's, never a line's tip at dequeue (#629)."""
+    commit = args.commit.strip()
+    if not FULL_SHA.fullmatch(commit):
+        print(f"::error::the pin {args.commit!r} is not a full commit sha (#629)")
+        return 1
+    # The line is only asked whether it holds the commit; the pin is never read from it.
+    held = subprocess.run(["git", "merge-base", "--is-ancestor", commit,
+                           f"refs/remotes/origin/{args.line}"], cwd=args.repo, check=False)
+    if held.returncode != 0:
+        print(f"::error::the dispatch names {commit}, which is not on {args.line}: refused (#629)")
+        return 1
+    print(f"commit={commit}")
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+            output.write(f"commit={commit}\n")
+    return 0
+
+
+def checkout_commit(pinned):
+    """The pinned commit, refused unless the checkout is at it; a local replay's HEAD."""
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    if pinned is not None and head != pinned:
+        raise SystemExit(f"the checkout is at {head}, not the pinned {pinned} (#629)")
+    return head if pinned is None else pinned
+
+
 def run(args):
     root = args.output.resolve()
     # Never let an interrupted retry inherit an older run's successful evidence.
@@ -139,7 +167,7 @@ def run(args):
         subprocess.run(command + ["--list", "--json"], stdout=dest, check=True, env=environment)
     metadata = {
         "surface": args.surface, "shard": args.shard,
-        "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "commit": checkout_commit(args.commit),
         "command": command,
         "cargo_incremental": "1",
         "rustc_version": subprocess.check_output(["rustc", "--version"], text=True).strip(),
@@ -332,9 +360,14 @@ def collect(root, expected_shards, floors):
 
 
 def report(args):
+    commit = getattr(args, "commit", None)
     try:
         floors = load_floors(args.floors)
         result = collect(args.input, args.expected_shards, floors)
+        if commit is not None and result["commits"] != [commit]:
+            result["errors"].append(f"results describe {result['commits']}, "
+                                    f"not the pinned commit {commit} (#629)")
+            result["complete"] = result["passed"] = False
     except (OSError, KeyError, ValueError, TypeError) as error:
         result = {"schema_version": 1, "complete": False, "passed": False,
                   "files": [], "errors": [f"invalid mutation evidence: {error}"]}
@@ -343,6 +376,7 @@ def report(args):
              "Score = caught / (caught + missed + timeout); unviable mutants are excluded.",
              f"Floors: {GATE_FLOOR}% on the gate paths; elsewhere `mutation_floors` "
              f"in `{args.floors}` (#602).", "",
+             *([f"Source commit: `{commit}` (the dispatch's, #629).", ""] if commit else []),
              "| File | Caught | Missed | Timeout | Unviable | Score | Floor | Result |",
              "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"]
     for row in result["files"]:
@@ -376,6 +410,7 @@ def main():
     runner.add_argument("--shard", default="0/1")
     runner.add_argument("--file", action="append", default=[])
     runner.add_argument("--output", type=Path, required=True)
+    runner.add_argument("--commit", help="the pin job's commit; the checkout must be at it (#629)")
     runner.set_defaults(func=run)
     packer = subs.add_parser("package")
     packer.add_argument("--run", type=Path, required=True)
@@ -387,7 +422,13 @@ def main():
     reporter.add_argument("--expected-shards", type=int)
     reporter.add_argument("--floors", type=Path, default=FLOORS_RECORD,
                           help="the record whose mutation_floors member holds the floors (#602)")
+    reporter.add_argument("--commit", help="the pin job's commit, which every shard must name (#629)")
     reporter.set_defaults(func=report)
+    pinner = subs.add_parser("pin", help="pin the run to the dispatch's commit (#629)")
+    pinner.add_argument("--commit", required=True, help="the dispatch's commit, a full sha")
+    pinner.add_argument("--line", required=True, help="the line the commit must be on")
+    pinner.add_argument("--repo", type=Path, default=Path("."))
+    pinner.set_defaults(func=pin)
     args = parser.parse_args()
     return args.func(args)
 
