@@ -1,12 +1,12 @@
-FILE — eighteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/pull/538#issuecomment-6539950425); pending the owner's cadence word.
+FILE — eighteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/pull/538#issuecomment-6539950425); filed as bsv-blockchain/ts-stack#1467 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
 
 # Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with rather than the coordinates given
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created.
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1467 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
 Eighteenth in the queue, on the keeper's word of 2026-10-31 06:1xZ
-(recorded on bsv-rs PR #538); pending the owner's cadence word.
+(recorded on bsv-rs PR #538).
 
 `PublicKey.fromString` accepts an uncompressed or hybrid key whose x or y
 is at or above the field prime p, computes with the coordinate reduced in
