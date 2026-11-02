@@ -763,6 +763,10 @@ fn hash_pair(left: &str, right: &str) -> String {
 }
 
 #[cfg(test)]
+#[path = "merkle_path_603_tests.rs"]
+mod mutants_603_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
