@@ -42,6 +42,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |
+| `merkle_path_603_tests.rs` | #603's witnesses for `MerklePath`'s constructor rules, `combine` and `trim` (test-only, wired in `mod.rs`): the reference's recordings in `tests/vectors/merkle_path_603.json` over BUMPs of the sibling's `corpus/wire/bump.jsonl` and the conformance corpus |
 | `beef.rs` | `Beef` (BRC-62/95/96): the type, the public readers (over `beef/collect.rs`), `verify_structure`, sorting, merging, the writers (`to_binary`, the atomic closure), logging |
 | `beef/collect.rs` | The whole-BEEF reader: the streaming decoder's collect mode collected into a `Beef`, with the stream's judge beside it (#86) |
 | `beef/reference_603_tests.rs` | #603: the surviving mutants' tests, the sibling's `corpus/wire` rows against the reference's answers (`tests/vectors/beef_reference_603.json`); a test module inside the BEEF surface's `--lib` selection, outside the `beef*.rs` mutation glob |

@@ -276,3 +276,10 @@ class SkipsNeverMatchInsideTheKeptRoot(unittest.TestCase):
                 for path in kept:
                     self.assertNotIn(skip, path, f"{surface}: skip {skip!r} matches inside kept {path!r}")
 
+
+class MerkleSurfaceKeepsItsSiblingTests(unittest.TestCase):
+    def test_the_merkle_surface_runs_merkle_path_603_tests(self):
+        skips = nightly.test_skips("merkle")
+        name = "transaction::merkle_path_603_tests::a_test"
+        self.assertFalse(any(skip in name for skip in skips), skips)
+        self.assertIn("transaction::beef::", skips)

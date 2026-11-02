@@ -72,7 +72,10 @@ def test_skips(surface):
         skip.append(f"{name}::")
     if surface in ("wire", "substrates", "merkle"):
         keep = {"wire": "wire", "substrates": "substrates", "merkle": "merkle_path"}[surface]
-        skip += [f"{root}::{name}::" for name in modules(f"src/{root}/mod.rs") if name != keep]
+        # The Merkle reader's tests live beside it too (`merkle_path_603_tests`,
+        # #603): every module whose name starts with `merkle_path` is kept.
+        skip += [f"{root}::{name}::" for name in modules(f"src/{root}/mod.rs")
+                 if not (name == keep or surface == "merkle" and name.startswith(keep))]
     if surface == "beef":
         skip += ["transaction::merkle_path::", "the_whole_path_walks_a_wide_bump_in_linear_time"]
     if surface == "merkle":

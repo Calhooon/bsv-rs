@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/merkle_path.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 25 survivors in `src/transaction/merkle_path.rs`
+(64 caught of 89 viable, 71.91 percent): the constructor's tree-height bound and
+legal-offset rule (`new_internal`, lines 160 to 194), `combine`'s extension to the
+other's levels (415), `trim` (455 to 494) and the shared root walk (`RootWalker`,
+592, 628, 660). The readers build a path through the stream, never through `new`,
+so under each survivor no entry of the sibling's corpora moves (`bsv-script-lean`
+at `387dab35`: the nine corpora of `harness/run --corpus all`, every one GREEN, and
+the 150 rows of `corpus/wire` through `run_wire`, both identical to the base
+column; a caught mutant at `merkle_path.rs:648` moves 192 lines of the wire
+column, the loop's control). The tests are seven in
+`src/transaction/merkle_path_603_tests.rs` against `tests/vectors/merkle_path_603.json`,
+which `tests/support/merkle_path_603.mjs` records under Node v22.18.0 from the
+reference's `MerklePath.ts` at `ts-stack@edf6e03` over BUMPs copied by their ids
+from the sibling's `corpus/wire/bump.jsonl` and the conformance corpus's
+`merkle-path.json` (`mp-parse-001`, `mp-combine-001`). The bound falls to
+`the_tree_height_bound_is_64_levels_bump_lean_66_wire_bump_001_029` (BRC-74's 64,
+the sibling's `bumpMaxTreeHeight`, `lean/BsvChain/Views/Wire/BUMP.lean:66`); the
+legal offsets (`MerklePath.ts:220-235`) to
+`legal_offsets_admit_every_path_the_reference_admits_wire_bump_rows_and_mp_parse_combine_001`,
+`a_level_0_duplicate_takes_no_part_in_the_offset_rule_wire_bump_007` and
+`an_offset_off_every_path_is_refused_by_legal_offsets_alone_wire_bump_008_014_018`,
+which also kill `RootWalker::root_from`'s meeting check (628); `combine` and
+`trim` (`MerklePath.ts:508-594`) to
+`combine_of_two_paths_of_one_block_is_the_references_compound_wire_bump_pairs`
+(every ordered pair of two mainnet rows of one block),
+`combine_extends_a_shorter_path_to_the_others_levels_wire_bump_005` and
+`trim_drops_a_level_0_pair_with_no_client_txid_wire_bump_023_to_026` (the four
+compound rows, each also with one client txid's flag cleared). Killed by tests 21, declared equivalent 4,
+remaining 0: `merkle_path.rs:592:13` (the `shared` field deleted) and the three
+replacements of the guard at `660:27`/`660:33`. Each changes only which nodes a
+later walk reuses: a node's hash at a level and offset is a function of its
+inputs, not of the walk that reaches it (BRC-74's root derivation), and every
+walk still returns its root, which the constructor compares with the first
+(`MerklePath.ts:242-261`, the sibling's `Bump.root`, `BUMP.lean:382-393`), so a
+differing root is refused before any mark is read and no verdict, root or byte
+moves. Declared on three reads: the cold read (0.92), the adversarial read
+(equivalent ×4, 0.93: paths sharing every internal node and none, duplicates on
+both sides of a shared node, a lone leaf at offset 0 and off it, `combine` and
+`trim` after walks) and the rule read (equivalent ×4, 0.95). The three guard
+mutants are `exclude_re` entries in `.cargo/mutants.toml`; `592:13` has no
+entry there, because cargo-mutants 27.1.0 adds a struct-field deletion without
+its name filter (`src/visit.rs:703-747`), so it still lists and still survives,
+the oracle's one standing miss on this file until the tool filters it. The Merkle surface's selection
+(`test_skips('merkle')`, `.github/scripts/nightly_mutants.py`) skipped every
+`transaction::` module but `merkle_path`, so under the oracle the seven tests
+never ran (64 caught, 25 missed, 0 timed out, 12 unviable on this tip, the cold
+read's re-measure); it now keeps every `transaction::` module whose name starts
+with `merkle_path`, pinned by
+`test_the_merkle_surface_runs_merkle_path_603_tests` in
+`.github/scripts/test_nightly_mutants.py` (`transaction::beef::` still skipped).
+Re-measured on the tip under the fixed selection's `mutation_args` with the
+conformance corpus at `ts-stack@edf6e03`: 85 caught, 4 missed, 0 timed out,
+12 unviable, 95.51 percent of viable; with the three guard mutants declared
+(98 listed): 85 caught, 1 missed (`592:13`), 0 timed out, 12 unviable, 98.84
+percent of viable. No behaviour changes.
+
+### Notes: cross-SDK parity (#603)
+
+The recorded vector shows three differences from the reference's `MerklePath`
+at `ts-stack@edf6e03`. Each is older than #603. None is a change. Two are the
+reference's bugs, for the keeper's filing queue. First, the reference refuses a
+path of more than 54 levels (`MerklePath.ts:198-199`, `Merkle Path must contain
+between 1 and 54 levels`), in its constructor and so in `fromBinary`, narrower
+than BRC-74's 64 (`transactions/0074.md:51`, the sibling's `BUMP.lean:66`), which
+this crate holds; the vector records the reference's refusal of the 64-level path
+beside this crate's root for it, the root the reference's own walk climbs to one
+level at a time. Second, `combine` of a receiver with fewer levels than the
+other: the reference merges over the receiver's levels alone (`:520`), so
+`bump-005` combined into its own level 1 gives one level and a root other than
+the one its combine checked; this crate extends the receiver to the other's
+levels and gives `bump-005` back byte for byte, its root unchanged. Go at
+`2ca481c` indexes past the receiver's levels there
+(`transaction/merklepath.go:453-467`) and has no level bound or offset rule in
+`NewMerklePath` (`:149`). Third, a crate-side difference this crate conforms
+under #631, not a divergence it keeps: a leaf off every path is refused in the
+reference's words up to the height, without its `, with legal offsets: …` list
+(`:230-235`); this PR does not change the text. No block holds 2^54
+transactions, and a path's verdict on the BEEF and BUMP readers is the stream's
+(bsv-rs#167).
+The line is in CLAUDE.md's divergence list.
+
 ### Added: src/script/script.rs's surviving mutants, shard B (the chunk parser), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129) left 28 mutants alive in
