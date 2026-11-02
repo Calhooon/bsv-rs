@@ -1,0 +1,9 @@
+{
+  "description": "#603 shard S3: the sibling's reader (bsv-stack-lean lean/BeefOfAnySize.lean readBytes) on a BEEF of two BUMPs carrying one txid (BUMP A at 800000: the anchor, two proven txids and the duplicate marker; BUMP B at 800006: the anchor again), the anchor under BUMP A and an unproven subject spending the anchor's two outputs; plain and under the Atomic prefix",
+  "recorder": "tests/support/beef_stream_603_s3.lean, Lean 4.34.0, the stand-in hashing of lean/BeefOfAnySize/Scenarios.lean",
+  "sibling": "bsv-stack-lean@9a69056314a0d7bebc84ed9b16af6fdf081fcca5",
+  "rows": [
+    {"name": "two_bumps_one_txid", "bytes": 334, "verdict": "accepted", "steps": 4, "work": 405, "index_size": 14},
+    {"name": "two_bumps_one_txid_atomic", "bytes": 370, "verdict": "accepted", "steps": 4, "work": 428, "index_size": 14}
+  ]
+}
