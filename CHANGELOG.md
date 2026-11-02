@@ -7,6 +7,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the CHECKSIG scriptCode built from the bytes as the node builds it, so an unlocking-script check after a codeseparator keeps the locking script whatever chunk follows (#654)
+
+The scriptCode of `OP_CHECKSIG`, `OP_CHECKSIGVERIFY`, `OP_CHECKMULTISIG` and
+`OP_CHECKMULTISIGVERIFY` was built from the executing script's chunks after the
+last `OP_CODESEPARATOR`, the locking script's chunks appended inside the
+unlocking script, then written through `Script::to_binary`'s chunk serializer
+(`build_subscript` and the CHECKMULTISIG site, `src/script/spend/crypto.rs`).
+That serializer stops at an `OP_RETURN` chunk holding data, and the parser
+folds every byte after a top-level `OP_RETURN` into one such chunk, so for an
+unlocking script `<sig> <P> OP_CODESEPARATOR OP_CHECKSIG OP_RETURN 01 00` over
+the locking script `OP_VERIFY OP_1` (U2) the scriptCode here was `ac6a0100`,
+the locking script dropped. bitcoin-sv v1.2.3 builds it from the bytes
+(`interpreter.cpp:1470-1484`, `1566-1579`; `script.h:201-224`):
+
+```cpp
+CScript scriptCode {pbegincodehash, pend};
+if(checksigData && IsChronicle(flags))
+{
+    scriptCode += *checksigData;
+}
+CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
+```
+
+the unlocking script's bytes from the last executed codeseparator to its end,
+then the locking script's bytes, `ac6a01006951`; `CleanupScriptCode`
+(`:255-263`) deletes a signature's push only without `SIGHASH_FORKID`, by
+`FindAndDelete`'s walk of `GetOp` instructions, which reads through an
+`OP_RETURN`. Under the post-Chronicle `block` and `standard` words (a version-2
+spend is malleable there, `:2321-2334`, so the unlocking script need not be
+push-only) the spend the node signs was refused here (`OP_VERIFY requires the
+top stack value to be truthy.`) and a spend signed over this crate's digest was
+accepted here and refused by the node: a consensus difference on the block
+word, through `Spend`, `Transaction::verify` and the streaming reader alike.
+
+Two more readings went with it. The locking script was appended inside the
+unlocking script under every word, where the node appends it only under
+`SCRIPT_CHRONICLE` (`IsChronicle(flags)`): under a pre-Chronicle word that does
+not require a push-only unlocking script (`ScriptFlags::block(ProtocolEra::PostGenesis)`
+without `SIGPUSHONLY`, or `set_require_push_only(false)` after it) the node
+signs the unlocking script's bytes alone. And a non-FORKID signature's push
+behind a top-level `OP_RETURN` was not deleted (the folded chunk never equals
+the push), where the node's walk deletes it: no word reaches this (a word
+carries `SIGHASH_FORKID`, which forces STRICTENC, `:2315-2318`, and refuses the
+signature at its encoding), the default mode does (#429 verifies a `0x01` signature over
+the original digest there).
+
+The fix: `src/script/spend/script_code.rs` builds the scriptCode at both sites
+as the node does: the executing script's bytes from the last executed
+`OP_CODESEPARATOR` (the chunk index's byte offset) to its end; inside the
+unlocking script the locking script's bytes, under a word carrying `CHRONICLE`
+and in the default mode at every version (the reference's `Spend` appends at
+every version, `Spend.ts:1688-1690`); then, for each signature without the
+FORKID bit, `FindAndDelete` of its minimal push ported byte for byte
+(`find_and_delete`, `GetOp2`'s read, consecutive copies, the bytes after a
+read that fails kept). No public API changes. `crypto.rs` frees the lines it
+held (439 from 499); `spend/mod.rs` stays at 800.
+
+The modes, U2 at version 2 (the full table in the vector):
+
+| Mode | Before | After | Node (Lean) | TypeScript default |
+|---|---|---|---|---|
+| `block` / `standard`, post-Chronicle, node-signed | refused (`OP_VERIFY`) | valid | valid | (no word) |
+| `block` / `standard`, post-Chronicle, signed over `ac6a0100` | valid | refused | invalid | (no word) |
+| default, `set_require_push_only(false)`, node-signed | refused | valid | | refused |
+| default, `set_require_push_only(false)`, signed over `ac6a0100` | valid | refused | | valid |
+
+The serializer's stop itself stays: it is the reference's writer
+(`Script.ts:450-484` at `ts-stack@edf6e03`), a script read from bytes writes
+its bytes back (the folded chunk is always its last), no template places a
+chunk behind such a chunk, and since #654 no scriptCode is built through it;
+only chunks a caller puts behind a data-carrying `OP_RETURN` are not written,
+as in the reference (pinned).
+
+A downstream on the live chain-parameter word (#440: the wallet toolbox's
+`verify_beef_spends`, `bsv-wallet-toolbox-rs` at `=0.9.0-beta.6`, on its next
+pin) refused a node-valid post-Chronicle spend whose unlocking script carries a
+codeseparator, a CHECKSIG and a data-carrying `OP_RETURN`, and accepted one the
+node refuses; after the update it accepts the node-valid spend and refuses the
+other. A default-mode caller (the overlay engine's submit door,
+`bsv-overlay-cloudflare` `script_door.rs`, `Spend` with no word, at `=0.7.2` on
+its `main`) refuses the unlocking-script shapes (U1, U2, U3, M2, P1) at
+push-only before and after, and on the update sees L1 alone (a `0x01` signature in the locking script behind its own
+`OP_RETURN`, a push-only unlocking script) accepted, where it was refused. The
+relay (`rust-message-box`, `=0.4.5`) sees nothing until it moves.
+
+The witnesses are `tests/sighash_scriptcode_654.rs`:
+`an_unlocking_checksig_signs_the_locking_script_past_a_top_level_op_return_654`
+(U2 under both post-Chronicle words, `ALL|FORKID` over BIP143 and
+`ALL|FORKID|CHRONICLE` over the original digest accepted, the old digest
+refused), `an_unlocking_checkmultisig_signs_the_locking_script_past_a_top_level_op_return_654`
+(M2, the same through `OP_CHECKMULTISIG`, run),
+`a_bare_op_return_ending_the_unlocking_script_keeps_the_locking_script_654`
+(U3, `ac6a6951` before, after and at the node),
+`an_unlocking_checksig_under_a_pre_chronicle_word_signs_the_unlocking_script_alone_654`
+(P1 and U2 under the post-Genesis block word without `SIGPUSHONLY`: the spend
+signed over the unlocking script's bytes alone valid, the one over the bytes
+with the locking script refused by NULLFAIL, `OP_CHECKSIG requires failing
+signatures to be empty.`),
+`a_non_forkid_signature_is_refused_by_the_words_before_its_script_code_654`
+(L1 and U1 under the five words, the words' refusal; L1 in the default mode
+valid), `the_chunk_serializer_keeps_the_references_stop_and_a_read_script_its_bytes_654`
+and `the_vector_holds_the_cases_this_crate_writes_and_their_verdicts_654`,
+against `tests/vectors/sighash_scriptcode_654.json`: twenty cases (ten shapes at
+versions 1 and 2, signatures by this crate's signer), each with its three
+scriptCodes (post-Chronicle, pre-Chronicle, this crate's before #654), the
+sibling's Lean evaluator's digest of each (`bsv-script-lean@387dab35` `eval/bsvs
+sighash`; U2's `6fd93a20...92f18370` the node's, `79a755dd...5b661b9900`
+this crate's before), this crate's verdict in seven modes, the evaluator's
+verdict under each of the five words (`eval --flags`; the node's rules,
+`Ops/Crypto.lean` `scriptCodeOf`, `Sighash.lean` `findAndDelete`; its
+self-test green on its flow and seed corpora), equal to this crate's on all
+100 cells, and the reference's default `Spend` verdict, recorded by
+`tests/support/sighash_scriptcode_654.mjs` under Node v22.18.0 from a bundle of
+`ts-stack@edf6e03`, two runs byte-identical. The `FindAndDelete` port answers
+the node's own unit cases (`src/script/spend/script_code_tests.rs`, as the
+Lean states them, `Sighash.lean:323-341`). RED on `3fd977be` (a scratch copy
+with the test and the vector alone): 5 of 6, U3 green there (the same
+scriptCode before and after).
+
+### Notes: cross-SDK parity (#654)
+
+The reference's `Spend` builds the scriptCode from chunks and writes it through
+the same stopping serializer (`ts-stack@edf6e03` `Spend.ts:1676-1702`,
+`Script.ts:450-484`), its parser folding the bytes after a top-level
+`OP_RETURN` into one chunk, a bare one as `data: []` (`Script.ts:608-610`), on
+which the serializer stops too. So in the default mode, where this crate now
+reads the node's bytes, the two differ: U2 at version 2 (the unlocking script
+need not be push-only there: the reference's default runs it; here with
+`set_require_push_only(false)`) is valid here and refused there when signed
+over the node's scriptCode, the converse when signed over `ac6a0100`; U3 at
+version 2 (a bare `OP_RETURN` ends the unlocking script) is valid here and at
+the node, refused there; M2 as U2; L1 at both versions (a push-only unlocking
+script, reachable with no switch) valid here, refused there, its signature's
+push behind the `OP_RETURN` kept in the reference's scriptCode. Under the words
+the reference has no parity mode to compare (its explicit flags append the
+locking script at every era, where the node appends it under `CHRONICLE`
+alone, P1). Go at `2ca481c` was not run here. Ours: the node's bytes
+(bitcoin-sv v1.2.3 `interpreter.cpp:1470-1484`, `script.h:201-224`), in every
+mode, as 0.3.27 made the scriptCode's cleanup the node's (bsv-rs#12). Theirs:
+a draft on the queue ([sighash-scriptcode-op-return-stop-ts-stack](./docs/lanes/375-filings/sighash-scriptcode-op-return-stop-ts-stack.md), row 27; unfiled).
+
 ### Fixed: the P2PK lock refuses a hybrid public key, and the Multisig lock a key not tagged 02/03 where every spend reaches it, locks whose spend no word lets pass (#625)
 
 `P2PK::lock` accepted a 65-byte hybrid key (`06`/`07` + x + y) and wrote

@@ -1,0 +1,834 @@
+{
+  "issue": 654,
+  "reference": "ts-stack@edf6e03 packages/sdk Spend, default mode (no flags), Node v22.18.0",
+  "node": "bsv-script-lean@387dab35 eval/bsvs (bitcoin-sv v1.2.3 6504a3af rules): --flags <word>, --consensus true for the block words and false for the standard words, prevout height 967000, spend height 967896",
+  "words": {
+    "block_post_chronicle": 4015663,
+    "block_post_genesis": 869935,
+    "block_post_genesis_no_sigpushonly": 869903,
+    "standard_post_chronicle": 4016127,
+    "standard_post_genesis": 870399
+  },
+  "cases": [
+    {
+      "name": "L1",
+      "version": 1,
+      "lock": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a483045022100ce954049f0df164277c3c054c13a7bcdbd60bfdd14a554c860837eb44c6824ae02200449f998eaded22146e161dd7e370d605e43abe79b34c71129b21fadf048828501",
+      "unlock": "483045022100ce954049f0df164277c3c054c13a7bcdbd60bfdd14a554c860837eb44c6824ae02200449f998eaded22146e161dd7e370d605e43abe79b34c71129b21fadf048828501",
+      "scope": 1,
+      "signed_over": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_pre_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_before_654": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a483045022100ce954049f0df164277c3c054c13a7bcdbd60bfdd14a554c860837eb44c6824ae02200449f998eaded22146e161dd7e370d605e43abe79b34c71129b21fadf048828501",
+      "lean_sighash": {
+        "chronicle": "5d683bbbbb092fee08614d098689ce9a41911c9d09f468796ee388a032558c95",
+        "pre_chronicle": "5d683bbbbb092fee08614d098689ce9a41911c9d09f468796ee388a032558c95",
+        "before_654": "515505c2f81b55dcd538b6b8ff754f6987f11a9e8c8a415b2039b1ab1af24b39"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000049483045022100ce954049f0df164277c3c054c13a7bcdbd60bfdd14a554c860837eb44c6824ae02200449f998eaded22146e161dd7e370d605e43abe79b34c71129b21fadf048828501ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
+        "block_post_genesis": "Err(The signature must use SIGHASH_FORKID.)",
+        "block_post_genesis_no_sigpushonly": "Err(The signature must use SIGHASH_FORKID.)",
+        "default": "Ok(true)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
+        "standard_post_genesis": "Err(The signature must use SIGHASH_FORKID.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_MUST_USE_FORKID",
+        "block_post_genesis": "SCRIPT_ERR_MUST_USE_FORKID",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_chronicle": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_genesis": "SCRIPT_ERR_MUST_USE_FORKID"
+      },
+      "ts_default": "Err(Script evaluation error: The top stack element must be truthy after script evaluation.)"
+    },
+    {
+      "name": "U1",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "483045022100d2c1835359ad076699dc0bca8c936238fd1bc5dc81393d530e19bf8492fc697602206b300c74dec528fac815fc8b2cc2b110ce22c60d8a21ed93ad00450a33c2daaa0121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a483045022100d2c1835359ad076699dc0bca8c936238fd1bc5dc81393d530e19bf8492fc697602206b300c74dec528fac815fc8b2cc2b110ce22c60d8a21ed93ad00450a33c2daaa01",
+      "scope": 1,
+      "signed_over": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a6951",
+      "script_code_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a6951",
+      "script_code_pre_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_before_654": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a483045022100d2c1835359ad076699dc0bca8c936238fd1bc5dc81393d530e19bf8492fc697602206b300c74dec528fac815fc8b2cc2b110ce22c60d8a21ed93ad00450a33c2daaa01",
+      "lean_sighash": {
+        "chronicle": "5f294be1a11676e8fee6f947057d301815226322a8ed39f8d46c4661076b8baa",
+        "pre_chronicle": "5d683bbbbb092fee08614d098689ce9a41911c9d09f468796ee388a032558c95",
+        "before_654": "b127f85a44353934f67d9ee05beccca835e66b139752bc33b54f7135d274a0a4"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a00000000b6483045022100d2c1835359ad076699dc0bca8c936238fd1bc5dc81393d530e19bf8492fc697602206b300c74dec528fac815fc8b2cc2b110ce22c60d8a21ed93ad00450a33c2daaa0121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a483045022100d2c1835359ad076699dc0bca8c936238fd1bc5dc81393d530e19bf8492fc697602206b300c74dec528fac815fc8b2cc2b110ce22c60d8a21ed93ad00450a33c2daaa01ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(The signature must use SIGHASH_FORKID.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "U2 0x41 node-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "483045022100ff77822c46593beff934852fd30eb3a5a98e6d7de656285f2075488ee350a83602200584a6bf376c4b8034e088674860a5ac20fa8c3c80731a8f7170054a8c99d48b4121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100",
+      "scope": 65,
+      "signed_over": "ac6a01006951",
+      "script_code_chronicle": "ac6a01006951",
+      "script_code_pre_chronicle": "ac6a0100",
+      "script_code_before_654": "ac6a0100",
+      "lean_sighash": {
+        "chronicle": "e8cc23f1c3ba6ac7c09fc2a076d9854581824c6ced8c14e710f43613e0be56a3",
+        "pre_chronicle": "ce255762fd7aa6f90a38c3a1bba5aaf18bb8e669d2f98c98295abcc41c2eb8cf",
+        "before_654": "ce255762fd7aa6f90a38c3a1bba5aaf18bb8e669d2f98c98295abcc41c2eb8cf"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000070483045022100ff77822c46593beff934852fd30eb3a5a98e6d7de656285f2075488ee350a83602200584a6bf376c4b8034e088674860a5ac20fa8c3c80731a8f7170054a8c99d48b4121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "U2 0x61 node-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "483045022100f9d53496573229108598c6f81d3701090602e791faa90fe541043e4586ec2eba0220724b3e52afc3bf7c192fdcd1a49478070dd4568a6cccc4ed56b5562aa1ed92fc6121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100",
+      "scope": 97,
+      "signed_over": "ac6a01006951",
+      "script_code_chronicle": "ac6a01006951",
+      "script_code_pre_chronicle": "ac6a0100",
+      "script_code_before_654": "ac6a0100",
+      "lean_sighash": {
+        "chronicle": "162f29c49b9d4bdfd4ca2b46fcf9326737c359ef8568816cb1c658c97e648f6d",
+        "pre_chronicle": "d91b678df664c0766d3bb2a2212fb1f1c3410892996c88c235bbacf00abc0302",
+        "before_654": "d91b678df664c0766d3bb2a2212fb1f1c3410892996c88c235bbacf00abc0302"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000070483045022100f9d53496573229108598c6f81d3701090602e791faa90fe541043e4586ec2eba0220724b3e52afc3bf7c192fdcd1a49478070dd4568a6cccc4ed56b5562aa1ed92fc6121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(The signature must not use SIGHASH_CHRONICLE before Chronicle.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(The signature format is invalid.)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_ILLEGAL_CHRONICLE",
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "U2 0x41 old-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "483045022100ebb843bfe45226fd7399744faac6ae1bcbc28297ae63535f2342abb3c444579c0220634921a76d8fb91df188ef931f081557a9ecc18cf05e34a717b4a2af37e5b0354121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100",
+      "scope": 65,
+      "signed_over": "ac6a0100",
+      "script_code_chronicle": "ac6a01006951",
+      "script_code_pre_chronicle": "ac6a0100",
+      "script_code_before_654": "ac6a0100",
+      "lean_sighash": {
+        "chronicle": "e8cc23f1c3ba6ac7c09fc2a076d9854581824c6ced8c14e710f43613e0be56a3",
+        "pre_chronicle": "ce255762fd7aa6f90a38c3a1bba5aaf18bb8e669d2f98c98295abcc41c2eb8cf",
+        "before_654": "ce255762fd7aa6f90a38c3a1bba5aaf18bb8e669d2f98c98295abcc41c2eb8cf"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000070483045022100ebb843bfe45226fd7399744faac6ae1bcbc28297ae63535f2342abb3c444579c0220634921a76d8fb91df188ef931f081557a9ecc18cf05e34a717b4a2af37e5b0354121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Ok(true)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "true",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": null,
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "U3",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "483045022100e05426a684dd6458ac75675608e284b26cda42fbce5d6b0bb2f1d6b30934b938022019c9af92d3f8c7ba549ad605b9a8005293d4f31e70ffb5736451ad364c3e16954121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a",
+      "scope": 65,
+      "signed_over": "ac6a6951",
+      "script_code_chronicle": "ac6a6951",
+      "script_code_pre_chronicle": "ac6a",
+      "script_code_before_654": "ac6a6951",
+      "lean_sighash": {
+        "chronicle": "f4d874ba52649c91d4680fdf7a7848180cd39d84a3d71678571362833563ec4d",
+        "pre_chronicle": "5e4cbe442f63ef4320106a2316659bc843e350f473222968a4f23631ff978754",
+        "before_654": "f4d874ba52649c91d4680fdf7a7848180cd39d84a3d71678571362833563ec4d"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006e483045022100e05426a684dd6458ac75675608e284b26cda42fbce5d6b0bb2f1d6b30934b938022019c9af92d3f8c7ba549ad605b9a8005293d4f31e70ffb5736451ad364c3e16954121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6affffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "M2 node-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "0047304402206b5c82f91f20ff2ea784732e7fcaa1f8a68d47e35e75ece10f2523b4f1c3a97d02206b4fdd42aa7da3eb16106484f77e6715b6f16adba92fedde1ac790af71ca8b28415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100",
+      "scope": 65,
+      "signed_over": "ae6a01006951",
+      "script_code_chronicle": "ae6a01006951",
+      "script_code_pre_chronicle": "ae6a0100",
+      "script_code_before_654": "ae6a0100",
+      "lean_sighash": {
+        "chronicle": "0ac4382ed668c41f75f9486eb9f36a071e437823b2b078f8268864d866288ea5",
+        "pre_chronicle": "75088443324f675dfa299af395701a5f549a8a35809abddcd2bc63decaa75e72",
+        "before_654": "75088443324f675dfa299af395701a5f549a8a35809abddcd2bc63decaa75e72"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a00000000720047304402206b5c82f91f20ff2ea784732e7fcaa1f8a68d47e35e75ece10f2523b4f1c3a97d02206b4fdd42aa7da3eb16106484f77e6715b6f16adba92fedde1ac790af71ca8b28415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKMULTISIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "M2 old-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "004830450221008ef579bc9239b15900277c13a6460d4a91ede79ebddcc93b03293024c516520402207de5109a09fa82ef3a94ac3b7bdb3a3cfb71b2f7cd8af3211cebda005dc5ebd7415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100",
+      "scope": 65,
+      "signed_over": "ae6a0100",
+      "script_code_chronicle": "ae6a01006951",
+      "script_code_pre_chronicle": "ae6a0100",
+      "script_code_before_654": "ae6a0100",
+      "lean_sighash": {
+        "chronicle": "0ac4382ed668c41f75f9486eb9f36a071e437823b2b078f8268864d866288ea5",
+        "pre_chronicle": "75088443324f675dfa299af395701a5f549a8a35809abddcd2bc63decaa75e72",
+        "before_654": "75088443324f675dfa299af395701a5f549a8a35809abddcd2bc63decaa75e72"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000073004830450221008ef579bc9239b15900277c13a6460d4a91ede79ebddcc93b03293024c516520402207de5109a09fa82ef3a94ac3b7bdb3a3cfb71b2f7cd8af3211cebda005dc5ebd7415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Ok(true)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "true",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": null,
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "P1 pre-Chronicle-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "473044022051d4cddea0f07a26dbb3b5c8538e2d7809e4ca31bb1706f8e19d8beec17c0d6902205000834552f3fbde8c2e5940332a91e01d5cb2528be53cb250c5c0a65c4b221f4121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac",
+      "scope": 65,
+      "signed_over": "ac",
+      "script_code_chronicle": "ac6951",
+      "script_code_pre_chronicle": "ac",
+      "script_code_before_654": "ac6951",
+      "lean_sighash": {
+        "chronicle": "79c870d8f556dc66c8dbb636ad41013c8d0341b7fcee3fe996236784592b78c9",
+        "pre_chronicle": "a79b2513ce8af8490af3401bd335845b2b61d7802d141732741bb0561c4bcef7",
+        "before_654": "79c870d8f556dc66c8dbb636ad41013c8d0341b7fcee3fe996236784592b78c9"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006c473044022051d4cddea0f07a26dbb3b5c8538e2d7809e4ca31bb1706f8e19d8beec17c0d6902205000834552f3fbde8c2e5940332a91e01d5cb2528be53cb250c5c0a65c4b221f4121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabacffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Ok(true)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "true",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": null,
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "P1 Chronicle-signed",
+      "version": 1,
+      "lock": "6951",
+      "unlock": "483045022100a28c6120bc1469fa3264727032685fbffa7041db5caeab9ffb817871f89ee7c502204b58457c99e95e2e440c58e71819bfa35494deeb4366974db74ec8034e9258a84121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac",
+      "scope": 65,
+      "signed_over": "ac6951",
+      "script_code_chronicle": "ac6951",
+      "script_code_pre_chronicle": "ac",
+      "script_code_before_654": "ac6951",
+      "lean_sighash": {
+        "chronicle": "79c870d8f556dc66c8dbb636ad41013c8d0341b7fcee3fe996236784592b78c9",
+        "pre_chronicle": "a79b2513ce8af8490af3401bd335845b2b61d7802d141732741bb0561c4bcef7",
+        "before_654": "79c870d8f556dc66c8dbb636ad41013c8d0341b7fcee3fe996236784592b78c9"
+      },
+      "tx": "01000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006d483045022100a28c6120bc1469fa3264727032685fbffa7041db5caeab9ffb817871f89ee7c502204b58457c99e95e2e440c58e71819bfa35494deeb4366974db74ec8034e9258a84121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabacffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": "SCRIPT_ERR_SIG_PUSHONLY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.)"
+    },
+    {
+      "name": "L1",
+      "version": 2,
+      "lock": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a473044022057e07861658f697b7fefbaf17e3f85a0bfb0e123964ad37a178c12789ef3c047022052191cc2b70414da3d0b8540ed5c8d01d0e128f757c0c8c8c81b5f9c7a2c7eb401",
+      "unlock": "473044022057e07861658f697b7fefbaf17e3f85a0bfb0e123964ad37a178c12789ef3c047022052191cc2b70414da3d0b8540ed5c8d01d0e128f757c0c8c8c81b5f9c7a2c7eb401",
+      "scope": 1,
+      "signed_over": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_pre_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_before_654": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a473044022057e07861658f697b7fefbaf17e3f85a0bfb0e123964ad37a178c12789ef3c047022052191cc2b70414da3d0b8540ed5c8d01d0e128f757c0c8c8c81b5f9c7a2c7eb401",
+      "lean_sighash": {
+        "chronicle": "99469cf8d37f738baad97c26bc179c8cafac9c739d421c718dea3be83001fdb0",
+        "pre_chronicle": "99469cf8d37f738baad97c26bc179c8cafac9c739d421c718dea3be83001fdb0",
+        "before_654": "b3ccf3e46eea971d9472a3829b52bc2d5cb2cbba06c0bea379710cf9d36470fa"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000048473044022057e07861658f697b7fefbaf17e3f85a0bfb0e123964ad37a178c12789ef3c047022052191cc2b70414da3d0b8540ed5c8d01d0e128f757c0c8c8c81b5f9c7a2c7eb401ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
+        "block_post_genesis": "Err(The signature must use SIGHASH_FORKID.)",
+        "block_post_genesis_no_sigpushonly": "Err(The signature must use SIGHASH_FORKID.)",
+        "default": "Ok(true)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
+        "standard_post_genesis": "Err(The signature must use SIGHASH_FORKID.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_MUST_USE_FORKID",
+        "block_post_genesis": "SCRIPT_ERR_MUST_USE_FORKID",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_chronicle": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_genesis": "SCRIPT_ERR_MUST_USE_FORKID"
+      },
+      "ts_default": "Err(Script evaluation error: The top stack element must be truthy after script evaluation.)"
+    },
+    {
+      "name": "U1",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "4730440220567cd90628438ccb7150371030926bdd3ddb5e0f1f9ef1813be6f5dd572ca72f02207f21b49690b1e41a49ecfabb6de2f14292198273870bb8d0931ad53b4247fead0121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a4730440220567cd90628438ccb7150371030926bdd3ddb5e0f1f9ef1813be6f5dd572ca72f02207f21b49690b1e41a49ecfabb6de2f14292198273870bb8d0931ad53b4247fead01",
+      "scope": 1,
+      "signed_over": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a6951",
+      "script_code_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a6951",
+      "script_code_pre_chronicle": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a",
+      "script_code_before_654": "21034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a4730440220567cd90628438ccb7150371030926bdd3ddb5e0f1f9ef1813be6f5dd572ca72f02207f21b49690b1e41a49ecfabb6de2f14292198273870bb8d0931ad53b4247fead01",
+      "lean_sighash": {
+        "chronicle": "7cce12364230d4842efe6df45e49436b376d2f0bbccc0e5b2f1a919dcd51fe95",
+        "pre_chronicle": "99469cf8d37f738baad97c26bc179c8cafac9c739d421c718dea3be83001fdb0",
+        "before_654": "37b62bfa90f1a42fbc2faf5c1036ec4f9b9dfa60f002ff42a24f439ff222ac4b"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a00000000b44730440220567cd90628438ccb7150371030926bdd3ddb5e0f1f9ef1813be6f5dd572ca72f02207f21b49690b1e41a49ecfabb6de2f14292198273870bb8d0931ad53b4247fead0121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaac6a4730440220567cd90628438ccb7150371030926bdd3ddb5e0f1f9ef1813be6f5dd572ca72f02207f21b49690b1e41a49ecfabb6de2f14292198273870bb8d0931ad53b4247fead01ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(The signature must use SIGHASH_FORKID.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_MUST_USE_FORKID",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_chronicle": "SCRIPT_ERR_MUST_USE_FORKID",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: OP_VERIFY requires the top stack value to be truthy.)"
+    },
+    {
+      "name": "U2 0x41 node-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "483045022100ea4ef806566a0b5a7adfee5adc2a4fea99ea5c95e6ba4145c59615b3aac6a57e022032ceba7244a07c92c652c83f652966ca6ac501456eccb44aaaf4a133bc6a712a4121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100",
+      "scope": 65,
+      "signed_over": "ac6a01006951",
+      "script_code_chronicle": "ac6a01006951",
+      "script_code_pre_chronicle": "ac6a0100",
+      "script_code_before_654": "ac6a0100",
+      "lean_sighash": {
+        "chronicle": "6fd93a207dfd7d1c053a4c820d0e17fd2e4f8e4d7470a3fe1affec6c92f18370",
+        "pre_chronicle": "79a755dd10ed5e6827f5f42b41fbd06702ff78e020a89e8551b903b5661b9900",
+        "before_654": "79a755dd10ed5e6827f5f42b41fbd06702ff78e020a89e8551b903b5661b9900"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000070483045022100ea4ef806566a0b5a7adfee5adc2a4fea99ea5c95e6ba4145c59615b3aac6a57e022032ceba7244a07c92c652c83f652966ca6ac501456eccb44aaaf4a133bc6a712a4121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Ok(true)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Ok(true)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "true",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "true",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": null,
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": null,
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: OP_VERIFY requires the top stack value to be truthy.)"
+    },
+    {
+      "name": "U2 0x61 node-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "483045022100d7e78f092f2d10aa548ed0968c2b0575d4b0d938500fed4155e58dfb6714033602205290814c455651751daea978a2c0a6043b5b838a5da106e153158b3da5725b7b6121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100",
+      "scope": 97,
+      "signed_over": "ac6a01006951",
+      "script_code_chronicle": "ac6a01006951",
+      "script_code_pre_chronicle": "ac6a0100",
+      "script_code_before_654": "ac6a0100",
+      "lean_sighash": {
+        "chronicle": "694a7de4b2d06061e91cf748b29cc0698580f620c896850b7aa9681ea064845a",
+        "pre_chronicle": "e1b273544f3207cae339310e02a8552bac2a7f40a41bba7167b1b87d5134d07f",
+        "before_654": "e1b273544f3207cae339310e02a8552bac2a7f40a41bba7167b1b87d5134d07f"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0000000070483045022100d7e78f092f2d10aa548ed0968c2b0575d4b0d938500fed4155e58dfb6714033602205290814c455651751daea978a2c0a6043b5b838a5da106e153158b3da5725b7b6121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Ok(true)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(The signature must not use SIGHASH_CHRONICLE before Chronicle.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Ok(true)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "true",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "true",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": null,
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_ILLEGAL_CHRONICLE",
+        "standard_post_chronicle": null,
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: OP_VERIFY requires the top stack value to be truthy.)"
+    },
+    {
+      "name": "U2 0x41 old-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "4730440220208870a4c1c96b935b2f5557c3d921c771fc8ca29400fe1bc65723ea5eaee60a02202f6356aa54ddfb0e07a647501933db9d21482ab7182998e8b2c8a67cdea5a6314121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100",
+      "scope": 65,
+      "signed_over": "ac6a0100",
+      "script_code_chronicle": "ac6a01006951",
+      "script_code_pre_chronicle": "ac6a0100",
+      "script_code_before_654": "ac6a0100",
+      "lean_sighash": {
+        "chronicle": "6fd93a207dfd7d1c053a4c820d0e17fd2e4f8e4d7470a3fe1affec6c92f18370",
+        "pre_chronicle": "79a755dd10ed5e6827f5f42b41fbd06702ff78e020a89e8551b903b5661b9900",
+        "before_654": "79a755dd10ed5e6827f5f42b41fbd06702ff78e020a89e8551b903b5661b9900"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006f4730440220208870a4c1c96b935b2f5557c3d921c771fc8ca29400fe1bc65723ea5eaee60a02202f6356aa54ddfb0e07a647501933db9d21482ab7182998e8b2c8a67cdea5a6314121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Ok(true)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "true",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_VERIFY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": null,
+        "standard_post_chronicle": "SCRIPT_ERR_VERIFY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Ok(true)"
+    },
+    {
+      "name": "U3",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "47304402203c0bc136d68b7a186c7dc50d9e351012212d400c998e08e0923d5d183378ee940220307fea513042fbdd31c76f99d0cff4fe2620de885c9f33a153caa10c6b1ee1a34121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6a",
+      "scope": 65,
+      "signed_over": "ac6a6951",
+      "script_code_chronicle": "ac6a6951",
+      "script_code_pre_chronicle": "ac6a",
+      "script_code_before_654": "ac6a6951",
+      "lean_sighash": {
+        "chronicle": "29fb24002f2707aea062d6e536436b7daf99397725c46e9e0d2c0b2301deb56c",
+        "pre_chronicle": "f2a4db8a30fdd46cb45dcb8262a9bb07dcfe8df679be644418654e6125a76c12",
+        "before_654": "29fb24002f2707aea062d6e536436b7daf99397725c46e9e0d2c0b2301deb56c"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006d47304402203c0bc136d68b7a186c7dc50d9e351012212d400c998e08e0923d5d183378ee940220307fea513042fbdd31c76f99d0cff4fe2620de885c9f33a153caa10c6b1ee1a34121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac6affffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Ok(true)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Ok(true)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "true",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "true",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": null,
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": null,
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: OP_VERIFY requires the top stack value to be truthy.)"
+    },
+    {
+      "name": "M2 node-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "00483045022100e2a33d31ffcac8993be655eddeb770119d67b87040187e63add420a17fdf51880220239f47c54afeab9e84f1db2e990cb1641f1a8d115f938fb7966b2181a8fcccea415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100",
+      "scope": 65,
+      "signed_over": "ae6a01006951",
+      "script_code_chronicle": "ae6a01006951",
+      "script_code_pre_chronicle": "ae6a0100",
+      "script_code_before_654": "ae6a0100",
+      "lean_sighash": {
+        "chronicle": "51fd5160615ba4464ba7207df7da06580a15bdb2bfcfe283b88015ab9cb4d376",
+        "pre_chronicle": "a939c07e65f62624e3f0df57b65a0aee8e8e832dd04383e247c6e41af4bac043",
+        "before_654": "a939c07e65f62624e3f0df57b65a0aee8e8e832dd04383e247c6e41af4bac043"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000007300483045022100e2a33d31ffcac8993be655eddeb770119d67b87040187e63add420a17fdf51880220239f47c54afeab9e84f1db2e990cb1641f1a8d115f938fb7966b2181a8fcccea415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Ok(true)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKMULTISIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Ok(true)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "true",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "true",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": null,
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": null,
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: OP_VERIFY requires the top stack value to be truthy.)"
+    },
+    {
+      "name": "M2 old-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "00483045022100aa4635791d9d43277c30cfeca95f5aaebc62d47c35ae798cfa39b07d8b90fe4c02200aafdb91b7d93f185fdb2545c58d2495b7173e01879c9e3613a9e777525e7fc2415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100",
+      "scope": 65,
+      "signed_over": "ae6a0100",
+      "script_code_chronicle": "ae6a01006951",
+      "script_code_pre_chronicle": "ae6a0100",
+      "script_code_before_654": "ae6a0100",
+      "lean_sighash": {
+        "chronicle": "51fd5160615ba4464ba7207df7da06580a15bdb2bfcfe283b88015ab9cb4d376",
+        "pre_chronicle": "a939c07e65f62624e3f0df57b65a0aee8e8e832dd04383e247c6e41af4bac043",
+        "before_654": "a939c07e65f62624e3f0df57b65a0aee8e8e832dd04383e247c6e41af4bac043"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000007300483045022100aa4635791d9d43277c30cfeca95f5aaebc62d47c35ae798cfa39b07d8b90fe4c02200aafdb91b7d93f185fdb2545c58d2495b7173e01879c9e3613a9e777525e7fc2415121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa51abae6a0100ffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Ok(true)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "true",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_VERIFY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": null,
+        "standard_post_chronicle": "SCRIPT_ERR_VERIFY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Ok(true)"
+    },
+    {
+      "name": "P1 pre-Chronicle-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "47304402202d22ba70dc0bdf6dce29c5f3100e3a2fa6fec186eeb54ed01de08adcd0a92c80022071aa5f76c749b5dc5b8c355c85e0f889a809b112840cab7799263470dc25f8944121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac",
+      "scope": 65,
+      "signed_over": "ac",
+      "script_code_chronicle": "ac6951",
+      "script_code_pre_chronicle": "ac",
+      "script_code_before_654": "ac6951",
+      "lean_sighash": {
+        "chronicle": "a880dcbabdb048c0272cdf05ffc3b9010c51ccb03fd13b35d1edc9e79523bc00",
+        "pre_chronicle": "25decaa89ce427aa60034368ec6dcdf730e294be240d3cd8771f111831a03979",
+        "before_654": "a880dcbabdb048c0272cdf05ffc3b9010c51ccb03fd13b35d1edc9e79523bc00"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006c47304402202d22ba70dc0bdf6dce29c5f3100e3a2fa6fec186eeb54ed01de08adcd0a92c80022071aa5f76c749b5dc5b8c355c85e0f889a809b112840cab7799263470dc25f8944121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabacffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Ok(true)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "false",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "true",
+        "standard_post_chronicle": "false",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": "SCRIPT_ERR_VERIFY",
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": null,
+        "standard_post_chronicle": "SCRIPT_ERR_VERIFY",
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Err(Script evaluation error: OP_VERIFY requires the top stack value to be truthy.)"
+    },
+    {
+      "name": "P1 Chronicle-signed",
+      "version": 2,
+      "lock": "6951",
+      "unlock": "483045022100f80d15a87cc3544f113c3eaa33124d4fd1615c5c4d365d2b237bac2095458b0f0220204be56ff76fc13dfa40bfbd534ff7f2a2b6540c78ad960cea42e90e6be690b24121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabac",
+      "scope": 65,
+      "signed_over": "ac6951",
+      "script_code_chronicle": "ac6951",
+      "script_code_pre_chronicle": "ac",
+      "script_code_before_654": "ac6951",
+      "lean_sighash": {
+        "chronicle": "a880dcbabdb048c0272cdf05ffc3b9010c51ccb03fd13b35d1edc9e79523bc00",
+        "pre_chronicle": "25decaa89ce427aa60034368ec6dcdf730e294be240d3cd8771f111831a03979",
+        "before_654": "a880dcbabdb048c0272cdf05ffc3b9010c51ccb03fd13b35d1edc9e79523bc00"
+      },
+      "tx": "02000000015a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a000000006d483045022100f80d15a87cc3544f113c3eaa33124d4fd1615c5c4d365d2b237bac2095458b0f0220204be56ff76fc13dfa40bfbd534ff7f2a2b6540c78ad960cea42e90e6be690b24121034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aaabacffffffff012823000000000000015100000000",
+      "rust": {
+        "block_post_chronicle": "Ok(true)",
+        "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
+        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default_no_push_only": "Ok(true)",
+        "standard_post_chronicle": "Ok(true)",
+        "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
+      },
+      "lean": {
+        "block_post_chronicle": "true",
+        "block_post_genesis": "false",
+        "block_post_genesis_no_sigpushonly": "false",
+        "standard_post_chronicle": "true",
+        "standard_post_genesis": "false"
+      },
+      "lean_code": {
+        "block_post_chronicle": null,
+        "block_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY",
+        "block_post_genesis_no_sigpushonly": "SCRIPT_ERR_SIG_NULLFAIL",
+        "standard_post_chronicle": null,
+        "standard_post_genesis": "SCRIPT_ERR_SIG_PUSHONLY"
+      },
+      "ts_default": "Ok(true)"
+    }
+  ]
+}
