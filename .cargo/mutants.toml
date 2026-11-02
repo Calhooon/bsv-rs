@@ -73,4 +73,29 @@ exclude_re = [
   '^src/script/script\.rs:814:17: replace \| with \^ in truncated_push_index$',
   '^src/script/script\.rs:815:17: replace \| with \^ in truncated_push_index$',
   '^src/script/script\.rs:816:17: replace \| with \^ in truncated_push_index$',
+  # src/script/script.rs:442:23 `<` to `<=` in write_bin, 486:29 `<` to `<=` in write_number,
+  # 488:27 `<` to `==`, `>` and `<=` in write_number, 507:28 `<` to `<=` in encode_script_number
+  # (#603, shard C, PR #636). The rules:
+  # - the direct-push bound differs only at length 76, where the direct opcode `76 as u8` is 0x4c,
+  #   OP_PUSHDATA1 itself, so both sides write the same chunk (442:23);
+  # - a number's minimal encoding of an i64 is at most nine bytes (eight of magnitude for 2^63
+  #   and a sign byte), so `len <= 75` always holds at 486:29 and 488:27's branch is never
+  #   reached;
+  # - zero returns before the sign test (and write_number pushes OP_0 for it before the call), so
+  #   `num < 0` and `num <= 0` agree on every value that reaches 507:28.
+  # bitcoin-sv v1.2.3 script.h:104-133 (CScript::operator<< of a vector) and script.cpp:228-251
+  # (push_int64, operator<< of a CScriptNum), CScriptNum::getvch script_num.cpp:465-483 on
+  # serialize int_serialization.h:23-59 (zero empty at :26-27); bsv-script-lean@5dc337e1
+  # lean/BsvScript/Sighash.lean:278-282 (pushData), Opcodes.lean:21 (OP_PUSHDATA1 = 0x4c),
+  # Numbers.lean:147 (encode) and :1019 (encode_length_le_iff); Script.ts writeBn:309-329,
+  # writeBin:338-360 and writeNumber:368-372 at ts-stack@edf6e03. Three reads, judged at
+  # b5e3f7d1: the cold read (accepts the six; FIX at 0.85 on other points), the adversarial read
+  # with push lengths 0 to 65537 and the i64 edges probed through the writers, from_asm and
+  # OP_NUM2BIN, all six diffs empty (EQUIVALENT x6, 0.97), the rule read (EQUIVALENT x6, 0.97).
+  '^src/script/script\.rs:442:23: replace < with <= in Script::write_bin$',
+  '^src/script/script\.rs:486:29: replace < with <= in Script::write_number$',
+  '^src/script/script\.rs:488:27: replace < with == in Script::write_number$',
+  '^src/script/script\.rs:488:27: replace < with > in Script::write_number$',
+  '^src/script/script\.rs:488:27: replace < with <= in Script::write_number$',
+  '^src/script/script\.rs:507:28: replace < with <= in Script::encode_script_number$',
 ]

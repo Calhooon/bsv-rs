@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/script.rs's surviving mutants, shard C (the writers), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left
+28 of the writers' mutants alive (`compute_serialized_length` 17,
+`serialize_chunks_to_bytes` 3, `write_bin` 3, `write_number` 4,
+`encode_script_number` 1). Killed by tests: 21. Declared equivalent: 6,
+named below, in `.cargo/mutants.toml`'s `exclude_re` on three reads that
+accept all six (judged at `b5e3f7d1`: the cold read; the adversarial read,
+EQUIVALENT ×6 at 0.97; the rule read, EQUIVALENT ×6 at 0.97). Remaining: 1, `write_bin`'s `451:32` (`<` to `<=` on the
+4 GiB bound): only an input of 2^32 bytes or more reaches it, and the
+oracle's shards run every test under `ulimit -v 4000000` (4,096,000,000
+bytes, `.github/scripts/test-runner-memory-ceiling.sh`, #574), where that
+allocation fails and aborts the shard's baseline; a test the oracle can
+never run is not a kill, so there is none (the reference's bound stays
+recorded in the vector's `bound`). Re-measured on this shard's functions
+(`--re 'compute_serialized_length|serialize_chunks_to_bytes|write_bin|write_number|encode_script_number'`,
+the script surface's selection from `nightly_mutants.py`'s `mutation_args`,
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, run as ten
+round-robin shards): 98 viable, 90 caught, 7 missed (`451:32` and the six
+candidates), 1 timed out (`511:23` `>` to `>=`, an endless loop, not a
+survivor of the census), 0 unviable: 91.8 percent caught
+of viable. With the six declared, the same run (ten round-robin shards,
+`--jobs 1`) lists 92: 92 viable, 90 caught, 1 missed (`451:32`), 1 timed out
+(`511:23`), 0 unviable, the six absent: 97.8 percent caught of viable.
+
+The sibling's whole corpus (`bsv-script-lean@5dc337e1`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
+of the 28: the harness reads every script with `from_binary`, whose bytes
+`to_binary` returns unwritten. The vectors reach the writers instead: the
+corpus's push, number and script shapes at the encoding edges, copied by id,
+and the reference's `Script.writeBin`, `writeBn` and `toBinary` at
+`ts-stack@edf6e03` under Node v22.18.0 for the shapes the corpus lacks
+(`tests/vectors/script_writers_603_c.json`, written by
+`tests/support/script_writers_603_c.mjs`, two runs byte-identical). The rules:
+`pushData` (`lean/BsvScript/Sighash.lean:275-282`, `CScript::operator<<`,
+`script.h:104-133`) with its `le32` length (`:66`); `encode`
+(`lean/BsvScript/Numbers.lean:134-147`, `CScriptNum::serialize`).
+
+- `src/script/script_length_603_tests.rs` (a unit module: the sum,
+  now `pub(crate)`, sizes the writer's buffer alone), the two-path rule with no
+  allocator assumption: `compute_serialized_length` of the chunks equals the
+  length of the bytes `to_binary` writes for them, which are the reference's,
+  and the length the reference's `toBinary` writes (`#computeSerializedLength`,
+  `Script.ts:450-476`). On the recording's eleven corpus scripts
+  (`bytes-00076` to `-00079`: a 75-byte direct push, `OP_PUSHDATA1`, `2`, `4`
+  of one byte; `arith-00011`, `-00013`, `-00687`; `seed-000647` and
+  `gen-00999`, data after a top-level `OP_RETURN`; `seed-000785`'s 65535-byte
+  push and `tx-00040`'s 10,000,036-byte output rebuilt by the writers) and
+  the writer's pushes at its twelve lengths, 1 to 2^24: all 17 of
+  `compute_serialized_length` (`328:9` `0` and `1`, `330:19`, `333:29`,
+  `334:27` `*=` and `-=`, `337:29` three, `339:36`, `340:27`, `340:32`,
+  `341:36`, `342:32`, `343:36`, `344:27`, `344:32`), and RED on each of the
+  function's 27 mutants in a scratch copy.
+- `tests/script_script_603_c.rs`: the push writer at each edge against the
+  reference's bytes and the corpus's (`seed-000785`'s 65535-byte push), 65536
+  bytes `OP_PUSHDATA4` `00 00 01 00` and 2^24 `00 00 00 01` (`448:23`, `380:38`,
+  `381:38`); `tx-00040`'s `OP_0 OP_RETURN` output rebuilt by the writers to the
+  corpus's 10,000,036 bytes, `4e 9d 96 98 00` (`379:38`, `380:38`); the number
+  writer on 22 corpus pushes by id (`seed-000040` -2 to `seed-000133`
+  -(2^63 - 1)) and `i64::MIN` by the reference; nine corpus scripts written
+  back from their chunks to their bytes and spent to their recorded verdicts
+  under the post-Chronicle block word.
+
+Each kill RED on its mutant in a scratch copy, every test green on the tree,
+and green under a simulated 4,096,000,000-byte ceiling (an allocator refusing
+past it; macOS refuses `ulimit -v`). The six declared equivalent, each with
+no corpus entry moving and no test of either file failing, on three reads:
+the cold read (accepts the six), the adversarial read (push lengths 0 to
+65537 at every edge and the `i64` edge set through the writers, `from_asm` and
+`OP_NUM2BIN`, all six diffs empty, two control mutants moving 81,966 and 1,220
+lines; EQUIVALENT ×6, 0.97), the rule read (`script.h:104-133`,
+`int_serialization.h:23-59` at bitcoin-sv v1.2.3; EQUIVALENT ×6, 0.97):
+
+- `write_bin` `442:23` (`<` to `<=`): at the one length where the branches
+  differ, 76, the direct branch's opcode is `76`, which is `OP_PUSHDATA1`, the
+  chunk the same and its bytes `pushData`'s (`Sighash.lean:279-280`; the
+  reference's recording at 76; the RPuzzle precedent, `rpuzzle.rs:350:34`).
+- `write_number` `486:29` (`<` to `<=`) and `488:27` (`<=`, `==`, `>`):
+  `encode` of an `i64` is at most nine bytes (`encode_length_le_iff`,
+  `Numbers.lean:1019`, bounds the length by the magnitude; 2^63 is eight bytes
+  and a sign byte), so the comparison with 76 is always true at
+  `486` and the `OP_PUSHDATA1`/`OP_PUSHDATA2` branch at `488` is never reached.
+- `encode_script_number` `507:28` (`<` to `<=`): zero returns before the sign
+  is read (`encode`'s `if v = 0 then []`, `Numbers.lean:147`), so `num <= 0`
+  and `num < 0` agree on every value that reaches it.
+
+No vector revealed a divergence from the reference.
+
 ### Added: src/script/script.rs's surviving mutants, shard D (the truncated-push index), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)

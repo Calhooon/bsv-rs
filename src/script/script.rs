@@ -324,7 +324,7 @@ impl Script {
     }
 
     /// Computes the serialized length of the chunks.
-    fn compute_serialized_length(chunks: &[ScriptChunk]) -> usize {
+    pub(crate) fn compute_serialized_length(chunks: &[ScriptChunk]) -> usize {
         let mut total = 0;
         for chunk in chunks {
             total += 1; // opcode byte

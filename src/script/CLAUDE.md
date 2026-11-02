@@ -43,6 +43,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `op.rs` | Opcode constants (u8) and name/value lookup functions via `LazyLock` HashMaps |
 | `chunk.rs` | `ScriptChunk` type representing individual script elements |
 | `script.rs` | Core `Script` class with parsing, serialization, builder methods, and type detection |
+| `script_length_603_tests.rs` | #603, shard C: the crate-visible `compute_serialized_length` (`pub(crate)` for this module, declared in `mod.rs`) by the two-path rule (the sum of the chunks = the length `to_binary` writes = the reference's `toBinary` length) on `tests/vectors/script_writers_603_c.json`'s eleven corpus scripts and twelve pushes; no allocator assumption. Of the writers' 28 survivors: killed 21, declared equivalent 6 in `.cargo/mutants.toml` on three reads (`442:23`, `486:29`, `488:27` ×3, `507:28`), remaining 1 (`451:32`, the 4 GiB bound) |
 | `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) with `to_address()` |
 | `unlocking_script.rs` | `UnlockingScript` newtype wrapper for input scripts (scriptSig) |
 | `address.rs` | `Address` type for P2PKH address parsing, creation, and Base58Check encoding |
