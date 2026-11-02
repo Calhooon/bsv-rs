@@ -11,6 +11,9 @@ use super::op::*;
 use crate::primitives::{from_hex, to_hex};
 use crate::Result;
 
+#[path = "script_asm.rs"]
+mod asm;
+
 /// The Script class represents a script in a Bitcoin SV transaction.
 ///
 /// Scripts can be constructed from ASM strings, hex strings, or binary data,
@@ -46,81 +49,6 @@ impl Script {
             raw_bytes_cache: RefCell::new(None),
             hex_cache: RefCell::new(None),
         }
-    }
-
-    /// Constructs a Script instance from an ASM (Assembly) formatted string.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use bsv_rs::script::Script;
-    ///
-    /// let script = Script::from_asm("OP_DUP OP_HASH160 abcd1234 OP_EQUALVERIFY OP_CHECKSIG").unwrap();
-    /// ```
-    pub fn from_asm(asm: &str) -> Result<Self> {
-        let mut chunks = Vec::new();
-
-        if asm.is_empty() {
-            return Ok(Self::from_chunks(chunks));
-        }
-
-        let tokens: Vec<&str> = asm.split(' ').filter(|s| !s.is_empty()).collect();
-        let mut i = 0;
-
-        while i < tokens.len() {
-            let token = tokens[i];
-            // "0" and "-1" first, then hex data (no opcode of that name) or an opcode
-            match name_to_opcode(token) {
-                _ if token == "0" => {
-                    chunks.push(ScriptChunk::new_opcode(OP_0));
-                    i += 1;
-                }
-                _ if token == "-1" => {
-                    chunks.push(ScriptChunk::new_opcode(OP_1NEGATE));
-                    i += 1;
-                }
-                None => {
-                    let mut hex = token.to_string();
-                    #[allow(unknown_lints, clippy::manual_is_multiple_of)]
-                    if hex.len() % 2 != 0 {
-                        hex = format!("0{}", hex);
-                    }
-                    let data = from_hex(&hex)?;
-                    let len = data.len();
-
-                    let op = if len < OP_PUSHDATA1 as usize {
-                        len as u8
-                    } else if len < 256 {
-                        OP_PUSHDATA1
-                    } else if len < 65536 {
-                        OP_PUSHDATA2
-                    } else {
-                        OP_PUSHDATA4
-                    };
-
-                    chunks.push(ScriptChunk::new(op, Some(data)));
-                    i += 1;
-                }
-                Some(op) => {
-                    if op == OP_PUSHDATA1 || op == OP_PUSHDATA2 || op == OP_PUSHDATA4 {
-                        // Format: OP_PUSHDATA1 <length> <hex>
-                        if i + 2 < tokens.len() {
-                            let data = from_hex(tokens[i + 2])?;
-                            chunks.push(ScriptChunk::new(op, Some(data)));
-                            i += 3;
-                        } else {
-                            chunks.push(ScriptChunk::new_opcode(op));
-                            i += 1;
-                        }
-                    } else {
-                        chunks.push(ScriptChunk::new_opcode(op));
-                        i += 1;
-                    }
-                }
-            }
-        }
-
-        Ok(Self::from_chunks(chunks))
     }
 
     /// Constructs a Script instance from a hexadecimal string.
@@ -174,12 +102,11 @@ impl Script {
         }
 
         if let Some(ref bytes) = *self.raw_bytes_cache.borrow() {
-            *self.chunks.borrow_mut() = Self::parse_chunks(bytes);
+            *self.chunks.borrow_mut() = Self::parse_chunks(bytes, true);
         }
         *self.parsed.borrow_mut() = true;
     }
 
-    /// Parses raw bytes into script chunks.
     /// The chunk index of the first push that declares more bytes than the
     /// script holds (a direct push, or a `OP_PUSHDATA1/2/4` whose length bytes
     /// or data are cut short), or `None` when every push is complete.
@@ -195,7 +122,13 @@ impl Script {
         truncated_push_index(&self.to_binary())
     }
 
-    fn parse_chunks(bytes: &[u8]) -> Vec<ScriptChunk> {
+    /// The reference's `#parseChunks` (`ts-stack@edf6e03` `Script.ts:599-631`):
+    /// the IF depth goes up on `OP_IF`/`OP_NOTIF`/`OP_VERIF`/`OP_VERNOTIF` and
+    /// down on `OP_ENDIF` with no floor (`:613-617`), and an `OP_RETURN` at
+    /// depth `=== 0` takes the rest as its data (`:608-611`). After a stray
+    /// `OP_ENDIF` the depth is negative, so `686a51` is three chunks (#634).
+    /// With `fold` false no `OP_RETURN` takes the rest (the node's `GetOp`).
+    fn parse_chunks(bytes: &[u8], fold: bool) -> Vec<ScriptChunk> {
         let mut chunks = Vec::new();
         let length = bytes.len();
         let mut pos = 0;
@@ -206,7 +139,7 @@ impl Script {
             pos += 1;
 
             // Handle OP_RETURN outside conditional blocks
-            if op == OP_RETURN && in_conditional_block == 0 {
+            if fold && op == OP_RETURN && in_conditional_block == 0 {
                 // Everything after OP_RETURN is data
                 let data = if pos < length {
                     Some(bytes[pos..].to_vec())
@@ -221,7 +154,7 @@ impl Script {
             if op == OP_IF || op == OP_NOTIF || op == OP_VERIF || op == OP_VERNOTIF {
                 in_conditional_block += 1;
             } else if op == OP_ENDIF {
-                in_conditional_block = (in_conditional_block - 1).max(0);
+                in_conditional_block -= 1;
             }
 
             // Handle push operations
@@ -285,14 +218,6 @@ impl Script {
         }
 
         chunks
-    }
-
-    /// Serializes the script to an ASM formatted string.
-    pub fn to_asm(&self) -> String {
-        self.ensure_parsed();
-        let chunks = self.chunks.borrow();
-        let parts: Vec<String> = chunks.iter().map(|c| c.to_asm()).collect();
-        parts.join(" ")
     }
 
     /// Serializes the script to a hexadecimal string.
@@ -787,7 +712,7 @@ fn truncated_push_index(bytes: &[u8]) -> Option<usize> {
         if op == OP_IF || op == OP_NOTIF || op == OP_VERIF || op == OP_VERNOTIF {
             in_conditional_block += 1;
         } else if op == OP_ENDIF {
-            in_conditional_block = (in_conditional_block - 1).max(0);
+            in_conditional_block -= 1;
         }
         let declared: Option<usize> = if op > 0 && op < OP_PUSHDATA1 {
             Some(op as usize)

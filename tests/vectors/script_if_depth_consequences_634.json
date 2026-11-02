@@ -1,0 +1,62 @@
+{
+  "source": "tests/support/script_if_depth_consequences_634.mjs",
+  "runtime": "node v22.18.0",
+  "reference": "bsv-blockchain/ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9 packages/sdk (bun bundle)",
+  "shapes": [
+    {
+      "id": "endif-return-op1",
+      "hex": "686a51",
+      "ts": {
+        "asm": "OP_ENDIF OP_RETURN OP_1",
+        "asm_back_to_hex": "686a51",
+        "pushdrop": {
+          "error": "script.chunks[0].data must have value"
+        }
+      }
+    },
+    {
+      "id": "endif-return-push",
+      "hex": "686a0568656c6c6f",
+      "ts": {
+        "asm": "OP_ENDIF OP_RETURN 68656c6c6f",
+        "asm_back_to_hex": "686a0568656c6c6f",
+        "pushdrop": {
+          "error": "script.chunks[0].data must have value"
+        }
+      }
+    },
+    {
+      "id": "p2pkh-then-endif-return-op1",
+      "hex": "76a914111111111111111111111111111111111111111188ac686a51",
+      "ts": {
+        "asm": "OP_DUP OP_HASH160 1111111111111111111111111111111111111111 OP_EQUALVERIFY OP_CHECKSIG OP_ENDIF OP_RETURN OP_1",
+        "asm_back_to_hex": "76a914111111111111111111111111111111111111111188ac686a51",
+        "pushdrop": {
+          "error": "script.chunks[0].data must have value"
+        }
+      }
+    },
+    {
+      "id": "pushdrop-field-endif-return-field-2drop",
+      "hex": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0461626364686a0568656c6c6f6d",
+      "ts": {
+        "asm": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 OP_CHECKSIG 61626364 OP_ENDIF OP_RETURN 68656c6c6f OP_2DROP",
+        "asm_back_to_hex": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0461626364686a0568656c6c6f6d",
+        "pushdrop": {
+          "fields": [
+            "61626364",
+            "",
+            "",
+            "68656c6c6f"
+          ]
+        }
+      }
+    }
+  ],
+  "registry_basket": {
+    "hex": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0161016201630164686a097369677369677369676d6d6d75",
+    "ts": {
+      "error": "PushDrop token must use the canonical PushDrop envelope"
+    }
+  }
+}

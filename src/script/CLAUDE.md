@@ -147,7 +147,7 @@ impl Script {
     // Constructors
     pub fn new() -> Self
     pub fn from_chunks(chunks: Vec<ScriptChunk>) -> Self
-    pub fn from_asm(asm: &str) -> Result<Self>      // "OP_DUP OP_HASH160 <hex>..."
+    pub fn from_asm(asm: &str) -> Result<Self>      // "OP_DUP OP_HASH160 <hex>...", "OP_RETURN 0x<raw>"
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_binary(bin: &[u8]) -> Result<Self>
 
@@ -505,6 +505,7 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 - **BSV Opcodes**: All BSV re-enabled opcodes supported (CAT, SPLIT, MUL, DIV, MOD, etc.)
 - **Default-mode gates (#397, #429)**: without a word all ten opcodes (`OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF`, `0xb3`–`0xb7`) run at every version (`chronicle_opcodes`, `Spend.ts:792-803`, `:827-858`); there is no number-length bound (`:393-401`, the V8 read bound above still applies), while `SIGHASH_CHRONICLE` requires version > 1 (`:586-591`), refused at version 1 in the reference's visible words, `The signature format is invalid.` (the DER wrapper's catch, `:622-625`). The fourth switch is the fork-ID gate: absent without a word, so `0x01` signatures at versions 1 and 2 verify over the original digest; under a word SIGHASH_FORKID is mandatory and implies STRICTENC. Under a word, `UTXO_AFTER_CHRONICLE` gates the opcodes and number length; `CHRONICLE` independently gates the hash type, with the existing refusals. `set_utxo_after_chronicle` overrides only the opcode and number-length gates. Undefined opcodes `0xba`–`0xff` executed, a truncated push reached, a second `OP_ELSE`: failures in every mode.
 - **ASM Rendering**: `OP_FALSE`/`OP_0` renders as `"0"`, not `"OP_0"` in `to_asm()`
+- **The IF depth and the fold (#634)**: `parse_chunks` (and `truncated_push_index`) count the IF depth as the reference's `#parseChunks` does (`Script.ts:599-631`): up on `OP_IF`/`OP_NOTIF`/`OP_VERIF`/`OP_VERNOTIF`, down on `OP_ENDIF` with no floor, the rest folded into an `OP_RETURN` read at depth 0 alone; `686a51` is three chunks, as in the reference (go-sdk's `DecodeScript` reads two). `to_asm` (`script_asm.rs`, a child module of `script.rs` with `from_asm`) writes a folded `OP_RETURN` as `OP_RETURN` and the rest's own ASM read with no fold, or as `OP_RETURN 0x<hex>` when that would not read back to the same bytes; `from_asm` reads a `0x<hex>` token as the raw rest only as the last token after an `OP_RETURN`. The rest after a fold reads back byte for byte on every script (a non-minimal push or an undefined opcode outside it does not, as before); the reference's `toASM` writes the rest's hex alone and its round trip fails on every folded `OP_RETURN` with data. `ScriptChunk::to_asm` is the reference's `_chunkToString` still
 
 ### The interpreter's layout (`spend/`, #85)
 

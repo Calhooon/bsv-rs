@@ -1,0 +1,889 @@
+{
+  "source": "tests/support/script_if_depth_634.mjs",
+  "runtime": "node v22.18.0",
+  "reference": "bsv-blockchain/ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9 packages/sdk (bun bundle), Node v22.18.0",
+  "go": "bsv-blockchain/go-sdk@2ca481c5931b987a0c8f48bb341c70b7477b6b07 script/script_chunk.go:245-332, transcribed, not run",
+  "unlocking_hex": "51",
+  "shapes": [
+    {
+      "id": "endif-return-op1",
+      "note": "the issue: a stray OP_ENDIF before OP_RETURN (686a51)",
+      "asm_in": "OP_ENDIF OP_RETURN OP_1",
+      "hex": "686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          }
+        ],
+        "asm": "OP_ENDIF OP_RETURN OP_1",
+        "to_hex": "686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ]
+      }
+    },
+    {
+      "id": "endif-return-push",
+      "note": "the issue's form OP_ENDIF OP_RETURN <push>",
+      "asm_in": "OP_ENDIF OP_RETURN 68656c6c6f",
+      "hex": "686a0568656c6c6f",
+      "ts": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 5,
+            "data": "68656c6c6f"
+          }
+        ],
+        "asm": "OP_ENDIF OP_RETURN 68656c6c6f",
+        "to_hex": "686a0568656c6c6f"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "0568656c6c6f"
+          }
+        ]
+      }
+    },
+    {
+      "id": "return-push",
+      "note": "the issue's form of a bare OP_RETURN <push>",
+      "asm_in": "OP_RETURN 68656c6c6f",
+      "hex": "6a0568656c6c6f",
+      "ts": {
+        "chunks": [
+          {
+            "op": 106,
+            "data": "0568656c6c6f"
+          }
+        ],
+        "asm": "0568656c6c6f",
+        "to_hex": "6a0568656c6c6f"
+      },
+      "ts_spend": {
+        "v1": {
+          "valid": true
+        },
+        "v2": {
+          "valid": true
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 106,
+            "data": "0568656c6c6f"
+          }
+        ]
+      }
+    },
+    {
+      "id": "if-endif-return-op1",
+      "note": "a balanced OP_IF OP_ENDIF before OP_RETURN",
+      "asm_in": "OP_1 OP_IF OP_ENDIF OP_RETURN OP_1",
+      "hex": "5163686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ],
+        "asm": "OP_1 OP_IF OP_ENDIF 51",
+        "to_hex": "5163686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "valid": true
+        },
+        "v2": {
+          "valid": true
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ]
+      }
+    },
+    {
+      "id": "if-endif-endif-return-push",
+      "note": "the issue's form OP_IF OP_ENDIF OP_ENDIF OP_RETURN <push>, as written (no condition pushed)",
+      "asm_in": "OP_IF OP_ENDIF OP_ENDIF OP_RETURN 68656c6c6f",
+      "hex": "6368686a0568656c6c6f",
+      "ts": {
+        "chunks": [
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 5,
+            "data": "68656c6c6f"
+          }
+        ],
+        "asm": "OP_IF OP_ENDIF OP_ENDIF OP_RETURN 68656c6c6f",
+        "to_hex": "6368686a0568656c6c6f"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "0568656c6c6f"
+          }
+        ]
+      }
+    },
+    {
+      "id": "op1-if-endif-endif-return-op1",
+      "note": "a balanced OP_IF OP_ENDIF, then a stray OP_ENDIF, before OP_RETURN",
+      "asm_in": "OP_1 OP_IF OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+      "hex": "516368686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          }
+        ],
+        "asm": "OP_1 OP_IF OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+        "to_hex": "516368686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ]
+      }
+    },
+    {
+      "id": "endif-endif-return-op1",
+      "note": "two stray OP_ENDIFs before OP_RETURN",
+      "asm_in": "OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+      "hex": "68686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          }
+        ],
+        "asm": "OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+        "to_hex": "68686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ]
+      }
+    },
+    {
+      "id": "return-endif-op1",
+      "note": "a stray OP_ENDIF after an OP_RETURN at depth 0",
+      "asm_in": "OP_RETURN OP_ENDIF OP_1",
+      "hex": "6a6851",
+      "ts": {
+        "chunks": [
+          {
+            "op": 106,
+            "data": "6851"
+          }
+        ],
+        "asm": "6851",
+        "to_hex": "6a6851"
+      },
+      "ts_spend": {
+        "v1": {
+          "valid": true
+        },
+        "v2": {
+          "valid": true
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 106,
+            "data": "6851"
+          }
+        ]
+      }
+    },
+    {
+      "id": "if-return-op1-endif",
+      "note": "OP_RETURN inside an open, executed OP_IF",
+      "asm_in": "OP_1 OP_IF OP_RETURN OP_1 OP_ENDIF",
+      "hex": "51636a5168",
+      "ts": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          }
+        ],
+        "asm": "OP_1 OP_IF OP_RETURN OP_1 OP_ENDIF",
+        "to_hex": "51636a5168"
+      },
+      "ts_spend": {
+        "v1": {
+          "valid": true
+        },
+        "v2": {
+          "valid": true
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "false-if-return-endif",
+      "note": "OP_RETURN inside an open, unexecuted OP_IF",
+      "asm_in": "OP_0 OP_IF OP_RETURN OP_ENDIF",
+      "hex": "00636a68",
+      "ts": {
+        "chunks": [
+          {
+            "op": 0,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          }
+        ],
+        "asm": "OP_0 OP_IF OP_RETURN OP_ENDIF",
+        "to_hex": "00636a68"
+      },
+      "ts_spend": {
+        "v1": {
+          "valid": true
+        },
+        "v2": {
+          "valid": true
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 0,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "nested-balanced-return-op1",
+      "note": "nested, balanced, before OP_RETURN",
+      "asm_in": "OP_1 OP_IF OP_1 OP_IF OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+      "hex": "5163516368686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ],
+        "asm": "OP_1 OP_IF OP_1 OP_IF OP_ENDIF OP_ENDIF 51",
+        "to_hex": "5163516368686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "valid": true
+        },
+        "v2": {
+          "valid": true
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ]
+      }
+    },
+    {
+      "id": "nested-balanced-endif-return-op1",
+      "note": "nested, balanced, then a stray OP_ENDIF, before OP_RETURN",
+      "asm_in": "OP_1 OP_IF OP_1 OP_IF OP_ENDIF OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+      "hex": "516351636868686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          }
+        ],
+        "asm": "OP_1 OP_IF OP_1 OP_IF OP_ENDIF OP_ENDIF OP_ENDIF OP_RETURN OP_1",
+        "to_hex": "516351636868686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "51"
+          }
+        ]
+      }
+    },
+    {
+      "id": "endif-if-return-op1-endif",
+      "note": "a stray OP_ENDIF, then an OP_IF around OP_RETURN: the depth -1 + 1 = 0 in TS and Go, 1 here",
+      "asm_in": "OP_ENDIF OP_IF OP_RETURN OP_1 OP_ENDIF",
+      "hex": "68636a5168",
+      "ts": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "5168"
+          }
+        ],
+        "asm": "OP_ENDIF OP_IF 5168",
+        "to_hex": "68636a5168"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "5168"
+          }
+        ]
+      }
+    },
+    {
+      "id": "balanced-endif-if-return-op1-endif",
+      "note": "balanced, a stray OP_ENDIF, then an OP_IF around OP_RETURN",
+      "asm_in": "OP_1 OP_IF OP_ENDIF OP_ENDIF OP_1 OP_IF OP_RETURN OP_1 OP_ENDIF",
+      "hex": "5163686851636a5168",
+      "ts": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "5168"
+          }
+        ],
+        "asm": "OP_1 OP_IF OP_ENDIF OP_ENDIF OP_1 OP_IF 5168",
+        "to_hex": "5163686851636a5168"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        },
+        "v2": {
+          "error": "Script evaluation error: OP_ENDIF requires a preceeding OP_IF."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": "5168"
+          }
+        ]
+      }
+    },
+    {
+      "id": "false-if-verif-endif-return-op1",
+      "note": "OP_VERIF in an unexecuted branch: every reader counts it as a depth, the node before Chronicle does not",
+      "asm_in": "OP_0 OP_IF OP_VERIF OP_ENDIF OP_RETURN OP_1",
+      "hex": "006365686a51",
+      "ts": {
+        "chunks": [
+          {
+            "op": 0,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 101,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          }
+        ],
+        "asm": "OP_0 OP_IF OP_VERIF OP_ENDIF OP_RETURN OP_1",
+        "to_hex": "006365686a51"
+      },
+      "ts_spend": {
+        "v1": {
+          "error": "Script evaluation error: Every OP_IF, OP_NOTIF, or OP_ELSE must be terminated with OP_ENDIF prior to the end of the script."
+        },
+        "v2": {
+          "error": "Script evaluation error: Every OP_IF, OP_NOTIF, or OP_ELSE must be terminated with OP_ENDIF prior to the end of the script."
+        }
+      },
+      "go_transcribed": {
+        "chunks": [
+          {
+            "op": 0,
+            "data": null
+          },
+          {
+            "op": 99,
+            "data": null
+          },
+          {
+            "op": 101,
+            "data": null
+          },
+          {
+            "op": 104,
+            "data": null
+          },
+          {
+            "op": 106,
+            "data": null
+          },
+          {
+            "op": 81,
+            "data": null
+          }
+        ]
+      }
+    }
+  ]
+}
