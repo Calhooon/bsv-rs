@@ -394,6 +394,65 @@ false` for the absent flag, a counterparty text judged at
 `Counterparty::from_hex` before the protocol) are #420's, unchanged and
 stated in `src/wallet/CLAUDE.md`.
 
+### Added: src/script/templates/pushdrop.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 13 of the file's 53 viable mutants missed
+(75.47%). Two of them, `-` to `+` and to `/` in `decode_lock_after`'s
+`take(last_idx - 1)` (`pushdrop.rs:308:50` at `b8d0a008`), are gone: #618's
+fold at `4b0678fa` removed that loop for `reference_fields`. They are not
+counted as killed. The file is a template, outside the sibling's Lean
+definition: `bsv-script-lean@5dc337e1` has no PushDrop rule in `corpus/`,
+`lean/` or `spec/`. A full-corpus run of each of the eleven that stand
+(`harness/run --impl bsv-rs --corpus all --spec recorded`, nine corpora, all
+GREEN) moved no verdict, so the rule source is the reference, `PushDrop.ts`
+at `ts-stack@edf6e03`. `tests/support/pushdrop_decode_618.mjs` is extended
+rather than duplicated. It now writes two more sections of
+`tests/vectors/pushdrop_decode_618.json` under Node v22.18.0, and its earlier
+sections are byte-identical:
+
+- `locks_603`: the reference's own `lock` of nine fields at both positions,
+  under a second key, with other fields, and with the key pushed uncompressed.
+- `two_chunks_603`: three two-chunk scripts with no key first, read at
+  `'after'`.
+
+`tests/script_pushdrop_mutants_603.rs` holds the tests:
+
+- `a_zero_byte_field_is_op_0_and_a_longer_one_a_push_pushdrop_ts_20_41_locks_603`
+  kills `create_minimally_encoded_chunk`'s `||` to `&&` and `==` to `!=`
+  (`:165:28`, `:165:43`). The reference writes `00` as `OP_0` and `0001` as a
+  push (`PushDrop.ts:21-41`). The node's `CheckMinimalPush` would write the
+  one-byte zero as `01 00` (`lean/BsvScript/Machine.lean:69-75`). The
+  reference reads its `OP_0` back as `00` (`:104-105`), and this crate writes
+  as the reference does.
+- `a_two_chunk_lock_after_is_refused_for_its_checksig_or_key_pushdrop_ts_79_94_two_chunks_603`
+  kills `decode_lock_after`'s `<` to `<=` and to `==` (`:290:25`). The
+  reference refuses each of these scripts for its last chunk or its key
+  (`:81-92`), never for its length.
+- Three `PartialEq` tests kill `eq`'s seven mutants (`:463:9` twice,
+  `:463:49`, `:464:13`, `:464:28`, `:465:13`, `:465:35`). They are
+  `tokens_the_reference_reads_alike_are_equal_pushdrop_ts_63_121_locks_603`,
+  `tokens_differing_in_position_alone_are_unequal_pushdrop_ts_197_201_locks_603`
+  and `tokens_differing_in_key_or_fields_alone_are_unequal_pushdrop_ts_63_121_locks_603`.
+  Tokens the reference reads alike at the same position are equal, the
+  uncompressed key included, because `PublicKey.toString` gives the same
+  text for both. Tokens that differ in the key alone, the fields alone or
+  the position alone are unequal. The reference has no equality of its own,
+  and its reading carries no position: two tokens that differ in position
+  alone read alike (`locks_603`). The position rule is this crate's
+  `PartialEq` contract (`src/script/templates/CLAUDE.md`: the compressed
+  key, the fields and the position), and the reference's `lock` writes the
+  two positions as different scripts (`PushDrop.ts:197-201`).
+
+Each test was RED on its mutants in a scratch copy and GREEN on the tree.
+Killed by tests 11, declared equivalent 0, remaining 0, removed by #618 2.
+Re-measured with the script surface's selection and the corpus set: 41
+caught, 0 missed, 1 timeout, 5 unviable, 97.62% caught of viable. The
+timeout is `add_drop_operations`' `-=` to `+=` (`:196:23`), an unbounded
+push. It was caught under the nightly's memory ceiling (0 timeouts in the
+census), and macOS has no `ulimit -v` to apply that ceiling here. No `src/`
+behaviour changed and no vector revealed a divergence from the reference,
+so there is no parity note.
+
 ### Added: src/script/templates/pushdrop_position.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened run 41327640129 left 25 of the file's 26 viable mutants missed
