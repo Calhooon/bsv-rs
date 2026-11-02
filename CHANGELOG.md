@@ -34,10 +34,12 @@ either rule. A script that re-reads as a different script is a reader bug
 whatever the door: `to_asm` now writes a folded `OP_RETURN` as `OP_RETURN` and
 the rest's own ASM read with no fold (`0 OP_RETURN 68656c6c6f` for
 `006a0568656c6c6f`, was `0 0568656c6c6f`), or as `OP_RETURN 0x<hex>` when that
-would not read back to the same bytes (a truncated push, a non-minimal one);
-`from_asm` reads a `0x<hex>` token as the raw rest when it is the last token
-and follows an `OP_RETURN`, and refuses it anywhere else (it was refused
-everywhere). The rest is written with no fold and no recursion, linear in its
+would not read back to the same bytes (a truncated push, a non-minimal one),
+and an empty rest as `OP_RETURN` alone (the reference writes `""` for `6a`,
+which reads back as `00`); `from_asm` reads a `0x<hex>` token as the raw rest
+when it is the last token and follows an `OP_RETURN` (`OP_RETURN 0x` is the
+bare `OP_RETURN`), and refuses it anywhere else (it was refused everywhere;
+the reference's `fromASM` refuses `0x` as invalid hex). The rest is written with no fold and no recursion, linear in its
 length, and reads back byte for byte whatever it holds; a chunk before it that
 `to_asm` cannot write back (a non-minimal push, `4c01aa` reading back as
 `01aa`; an undefined opcode) is as before. `ScriptChunk::to_asm` is unchanged.

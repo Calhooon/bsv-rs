@@ -299,6 +299,65 @@ fn the_asm_round_trips_on_every_shape_both_readings_of_op_return_included_634() 
     assert!(Script::from_asm("OP_RETURN 0x51 OP_1").is_err());
 }
 
+/// An `OP_RETURN` with an empty rest is written as `OP_RETURN` alone, and an
+/// empty raw token after it (`OP_RETURN 0x`) reads as that bare `OP_RETURN`:
+/// the round trip holds on `6a` and `006a`, from the bytes and from the ASM.
+/// The reference's parser gives a bare `OP_RETURN` an empty data array
+/// (`Script.ts:609`), so its `toASM` writes `""` for `6a` and `"OP_0 "` for
+/// `006a`, which its `fromASM` reads back as `00` and `0000`; its `fromASM`
+/// has no raw token and refuses `OP_RETURN 0x` as invalid hex (recorded under
+/// Node 22 at `edf6e03`).
+#[test]
+fn an_empty_raw_token_after_op_return_round_trips_634() {
+    for (asm, hex, written) in [
+        ("OP_RETURN 0x", "6a", "OP_RETURN"),
+        ("0 OP_RETURN 0x", "006a", "0 OP_RETURN"),
+        ("OP_RETURN", "6a", "OP_RETURN"),
+        ("0 OP_RETURN", "006a", "0 OP_RETURN"),
+    ] {
+        let s = Script::from_asm(asm).unwrap();
+        assert_eq!(s.to_hex(), hex, "{asm}");
+        assert_eq!(s.to_asm(), written, "{asm}");
+        assert_eq!(Script::from_asm(&s.to_asm()).unwrap(), s, "{asm}");
+        let b = Script::from_hex(hex).unwrap();
+        assert_eq!(b.to_asm(), written, "{hex}");
+        assert_eq!(Script::from_asm(&b.to_asm()).unwrap().to_hex(), hex);
+    }
+    // A chunk built by hand with empty data writes and reads back the same.
+    let held = Script::from_chunks(vec![
+        ScriptChunk::new(0x00, None),
+        ScriptChunk::new(0x6a, Some(vec![])),
+    ]);
+    assert_eq!(held.to_asm(), "0 OP_RETURN");
+    assert_eq!(Script::from_asm(&held.to_asm()).unwrap(), held);
+}
+
+/// `from_asm(to_asm(s))` is `s` for an `OP_RETURN` followed by 200,000
+/// random rests of 0 to 8 bytes, at the top level and after an `OP_0`.
+#[test]
+fn the_asm_round_trips_on_random_rests_after_op_return_634() {
+    let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut next = || {
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        x
+    };
+    for _ in 0..200_000 {
+        let r = next();
+        let mut bytes = if r & 1 == 0 {
+            vec![0x6a]
+        } else {
+            vec![0x00, 0x6a]
+        };
+        let len = (r >> 1) % 9;
+        bytes.extend((0..len).map(|_| next() as u8));
+        let asm = Script::from_binary(&bytes).unwrap().to_asm();
+        let back = Script::from_asm(&asm).unwrap().to_binary();
+        assert_eq!(back, bytes, "{}: {asm}", to_hex(&bytes));
+    }
+}
+
 /// The interpreter refuses every shape whose walk reaches the stray
 /// `OP_ENDIF`, in every mode, as the node refuses it
 /// (`SCRIPT_ERR_UNBALANCED_CONDITIONAL`, `interpreter.cpp:835-840`); the
