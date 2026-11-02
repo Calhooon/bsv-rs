@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the public PushDrop::decode reads a key-only and a no-CHECKSIG token as the reference does; the refusal stands on the canonical path (#618)
+
+On the keeper's word of 2026-11-01 22:1xZ on census row 93 (#614's read):
+`PushDrop::decode` refused a script that is a key alone (`Script too short for
+PushDrop`) and a key whose second chunk is not `OP_CHECKSIG` (`Expected
+OP_CHECKSIG after pubkey`), where the reference's `PushDrop.decode` at its
+default position reads both (`ts-stack@edf6e03` `PushDrop.ts:63-121`): the key
+the first chunk, the second chunk never read, the fields from the third, each
+pushed before the read ends at a *next* chunk that is a DROP. A first chunk of
+33 or 65 bytes followed by anything but `OP_CHECKSIG`, or by nothing, is now
+read that way (`src/script/templates/pushdrop_reference_read.rs`), the lock
+position `Before`, the key's compressed bytes the reference's
+`lockingPublicKey`; a lock-after token whose first field is a point is such a
+token and is read as the reference's default reads it. Nothing else of the
+door moves: the writer's lock-before token reads as it did, a first chunk that
+is no 33- or 65-byte push is read lock-after (the reference's `'after'`), the
+empty script and one chunk that is no key are `Script too short for PushDrop`,
+and a key the parse refuses is refused in its words (`Point not on curve` for
+an x off the curve, where the reference says `Invalid point`). The vector
+`tests/vectors/pushdrop_decode_618.json` is the reference's reading of
+fourteen shapes at both positions and of the two shapes at each of the six
+#537 sites, written by `tests/support/pushdrop_decode_618.mjs` under Node
+v22.18.0, two runs byte-identical; `tests/script_pushdrop_decode_618.rs`
+pins the door (3 of 5 RED on the tree before the fix: the key alone, the
+token without CHECKSIG, and the off-curve key alone's words). The fold
+(the read's FIX 1): every path of the door, lock-before, lock-after and the
+reference read, reads its fields through one loop, `reference_fields`
+(`PushDrop.ts:96-115`), so `<key> OP_CHECKSIG OP_DROP` and `<key>
+OP_CHECKSIG OP_2DROP` read one empty field where they read none, an
+`OP_RESERVED` field reads `00` where it read empty, and a lock-after token
+reads to the next DROP as the reference's `'after'` does (the key and
+`OP_CHECKSIG` fields when no DROP comes), ten more recorded shapes, the three
+RED on `646209a3` at both positions, `decode_before`'s refusals unchanged.
+
+The canonical path is unchanged and refuses both shapes as each site's
+reference counterpart does: `PushDrop::decode_before` (`Script too short for
+PushDrop`, `Expected OP_CHECKSIG after pubkey`) and `canonical_refusal`'s
+words at the five `decodeCanonicalPushDrop` sites (`PushDropValidation.ts:54-79`),
+the identity and contacts managers' field-count and canonical-script checks
+(`IdentityClient.ts:130-147`, `ContactsManager.ts:225-242`). The two sites
+that read through the public door, the local store's decode
+(`src/kvstore/local_parser_words.rs`) and the revocation
+(`src/identity/revoke.rs`), now call `decode_before`, the same verdict on
+every token those sites gate. A witness per site, each the recorded
+reference outcome on the site's own #537 token in the two shapes (this
+crate's writer, its bytes the recording's): the identity parsers and the
+revocation skip them in the reference's words (`No authenticated revelation
+output matches the requested certificate.`), the contacts manager drops
+them, the registry's reader refuses them in `decodeCanonicalPushDrop`'s words
+and its resolvers skip them, the kvstore interpreter reads no value, the
+admin token is refused in the recorded words, the downloader names no host,
+and the local store refuses `token_key_only` and `token_no_checksig` of
+`kvstore_local_454.json`'s `parser_words_489` in the recorded words
+(`_618` tests in the six `*_lock_position_537.rs` files and
+`kvstore_local_parser_words_489.rs`).
+
+Semver: a behaviour change on a public function. A caller of
+`PushDrop::decode` that relied on its refusal of a key alone or of a key
+without CHECKSIG second now gets the reference's reading; a caller that needs
+the refusal checks the token's shape itself (the crate's own sites read
+through the canonical path, `decode_before` and the canonical-script checks).
+One such caller is downstream: `bsv-overlay-cloudflare`'s topic managers
+(`overlay-discovery` SHIP, SLAP, UHRP, agent, DM delegation and LOW, and
+`overlay-engine`'s `engine.rs`, at `9dff935b`) gate admission on
+`PushDrop::decode` and a field count, so on a bump past their `=0.7.2` pin a
+token with no `OP_CHECKSIG` second decodes there; one that must keep refusing
+it checks that the second chunk is `OP_CHECKSIG`.
+
+### Notes: cross-SDK parity (#618)
+
+The public door follows the reference from this landing; the stated
+difference stands on the canonical path alone, where every site refuses both
+shapes as its reference counterpart refuses them. go-sdk at `2ca481c` refuses
+both, as this crate did (`transaction/template/pushdrop/pushdrop.go:20-53`:
+`nil` for fewer than two chunks, and the lock-before branch taken only with
+`OpCHECKSIG` second): stated, no filing. Residues: a key the reference reads
+and this crate's parse refuses (hybrid, x above p; #489, #498) keeps the
+parse's words on both shapes, as on the writer's token; the refused shapes'
+words are this crate's where the reference throws a JavaScript `TypeError` or
+its key parse's words (`Cannot read properties of undefined (reading
+'data')`, `script.chunks[0].data must have value`, `Unknown point format`,
+`Invalid point`), recorded in the vector beside them.
+
+Census (#375; current reading):
+
+- Row 93: Ours: since #618 the public `PushDrop::decode` reads a key-only script and a token without CHECKSIG second as `PushDrop.decode` at its default position reads them (PushDrop.ts:63-121 at edf6e03; tests/vectors/pushdrop_decode_618.json, tests/script_pushdrop_decode_618.rs); the refusal stands on the canonical path alone (`decode_before` and the canonical-script checks), where every site refuses both as its counterpart does (PushDropValidation.ts:54-79 at the local store, the kvstore interpreter, the registry, the overlay admin token and the storage downloader; IdentityClient.ts:130-147; ContactsManager.ts:225-242; one `_618` witness per site), as go-sdk at 2ca481c refuses them at its public `Decode` (pushdrop.go:20-53); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73), and the key parse's and the refused shapes' words where the reference throws its own. Theirs: go-sdk, its public `Decode` refusing what the reference reads, no filing made (the #618 entry).
+
 ### Added: src/script/not_judged.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened run 41327640129 left 1 of the file's 3 viable mutants missed
@@ -251,7 +338,7 @@ field` or `PushDrop token payload is too large`; the verdict is the same.
 
 Census (#375; current reading):
 
-- Row 93: Ours: `PushDrop::decode` and `decode_before` refuse a key-only script and a token without CHECKSIG second, which `PushDrop.decode` at its default position reads (PushDrop.ts:73-78,97 at edf6e03; `token_key_only` and `token_no_checksig` in tests/vectors/kvstore_local_454.json's `parser_words_489`), as go-sdk at 2ca481c refuses them (pushdrop.go:20-53); every site that reads a token through `decode_before` refuses as its counterpart does (PushDropValidation.ts:54-79, IdentityClient.ts:130-147, ContactsManager.ts:225-242); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73). Theirs: the reference's decode does not read the second chunk, no filing made.
+- Row 93: Ours: since #618 the public `PushDrop::decode` reads a key-only script and a token without CHECKSIG second as `PushDrop.decode` at its default position reads them (PushDrop.ts:63-121 at edf6e03; tests/vectors/pushdrop_decode_618.json, tests/script_pushdrop_decode_618.rs); the refusal stands on the canonical path alone (`decode_before` and the canonical-script checks), where every site refuses both as its counterpart does (PushDropValidation.ts:54-79 at the local store, the kvstore interpreter, the registry, the overlay admin token and the storage downloader; IdentityClient.ts:130-147; ContactsManager.ts:225-242; one `_618` witness per site), as go-sdk at 2ca481c refuses them at its public `Decode` (pushdrop.go:20-53); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73), and the key parse's and the refused shapes' words where the reference throws its own. Theirs: go-sdk, its public `Decode` refusing what the reference reads, no filing made (the #618 entry).
 
 ### Added: src/script/templates/rpuzzle.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 

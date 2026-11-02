@@ -17,7 +17,8 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 | `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
 | `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock; `lock` pushes `locking_public_key` compressed, through the crate-visible `lock_with_key_bytes` (#545) |
 | `pushdrop_key_bytes.rs` | `PushDrop::lock_with_key_bytes`, `pub(crate)` (a port helper: the reference has one `lock`, taking the key as text; its vector tests the unit file `pushdrop_key_bytes_545_tests.rs`): the key pushed as the bytes given, the reference's `lock` pushing a wallet's answer as returned (`PushDrop.ts:158-175`, #545); crate-visible `wallet_key_lock` (under `kvstore`, `identity` or `registry`), the five wallet sites' lock: the answer read by `PublicKey::from_hex`, pushed as the bytes `toArray(_, 'hex')` reads (an odd-length text with a leading `0`) |
-| `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; `decode()` unchanged; its vector tests the unit file `pushdrop_position_603_tests.rs`, inside the script surface's mutation selection (#603) |
+| `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; it refuses a key alone and a key without `OP_CHECKSIG` second, which `decode()` reads as the reference does since #618; its vector tests the unit file `pushdrop_position_603_tests.rs`, inside the script surface's mutation selection (#603) |
+| `pushdrop_reference_read.rs` | Private: `decode()`'s reading of a key alone and of a key whose second chunk is not `OP_CHECKSIG`, the reference's `PushDrop.decode` at its default position (`PushDrop.ts:63-121`: the second chunk never read, each field pushed before a *next* DROP ends the read; #618, `tests/script_pushdrop_decode_618.rs`); the canonical path (`decode_before`) still refuses both; and `reference_fields`, the one field loop of every `decode` path (`:96-115`, #618's fold) |
 | `rpuzzle.rs` | R-Puzzle template for knowledge-based locking using ECDSA K-values |
 
 ## Key Exports
@@ -223,7 +224,7 @@ These are worst-case estimates; actual DER signatures may be 1-2 bytes shorter.
 - If first chunk is a 33 or 65-byte data push (public key) -> lock-before
 - Otherwise -> lock-after
 
-Minimal-encoded opcodes are converted back to bytes: `OP_0` -> `[0]`, `OP_1`-`OP_16` -> `[1]`-`[16]`, `OP_1NEGATE` -> `[0x81]`
+Minimal-encoded opcodes are converted back to bytes: `OP_0` -> `[0]`, `OP_RESERVED` -> `[0]`, `OP_1`-`OP_16` -> `[1]`-`[16]`, `OP_1NEGATE` -> `[0x81]`. Each chunk is a field until the *next* chunk is a DROP or 2DROP (`PushDrop.ts:96-115`, #618's fold): a trailing DROP alone is one empty field, and lock-after with no DROP reads the key and `OP_CHECKSIG` as fields, as the reference's `'after'` does
 
 ### Multisig Signature Ordering
 

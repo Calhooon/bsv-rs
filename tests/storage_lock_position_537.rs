@@ -8,6 +8,8 @@
 //! after #537.
 #![cfg(feature = "storage")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/pushdrop_decode_618.rs"]
+mod decode_618;
 #[path = "support/pushdrop_lock_position_537.rs"]
 mod lock_position;
 
@@ -41,4 +43,31 @@ async fn a_lock_after_advertisement_names_no_host_as_in_the_reference_537() {
     // (`UHRPAdvertisementValidation.ts:46-48`).
     let control = lock_position::relocked_before(&cases[0]);
     assert!(hosts(&cases[0], control).await.is_empty());
+}
+
+/// The #537 case a #618 case was built from.
+fn from_537<'a>(cases: &'a [Value], case: &Value) -> &'a Value {
+    cases
+        .iter()
+        .find(|old| old["name"] == case["from_537"])
+        .unwrap()
+}
+
+/// #618: a key alone and a token without CHECKSIG second, which the public
+/// `PushDrop::decode` reads as the reference does, name no host, as
+/// `decodeCanonicalPushDrop` refuses them (`UHRPAdvertisementValidation.ts:40`,
+/// `PushDropValidation.ts:54-79`) and the downloader's catch skips them
+/// (`StorageDownloader.ts:121`).
+#[tokio::test]
+async fn a_key_only_and_a_no_checksig_advertisement_name_no_host_as_in_the_reference_618() {
+    let old = lock_position::cases("storage_downloader");
+    let cases = decode_618::cases("storage_downloader");
+    assert_eq!(cases.len(), 2);
+    for case in &cases {
+        assert_eq!(case["outcome"], "skipped", "{}", case["name"]);
+        let from = from_537(&old, case);
+        let script = decode_618::script(case, from);
+        let found = hosts(from, script).await;
+        assert!(found.is_empty(), "{}: {found:?}", case["name"]);
+    }
 }

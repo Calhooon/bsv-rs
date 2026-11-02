@@ -5,6 +5,8 @@
 //! `:478`, `:507-513` drops it, before the wallet is asked to decrypt.
 #![cfg(feature = "identity")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/pushdrop_decode_618.rs"]
+mod decode_618;
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
 #[path = "support/pushdrop_lock_position_537.rs"]
@@ -122,4 +124,30 @@ async fn a_lock_after_contact_token_is_dropped_as_the_reference_drops_it_537() {
     // wallet's for the key ID (`ContactsManager.ts:447-449`).
     let control = lock_position::relocked_before(&cases[0]);
     assert_eq!(contacts(&cases[0], control).await, 0);
+}
+
+/// The #537 case a #618 case was built from.
+fn from_537<'a>(cases: &'a [Value], case: &Value) -> &'a Value {
+    cases
+        .iter()
+        .find(|old| old["name"] == case["from_537"])
+        .unwrap()
+}
+
+/// #618: a key alone and a token without CHECKSIG second, which the public
+/// `PushDrop::decode` reads as the reference does, are dropped, as the
+/// reference's field count and canonical-script check drop them
+/// (`ContactsManager.ts:432`, `:225-242`; `Invalid contact PushDrop field
+/// count`, `Contact output must use the canonical signed PushDrop script`).
+#[tokio::test]
+async fn a_key_only_and_a_no_checksig_contact_token_are_dropped_as_the_reference_drops_them_618() {
+    let old = lock_position::cases("contacts_cache");
+    let cases = decode_618::cases("contacts_cache");
+    assert_eq!(cases.len(), 2);
+    for case in &cases {
+        assert_eq!(case["outcome"], "skipped", "{}", case["name"]);
+        let from = from_537(&old, case);
+        let script = decode_618::script(case, from);
+        assert_eq!(contacts(from, script).await, 0, "{}", case["name"]);
+    }
 }

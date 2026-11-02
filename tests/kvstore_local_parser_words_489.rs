@@ -316,3 +316,41 @@ async fn a_lock_after_token_is_refused_by_the_reference_lock_before_read_499() {
     }
     assert_cases("token_lock_after", 12).await;
 }
+
+/// #618: a key alone and a token without CHECKSIG second, which the public
+/// `PushDrop::decode` now reads as the reference does (no `parser_error`),
+/// are refused by the local store in the reference's words, as
+/// `decodeCanonicalPushDrop` with its two fields refuses them
+/// (`LocalKVStore.ts:278-279`, `PushDropValidation.ts:54-79`).
+#[tokio::test]
+async fn a_key_only_and_a_no_checksig_token_stay_refused_by_the_local_store_618() {
+    let recorded: Value =
+        serde_json::from_str(include_str!("vectors/kvstore_local_454.json")).unwrap();
+    let cases: Vec<_> = recorded["parser_words_489"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| {
+            matches!(
+                case["name"].as_str(),
+                Some("token_key_only" | "token_no_checksig")
+            )
+        })
+        .collect();
+    assert_eq!(cases.len(), 4);
+    for case in cases {
+        assert!(case["parser_error"].is_null(), "{}", case["name"]);
+        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            PushDrop::decode(&script).unwrap().lock_position,
+            LockPosition::Before
+        );
+        let expected = case["error"].as_str().unwrap();
+        assert_eq!(
+            local_failure(case).await,
+            Error::KvStoreLocalError(expected.into()),
+            "{}",
+            case["name"]
+        );
+    }
+}
