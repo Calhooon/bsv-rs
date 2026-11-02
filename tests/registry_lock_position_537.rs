@@ -6,6 +6,8 @@
 //! reference's catches at `RegistryClient.ts:392` and `:445` skip it.
 #![cfg(feature = "registry")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/pushdrop_decode_618.rs"]
+mod decode_618;
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
 #[path = "support/pushdrop_lock_position_537.rs"]
@@ -14,8 +16,8 @@ mod lock_position;
 mod token_fields;
 
 use bsv_rs::registry::{
-    BasketQuery, CertificateQuery, DefinitionType, ProtocolQuery, RegistryClient,
-    RegistryClientConfig,
+    decode_and_verify_registry_token, BasketQuery, CertificateQuery, DefinitionType, ProtocolQuery,
+    RegistryClient, RegistryClientConfig,
 };
 use bsv_rs::script::LockingScript;
 use bsv_rs::wallet::{ListOutputsResult, Outpoint, WalletOutput};
@@ -94,5 +96,40 @@ async fn a_lock_after_registry_token_is_skipped_as_the_reference_skips_it_537() 
             let control = token_fields::script(&control);
             assert_eq!(read(kind, control).await, (1, 1), "{}", case["name"]);
         }
+    }
+}
+
+/// The #537 case a #618 case was built from.
+fn from_537<'a>(cases: &'a [Value], case: &Value) -> &'a Value {
+    cases
+        .iter()
+        .find(|old| old["name"] == case["from_537"])
+        .unwrap()
+}
+
+/// #618: a key alone and a token without CHECKSIG second, which the public
+/// `PushDrop::decode` reads as the reference does, are refused by the
+/// registry's reader in `decodeCanonicalPushDrop`'s words
+/// (`registryTokenValidation.ts:28`, `PushDropValidation.ts:54-79`) and
+/// skipped by the resolvers and the listing (`RegistryClient.ts:392,445`).
+#[tokio::test]
+async fn a_key_only_and_a_no_checksig_registry_token_are_skipped_as_the_reference_skips_them_618() {
+    let old = lock_position::cases("registry_client");
+    let cases = decode_618::cases("registry_client");
+    assert_eq!(cases.len(), 6);
+    for case in &cases {
+        assert_eq!(case["outcome"], "skipped", "{}", case["name"]);
+        let from = from_537(&old, case);
+        let kind = definition_type(from);
+        let script = decode_618::script(case, from);
+        let words = decode_and_verify_registry_token(kind, &script)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            words.ends_with(case["site_words"].as_str().unwrap()),
+            "{}: {words}",
+            case["name"]
+        );
+        assert_eq!(read(kind, script).await, (0, 0), "{}", case["name"]);
     }
 }

@@ -187,7 +187,7 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
     ) -> Option<Revelation> {
         let tx = Transaction::from_beef(&output.beef, None).ok()?;
         let source = tx.outputs.get(output.output_index as usize)?;
-        let token = PushDrop::decode(&source.locking_script).ok()?;
+        let token = PushDrop::decode_before(&source.locking_script).ok()?;
         if token.fields.len() != 2
             || !super::token_envelope::is_canonical_signed_pushdrop(
                 &source.locking_script,

@@ -12,7 +12,10 @@ impl PushDrop {
     /// identity, contacts, registry, kvstore, overlay and storage clients'
     /// counterparts passes it: the key is the first chunk and the other
     /// position is never tried, so a lock-after token is refused at the key
-    /// read. [`PushDrop::decode`] still reads both positions.
+    /// read. [`PushDrop::decode`] still reads both positions. A key alone and
+    /// a key without `OP_CHECKSIG` second are refused here, the canonical
+    /// path: every caller's counterpart refuses them after its read, where
+    /// [`PushDrop::decode`] reads them as the reference does (#618).
     pub(crate) fn decode_before(script: &LockingScript) -> Result<Self> {
         let chunks = script.chunks();
         if chunks.len() < 2 {

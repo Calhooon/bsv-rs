@@ -1,0 +1,701 @@
+{
+  "issue": 618,
+  "reference": "ts-stack@edf6e03 packages/sdk/src/script/templates/PushDrop.ts:63-121",
+  "runtime": "node v22.18.0",
+  "fields": [
+    "6869",
+    "05",
+    ""
+  ],
+  "cases": [
+    {
+      "name": "lock_before_three_fields",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac02686955006d75",
+      "before": {
+        "fields": [
+          "6869",
+          "05",
+          "00"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "lock_after_three_fields",
+      "locking_script": "02686955006d752103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Unknown point format"
+      },
+      "after": {
+        "fields": [
+          "6869",
+          "05",
+          "00"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "lock_only",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": [],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": [
+          "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+          ""
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "key_only",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+      "before": {
+        "fields": [],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "key_only_uncompressed",
+      "locking_script": "4104acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbecc338921b0a7d9fd64380971763b61e9add888a4375f8e0f05cc262ac64f9c37",
+      "before": {
+        "fields": [],
+        "locking_public_key": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "key_only_off_curve",
+      "locking_script": "21020000000000000000000000000000000000000000000000000000000000000000",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Invalid point"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "no_checksig",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc45102686955006d75",
+      "before": {
+        "fields": [
+          "6869",
+          "05",
+          "00"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "no_checksig_nop",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc46102686955006d75",
+      "before": {
+        "fields": [
+          "6869",
+          "05",
+          "00"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "no_checksig_no_field",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc451",
+      "before": {
+        "fields": [],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "no_checksig_off_curve",
+      "locking_script": "210200000000000000000000000000000000000000000000000000000000000000005102686955006d75",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Invalid point"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "lock_after_point_first",
+      "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817980268696d2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": [
+          "",
+          "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+          ""
+        ],
+        "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "error": null
+      },
+      "after": {
+        "fields": [
+          "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "empty",
+      "locking_script": "",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Cannot read properties of undefined (reading 'data')"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Cannot read properties of undefined (reading 'op')"
+      }
+    },
+    {
+      "name": "one_chunk_op_true",
+      "locking_script": "51",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "script.chunks[0].data must have value"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "one_chunk_short_push",
+      "locking_script": "050102030405",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Unknown point format"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "checksig_drop",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac75",
+      "before": {
+        "fields": [
+          ""
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "checksig_drop_lock_after",
+      "locking_script": "752103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "script.chunks[0].data must have value"
+      },
+      "after": {
+        "fields": [
+          "",
+          "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+          ""
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "checksig_2drop",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac6d",
+      "before": {
+        "fields": [
+          ""
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "checksig_2drop_lock_after",
+      "locking_script": "6d2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "script.chunks[0].data must have value"
+      },
+      "after": {
+        "fields": [
+          "",
+          "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+          ""
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "checksig_field_drop",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac02686975",
+      "before": {
+        "fields": [
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "checksig_field_drop_lock_after",
+      "locking_script": "026869752103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Unknown point format"
+      },
+      "after": {
+        "fields": [
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "reserved_field",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac026869506d",
+      "before": {
+        "fields": [
+          "6869",
+          "00"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "reserved_field_lock_after",
+      "locking_script": "026869506d2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Unknown point format"
+      },
+      "after": {
+        "fields": [
+          "6869",
+          "00"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "op_0_op_1_fields",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac00516d",
+      "before": {
+        "fields": [
+          "00",
+          "01"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "op_0_op_1_fields_lock_after",
+      "locking_script": "00516d2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "script.chunks[0].data must have value"
+      },
+      "after": {
+        "fields": [
+          "00",
+          "01"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    }
+  ],
+  "sites": [
+    {
+      "site": "identity_client",
+      "reference_call": "IdentityClient.ts:773",
+      "reference_outcome": "IdentityClient.ts:823 catch: the output skipped",
+      "cases": [
+        {
+          "name": "key_only",
+          "shape": "key_only",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "No authenticated revelation output matches the requested certificate.",
+          "outcome": "skipped"
+        },
+        {
+          "name": "no_checksig",
+          "shape": "no_checksig",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798514d9f047b2274797065223a22426759474267594742675947426759474267594742675947426759474267594742675947426759474267593d222c2273657269616c4e756d626572223a22427763484277634842776348427763484277634842776348427763484277634842776348427763484277633d222c227375626a656374223a22303336326431346461623431353062663439373430326664633435613231356531306463623031633335343935396231306366653331633765396438376666333364222c22636572746966696572223a22303236613234356266366463363938353034633839613230636664656436303835333135326236393533333663323830363362363163363563626432363965366234222c227265766f636174696f6e4f7574706f696e74223a22303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030302e30222c226669656c6473223a7b226e616d65223a223174716d757430514d68494f54437a64346277655342677162426666496d33314a4f6e4c7270385938754f7a46622b784f314f6f37542f4c7649562b4946736362753776477245457a53595238346a7553513d3d222c22656d61696c223a225630744d6a5a482f58434d4d6b485151316c4430306b6163587233496433456c45696c6f37744e6d554131506e3547467553446354593168694a6a7646766d386a4c644c5550746a5a695472397345456467424f2f54303d222c2263697479223a2238415661563069745542346d2b7a4f624b416546594b49496a70656a537162426e7949475a78506a507a532b644954764353344e4e685541784373686764546744385673494b6f53564f357570497a33227d2c227369676e6174757265223a223330343430323230343464663234396235393335373662663964316530626537613662333366616431343261363937386562303733656463656463353330316339653135346539633032323034633937373164346432626538333539633534626563313562383238663432633533306437306261376435346133313137336536613339353235643466383336222c226b657972696e67223a7b2263697479223a224c4352475255676751563869542f7a53556b3469696b4d484f727978526242597545336b695063795a764b75487059464561716461772f757474414a6f78694452434a6370474b70625655683539745148675a5971747355625144777a786b385457306d4a3338463766513d222c22656d61696c223a226e30766c635a79364e6f4e734553476469564c4745524c5248436b79325451344b74672b6436546548795236412f31724b696c54774268326e4a61714e746b624173694f58786d4e2b4a525647544e30666e543432465a496d696c754d353573487a364f2b504f30476d633d222c226e616d65223a22333045763932774e526f674f30592b6733425368514e61335a705a386a456b737a614a585975757a3569314b5757354e366a7055562f59355155636535416f776f6b534f517035645a392f684355582b314337782f416c72396e4e736859356f4d526e6a425231617a67303d227d7d473045022100a02440c3d8653702c184c1183a2b2c5d177cf0ad7c1b3ca04a098dbcb5e7374d022074cf1a01b9e9231758207bd0e394b3d611adfc457a29e39da317b4a2223b7cc96d",
+          "decode": {
+            "fields": [
+              "7b2274797065223a22426759474267594742675947426759474267594742675947426759474267594742675947426759474267593d222c2273657269616c4e756d626572223a22427763484277634842776348427763484277634842776348427763484277634842776348427763484277633d222c227375626a656374223a22303336326431346461623431353062663439373430326664633435613231356531306463623031633335343935396231306366653331633765396438376666333364222c22636572746966696572223a22303236613234356266366463363938353034633839613230636664656436303835333135326236393533333663323830363362363163363563626432363965366234222c227265766f636174696f6e4f7574706f696e74223a22303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030302e30222c226669656c6473223a7b226e616d65223a223174716d757430514d68494f54437a64346277655342677162426666496d33314a4f6e4c7270385938754f7a46622b784f314f6f37542f4c7649562b4946736362753776477245457a53595238346a7553513d3d222c22656d61696c223a225630744d6a5a482f58434d4d6b485151316c4430306b6163587233496433456c45696c6f37744e6d554131506e3547467553446354593168694a6a7646766d386a4c644c5550746a5a695472397345456467424f2f54303d222c2263697479223a2238415661563069745542346d2b7a4f624b416546594b49496a70656a537162426e7949475a78506a507a532b644954764353344e4e685541784373686764546744385673494b6f53564f357570497a33227d2c227369676e6174757265223a223330343430323230343464663234396235393335373662663964316530626537613662333366616431343261363937386562303733656463656463353330316339653135346539633032323034633937373164346432626538333539633534626563313562383238663432633533306437306261376435346133313137336536613339353235643466383336222c226b657972696e67223a7b2263697479223a224c4352475255676751563869542f7a53556b3469696b4d484f727978526242597545336b695063795a764b75487059464561716461772f757474414a6f78694452434a6370474b70625655683539745148675a5971747355625144777a786b385457306d4a3338463766513d222c22656d61696c223a226e30766c635a79364e6f4e734553476469564c4745524c5248436b79325451344b74672b6436546548795236412f31724b696c54774268326e4a61714e746b624173694f58786d4e2b4a525647544e30666e543432465a496d696c754d353573487a364f2b504f30476d633d222c226e616d65223a22333045763932774e526f674f30592b6733425368514e61335a705a386a456b737a614a585975757a3569314b5757354e366a7055562f59355155636535416f776f6b534f517035645a392f684355582b314337782f416c72396e4e736859356f4d526e6a425231617a67303d227d7d",
+              "3045022100a02440c3d8653702c184c1183a2b2c5d177cf0ad7c1b3ca04a098dbcb5e7374d022074cf1a01b9e9231758207bd0e394b3d611adfc457a29e39da317b4a2223b7cc9"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "No authenticated revelation output matches the requested certificate.",
+          "outcome": "skipped"
+        }
+      ]
+    },
+    {
+      "site": "contacts_cache",
+      "reference_call": "ContactsManager.ts:432",
+      "reference_outcome": "ContactsManager.ts:478,507-513 allSettled: the output dropped",
+      "cases": [
+        {
+          "name": "key_only",
+          "shape": "key_only",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Invalid contact PushDrop field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "no_checksig",
+          "shape": "no_checksig",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798514c93b0bc845a8bd8d31ac3e309566f49e6aca52014f8c32e160c468bbb10c7b47b1b083acd5afa008665122657f64c38506aec1d030eec76995860ba3bbd4c1bb95eb44d61fc2d33a51102b35551db91df13a0d122ed75a15bf70bdcce63a4529dda80cc04ec0efe4d9ebef9b2033d6857fd4f8dc3764111519a7cfd52854168f0b499c6ba6d8525572aaf25bf1bdcf299f388bacf4730450221009b1ad2d3b01345debc9af37f7b075c5e37a95c3d8449d9a8c4f688113c4d96d6022031f6a308eb140dcdf5d5932fe1307fa69cd137fc72afdd8ccdce7b4149bff2346d",
+          "decode": {
+            "fields": [
+              "b0bc845a8bd8d31ac3e309566f49e6aca52014f8c32e160c468bbb10c7b47b1b083acd5afa008665122657f64c38506aec1d030eec76995860ba3bbd4c1bb95eb44d61fc2d33a51102b35551db91df13a0d122ed75a15bf70bdcce63a4529dda80cc04ec0efe4d9ebef9b2033d6857fd4f8dc3764111519a7cfd52854168f0b499c6ba6d8525572aaf25bf1bdcf299f388bacf",
+              "30450221009b1ad2d3b01345debc9af37f7b075c5e37a95c3d8449d9a8c4f688113c4d96d6022031f6a308eb140dcdf5d5932fe1307fa69cd137fc72afdd8ccdce7b4149bff234"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Contact output must use the canonical signed PushDrop script",
+          "outcome": "skipped"
+        }
+      ]
+    },
+    {
+      "site": "registry_client",
+      "reference_call": "registryTokenValidation.ts:28",
+      "reference_outcome": "RegistryClient.ts:392,445 catch: the output skipped",
+      "cases": [
+        {
+          "name": "basket_key_only",
+          "shape": "key_only",
+          "from_537": "basket_lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "basket_no_checksig",
+          "shape": "no_checksig",
+          "from_537": "basket_lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179851076261736b657431064261736b65741468747470733a2f2f69636f6e2e6578616d706c650841206261736b65741368747470733a2f2f646f632e6578616d706c65423033616364343834653266306337663635333039616431373861396635353961626465303937393639373463353765373134633335663131306466633237636362656d6d6d",
+          "decode": {
+            "fields": [
+              "6261736b657431",
+              "4261736b6574",
+              "68747470733a2f2f69636f6e2e6578616d706c65",
+              "41206261736b6574",
+              "68747470733a2f2f646f632e6578616d706c65",
+              "303361636434383465326630633766363533303961643137386139663535396162646530393739363937346335376537313463333566313130646663323763636265"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "protocol_key_only",
+          "shape": "key_only",
+          "from_537": "protocol_lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "protocol_no_checksig",
+          "shape": "no_checksig",
+          "from_537": "protocol_lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179851105b312c2270726f746f206e616d65225d0550726f746f1468747470733a2f2f69636f6e2e6578616d706c650a412070726f746f636f6c1368747470733a2f2f646f632e6578616d706c65423033616364343834653266306337663635333039616431373861396635353961626465303937393639373463353765373134633335663131306466633237636362656d6d6d",
+          "decode": {
+            "fields": [
+              "5b312c2270726f746f206e616d65225d",
+              "50726f746f",
+              "68747470733a2f2f69636f6e2e6578616d706c65",
+              "412070726f746f636f6c",
+              "68747470733a2f2f646f632e6578616d706c65",
+              "303361636434383465326630633766363533303961643137386139663535396162646530393739363937346335376537313463333566313130646663323763636265"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "certificate_key_only",
+          "shape": "key_only",
+          "from_537": "certificate_lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "certificate_no_checksig",
+          "shape": "no_checksig",
+          "from_537": "certificate_lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817985108636572747479706504436572741468747470733a2f2f69636f6e2e6578616d706c650d412063657274696669636174651368747470733a2f2f646f632e6578616d706c65027b7d423033616364343834653266306337663635333039616431373861396635353961626465303937393639373463353765373134633335663131306466633237636362656d6d6d75",
+          "decode": {
+            "fields": [
+              "6365727474797065",
+              "43657274",
+              "68747470733a2f2f69636f6e2e6578616d706c65",
+              "41206365727469666963617465",
+              "68747470733a2f2f646f632e6578616d706c65",
+              "7b7d",
+              "303361636434383465326630633766363533303961643137386139663535396162646530393739363937346335376537313463333566313130646663323763636265"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        }
+      ]
+    },
+    {
+      "site": "kvstore_interpreter",
+      "reference_call": "kvStoreTokenValidation.ts:88",
+      "reference_outcome": "kvStoreInterpreter.ts:48 catch: no value",
+      "cases": [
+        {
+          "name": "key_only",
+          "shape": "key_only",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "no_checksig",
+          "shape": "no_checksig",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798510d5b312c226b7673746f7265225d05616c706861036f6e65210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179846304402203ce88a7d4b15f9768959da4689a2beedc393971654ba3c4418de853436cd095f0220107d38fadf6807177d8acbff7a4be105312a1ac8339a8196378d132b5fbc6bfb6d6d75",
+          "decode": {
+            "fields": [
+              "5b312c226b7673746f7265225d",
+              "616c706861",
+              "6f6e65",
+              "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "304402203ce88a7d4b15f9768959da4689a2beedc393971654ba3c4418de853436cd095f0220107d38fadf6807177d8acbff7a4be105312a1ac8339a8196378d132b5fbc6bfb"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "PushDrop token must use the canonical PushDrop envelope",
+          "outcome": "skipped"
+        }
+      ]
+    },
+    {
+      "site": "overlay_admin_token",
+      "reference_call": "OverlayAdminTokenTemplate.ts:164",
+      "reference_outcome": "OverlayAdminTokenTemplate.ts:237-239: thrown",
+      "cases": [
+        {
+          "name": "key_only",
+          "shape": "key_only",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "refused"
+        },
+        {
+          "name": "no_checksig",
+          "shape": "no_checksig",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798510453484950210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981468747470733a2f2f736869702e6578616d706c6507746d5f7465737446304402205189a1fc07f28160ee53708a9e0557b0e197c0531e5ca98105bcc083b1d40b34022049d60d6af285eb7eb8aa27aca8a02a1d844165e6c5b20648ea18e705d5f7dd806d6d75",
+          "decode": {
+            "fields": [
+              "53484950",
+              "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "68747470733a2f2f736869702e6578616d706c65",
+              "746d5f74657374",
+              "304402205189a1fc07f28160ee53708a9e0557b0e197c0531e5ca98105bcc083b1d40b34022049d60d6af285eb7eb8aa27aca8a02a1d844165e6c5b20648ea18e705d5f7dd80"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "PushDrop token must use the canonical PushDrop envelope",
+          "outcome": "refused"
+        }
+      ]
+    },
+    {
+      "site": "storage_downloader",
+      "reference_call": "UHRPAdvertisementValidation.ts:40",
+      "reference_outcome": "StorageDownloader.ts:121 catch: the output skipped",
+      "cases": [
+        {
+          "name": "key_only",
+          "shape": "key_only",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "decode": {
+            "fields": [],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "Unexpected PushDrop token field count",
+          "outcome": "skipped"
+        },
+        {
+          "name": "no_checksig",
+          "shape": "no_checksig",
+          "from_537": "lock_after_not_a_point",
+          "locking_script": "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798512011111111111111111111111111111111111111111111111111111111111111112044444444444444444444444444444444444444444444444444444444444444441968747470733a2f2f686f73742e6578616d706c652f66696c6505fe005786f4604730450221008112fa7091fe5116e5fb133ff036ef20c18a690f727c8ed3fa6a561de274536a02200ccc4a5b10fbe9b8e25728f87685146f84f73ad5136313feec1eb014620cdec16d6d6d",
+          "decode": {
+            "fields": [
+              "1111111111111111111111111111111111111111111111111111111111111111",
+              "4444444444444444444444444444444444444444444444444444444444444444",
+              "68747470733a2f2f686f73742e6578616d706c652f66696c65",
+              "fe005786f4",
+              "10",
+              "30450221008112fa7091fe5116e5fb133ff036ef20c18a690f727c8ed3fa6a561de274536a02200ccc4a5b10fbe9b8e25728f87685146f84f73ad5136313feec1eb014620cdec1"
+            ],
+            "locking_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "error": null
+          },
+          "site_words": "PushDrop token must use the canonical PushDrop envelope",
+          "outcome": "skipped"
+        }
+      ]
+    }
+  ]
+}

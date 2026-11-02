@@ -17,6 +17,9 @@ pub(super) fn parse_public_key(key: &str) -> Result<PublicKey> {
 // The reference's local decode is lock-before alone (PushDropValidation.ts:59,
 // PushDrop.ts:74-75; #499). The general decoder reads a first chunk that is not
 // a 33- or 65-byte push as lock-after; here that token meets the first-chunk read.
+// The canonical path, not the public door: a key alone or a key without
+// CHECKSIG second, which `PushDrop::decode` reads as the reference does (#618),
+// is refused here as `decodeCanonicalPushDrop` refuses it.
 pub(super) fn decode_pushdrop(script: &LockingScript) -> Result<PushDrop> {
     let lock_before = script
         .chunks()
@@ -27,7 +30,7 @@ pub(super) fn decode_pushdrop(script: &LockingScript) -> Result<PushDrop> {
         let error = Error::ScriptParseError("Expected a lock-before PushDrop".into());
         return Err(decode_error(error, script));
     }
-    PushDrop::decode(script).map_err(|error| decode_error(error, script))
+    PushDrop::decode_before(script).map_err(|error| decode_error(error, script))
 }
 
 fn decode_error(error: Error, script: &LockingScript) -> Error {

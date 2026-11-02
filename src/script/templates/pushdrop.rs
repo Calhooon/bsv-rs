@@ -29,6 +29,7 @@
 //! let script = pushdrop.lock();
 //! ```
 
+use super::pushdrop_reference_read::reference_fields;
 use crate::error::Error;
 use crate::primitives::bsv::TransactionSignature;
 use crate::primitives::ec::{PrivateKey, PublicKey};
@@ -213,6 +214,15 @@ impl PushDrop {
     ///
     /// The decoded PushDrop template, or an error if the script format is invalid.
     ///
+    /// A first chunk of 33 or 65 bytes is the key, read lock-before. A key
+    /// alone, or a key whose second chunk is not `OP_CHECKSIG`, is read as
+    /// the reference's `PushDrop.decode` reads it (#618): the second chunk
+    /// never read, the fields from the third. Any other first chunk is read
+    /// lock-after. Every path reads the fields as `PushDrop.ts:96-115` does
+    /// (#618's fold): each chunk its data, or the number a data-less opcode
+    /// pushes (`OP_RESERVED` `00`), until the *next* chunk is a DROP or
+    /// 2DROP, so a trailing DROP alone is one empty field.
+    ///
     /// # Example
     ///
     /// ```rust,ignore
@@ -226,19 +236,22 @@ impl PushDrop {
     pub fn decode(script: &LockingScript) -> Result<Self> {
         let chunks = script.chunks();
 
+        // Determine lock position by checking first chunk
+        // If first chunk is a 33 or 65 byte data push, it's lock-before
+        let first_is_pubkey = chunks
+            .first()
+            .and_then(|chunk| chunk.data.as_ref())
+            .is_some_and(|d| d.len() == 33 || d.len() == 65);
+
+        if first_is_pubkey && chunks.get(1).is_none_or(|chunk| chunk.op != OP_CHECKSIG) {
+            return Self::decode_reference_before(&chunks);
+        }
+
         if chunks.len() < 2 {
             return Err(Error::ScriptParseError(
                 "Script too short for PushDrop".into(),
             ));
         }
-
-        // Determine lock position by checking first chunk
-        // If first chunk is a 33 or 65 byte data push, it's lock-before
-        let first_is_pubkey = chunks[0]
-            .data
-            .as_ref()
-            .map(|d| d.len() == 33 || d.len() == 65)
-            .unwrap_or(false);
 
         if first_is_pubkey {
             Self::decode_lock_before(&chunks)
@@ -264,19 +277,9 @@ impl PushDrop {
             ));
         }
 
-        // Extract fields (between OP_CHECKSIG and first DROP)
-        let mut fields = Vec::new();
-        for chunk in chunks.iter().skip(2) {
-            // Stop when we hit a DROP operation
-            if chunk.op == OP_DROP || chunk.op == OP_2DROP {
-                break;
-            }
-            fields.push(Self::chunk_to_bytes(chunk));
-        }
-
         Ok(Self {
             locking_public_key,
-            fields,
+            fields: reference_fields(chunks, 2),
             lock_position: LockPosition::Before,
         })
     }
@@ -303,50 +306,11 @@ impl PushDrop {
         })?;
         let locking_public_key = PublicKey::from_bytes(pubkey_data)?;
 
-        // Extract fields (before the DROP operations)
-        let mut fields = Vec::new();
-        for chunk in chunks.iter().take(last_idx - 1) {
-            // Stop when we hit a DROP operation
-            if chunk.op == OP_DROP || chunk.op == OP_2DROP {
-                break;
-            }
-            fields.push(Self::chunk_to_bytes(chunk));
-        }
-
         Ok(Self {
             locking_public_key,
-            fields,
+            fields: reference_fields(chunks, 0),
             lock_position: LockPosition::After,
         })
-    }
-
-    /// Converts a script chunk to bytes, handling minimal encoding.
-    fn chunk_to_bytes(chunk: &ScriptChunk) -> Vec<u8> {
-        // If chunk has data, return it
-        if let Some(ref data) = chunk.data {
-            return data.clone();
-        }
-
-        // Handle opcodes that represent data
-        let op = chunk.op;
-
-        // OP_0 -> [0]
-        if op == OP_0 {
-            return vec![0];
-        }
-
-        // OP_1 through OP_16 -> [1] through [16]
-        if (OP_1..=OP_16).contains(&op) {
-            return vec![op - 0x50];
-        }
-
-        // OP_1NEGATE -> [0x81]
-        if op == OP_1NEGATE {
-            return vec![0x81];
-        }
-
-        // Other opcodes have no data representation
-        Vec::new()
     }
 
     /// Creates an unlock template for spending a PushDrop output.
