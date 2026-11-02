@@ -436,7 +436,8 @@ percent of viable. No behaviour changes.
 
 The recorded vector shows three differences from the reference's `MerklePath`
 at `ts-stack@edf6e03`. Each is older than #603. None is a change. Two are the
-reference's bugs, for the keeper's filing queue. First, the reference refuses a
+reference's bugs, filed as ts-stack #1469 and #1470 on 2026-11-02 from the #375
+queue's twenty-third and twenty-fourth drafts; answer pending. First, the reference refuses a
 path of more than 54 levels (`MerklePath.ts:198-199`, `Merkle Path must contain
 between 1 and 54 levels`), in its constructor and so in `fromBinary`, narrower
 than BRC-74's 64 (`transactions/0074.md:51`, the sibling's `BUMP.lean:66`), which
@@ -7048,7 +7049,7 @@ change makes no claim of complete JSON result parity.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 18: Ours: R02/R03 are native JSON representation residues (WalletResultValidation.ts:623-645,664-667 at edf6e03); R47 keeps u32 by the keeper's #467 word (BRC-100 wallet/0100.md:274; Wallet.interfaces.ts:31-35 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/wallet_http_json_pending_432.rs; tests/wallet_http_json_result_values_408.rs). Draft: [http-json-result-validation](./docs/lanes/375-filings/http-json-result-validation.md).
+- Row 18: Ours: R02/R03 are native JSON representation residues (WalletResultValidation.ts:623-645,664-667 at edf6e03); R47 keeps u32 by the keeper's #467 word (BRC-100 wallet/0100.md:274; Wallet.interfaces.ts:31-35 at edf6e03). Theirs: go-sdk #406 (filed 2026-11-02; answer pending; the witness: tests/wallet_http_json_pending_432.rs; tests/wallet_http_json_result_values_408.rs). Draft: [http-json-result-validation](./docs/lanes/375-filings/http-json-result-validation.md).
 
 ### Fixed: certificate requests verify the parsed object's JSON.stringify preimage (#426)
 
@@ -7987,7 +7988,7 @@ ways.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 73: Ours: native compressed-key refusal text differs while refusing the same malformed keys (WalletWireTransceiver.ts:790-924 at edf6e03). Theirs: go-sdk, filing pending (the witness: tests/wire_linkage_calls_406.rs; tests/vectors/wallet_wire/linkage_calls_406.json). Draft: [linkage-reason-and-result-validation](./docs/lanes/375-filings/linkage-reason-and-result-validation.md).
+- Row 73: Ours: native compressed-key refusal text differs while refusing the same malformed keys (WalletWireTransceiver.ts:790-924 at edf6e03). Theirs: go-sdk #405 (filed 2026-11-02; answer pending; the witness: tests/wire_linkage_calls_406.rs; tests/vectors/wallet_wire/linkage_calls_406.json). Draft: [linkage-reason-and-result-validation](./docs/lanes/375-filings/linkage-reason-and-result-validation.md).
 
 ### Fixed: `HttpWalletJson` reads every success-path byte field as the reference's `HTTPWalletJSON` does, the historical object form included (#365)
 
@@ -12918,7 +12919,7 @@ and judges neither.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 57: Ours: BRC-100 wallet/0100.md:649 requires a positive unlockingScriptLength, with native early bound wording. Theirs: ts-stack #1466 (filed 2026-11-02; answer pending; the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Theirs: go-sdk, filing pending (the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Draft: [create-action-positive-script-length-ts-stack](./docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md). Draft: [create-action-positive-script-length-go-sdk](./docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md).
+- Row 57: Ours: BRC-100 wallet/0100.md:649 requires a positive unlockingScriptLength, with native early bound wording. Theirs: ts-stack #1466 (filed 2026-11-02; answer pending; the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Theirs: go-sdk #403 (filed 2026-11-02; answer pending; the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Draft: [create-action-positive-script-length-ts-stack](./docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md). Draft: [create-action-positive-script-length-go-sdk](./docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md).
 
 ### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
 
@@ -13399,7 +13400,7 @@ refused by this crate's readers as by the reference's; the divergence is the
 
 Census (#375; current reading, historical account above retained):
 
-- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk, filing pending (the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
+- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk #404 (filed 2026-11-02; answer pending; the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
 
 ### Changed: a duplicate at an even offset is read as the reference reads it (#167)
 
@@ -15986,7 +15987,7 @@ any point that this crate or TS writes.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk, filing pending (the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
+- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk #404 (filed 2026-11-02; answer pending; the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
 
 ### Fixed: the transceiver reads certificate results as the reference writes them (#177)
 
@@ -16075,7 +16076,7 @@ follow-up filed as #184.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk, filing pending (the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
+- Row 38: Ours: native field-prime key rejection and early trust validation; BRC-100 wallet/0100.md:276,1401-1411 requires trust 1 through 10. Theirs: go-sdk #404 (filed 2026-11-02; answer pending; the witness: tests/wire_reader_strictness.rs; tests/wire_identity_certificate_roundtrip.rs). Draft: [discovery-trust-range](./docs/lanes/375-filings/discovery-trust-range.md).
 
 ### Fixed: the identity-certificate readers read the reference's layout (#184)
 
