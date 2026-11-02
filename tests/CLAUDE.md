@@ -404,7 +404,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`beef_limits.rs`**: `BeefLimits` as memory hints: a BEEF over every one is read, a claimed count is refused for the bytes
 
 ### Conformance corpus (`transaction` feature; `$BSV_CONFORMANCE_DIR`, skipped loudly when absent)
-- **`conformance_scripts.rs`** — The ts-stack corpus's script domain: 5,116 evaluation vectors (node script fixtures from bitcoin-sv and Teranode, the SDK's), the sighash and script regressions; every mismatch classified into an enumerated `unsupported` class or a pinned known failure, the per-class counts pinned (`EVALUATION_UNSUPPORTED_PINS`, `EVALUATION_KNOWN_FAILURES`), so corpus or interpreter drift is a red test. CI never sees the corpus (Calhooon/bsv-rs#31): run it before a release
+- **`conformance_scripts.rs`** — The ts-stack corpus's script domain: 5,116 evaluation vectors (node script fixtures from bitcoin-sv and Teranode, the SDK's), the sighash and script regressions; every mismatch classified into an enumerated `unsupported` class or a pinned known failure, the per-class counts pinned (`EVALUATION_UNSUPPORTED_PINS`, `EVALUATION_KNOWN_FAILURES`), so corpus or interpreter drift is a red test. CI's `vectors` job (required on both lines) runs it against the corpus at `ts-stack@edf6e03`, its `TS_STACK_PIN` (Calhooon/bsv-rs#31); the other CI jobs see no corpus and skip
 - **`conformance_beef.rs`** — The corpus's BUMP (MerklePath), serialization, BEEF and transaction-regression suites, the same classification and pins
 
 ### Transaction HTTP (`transaction`+`http` features, wiremock)
