@@ -43,7 +43,7 @@ use crate::Result;
 /// The most levels a path may have. Offsets are `u64`, so a path of 64 levels
 /// shifts an offset by at most 63; a tree-height byte over this is refused
 /// before any shift (bsv-stack-lean #57, P0-5c).
-const MAX_TREE_HEIGHT: usize = 64;
+pub(super) const MAX_TREE_HEIGHT: usize = 64;
 
 fn tree_height_error(height: usize) -> crate::Error {
     crate::Error::MerklePathError(format!(
@@ -153,9 +153,7 @@ impl MerklePath {
         legal_offsets_only: bool,
     ) -> Result<Self> {
         if path.is_empty() {
-            return Err(crate::Error::MerklePathError(
-                "Path cannot be empty".to_string(),
-            ));
+            return Err(super::merkle_path_legal::no_levels());
         }
 
         if path.len() > MAX_TREE_HEIGHT {
@@ -336,7 +334,7 @@ impl MerklePath {
 
     /// Returns the index (offset) of a transaction in the path.
     fn index_of(&self, txid: &str) -> Result<u64> {
-        for leaf in &self.path[0] {
+        for leaf in self.level0() {
             if leaf.hash.as_deref() == Some(txid) {
                 return Ok(leaf.offset);
             }
@@ -362,7 +360,7 @@ impl MerklePath {
             Some(t) => t.to_string(),
             None => {
                 // Find the first valid hash
-                self.path[0]
+                self.level0()
                     .iter()
                     .find_map(|l| l.hash.clone())
                     .ok_or_else(|| {
@@ -453,7 +451,7 @@ impl MerklePath {
         let mut drop_offsets: Vec<u64> = Vec::new();
 
         // Process level 0
-        for leaf in &self.path[0] {
+        for leaf in self.level0() {
             if leaf.txid {
                 // txid nodes enable computing their parent
                 let parent_offset = leaf.offset >> 1;
@@ -468,7 +466,7 @@ impl MerklePath {
                 } else {
                     leaf.offset + 1
                 };
-                let peer = self.path[0].iter().find(|l| l.offset == peer_offset);
+                let peer = self.level0().iter().find(|l| l.offset == peer_offset);
                 if let Some(p) = peer {
                     if !p.txid && drop_offsets.last() != Some(&p.offset) {
                         drop_offsets.push(p.offset);
@@ -477,8 +475,10 @@ impl MerklePath {
             }
         }
 
-        // Remove non-txid pairs from level 0
-        self.path[0].retain(|l| !drop_offsets.contains(&l.offset));
+        // Remove non-txid pairs from level 0, if there is one (#649)
+        if let Some(level0) = self.path.first_mut() {
+            level0.retain(|l| !drop_offsets.contains(&l.offset));
+        }
 
         // Process higher levels
         for h in 1..self.path.len() {
@@ -492,7 +492,7 @@ impl MerklePath {
 
     /// Returns true if this path contains the given txid in its leaf level.
     pub fn contains(&self, txid: &str) -> bool {
-        self.path[0].iter().any(|l| l.hash.as_deref() == Some(txid))
+        self.index_of(txid).is_ok()
     }
 
     /// Returns true if this path contains the given txid, and marks the
@@ -501,7 +501,7 @@ impl MerklePath {
     /// for subsequent validation. Matches the TS SDK's pattern where
     /// `tryToValidateBumpIndex` sets `node.txid = true` after finding a match.
     pub fn contains_and_mark(&mut self, txid: &str) -> bool {
-        for leaf in &mut self.path[0] {
+        for leaf in self.path.iter_mut().take(1).flatten() {
             if leaf.hash.as_deref() == Some(txid) {
                 leaf.txid = true;
                 return true;
@@ -512,7 +512,7 @@ impl MerklePath {
 
     /// Returns all txids in this path.
     pub fn txids(&self) -> Vec<String> {
-        self.path[0]
+        self.level0()
             .iter()
             .filter(|l| l.txid)
             .filter_map(|l| l.hash.clone())
