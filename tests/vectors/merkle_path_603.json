@@ -3058,6 +3058,277 @@
       }
     },
     {
+      "id": "mp-parse-001-off-path-level-1",
+      "source": "ts-stack conformance vectors/sdk/transactions/merkle-path.json mp-parse-001",
+      "derivation": "a leaf added at level 1, offset 1526, carrying the hash of that level's first leaf",
+      "block_height": 813706,
+      "path": [
+        [
+          {
+            "offset": 3048,
+            "hash": "304e737fdfcb017a1a322e78b067ecebb5e07b44f0a36ed1f01264d2014f7711"
+          },
+          {
+            "offset": 3049,
+            "txid": true,
+            "hash": "d888711d588021e588984e8278a2decf927298173a06737066e43f3e75534e00"
+          },
+          {
+            "offset": 3050,
+            "txid": true,
+            "hash": "98c9c5dd79a18f40837061d5e0395ffb52e700a2689e641d19f053fc9619445e"
+          },
+          {
+            "offset": 3051,
+            "duplicate": true
+          }
+        ],
+        [
+          {
+            "offset": 1524,
+            "hash": "811ae75c80fecd27efff5ef272c2adf7edb6e535447f27a4087d23724f397106"
+          },
+          {
+            "offset": 1525,
+            "hash": "82520a4501a06061dd2386fb92fa5e9ceaed14747acc00edf34a6cecabcc2b26"
+          },
+          {
+            "offset": 1526,
+            "hash": "811ae75c80fecd27efff5ef272c2adf7edb6e535447f27a4087d23724f397106"
+          }
+        ],
+        [
+          {
+            "offset": 763,
+            "duplicate": true
+          }
+        ],
+        [
+          {
+            "offset": 380,
+            "hash": "858e41febe934b4cbc1cb80a1dc8e254cb1e69acff8e4f91ecdd779bcaefb393"
+          }
+        ],
+        [
+          {
+            "offset": 191,
+            "duplicate": true
+          }
+        ],
+        [
+          {
+            "offset": 94,
+            "hash": "f80263e813c644cd71bcc88126d0463df070e28f11023a00543c97b66e828158"
+          }
+        ],
+        [
+          {
+            "offset": 46,
+            "hash": "f36f792fa2b42acfadfa043a946d4d7b6e5e1e2e0266f2cface575bbb82b7ae0"
+          }
+        ],
+        [
+          {
+            "offset": 22,
+            "hash": "7d5051f0d4ceb7d2e27a49e448aedca2b3865283ceffe0b00b9c3017faca2081"
+          }
+        ],
+        [
+          {
+            "offset": 10,
+            "hash": "43aeeb9b6a9e94a5a787fbf04380645e6fd955f8bf0630c24365f492ac592e50"
+          }
+        ],
+        [
+          {
+            "offset": 4,
+            "hash": "45be5d16ac41430e3589a579ad780e5e42cf515381cc309b48d0f4648f9fcd1c"
+          }
+        ],
+        [
+          {
+            "offset": 3,
+            "duplicate": true
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "hash": "d40cb31af3ef53dd910f5ce15e9a1c20875c009a22d25eab32c11c7ece6487af"
+          }
+        ]
+      ],
+      "legal": {
+        "accepted": false,
+        "refusal": "Invalid offset: 1526, at height: 1, with legal offsets: 1525, 1524"
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "57aab6e6fb1b697174ffb64e062c4728f2ffd33ddcfa02a43b64d8cd29b483b4",
+        "roots": {
+          "304e737fdfcb017a1a322e78b067ecebb5e07b44f0a36ed1f01264d2014f7711": "57aab6e6fb1b697174ffb64e062c4728f2ffd33ddcfa02a43b64d8cd29b483b4",
+          "d888711d588021e588984e8278a2decf927298173a06737066e43f3e75534e00": "57aab6e6fb1b697174ffb64e062c4728f2ffd33ddcfa02a43b64d8cd29b483b4",
+          "98c9c5dd79a18f40837061d5e0395ffb52e700a2689e641d19f053fc9619445e": "57aab6e6fb1b697174ffb64e062c4728f2ffd33ddcfa02a43b64d8cd29b483b4"
+        }
+      }
+    },
+    {
+      "id": "mp-combine-001-off-path-level-1",
+      "source": "ts-stack conformance vectors/sdk/transactions/merkle-path.json mp-combine-001",
+      "derivation": "a leaf added at level 1, offset 7, carrying the hash of that level's first leaf",
+      "block_height": 125632,
+      "path": [
+        [
+          {
+            "offset": 2,
+            "txid": true,
+            "hash": "90a2de85351cfadd2326b9b0098e9c453af09b2980835f57a1429bbb44beb872"
+          },
+          {
+            "offset": 3,
+            "hash": "a31f2ddfea7ddd4581dca3007ee99e58ea6baa97a8ac3b32bb4610baac9f7206"
+          },
+          {
+            "offset": 4,
+            "hash": "c36eeed6fbc0259d30804f59f804dfcda35a54461157d6ac9c094f0ea378f35c"
+          },
+          {
+            "offset": 5,
+            "txid": true,
+            "hash": "17752483868c52a98407a0e226d73b42e214e0fad548541619d858e1fd4a9549"
+          },
+          {
+            "offset": 8,
+            "txid": true,
+            "hash": "66e2b022da877621ef197e02c3ef7d3f820d33a86ead2e72bf966432ea6776f1"
+          },
+          {
+            "offset": 9,
+            "hash": "e988b5d7a2cec8e0759ade2e151737d1cdfdde68accff42938583ad12eb98b99"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "hash": "a78518f7ad58db80c0321ee3a3aa40d9bcabc7fe0e960d1128042b8742d5c531"
+          },
+          {
+            "offset": 3,
+            "hash": "15ce1d192a53c750b2f876282dbd1638d23a5cf95b7d520c68d8e6fd67f071fb"
+          },
+          {
+            "offset": 5,
+            "hash": "1114122b8cee5cfe56ef1bc15a0670b371e215bb071ddad42b45bde14e88f056"
+          },
+          {
+            "offset": 7,
+            "hash": "a78518f7ad58db80c0321ee3a3aa40d9bcabc7fe0e960d1128042b8742d5c531"
+          }
+        ],
+        [
+          {
+            "offset": 3,
+            "duplicate": true
+          }
+        ],
+        []
+      ],
+      "legal": {
+        "accepted": false,
+        "refusal": "Invalid offset: 7, at height: 1, with legal offsets: 0, 3, 5"
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+        "roots": {
+          "90a2de85351cfadd2326b9b0098e9c453af09b2980835f57a1429bbb44beb872": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "a31f2ddfea7ddd4581dca3007ee99e58ea6baa97a8ac3b32bb4610baac9f7206": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "c36eeed6fbc0259d30804f59f804dfcda35a54461157d6ac9c094f0ea378f35c": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "17752483868c52a98407a0e226d73b42e214e0fad548541619d858e1fd4a9549": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "66e2b022da877621ef197e02c3ef7d3f820d33a86ead2e72bf966432ea6776f1": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "e988b5d7a2cec8e0759ade2e151737d1cdfdde68accff42938583ad12eb98b99": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a"
+        }
+      }
+    },
+    {
+      "id": "mp-combine-001-reversed-off-path-level-1",
+      "source": "ts-stack conformance vectors/sdk/transactions/merkle-path.json mp-combine-001",
+      "derivation": "a leaf added at level 1, offset 7, carrying the hash of that level's first leaf, level 0's leaves reversed",
+      "block_height": 125632,
+      "path": [
+        [
+          {
+            "offset": 9,
+            "hash": "e988b5d7a2cec8e0759ade2e151737d1cdfdde68accff42938583ad12eb98b99"
+          },
+          {
+            "offset": 8,
+            "txid": true,
+            "hash": "66e2b022da877621ef197e02c3ef7d3f820d33a86ead2e72bf966432ea6776f1"
+          },
+          {
+            "offset": 5,
+            "txid": true,
+            "hash": "17752483868c52a98407a0e226d73b42e214e0fad548541619d858e1fd4a9549"
+          },
+          {
+            "offset": 4,
+            "hash": "c36eeed6fbc0259d30804f59f804dfcda35a54461157d6ac9c094f0ea378f35c"
+          },
+          {
+            "offset": 3,
+            "hash": "a31f2ddfea7ddd4581dca3007ee99e58ea6baa97a8ac3b32bb4610baac9f7206"
+          },
+          {
+            "offset": 2,
+            "txid": true,
+            "hash": "90a2de85351cfadd2326b9b0098e9c453af09b2980835f57a1429bbb44beb872"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "hash": "a78518f7ad58db80c0321ee3a3aa40d9bcabc7fe0e960d1128042b8742d5c531"
+          },
+          {
+            "offset": 3,
+            "hash": "15ce1d192a53c750b2f876282dbd1638d23a5cf95b7d520c68d8e6fd67f071fb"
+          },
+          {
+            "offset": 5,
+            "hash": "1114122b8cee5cfe56ef1bc15a0670b371e215bb071ddad42b45bde14e88f056"
+          },
+          {
+            "offset": 7,
+            "hash": "a78518f7ad58db80c0321ee3a3aa40d9bcabc7fe0e960d1128042b8742d5c531"
+          }
+        ],
+        [
+          {
+            "offset": 3,
+            "duplicate": true
+          }
+        ],
+        []
+      ],
+      "legal": {
+        "accepted": false,
+        "refusal": "Invalid offset: 7, at height: 1, with legal offsets: 5, 3, 0"
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+        "roots": {
+          "e988b5d7a2cec8e0759ade2e151737d1cdfdde68accff42938583ad12eb98b99": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "66e2b022da877621ef197e02c3ef7d3f820d33a86ead2e72bf966432ea6776f1": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "17752483868c52a98407a0e226d73b42e214e0fad548541619d858e1fd4a9549": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "c36eeed6fbc0259d30804f59f804dfcda35a54461157d6ac9c094f0ea378f35c": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "a31f2ddfea7ddd4581dca3007ee99e58ea6baa97a8ac3b32bb4610baac9f7206": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a",
+          "90a2de85351cfadd2326b9b0098e9c453af09b2980835f57a1429bbb44beb872": "205b2e27c58601fc1a8de04c83b6b0c46f89c16b2161c93441b7e9269cf6bc4a"
+        }
+      }
+    },
+    {
       "id": "bump-001-duplicates-54-levels",
       "source": "bsv-script-lean corpus/wire/bump.jsonl bump-001",
       "derivation": "bump-001's txid at offset 0, the duplicate marker at offset 1 on each of 54 levels",

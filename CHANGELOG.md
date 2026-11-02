@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: MerklePath's off-path offset refusal names the legal offsets as the reference's text does (#631)
+
+`MerklePath::new` refused a leaf above level 0 at an offset no level-0 hash
+climbs through as `Invalid offset: N, at height: H`; the reference goes on to
+list the legal offsets (`ts-stack@edf6e03` `MerklePath.ts:220-235`):
+
+```ts
+legalOffsets[h].add(siblingOf(offsetAtHeight(leaf.offset, h)))
+...
+`Invalid offset: ${leaf.offset}, at height: ${height}, with legal offsets: ${Array.from(legalOffsets[height], offset => offset.toString()).join(', ')}`
+```
+
+The refusal is now the reference's text byte for byte, the list in the order
+level 0's leaves (duplicates apart) first name each offset, as its `Set`
+iterates, not sorted: `mp-parse-001` with a leaf added at level 1, offset 1526,
+is `Invalid offset: 1526, at height: 1, with legal offsets: 1525, 1524`;
+`mp-combine-001` at level 1, offset 7, `…, with legal offsets: 0, 3, 5`, and
+`5, 3, 0` with its level 0 reversed (`src/transaction/merkle_path_legal.rs`).
+The legal set is unchanged, so no verdict moves; the lone leaf at an offset
+other than 0 keeps this crate's refusal (`MissingSibling`, 0.4.2), a stated
+difference. The witness is
+`an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631`
+(`src/transaction/merkle_path_603_tests.rs`, renamed from #603's
+`…_by_legal_offsets_alone_wire_bump_008_014_018`) against six shapes of
+`tests/vectors/merkle_path_603.json`, three added to
+`tests/support/merkle_path_603.mjs` and re-recorded under Node v22.18.0 (the
+existing entries byte for byte unchanged); RED before the change (`left:
+"Invalid offset: 3, at height: 1"`). The 0.3.34 root-check equivalence keeps
+its legacy copy verbatim and maps its offset words through the #631 rule.
+`new_unchecked` and the BUMP readers do not judge legal offsets and are
+unchanged.
+
+Semver: an error text changed, no type. A caller matching the whole
+`MerklePathError` text of an off-path refusal sees `, with legal offsets: …`
+appended; a prefix match on `Invalid offset: N, at height: H` still holds. No
+`.rs` file of `bsv-overlay-cloudflare`, `rust-message-box`,
+`bsv-middleware-cloudflare-public` or `rust-chaintracks` names the text (the
+`bsv-low` workers were not read by this lane).
+
 ### Added: src/transaction/merkle_path.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened run 41327640129 left 25 survivors in `src/transaction/merkle_path.rs`
@@ -29,7 +68,7 @@ the sibling's `bumpMaxTreeHeight`, `lean/BsvChain/Views/Wire/BUMP.lean:66`); the
 legal offsets (`MerklePath.ts:220-235`) to
 `legal_offsets_admit_every_path_the_reference_admits_wire_bump_rows_and_mp_parse_combine_001`,
 `a_level_0_duplicate_takes_no_part_in_the_offset_rule_wire_bump_007` and
-`an_offset_off_every_path_is_refused_by_legal_offsets_alone_wire_bump_008_014_018`,
+`an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631` (#603's `…_by_legal_offsets_alone_wire_bump_008_014_018`, renamed by #631),
 which also kill `RootWalker::root_from`'s meeting check (628); `combine` and
 `trim` (`MerklePath.ts:508-594`) to
 `combine_of_two_paths_of_one_block_is_the_references_compound_wire_bump_pairs`
@@ -82,10 +121,10 @@ the one its combine checked; this crate extends the receiver to the other's
 levels and gives `bump-005` back byte for byte, its root unchanged. Go at
 `2ca481c` indexes past the receiver's levels there
 (`transaction/merklepath.go:453-467`) and has no level bound or offset rule in
-`NewMerklePath` (`:149`). Third, a crate-side difference this crate conforms
-under #631, not a divergence it keeps: a leaf off every path is refused in the
-reference's words up to the height, without its `, with legal offsets: …` list
-(`:230-235`); this PR does not change the text. No block holds 2^54
+`NewMerklePath` (`:149`). Third, a crate-side difference conformed by #631 and
+no longer a difference: a leaf off every path is refused in the reference's
+words with its `, with legal offsets: …` list (`:230-235`); the lone leaf at an
+offset other than 0 stays this crate's refusal (0.4.2). No block holds 2^54
 transactions, and a path's verdict on the BEEF and BUMP readers is the stream's
 (bsv-rs#167).
 The line is in CLAUDE.md's divergence list.
