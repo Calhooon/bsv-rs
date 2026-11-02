@@ -414,14 +414,16 @@ jobs:
           cargo fmt --manifest-path fuzz/Cargo.toml -- --check
           cargo fmt --manifest-path fuzz/corpus-gen/Cargo.toml -- --check
 
-  # the conformance vectors as one named check (a required status on main): the shared JSON under
+  # the conformance vectors as one named check (required on both lines): the shared JSON under
   # tests/vectors/ and the ts-stack corpus. The conformance files skip when the corpus is absent
   # (Calhooon/bsv-rs#31), so the corpus is checked out at the commit the pinned totals were audited
-  # against (5,116 evaluation vectors) and its presence is asserted before the tests run
+  # against (5,116 evaluation vectors) and its presence is asserted before the tests run; a pin
+  # move is TS_STACK_PIN alone (nightly.yml's mutants job carries the same commit)
   vectors:
     name: vectors
     runs-on: ubuntu-latest
     env:
+      TS_STACK_PIN: edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9
       BSV_CONFORMANCE_DIR: ${{ github.workspace }}/ts-stack/conformance
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -430,7 +432,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: bsv-blockchain/ts-stack
-          ref: edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9
+          ref: ${{ env.TS_STACK_PIN }}
           path: ts-stack
           sparse-checkout: conformance
           persist-credentials: false

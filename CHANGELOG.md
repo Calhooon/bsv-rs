@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: ci: the `vectors` job's corpus pin is one named constant, and CLAUDE.md no longer says CI skips the conformance corpus (#31)
+
+#31 found that `ci.yml` checked out no corpus and set no `BSV_CONFORMANCE_DIR`,
+so every CI run of `conformance_scripts` and `conformance_beef` was the skip,
+and 0.3.29 reached `main` with the evaluation gate red. The `vectors` job
+(1e4cfc2b, required on both lines) already closes that: it sparse-checks out
+`bsv-blockchain/ts-stack` at `edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`
+(`conformance` alone, no credentials), sets `BSV_CONFORMANCE_DIR`, asserts
+`META.json` and runs both files with `--nocapture` (beta's run 41518921952:
+`total=5116 run=4120 passed=4109 unsupported=959 skipped=37
+known_failures=11 failures=0 panics=0`). The pin is now the job's
+`TS_STACK_PIN`, so a pin move is one line (`nightly.yml`'s `mutants` job
+carries the same commit); `CLAUDE.md`'s "Where the numbers come from" said
+"CI does not" run the files and now names the job. No separate `conformance`
+job: a job outside the required set that runs on a push or a pull request is
+refused by `tests/arch_ci_pr_runs_the_required_set.rs`, and it would repeat
+the `vectors` job. No crate code moves.
+
 ### Added: src/transaction/beef_stream.rs's surviving mutants, shard S4 (the judge and the remainder), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left
