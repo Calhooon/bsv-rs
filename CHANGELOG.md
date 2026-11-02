@@ -79,7 +79,14 @@ rest of the script one `OP_RETURN` chunk's data) reads them as opcodes now, as
 the reference and the node's `GetOp` do; a caller that parsed `to_asm`'s text
 of a data carrier read from bytes finds `OP_RETURN` and the pushes where the
 hex of the rest stood. No dependent named in `CLAUDE.md` calls `to_asm` or
-`from_asm`.
+`from_asm`. One counts the chunks itself: `bsv-overlay-cloudflare`'s
+`overlay-engine` (`chunk_count`, `crates/overlay-engine/src/script_door.rs:147-169`,
+the depth floored by `saturating_sub` as this crate's was), pinned to this
+crate's parse by `e585f2_m1_the_chunk_count_is_the_sdks`, whose edge
+`OP_ENDIF OP_ENDIF OP_RETURN 0x01` counts 3 there and 4 here: that pin goes
+RED at its bump from `=0.7.2` until its counter drops the floor; its sig-op
+count over `Script::chunks` (`engine.rs:851`) reads the opcodes after a stray
+`OP_ENDIF` too.
 
 ### Notes: cross-SDK parity (#634)
 
@@ -99,7 +106,8 @@ queue row 28, unfiled. The reference's own reading the keeper names wrong is
 `68636a5168` (`OP_ENDIF OP_IF OP_RETURN OP_1 OP_ENDIF`): the `OP_RETURN` sits
 inside an open `OP_IF` and is folded as top level, the depth -1 + 1 = 0,
 against the parser's own rule that only an `OP_RETURN` outside every
-conditional folds the rest (the interpreter's data reading, top level alone); this crate follows the reference there too, and queue row 26
+conditional folds the rest (the interpreter's data reading, top level alone);
+this crate follows the reference there too, and queue row 26
 (`docs/lanes/375-filings/script-if-depth-negative-ts-stack.md`) is narrowed to
 it. The reference's ASM round trip fails on every folded `OP_RETURN` carrying
 data: its `toASM` writes the rest's hex alone, its `fromASM` reads it as a
