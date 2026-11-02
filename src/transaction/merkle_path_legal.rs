@@ -45,6 +45,20 @@ impl LegalOffsets {
     }
 }
 
+/// The root check's end (`ts-stack@edf6e03` `MerklePath.ts:241-263`): a
+/// level 0 of duplicates alone has no hashed leaf to climb from, and the
+/// reference's constructor throws where `computeRootCached` finds none
+/// (`:342-343`), with `legalOffsetsOnly` or without, after the offset checks;
+/// `new` and `new_unchecked` refuse it in its words (#641).
+pub(super) fn rooted(root: Option<String>, path: super::MerklePath) -> Result<super::MerklePath> {
+    match root {
+        Some(_) => Ok(path),
+        None => Err(crate::Error::MerklePathError(
+            "Transaction ID is undefined".to_string(),
+        )),
+    }
+}
+
 /// The 0.3.34 offset refusal (`Invalid offset: N, at height: H`, kept verbatim
 /// by the root check's equivalence tests) in #631's words, its list computed
 /// from `path`'s level 0 apart from [`LegalOffsets`]; any other text as given.
@@ -62,4 +76,17 @@ pub(super) fn with_legal_offsets(path: &[Vec<super::MerklePathLeaf>], words: Str
         }
     }
     format!("{words}, with legal offsets: {}", legal.join(", "))
+}
+
+/// #641's ruling on an answer of the 0.3.34 forms: a level 0 with no hashed
+/// leaf, which the 0.3.34 constructor accepted, refused in the reference's
+/// words, as [`rooted`] refuses it.
+#[cfg(test)]
+pub(super) fn with_a_hashed_leaf<T>(path: &[Vec<super::MerklePathLeaf>], value: T) -> Result<T> {
+    if path[0].iter().any(|leaf| leaf.hash.is_some()) {
+        return Ok(value);
+    }
+    Err(crate::Error::MerklePathError(
+        "Transaction ID is undefined".to_string(),
+    ))
 }

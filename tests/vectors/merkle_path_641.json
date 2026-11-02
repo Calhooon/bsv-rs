@@ -1,0 +1,188 @@
+{
+  "description": "bsv-rs#641: a level 0 made only of duplicate-flagged leaves as @bsv/sdk reads it. Each shape is the BUMP the reference writes (hex) and its leaves; checked is the constructor with its defaults, unchecked with legalOffsetsOnly false, from_hex is fromHex of the bytes, compute_root is computeRoot() on the path built with no check: accepted, or the words thrown and the error class. Written by tests/support/merkle_path_641.mjs.",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/MerklePath.ts",
+  "node": "v22.18.0",
+  "shapes": [
+    {
+      "name": "one-duplicate-at-0",
+      "note": "one level, one duplicate at offset 0",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          }
+        ]
+      ],
+      "hex": "0101010001",
+      "checked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "No valid leaf found in the Merkle Path",
+        "class": "Error"
+      }
+    },
+    {
+      "name": "one-duplicate-at-1",
+      "note": "one level, one duplicate at offset 1",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 1,
+            "duplicate": true
+          }
+        ]
+      ],
+      "hex": "0101010101",
+      "checked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "No valid leaf found in the Merkle Path",
+        "class": "Error"
+      }
+    },
+    {
+      "name": "two-duplicates",
+      "note": "one level, duplicates at 0 and 1",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 1,
+            "duplicate": true
+          }
+        ]
+      ],
+      "hex": "01010200010101",
+      "checked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "No valid leaf found in the Merkle Path",
+        "class": "Error"
+      }
+    },
+    {
+      "name": "duplicate-under-an-empty-level",
+      "note": "a duplicate at 0, level 1 empty",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          }
+        ],
+        []
+      ],
+      "hex": "010201000100",
+      "checked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "No valid leaf found in the Merkle Path",
+        "class": "Error"
+      }
+    },
+    {
+      "name": "duplicate-under-a-hash",
+      "note": "a duplicate at 0, level 1 carrying a hash at 1: no level-0 hash names a legal offset there",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          }
+        ],
+        [
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          }
+        ]
+      ],
+      "hex": "010201000101010054f215815633211f91de84ed7aa8b8b06be17312c17538a204b7ce940c54dc47",
+      "checked": {
+        "accepted": false,
+        "refusal": "Invalid offset: 1, at height: 1, with legal offsets: ",
+        "class": "Error"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Transaction ID is undefined",
+        "class": "TypeError"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Invalid offset: 1, at height: 1, with legal offsets: ",
+        "class": "Error"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "No valid leaf found in the Merkle Path",
+        "class": "Error"
+      }
+    }
+  ]
+}

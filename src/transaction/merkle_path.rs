@@ -122,7 +122,7 @@ impl MerklePath {
     /// Creates a new MerklePath from block height and path data.
     ///
     /// Validates that:
-    /// - Level 0 is not empty
+    /// - Level 0 is not empty and carries a hashed leaf (#641)
     /// - No duplicate offsets at the same level
     /// - All non-level-0 offsets are legal (derivable from level 0 txids)
     /// - All txids compute to the same root
@@ -139,9 +139,10 @@ impl MerklePath {
         Self::new_internal(block_height, path, true)
     }
 
-    /// Creates a new MerklePath without strict offset validation.
-    ///
-    /// Used during parsing when the path may have been trimmed.
+    /// Creates a new MerklePath as [`new`](Self::new) does but for the legal
+    /// offsets above level 0, the reference's constructor with
+    /// `legalOffsetsOnly` false (`MerklePath.ts:185-264`): every root checked,
+    /// a level 0 of duplicates alone refused (#641). For a trimmed path.
     pub fn new_unchecked(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self> {
         Self::new_internal(block_height, path, false)
     }
@@ -221,7 +222,7 @@ impl MerklePath {
             }
         }
 
-        Ok(merkle_path)
+        super::merkle_path_legal::rooted(root, merkle_path)
     }
 
     /// Creates a MerklePath from binary data: the bytes are one BUMP, read
@@ -1321,7 +1322,7 @@ mod linear_root_equivalence_tests {
                     }
                 }
             }
-            Ok(value)
+            super::super::merkle_path_legal::with_a_hashed_leaf(path, value)
         })
     }
 
