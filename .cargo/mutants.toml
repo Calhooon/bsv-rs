@@ -13,4 +13,17 @@ exclude_re = [
   # adversarial read with every length 0 to 80 and the PUSHDATA edges probed (0.98), the rule
   # read (0.97).
   '^src/script/templates/rpuzzle\.rs:350:34: replace < with <= in <impl ScriptTemplate for RPuzzle>::lock$',
+  # src/script/script.rs:257:30, 280:31, 280:43, 280:56, `|` to `^` in Script::parse_chunks (#603,
+  # shard B). The size of OP_PUSHDATA2 and OP_PUSHDATA4 is the little-endian sum of its size
+  # bytes, `a + 256 * b` and `a + 256 * (b + 256 * (c + 256 * d))` (bsv-script-lean@5dc337e1
+  # lean/BsvScript/Machine.lean:39,43; bitcoin-sv v1.2.3 script.h:180-191): each operand is one
+  # byte shifted into its own 8-bit lane, so every `|` joins operands with no bit in common, where
+  # `|`, `^` and `+` agree under any grouping (`^` binds before `|`). No entry of the sibling's
+  # corpora (all nine, road, million, xsig-144) moved under any of the four; every pair of size
+  # bytes checked exhaustively, 0 differences; tests/script_script_603_b.rs green under each.
+  # The lane's own reads; the ensemble's three independent reads are pending.
+  '^src/script/script\.rs:257:30: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:280:31: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:280:43: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:280:56: replace \| with \^ in Script::parse_chunks$',
 ]
