@@ -20,7 +20,7 @@ permissions:
 
 # The required set, nothing more (the owner's word of 2026-10-26 for a pull request, of
 # 2026-10-27 for a push): a pull request runs exactly the required contexts of its base line's
-# protection (and the jobs `dependents` needs to decide), one test cell and one wasm32 consumer
+# protection (and the jobs `dependents` needs to decide), one test cell, `lint` and `checks`
 # among them; a push to beta or main runs the same set for its line, less the jobs that read a
 # pull request (`semver`, `beta-born`). A dispatch (the nightly's on each line, the sync's on its
 # branch) and a tag's call from release.yml add the five other test cells and run `dependents` on
@@ -28,7 +28,8 @@ permissions:
 # run on dispatch and called by release.yml before a tag: bench.yml (benchmark builds and the
 # scoreboard; comparisons only on a branch), msrv.yml, features.yml (each feature alone, the
 # other five wasm32 slices), machete.yml, docs.yml (actionlint). Documentation judges the commit
-# and joins the required set on both lines (#515, the keeper's word of 2026-10-30).
+# and joins the required set on both lines (#515, the keeper's word of 2026-10-30), a step of
+# `checks` since the small gates were bundled (docs/lanes/ci-speed-2.md).
 # Each condition is on the event and the refs, so the one file serves both lines;
 # tests/arch_ci_pr_runs_the_required_set.rs pins
 # the exact set for every event.
@@ -245,71 +246,81 @@ jobs:
       - name: Run doc tests
         run: cargo test --doc --all-features
 
-  fixtures:
-    name: fixtures
+  # The small gates bundled (CI speed round 1, cut 2; docs/lanes/ci-speed-2.md): each was its own
+  # runner with its own checkout, toolchain and cache restore, the setup longer than the gate for
+  # most of them. `lint` carries Rustfmt, Clippy, deny and ratchet; `checks` carries vectors,
+  # fixtures, secrets, Documentation and wasm32 (combined). Every gate is its own step that runs
+  # when an earlier gate failed (`!cancelled()`, the setup green), prints `PASS <gate>` or
+  # `FAIL <gate>` from its exit trap, and the job's last step fails naming every gate that did not
+  # pass. One cache per job (Swatinem/rust-cache), saved by a push to a line alone, so a pull
+  # request restores its line's build and never spends the account's cache budget on its own ref.
+  # tests/arch_ci_lines.rs pins the shape (every gate a step, its line, the last step naming it).
+  lint:
+    name: lint
     runs-on: ubuntu-latest
-    env:
-      BSV_FIXTURES_RECORD: "0"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Install Rust
+      # ratchet's diagnostics are compiler-version dependent; it keeps the baseline's toolchain.
+      # The stable toolchain is installed after it, so it is the default every other gate runs
+      - name: Install the measurement toolchain
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
-          toolchain: stable
-
-      - name: Keep build output outside the checkout
-        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-fixtures-target" >> "$GITHUB_ENV"
-
-      - name: Cache cargo registry and fixture build
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ runner.temp }}/bsv-fixtures-target
-          key: ubuntu-fixtures-${{ hashFiles('**/Cargo.lock', 'Cargo.toml') }}
-
-      # This library does not currently commit Cargo.lock. If a later lane
-      # supplies it, use that lock unchanged; otherwise lock this job's resolve.
-      - name: Resolve dependencies when no lock is committed
-        run: test -f Cargo.lock || cargo generate-lockfile
-
-      - name: Replay the public surface fixtures
-        run: cargo test --features "full,http" --test fixtures_replay --locked
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+          toolchain: "1.95.0"
+          components: clippy, rustfmt
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
-          components: clippy
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
 
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # the release binary, checked against the action's manifest, in place of a 2-minute build
+      - name: Install cargo-deny 0.20.2
+        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ubuntu-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ubuntu-clippy-
+          tool: cargo-deny@0.20.2
 
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      # the cache holds Clippy's --all-targets --all-features build (and each slice's), plus
+      # ratchet's measurement build outside the checkout
+      - name: Cache the Clippy and ratchet builds
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: lint
+          cache-directories: ${{ runner.temp }}/bsv-rs-ratchet-target
+          save-if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') }}
 
-      # Each published slice alone (#115): a function dead under one slice fails every consumer
-      # that builds that slice with warnings denied, and --all-features never sees it.
-      - name: Clippy on each slice alone
+      # This library does not commit Cargo.lock. Resolve once, after the cache's key is taken;
+      # Clippy builds on it and deny keeps it unchanged (--locked) for all three graphs
+      - name: Resolve the lockfile
+        id: ready
         run: |
+          mkdir -p "$RUNNER_TEMP/bsv-rs-ratchet-target"
+          cargo generate-lockfile
+
+      # The root has no [workspace], so --all stops at the crate: the fuzz
+      # crates are checked by manifest path, as the tools are (#180).
+      - name: Rustfmt
+        id: fmt
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS Rustfmt"; else echo "FAIL Rustfmt"; fi' EXIT
+          cargo fmt --all -- --check
+          cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+          cargo fmt --manifest-path fuzz/corpus-gen/Cargo.toml -- --check
+
+      # Each published slice alone as well (#115): a function dead under one slice fails every
+      # consumer that builds that slice with warnings denied, and --all-features never sees it.
+      - name: Clippy
+        id: clippy
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS Clippy"; else echo "FAIL Clippy"; fi' EXIT
+          cargo clippy --all-targets --all-features -- -D warnings
           for slice in primitives block compat totp script transaction wallet \
                        "auth,wallet,transaction,overlay,socketio,wasm" "wallet,auth,transaction,wasm" \
                        "transaction,wasm" "overlay,wasm" "auth,socketio,wasm"; do
@@ -318,114 +329,78 @@ jobs:
             echo "::endgroup::"
           done
 
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # all features, the Cloudflare slice and default features; every graph must pass
+      - name: deny
+        id: deny
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS deny"; else echo "FAIL deny"; fi' EXIT
+          result=0
+          cargo-deny --locked --all-features check || result=1
+          cargo-deny --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check || result=1
+          cargo-deny --locked check || result=1
+          exit "$result"
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ubuntu-docs-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ubuntu-docs-
-
-      - name: Build docs
-        run: cargo doc --no-deps --all-features
+      - name: ratchet
+        id: ratchet
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         env:
-          RUSTDOCFLAGS: -Dwarnings
-
-  ratchet:
-    name: ratchet
-    runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: ""
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Keep generated files outside the checkout
+          RUSTFLAGS: ""
+          CARGO_TARGET_DIR: ${{ runner.temp }}/bsv-rs-ratchet-target
+          TMPDIR: ${{ runner.temp }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-ratchet-target" >> "$GITHUB_ENV"
-          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/bsv-rs-ratchet-target"
-
-      # Diagnostics are compiler-version dependent; keep the baseline's toolchain.
-      - name: Install the measurement toolchain
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: "1.95.0"
-          components: clippy, rustfmt
-
-      - name: Cache the measurement build
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ env.CARGO_TARGET_DIR }}
-          key: ${{ runner.os }}-ratchet-1.95.0-${{ hashFiles('tools/ratchet/Cargo.lock', 'tools/ratchet/library.Cargo.lock') }}
-
-      - name: Check the measurement tool
-        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS ratchet"; else echo "FAIL ratchet"; fi' EXIT
+          # the measurement tool itself
           cargo +1.95.0 fmt --manifest-path tools/ratchet/Cargo.toml -- --check
           cargo +1.95.0 clippy --locked --manifest-path tools/ratchet/Cargo.toml --all-targets -- -D warnings
           cargo +1.95.0 test --locked --manifest-path tools/ratchet/Cargo.toml
-
-      - name: Reject code-health increases
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
+          # no code-health increase
           if [ -n "$BASE_REF" ] && [ "$BASE_REF" != 0000000000000000000000000000000000000000 ] && git rev-parse --verify --quiet --end-of-options "${BASE_REF}^{commit}" >/dev/null 2>&1; then
             tools/ratchet/run --check --against "$BASE_REF"
           else
             tools/ratchet/run --check
           fi
 
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-          components: rustfmt
-
-      # The root has no [workspace], so --all stops at the crate: the fuzz
-      # crates are checked by manifest path, as the tools are (#180).
-      - name: Check formatting
+      - name: Every gate passed
+        if: ${{ !cancelled() }}
+        env:
+          VERDICTS: |
+            ${{ steps.fmt.outcome }} Rustfmt
+            ${{ steps.clippy.outcome }} Clippy
+            ${{ steps.deny.outcome }} deny
+            ${{ steps.ratchet.outcome }} ratchet
         run: |
-          cargo fmt --all -- --check
-          cargo fmt --manifest-path fuzz/Cargo.toml -- --check
-          cargo fmt --manifest-path fuzz/corpus-gen/Cargo.toml -- --check
+          failed=()
+          while read -r outcome gate; do
+            [ -n "$gate" ] || continue
+            if [ "$outcome" = success ]; then
+              echo "PASS $gate"
+            else
+              echo "FAIL $gate (${outcome:-not run})"
+              failed+=("$gate")
+            fi
+          done <<< "$VERDICTS"
+          if [ "${#failed[@]}" -ne 0 ]; then
+            echo "::error::lint: ${#failed[@]} gate(s) failed: $(printf '%s, ' "${failed[@]}" | sed 's/, $//')"
+            exit 1
+          fi
 
-  # the conformance vectors as one named check (a required status on main): the shared JSON under
-  # tests/vectors/ and the ts-stack corpus. The conformance files skip when the corpus is absent
-  # (Calhooon/bsv-rs#31), so the corpus is checked out at the commit the pinned totals were audited
-  # against (5,116 evaluation vectors) and its presence is asserted before the tests run
-  vectors:
-    name: vectors
+  checks:
+    name: checks
     runs-on: ubuntu-latest
     env:
       BSV_CONFORMANCE_DIR: ${{ github.workspace }}/ts-stack/conformance
     steps:
+      # the full history: secrets scans the line's history on a push and a dispatch
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
+      # vectors: the ts-stack corpus at the commit the pinned totals were audited against
+      # (5,116 evaluation vectors); the conformance files skip when it is absent
+      # (Calhooon/bsv-rs#31), so the vectors gate asserts its presence before the tests run
       - name: Check out the ts-stack conformance corpus
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -435,68 +410,130 @@ jobs:
           sparse-checkout: conformance
           persist-credentials: false
 
-      - name: Assert the corpus is present
-        run: test -f "$BSV_CONFORMANCE_DIR/META.json"
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
+          targets: wasm32-unknown-unknown
 
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - name: Cache the checks' builds
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ubuntu-vectors-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ubuntu-vectors-
+          shared-key: checks
+          save-if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') }}
 
-      - name: Run the chain primitive vectors
-        run: cargo test --all-features --test chain_primitives --test chain_difficulty --test chain_encoding --test canonical_varint --test hash_stream --test hkdf_wycheproof --verbose
+      # This library does not commit Cargo.lock. If a later lane supplies it, use that lock
+      # unchanged; otherwise lock this job's resolve (after the cache's key is taken)
+      - name: Resolve dependencies when no lock is committed
+        id: ready
+        run: test -f Cargo.lock || cargo generate-lockfile
 
-      - name: Run the vector-backed tests
-        run: cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --test wallet_http_json_busy_tests --verbose -- --nocapture
-
-  # the secrets scan (bsv-stack-lean #140): gitleaks over the commits the event brings, the
-  # values redacted, the locations printed; the findings judged not secrets are named by
-  # fingerprint in .gitleaksignore or, for test material that is not a secret, by reason in
-  # .gitleaks.toml. On a pull request the scan covers the PR's own commits (what decides the
-  # merge; gitleaks's default is every ref of the checkout, so a literal on any pushed branch
-  # failed every PR, bsv-rs#272); on a push and on a dispatch the line's full history.
-  # gitleaks is built from its release source, the tarball pinned by sha256 (no third-party action)
-  secrets:
-    name: secrets
-    runs-on: ubuntu-latest
-    env:
-      GITLEAKS_VERSION: 8.30.1
-      GITLEAKS_SHA256: e90fb266d75837e75894c778bf594ab8e2787f12dce5a62651f21b893eaf9abb
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Build gitleaks from its pinned source
+      # the conformance vectors as one named gate: the shared JSON under tests/vectors/ and the
+      # ts-stack corpus
+      - name: vectors
+        id: vectors
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS vectors"; else echo "FAIL vectors"; fi' EXIT
+          test -f "$BSV_CONFORMANCE_DIR/META.json"
+          cargo test --all-features --test chain_primitives --test chain_difficulty --test chain_encoding --test canonical_varint --test hash_stream --test hkdf_wycheproof --verbose
+          cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --test wallet_http_json_busy_tests --verbose -- --nocapture
+
+      - name: fixtures
+        id: fixtures
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        env:
+          BSV_FIXTURES_RECORD: "0"
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS fixtures"; else echo "FAIL fixtures"; fi' EXIT
+          cargo test --features "full,http" --test fixtures_replay --locked
+
+      # the secrets scan (bsv-stack-lean #140): gitleaks over the commits the event brings, the
+      # values redacted, the locations printed; the findings judged not secrets are named by
+      # fingerprint in .gitleaksignore or, for test material that is not a secret, by reason in
+      # .gitleaks.toml. On a pull request the scan covers the PR's own commits (what decides the
+      # merge; gitleaks's default is every ref of the checkout, so a literal on any pushed branch
+      # failed every PR, bsv-rs#272); on a push and on a dispatch the line's full history.
+      # gitleaks is built from its release source, the tarball pinned by sha256 (no third-party action)
+      - name: Scan the commits the event brings
+        id: secrets
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: e90fb266d75837e75894c778bf594ab8e2787f12dce5a62651f21b893eaf9abb
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS secrets"; else echo "FAIL secrets"; fi' EXIT
           curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/archive/refs/tags/v${GITLEAKS_VERSION}.tar.gz"
           echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP"
-          cd "$RUNNER_TEMP/gitleaks-${GITLEAKS_VERSION}"
-          go build -o "$RUNNER_TEMP/bin/gitleaks" .
-
-      - name: Scan the commits the event brings
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
+          (cd "$RUNNER_TEMP/gitleaks-${GITLEAKS_VERSION}" && go build -o "$RUNNER_TEMP/bin/gitleaks" .)
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] && [ -n "${PR_BASE_SHA}" ]; then
             log_opts="${PR_BASE_SHA}..HEAD"
           else
             log_opts="HEAD"
           fi
           "$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner --exit-code 1 -v --log-opts="${log_opts}" .
+
+      - name: Documentation
+        id: docs
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS Documentation"; else echo "FAIL Documentation"; fi' EXIT
+          cargo doc --no-deps --all-features
+
+      # The combined library slice the Workers consume (the slice CLAUDE.md rule 6 names), on
+      # every event; the other five slices are features.yml's. A step, not a matrix: one consumer
+      # here. Keep dead code in a diagnostic cdylib so the size is not an empty module; #96 will
+      # define the deployment artifact and its size budget. `http` is native-only (#152): the
+      # slice with it stops at build.rs, one message
+      - name: wasm32 (combined)
+        id: wasm32
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        env:
+          SLICE_FEATURES: auth,wallet,transaction,overlay,socketio,wasm
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS wasm32 (combined)"; else echo "FAIL wasm32 (combined)"; fi' EXIT
+          cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES"
+          if cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES,http" 2> "$RUNNER_TEMP/http.log"; then
+            echo '::error::the wasm32 build with http succeeded; build.rs no longer refuses it (#152)'
+            exit 1
+          fi
+          grep -F 'feature is native-only and does not build for wasm32' "$RUNNER_TEMP/http.log"
+          if grep -E '^error\[E[0-9]+\]|could not compile .bsv-rs. \(lib\)' "$RUNNER_TEMP/http.log"; then
+            echo '::error::the wasm32 build with http failed past the build script (#152)'
+            exit 1
+          fi
+          cargo rustc --lib --crate-type cdylib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES" -- -C link-dead-code=yes
+          bytes=$(wc -c < target/wasm32-unknown-unknown/debug/bsv_rs.wasm)
+          printf 'combined: %s bytes (debug cdylib, dead code retained)\n' "$bytes"
+
+      - name: Every gate passed
+        if: ${{ !cancelled() }}
+        env:
+          VERDICTS: |
+            ${{ steps.vectors.outcome }} vectors
+            ${{ steps.fixtures.outcome }} fixtures
+            ${{ steps.secrets.outcome }} secrets
+            ${{ steps.docs.outcome }} Documentation
+            ${{ steps.wasm32.outcome }} wasm32 (combined)
+        run: |
+          failed=()
+          while read -r outcome gate; do
+            [ -n "$gate" ] || continue
+            if [ "$outcome" = success ]; then
+              echo "PASS $gate"
+            else
+              echo "FAIL $gate (${outcome:-not run})"
+              failed+=("$gate")
+            fi
+          done <<< "$VERDICTS"
+          if [ "${#failed[@]}" -ne 0 ]; then
+            echo "::error::checks: ${#failed[@]} gate(s) failed: $(printf '%s, ' "${failed[@]}" | sed 's/, $//')"
+            exit 1
+          fi
 
   # nothing sits on main that beta lacks (RELEASING.md, "The direction rule"): every commit of
   # origin/main is on the tree (the PR's merge commit, beta's tip after a push, the sync branch on
@@ -599,91 +636,3 @@ jobs:
           for sha in "${missing[@]}"; do git log -1 --oneline "$sha"; done
           echo "::error::${#missing[@]} commit(s) of this PR were not born on beta; land each on beta through a PR, then cherry-pick it here with -x"
           exit 1
-
-  # The combined library slice the Workers consume (the required wasm32 (combined), the slice
-  # CLAUDE.md rule 6 names), on every event; the other five slices are features.yml's. The
-  # one-cell matrix keeps the context's name. Keep dead code in a diagnostic cdylib so the size
-  # is not an empty module; #96 will define the deployment artifact and its size budget.
-  wasm32:
-    name: wasm32 (${{ matrix.consumer }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        consumer: [combined]
-    env:
-      SLICE_NAME: ${{ matrix.consumer }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Select the consumer's features
-        run: |
-          case "$SLICE_NAME" in
-            combined) features=auth,wallet,transaction,overlay,socketio,wasm ;;
-            *) echo "::error::no feature slice for consumer $SLICE_NAME"; exit 1 ;;
-          esac
-          echo "SLICE_FEATURES=$features" >> "$GITHUB_ENV"
-
-      - name: Put build output in runner scratch
-        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-wasm32" >> "$GITHUB_ENV"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - name: Build the library slice
-        run: cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES"
-
-      # `http` is native-only (#152): the slice with it stops at build.rs, one message
-      - name: The slice with http is refused at the build script
-        run: |
-          if cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES,http" 2> "$RUNNER_TEMP/http.log"; then
-            echo '::error::the wasm32 build with http succeeded; build.rs no longer refuses it (#152)'
-            exit 1
-          fi
-          grep -F 'feature is native-only and does not build for wasm32' "$RUNNER_TEMP/http.log"
-          ! grep -E '^error\[E[0-9]+\]|could not compile .bsv-rs. \(lib\)' "$RUNNER_TEMP/http.log"
-
-      - name: Measure the diagnostic wasm artifact
-        run: |
-          cargo rustc --lib --crate-type cdylib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES" -- -C link-dead-code=yes
-          artifact="$CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/bsv_rs.wasm"
-          bytes=$(wc -c < "$artifact")
-          printf '%s: %s bytes (debug cdylib, dead code retained)\n' "$SLICE_NAME" "$bytes"
-
-  deny:
-    name: deny
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - name: Install cargo-deny 0.20.2
-        env:
-          RUSTFLAGS: ""
-          CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-deny-target
-        run: cargo install cargo-deny --version 0.20.2 --locked --root "$RUNNER_TEMP/tools"
-
-      # This library does not commit Cargo.lock. Resolve once, then keep that
-      # same lockfile for all three graphs; every check must succeed.
-      - name: Resolve the audit lockfile
-        run: cargo generate-lockfile
-
-      - name: Check all features, the Cloudflare slice and default features
-        run: |
-          result=0
-          "$RUNNER_TEMP/tools/bin/cargo-deny" --locked --all-features check || result=1
-          "$RUNNER_TEMP/tools/bin/cargo-deny" --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check || result=1
-          "$RUNNER_TEMP/tools/bin/cargo-deny" --locked check || result=1
-          exit "$result"

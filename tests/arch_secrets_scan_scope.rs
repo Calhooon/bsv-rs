@@ -1,4 +1,5 @@
-//! The `secrets` job scans the commits the event brings, never every ref of the checkout
+//! The `secrets` scan (a step of the `checks` job since CI speed round 1, cut 2) covers the
+//! commits the event brings, never every ref of the checkout
 //! (bsv-rs#272): on a pull request the PR's own commits (`<base sha>..HEAD`), on a push or a
 //! dispatch the line's full history (`HEAD`), the findings' locations printed (`-v`) with the
 //! values redacted. gitleaks's default is every ref, so a key-looking literal on any pushed

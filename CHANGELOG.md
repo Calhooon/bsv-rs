@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: CI's small gates are steps of two jobs, `lint` and `checks`, one setup each; the required contexts re-pointed (CI speed round 1, cuts 2 and 3)
+
+What was wasteful: a pull request into `beta` ran twelve jobs, ten of them small
+gates each on a runner of its own, with its own checkout, toolchain and cache
+restore. On run 41537280176 (2026-11-02, 30 minutes, the `Test Suite` 26 of
+them) those ten took 632 s of runner time, 261 s of it setup steps against
+283 s of gate steps (`deny` 139 s of setup, building cargo-deny from source,
+for 3 s of checks), and queued 4 to 9.5 minutes for a slot of the account's
+twenty, shared by three captains. What changed (`ci.yml`): `lint` carries
+Rustfmt, Clippy (`--all-targets --all-features`, then each published slice
+alone), deny and ratchet; `checks` carries vectors, fixtures, secrets,
+Documentation and wasm32 (combined), its one-cell matrix now a step. Each job
+has one checkout, one toolchain setup and one `Swatinem/rust-cache` restore
+(v2.9.3, `d1527c8f67ef9af357290475d4af4b0fab8f12e0`), saved by a push to a
+line alone, so a pull request restores its line's build; cargo-deny 0.20.2 is
+the release binary through `taiki-e/install-action` (v2.89.1,
+`682ce6c3c696a4cd5168a05f98e51aa02b877941`). What did not change: every gate
+still runs, with the same commands, on the same events; each is its own step
+that runs when an earlier gate failed, prints its own `PASS <gate>` or
+`FAIL <gate>` line, and the job's last step fails naming every gate that did
+not pass. `semver`, `main-in-beta`, `beta-born` and the dependents jobs stay
+jobs of their own (their own events, `main-in-beta` beta's alone). The test
+job is unchanged here.
+
+The required contexts move: `beta` from twelve to five (`Test Suite
+(ubuntu-latest, stable)`, `lint`, `checks`, `main-in-beta`, `semver`); `main`
+keeps its thirteen until its `ci.yml` carries the two jobs, then six (`Test
+Suite (ubuntu-latest, stable)`, `lint`, `checks`, `dependents`, `semver`,
+`beta-born`). The branch protection and the sequencer's names move at the
+landing (`docs/lanes/ci-speed-2.md` lists each). Cut 3, the twin runs: none
+were found to end. `ci.yml` already runs `push` on `main` and `beta` alone
+(every run of the last thirty on a lane branch is a `pull_request` run), so the
+`on:` block is unchanged, as is the concurrency group, which cancels a
+superseded run of the same pull request.
+
+The tests: `tests/arch_ci_lines.rs`'s
+`the_bundled_gates_each_run_and_report_and_the_last_step_names_every_failure`
+(RED on `ffff16d0`'s `ci.yml`: no `lint`, no `checks`) and
+`a_bundle_with_a_gate_stopped_unreported_or_unjudged_is_refused` (a gate
+without `!cancelled()`, without its line, unjudged, gone, a second cache, a
+lenient last step, each refused naming it);
+`tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` and
+`REQUIRED_ON_MAIN` (12 of its 16 tests RED on `ffff16d0`'s `ci.yml` with the
+new constants). `docs/ARCH-RULES.md` section 7, `tests/CLAUDE.md`'s rows,
+`RELEASING.md` step 2 and `CLAUDE.md` rule 7 name the new contexts.
+
 ### Fixed: the nightly's pin job pins the dispatch's commit, never beta's tip at dequeue; the consumers check it out and the report names it (#629)
 
 The nightly's `source` job checked out the dispatched branch and pinned
