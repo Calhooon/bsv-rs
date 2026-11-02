@@ -69,58 +69,54 @@ impl Script {
 
         while i < tokens.len() {
             let token = tokens[i];
-
-            // Check if it's an opcode
-            let op_code_num = name_to_opcode(token);
-
-            // Handle special cases: "0" and "-1"
-            if token == "0" {
-                chunks.push(ScriptChunk::new_opcode(OP_0));
-                i += 1;
-            } else if token == "-1" {
-                chunks.push(ScriptChunk::new_opcode(OP_1NEGATE));
-                i += 1;
-            } else if op_code_num.is_none() {
-                // It's hex data
-                let mut hex = token.to_string();
-                #[allow(unknown_lints, clippy::manual_is_multiple_of)]
-                if hex.len() % 2 != 0 {
-                    hex = format!("0{}", hex);
+            // "0" and "-1" first, then hex data (no opcode of that name) or an opcode
+            match name_to_opcode(token) {
+                _ if token == "0" => {
+                    chunks.push(ScriptChunk::new_opcode(OP_0));
+                    i += 1;
                 }
+                _ if token == "-1" => {
+                    chunks.push(ScriptChunk::new_opcode(OP_1NEGATE));
+                    i += 1;
+                }
+                None => {
+                    let mut hex = token.to_string();
+                    #[allow(unknown_lints, clippy::manual_is_multiple_of)]
+                    if hex.len() % 2 != 0 {
+                        hex = format!("0{}", hex);
+                    }
+                    let data = from_hex(&hex)?;
+                    let len = data.len();
 
-                let data = from_hex(&hex)?;
-                let len = data.len();
+                    let op = if len < OP_PUSHDATA1 as usize {
+                        len as u8
+                    } else if len < 256 {
+                        OP_PUSHDATA1
+                    } else if len < 65536 {
+                        OP_PUSHDATA2
+                    } else {
+                        OP_PUSHDATA4
+                    };
 
-                let op = if len < OP_PUSHDATA1 as usize {
-                    len as u8
-                } else if len < 256 {
-                    OP_PUSHDATA1
-                } else if len < 65536 {
-                    OP_PUSHDATA2
-                } else {
-                    OP_PUSHDATA4
-                };
-
-                chunks.push(ScriptChunk::new(op, Some(data)));
-                i += 1;
-            } else if let Some(op) = op_code_num {
-                // Handle PUSHDATA opcodes specially (they have length and data following)
-                if op == OP_PUSHDATA1 || op == OP_PUSHDATA2 || op == OP_PUSHDATA4 {
-                    // Format: OP_PUSHDATA1 <length> <hex>
-                    if i + 2 < tokens.len() {
-                        let data = from_hex(tokens[i + 2])?;
-                        chunks.push(ScriptChunk::new(op, Some(data)));
-                        i += 3;
+                    chunks.push(ScriptChunk::new(op, Some(data)));
+                    i += 1;
+                }
+                Some(op) => {
+                    if op == OP_PUSHDATA1 || op == OP_PUSHDATA2 || op == OP_PUSHDATA4 {
+                        // Format: OP_PUSHDATA1 <length> <hex>
+                        if i + 2 < tokens.len() {
+                            let data = from_hex(tokens[i + 2])?;
+                            chunks.push(ScriptChunk::new(op, Some(data)));
+                            i += 3;
+                        } else {
+                            chunks.push(ScriptChunk::new_opcode(op));
+                            i += 1;
+                        }
                     } else {
                         chunks.push(ScriptChunk::new_opcode(op));
                         i += 1;
                     }
-                } else {
-                    chunks.push(ScriptChunk::new_opcode(op));
-                    i += 1;
                 }
-            } else {
-                i += 1;
             }
         }
 
@@ -589,7 +585,8 @@ impl Script {
         self.len() == 0
     }
 
-    /// Sets a specific chunk's opcode at the given index.
+    /// Sets a specific chunk's opcode at the given index; at the chunk count it appends one, as
+    /// the reference's `setChunkOpCode` does (`Script.ts:297-301`); beyond it, nothing changes.
     pub fn set_chunk_opcode(&mut self, index: usize, op: u8) -> &mut Self {
         // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
         // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
@@ -600,6 +597,8 @@ impl Script {
             let mut chunks = self.chunks.borrow_mut();
             if index < chunks.len() {
                 chunks[index] = ScriptChunk::new_opcode(op);
+            } else if index == chunks.len() {
+                chunks.push(ScriptChunk::new_opcode(op));
             }
         }
         self

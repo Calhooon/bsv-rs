@@ -114,4 +114,14 @@ exclude_re = [
   '^src/transaction/beef_stream\.rs:502:28: replace match guard \*p == parent with true in bump_root$',
   '^src/transaction/beef_stream\.rs:507:42: replace \+ with - in bump_root$',
   '^src/transaction/beef_stream\.rs:507:42: replace \+ with \* in bump_root$',
+  # src/script/script.rs:91:37, `<` to `<=` in Script::from_asm (#603 shard A, PR #639; 94:33
+  # before #639's fold). The comparison bounds a hex token's direct push against OP_PUSHDATA1: at
+  # 76, the one length where the two branches differ, `len as u8` is 0x4c, OP_PUSHDATA1 itself, so
+  # both write the same chunk (bitcoin-sv v1.2.3 script.h:106-113, a direct push for 1 to 75 bytes
+  # and OP_PUSHDATA1 from 76; bsv-script-lean lean/BsvScript/Opcodes.lean:21, OP_PUSHDATA1 :=
+  # 0x4c). Three reads: the cold read with lengths 70 to 80 in five ASM shapes (0.97), the
+  # adversarial read with every length 0 to 80 and 255, 256, 65535, 65536 through from_asm,
+  # to_binary, to_asm and the interpreter byte-identical (EQUIVALENT, 0.99), the rule read
+  # (EQUIVALENT, 0.97).
+  '^src/script/script\.rs:91:37: replace < with <= in Script::from_asm$',
 ]
