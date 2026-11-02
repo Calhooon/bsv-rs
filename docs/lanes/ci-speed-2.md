@@ -114,7 +114,7 @@ and `HANDOFF.md` (the captain's, naming the protection as it stands until the PA
 
 For the captain at the landing (none of this is done by the lane):
 
-1. `beta`'s protection: `gh api -X PATCH repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks -f strict=true -f 'contexts[]=Test Suite (ubuntu-latest, stable)' -f 'contexts[]=lint' -f 'contexts[]=checks' -f 'contexts[]=main-in-beta' -f 'contexts[]=semver'`, read back with `--jq '.contexts'`: 12 contexts to 5.
+1. `beta`'s protection: `gh api -X PATCH repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --input payload.json` with `{"strict": true, "checks": [{"context": "Test Suite (ubuntu-latest, stable)", "app_id": 15368}, {"context": "lint", "app_id": 15368}, {"context": "checks", "app_id": 15368}, {"context": "main-in-beta", "app_id": 15368}, {"context": "semver", "app_id": 15368}]}` (every context bound to GitHub Actions' app 15368, as the twelve are today; a `contexts[]` list binds none, and `-f strict=true` sends a string), read back with `--jq '[.checks[] | [.context, .app_id]]'`: 12 contexts to 5.
 2. The sequencer's required names for `beta`: the same five; its threshold 12 to 5.
 3. `main`'s protection and the sequencer's `main` list: unchanged now (13); when `main`'s `ci.yml` carries the two jobs, 13 to 6 (the six above), in the same change.
 4. The order: this pull request's own run reports `lint` and `checks`, never the nine contexts they replace, so under the twelve it never turns mergeable; PATCH (1) with the merge, then every open pull request into `beta` rebases on it (strict protection asks that anyway) to report the new contexts. `ci-speed-1` lands in its order; the second is rebased by the captain.
