@@ -53,7 +53,7 @@ fn tree_height_error(height: usize) -> crate::Error {
 }
 
 /// `offset >> height`, 0 when the shift is out of range, so no build panics.
-fn offset_at_height(offset: u64, height: usize) -> u64 {
+pub(super) fn offset_at_height(offset: u64, height: usize) -> u64 {
     u32::try_from(height)
         .ok()
         .and_then(|h| offset.checked_shr(h))
@@ -168,7 +168,7 @@ impl MerklePath {
         }
 
         // Compute legal offsets based on level 0 txid positions
-        let mut legal_offsets: Vec<HashSet<u64>> = vec![HashSet::new(); path.len()];
+        let mut legal_offsets = super::merkle_path_legal::LegalOffsets::new(path.len());
 
         for (height, leaves) in path.iter().enumerate() {
             let mut offsets_at_height = HashSet::new();
@@ -185,18 +185,9 @@ impl MerklePath {
 
                 // For level 0 non-duplicate leaves, compute legal offsets for higher levels
                 if height == 0 && !leaf.duplicate {
-                    #[allow(clippy::needless_range_loop)]
-                    for h in 1..path.len() {
-                        legal_offsets[h].insert(offset_at_height(leaf.offset, h) ^ 1);
-                    }
-                } else if height > 0
-                    && legal_offsets_only
-                    && !legal_offsets[height].contains(&leaf.offset)
-                {
-                    return Err(crate::Error::MerklePathError(format!(
-                        "Invalid offset: {}, at height: {}",
-                        leaf.offset, height
-                    )));
+                    legal_offsets.name(leaf.offset);
+                } else if height > 0 && legal_offsets_only {
+                    legal_offsets.check(leaf.offset, height)?;
                 }
             }
         }
@@ -1306,12 +1297,19 @@ mod linear_root_equivalence_tests {
     }
 
     // The legacy routines above remain verbatim. The owner's L2-offset0
-    // ruling intentionally changes their successful nonzero lone-leaf answer;
-    // every other answer, including a missing requested txid, stays identical.
+    // ruling intentionally changes their successful nonzero lone-leaf answer,
+    // and #631 lists the legal offsets after their offset refusal; every
+    // other answer, including a missing requested txid, stays identical.
     fn expected_after_lone_leaf_ruling<T>(
         path: &[Vec<MerklePathLeaf>],
         legacy: Result<T>,
     ) -> Result<T> {
+        let legacy = legacy.map_err(|err| match err {
+            crate::Error::MerklePathError(w) => crate::Error::MerklePathError(
+                super::super::merkle_path_legal::with_legal_offsets(path, w),
+            ),
+            other => other,
+        });
         legacy.and_then(|value| {
             if let [level] = path {
                 if let [leaf] = level.as_slice() {

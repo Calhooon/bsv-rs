@@ -147,25 +147,30 @@ fn a_level_0_duplicate_takes_no_part_in_the_offset_rule_wire_bump_007() {
 /// A leaf above level 0 at an offset no level-0 hash climbs through is refused
 /// with legal offsets only, and read without them (`MerklePath.ts:230-235`;
 /// `legalOffsetsOnly` false, `MerklePath::new_unchecked`), the roots
-/// unchanged. Three shapes, each a row of `corpus/wire/bump.jsonl` with one
-/// leaf added (`bump-008` at level 1, `bump-014` at level 5, `bump-018` at its
-/// top level, 11). The reference's words go on to list the legal offsets
-/// (`, with legal offsets: 1`); this crate's stop at the height.
+/// unchanged. Three shapes are rows of `corpus/wire/bump.jsonl` with one leaf
+/// added (`bump-008` at level 1, `bump-014` at level 5, `bump-018` at its top
+/// level, 11), three the conformance corpus's (`mp-parse-001` and
+/// `mp-combine-001` at level 1, the second again with level 0 reversed). The
+/// refusal is the reference's text byte for byte, the legal offsets listed in
+/// the order level 0's leaves first name them (#631): `1525, 1524`,
+/// `0, 3, 5` and `5, 3, 0`.
 #[test]
-fn an_offset_off_every_path_is_refused_by_legal_offsets_alone_wire_bump_008_014_018() {
+fn an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631() {
     let v = recorded();
     for id in [
         "bump-008-off-path-level-1",
         "bump-014-off-path-level-5",
         "bump-018-off-path-level-11",
+        "mp-parse-001-off-path-level-1",
+        "mp-combine-001-off-path-level-1",
+        "mp-combine-001-reversed-off-path-level-1",
     ] {
         let e = entry(&v, "construct", id);
         let path = levels(&e["path"]);
         let theirs = e["legal"]["refusal"].as_str().unwrap();
-        let (words, _) = theirs.split_once(", with legal offsets").unwrap();
         assert_eq!(
             refusal(MerklePath::new(height(e), path.clone())),
-            words,
+            theirs,
             "{id}"
         );
         assert_eq!(e["unchecked"]["accepted"], true, "{id}");

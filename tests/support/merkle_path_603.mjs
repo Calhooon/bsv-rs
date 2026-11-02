@@ -25,7 +25,7 @@
 // `trim`: a BUMP, `trim()` and `toHex()` after.
 //
 // Recorded under Node v22.18.0:
-//   W=/Volumes/Lanes/out/bsv-rs/fix-603-merkle-path/ref
+//   W=/Volumes/Lanes/out/bsv-rs/fix-631-offset-words/ref (fix-603-merkle-path's at #603)
 //   git -C <ts-stack clone> archive edf6e03 packages/sdk | tar -x -C "$W"
 //   (cd "$W/packages/sdk" && bun build mod.ts --target node --format esm --outfile "$W/sdk.mjs")
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/merkle_path_603.mjs "$W/sdk.mjs" \
@@ -92,19 +92,33 @@ for (const id of ['mp-parse-001', 'mp-combine-001']) {
 }
 
 // A leaf at an offset no level-0 hash climbs through (`:230-235`), its hash
-// another of the row's own.
-function offPath (id, source, level, offset) {
-  const mp = read(row(source).hex)
+// another of the row's own. The refusal lists the legal offsets in the order
+// level 0's leaves first name them (#631): `mp-parse-001`'s 3048 and 3050
+// name 1525 then 1524 at level 1, `mp-combine-001`'s 2, 4 and 8 name 0, 3, 5,
+// and the same leaves reversed name 5, 3, 0.
+function offPath (id, mp, label, level, offset, reverseLevel0 = false) {
   const path = levels(mp)
   const hash = path[level][0].hash
   path[level].push({ offset, hash })
   path[level].sort((a, b) => a.offset - b.offset)
-  recordConstruct(id, `bsv-script-lean corpus/wire/bump.jsonl ${source}`,
-    `a leaf added at level ${level}, offset ${offset}, carrying the hash of that level's first leaf`, mp.blockHeight, path)
+  if (reverseLevel0) path[0].reverse()
+  recordConstruct(id, label,
+    `a leaf added at level ${level}, offset ${offset}, carrying the hash of that level's first leaf` +
+      (reverseLevel0 ? ', level 0\'s leaves reversed' : ''), mp.blockHeight, path)
 }
-offPath('bump-008-off-path-level-1', 'bump-008', 1, 3)
-offPath('bump-018-off-path-level-11', 'bump-018', 11, 0)
-offPath('bump-014-off-path-level-5', 'bump-014', 5, 2)
+const rowOffPath = (id, source, level, offset) =>
+  offPath(id, read(row(source).hex), `bsv-script-lean corpus/wire/bump.jsonl ${source}`, level, offset)
+const vectorOffPath = (id, source, level, offset, reverseLevel0) => {
+  const v = conformance.get(source)
+  offPath(id, read(v.input.bump_hex ?? v.input.combined_bump_hex),
+    `ts-stack conformance vectors/sdk/transactions/merkle-path.json ${source}`, level, offset, reverseLevel0)
+}
+rowOffPath('bump-008-off-path-level-1', 'bump-008', 1, 3)
+rowOffPath('bump-018-off-path-level-11', 'bump-018', 11, 0)
+rowOffPath('bump-014-off-path-level-5', 'bump-014', 5, 2)
+vectorOffPath('mp-parse-001-off-path-level-1', 'mp-parse-001', 1, 1526)
+vectorOffPath('mp-combine-001-off-path-level-1', 'mp-combine-001', 1, 7)
+vectorOffPath('mp-combine-001-reversed-off-path-level-1', 'mp-combine-001', 1, 7, true)
 
 // The level bound: a client txid at offset 0 (bump-001's, block 1's lone
 // transaction) with the duplicate marker as its sibling at every level, 54
