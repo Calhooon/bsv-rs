@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: a stray OP_ENDIF before OP_RETURN, the IF depth clamped at 0 pinned beside the reference's three-chunk reading (#634)
+
+`Script::parse_chunks` counts an IF depth as it reads and ends the parse at an
+`OP_RETURN` read at depth 0, the rest of the script that chunk's data. A stray
+`OP_ENDIF` leaves the depth at 0, so `686a51` (`OP_ENDIF OP_RETURN OP_1`) is
+two chunks here, `[OP_ENDIF, OP_RETURN <51>]`, and `to_asm` writes
+`OP_ENDIF 51`. The reference lets the depth go negative and ends the parse only
+at `=== 0` (`ts-stack@edf6e03` `Script.ts:599-632`, the decrement at `:616`,
+the test at `:608`): three chunks, `OP_ENDIF OP_RETURN OP_1`. No behaviour
+changes: the difference is pinned and stated, and its door is the three reads'
+call.
+
+`tests/vectors/script_if_depth_634.json` records fifteen shapes (the issue's
+three forms; a balanced `OP_IF OP_ENDIF`; one and two stray `OP_ENDIF`s; a
+stray `OP_ENDIF` after a top-level `OP_RETURN`; `OP_RETURN` inside an executed
+and an unexecuted `OP_IF`; nested forms; a stray `OP_ENDIF` then an `OP_IF`
+around the `OP_RETURN`; `OP_VERIF` in an unexecuted branch), written by
+`tests/support/script_if_depth_634.mjs` from `@bsv/sdk` at `ts-stack@edf6e03`
+bundled with bun under Node v22.18.0 (two runs byte-identical): the reference's
+chunks, `toASM` and `Spend` verdict at versions 1 and 2, and go-sdk's
+`Script.Chunks()` reading transcribed from `script/script_chunk.go:245-332` at
+`2ca481c` (not run: no Go toolchain on the recording host). Each shape's bytes
+are this crate's writer's (`Script::from_asm`). `tests/script_if_depth_634.rs`:
+
+- `a_stray_endif_before_op_return_parses_as_two_chunks_the_if_depth_clamped_at_0_634`:
+  the clamp on `686a51` and the issue's other forms, the reference's reading
+  beside it.
+- `the_readers_differ_only_after_a_stray_endif_634`: this crate's chunks equal
+  the reference's on every shape without a stray `OP_ENDIF` before the
+  `OP_RETURN` and differ on the eight with one; equal go-sdk's but on the two
+  where a stray `OP_ENDIF` is followed by an `OP_IF` around the `OP_RETURN`
+  (`68636a5168`: five chunks here, three in both others).
+- `a_stray_endif_is_refused_as_unbalanced_in_every_mode_634`: the eight shapes
+  refused in the default mode at versions 1 and 2 and under
+  `ScriptFlags::block` and `standard` (post-Genesis; post-Chronicle with the
+  coin before and after Chronicle), as the node refuses them
+  (`SCRIPT_ERR_UNBALANCED_CONDITIONAL`, bitcoin-sv v1.2.3 `interpreter.cpp:835-840`).
+- `the_verdict_does_not_depend_on_the_chunking_634`: every shape in those eight
+  modes, run on this crate's chunks, the reference's and go-sdk's
+  (`LockingScript::from_chunks`), the same verdict; the default mode's verdicts
+  the reference's recorded ones.
+- `each_shape_is_this_crates_writers_bytes_and_every_chunking_writes_them_back_634`.
+
+The two chunk tests are RED in a scratch copy with the clamp removed (the
+reference's rule; `red-clamp-removed.log` in the lane's evidence), the three
+verdict tests green there: the verdicts stand on either rule.
+
+### Notes: cross-SDK parity (#634)
+
+The node reads no chunks: `CScript::GetOp2` (bitcoin-sv v1.2.3 `6504a3a`
+`src/script/script.h:165-198`) reads one opcode and its push with no depth, and
+the interpreter judges at run time (`OP_ENDIF` on an empty conditional stack
+refused, `:835-840`; `OP_RETURN` after Genesis on an empty stack a success,
+inside an executed branch execution stopped with the conditionals still
+checked, `:856-871`, `:459`; inside an unexecuted branch not executed, `:482`).
+A reader's depth is never below the interpreter's (the readers count
+`OP_VERIF`/`OP_VERNOTIF` where a pre-Chronicle coin skips them, `:773-781`),
+so the interpreter refuses at a stray `OP_ENDIF` before it reaches any
+`OP_RETURN` the readers fold differently, and the chunkings differ only in the
+chunk list and the ASM of a script the node refuses. go-sdk at `2ca481c` has
+four readers: `Script.Chunks()` (`DecodeScript`, no floor, `OP_RETURN` read as
+an opcode only at `> 0`: two chunks on `686a51`, three on `68636a5168`), the
+interpreter's legacy parser (clamped at 0, this crate's rule,
+`interpreter/opcodeparser.go:389-401`), `ToASM`'s `ReadOp` (no depth, no fold,
+`script_chunk.go:25-115`) and the engine's node-exact parser (no fold,
+`opcodeparser.go:218-266`). The `CLAUDE.md` row states the difference; the
+draft `docs/lanes/375-filings/script-if-depth-negative-ts-stack.md` is queue
+row 26, unfiled, pending the reads on the door.
+
 ### Fixed: MerklePath's constructors refuse a level 0 of duplicate flags alone, as the reference's constructor does (#641)
 
 `MerklePath::new` and `MerklePath::new_unchecked` accepted a path whose level
