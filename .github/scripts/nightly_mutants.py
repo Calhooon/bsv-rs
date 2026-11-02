@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Run the five mutation surfaces and check complete per-file results (#81)."""
+"""Run the five mutation surfaces and check complete per-file results (#81).
+
+Since cut 7 a night mutates what the reach rule (`plan`) names since the last
+complete run and carries every other figure with its run (docs/NIGHTLY.md).
+"""
 
 import argparse
 from collections import Counter
+import hashlib
+import io
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -11,6 +18,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tomllib
+import zipfile
 
 
 SURFACES = {
@@ -108,13 +117,20 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
-def mutation_args(surface, shard, files=()):
-    patterns, tests = SURFACES[surface]
+def surface_tests(surface, root=Path(".")):
+    """The integration targets a surface's mutants are tested by, in the run's order."""
+    tests = SURFACES[surface][1]
     if surface == "script":
-        tests = tests + sorted(p.stem for p in Path("tests").glob("script_*.rs"))
+        tests = tests + sorted(p.stem for p in (root / "tests").glob("script_*.rs"))
     if surface == "beef":
         # #603: `beef_stream.rs`'s shards each kill their survivors in a file of their own.
-        tests = tests + sorted(p.stem for p in Path("tests").glob("beef_stream_603_*.rs"))
+        tests = tests + sorted(p.stem for p in (root / "tests").glob("beef_stream_603_*.rs"))
+    return tests
+
+
+def mutation_args(surface, shard, files=()):
+    patterns = SURFACES[surface][0]
+    tests = surface_tests(surface)
     args = ["cargo", "mutants", "--no-shuffle", "--sharding", "round-robin", "--shard", shard,
             "--features", "full,http"]
     for pattern in files or patterns:
@@ -159,12 +175,22 @@ def run(args):
     root = args.output.resolve()
     # Never let an interrupted retry inherit an older run's successful evidence.
     root.mkdir(parents=True, exist_ok=False)
-    command = mutation_args(args.surface, args.shard, args.file)
+    files, allow_empty = list(args.file), False
+    plan_path = getattr(args, "plan", None)
+    if plan_path is not None:
+        # Cut 7: an incremental plan names the files to mutate; a complete one, the globs.
+        night = json.loads(Path(plan_path).read_text())
+        if night["mode"] == "incremental":
+            files, allow_empty = night["files"].get(args.surface, []), True
+            if not files:
+                raise SystemExit(f"the plan measures no file of {args.surface}: no shard of it runs")
+    command = mutation_args(args.surface, args.shard, files)
     environment = dict(os.environ, CARGO_INCREMENTAL="1")
     print(shlex.join(command), flush=True)
     # A separate manifest exists even if the baseline or a worker fails.
     with (root / "candidates.json").open("w") as dest:
         subprocess.run(command + ["--list", "--json"], stdout=dest, check=True, env=environment)
+    candidates = json.loads((root / "candidates.json").read_text())
     metadata = {
         "surface": args.surface, "shard": args.shard,
         "commit": checkout_commit(args.commit),
@@ -175,9 +201,16 @@ def run(args):
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CARGO_PROFILE_TEST_DEBUG",
             "CARGO_TARGET_DIR", "CARGO_INCREMENTAL",
         )},
-        "files": sorted({str(p) for pattern in args.file or SURFACES[args.surface][0]
+        "files": sorted({str(p) for pattern in files or SURFACES[args.surface][0]
                          for p in Path().glob(pattern)}),
     }
+    if not candidates and allow_empty:
+        # A night's file may generate no mutant (a module of declarations), and a
+        # round-robin shard past the night's last mutant has none: no baseline runs.
+        metadata.update(exit_code=0, empty=True)
+        write_json(root / "run.json", metadata)
+        print(f"{args.surface} {args.shard}: no mutant in this shard of the night's files")
+        return 0
     write_json(root / "run.json", metadata)
     command += ["--timeout", "300" if args.surface == "beef" else "120", "--build-timeout", "300",
                 "--jobs", "1", "--output", str(root)]
@@ -221,7 +254,7 @@ def command_signature(command):
     return result
 
 
-def collect(root, expected_shards, floors):
+def collect(root, expected_shards, floors, planned=None, floor_files=True):
     errors, rows, seen_runs, seen_mutants, commits = [], {}, set(), set(), set()
     file_surfaces, complete_surfaces = {}, set()
     invalid_surfaces = set()
@@ -245,6 +278,8 @@ def collect(root, expected_shards, floors):
         if metadata.get("exit_code") not in (0, 2, 3):
             errors.append(f"{label}: runner failed or unfinished ({metadata.get('exit_code')})")
         candidates = json.loads((directory / "candidates.json").read_text())
+        if not candidates and metadata.get("empty") and metadata.get("exit_code") == 0:
+            continue  # an incremental shard with nothing to mutate (cut 7)
         if not candidates:
             errors.append(f"{label}: no mutation candidates")
         expected = {identity(m) for m in candidates}
@@ -310,6 +345,8 @@ def collect(root, expected_shards, floors):
                   for s in SURFACES for i in range(expected_shards)}
         if seen_runs != wanted:
             errors.append(f"missing or unexpected shards: {sorted(wanted ^ seen_runs)}")
+    if planned is not None and seen_runs != planned:
+        errors.append(f"missing or unexpected shards against the plan: {sorted(planned ^ seen_runs)}")
     if not runs:
         errors.append("no mutation runs found")
     if len(commits) != 1:
@@ -349,7 +386,7 @@ def collect(root, expected_shards, floors):
         files.append(row)
         if passed is False:
             errors.append(f"{file}: below {floor}% or no viable mutants")
-    for file in floors:
+    for file in floors if floor_files else ():
         if (file not in rows or rows[file]["generated"] == 0
                 or rows[file]["caught"] + rows[file]["missed"] + rows[file]["timeout"] == 0
                 or not file_surfaces.get(file, set()) <= complete_surfaces):
@@ -359,11 +396,413 @@ def collect(root, expected_shards, floors):
             "files": files, "errors": errors, "passed": not errors}
 
 
+# Cut 7 (the keeper's speed line, the owner's word of 2026-11-02): a file's score
+# moves only when the file, the tests that reach it or the build that runs them
+# changes, so the nightly mutates the files the reach rule names since the last
+# complete run and carries every other figure with its run's id and sha.
+#
+# The complete run fills the account's twenty slots in one wave. Minutes per
+# mutant, from run 41347058507's shards (the scoped step's minutes over the
+# shard's mutants, at 42a74f1b): script 130/515, BEEF 37/187, Merkle 3/25, wire
+# 19.5/198, substrates 36.5/286; 901 shard-minutes in all, shared out by the
+# largest remainder with one shard at least: about 47, 50, 11, 39 and 49 minutes.
+SLOT_LIMIT = 20
+COMPLETE_SHARDS = {"script": 11, "beef": 3, "merkle": 1, "wire": 2, "substrates": 3}
+MINUTES_PER_MUTANT = {"script": 0.25, "beef": 0.20, "merkle": 0.12, "wire": 0.10,
+                      "substrates": 0.13}
+NIGHT_SHARD_MINUTES = 45
+# The night shares the account with pull requests and the fleet's other nights
+# (the balance rule of 2026-10-26): six slots; the complete run takes the twenty.
+NIGHT_PARALLEL = 6
+RECORD_ARTIFACT = "mutation-record"
+# A change to these reaches every measured file, whatever it touches.
+EVERYTHING = {
+    "Cargo.toml": "the manifest: a dependency, a feature or a profile reaches every file that uses it",
+    "Cargo.lock": "the resolved graph: a dependency bump reaches every file that uses it",
+    "build.rs": "the build script runs before every test binary",
+    "src/lib.rs": "the crate root: every module, and the unit-test skips are read from it",
+    "src/error.rs": "the one Error every module returns and every test compares",
+    ".github/workflows/nightly.yml": "the oracle's jobs, toolchain, corpus pin, timeouts and memory ceiling",
+    ".github/scripts/nightly_mutants.py": "the selection, the skips and the score",
+    ".github/scripts/test-runner-memory-ceiling.sh": "the ceiling decides a runaway mutant's outcome",
+}
+
+
+def is_doc(path):
+    return path.startswith("docs/") or path.endswith(".md")
+
+
+def measured_files(root=Path(".")):
+    """Every file a complete run mutates, with its surface."""
+    return {str(p.relative_to(root)): surface for surface, (patterns, _) in SURFACES.items()
+            for pattern in patterns for p in sorted(root.glob(pattern))}
+
+
+def test_rows(root=Path(".")):
+    """`tests/CLAUDE.md`'s file table: each test file's stem to the text of its row."""
+    rows, inside = {}, False
+    for line in (root / "tests" / "CLAUDE.md").read_text().splitlines():
+        if line.startswith("## "):
+            inside = line.strip() == "## Files"
+        elif inside and line.startswith("| `"):
+            cell = line.split("|")[1]
+            for name in re.findall(r"`([^`]+)\.rs`", cell):
+                rows[Path(name).stem] = line
+    return rows
+
+
+def row_reach(row, measured):
+    """The measured files a row names, else every measured file of a module it names."""
+    named = {f"src/{path}" for path in re.findall(
+        r"(?<![\w.-])(?:src/)?((?:[a-z0-9_]+/)+[a-z0-9_]+\.rs)", row)} & set(measured)
+    if named:
+        return named
+    modules = set(re.findall(r"src/([a-z_]+)/", row)) | set(
+        re.findall(r"`(?:crate::|bsv_rs::|bsv::)?([a-z_]+)::", row))
+    return {file for file in measured if file.split("/")[1] in modules}
+
+
+def mutants_exclusions(text):
+    """`.cargo/mutants.toml`'s exclude_re entries and every other key, apart."""
+    config = tomllib.loads(text) if text else {}
+    excluded = set(config.pop("exclude_re", []))
+    return excluded, config
+
+
+def excluded_file(pattern):
+    """The file an anchored exclusion names (`^src/script/script\\.rs:257:30: ...`)."""
+    match = re.match(r"\^((?:[a-z0-9_]+/)+[a-z0-9_]+)\\\.rs:", pattern)
+    return f"{match.group(1)}.rs" if match else None
+
+
+def reach(changed, root=Path("."), base_mutants="", head_mutants=None):
+    """The reach rule: each changed path to the measured files it re-measures.
+
+    Returns (everything, reasons, files): `everything` names the path that reaches
+    every file, `reasons` maps each changed path to what it reaches and why.
+    """
+    measured = measured_files(root)
+    rows = test_rows(root)
+    selections = {surface: set(surface_tests(surface, root)) for surface in SURFACES}
+    texts = {}
+
+    def text(path):
+        if path not in texts:
+            texts[path] = path.read_text(errors="replace")
+        return texts[path]
+
+    def namers(path):
+        """The compiled sources that name a file under `tests/` (by name, or a module by stem)."""
+        name = Path(path).name
+        if name.endswith(".rs"):
+            stem = Path(path).parent.name if name == "mod.rs" else Path(path).stem
+            hit = re.compile(rf"\b{re.escape(stem)}\b").search
+        else:
+            hit = lambda body: name in body  # noqa: E731
+        sources = [*sorted((root / "tests").rglob("*.rs")), *sorted((root / "src").rglob("*.rs"))]
+        return [str(p.relative_to(root)) for p in sources
+                if str(p.relative_to(root)) != path and hit(text(p))]
+
+    def reach_test(path):
+        stem = Path(path).stem
+        surfaces = [s for s, tests in selections.items() if stem in tests]
+        if not surfaces:
+            return set(), "a test no surface's selection runs: it never meets a mutant"
+        scope = {f for f, s in measured.items() if s in surfaces}
+        named = row_reach(rows[stem], measured) & scope if stem in rows else set()
+        if named:
+            return named, f"its tests/CLAUDE.md row, within the {'/'.join(surfaces)} selection"
+        return scope, f"in the {'/'.join(surfaces)} selection; its row names no measured file or module"
+
+    def reach_one(path, seen):
+        if path in seen:
+            return set(), "already reached"
+        seen.add(path)
+        if path in EVERYTHING:
+            return None, EVERYTHING[path]
+        if is_doc(path):
+            return set(), "documentation: never compiled"
+        if path == ".cargo/mutants.toml":
+            base_ex, base_rest = mutants_exclusions(base_mutants)
+            head_ex, head_rest = mutants_exclusions(
+                (root / path).read_text() if head_mutants is None else head_mutants)
+            if base_rest != head_rest:
+                return None, "a cargo-mutants setting other than exclude_re: every file's mutants"
+            files = {excluded_file(p) for p in base_ex ^ head_ex}
+            if None in files:
+                return None, "an exclusion that names no file: it may match any mutant"
+            return files & set(measured), "the exclusions added or removed name these files"
+        if path.startswith(".cargo/"):
+            return None, "cargo's configuration: every build"
+        if path in measured:
+            return {path}, "a measured file"
+        if path.startswith("src/"):
+            parts = path.split("/")
+            if len(parts) == 2:
+                return None, "a crate-root source: every module's"
+            files = {f for f in measured if f.split("/")[1] == parts[1]}
+            return files, f"a source of src/{parts[1]}/: its module's measured files"
+        if path.startswith("tests/"):
+            if path.count("/") == 1 and path.endswith(".rs"):
+                return reach_test(path)
+            if not (root / path).exists():
+                return set(), "removed: what named it changed with it"
+            found, via = set(), namers(path)
+            for source in via:
+                files, _ = reach_one(source, seen)
+                if files is None:
+                    return None, f"named by {source}, which reaches every file"
+                found |= files
+            if not via:
+                return set(), "no compiled test or source names it (a recorder, a vector no test reads)"
+            return found, "through the sources that name it: " + ", ".join(via)
+        return set(), "outside the library and its tests: no selection compiles it"
+
+    reasons, files = {}, set()
+    for path in sorted(changed):
+        reached, why = reach_one(path, set())
+        if reached is None:
+            reasons[path] = {"files": "everything", "why": why}
+            return path, reasons, set(measured)
+        reasons[path] = {"files": sorted(reached), "why": why}
+        files |= reached
+    return None, reasons, files
+
+
+def shard_matrix(files_by_surface, mode, base_files=None):
+    """The matrix: twenty shards for a complete run, the night's by its estimated minutes."""
+    matrix = []
+    for surface in SURFACES:
+        files = files_by_surface.get(surface, [])
+        if not files:
+            continue
+        if mode == "complete":
+            count = COMPLETE_SHARDS[surface]
+        else:
+            known = [row["generated"] for row in (base_files or {}).values()
+                     if row.get("surface") == surface]
+            mean = sum(known) / len(known) if known else 20
+            mutants = sum((base_files or {}).get(f, {}).get("generated", mean) for f in files)
+            minutes = mutants * MINUTES_PER_MUTANT[surface]
+            count = min(COMPLETE_SHARDS[surface], max(1, math.ceil(minutes / NIGHT_SHARD_MINUTES)))
+        # The label names the shard's artifact, which may not carry a slash.
+        matrix += [{"surface": surface, "shard": f"{i}/{count}", "label": f"{surface}-{i}-{count}"}
+                   for i in range(count)]
+    return matrix
+
+
+def git(repo, *args):
+    return subprocess.check_output(["git", *args], cwd=repo, text=True)
+
+
+def plan(args):
+    """The night's plan: the files to mutate, their shards, the base it carries from."""
+    repo, commit = args.repo, args.commit
+    base_record = None
+    if args.base_record is not None and (args.base_record / "record.json").exists():
+        base_record = json.loads((args.base_record / "record.json").read_text())
+    measured = measured_files(repo)
+    result = {"schema_version": 1, "commit": commit, "requested_mode": args.mode,
+              "base": None, "why_complete": None, "changed": [], "reach": {},
+              "measured": measured, "lockfile": "generate"}
+    why = None
+    if args.mode == "complete":
+        why = "dispatched complete (a prerelease pin, or by hand)"
+    elif base_record is None:
+        why = "no record of a complete run on the line to carry from"
+    else:
+        base = base_record["complete_run"]
+        result["base"] = {"run_id": base["run_id"], "commit": base["commit"],
+                          "record_run_id": base_record["runs"][-1]["run_id"]}
+        held = subprocess.run(["git", "merge-base", "--is-ancestor", base["commit"], commit],
+                              cwd=repo, check=False)
+        if held.returncode != 0:
+            why = f"the complete run's commit {base['commit']} is not an ancestor of {commit}"
+        else:
+            changed = git(repo, "diff", "--name-only", "--no-renames",
+                          f"{base['commit']}..{commit}").split()
+            result["changed"] = changed
+            try:
+                base_mutants = git(repo, "show", f"{base['commit']}:.cargo/mutants.toml")
+            except subprocess.CalledProcessError:
+                base_mutants = ""
+            everything, reasons, files = reach(changed, repo, base_mutants)
+            result["reach"] = reasons
+            if everything:
+                why = f"{everything} changed: {reasons[everything]['why']}"
+    if why:
+        result.update(mode="complete", why_complete=why)
+        files = set(measured)
+    else:
+        result.update(mode="incremental", lockfile="carry")
+    by_surface = {}
+    for file in sorted(files):
+        by_surface.setdefault(measured[file], []).append(file)
+    result["files"] = by_surface
+    result["matrix"] = shard_matrix(by_surface, result["mode"],
+                                    base_record["files"] if base_record else None)
+    result["shards"] = len(result["matrix"])
+    result["max_parallel"] = SLOT_LIMIT if result["mode"] == "complete" else NIGHT_PARALLEL
+    result["carried"] = sorted(set(measured) - files)
+    write_json(args.output, result)
+    print(json.dumps({k: result[k] for k in ("mode", "why_complete", "base", "files", "matrix",
+                                              "shards", "max_parallel")}, indent=2))
+    print(f"{sum(map(len, by_surface.values()))} files measured tonight, "
+          f"{len(result['carried'])} carried")
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+            output.write(f"mode={result['mode']}\n")
+            output.write(f"shards={result['shards']}\n")
+            output.write(f"max_parallel={result['max_parallel']}\n")
+            output.write(f"lockfile={result['lockfile']}\n")
+            output.write(f"matrix={json.dumps(result['matrix'], separators=(',', ':'))}\n")
+    return 0
+
+
+def judge(counts, floor):
+    viable = counts["caught"] + counts["missed"] + counts["timeout"]
+    return viable > 0 and 100 * counts["caught"] >= floor * viable
+
+
+def floor_of(file, floors):
+    return floors.get(file, {}).get("percent", GATE_FLOOR), floors.get(file, {}).get("issue")
+
+
+def merge(night, the_plan, base_record, floors, run_id):
+    """The night's rows over the record it carries from: (rows, findings, errors, record)."""
+    commit = the_plan["commit"]
+    measured = the_plan["measured"]
+    rows, findings, errors = [], [], []
+    tonight = {row["file"]: row for row in night["files"]}
+    base_files = (base_record or {}).get("files", {}) if the_plan["mode"] == "incremental" else {}
+    record_files = {}
+    for file in sorted(set(measured) | set(tonight)):
+        if file in tonight:
+            row = dict(tonight[file], provenance="night", run_id=run_id, commit=commit)
+        elif file in base_files:
+            carried = base_files[file]
+            floor, issue = floor_of(file, floors)
+            counts = {k: carried[k] for k in ("generated", *OUTCOMES.values(), "viable")}
+            passed = judge(counts, floor) if counts["viable"] else None
+            if carried.get("no_viable") or counts["generated"] == 0:
+                passed = None
+            row = {"file": file, **counts, "score_percent": carried["score_percent"],
+                   "floor_percent": floor, "issue": issue, "passed": passed,
+                   "scope_complete": True, "no_viable": carried.get("no_viable", False),
+                   "provenance": "carried", "run_id": carried["run_id"],
+                   "commit": carried["commit"]}
+            if passed is False:
+                findings.append(f"{file}: carried {carried['score_percent']:.2f}% below its "
+                                f"{floor}% floor, measured by run {carried['run_id']} at "
+                                f"{carried['commit']} (a finding, not a failure of the night)")
+        else:
+            errors.append(f"{file}: measured, but neither tonight's nor the record's")
+            continue
+        rows.append(row)
+        record_files[file] = {
+            "surface": measured.get(file), **{k: row[k] for k in (
+                "generated", *OUTCOMES.values(), "viable", "score_percent", "no_viable",
+                "provenance", "run_id", "commit")}}
+    by_file = {row["file"]: row for row in rows}
+    for file in floors:
+        row = by_file.get(file)
+        if row is None or row["generated"] == 0 or row["viable"] == 0:
+            errors.append(f"floor has no measured file: {file}")
+    run = {"run_id": run_id, "commit": commit, "mode": the_plan["mode"],
+           "files": len(tonight)}
+    if the_plan["mode"] == "complete":
+        complete_run, runs = {"run_id": run_id, "commit": commit}, [run]
+    else:
+        complete_run = base_record["complete_run"]
+        runs = base_record["runs"] + [run]
+    record = {"schema_version": 1, "complete_run": complete_run, "runs": runs,
+              "commit": commit, "files": record_files}
+    return rows, findings, errors, record
+
+
+def provenance(row):
+    if row.get("provenance") == "carried":
+        return f"carried: run {row['run_id']} at `{row['commit'][:8]}`"
+    return "night" if row.get("provenance") else ""
+
+
+def newest_record(listing, line, commit, fetch, is_ancestor):
+    """The newest unexpired record of the line whose run measured an ancestor of `commit`."""
+    candidates = sorted((a for a in listing if a["name"] == RECORD_ARTIFACT and not a["expired"]
+                         and a.get("workflow_run", {}).get("head_branch") == line),
+                        key=lambda a: a["created_at"], reverse=True)
+    for artifact in candidates:
+        files = fetch(artifact)
+        record = json.loads(files["record.json"])
+        if is_ancestor(record["commit"], commit) and is_ancestor(
+                record["complete_run"]["commit"], commit):
+            return artifact, files
+    return None, None
+
+
+def latest_record(args):
+    """Download the newest record the night can carry from (the artifact store, no commit)."""
+    repository = os.environ.get("GITHUB_REPOSITORY", "Calhooon/bsv-rs")
+    listing = []
+    for page in range(1, 11):
+        answer = json.loads(subprocess.check_output(["gh", "api", (
+            f"repos/{repository}/actions/artifacts?name={RECORD_ARTIFACT}"
+            f"&per_page=100&page={page}")]))
+        listing += answer["artifacts"]
+        if len(answer["artifacts"]) < 100:
+            break
+
+    def fetch(artifact):
+        archive = zipfile.ZipFile(io.BytesIO(subprocess.check_output(
+            ["gh", "api", f"repos/{repository}/actions/artifacts/{artifact['id']}/zip"])))
+        return {name: archive.read(name) for name in archive.namelist()}
+
+    def is_ancestor(old, new):
+        return subprocess.run(["git", "merge-base", "--is-ancestor", old, new],
+                              cwd=args.repo, check=False).returncode == 0
+
+    artifact, files = newest_record(listing, args.line, args.commit, fetch, is_ancestor)
+    args.dest.mkdir(parents=True, exist_ok=True)
+    if artifact is None:
+        print(f"no {RECORD_ARTIFACT} of {args.line} carries to {args.commit}: the night runs complete")
+        return 0
+    for name, body in files.items():
+        (args.dest / name).write_bytes(body)
+    print(f"carrying from run {artifact['workflow_run']['id']}'s record (artifact {artifact['id']})")
+    return 0
+
+
+def lockfile_digest(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
 def report(args):
     commit = getattr(args, "commit", None)
+    plan_path = getattr(args, "plan", None)
+    the_plan = json.loads(Path(plan_path).read_text()) if plan_path else None
+    record = findings = None
     try:
         floors = load_floors(args.floors)
-        result = collect(args.input, args.expected_shards, floors)
+        if the_plan is None:
+            result = collect(args.input, args.expected_shards, floors)
+        else:
+            # Cut 7: the night's shards against the plan's, then the carried figures.
+            expected = {(entry["surface"], entry["shard"]) for entry in the_plan["matrix"]}
+            if expected:
+                result = collect(args.input, None, floors, planned=expected, floor_files=False)
+            else:
+                result = {"schema_version": 1, "cargo_mutants_version": "27.1.0",
+                          "commits": [the_plan["commit"]], "complete": True,
+                          "files": [], "errors": [], "passed": True}
+            base = None
+            if the_plan["mode"] == "incremental":
+                base = json.loads((args.base_record / "record.json").read_text())
+            run_id = getattr(args, "run_id", None) or os.environ.get("GITHUB_RUN_ID", "local")
+            rows, findings, errors, record = merge(result, the_plan, base, floors, run_id)
+            result["errors"] += errors
+            result.update(files=rows, findings=findings, mode=the_plan["mode"],
+                          complete_run=record["complete_run"],
+                          passed=not result["errors"])
         if commit is not None and result["commits"] != [commit]:
             result["errors"].append(f"results describe {result['commits']}, "
                                     f"not the pinned commit {commit} (#629)")
@@ -371,14 +810,30 @@ def report(args):
     except (OSError, KeyError, ValueError, TypeError) as error:
         result = {"schema_version": 1, "complete": False, "passed": False,
                   "files": [], "errors": [f"invalid mutation evidence: {error}"]}
+        record = None
     write_json(args.output, result)
+    # The record is the night's whole evidence, a floor's failure included; an
+    # incomplete night (a missing shard, a failed baseline) writes none.
+    record_output = getattr(args, "record_output", None)
+    if record_output is not None and record is not None and result["complete"]:
+        lockfile = getattr(args, "lockfile", None)
+        if lockfile is not None:
+            record["lockfile_sha256"] = lockfile_digest(lockfile)
+            shutil.copyfile(lockfile, Path(record_output).parent / "Cargo.lock")
+        if the_plan["mode"] == "complete":
+            record["complete_run"]["lockfile_sha256"] = record.get("lockfile_sha256")
+        write_json(Path(record_output), record)
+    carried_from = result.get("complete_run")
     lines = ["## Mutation scores (#81)", "",
              "Score = caught / (caught + missed + timeout); unviable mutants are excluded.",
              f"Floors: {GATE_FLOOR}% on the gate paths; elsewhere `mutation_floors` "
              f"in `{args.floors}` (#602).", "",
              *([f"Source commit: `{commit}` (the dispatch's, #629).", ""] if commit else []),
-             "| File | Caught | Missed | Timeout | Unviable | Score | Floor | Result |",
-             "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"]
+             *([f"Mode: {result['mode']}; the carried figures are the record's, the complete "
+                f"run {carried_from['run_id']} at `{carried_from['commit']}` and the nights since "
+                f"(cut 7).", ""] if carried_from and result.get("mode") == "incremental" else []),
+             "| File | Caught | Missed | Timeout | Unviable | Score | Floor | Result | Figure |",
+             "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"]
     for row in result["files"]:
         score = "n/a" if row["score_percent"] is None else f"{row['score_percent']:.2f}%"
         floor = f"{row['floor_percent']}%"
@@ -391,8 +846,11 @@ def report(args):
                 status = "NO VIABLE MUTANTS"
         lines.append(f"| `{row['file']}` | {row['caught']} | {row['missed']} | "
                      f"{row['timeout']} | {row['unviable']} | {score} | {floor} | "
-                     f"{status} |")
+                     f"{status} | {provenance(row)} |")
     lines += ["", *(f"- {error}" for error in result["errors"])]
+    if findings:
+        lines += ["", "Carried below their floors (findings with their runs, not failures "
+                  "of the night):", "", *(f"- {finding}" for finding in findings)]
     markdown = "\n".join(lines) + "\n"
     args.output.with_suffix(".md").write_text(markdown)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
@@ -411,6 +869,7 @@ def main():
     runner.add_argument("--file", action="append", default=[])
     runner.add_argument("--output", type=Path, required=True)
     runner.add_argument("--commit", help="the pin job's commit; the checkout must be at it (#629)")
+    runner.add_argument("--plan", type=Path, help="the night's plan: its files for the surface (cut 7)")
     runner.set_defaults(func=run)
     packer = subs.add_parser("package")
     packer.add_argument("--run", type=Path, required=True)
@@ -423,7 +882,27 @@ def main():
     reporter.add_argument("--floors", type=Path, default=FLOORS_RECORD,
                           help="the record whose mutation_floors member holds the floors (#602)")
     reporter.add_argument("--commit", help="the pin job's commit, which every shard must name (#629)")
+    reporter.add_argument("--plan", type=Path, help="the night's plan: its shards and measured files")
+    reporter.add_argument("--base-record", type=Path,
+                          help="the directory of the record the night carries from")
+    reporter.add_argument("--record-output", type=Path, help="where the merged record is written")
+    reporter.add_argument("--lockfile", type=Path, help="the Cargo.lock every shard built")
+    reporter.add_argument("--run-id", help="this run's id (default: GITHUB_RUN_ID)")
     reporter.set_defaults(func=report)
+    planner = subs.add_parser("plan", help="the files the reach rule re-measures tonight (cut 7)")
+    planner.add_argument("--commit", required=True, help="the pinned commit")
+    planner.add_argument("--mode", choices=("incremental", "complete"), default="incremental")
+    planner.add_argument("--base-record", type=Path,
+                         help="the directory of the record to carry from (absent: complete)")
+    planner.add_argument("--repo", type=Path, default=Path("."))
+    planner.add_argument("--output", type=Path, required=True)
+    planner.set_defaults(func=plan)
+    finder = subs.add_parser("latest-record", help="download the record the night carries from")
+    finder.add_argument("--line", required=True)
+    finder.add_argument("--commit", required=True)
+    finder.add_argument("--repo", type=Path, default=Path("."))
+    finder.add_argument("--dest", type=Path, required=True)
+    finder.set_defaults(func=latest_record)
     pinner = subs.add_parser("pin", help="pin the run to the dispatch's commit (#629)")
     pinner.add_argument("--commit", required=True, help="the dispatch's commit, a full sha")
     pinner.add_argument("--line", required=True, help="the line the commit must be on")
