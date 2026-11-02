@@ -95,6 +95,8 @@ pub mod fee_model;
 pub mod fee_models;
 pub mod input;
 pub mod merkle_path;
+#[cfg(test)]
+mod merkle_path_603_tests;
 pub mod output;
 #[allow(clippy::module_inception)]
 pub mod transaction;
