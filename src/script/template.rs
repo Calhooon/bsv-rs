@@ -368,4 +368,25 @@ mod tests {
             SIGHASH_SINGLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY
         );
     }
+
+    /// #603: the unlock's `Debug` follows the Rust API Guidelines' C-DEBUG
+    /// (every public type implements `Debug`) and C-DEBUG-NONEMPTY (a `Debug`
+    /// representation is never empty),
+    /// <https://rust-lang.github.io/api-guidelines/debuggability.html>: the
+    /// text is non-empty, names the type, shows the one field it can show (the
+    /// estimate's value; the two functions are opaque) and marks the rest
+    /// elided. Kills `template.rs:299:9` (`fmt` answering `Ok(())` and writing
+    /// nothing).
+    #[test]
+    fn the_unlock_debug_is_nonempty_and_names_its_estimate_c_debug_nonempty_603() {
+        let unlock = ScriptTemplateUnlock::new(|_| Ok(UnlockingScript::new()), || 74);
+        let text = format!("{unlock:?}");
+        assert!(
+            !text.is_empty(),
+            "C-DEBUG-NONEMPTY: the representation is empty"
+        );
+        assert!(text.starts_with("ScriptTemplateUnlock"), "{text}");
+        assert!(text.contains("estimate_length: 74"), "{text}");
+        assert!(text.contains(".."), "the opaque rest is not elided: {text}");
+    }
 }

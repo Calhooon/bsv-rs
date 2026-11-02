@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/templates/p2pk.rs and src/script/template.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The P2PK lock is `<pubkey> OP_CHECKSIG`, so the rule source is the sibling
+`bsv-script-lean` at `5dc337e1`: `decodePubKey`
+(`lean/BsvScript/Crypto/Secp256k1.lean:151-175`, the tags `02`/`03` with 32
+bytes, `04`/`06`/`07` with 64) and, under STRICTENC,
+`isCompressedOrUncompressedPubKey` in `checkSigOp`
+(`lean/BsvScript/Ops/Crypto.lean:77-84`, `:133-156`). The reference has no P2PK
+template at `ts-stack@edf6e03`, nor go-sdk at `2ca481c`. The widened run
+41327640129 left 5 survivors in `p2pk.rs` (54.55%) and 4 in `template.rs`
+(75.00%). 8 are killed by tests, 1 is declared equivalent, and 0 remain.
+
+`tests/script_p2pk_template_603.rs` copies four entries of the sibling's
+`corpus/crypto/cases.jsonl` by id, each with its recorded verdict (every column
+`valid`). The signer is the corpus's `key("a")`, the sha256 of its label, and
+its signatures are RFC 6979, so the templates must write the recorded bytes:
+
+- `the_lock_writes_both_key_forms_as_the_corpus_crypto_p2pk_crypto_00001_00002`
+  locks the compressed and uncompressed keys to the corpus's scripts. It kills
+  `p2pk.rs:116:47` (`!=` to `==`), `p2pk.rs:126:35` (the guard `false`) and
+  `p2pk.rs:126:48` (`==` to `!=`).
+- `the_unlock_signs_the_corpus_spend_and_it_verifies_crypto_p2pk_crypto_00001_00002`
+  signs with `P2PK::unlock`, writes the recorded unlocking script and spends
+  valid under the post-Chronicle block word. It kills `template.rs:286:9`
+  (`sign` answering an empty script; in the sibling's `corpus/signer`, run
+  through its bsv-rs signer adapter against this tree, the mutant moved 97
+  template rows) and the three lock mutants above.
+- `the_lock_refuses_a_tag_its_length_does_not_carry_crypto_p2pk_crypto_00001_00002`
+  retags the corpus keys (`02`/`03` at 65 bytes, `04`/`06`/`07` at 33), as the
+  corpus builds its hybrid key. The lock refuses each, and the same key as a raw
+  lock is refused under the block word, as `crypto-00014` records
+  (`SCRIPT_ERR_PUBKEYTYPE`). It kills `p2pk.rs:125:28` and `p2pk.rs:126:35`
+  (each guard `true`).
+- `the_p2pkh_helper_writes_the_corpus_unlock_crypto_p2pkh_crypto_00015` covers
+  `build_p2pkh_unlocking_script`, which writes `crypto-00015`'s unlock, and the
+  spend is valid. It kills `template.rs:325:5`.
+
+`the_unlock_debug_is_nonempty_and_names_its_estimate_c_debug_nonempty_603` (in
+`template.rs`'s unit tests) pins the Rust API Guidelines' C-DEBUG and
+C-DEBUG-NONEMPTY (<https://rust-lang.github.io/api-guidelines/debuggability.html>:
+every public type implements `Debug`, and its representation is never empty):
+the unlock's text is non-empty, names `ScriptTemplateUnlock`, shows the
+estimate's value and elides the two opaque functions. It kills
+`template.rs:299:9` (`fmt` answering `Ok(())` and writing nothing).
+
+The ninth, `template.rs:210:36` (`|` to `^` in `compute_sighash_scope`), is
+declared equivalent in `.cargo/mutants.toml`'s `exclude_re`. The base types 1
+to 3 and FORKID `0x40` occupy disjoint bits, so the two operators give the
+same word for every `SignOutputs` (bitcoin-sv v1.2.3
+`sighashtype.h:16-21,43,73-74,87`; `TransactionSignature.ts:240-245` and
+`SignatureUtils.ts:44-62` at `ts-stack@edf6e03`;
+`lean/BsvScript/Sighash.lean:52-58`, `:73`, `:79`, `:478`). Three independent
+reads accept it: the cold read; the adversarial read (EQUIVALENT, 0.97: every
+`SignOutputs` value under both `anyone_can_pay` values and twelve signed and
+verified transactions byte-identical on both sides; `SignOutputs` is closed and
+no conversion puts `0x40` into its flag); the rule read (EQUIVALENT, 0.97: the
+six scopes `0x41`, `0xc1`, `0x42`, `0xc2`, `0x43`, `0xc3` equal on the tree and
+the mutant). No entry of the sibling's `--corpus all` run or of its
+`corpus/signer` moved under it either. For the other eight mutants, the
+`--corpus all` run (9 corpora, GREEN) moved no verdict: the harness judges
+script bytes and never calls a template.
+
+Re-measured with the script surface's selection and the corpus:
+
+| File | Caught | Missed | Timeouts | Unviable | Caught of viable |
+|---|---:|---:|---:|---:|---:|
+| `p2pk.rs` | 11 | 0 | 0 | 1 | 100.00% |
+| `template.rs` | 15 | 0 | 0 | 2 | 100.00% |
+
+`template.rs` re-measured with the declaration in place (`cargo mutants --file
+src/script/template.rs --jobs 1`): 17 mutants, 15 caught, 0 missed, 2 unviable,
+the declared one not listed.
+
+Stated, not changed: the template locks a hybrid key (`06`/`07` at 65 bytes),
+which `decodePubKey` reads. But every column of the sibling's corpus refuses
+that output's spend under STRICTENC (`crypto-00014`, `SCRIPT_ERR_PUBKEYTYPE`),
+so such an output cannot be spent under the node's words.
+
 ### Fixed: the public PushDrop::decode reads a key-only and a no-CHECKSIG token as the reference does; the refusal stands on the canonical path (#618)
 
 On the keeper's word of 2026-11-01 22:1xZ on census row 93 (#614's read):

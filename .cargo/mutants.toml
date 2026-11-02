@@ -13,4 +13,14 @@ exclude_re = [
   # adversarial read with every length 0 to 80 and the PUSHDATA edges probed (0.98), the rule
   # read (0.97).
   '^src/script/templates/rpuzzle\.rs:350:34: replace < with <= in <impl ScriptTemplate for RPuzzle>::lock$',
+  # src/script/template.rs:210:36, `|` to `^` in compute_sighash_scope (#603, PR #624). The
+  # operands' bits are disjoint under the sighash rule (a base type 1 to 3 against FORKID 0x40), so
+  # `^` and `|` give the same word for every SignOutputs (bitcoin-sv v1.2.3 sighashtype.h:16-21,43,
+  # 73-74,87; TransactionSignature.ts:240-245 and SignatureUtils.ts:44-62 at ts-stack@edf6e03;
+  # bsv-script-lean lean/BsvScript/Sighash.lean:52-58,73,79,478). Three reads: the cold read
+  # (accepts), the adversarial read with every SignOutputs value under both anyone_can_pay values
+  # and twelve signed and verified transactions byte-identical (EQUIVALENT, 0.97), the rule read
+  # with the six scopes 0x41, 0xc1, 0x42, 0xc2, 0x43, 0xc3 equal on the tree and the mutant
+  # (EQUIVALENT, 0.97).
+  '^src/script/template\.rs:210:36: replace \| with \^ in compute_sighash_scope$',
 ]
