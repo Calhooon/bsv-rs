@@ -7,6 +7,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the P2PK lock refuses a hybrid public key, and the Multisig lock a key not tagged 02/03 where every spend reaches it, locks whose spend no word lets pass (#625)
+
+`P2PK::lock` accepted a 65-byte hybrid key (`06`/`07` + x + y) and wrote
+`<key> OP_CHECKSIG`; `Multisig::lock` (the `ScriptTemplate` door, raw 33-byte
+keys) accepted any tag. Under STRICTENC the node refuses either key at the
+CHECKSIG or CHECKMULTISIG that reads it (bitcoin-sv v1.2.3 `6504a3a`
+`src/script/interpreter.cpp:132-152` `IsCompressedOrUncompressedPubKey`,
+`:312-316` `CheckPubKeyEncoding`, called at `:1465` and `:1611`;
+`SCRIPT_ERR_PUBKEYTYPE`), and every word this crate builds carries STRICTENC
+(the block and standard words name it; `SIGHASH_FORKID`, which
+`ScriptFlags::check` requires, forces it, `:2315-2318`), as every column of
+the sibling's corpus refuses `crypto-00014` (`bsv-script-lean@5dc337e1`
+`corpus/crypto/cases.jsonl`, the hybrid `07` lock). The P2PK template wrote a
+lock nothing can spend. It refuses it now, `Error::InvalidPublicKey` naming
+the tag and the rule (`a hybrid public key (tag 0x07) is neither compressed
+nor uncompressed: its spend fails under STRICTENC
+(IsCompressedOrUncompressedPubKey)`); a 33-byte `06`/`07` key at P2PK keeps
+the existing `Invalid public key prefix`.
+
+CHECKMULTISIG checks only the keys it reaches. The node's loop
+(`interpreter.cpp:1538-1633`) starts `ikey` at the stack's second item, the
+key pushed last (index n - 1 of the lock), and walks down to index 0, taking
+the signatures from the last pushed down the same way; it checks each key's
+encoding as it reaches it (`:1611`) and stops at the threshold's last match,
+so a key below that point is never read. The reference's `Spend` walks the
+same way (`ts-stack@edf6e03` `Spend.ts:1752-1838`), and this crate's
+`op_checkmultisig` pops the keys in that order (`pubkeys[0]` the last
+pushed). Index n - 1 is reached first. A spend can avoid every bad key
+exactly when, with `j` the highest index of a bad key, the `n - 1 - j` keys
+after it meet the threshold: `Multisig::lock` refuses the lock only when
+`n - 1 - j < m` (a dead lock: every spend reaches a bad key), naming `j`,
+its tag, the count after it and the threshold (`public key 1 has tag 0x07,
+not a compressed key's 0x02 or 0x03, and the 1 key(s) after it cannot meet
+the threshold 2: every spend reaches it and fails under STRICTENC
+(IsCompressedOrUncompressedPubKey)`); a lock whose bad keys a spend can
+avoid is written, as the node and the reference spend it. The bad set is
+every tag but `02`/`03` at 33 bytes: a 33-byte `04` key fails the same check
+in both (the reference's `The non-compressed public key must be 65 bytes.`).
+`Multisig::lock_from_keys` writes compressed keys and was never open to it.
+
+The reference has no P2PK or Multisig template (`ts-stack@edf6e03`
+`packages/sdk/src/script/templates/index.ts`: P2PKH, RPuzzle, PushDrop;
+go-sdk at `2ca481c` neither). Recorded under Node v22.18.0 from a bun build
+of `edf6e03` (`tests/support/p2pk_hybrid_625.mjs`,
+`tests/vectors/p2pk_hybrid_625.json`) on the corpus's `key("a")`, whose y is
+odd: `PublicKey.fromString` and `fromDER` read `07` + x + y to the compressed
+key and refuse `06` for it (`Point string value is wrong length`,
+`src/primitives/Point.ts:303-330`); its
+`Script` writer pushes either as given; its `Spend` refuses both spends, at
+versions 1 and 2, under its default flags and under an explicit
+`SIGHASH_FORKID` word, `The public key is in an unknown format.`
+(`Spend.ts:687-716`, at the CHECKSIG `:1669`), and accepts the uncompressed
+control under both. This crate's interpreter gives the same verdicts and words
+in its default mode and under `ScriptFlags::block` and `ScriptFlags::standard`
+of the post-Genesis and post-Chronicle eras; the version-2 `07` spend this
+crate signs is `crypto-00014`'s transaction byte for byte. The vector's
+`multisig` sweep: m-of-n for n from 1 to 4 and every m, a key retagged `04`,
+`06` or `07` at each index and `07` at each pair of indices (125 shapes),
+each spent at versions 1 and 2 by the m highest-indexed good keys (a bad
+index's own key filling the count): the reference's `Spend`, under its
+default flags and the explicit `SIGHASH_FORKID` word, accepts the 35 shapes
+the rule calls avoidable and refuses the 90 it calls dead (500 of 500
+records agree), in its key check's words.
+
+The witnesses are `tests/p2pk_hybrid_625.rs`:
+`a_hybrid_key_is_refused_at_the_p2pk_lock_625`, RED on `b9f78224` (`left:
+Ok("41065935…ac")` for `hybrid_06`), green after;
+`an_unreached_bad_key_lock_is_written_and_spent_under_every_word_625` (a
+one-of-two lock with key 0 retagged `04`, `06`, `07`, written to the
+reference's bytes and spent by key 1, valid in the default mode at versions 1
+and 2 and under the block and standard words of both eras) and
+`the_multisig_sweep_follows_the_reachability_rule_and_the_reference_625` (the
+125 shapes: the lock written to the reference's bytes exactly where the rule
+says avoidable, refused naming the highest bad index elsewhere; the spend
+signed to the reference's unlock byte for byte and judged in the five modes
+as the rule says), RED on #625's first cut `82afa758` (the first refused at
+`lock`, `unwrap()` on an `Err`; the second at `1-of-1 bad [0] tag 04`, the
+old words), and `a_multisig_lock_a_bad_key_makes_dead_is_refused_at_the_lock_625`
+(1-of-1, 2-of-2 with either key bad, 1-of-2 with the last bad, 2-of-3 with
+the middle bad, 2-of-4 with keys 0 and 3 bad, tags `00`, `04`, `05`, `06`,
+`07`), RED on `b9f78224` (every lock written) and on `82afa758` in its words
+alone, green after; `the_spend_of_a_hybrid_lock_is_refused_under_every_word_625`
+(the lock written by `Script`'s writer to the reference's bytes, the spend
+signed by `P2PK::sign_with_sighash` to the reference's transaction, every
+verdict above), `the_spend_of_a_retagged_multisig_lock_is_refused_under_every_word_625`
+and `the_reference_parser_reads_the_hybrid_tag_y_names_and_no_template_carries_it_625`
+(`PublicKey::from_hex` reads both tags as the reference does, `from_bytes`
+refuses both), green before and after: the parser and the interpreter are not
+the doors that moved.
+
+### Notes: cross-SDK parity (#625)
+
+The reference's doors for a hybrid key are its parser, which accepts the tag
+y names, and its interpreter, which refuses both tags; it has no template
+door, and its `Script` writer locks the key as given. This crate refuses the
+key at its own templates, a door the reference does not have: a stated
+divergence (a row in `CLAUDE.md`'s list), not a verdict that differs. Every
+column refuses the spend of a P2PK lock of a hybrid key and of a dead
+Multisig lock; a Multisig lock whose bad keys a spend can avoid is written
+here and spent by every column, so its verdict does not differ either.
+Multisig's spend reaching a retagged key is refused here in this crate's
+CHECKMULTISIG words (`OP_CHECKMULTISIG requires correct encoding for the
+public key and signature.`); the reference's visible words are its key
+check's (`The public key is in an unknown format.`, or for a 33-byte `04`
+key `The non-compressed public key must be 65 bytes.`, thrown inside
+`#checkPublicKeyEncoding` before its wrapper at `Spend.ts:1808-1814`; the
+sweep records them): a pre-existing difference of words, #657.
+
+Semver: no type changed. A caller that locked a hybrid key with `P2PK::lock`,
+or with `Multisig::lock` a set of keys every spend of which reaches one
+tagged other than `02`/`03`, gets `Err` where it got a lock no node would let
+spend. No downstream on this host (`bsv-overlay-cloudflare`,
+`rust-message-box`, `bsv-wallet-toolbox-rs`) calls either template.
+
 ### Changed: ci: the `vectors` job's corpus pin is one named constant, and CLAUDE.md no longer says CI skips the conformance corpus (#31)
 
 #31 found that `ci.yml` checked out no corpus and set no `BSV_CONFORMANCE_DIR`,

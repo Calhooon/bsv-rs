@@ -112,6 +112,11 @@ impl P2PK {
 impl ScriptTemplate for P2PK {
     /// Creates a P2PK locking script from a compressed (33-byte) or
     /// uncompressed (65-byte) public key.
+    ///
+    /// A hybrid key (`06`/`07` + x + y) is refused: under STRICTENC, which
+    /// every word carries, the node's `IsCompressedOrUncompressedPubKey`
+    /// refuses it (bitcoin-sv v1.2.3 `interpreter.cpp:132-152`, `:312-316`),
+    /// so no spend of the lock passes (#625).
     fn lock(&self, params: &[u8]) -> Result<LockingScript> {
         if params.len() != 33 && params.len() != 65 {
             return Err(Error::InvalidDataLength {
@@ -123,7 +128,14 @@ impl ScriptTemplate for P2PK {
         // Validate key prefix
         match params[0] {
             0x02 | 0x03 if params.len() == 33 => {}
-            0x04 | 0x06 | 0x07 if params.len() == 65 => {}
+            0x04 if params.len() == 65 => {}
+            0x06 | 0x07 if params.len() == 65 => {
+                return Err(Error::InvalidPublicKey(format!(
+                    "a hybrid public key (tag 0x{:02x}) is neither compressed nor uncompressed: \
+                     its spend fails under STRICTENC (IsCompressedOrUncompressedPubKey)",
+                    params[0]
+                )));
+            }
             _ => {
                 return Err(Error::InvalidPublicKey(
                     "Invalid public key prefix".to_string(),
