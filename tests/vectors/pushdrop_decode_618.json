@@ -697,5 +697,195 @@
         }
       ]
     }
+  ],
+  "locks_603": [
+    {
+      "name": "minimal_pushes_before",
+      "fields": [
+        "",
+        "00",
+        "0001",
+        "0000",
+        "01",
+        "10",
+        "81",
+        "11",
+        "6869"
+      ],
+      "position": "before",
+      "key_id": "1",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac000002000102000051604f01110268696d6d6d6d75",
+      "reading": {
+        "fields": [
+          "00",
+          "00",
+          "0001",
+          "0000",
+          "01",
+          "10",
+          "81",
+          "11",
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "minimal_pushes_after",
+      "fields": [
+        "",
+        "00",
+        "0001",
+        "0000",
+        "01",
+        "10",
+        "81",
+        "11",
+        "6869"
+      ],
+      "position": "after",
+      "key_id": "1",
+      "locking_script": "000002000102000051604f01110268696d6d6d6d752103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac",
+      "reading": {
+        "fields": [
+          "00",
+          "00",
+          "0001",
+          "0000",
+          "01",
+          "10",
+          "81",
+          "11",
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "minimal_pushes_before_other_key",
+      "fields": [
+        "",
+        "00",
+        "0001",
+        "0000",
+        "01",
+        "10",
+        "81",
+        "11",
+        "6869"
+      ],
+      "position": "before",
+      "key_id": "2",
+      "locking_script": "2103727195993124642844e478d8d690b7c131bba902bcf852d1eb13a1c87145f8f1ac000002000102000051604f01110268696d6d6d6d75",
+      "reading": {
+        "fields": [
+          "00",
+          "00",
+          "0001",
+          "0000",
+          "01",
+          "10",
+          "81",
+          "11",
+          "6869"
+        ],
+        "locking_public_key": "03727195993124642844e478d8d690b7c131bba902bcf852d1eb13a1c87145f8f1",
+        "error": null
+      }
+    },
+    {
+      "name": "other_fields_before",
+      "fields": [
+        "6869"
+      ],
+      "position": "before",
+      "key_id": "1",
+      "locking_script": "2103314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4ac02686975",
+      "reading": {
+        "fields": [
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    },
+    {
+      "name": "minimal_pushes_before_uncompressed_key",
+      "fields": [
+        "",
+        "00",
+        "0001",
+        "0000",
+        "01",
+        "10",
+        "81",
+        "11",
+        "6869"
+      ],
+      "position": "before",
+      "key_id": "1",
+      "locking_script": "4104314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4c923bfce76ffb2e723e6d92b50c26353b185ee090d2f95135e51446540dc8ba3ac000002000102000051604f01110268696d6d6d6d75",
+      "reading": {
+        "fields": [
+          "00",
+          "00",
+          "0001",
+          "0000",
+          "01",
+          "10",
+          "81",
+          "11",
+          "6869"
+        ],
+        "locking_public_key": "03314b6df903d4aea4aac54fed9e29ff84e9416aded06b5167ddc02786f6197cc4",
+        "error": null
+      }
+    }
+  ],
+  "two_chunks_603": [
+    {
+      "name": "op_1_op_1",
+      "locking_script": "5151",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "script.chunks[0].data must have value"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Expected OP_CHECKSIG at the end of the script"
+      }
+    },
+    {
+      "name": "op_1_checksig",
+      "locking_script": "51ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "script.chunks[0].data must have value"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "public key chunk data must have value"
+      }
+    },
+    {
+      "name": "short_push_checksig",
+      "locking_script": "050102030405ac",
+      "before": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Unknown point format"
+      },
+      "after": {
+        "fields": null,
+        "locking_public_key": null,
+        "error": "Unknown point format"
+      }
+    }
   ]
 }
