@@ -108,7 +108,7 @@ credentials and makes no live wallet call.
 | Surface | Files mutated | Integration test targets |
 | --- | --- | --- |
 | script | `src/script/**/*.rs` | Every `tests/script_*.rs`, `template_tests`, `sighash_tests`, `resource_limits`, `conformance_scripts`, `identity_spend_witness` |
-| BEEF | `src/transaction/beef*.rs` | `transaction_tests`, `beef_stream`, `beef_limits`, `beef_atomic_graph`, `conformance_beef` |
+| BEEF | `src/transaction/beef*.rs` | `transaction_tests`, `beef_stream`, `beef_limits`, `beef_atomic_graph`, `conformance_beef`, every `tests/beef_stream_603_*.rs` |
 | merkle path | `src/transaction/merkle_path.rs` | `transaction_tests`, `merkle_path_lone_leaf`, `conformance_beef` |
 | wallet wire | `src/wallet/wire/**/*.rs` | `wallet_tests`, `wire_method_roundtrip_tests`, `wallet_wire_cross_sdk_tests` |
 | wallet substrates | `src/wallet/substrates/**/*.rs` | `wallet_tests`, `wallet_http_json_busy_tests` |
