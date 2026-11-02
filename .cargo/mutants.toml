@@ -138,4 +138,18 @@ exclude_re = [
   # 0.98). At :2348:55 since the seed fold (#645): the comparison walks the unreached txids in a
   # `BTreeSet`, still one per map key, so the reason stands.
   '^src/transaction/beef_stream\.rs:2348:55: replace < with <= in atomic_unreached$',
+  # src/transaction/beef_stream.rs:788:9, `BeefDecoder::take_deferred` replaced by `None` (#603,
+  # shard S1, PR #647; the line unmoved by #643 to #648). Only the collecting decoder fills
+  # `deferred` and only `Beef::collect` reads it; under the mutant the fold reaches the pure
+  # `check_transaction` with the same arguments, the same refusal, name and offset, the earliest
+  # kept either way (beef_stream.rs:787-799, the decoder's check at :1323, the fold's at :2019;
+  # beef/collect.rs:67-86, 118, 131; bsv-script-lean@387dab35 lean/BsvScript/TxRules.lean:82-95
+  # `checkTransactionCommon`, a check of the transaction alone; bsv-stack-lean@5df1e0a3
+  # lean/BeefOfAnySize.lean:797-825 `parseElement` and :951-965, the earliest refusal, nothing
+  # deferred; BRC-62 0062.md:183, "stopping at the soonest failure"; Beef.ts:1054-1090 at
+  # ts-stack@edf6e03, no per-transaction node rule in verifyValid). Three reads: the cold read
+  # (MERGE, 0.95), the adversarial read with 325,122 inputs compared on seven entries, the tree's
+  # and the mutant's tables with the same SHA-256 and 10,773 reaching the arm with identical
+  # errors (EQUIVALENT, 0.96), the rule read (EQUIVALENT, 0.96).
+  '^src/transaction/beef_stream\.rs:788:9: replace BeefDecoder::take_deferred -> Option<Refusal> with None$',
 ]

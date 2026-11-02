@@ -7,6 +7,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S1 (the stream's cursor and element reading), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 44 survivors in this shard's sixteen functions of
+`src/transaction/beef_stream.rs` (the decoder's and the stream's accessors,
+`finish`, `on_varint`, `on_run_done`, `next_element`, the cursor's
+`to_binary`, `from_binary` and `input_reached`, the verifier's `cursor` and
+`step_until`); two of them timed out. Of the 44: killed 40 (30 from the
+sibling's rules and the reference's recordings, 10 on crate-contract pins
+stated apart, below); declared equivalent 1 (`788:9`, on three reads); two
+timeouts the oracle counts as such, never as caught (`1263:9`, `3214:32`);
+remaining 1, stated (`2828:26`, below).
+
+The sibling's wire corpus (bsv-script-lean@387dab35 `corpus/wire`, 150
+rows, through a scratch copy of its `run_wire` linked to this tree) reaches
+only the whole-BEEF path: under six of the survivors no row moved, and under
+`on_run_done` replaced by `()` the run stops at beef-001, the earliest row
+with a script. Sixteen tests in `tests/beef_stream_603_s1.rs` take the rows by id
+(beef-001, -023 to -026, -031, atomic-beef-023, bump-003) and expect the
+reference's reading of them. The shared recorder
+`tests/support/beef_reference_603.mjs` gains three cases (`stream`:
+`Beef.fromReader`'s position after the header and after each element, the
+version, the atomic subject, the element kinds and `verifyValid` on seven
+rows; `stream_txids`; `bump_offset_outside_its_level`, bump-003 with a
+level-1 leaf moved to its level's width, which the reference refuses) and
+three rows (beef-024, beef-025, bump-003), merged after S2's and S4's cases;
+`tests/vectors/beef_reference_603.json` regenerated at `ts-stack@edf6e03`
+under Node v22.18.0, two runs byte-identical, every entry of beta's vector
+(14 rows, 30 cases) and of the lane's (13 rows, 20 cases) byte-identical,
+17 rows and 33 cases in all. Each test cites the sibling's wire views
+(`lean/BsvChain/Views/Wire/BEEF.lean:89-128`, `AtomicBEEF.lean:36-41`,
+`BUMP.lean:108-115`). The cursor tests resume every cursor between the
+rows' elements (BSC3, BSC4 for beef-026's held child, BSC5 under a work
+budget) to the one-pass verdict, the reference's `verifyValid`; the pause
+and the held-and-charged cursor are fixtures this crate's writer builds in
+the rows' shapes. `input_reached` is held to the input that the resumed
+reading's verdict names (a third input refused by CLEANSTACK at version 1),
+not to a constant. Each kill is RED on its test in a scratch copy.
+
+The crate-contract pins (the keeper's ruling of 2026-11-02 14:1xZ: no
+`BSC*` layout is the sibling's or the reference's, so each test names the
+public line it pins and says "crate-contract pin, no sibling rule, stated"),
+10 kills:
+
+- `a_cursor_in_no_layout_is_refused_by_its_word_wire_beef_023`, `2769:22`:
+  `Cursor::to_binary`'s rustdoc, "BSC1 is refused: restart its reading".
+- `a_bsc2_cursor_carrying_the_spent_bit_reads_and_resumes_wire_beef_023`,
+  `2828:22` (`>` to `==` and to `>=`) and `2861:32`: `Cursor::to_binary`'s
+  rustdoc, "reads a BSC2 cursor as BSC3 with no edge for a transaction read
+  before it", with 0.8.0's "the transactions by txid with a spent flag".
+- `a_cursor_edge_of_a_transaction_not_held_raw_is_refused_wire_atomic_beef_023`,
+  `2886:36`, `2886:46` and `2828:44` (`&` to `^` and to `|`, which refuse
+  the entry's flags 0 for its flags, not its edge): `src/transaction/CLAUDE.md`,
+  "edges of a txid the index does not hold raw, is refused", and 0.8.1's
+  entry below.
+- `a_pause_before_its_frame_is_refused`, `2941:23` (`<` to `>`) and
+  `2941:38`: `Cursor::input_reached`'s rustdoc, "the transaction starts at
+  `offset`", with `src/transaction/CLAUDE.md`'s exception for a released
+  held transaction, "the cursor naming it before the frame".
+
+Two tests changed under the ruling. The lane's spent-bit test also asserted
+that BSC3 refuses the spent bit and that every flags byte above 3 is
+refused. No public line states either. Those assertions went, so
+`2828:26` (`||` to `&&` in the flags check) remains, a stated candidate:
+observable only on a hand-made cursor, which `Cursor`'s rustdoc calls
+trusted state, and neither a kill nor an equivalence. The lane's edge test
+refused an empty edge list, which no public line states either. It now
+refuses the stated case, an edge of an entry not held raw.
+
+The two timeouts are RED on tests with their own bound. `step_until`'s `&&`
+to `||` (`3214:32`) is bounded by a step count: twice the row's elements.
+`on_run_done` replaced by `()` (`1263:9`) is bounded by a 60 s wall-clock
+timer, because under that mutant the decoder loops inside one
+`BeefDecoder::next` call without consuming a byte, so no count the public
+surface offers reaches it. The oracle still counts both as timeouts, since
+every unbounded reading in the selection hangs under them. The tests are
+kill witnesses, not the oracle's verdict.
+
+Declared equivalent on three reads (`.cargo/mutants.toml`): `take_deferred`
+replaced by `None` (`788:9`). Only the collecting decoder fills `deferred`
+and only `Beef::collect` reads it; under the mutant the fold reaches the
+pure `check_transaction` with the same arguments, so the refusal, its name
+and its offset are the same, the earliest kept either way
+(`beef_stream.rs:787-799, 1323, 2019`; `beef/collect.rs:67-86, 118, 131`;
+bsv-script-lean@387dab35 `lean/BsvScript/TxRules.lean:82-95`;
+bsv-stack-lean@5df1e0a3 `lean/BeefOfAnySize.lean:797-825, 951-965`; BRC-62
+`0062.md:183`; `Beef.ts:1054-1090` at `ts-stack@edf6e03`). The cold read
+(MERGE, 0.95), the adversarial read (EQUIVALENT, 0.96, 325,122 inputs) and
+the rule read (EQUIVALENT, 0.96). Its witness is
+`the_earliest_refusal_is_a_transactions_before_a_trailing_byte_lean_no_input_anchor`:
+bsv-stack-lean's `no_input_anchor` row with a trailing byte, refused
+`NoInputs` at 49 by the stream and by `Beef::from_binary`.
+
+The beef surface's mutation selection takes `tests/beef_stream_603_*.rs`
+(beta's glob since #643); `test_the_beef_selection_runs_the_streams_603_files`
+now names `beef_stream_603_s1` too. Re-measured on this shard's sixteen
+functions at the rebased tree (`--re` over the sixteen, the surface's
+selection, the corpus at `edf6e03`, `--jobs 1`, ten pieces of 14 mutants in
+the foreground): 141 mutants, `788:9`'s `None` absent, 131 caught, 1 missed
+(`2828:26`, the stated candidate), 2 timeouts (`1263:9`, `3214:32`), 7
+unviable; 97.76 percent caught of 134 viable. One of the caught is outside
+the sixteen: `BeefDecoder::collecting`'s field deletion (`780:13`), which
+cargo-mutants 27.1.0 lists whatever the `--re` (see `.cargo/mutants.toml` on
+`592:13`). The whole file's figure is the witness's after the four shards
+land.
+
 ### Changed: ci: the `vectors` job's corpus pin is one named constant, and CLAUDE.md no longer says CI skips the conformance corpus (#31)
 
 #31 found that `ci.yml` checked out no corpus and set no `BSV_CONFORMANCE_DIR`,
