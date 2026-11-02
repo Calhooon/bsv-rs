@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/beef.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 25 of the file's 117 viable mutants missed and 1 timed out (77.78
+percent). The sibling's wire corpus (bsv-script-lean@387dab35
+`corpus/wire/beef.jsonl` and `atomic-beef.jsonl`, 63 rows, run through a
+scratch copy of its `harness/src/bin/run_wire.rs` linked to this tree) moved
+under one survivor alone (`is_atomic` to `true`: 28 plain rows read as
+atomic). Eighteen tests in `src/transaction/beef/reference_603_tests.rs`
+(inside the surface's `--lib` selection, outside the `beef*.rs` glob) take
+the rows by id (beef-001, -002, -004, -023, -029, -030, atomic-beef-001) and
+expect the reference's answer on them: `tests/vectors/beef_reference_603.json`,
+17 cases recorded from `Beef.ts` at `ts-stack@edf6e03` under Node v22.18.0 by
+`tests/support/beef_reference_603.mjs` (two runs byte-identical), with the
+sibling's BEEF view cited per test (`lean/BsvChain/Views/Wire/BEEF.lean`
+`:121-128`, `:344-364`, `:398-416`; `AtomicBEEF.lean:102-112`). The rules:
+`mergeBump`'s combine, `#mergeBumpEntry`, `#markMutated` and the sort before
+serializing, `findBump`, `findTransactionForSigning`, `findAtomicTransaction`,
+`fromReader`, `isAtomic`, `clone`, `toLogString`, `#collectBumpTxids`'s one
+root per height (both directions), `#verifyBumpIndexLeaves` (beef-029 also in
+the streaming reader's kind, `BumpIndexNamesNoBump`), `partitionTxs` on a raw
+transaction with no input, `verifyValid` on a ring held in the input cache,
+`#reindexBumps`' guard; `trim_known_proven`'s cut at a proof from the mined
+object (BRC-62 `0062.md:183-187`). Each mutant RED on its test in a scratch
+copy, 24 of 25 (the conformed log string removed the 26th's `!`).
+
+Killed by tests: 23 of the 25 missed (one more, the inputs list's `!` at
+`1174:16`, left with the code its conformed log no longer has); declared
+equivalent: 1; remaining: 0. The timeout, `add_input_proof`'s `+=` to `*=`
+(`beef.rs:278:28`), fails its test now (the frame's parent index underflows)
+but stays a timeout, not counted as caught: other tests of the selection,
+whose inputs name no entry of the BEEF, loop under it until the 300 s bound.
+The declared, `sort_txs`' `i < j` to `i <= j` (`beef.rs:912:33`): `i == j` is
+reached only if a transaction waits on its own txid at its own acceptance,
+and a waiter is released before it is ready (`dependents` is removed at the
+release, a repeat returns early), so the branch is not reached even with a
+hand-written input cache; no row of either corpus moves under it. Declared equivalent in
+`.cargo/mutants.toml`'s `exclude_re` with that reason, the sibling's
+`BeefEntry.txid` and `parents` (`BEEF.lean:338-342,370-373`: no txid among
+its own parents) and the reference's `sortTxs` (`Beef.ts` at
+`ts-stack@edf6e03`), on three reads that accept it: the cold read (MERGE at
+0.9), the adversarial read (EQUIVALENT at 0.95: a raw transaction naming its
+own txid as a source, one transaction merged twice as raw and txid-only in
+each order, an entry whose input cache lists itself, a ring of two, a
+txid-only entry whose txid a raw entry carries, the subject first, last and
+in the middle, each written, read, sorted, verified and serialized
+byte-identical under both) and the rule read (EQUIVALENT at 0.96: BRC-62's
+sources-precede order and the sort's invariant leave `i != j` at the line).
+Re-measured with the surface's selection and `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03` (the corpus read, its pinned totals unchanged), the
+declared one excluded: 114 caught, 0 missed, 1 timed out (`278:28`), 6
+unviable of 121, 99.13 percent of viable (114 of 115).
+
+Two readings conformed to the reference (rule 1; reference-shaped public
+changes on the 0.9.0 line): `Beef::find_transaction_for_signing` now links
+each input without a source transaction to the one the BEEF holds
+(`Beef.ts:615-631`; until #603 the inputs were left unlinked, "simplified for
+now"), and `Beef::to_log_string` writes `Beef.toLogString`'s text
+(`Beef.ts:1698-1733`: `BUMPS`, the lists joined with `,\n`, a BUMP's txids
+list written when empty). Both RED on the base through their tests.
+The semver reading: both are public behaviour, reference-shaped on the 0.9.0
+line (the owner's word of 2026-10-26); a caller matching the old log text
+(`BUMPs`, no separators) reads the reference's, and a caller of
+`find_transaction_for_signing` finds its inputs' held sources linked where
+they were `None`. None of the named downstreams calls either (grepped at the
+cold read, 2026-11-01).
+
+### Notes: cross-SDK parity (#603)
+
+The two conformed readings close differences no list carried; none remains
+at the cases recorded. The log's `isValid` stays `is_valid(false)`, where the
+reference calls `isValid()` (`allow_txid_only` decides nothing here, the
+stated 0.4.2 row), and a txid-flagged leaf with no hash is left out of the
+txids list where the reference writes `''`. The reference's
+`findTransactionForSigning` links the BEEF's own transaction objects in
+place, so a later call sees the links; this crate returns a clone with each
+held source cloned in, the BEEF unchanged, one level deep on a BEEF read from
+bytes as the reference's; an input with no source txid is left unlinked here
+where the reference throws `sourceTXID must be valid` (`Beef.ts:621`).
+
 ### Added: src/script/locking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129) left 8 of the file's 27 viable mutants
