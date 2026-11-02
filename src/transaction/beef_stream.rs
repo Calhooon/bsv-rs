@@ -101,7 +101,7 @@
 //! }
 //! ```
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::future::Future;
 use std::io::{Read, Seek};
@@ -2303,24 +2303,21 @@ impl Default for BeefIndex {
 /// BRC-95's atomic rule on the subject's dependency graph: the one walk of
 /// both readers ([`BeefIndex::finish`] and `Beef::verify_structure`, 0.8.1;
 /// the Lean's `finish`). `table` holds the BEEF's entries by txid (internal
-/// byte order), each read as raw or not, with the txids its inputs name
-/// ([`AtomicNode`]). The subject is a raw entry, else [`Kind::SubjectMissing`]; then
-/// one walk from the subject over the inputs of raw entries, and the answer
-/// is the entry it does not reach that comes earliest in the Lean's trie
-/// order (the txid's bytes, each byte's bits reversed, least first), or
-/// none when it reaches every entry.
+/// byte order), raw or not, with the txids their inputs name ([`AtomicNode`]).
+/// The subject is a raw entry, else [`Kind::SubjectMissing`]; the answer is
+/// the entry the walk from it over the inputs of raw entries does not reach
+/// that comes earliest in the Lean's trie order (the txid's bytes, each
+/// byte's bits reversed, least first), or none when it reaches every entry.
 ///
 /// Position is not judged: BRC-95 (`BRCs transactions/0095.md`) defines the
-/// rule on the graph, the TypeScript writer puts every proven transaction
-/// before the unproven ones (a raw unproven ancestor can follow its proven
-/// descendant), and the Go writer puts the subject last. Until 0.8.0 both
-/// readers counted a spend only by a transaction read after its parent, and
-/// refused the first shape (the bsv-dd x402 refund, P0-65). The graph
-/// follows the inputs of every raw entry, proven or not (the owner's ruling,
-/// 2026-10-22); `@bsv/sdk` 3 cuts it at each proven transaction (ts-stack
-/// `Beef.ts:420-434`) and refuses a raw ancestor behind a proof, a stated
-/// divergence. This crate's writer emits the cut closure
-/// (`Beef::to_binary_atomic`), which every reader accepts.
+/// rule on the graph, the TypeScript writer puts the proven transactions
+/// first (a raw unproven ancestor can follow its proven descendant), the Go
+/// writer the subject last; until 0.8.0 both readers counted a spend only
+/// after its parent and refused the former (the bsv-dd x402 refund, P0-65).
+/// The graph follows the inputs of every raw entry, proven or not (the
+/// owner's ruling, 2026-10-22); `@bsv/sdk` 3 cuts it at each proven
+/// transaction (`Beef.ts:420-434`) and refuses a raw ancestor behind a proof,
+/// a stated divergence; `Beef::to_binary_atomic` emits the cut closure.
 pub(crate) fn atomic_unreached<T: AtomicNode>(
     subject: &Hash32,
     table: &mut HashMap<Hash32, T>,
@@ -2340,13 +2337,16 @@ pub(crate) fn atomic_unreached<T: AtomicNode>(
             }
         }
     }
-    // The Lean's `failing` over the table, the marks cleared as it passes.
+    // The Lean's `failing`, the marks cleared, the unreached by their bytes.
+    let left: BTreeSet<Hash32> = table
+        .iter_mut()
+        .filter_map(|(txid, entry)| (!std::mem::take(entry.reached())).then_some(*txid))
+        .collect();
     let trie_order = |txid: &Hash32| txid.map(u8::reverse_bits);
     let mut unreached: Option<Hash32> = None;
-    for (txid, entry) in table.iter_mut() {
-        let reached = std::mem::take(entry.reached());
-        if !reached && unreached.is_none_or(|u| trie_order(txid) < trie_order(&u)) {
-            unreached = Some(*txid);
+    for txid in left {
+        if unreached.is_none_or(|u| trie_order(&txid) < trie_order(&u)) {
+            unreached = Some(txid);
         }
     }
     Ok(unreached)
@@ -3046,9 +3046,9 @@ impl Judge {
             return r.into();
         }
         let subject = self.subject.or(decoder.subject());
-        // A missing subject is named at the prefix's 32 bytes; without a
-        // prefix, at the last raw transaction instead, or at the stream's end
-        // when there is none.
+        // Where a missing subject is named (the prefix's 32 bytes, else the
+        // last raw transaction, else the stream's end): the public line on
+        // `Reason::SubjectMissing`.
         let subject_at = if decoder.subject().is_some() {
             4
         } else {

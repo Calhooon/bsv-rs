@@ -265,7 +265,10 @@ pub enum Reason {
     },
     /// The byte at the offset belongs to no field.
     TrailingBytes,
-    /// The subject that is not a raw transaction of the BEEF.
+    /// The subject that is not a raw transaction of the BEEF. A missing
+    /// subject is named at the prefix's 32 bytes; without a prefix, at the
+    /// last raw transaction instead, or at the stream's end when there is
+    /// none.
     SubjectMissing {
         /// The subject.
         subject: Hash32,

@@ -124,4 +124,18 @@ exclude_re = [
   # to_binary, to_asm and the interpreter byte-identical (EQUIVALENT, 0.99), the rule read
   # (EQUIVALENT, 0.97).
   '^src/script/script\.rs:91:37: replace < with <= in Script::from_asm$',
+  # src/transaction/beef_stream.rs:2348:66, `<` to `<=` in atomic_unreached (#603, shard S4, PR
+  # #645). Every table the comparison walks holds one entry per txid, and the trie order's key
+  # (each byte's bits reversed) is one-to-one, so the two keys compared are never equal and `<`
+  # and `<=` pick the same entry (the stream's `HashMap`, beef_stream.rs:1746, a repeat through
+  # `entry().or_insert` at :2053 and `get_mut` then `insert` at :2205-2223; the whole path's
+  # beef/in_memory.rs:264-280; bsv-stack-lean@5df1e0a3 lean/BeefOfAnySize.lean:363-376 `failing`,
+  # :381-384 `key`, :993-998 `finish`, one value per trie node; Beef.ts:517-522, 529-538, 919-929
+  # at ts-stack@edf6e03, a `Map` by txid with repeats merged; go-sdk v1.7.2 beef.go:23, 416, a map
+  # by txid). Three reads: the cold read (accepts, 0.97), the adversarial read with a transaction
+  # carried twice raw and txid-only, in two BUMPs, merged from two BEEFs, a subject repeated and
+  # every feed split of a streamed BEEF probed (EQUIVALENT, 0.98), the rule read (EQUIVALENT,
+  # 0.98). At :2348:55 since the seed fold (#645): the comparison walks the unreached txids in a
+  # `BTreeSet`, still one per map key, so the reason stands.
+  '^src/transaction/beef_stream\.rs:2348:55: replace < with <= in atomic_unreached$',
 ]

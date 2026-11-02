@@ -26,6 +26,10 @@ const ROWS = [
   'beef-001', 'beef-002', 'beef-003', 'beef-004', 'beef-014', 'beef-015', 'beef-023', 'beef-026',
   'beef-029', 'beef-030', 'atomic-beef-001'
 ]
+// Shard S4 of src/transaction/beef_stream.rs (the judge and the remainder):
+// these rows join the recording; the cases below are `s4_*`, the tests
+// `tests/beef_stream_603_s4.rs`.
+ROWS.push('beef-031', 'atomic-beef-023', 'atomic-beef-025')
 const rows = {}
 for (const file of ['beef.jsonl', 'atomic-beef.jsonl']) {
   for (const line of fs.readFileSync(path.join(corpusDir, file), 'utf8').split('\n')) {
@@ -379,12 +383,83 @@ const pEntry = () => BeefTx.fromRawTx(pRaw, 0)
   }
 }
 
+// ---- Shard S4 (src/transaction/beef_stream.rs's judge and remainder, #603) ----
+
+// A chain tracker that answers every root with `carried` and fails a height read:
+// Beef.verify (:1020-1035) asks the tracker for the roots and nothing else.
+const tracker = carried => ({
+  isValidRootForHeight: async () => carried,
+  currentHeight: async () => {
+    throw new Error('the height is not read')
+  }
+})
+const outcome = f => {
+  try {
+    return { ok: f() }
+  } catch (e) {
+    return { error: e.message }
+  }
+}
+
+// BRC-95's subject (Transaction.fromAtomicBEEF, Transaction.ts:302-313): the
+// subject the prefix names is found as a raw transaction of the BEEF; the same
+// bytes with the subject absent (atomic-beef-025) are refused.
+cases.s4_atomic_subject = {
+  rows: ['atomic-beef-023', 'atomic-beef-025'],
+  prefix_subject: read('atomic-beef-023').atomicTxid,
+  found: outcome(() => Transaction.fromAtomicBEEF(bytes('atomic-beef-023')).id('hex')),
+  missing_prefix_subject: read('atomic-beef-025').atomicTxid,
+  missing: outcome(() => Transaction.fromAtomicBEEF(bytes('atomic-beef-025')).id('hex'))
+}
+
+// A subject the caller names that the BEEF does not carry (Transaction.fromBEEF
+// with a txid, Transaction.ts:282-285): beef-023 asked for atomic-beef-025's subject.
+cases.s4_named_subject_absent = {
+  row: 'beef-023',
+  subject: rows['atomic-beef-025'].subject,
+  found: outcome(() => Transaction.fromBEEF(bytes('beef-023'), rows['atomic-beef-025'].subject).id('hex')),
+  raw_txids: read('beef-023').txs.filter(t => !t.isTxidOnly).map(t => t.txid)
+}
+
+// The roots against the tracker (Beef.verify, :1020-1035): every root carried,
+// then no root carried; the height is never read for a BEEF of proven roots.
+{
+  const roots = {}
+  for (const id of ['beef-001', 'beef-023']) {
+    const b = read(id)
+    roots[id] = {
+      carried: await b.verify(tracker(true)),
+      not_carried: await b.verify(tracker(false)),
+      bumps: b.bumps.map(m => ({ block_height: m.blockHeight, root: m.computeRoot() }))
+    }
+  }
+  cases.s4_roots_against_the_tracker = { rows: roots }
+}
+
+// The outpoints the unproven transactions of beef-023 and beef-001 spend: each
+// raw transaction without a BUMP, its inputs as parsed (BeefTx, Beef.ts).
+{
+  const spent = {}
+  for (const id of ['beef-001', 'beef-023']) {
+    spent[id] = read(id)
+      .txs.filter(t => !t.isTxidOnly && t.bumpIndex === undefined)
+      .flatMap(t => t.tx.inputs.map(i => ({ txid: i.sourceTXID, vout: i.sourceOutputIndex })))
+  }
+  cases.s4_unproven_spends = { rows: spent }
+}
+
+// A truncated BEEF (beef-031) is refused by the reader (Beef.fromBinary, :1240-1309).
+cases.s4_truncated = { row: 'beef-031', read: outcome(() => read('beef-031').toHex()) }
+
 console.log(
   JSON.stringify(
     {
       reference: 'ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9 packages/sdk/src/transaction/Beef.ts',
       node: process.version,
       sibling: 'bsv-script-lean@387dab351273e9018cffb595ef40521f39e4b8d3 corpus/wire',
+      // S4's rows (beef-031, atomic-beef-023, atomic-beef-025) were read at
+      // 5dc337e1, where every row above it is byte-identical.
+      sibling_s4: 'bsv-script-lean@5dc337e1 corpus/wire',
       rows,
       cases
     },

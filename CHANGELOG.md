@@ -7,6 +7,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S4 (the judge and the remainder), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left
+21 of the judge's and the remainder's mutants alive (`Judge::start_of` 6,
+`Judge::check_named_subject` 2, `BeefIndex::note_raw` 2,
+`BeefIndex::model_work` 2, `BeefIndex::entries`, `Referenced::is_empty`,
+`Verdict::is_valid`, `atomic_unreached`, `HeadersFn::carries`, the two
+`Display` impls, `AsyncStreamVerifier::run`, the constant `CHUNK`). Killed by
+tests: 19 of 21, in `tests/beef_stream_603_s4.rs` (12 tests, each RED on its
+mutants in a scratch copy, the log beside the lane's evidence; the 12th, for
+`3026:33`, added by the review of #645): 17 rest on the sibling's rules and
+the reference's recordings, 2 on crate-contract pins stated apart
+(`note_raw`'s `2234:9` and `2234:50`, the offset a missing subject is named
+at without a prefix: crate-contract pin, no sibling rule, stated; the Lean
+names offset 4 only and the reference reports no offset). The line they pin
+is now public, on `Reason::SubjectMissing`'s rustdoc and
+`src/transaction/CLAUDE.md:21`: "a missing subject is named at the prefix's
+32 bytes; without a prefix, at the last raw transaction instead, or at the
+stream's end when there is none" (the line promoted from `Judge::conclude`'s
+0.8.1 comment, not invented), and their test names it, so the keeper's
+condition (1) holds; re-cited the day a sibling rule or a reference recording
+covers it. Declared equivalent: 1, `2348:66` on three reads (below, in
+`.cargo/mutants.toml`; at `2348:55` since the seed fold, below). Remaining: 1, stated: `1378:25` (`replace * with +`,
+the 16 KiB read size `CHUNK`), an internal parameter a pin would freeze,
+neither a kill nor an equivalence (its test, `source.largest == 16 * 1024`,
+asserted a read size no document states and went under the keeper's ruling
+of 2026-11-02; no verdict or element depends on it, the Lean's resume at
+every `k`); it enters nothing.
+
+The vectors: the rows of `bsv-script-lean@5dc337e1` `corpus/wire`
+(`beef-001`, `beef-023`, `beef-031`, `atomic-beef-023`, `atomic-beef-025`)
+with the reference's answers on them, recorded by #632's recorder
+(`tests/support/beef_reference_603.mjs`, extended with five `s4_*` cases:
+`Transaction.fromAtomicBEEF` and `fromBEEF` on the subject, `Beef.verify`
+with every root carried and none, the unproven spends, the truncated read; at
+`ts-stack@edf6e03` under Node v22.18.0; every earlier case and row
+byte-identical on the re-run); the recording's `two_bumps_one_root`; and the
+rows of `bsv-stack-lean@5df1e0a3` `lean/BeefOfAnySize/Scenarios.lean` (the
+atomic chain of 10,000 links: 740,145 units of work, an index of 20,005; the
+root not carried at offset 5). A named subject the prefix also names is
+found, a missing one is refused at offset 4, or without a prefix at the last
+raw transaction (`note_raw`); a root the headers function does not carry is
+refused; the first pass names the unproven spends; a txid two BUMPs carry is
+one entry per BUMP (`entries`' `proven_again`); a resumed reading runs from
+the input reached, and a resumed source carrying another transaction at that
+offset has every input run (`start_of`, against `tests/beef_stream_pause.rs`'s
+shape at two inputs); a BEEF of proven transactions never asks the tracker
+for the tip (`run`'s `&&`); the two error texts; a bad version word after the atomic prefix is refused at 36 by the
+asynchronous reader in chunks of 36 bytes as by the stream whole (the Lean's
+`cutFrame`, `bsv-stack-lean@5df1e0a3` `lean/BeefOfAnySize.lean:1108-1124`,
+cuts the frame before `finish` asks the subject).
+
+Declared equivalent on three reads (the keeper's word of 2026-11-02), with
+no entry of the sibling's wire corpus moving
+(`run_wire` on its five files, 150 rows, the scratch harness's `bsv-rs` the
+lane's tree and the mutant's), the ts-stack corpus's BEEF suites
+(`conformance_beef` at `edf6e03`) and this crate's BEEF witnesses
+(`beef_stream`, `beef_atomic_graph`, `beef_stream_pause`, `beef_order_held`)
+green under it:
+
+- `atomic_unreached` `2348:66`, `<` to `<=`: the comparison picks the
+  earliest unreached entry by the trie order over a `HashMap` keyed by txid;
+  `u` is an earlier key, so the two orders are equal only for the same txid
+  (`reverse_bits` is a bijection), which a map never holds twice. The Lean's
+  `failing` walks a trie of one value per key (`bsv-stack-lean@5df1e0a3`
+  `lean/BeefOfAnySize.lean:363-376`, `key` at `:381-384`, `finish` at
+  `:993-998`). Both callers' tables hold one entry per txid (the stream's
+  `HashMap`, `beef_stream.rs:1746`, `:2053`, `:2205-2223`; the whole path's
+  `beef/in_memory.rs:264-280`), as do TS's (`Beef.ts:517-522, 529-538,
+  919-929` at `edf6e03`) and go-sdk v1.7.2's (`beef.go:23, 416`). The cold
+  read (accepts, 0.97), the adversarial read (EQUIVALENT, 0.98: a transaction
+  carried twice raw and txid-only, in two BUMPs, merged from two BEEFs, a
+  subject repeated, every feed split of a streamed BEEF, none moved), the rule
+  read (EQUIVALENT, 0.98).
+
+`Judge::check_named_subject` `3026:33`, `||` to `&&`, was the lane's second
+candidate; it is not equivalent. The prefix's subject is set when its 32
+bytes are read, before the version word ends the header, and the
+asynchronous reader asks the check after every decoder step: the mutant
+compares the subjects there and refuses `SubjectMissing` at 4 an atomic BEEF
+whose chunk ends after the prefix and whose version word is bad, where the
+tree refuses `BadVersion` at 36
+(`a_bad_version_after_the_prefix_is_refused_whatever_the_chunks_wire_atomic_beef_023`).
+
+Re-measured on this shard's functions (`--re` of the brief, the beef
+surface's selection from `nightly_mutants.py`'s `mutation_args` with this
+file added, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, ten
+round-robin shards): 48 mutants of S4's functions, 47 viable, 45 caught, 2
+missed (`2348:66`, `3026:33`), 0 timed out, 1 unviable (`3443:9`): 95.7
+percent caught of viable, re-measured the same mutant for mutant by the
+review of #645 in fourteen shards; with the review's test `3026:33` is
+caught: 46 caught, 1 missed, 97.9 percent; with the chunk test gone under the
+keeper's ruling (re-measured by the ruling's read on `f04eb090`, fourteen
+round-robin shards of four, the same 56 mutants as the lane's list): 45
+caught, 2 missed (`1378:25` `*` to `+`, `2348:66`, the two candidates), 1
+unviable, 95.7 percent; the whole regex 53 caught of 56. The regex matched 8
+more of other shards' functions (`Refusal`'s and `SpendRefusal`'s `fmt`, the five of the
+other two `carries`, `BeefDecoder::collecting`'s `780:13`), all caught. After
+the declaration (the fold, on `d1826625` with the entry, fourteen round-robin
+shards, `--jobs 1`, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`): the regex
+lists 55, `2348:66`'s `<=` absent; 53 caught, 1 missed (`1378:25`, stated), 1
+unviable (`3443:9`), 0 timed out; the shard's 47 at 45 caught of 46 viable,
+97.8 percent.
+
+The seed fold (the declaration's re-read): the other mutant at the
+declared site, `2348:66` `<` to `==`, was counted as caught by the run but
+its kill hung on the `HashMap`'s random seed. Under `==` the comparison never
+replaces, so the walk named the unreached entry the map yielded first, and
+the tests of the named entry (`beef_atomic_graph`'s X/Y pair) passed when
+the seed put the expected entry there: 16 of 200 runs through. The last pass
+of `atomic_unreached` now takes the unreached txids in a `BTreeSet`, by their
+bytes, and keeps the least by the trie order: the tree's answer is the same
+(the least of a set by a one-to-one key does not depend on the order it is
+taken in; no allocation when the walk reaches every entry), and under `==`
+the mutant names the least by the bytes on every seed. The 13th test,
+`the_entry_named_is_the_trie_earliest_not_the_byte_or_wire_earliest_on_every_seed`,
+puts two txid-only entries beside a proven subject, `01 00..` on the wire
+before `02 00..`, so the byte-earliest and wire-earliest is not the
+trie-earliest: RED on the mutant in 20 of 20 runs in a scratch copy (it
+names `01` at 151, not `02` at 184), RED on the pre-fix code with the mutant
+in 25 of 40 (the seed's share), GREEN on the tree. The site moved within the
+line, so the mutants are now `2348:55` (`<=` declared, its entry's regex
+moved, the reason unchanged: the set holds one txid per map key), and the
+`&&` to `||` at `2348:21` is gone with the `&&`. The function's line count is
+unchanged (its doc rewrapped), so every other mutant of the file keeps its
+line and column. Re-measured (`cargo mutants`, the beef surface's selection,
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`): `2348:55` `==`
+alone 20 runs, 20 caught (by `beef_atomic_graph`'s X/Y pair, now
+deterministic, ahead of this file in the run); the regex in five round-robin
+shards lists 54, 52 caught, 1 missed (`1378:25`, stated), 1 unviable
+(`3443:9`), 0 timed out; the shard's functions 46 listed, 44 caught of 45
+viable, 97.8 percent. Of the shard's 21 survivors: killed 19, declared 1,
+remaining 1, stated (`1378:25`); the `==` mutant, never one of the 21, is
+now killed on every seed.
+
+`tests/beef_stream_603_s4.rs` is in the beef surface's selection through
+shard S2's `tests/beef_stream_603_*.rs` glob (`.github/scripts/nightly_mutants.py`,
+`docs/NIGHTLY.md`): the existing pins of these behaviours (`beef_stream_deep`,
+`beef_stream_pause`) are outside the selection, which is why the mutants
+survived it.
+
 ### Fixed: the nightly's pin job pins the dispatch's commit, never beta's tip at dequeue; the consumers check it out and the report names it (#629)
 
 The nightly's `source` job checked out the dispatched branch and pinned
