@@ -21,16 +21,16 @@ threads following answers to the earlier ones.
 | 6 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/beef-duplicate-offsets-go-sdk.md](./beef-duplicate-offsets-go-sdk.md) | Reject contradictory repeated BUMP offsets (filed as bsv-blockchain/go-sdk#397 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
 | 7 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/beef-reserved-flags-ts-stack.md](./beef-reserved-flags-ts-stack.md) | Reject reserved BEEF discriminators (filed as bsv-blockchain/ts-stack#1462 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
 | 8 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/canonical-varint-reader.md](./canonical-varint-reader.md) | Provide a canonical CompactSize reader for protocol parsing (filed as bsv-blockchain/go-sdk#398 on 2026-10-31 under the owner's name (cadence (b), the owner's word of 16:2xZ through the keeper); answer pending) |
-| 9 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-bounds-der.md](./certificate-bounds-der.md) | Certificate wallet conversion rewrites valid high-S signature bytes |
-| 10 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-response-preimage-go-sdk.md](./certificate-response-preimage-go-sdk.md) | Preserve certificate-response property order when signing and verifying |
+| 9 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-bounds-der.md](./certificate-bounds-der.md) | Certificate wallet conversion rewrites valid high-S signature bytes (filed as bsv-blockchain/go-sdk#401 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending) |
+| 10 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/certificate-response-preimage-go-sdk.md](./certificate-response-preimage-go-sdk.md) | Preserve certificate-response property order when signing and verifying (filed as bsv-blockchain/go-sdk#402 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending) |
 | 11 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/certificate-outpoint-bound.md](./certificate-outpoint-bound.md) | Reject certificate outpoint indexes that the writer cannot serialize (filed as bsv-blockchain/ts-stack#1463 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending) |
 | 12 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/wire-input-index-width.md](./wire-input-index-width.md) | Bound internalizeAction outputIndex consistently with PositiveIntegerOrZero (filed as bsv-blockchain/ts-stack#1464 on 2026-11-01 under the owner's name (cadence (b), the owner's word of 2026-10-31 16:2xZ through the keeper); answer pending) |
-| 13 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md](./create-action-positive-script-length-ts-stack.md) | Refuse zero unlockingScriptLength as BRC-100 specifies |
+| 13 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md](./create-action-positive-script-length-ts-stack.md) | Refuse zero unlockingScriptLength as BRC-100 specifies (filed as bsv-blockchain/ts-stack#1466 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending) |
 | 14 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md](./create-action-positive-script-length-go-sdk.md) | Validate positive createAction unlockingScriptLength |
 | 15 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/discovery-trust-range.md](./discovery-trust-range.md) | Validate discovery certificate trust on read and write |
 | 16 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/linkage-reason-and-result-validation.md](./linkage-reason-and-result-validation.md) | Use the linkage reason width and validate returned linkage context |
 | 17 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/http-json-result-validation.md](./http-json-result-validation.md) | Validate HTTP wallet results against their requests and BRC-100 shapes |
-| 18 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/public-key-unreduced-coordinate-serialization.md](./public-key-unreduced-coordinate-serialization.md) | Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with rather than the coordinates given |
+| 18 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/public-key-unreduced-coordinate-serialization.md](./public-key-unreduced-coordinate-serialization.md) | Reduce or refuse an unreduced public key coordinate at parse, and serialize the point computed with rather than the coordinates given (filed as bsv-blockchain/ts-stack#1467 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending) |
 | 19 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/decode-outpoints-count-bound-go-sdk.md](./decode-outpoints-count-bound-go-sdk.md) | Bound the outpoint count read off the wire by the body's remaining bytes before allocating |
 | 20 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/no-send-change-framing-go-sdk.md](./no-send-change-framing-go-sdk.md) | createAction's noSendChange is framed behind an extra byte length, so a Go wallet and a TypeScript client cannot read each other's list |
 | 21 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/send-with-results-marker-go-sdk.md](./send-with-results-marker-go-sdk.md) | createAction and signAction results: an absent sendWithResults panics on the wire's absent marker, and a nil one is written as a zero count instead of the marker |
@@ -59,9 +59,15 @@ keeper); each row above carries its number. The four of 2026-11-01 (rows 1,
 2, 11 and 12: go-sdk#399, go-sdk#400, ts-stack#1463, ts-stack#1464) were filed
 the same way, and ts-stack#1463 and #1464 also omit their drafts' line
 "Existing related filing(s): go-sdk #387. Keep these numbers; confirm their
-scope before opening a duplicate." The remaining twelve are filed two a day per
-repository in this order from 2026-11-01, from the drafts as they stand on
-beta on their day. Rows 1 and 2 were neither deferred nor dropped: the owner's cadence put the six verifier rows first by consequence; rows 1 and 2 are the first go-sdk pair of 2026-11-01 and rows 11 and 12 ts-stack's (the certificate outpoint bound, the internalize output index width); then two a day per repository in queue order (the keeper, the rulings page's entry of 2026-10-31 17:1xZ).
+scope before opening a duplicate." The four of 2026-11-02 (rows 9, 10, 13 and
+18: go-sdk#401, go-sdk#402, ts-stack#1466, ts-stack#1467) were filed at 00:00Z
+by the keeper's detached script from the drafts as they stood on beta. Fourteen
+of the twenty-two entries are filed; ts-stack's seven (rows 3, 4, 7, 11, 12, 13
+and 18) are all filed. The remaining eight, all go-sdk (rows 14 to 17 and 19 to
+22), are filed two a day in queue order, from the drafts as they stand on beta
+on their day: rows 14 and 15 at 00:00Z on 2026-11-03, then rows 16 and 17, then
+rows 19 to 22 in the order the keeper's words placed them (row 21 ahead of row
+20). Rows 1 and 2 were neither deferred nor dropped: the owner's cadence put the six verifier rows first by consequence; rows 1 and 2 are the first go-sdk pair of 2026-11-01 and rows 11 and 12 ts-stack's (the certificate outpoint bound, the internalize output index width); then two a day per repository in queue order (the keeper, the rulings page's entry of 2026-10-31 17:1xZ).
 
 The keeper's word of 2026-11-01 02:1xZ adds a nineteenth draft, FILE,
 nineteenth in the keeper's order: go-sdk PR #392 (the fix of #387, merged

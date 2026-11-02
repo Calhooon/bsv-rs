@@ -1,12 +1,11 @@
-FILE — tenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6528735229); pending the owner's cadence word.
+FILE — tenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6528735229); filed as bsv-blockchain/go-sdk#402 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
 
 # Preserve certificate-response property order when signing and verifying
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created.
-Tenth in the queue, after `certificate-bounds-der`; pending the keeper's
-per-draft word and the owner's cadence word. Census row 61.
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#402 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
+Tenth in the queue, after `certificate-bounds-der`. Census row 61.
 
 Go's certificate-response preimage sorts map keys where the TypeScript
 reference signs property order, so a certificate with names out of byte

@@ -1,10 +1,10 @@
-FILE — ninth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6518218558); pending the owner's cadence word.
+FILE — ninth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6518218558); filed as bsv-blockchain/go-sdk#401 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
 
 # Certificate wallet conversion rewrites valid high-S signature bytes
 
 Repository: bsv-blockchain/go-sdk
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created.
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/go-sdk#401 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
 Census row 60's DER-preservation claim only.
 
 A signed certificate's valid high-S DER signature changes to low-S DER

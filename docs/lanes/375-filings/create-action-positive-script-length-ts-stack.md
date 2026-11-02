@@ -1,10 +1,10 @@
-FILE — thirteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; pending the owner's cadence word.
+FILE — thirteenth in [the keeper's order](https://github.com/Calhooon/bsv-rs/issues/375#issuecomment-6521258019), moved one place by the keeper's 11:1xZ word; filed as bsv-blockchain/ts-stack#1466 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending.
 
 # Refuse zero unlockingScriptLength as BRC-100 specifies
 
 Repository: bsv-blockchain/ts-stack
 
-Prepared for filing by Calhooon (owner). Draft only; no issue was created. Census row 57: A createAction input's unlockingScriptLength of 0 is refused (Unreleased, bsv-rs#282)…
+Prepared for filing by Calhooon (owner). Filed as bsv-blockchain/ts-stack#1466 on 2026-11-02 under the owner's name (cadence (b), the keeper's detached script at 00:00Z from the draft as it stood on beta); answer pending. Census row 57: A createAction input's unlockingScriptLength of 0 is refused (Unreleased, bsv-rs#282)…
 
 With unlockingScript omitted and unlockingScriptLength 0, validateCreateActionInput uses a zero minimum even though the interface and BRC-100 call the field a positive integer. The linked witness expects WERR_INVALID_PARAMETER. An actual empty unlockingScript is already refused by the reference; keep those two cases distinct. Use a minimum of one for the requested length.
 

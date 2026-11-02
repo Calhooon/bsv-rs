@@ -1695,7 +1695,7 @@ tests/auth_response_order_400.rs; tests/vectors/auth_response_order_400.json).
 
 Census (#375; current reading, historical account above retained):
 
-- Row 61: Ours: the reference's property order at the signing site, #400. Theirs: go-sdk, filing pending (the witness: tests/auth_certificate_preimage_375.rs; tests/vectors/auth_certificate_preimage_375.json). Draft: [certificate-response-preimage-go-sdk](./docs/lanes/375-filings/certificate-response-preimage-go-sdk.md).
+- Row 61: Ours: the reference's property order at the signing site, #400. Theirs: go-sdk #402 (filed 2026-11-02; answer pending; the witness: tests/auth_certificate_preimage_375.rs; tests/vectors/auth_certificate_preimage_375.json). Draft: [certificate-response-preimage-go-sdk](./docs/lanes/375-filings/certificate-response-preimage-go-sdk.md).
 
 ### Added: the reference AuthFetch client (#423)
 
@@ -2571,8 +2571,8 @@ a y above p the reference's compressed text names the other point: for
 `04`+x+(p+1) it computes with y = 1 and writes `02`+x, the negated point,
 where this crate writes `03`+x, the point read; that `02`+x is the
 reference's defect, never parity, by the keeper's word of 2026-10-31 06:1xZ
-(`Point.ts:303-321,472-478,527-536`; a FILE draft in the #375 queue, filed at
-the owner's cadence word), and a leading space is read
+(`Point.ts:303-321,472-478,527-536`; filed as ts-stack #1467 on 2026-11-02
+from the #375 queue's eighteenth draft; answer pending), and a leading space is read
 by Python's `bytes.fromhex` alone. Strictness returns on the upstream's
 answer: `PublicKey::from_bytes` is the strict reading, and flipping the
 pins back is the change. Ours: the keeper's 2026-10-30 05:1xZ word on #498 accepts the reference's key forms on the hex path (Point.ts:303-325,365-384 at edf6e03), while BRC-100 at 5119a9b wallet/0100.md defines PubKeyHex as compressed and the byte path stays strict.
@@ -11221,7 +11221,7 @@ This crate follows the reference.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk #401 for DER preservation (filed 2026-11-02; answer pending; the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: the identity token `publicly_reveal_attributes` publishes is the reference's, signed by the subject, and createAction's empty answer is refused (#310)
 
@@ -11605,7 +11605,7 @@ parse the DER (#183, #189).
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk #401 for DER preservation (filed 2026-11-02; answer pending; the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
@@ -11749,7 +11749,7 @@ parse and re-encoding remain the wire's alone.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk #401 for DER preservation (filed 2026-11-02; answer pending; the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 
@@ -11817,7 +11817,7 @@ revealed certificate fields using keyring: <words>`,
 
 Census (#375; current reading, historical account above retained):
 
-- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk, filing pending for DER preservation (the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
+- Row 60: Ours: byte bounds (1 MiB field, 16 MiB frame, 72-byte signature, 2048-byte keyring entry) are the reference's own safeguards at the cited sites, not BRC numbers; native ordering and UTF-8 diagnostic residuals. Theirs: go-sdk #401 for DER preservation (filed 2026-11-02; answer pending; the witness: tests/auth_certificate_der_roundtrip_375.rs; tests/vectors/auth_certificate_der_roundtrip_375.json). Draft: [certificate-bounds-der](./docs/lanes/375-filings/certificate-bounds-der.md).
 
 ### Fixed: `Peer` refuses a malformed requested certificate set where the reference does, on its own policy and on receipt (#294)
 
@@ -12172,7 +12172,7 @@ and judges neither.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 57: Ours: BRC-100 wallet/0100.md:649 requires a positive unlockingScriptLength, with native early bound wording. Theirs: ts-stack, filing pending (the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Theirs: go-sdk, filing pending (the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Draft: [create-action-positive-script-length-ts-stack](./docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md). Draft: [create-action-positive-script-length-go-sdk](./docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md).
+- Row 57: Ours: BRC-100 wallet/0100.md:649 requires a positive unlockingScriptLength, with native early bound wording. Theirs: ts-stack #1466 (filed 2026-11-02; answer pending; the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Theirs: go-sdk, filing pending (the witness: tests/wallet_create_action_unlocking_script_282.rs; tests/vectors/wallet_create_action_unlocking_script_282.json). Draft: [create-action-positive-script-length-ts-stack](./docs/lanes/375-filings/create-action-positive-script-length-ts-stack.md). Draft: [create-action-positive-script-length-go-sdk](./docs/lanes/375-filings/create-action-positive-script-length-go-sdk.md).
 
 ### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
 
