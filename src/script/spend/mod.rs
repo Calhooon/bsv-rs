@@ -95,8 +95,7 @@ use super::flags::{
     ScriptFlags, DEFAULT_SCRIPT_NUM_LENGTH_POLICY, DEFAULT_STACK_MEMORY_USAGE_POLICY,
 };
 use super::op::*;
-use super::script_num::ScriptNum;
-use super::{LockingScript, ScriptChunk, UnlockingScript};
+use super::{script_num::ScriptNum, LockingScript, ScriptChunk, UnlockingScript};
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::primitives::to_hex;
 use std::sync::Arc;
@@ -107,6 +106,7 @@ mod bitwise;
 mod crypto;
 mod flow;
 mod hash_type;
+mod key_point;
 mod limits;
 mod num;
 mod push;

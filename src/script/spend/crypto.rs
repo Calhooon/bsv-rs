@@ -5,7 +5,6 @@
 
 use crate::primitives::bsv::sighash::SIGHASH_FORKID;
 use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::ec::PublicKey;
 use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, BigNumber};
 use crate::script::evaluation_error::{ExecutionContext, ScriptEvaluationError};
 use crate::script::op::{opcode_to_name, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY};
@@ -412,11 +411,10 @@ impl Spend {
             return Err(self.error("The public key must be compressed."));
         }
 
-        // Try to parse it
-        PublicKey::from_bytes(pubkey)
-            .map_err(|_| self.error("The public key is in an unknown format."))?;
-
-        Ok(())
+        // The length and the prefix alone, as `IsCompressedOrUncompressedPubKey`
+        // reads them (interpreter.cpp:132-152); the point is the signature
+        // check's (key_point.rs, #660).
+        self.check_public_key_point(pubkey)
     }
 
     pub(super) fn build_subscript(
@@ -469,9 +467,9 @@ impl Spend {
             Err(_) => return Ok(false),
         };
 
-        let pubkey = match PublicKey::from_bytes(pubkey_bytes) {
-            Ok(p) => p,
-            Err(_) => return Ok(false),
+        let pubkey = match self.signature_key(pubkey_bytes) {
+            Some(p) => p,
+            None => return Ok(false),
         };
 
         // The digest, dispatched as the reference's `SignatureHash` does
