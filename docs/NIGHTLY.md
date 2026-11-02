@@ -25,8 +25,24 @@ The captain adds that context to `beta`'s protection at the landing and to
 `main`'s once `main`'s `ci.yml` carries the job, reading each back, then
 updates the sequencer's required-check list. The constants
 in `tests/arch_ci_pr_runs_the_required_set.rs` name that intended set.
-A dispatched run resolves the selected ref once, then every mutation
-shard, the score job and every fuzz job check out that same commit.
+**The pin (#629).** A run measures the commit it was dispatched on, never
+the line's tip when its pin job dequeues. The `source` job pins
+`inputs.commit` when the dispatch names one, else `github.sha`, the
+dispatched ref's commit, which GitHub fixes when it creates the run;
+`nightly_mutants.py pin` takes that sha as an argument, refuses one that is
+not a full 40-hex sha or not on the dispatched line (`::error::the dispatch
+names <sha>, which is not on beta: refused (#629)`), and never reads the pin
+from a ref. Every mutation shard, the score job and every fuzz job check out
+that commit; each shard refuses a checkout at another one (`run --commit`),
+and the score job refuses evidence of another commit and names the pin in
+the scoreboard (`report --commit`, `Source commit: <sha>`). A run queued
+behind another therefore measures the tree it was dispatched on, whatever
+lands meanwhile: the 2026-11-01 run 41347058507, dispatched at `9640eaa7`,
+dequeued after #613 landed and measured `42a74f1b` while its `head_sha` named
+`9640eaa7`. To measure a given commit of the line:
+`gh workflow run nightly.yml --ref beta -f commit=<full sha>`. The workflow
+has no schedule; were one restored, its `github.sha` is the default branch's
+commit at the run's creation, so it would pin `main`, never `beta`.
 
 GitHub requires the workflow on the default branch (`main`) to enable manual
 dispatch, so the file lives on both lines, ported by `git cherry-pick -x`.

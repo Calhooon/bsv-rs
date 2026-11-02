@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the nightly's pin job pins the dispatch's commit, never beta's tip at dequeue; the consumers check it out and the report names it (#629)
+
+The nightly's `source` job checked out the dispatched branch and pinned
+`git rev-parse HEAD`, the line's tip when the job dequeued, not the commit
+the run was dispatched on. Run 41347058507 (2026-11-01), dispatched at
+`9640eaa7` as the witness for #611's floors, queued until #613 landed and
+pinned `42a74f1b`: every shard measured that tree while the run's `head_sha`
+and the record named `9640eaa7`. The `source` job now pins the dispatch's
+commit, `inputs.commit` when the dispatch names one (a new optional input,
+`gh workflow run nightly.yml --ref beta -f commit=<full sha>`), else
+`github.sha`, fixed by GitHub at the run's creation, through
+`nightly_mutants.py pin`, which takes the sha as an argument, never resolves
+a ref, and refuses a sha that is not a full 40-hex sha or not on the
+dispatched line. The Mutants shards pass it to `run --commit`, which refuses
+a checkout at another commit, and the score job to `report --commit`, which
+refuses evidence of another commit and names the pin in the scoreboard
+(`Source commit: <sha>`); the fuzz jobs already checked out the pin. The
+shards' selection, the ceiling, the floors, the fuzz targets and the
+record's shape are unchanged. `docs/NIGHTLY.md` states the rule. The test:
+`PinIsTheDispatchCommit` in `.github/scripts/test_nightly_mutants.py` (a
+repository whose `origin/beta` moved from A to B after the dispatch pins A;
+a sha off the line, a ref name and a short sha are refused; a shard and the
+report refuse another commit), red on the pre-fix script (no `pin`, no
+`checkout_commit`, a report that names no commit), green after.
+
 ### Fixed: a MerklePath with no levels at all is refused at every door and panics no walk (#649)
 
 A `MerklePath` whose `path` is empty (no levels), held through the public
