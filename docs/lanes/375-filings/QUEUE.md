@@ -35,6 +35,8 @@ threads following answers to the earlier ones.
 | 20 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/no-send-change-framing-go-sdk.md](./no-send-change-framing-go-sdk.md) | createAction's noSendChange is framed behind an extra byte length, so a Go wallet and a TypeScript client cannot read each other's list |
 | 21 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/send-with-results-marker-go-sdk.md](./send-with-results-marker-go-sdk.md) | createAction and signAction results: an absent sendWithResults panics on the wire's absent marker, and a nil one is written as a zero count instead of the marker |
 | 22 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/create-action-result-success-byte-go-sdk.md](./create-action-result-success-byte-go-sdk.md) | createAction's result carries an extra success byte inside the frame that the wire does not define, so a Go client refuses every TypeScript result that carries a txid and a TypeScript client misreads Go's |
+| 23 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-path-height-bound-ts-stack.md](./merkle-path-height-bound-ts-stack.md) | Bound MerklePath height at BRC-74's 64 levels rather than 54 |
+| 24 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-path-combine-shorter-receiver-ts-stack.md](./merkle-path-combine-shorter-receiver-ts-stack.md) | Combine a longer MerklePath into a shorter receiver over the union of levels so the root is the checked root |
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
@@ -107,6 +109,21 @@ it is filed in the go-sdk turn beside row 20, from the draft as it stands on bet
 ask row 20's evidence line to state its probe method (bytes handed straight
 to go-sdk's serializer functions), and it now does. The queue now has
 twenty-two entries. Nothing new has been filed.
+
+The keeper's word of 2026-11-02 05:1xZ adds a twenty-third and a
+twenty-fourth draft, FILE, against ts-stack, from #628's cold read of
+`MerklePath.ts` at `edf6e03` (the vector `tests/vectors/merkle_path_603.json`
+recorded from the reference under Node 22): row 23, the constructor's
+54-level bound below BRC-74's "max 64" (`MerklePath.ts:198-199`,
+`0074.md:51`); row 24, `combine` merging over the receiver's levels alone
+(`MerklePath.ts:520`), so a longer path combined into a shorter receiver
+climbs to a root other than the one checked. The queue now has twenty-four
+entries. Fourteen are filed; ts-stack's seven earlier rows are all filed. The
+ten pending are go-sdk's eight (rows 14 to 17 and 19 to 22) and ts-stack's two
+(rows 23 and 24). The cadence's order: rows 14 and 15 on 2026-11-03, rows 16
+and 17 on 2026-11-04, then rows 19 to 22 (row 21 ahead of row 20), then rows
+23 and 24, about 2026-11-07, each from the draft as it stands on beta at
+00:00Z on its day. Nothing new has been filed.
 
 ## HOLD
 
