@@ -111,6 +111,9 @@ def mutation_args(surface, shard, files=()):
     patterns, tests = SURFACES[surface]
     if surface == "script":
         tests = tests + sorted(p.stem for p in Path("tests").glob("script_*.rs"))
+    if surface == "beef":
+        # #603: `beef_stream.rs`'s shards each kill their survivors in a file of their own.
+        tests = tests + sorted(p.stem for p in Path("tests").glob("beef_stream_603_*.rs"))
     args = ["cargo", "mutants", "--no-shuffle", "--sharding", "round-robin", "--shard", shard,
             "--features", "full,http"]
     for pattern in files or patterns:
