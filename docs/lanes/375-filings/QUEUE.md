@@ -37,6 +37,7 @@ threads following answers to the earlier ones.
 | 22 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/create-action-result-success-byte-go-sdk.md](./create-action-result-success-byte-go-sdk.md) | createAction's result carries an extra success byte inside the frame that the wire does not define, so a Go client refuses every TypeScript result that carries a txid and a TypeScript client misreads Go's |
 | 23 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-path-height-bound-ts-stack.md](./merkle-path-height-bound-ts-stack.md) | Bound MerklePath height at BRC-74's 64 levels rather than 54 |
 | 24 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-path-combine-shorter-receiver-ts-stack.md](./merkle-path-combine-shorter-receiver-ts-stack.md) | Combine a longer MerklePath into a shorter receiver over the union of levels so the root is the checked root |
+| 25 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/merkle-path-combine-longer-receiver-go-sdk.md](./merkle-path-combine-longer-receiver-go-sdk.md) | Combine files the receiver's level-1 nodes under level 0 when the receiver is the longer path and returns no error |
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
@@ -124,6 +125,20 @@ ten pending are go-sdk's eight (rows 14 to 17 and 19 to 22) and ts-stack's two
 and 17 on 2026-11-04, then rows 19 to 22 (row 21 ahead of row 20), then rows
 23 and 24, about 2026-11-07, each from the draft as it stands on beta at
 00:00Z on its day. Nothing new has been filed.
+
+The keeper's word of 2026-11-02 08:1xZ adds a twenty-fifth draft, FILE,
+against go-sdk, from #637's cold read's probe of `merklepath.go` at
+`2ca481c`: row 25, `combineVerified` merging the other path's levels into
+the receiver's by index (`merklepath.go:463-467`), so with the longer path
+as the receiver `Combine` files the receiver's level-1 nodes under level 0,
+returns no error, and the result climbs to `0a1c0549…` against the checked
+root `f3e94742…` (the same pair as row 24, `tests/vectors/merkle_path_603.json`).
+The queue now has twenty-five entries. Fourteen are filed. The eleven pending
+are go-sdk's nine (rows 14 to 17, 19 to 22 and 25) and ts-stack's two (rows
+23 and 24). The cadence's order: rows 14 and 15 on 2026-11-03, rows 16 and 17
+on 2026-11-04, then rows 19 to 22 (row 21 ahead of row 20), then rows 23 and
+24, then row 25, each from the draft as it stands on beta at 00:00Z on its
+day. Nothing new has been filed.
 
 ## HOLD
 
