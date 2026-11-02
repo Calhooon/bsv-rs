@@ -7,6 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S2 (the index's folds), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 35 mutants of `BeefIndex::fold_bump`, `fold_txid_only` and `fold_tx`
+alive. Killed by tests: 35. Declared equivalent: 0. Remaining: 0. Re-measured
+on the three functions (`cargo mutants --file src/transaction/beef_stream.rs
+--re 'BeefIndex::fold_bump|BeefIndex::fold_tx|BeefIndex::fold_txid_only'`
+with the BEEF surface's selection from `nightly_mutants.py`'s
+`mutation_args`, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, ten
+shards; the regex matches 76, the three functions' 75 and one stray,
+`780:13` in `BeefDecoder::collecting`, shard S1's, caught and not counted
+here): 75 mutants, 73 caught, 0 missed, 0 timed out, 2 unviable (`2049:9`,
+`2097:9`, `Ok(Default::default())` of a type without one), 100 percent of 73
+viable. The BEEF surface's selection now takes every
+`tests/beef_stream_603_*.rs` (the script surface's `script_*.rs` form), so the
+four shards' files run under the oracle; before it none did.
+
+`tests/beef_stream_603_s2.rs` (8 tests) reads, through the stream's public
+readers, the BEEFs of `tests/vectors/beef_reference_603.json`'s eight
+`stream_s2_*` cases: the rows of bsv-script-lean `corpus/wire/beef.jsonl` by id
+(beef-001, -003, -004, -014, -015, -023, -026; byte-identical at `5dc337e1`
+and `387dab35`) written into the shapes of the reference's `mergeBump`,
+`makeTxidOnly`, `mergeRawTx` and `mergeBeef` by #632's recorder
+(`tests/support/beef_reference_603.mjs`, extended; its 17 earlier cases
+unchanged), each with the reference's `verifyValid(true)` (`Beef.ts:1054-1090`
+at `ts-stack@edf6e03`, Node v22.18.0); and the Lean's reading of the same
+bytes (`tests/vectors/beef_stream_603_s2_lean.json`, written by
+`tests/support/beef_stream_603_s2.lean`): bsv-stack-lean@88c37ac8's
+`readBytes` (`lean/BeefOfAnySize.lean:1151-1155`, the definition this reader
+states) under SHA-256 (the sibling's `BsvScript.Hash.sha256d`, bsvscript
+v1.1.1) with headers carrying the reference's roots, and bsv-script-lean's
+`isFinalTx` (`lean/BsvChain/Finality.lean:116-120`). The Lean's three modules
+compiled from `git show 88c37ac8:` into the lane's folder: the sibling's
+checkout's own build predates its 2026-10-22 and 10-25 `BeefOfAnySize`
+commits and counts the index without the edges.
+
+- The counts (`fold_bump` 1942:20, 1954:22 ×2, 1954:31, 1954:35 ×2, 1954:62
+  ×2, 1956:19, 1956:36, 1956:43 ×2, 1956:47 ×2, 1956:51 ×2; `fold_txid_only`
+  2062:20 ×2, 2063:19 ×2, 2063:25 ×2; `fold_tx` 2228:38 ×2, 2228:42 ×2,
+  2228:46 ×2): beef-014's and beef-015's BUMPs at block 500000, one root,
+  combined by `mergeBump` into one proving two txids, beef-023's lone BUMP
+  proving one, beef-014's transaction a txid-only entry, beef-015's of three
+  inputs. The Lean accepts with steps 6, work 1611 and index size 21
+  (`Parsed.cost`, `BeefOfAnySize.lean:920-926`; `Index.size`, :860-861; its
+  `summary`, `Scenarios.lean:91-95`), and `steps()`, `model_work()` and
+  `spec_size()` answer them (`the_folds_count_the_leans_cost_…_beef_014_015_023`).
+  These counters reach no verdict: the Lean's summary is the only place they
+  are stated, so the test reads them through the public counts.
+- The BUMP index rule (1947:35 `false`, 1947:45 `==`): beef-003's transaction
+  carried by its own BUMP and by a later one, naming the later; valid for the
+  reference (`#verifyBumpIndexLeaves`, `Beef.ts:1129-1139`) and the Lean
+  (`checkBump`, `BeefOfAnySize.lean:888-892`), `TxidNotInBump { index: 1 }`
+  on the mutants (`a_txid_two_bumps_carry_is_proven_by_the_later_it_names_beef_003_004`).
+- A BUMP carrying one txid twice (1947:35 `true`): the Lean keeps a BUMP's
+  txids as a set (`setOf`, `:475`), size 5; the mutant counts 6
+  (`a_bump_carrying_one_txid_twice_holds_it_once_beef_003`).
+- A new entry releases its held children (2052:19, 2200:19): beef-026 (the
+  child ahead of its parent) as the sibling wrote it and with the parent a
+  txid-only entry; valid for the reference (`sortTxs`, `Beef.ts:1065`) and
+  this reader (#240), the held child never released on the mutants. The Lean
+  is order-bound and refuses both at the child's input, its row (b)
+  (`BeefOfAnySize.lean:3381-3392`, "a divergence row, no filing"), recorded
+  beside them (`a_child_ahead_of_its_parent_is_released_by_it_beef_026`,
+  `a_child_ahead_of_its_txid_only_parent_is_released_by_it_beef_026`).
+- A repeat keeps the transaction's outputs (2203:20): a parent read as a
+  txid-only entry then raw, and read raw twice, then a child spending it
+  (P2PKH, the reference's scripts verdict true); the Lean takes the repeat
+  (`enter`, `enterRaw`, `:900-910`) and accepts; the mutants refuse the
+  child's spend (`a_txid_only_entry_then_its_transaction_keeps_its_outputs_for_the_child`,
+  `a_transaction_read_twice_keeps_its_outputs_for_the_child`).
+- The finality threshold (2143:46 `<=`): `finality/threshold-500000000`
+  (bsv-script-lean `corpus/chain/finality/finality.jsonl`; node
+  `validation.cpp:227-247` at `6504a3af`): its lock time 500000000 and
+  sequence 0 on a child spending the parent; at the row's own height and
+  cutoff (500000000, 500000000) both `isFinalTx` and the stream answer not
+  final, which no `<=` changes, so the row is read again at candidate 800001
+  with a cutoff of 500000001, where the Lean's `isFinalTx` answers final and
+  the mutant, reading the lock as a height, `NonFinal`
+  (`a_lock_time_at_the_threshold_is_a_time_finality_threshold_500000000`).
+
+Each test RED on its mutants in the re-measure's logs, all eight green on the
+tree.
+
+### Notes: cross-SDK parity (#603, shard S2)
+
+A BEEF that carries one txid twice (a txid-only entry then the raw
+transaction, or the raw transaction twice) is refused by the reference's
+`verifyValid` (`#hasDuplicateTxids`, `Beef.ts:1066,1092-1099` at
+`ts-stack@edf6e03`) and accepted by both of this crate's readers, the stream
+and `Beef::from_binary` with `verify_valid` (three entries, valid), as the Lean
+this reader states accepts it (`enter` keeps the earliest entry, `enterRaw`
+upgrades it, `BeefOfAnySize.lean:900-910`). The reference reads the same bytes
+as one entry when merged (`mergeBeef`, `:971`, valid). Older than #603; no
+change: the stream's rule is its Lean's. The vectors are the
+`stream_s2_txid_only_entry_then_its_transaction` and
+`stream_s2_transaction_twice` cases.
+
 ### Added: src/script/script.rs's surviving mutants, shard C (the writers), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left

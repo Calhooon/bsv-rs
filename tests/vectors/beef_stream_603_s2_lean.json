@@ -1,0 +1,26 @@
+{"lean":
+ "bsv-stack-lean@88c37ac8 lean/BeefOfAnySize.lean readBytes; bsv-script-lean@a478bf56 (v1.1.1) BsvScript.Hash.sha256d, BsvChain.isFinalTx",
+ "cases":
+ {"stream_s2_txid_only_entry_then_its_transaction":
+  {"reading": {"work": 447, "steps": 4, "size": 9, "refusal": null}},
+  "stream_s2_two_bumps_combined_and_a_txid_only_entry":
+  {"reading": {"work": 1611, "steps": 6, "size": 21, "refusal": null}},
+  "stream_s2_transaction_twice":
+  {"reading": {"work": 529, "steps": 4, "size": 10, "refusal": null}},
+  "stream_s2_one_txid_in_two_bumps_named_by_the_later":
+  {"reading": {"work": 383, "steps": 3, "size": 10, "refusal": null}},
+  "stream_s2_one_bump_carries_one_txid_twice":
+  {"reading": {"work": 238, "steps": 2, "size": 5, "refusal": null}},
+  "stream_s2_lock_time_at_the_threshold":
+  {"reading": {"work": 411, "steps": 3, "size": 9, "refusal": null},
+   "is_final_tx":
+   {"row_height_500000000_time_500000000": false,
+    "height_800001_time_500000001": true}},
+  "stream_s2_child_before_its_txid_only_parent":
+  {"reading":
+   {"refusal":
+    "{ offset := 49,\n  reason := BeefOfAnySize.Reason.inputNamesNoElement\n              1907846278832283712173277352074906518103059572355414273281854618866066757577 }"}},
+  "stream_s2_child_before_its_parent":
+  {"reading":
+   {"refusal":
+    "{ offset := 48,\n  reason := BeefOfAnySize.Reason.inputNamesNoElement\n              1907846278832283712173277352074906518103059572355414273281854618866066757577 }"}}}}

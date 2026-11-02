@@ -10,17 +10,22 @@
 // The inputs are the rows of bsv-script-lean@387dab35's `corpus/wire/beef.jsonl`
 // and `atomic-beef.jsonl` named below, copied by id with their bytes; every
 // expectation is the reference's `Beef.ts` (`packages/sdk/src/transaction/Beef.ts`
-// at edf6e03) on them. The tests are `src/transaction/beef/reference_603_tests.rs`.
+// at edf6e03) on them. The tests are `src/transaction/beef/reference_603_tests.rs`
+// and, for the `stream_s2_*` cases (#603 shard S2 of `beef_stream.rs`, rows byte-identical
+// at bsv-script-lean@5dc337e1), `tests/beef_stream_603_s2.rs`.
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 
 const [sdkPath, corpusDir] = process.argv.slice(2)
-const { Beef, MerklePath, Transaction, Utils } = await import(
+const { Beef, BeefTx, MerklePath, P2PKH, PrivateKey, Transaction, Utils } = await import(
   pathToFileURL(sdkPath).href
 )
 
-const ROWS = ['beef-001', 'beef-002', 'beef-004', 'beef-023', 'beef-029', 'beef-030', 'atomic-beef-001']
+const ROWS = [
+  'beef-001', 'beef-002', 'beef-003', 'beef-004', 'beef-014', 'beef-015', 'beef-023', 'beef-026',
+  'beef-029', 'beef-030', 'atomic-beef-001'
+]
 const rows = {}
 for (const file of ['beef.jsonl', 'atomic-beef.jsonl']) {
   for (const line of fs.readFileSync(path.join(corpusDir, file), 'utf8').split('\n')) {
@@ -206,6 +211,172 @@ cases.bump_index_names_no_bump = { row: 'beef-029', valid: read('beef-029').veri
   t.bumpIndex = 5
   b.trimKnownTxids([])
   cases.reindex_guard_with_an_index_past_the_bumps = { rows: ['beef-002', 'beef-004'], bumps: b.bumps.length }
+}
+
+// #603 shard S2, src/transaction/beef_stream.rs's index folds (`BeefIndex::fold_bump`,
+// `fold_tx`, `fold_txid_only`): the BEEFs the stream reads in `tests/beef_stream_603_s2.rs`,
+// each with the reference's verdict (`verifyValid(true)`, :1054-1090) and the roots it
+// checked. A frame whose order the reference's sort would change is written entry by
+// entry by the reference's own writer (`Beef.toWriter`, :1169-1181, no sort). The Lean's
+// summaries of the same bytes are `tests/support/beef_stream_603_s2.lean`'s.
+const BEEF_V2 = 4022206466
+const framed = (version, bumps, txs) => {
+  const b = new Beef(version)
+  b.bumps = bumps
+  b.txs = txs
+  const w = new Utils.Writer()
+  b.toWriter(w)
+  return Utils.toHex(w.toArray())
+}
+const verdict = hex => {
+  const r = Beef.fromString(hex).verifyValid(true)
+  return { valid: r.valid, roots: r.roots }
+}
+const shape = m => ({
+  height: m.blockHeight,
+  levels: m.path.length,
+  leaves: m.path.reduce((n, l) => n + l.length, 0),
+  txids: m.path[0].filter(l => l.txid === true).length
+})
+
+// mergeBump (:687-811): two BUMPs at one height with one root are combined into one that
+// proves both txids (beef-014 and beef-015, block 500000); a second BUMP (beef-023's,
+// block 9) proves one; makeTxidOnly (:552-563) leaves beef-014's transaction as a txid
+// the combined BUMP proves; beef-015's transaction has three inputs.
+{
+  const b = new Beef(BEEF_V2)
+  b.mergeBeef(bytes('beef-014'))
+  b.mergeBeef(bytes('beef-015'))
+  b.mergeBeef(bytes('beef-023'))
+  b.makeTxidOnly(read('beef-014').txs[0].txid)
+  const hex = b.toHex()
+  const again = Beef.fromString(hex)
+  cases.stream_s2_two_bumps_combined_and_a_txid_only_entry = {
+    rows: ['beef-014', 'beef-015', 'beef-023'],
+    hex,
+    bumps: again.bumps.map(shape),
+    txs: again.txs.map(t => ({ txid: t.txid, txid_only: t.isTxidOnly, bump_index: t.bumpIndex ?? null })),
+    ...verdict(hex)
+  }
+}
+
+// One BUMP whose level 0 carries one txid at two offsets (beef-003's transaction at 0
+// and at 1, a tree of height 1), its transaction naming it.
+{
+  const t = read('beef-003').txs[0]
+  const m = new MerklePath(100000, [[
+    { offset: 0, hash: t.txid, txid: true },
+    { offset: 1, hash: t.txid, txid: true }
+  ]])
+  const hex = framed(BEEF_V1, [m], [BeefTx.fromRawTx(t.rawTx, 0)])
+  cases.stream_s2_one_bump_carries_one_txid_twice = { row: 'beef-003', hex, bumps: [shape(m)], ...verdict(hex) }
+}
+
+// One txid carried by two BUMPs (beef-003's own at block 100000, and one at 800000 where
+// beef-004's txid is its sibling), the transaction naming the later (#verifyBumpIndexLeaves,
+// :1129-1139: the BUMP its index names carries it).
+{
+  const t = read('beef-003').txs[0]
+  const own = read('beef-003').bumps[0]
+  const later = new MerklePath(800000, [[
+    { offset: 0, hash: read('beef-004').txs[0].txid },
+    { offset: 1, hash: t.txid, txid: true }
+  ]])
+  const hex = framed(BEEF_V1, [MerklePath.fromHex(own.toHex()), later], [BeefTx.fromRawTx(t.rawTx, 1)])
+  cases.stream_s2_one_txid_in_two_bumps_named_by_the_later = {
+    rows: ['beef-003', 'beef-004'],
+    hex,
+    bumps: [shape(own), shape(later)],
+    ...verdict(hex)
+  }
+}
+
+// beef-026 (the child ahead of its parent, the parent under its BUMP) with the parent a
+// txid-only entry: the reference sorts before it checks (sortTxs, :1065).
+{
+  const row = read('beef-026')
+  const childTx = row.txs[0]
+  const parentTx = row.txs[1]
+  const hex = framed(
+    BEEF_V2,
+    [MerklePath.fromHex(row.bumps[0].toHex())],
+    [BeefTx.fromRawTx(childTx.rawTx), BeefTx.fromTxid(parentTx.txid)]
+  )
+  cases.stream_s2_child_before_its_txid_only_parent = { row: 'beef-026', hex, ...verdict(hex) }
+}
+cases.stream_s2_child_before_its_parent = { row: 'beef-026', hex: rows['beef-026'].hex, ...verdict(rows['beef-026'].hex) }
+
+// A parent P under a BUMP of block 800000 (beef-001's coinbase txid its sibling at offset
+// 0) and two children spending P:0 with P2PKH under one key: C0 (version 1, lock time 0)
+// and C1 (the sibling's finality row `finality/threshold-500000000`'s transaction: version
+// 2, lock time 500000000, sequence 0). The scripts are the reference's verdict
+// (`Transaction.verify('scripts only')`).
+const key = PrivateKey.fromString('0000000000000000000000000000000000000000000000000000000000000603', 'hex')
+const lock = new P2PKH().lock(key.toAddress())
+const p = new Transaction(1, [{
+  sourceTXID: read('beef-001').txs[0].txid, sourceOutputIndex: 0,
+  unlockingScript: new P2PKH().lock(key.toAddress()), sequence: 0xffffffff
+}], [{ satoshis: 1000, lockingScript: lock }], 0)
+const pBump = new MerklePath(800000, [[
+  { offset: 0, hash: read('beef-001').txs[0].txid },
+  { offset: 1, hash: p.id('hex'), txid: true }
+]])
+p.merklePath = pBump
+const spender = async (version, lockTime, sequence) => {
+  const c = new Transaction(version, [{
+    sourceTransaction: p, sourceOutputIndex: 0, unlockingScriptTemplate: new P2PKH().unlock(key), sequence
+  }], [{ satoshis: 900, lockingScript: lock }], lockTime)
+  await c.sign()
+  return c
+}
+const c0 = await spender(1, 0, 0xffffffff)
+const c1 = await spender(2, 500000000, 0)
+const scripts = async c => c.verify('scripts only')
+const pRaw = p.toBinary()
+const pEntry = () => BeefTx.fromRawTx(pRaw, 0)
+{
+  const hex = framed(BEEF_V2, [pBump], [BeefTx.fromTxid(p.id('hex')), pEntry(), BeefTx.fromRawTx(c0.toBinary())])
+  const merged = new Beef(BEEF_V2)
+  merged.mergeBeef(Utils.toArray(hex, 'hex'))
+  cases.stream_s2_txid_only_entry_then_its_transaction = {
+    hex,
+    parent: p.id('hex'),
+    child: c0.id('hex'),
+    scripts: await scripts(c0),
+    valid: verdict(hex).valid,
+    merged_valid: merged.verifyValid(true).valid,
+    merged_txs: merged.txs.length,
+    roots: merged.verifyValid(true).roots
+  }
+}
+{
+  const hex = framed(BEEF_V1, [pBump], [pEntry(), pEntry(), BeefTx.fromRawTx(c0.toBinary())])
+  const merged = new Beef(BEEF_V1)
+  merged.mergeBeef(Utils.toArray(hex, 'hex'))
+  cases.stream_s2_transaction_twice = {
+    hex,
+    parent: p.id('hex'),
+    child: c0.id('hex'),
+    scripts: await scripts(c0),
+    valid: verdict(hex).valid,
+    merged_valid: merged.verifyValid(true).valid,
+    merged_txs: merged.txs.length,
+    roots: merged.verifyValid(true).roots
+  }
+}
+{
+  const hex = framed(BEEF_V1, [pBump], [pEntry(), BeefTx.fromRawTx(c1.toBinary())])
+  cases.stream_s2_lock_time_at_the_threshold = {
+    finality_row: 'finality/threshold-500000000',
+    hex,
+    child: c1.id('hex'),
+    child_raw: c1.toHex(),
+    version: c1.version,
+    lock_time: c1.lockTime,
+    sequences: c1.inputs.map(i => i.sequence),
+    scripts: await scripts(c1),
+    ...verdict(hex)
+  }
 }
 
 console.log(
