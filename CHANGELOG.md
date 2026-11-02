@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/script.rs's surviving mutants, shard D (the truncated-push index), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 27 mutants of `truncated_push_index` alive (the index `Spend` refuses a
+truncated push at, read through `Script::truncated_push`), three of them
+timeouts. Killed by tests: 22 (19 the oracle reads caught; the three
+walk-stalling ones fail this file's deadline test but the oracle still reads
+TIMEOUT, below, never caught). Declared equivalent: 5 (on three reads, below,
+in `.cargo/mutants.toml`). Remaining: 0. Re-measured on this function alone
+(`cargo mutants --file src/script/script.rs --re truncated_push_index` with
+the script surface's selection from `nightly_mutants.py`'s `mutation_args`,
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--in-place` on a scratch copy,
+20 shards): 75 caught, 5 missed (the five candidates), 3 timed out, 0
+unviable, 90.36 percent of 83 viable. With the five declared, the same run
+(`--jobs 1`, 20 shards): 78 mutants, 75 caught, 0 missed, the same 3 timed
+out (784:13, 800:17, 826:17), 0 unviable, 96.15 percent of 78 viable.
+
+The rules, from the sibling `bsv-script-lean@5dc337e1`: `getOpTail`
+(`lean/BsvScript/Machine.lean:29-50`), a push's size the opcode below
+`OP_PUSHDATA1`, else 1, 2 or 4 little-endian length bytes, a cut length or a
+body short of the size a parse failure that the loop reports as `badOpcode`
+where the walk reaches it (`:384-386`; bitcoin-sv v1.2.3 `script.h:165-200`,
+`GetOp2` returning false, `interpreter.cpp:450-451`; this crate's rule since
+0.3.27, bsv-rs#12); a top-level `OP_RETURN` ending the script (`:342-344`;
+`interpreter.cpp:856-861`), top level by the static scope of
+`GetSigOpCount` (`lean/BsvScript/SigOps.lean:62-69,85`; `script.cpp:45-58`).
+The vectors: the sibling's harness (`harness/run --impl bsv-rs --spec
+recorded`, a scratch copy linked to a scratch tree) over `all`, `road`,
+`xsig-144`, `million` and the `cpp/replay` corpora, base and each mutant, and
+every script of the whole `corpus/` through `truncated_push` on each mutant.
+`tests/script_script_603_d.rs` copies the moved entries by corpus and id with
+their recorded verdicts (`spec@cb7e46e`, `sv-node@v1.2.3`, or
+`sv-node-unit@v1.2.2` for the node's own `GetOp2` table): flow-01085
+(`516a4c`, valid: 788:15, 788:30, 788:48, 788:66), the subscript at
+`sighash/bsv-rs-0.7.0.jsonl:495` (`ffd7646f6a13…`, a cut push after a nested
+`OP_RETURN`: 788:42, 790:22), flow-01031 (800:17 `*=`), cpp-cscript-00009 and
+flow-01045 (806:41 `&`, 806:70), cpp-cscript-00013 and flow-00753 (810:20),
+flow-01049, road-seed-009157 and cpp-cscript-00014 (814:46, 815:17 `&`,
+815:46, 816:17 `&`, 816:46). Four moved no entry of the whole corpus
+(788:60, `OP_VERIF` and `OP_VERNOTIF` opening no scope; 789:34; 791:58 `+`
+and `/`) and fall to scripts of the scope rule (`65 6a 01`, `66 6a 01`,
+`63 63 68 6a 01`, `63 68 6a 01`, and a spend of `63 63 68 6a 68 02 aa`
+refused at the cut push): built by hand from the rule, no recorder's. The
+three walk-stalling mutants (784:13 `*=`, 800:17 `-=`, 826:17 `-=`) fail the
+file's tests within a ten-second deadline thread on arith-00001, arith-00003
+and cpp-bn_op-00003; `cargo mutants` still reads them TIMEOUT, because the
+library's own `script::spend` unit tests run first and hang on them. Each
+test RED on its mutants in a scratch copy, all eight green on the tree.
+
+The five declared equivalent in `.cargo/mutants.toml`'s `exclude_re`, on the
+ensemble's three reads (the cold read, MERGE at 0.93; the adversarial read,
+EQUIVALENT ×5 at 0.97, 1,068,663 observations byte-identical on the tree and
+each mutant where a control mutant moved them all; the rule read, EQUIVALENT
+×5 at 0.97, bitcoin-sv v1.2.3 `script.h:177-189`): `793:45`, `op > 0` to `op
+>= 0`: `OP_0` is a push of size 0 (`Machine.lean:32`, `op < OP_PUSHDATA1`),
+never short of its body (`:49`), and the index's `pos + 0 > length` cannot
+hold, so the push and the non-push branch both advance by nothing; `806:41`,
+`814:17`, `815:17`, `816:17`, `|` to `^`: the operands are one byte and bytes
+shifted by 8, 16 and 24, disjoint in their bits, so `^` equals `|` (and the
+sum of `Machine.lean:39,43`) at every association. No corpus entry and no
+script of the corpus moved under any of the five. No vector revealed a
+divergence.
+
 ### Fixed: MerklePath's off-path offset refusal names the legal offsets as the reference's text does (#631)
 
 `MerklePath::new` refused a leaf above level 0 at an offset no level-0 hash
