@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/locking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 8 of the file's 27 viable mutants
+alive (70.37 percent): `into_script`, `len` (twice), `is_empty` (twice),
+`is_push_only` (twice) and `From<Script>::from`. Killed by tests: 8. Declared
+equivalent: 0. Remaining: 0. Re-measured with the script surface's selection
+(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03`): 27 caught, 0 missed, 0 timed out, 1 unviable, 100 percent.
+
+The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
+of the eight: the harness builds its locking script with `from_binary` and the
+interpreter reads it through `as_script` and `chunks`. Each mutant is
+observable, so each is a hand vector, not an equivalent:
+`tests/script_locking_script_603.rs` takes six public corpus entries by id
+with their recorded verdicts (flow-01005, lock `5151`, valid; flow-01009, the
+empty lock, valid; flow-01011, the empty lock under an empty scriptSig, refused;
+seed-000013, lock `8f5187`, `SCRIPT_ERR_INVALID_STACK_OPERATION`; flow-01061,
+scriptSig `60`, valid; flow-01092, scriptSig `5161` at version 1,
+`SCRIPT_ERR_SIG_PUSHONLY`), run under the post-Chronicle block word: `len` and
+`is_empty` count `getOpTail`'s instructions (`lean/BsvScript/Machine.lean:29-50`;
+four mutants); `is_push_only` is `isPushOnly` over the script's bytes
+(`:52-59`), the predicate `verifyScript`'s SIGPUSHONLY gate applies
+(`:500-503`), true on flow-01061's accepted `60` and the empty lock, false on
+flow-01092's refused `5161` and on `8f5187` (two); `into_script` and
+`From<Script>` hand `verifyScript` the scriptPubKey's own bytes (`:495-509`),
+flow-01005's `5151` round-tripped through `Script` still valid, where the
+mutants' empty lock is flow-01011's recorded refusal (two). Each test RED on
+its mutants in a scratch copy, all three green on the tree. No vector revealed
+a divergence.
+
 ### Added: src/script/templates/p2pk.rs and src/script/template.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The P2PK lock is `<pubkey> OP_CHECKSIG`, so the rule source is the sibling
