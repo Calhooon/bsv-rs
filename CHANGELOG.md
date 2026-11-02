@@ -7,6 +7,159 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/script/script.rs's surviving mutants, shard A (the ASM parser and the predicates), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 115 of the file's 448 viable mutants
+alive (74.33 percent), 32 of them in shard A's functions: `from_asm` (22),
+`len`, `is_empty`, `set_chunk_opcode`, `is_locking_script`,
+`is_unlocking_script`, `is_data`, `is_multisig` (three) and `PartialEq::eq`.
+Killed by tests: 29 (`set_chunk_opcode`'s on the reference's recording).
+Declared equivalent: 1, `94:33` (`91:37` after #639's fold), in
+`.cargo/mutants.toml`'s `exclude_re` on three accepting reads (below). Removed:
+2, `123:19` (`-=` and `*=`), a dead arm of `from_asm`'s chain folded into a
+`match` on the opcode (#639's fold), not declared. Remaining: 0.
+Re-measured on shard A's functions alone with the script surface's selection
+(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` a sparse clone of
+`ts-stack@edf6e03`, `--jobs 1`, 15 round-robin shards), after #639's fold and
+before the declaration: 91
+mutants (the two of `123:19` gone; seven new from the fold: the `match`'s four
+guard replacements and `set_chunk_opcode`'s append, caught, and the two arm
+deletions, unviable), 82 caught, 1 missed (`94:33`, now `91:37`), 6 timed out,
+2 unviable (92.1 percent caught of 89 viable; 98.8 percent of the 83 that end).
+After the declaration, `from_asm` alone re-measured the same way (`--re
+'from_asm'`, 12 round-robin shards, one split in two): 48 mutants, 40 caught,
+0 missed, 6 timed out (the six below), 2 unviable (the fold's two arm
+deletions); the declared `91:37` is absent from the list (its `==` and `>`
+caught). The other shard-A functions' mutants are untouched by the declaration.
+The six timeouts are `from_asm` loop mutants outside the 32 (`76:23` and
+`80:23` `*=`, `102:23` and `117:27` `-=` and `*=`; before the fold `79:19`,
+`82:19`, `105:19`, `120:23`), caught in run 41327640129: here the library's own
+`from_asm` tests hang past the 120-second budget before any test fails. The whole file's figure is the witness's
+after the four shards land.
+
+The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`) moved no verdict under any of the 32: the
+harness reads every script from its bytes and calls none of these functions
+(its `gen` corpus is RED on the base and on every mutant alike, `gen-00793`'s
+transaction hex odd-length, a corpus defect). The rule sources are therefore
+the reference's `Script.fromASM` (`Script.ts:73-123`), recorded under Node
+v22.18.0 by `tests/support/script_asm_603_a.mjs` into
+`tests/vectors/script_asm_603_a.json` (23 ASM texts, the type predicates and
+`setChunkOpCode` at three indexes, two runs byte-identical), and the sibling's rules on its recorded entries.
+`tests/script_script_603_a.rs` holds ten tests (the positions are run
+41327640129's, before #639's fold: `from_asm`'s after its `match` sit three
+lines up and four columns right, `108:39` now `105:43`; `len`'s and
+`is_empty`'s four lines up, `579:9` and `585:9`; `set_chunk_opcode`'s `601:22`
+now `598:22`; the predicates' one line up, `610:9`, `616:9`, `673:55`, `710:54`,
+`712:47`; `PartialEq::eq`'s `834:9`):
+
+- `an_inline_pushdata_takes_the_next_two_tokens_script_ts_102_108`: an inline
+  `OP_PUSHDATA1`, `2` and `4` at indexes 0, 1 and 3 and before an opcode, the
+  reference's bytes; kills `108:39`, `108:61`, `110:26` (two), `110:30` (`==`,
+  `>`), `111:54` (two), `113:27` (two).
+- `a_hex_token_is_the_minimal_push_script_ts_85_90_machine_lean_66_80`: hex
+  tokens of 75, 76, 77, 100, 255, 256, 257, 65,535 and 65,536 bytes, the
+  reference's minimal push (`#pushdataOpCodeNum`, `:85-90`; the sibling's
+  `checkMinimalPush`, `lean/BsvScript/Machine.lean:66-80`); kills `96:31` and
+  `98:31` (three each).
+- `a_short_inline_pushdata_is_the_opcode_alone_stated_against_script_ts_102_108`:
+  the four short inline forms in this crate's reading beside the reference's
+  recorded one (the parity note below); kills `110:30` (`<=`) and `116:27`
+  (two).
+- `an_empty_token_is_skipped_stated_against_script_ts_75`: the empty text and
+  a double space, the same; kills nothing, the parity note's witness.
+- `instruction_count_is_the_get_op_split_flow_01013_flow_01005_flow_01009`:
+  `len` and `is_empty` as `getOpTail`'s count (`Machine.lean:29-50`); kills
+  `583:9`, `589:9`.
+- `set_chunk_opcode_at_the_chunk_count_appends_as_the_reference_does_ts_297_301`:
+  flow-01005's `5151` with instruction 1 set to `OP_0` is flow-01007's refused
+  `5100`; at index 2, the chunk count, `515100` (three chunks) as the
+  reference's `setChunkOpCode` writes it (`Script.ts:297-301`, recorded); at
+  index 3 unchanged and valid here, the reference's hole stated (the parity
+  note below); kills `601:22`.
+- `scripts_are_equal_by_their_bytes_flow_01005_flow_01007`: `PartialEq`'s
+  contract on two locks one instruction apart; kills `835:9`.
+- `a_base_script_is_neither_locking_nor_unlocking_script_ts_430_441`: the base
+  `Script` answers `false` to both where the reference's throws `Not
+  implemented` (recorded), its two types as the reference's; kills `611:9`,
+  `617:9`.
+- `a_return_after_a_true_push_is_no_data_carrier_standard_lean_163_flow_00953`:
+  flow-00953's valid `516a00` is no data carrier (`solver`,
+  `lean/BsvScript/Standard.lean:163-173`); kills `674:55`.
+- `every_multisig_key_is_a_33_to_65_byte_push_standard_lean_74_102_cpp_multisig_00031`:
+  `corpus/cpp/multisig_tests.jsonl` entries 00031, 00033 (multisig), 00036,
+  00038 (not), and 00031 with its last key cut to 20 bytes, no multisig by
+  `pubkeysLoop` and `matchOne` (`Standard.lean:74-102`; a hand derivation from
+  the recorded entry, read by the rule, not executed); kills `711:54` (two),
+  `713:47`.
+
+Four mutants of `from_asm` can parse forever (`*=` at `113:27` at index 0 and
+at `116:27` everywhere, `-=` at either past the first tokens), so every `from_asm` case runs in a child
+process of the test binary that the parent kills after 3 seconds (the looping
+child's peak 203 MB on the Studio): a parse that does not end fails the test.
+Each test RED on its mutants (`cargo mutants` with this file alone: 29 caught,
+the three candidates missed, before the fold), all ten green on the tree.
+
+The declared equivalence and the dead arm:
+
+- `94:33` (`91:37` after the fold), `<` to `<=` in `from_asm`'s `len <
+  OP_PUSHDATA1`: the branches differ at 76 bytes alone, where the direct
+  branch's `len as u8` is 76, the byte `OP_PUSHDATA1` is (bitcoin-sv v1.2.3
+  `script.h:106-113`, a direct push for 1 to 75 bytes and `OP_PUSHDATA1` from
+  76; `lean/BsvScript/Opcodes.lean:21`, `OP_PUSHDATA1 := 0x4c`), so the chunk
+  and its bytes are the same (the shape of `rpuzzle.rs:350:34`'s accepted
+  equivalence). Declared on three reads: the cold read (Opus, 0.97: lengths 70
+  to 80 in five ASM shapes), the adversarial read (Opus, EQUIVALENT at 0.99:
+  every token length 0 to 80 and 255, 256, 65,535 and 65,536, bare, after an
+  opcode and after another push, through `from_asm`, `to_binary`, `to_asm` and
+  the interpreter, 2,520 probe lines byte-identical), the rule read (Opus,
+  EQUIVALENT at 0.97).
+- `123:19`, `+=` to `-=` and to `*=`: the arm was unreachable, after
+  `op_code_num.is_none()` and `if let Some(op) = op_code_num` had taken both
+  values of the `Option`. #639's fold rewrites the chain as one `match` on the
+  opcode (the literals `0` and `-1` as guards, then `None` and `Some(op)`), no
+  arm left over: both mutants are gone from `cargo mutants --list`, removed,
+  not declared.
+
+### Notes: cross-SDK parity (#603)
+
+The recording reveals two readings of `from_asm` older than #603 that differ
+from the reference's `Script.fromASM` (`Script.ts:73-123` at `ts-stack@edf6e03`):
+an empty token, which the reference's split on one space gives for the empty
+text and a double space, is an empty push there (`00`; `OP_1  OP_2` is
+`510052`) and skipped here (`5152`); an inline `OP_PUSHDATA<n>` with fewer than
+two tokens after it is an empty push of that opcode there, three tokens
+consumed (`toArray(undefined, 'hex')`, `:102-108`: `OP_PUSHDATA1` and
+`OP_PUSHDATA1 01` are both `4c00`), and the opcode alone here, a following
+token a push of its own (`4c`, `4c0101`). Every other recorded form agrees. The
+two helpers `is_multisig` and `is_data` have no counterpart in the reference;
+reading them against the sibling's `Solver` shows `is_multisig` taking a key as
+33 or 65 bytes where `Solver` takes 33 to 65 (`Standard.lean:74-102`) and
+go-sdk's `IsMultiSigOut` any non-empty push (`script/script.go:275-296` at
+`2ca481c`), and `is_data` reading a leading `OP_RETURN` in every era with no
+push-only check after it (`Standard.lean:163-173`). The base `Script`'s
+`is_locking_script` and `is_unlocking_script` answer `false` where the
+reference's `isLockingScript` and `isUnlockingScript` throw `Not implemented`
+(`Script.ts:430-441`, recorded); its two subclasses answer as here. The tests pin this crate's
+readings and the recording beside them; conforming is the keeper's word. The
+line is in CLAUDE.md's divergence list. `set_chunk_opcode` conforms at the
+chunk count (#639's fold, rule 1): the reference's `setChunkOpCode` assigns
+`this.chunks[i] = { op }` (`Script.ts:297-301`), which on a JavaScript array
+appends at the length (`5151` at index 2 is `515100`, recorded), as this crate
+now does; beyond the length it leaves a hole (at index 3 four chunks, its
+`toHex` throwing `Cannot read properties of undefined (reading 'data')`,
+recorded), a sparse array no byte form carries, and this crate leaves the
+script unchanged there, a stated difference. Semver: a behaviour change of a
+public method, its signature unchanged, a minor change: a call at the chunk count, which left
+the script unchanged, now appends one chunk, every other index answering as
+before; a fix toward the reference (rule 1), called out for a caller that
+relied on the no-op; no caller in `bsv-overlay-cloudflare`,
+`rust-message-box`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
+`bsv-middleware-cloudflare`, `bsv-middleware-rs` or `chaintracks-cloudflare`
+(read 2026-11-02). The witness is
+`set_chunk_opcode_at_the_chunk_count_appends_as_the_reference_does_ts_297_301`,
+RED with the append removed.
+
 ### Fixed: MerklePath's constructors refuse a level 0 of duplicate flags alone, as the reference's constructor does (#641)
 
 `MerklePath::new` and `MerklePath::new_unchecked` accepted a path whose level
