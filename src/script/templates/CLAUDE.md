@@ -13,8 +13,8 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 |------|---------|
 | `mod.rs` | Module root; submodule declarations and public re-exports |
 | `p2pkh.rs` | P2PKH template for the most common Bitcoin transaction type |
-| `p2pk.rs` | P2PK template for direct public key locking (simpler than P2PKH) |
-| `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
+| `p2pk.rs` | P2PK template for direct public key locking (simpler than P2PKH); `lock` refuses a hybrid `06`/`07` key, whose spend the node refuses under STRICTENC (#625, `tests/p2pk_hybrid_625.rs`) |
+| `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG; `lock` refuses a 33-byte key not tagged `02`/`03` only where every spend reaches it: with `j` the highest bad index, when `n - 1 - j < m`, the walk going from the last pushed key down (#625, `tests/p2pk_hybrid_625.rs`) |
 | `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock; `lock` pushes `locking_public_key` compressed, through the crate-visible `lock_with_key_bytes` (#545) |
 | `pushdrop_key_bytes.rs` | `PushDrop::lock_with_key_bytes`, `pub(crate)` (a port helper: the reference has one `lock`, taking the key as text; its vector tests the unit file `pushdrop_key_bytes_545_tests.rs`): the key pushed as the bytes given, the reference's `lock` pushing a wallet's answer as returned (`PushDrop.ts:158-175`, #545); crate-visible `wallet_key_lock` (under `kvstore`, `identity` or `registry`), the five wallet sites' lock: the answer read by `PublicKey::from_hex`, pushed as the bytes `toArray(_, 'hex')` reads (an odd-length text with a leading `0`) |
 | `pushdrop_position.rs` | Crate-visible, under `overlay`: `PushDrop::decode_before` (the reference's default lock position alone, #537) and the reference-words helpers; it refuses a key alone and a key without `OP_CHECKSIG` second, which `decode()` reads as the reference does since #618; its vector tests the unit file `pushdrop_position_603_tests.rs`, inside the script surface's mutation selection (#603) |
@@ -74,7 +74,7 @@ impl P2PK {
 }
 
 impl ScriptTemplate for P2PK {
-    fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = 33-byte compressed or 65-byte uncompressed key
+    fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = 33-byte compressed or 65-byte uncompressed key; a hybrid 06/07 key refused (#625)
 }
 ```
 
@@ -101,7 +101,7 @@ impl Multisig {
 }
 
 impl ScriptTemplate for Multisig {
-    fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = concatenated 33-byte compressed keys
+    fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = concatenated 33-byte compressed keys; a tag not 02/03 refused where every spend reaches it (n - 1 - j < m, j the highest bad index; #625)
 }
 ```
 

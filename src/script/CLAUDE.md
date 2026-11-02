@@ -482,6 +482,8 @@ See `templates/CLAUDE.md` for detailed template documentation.
 
 Summary: each template provides `lock()` (via `ScriptTemplate` trait or direct), `unlock()` (returns `ScriptTemplateUnlock`), and `sign_with_sighash()` (direct signing). PushDrop also provides `decode()` and `estimate_unlocking_length()`.
 
+A template refuses a lock whose spend no word lets pass (#625): `P2PK::lock` a hybrid `06`/`07` key; `Multisig::lock` a 33-byte key not tagged `02`/`03` only where every spend reaches one, i.e. with `j` the highest bad index, when `n - 1 - j < m` (CHECKMULTISIG walks the keys from the last pushed, index n - 1, down and stops at the threshold's last match: bitcoin-sv v1.2.3 `interpreter.cpp:1538-1633`, this crate's `op_checkmultisig` popping them in that order). `Error::InvalidPublicKey` names the tag (and for Multisig the index, the count after it and the threshold) and the node's `IsCompressedOrUncompressedPubKey` (`interpreter.cpp:132-152`, under STRICTENC, which every word carries). The reference has no P2PK or Multisig template; its interpreter refuses what is refused and spends a Multisig lock whose bad keys a spend avoids, as this crate's does in every mode (`tests/p2pk_hybrid_625.rs`, the vector's 125-shape sweep; a stated divergence in the root `CLAUDE.md`).
+
 ## Transaction Interface Traits
 
 Traits for Transaction module integration (implemented by the `transaction` module):

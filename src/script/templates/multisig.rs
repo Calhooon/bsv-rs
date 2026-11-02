@@ -221,6 +221,12 @@ impl ScriptTemplate for Multisig {
     /// Creates a multisig locking script from concatenated 33-byte compressed public keys.
     ///
     /// The `params` slice must be a multiple of 33 bytes (each key is 33 bytes compressed).
+    /// A key whose tag is not `02`/`03` is refused only where every spend
+    /// reaches it (#625): CHECKMULTISIG checks the keys from the last pushed
+    /// backwards and stops at the threshold's last match (bitcoin-sv v1.2.3
+    /// `interpreter.cpp:1538-1633`), refusing a key it reaches under STRICTENC,
+    /// so with `j` the highest index of such a key the lock is refused when
+    /// the `n - 1 - j` keys after it cannot meet the threshold.
     fn lock(&self, params: &[u8]) -> Result<LockingScript> {
         if params.is_empty() || !params.len().is_multiple_of(33) {
             return Err(Error::CryptoError(
@@ -244,9 +250,32 @@ impl ScriptTemplate for Multisig {
             self.threshold,
         )?));
 
-        for i in 0..n {
-            let pk_bytes = &params[i * 33..(i + 1) * 33];
-            chunks.push(ScriptChunk::new(33, Some(pk_bytes.to_vec())));
+        let keys = params.as_chunks::<33>().0;
+        // A tag not 02/03 at 33 bytes is refused by the node's
+        // IsCompressedOrUncompressedPubKey under STRICTENC, which every word
+        // carries (interpreter.cpp:132-152, :1611), but only for a key the walk
+        // reaches: from index n - 1 down, ending at the threshold's last match.
+        // The highest bad index j is avoidable when the n - 1 - j keys after it
+        // can meet the threshold (#625)
+        if let Some((j, key)) = keys
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, key)| key[0] != 0x02 && key[0] != 0x03)
+        {
+            let after = n - 1 - j;
+            if after < self.threshold as usize {
+                return Err(Error::InvalidPublicKey(format!(
+                    "public key {j} has tag 0x{:02x}, not a compressed key's 0x02 or 0x03, \
+                     and the {after} key(s) after it cannot meet the threshold {}: \
+                     every spend reaches it and fails under STRICTENC \
+                     (IsCompressedOrUncompressedPubKey)",
+                    key[0], self.threshold
+                )));
+            }
+        }
+        for key in keys {
+            chunks.push(ScriptChunk::new(33, Some(key.to_vec())));
         }
 
         chunks.push(ScriptChunk::new_opcode(small_int_to_opcode(n as u8)?));
