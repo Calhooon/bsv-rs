@@ -348,7 +348,7 @@ fn the_scriptcode_keeps_a_forkid_signatures_push_and_deletes_an_empty_ones_op_0(
     s.context = ExecutionContext::LockingScript;
     let sig_bytes = crate::primitives::from_hex(sig).unwrap();
     assert!(has_forkid_bit(&sig_bytes));
-    let sub = s.build_subscript(&sig_bytes).unwrap();
+    let sub = s.script_code(&[&sig_bytes]);
     assert_eq!(
         sub.to_binary(),
         s.locking_script.to_binary(),
@@ -358,7 +358,7 @@ fn the_scriptcode_keeps_a_forkid_signatures_push_and_deletes_an_empty_ones_op_0(
     let mut s = spend("OP_0 OP_1 OP_0", "", 2);
     s.context = ExecutionContext::LockingScript;
     assert!(!has_forkid_bit(&[]));
-    let sub = s.build_subscript(&[]).unwrap();
+    let sub = s.script_code(&[&[]]);
     assert_eq!(sub.to_asm(), "OP_1");
     // a signature without the FORKID bit would be deleted (and is refused by the encoding check)
     assert!(!has_forkid_bit(&[

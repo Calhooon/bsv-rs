@@ -7,9 +7,9 @@ use crate::primitives::bsv::sighash::SIGHASH_FORKID;
 use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::primitives::ec::PublicKey;
 use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, BigNumber};
-use crate::script::evaluation_error::{ExecutionContext, ScriptEvaluationError};
+use crate::script::evaluation_error::ScriptEvaluationError;
 use crate::script::op::{opcode_to_name, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY};
-use crate::script::{Script, ScriptChunk};
+use crate::script::Script;
 
 use super::limits::MAX_MULTISIG_KEY_COUNT;
 use super::Spend;
@@ -164,8 +164,8 @@ impl Spend {
         self.check_signature_encoding(&sig_bytes)?;
         self.check_public_key_encoding(&pubkey_bytes)?;
 
-        // Build subscript
-        let subscript = self.build_subscript(&sig_bytes)?;
+        // The scriptCode from the bytes, as the node builds it (script_code.rs, #654).
+        let subscript = self.script_code(&[&sig_bytes]);
 
         // Verify signature
         let success = if sig_bytes.is_empty() {
@@ -272,32 +272,10 @@ impl Spend {
             sigs.push(self.pop_stack()?);
         }
 
-        // Build subscript and remove all signatures
-        let base_script = match self.context {
-            ExecutionContext::UnlockingScript => self.unlocking_script.as_script().clone(),
-            ExecutionContext::LockingScript => self.locking_script.as_script().clone(),
-        };
-        let start_idx = self.last_code_separator.map(|i| i + 1).unwrap_or(0);
-        let chunks = base_script.chunks();
-        let mut subscript_chunks: Vec<ScriptChunk> = chunks.into_iter().skip(start_idx).collect();
-        // See build_subscript: unlock-context subscripts continue into the
-        // full locking script (combined-script semantics, ts-sdk parity).
-        if self.context == ExecutionContext::UnlockingScript {
-            subscript_chunks.extend(self.locking_script.as_script().chunks());
-        }
-        let mut subscript = Script::from_chunks(subscript_chunks);
-
-        // CleanupScriptCode (interpreter.cpp:255-263, applied per signature at
-        // 1573-1578): a signature's push is deleted from the scriptCode only when
-        // it does not carry SIGHASH_FORKID, in either mode. This includes
-        // default-mode legacy signatures and empty signatures (an OP_0 push).
-        for sig in &sigs {
-            if !has_forkid_bit(sig) {
-                let mut sig_script = Script::new();
-                sig_script.write_bin(sig);
-                subscript.find_and_delete(&sig_script);
-            }
-        }
+        // The scriptCode from the bytes, every signature without FORKID
+        // deleted, as the node builds it (script_code.rs, #654).
+        let sig_refs: Vec<&[u8]> = sigs.iter().map(Vec::as_slice).collect();
+        let subscript = self.script_code(&sig_refs);
 
         // Verify signatures
         let mut success = true;
@@ -417,44 +395,6 @@ impl Spend {
             .map_err(|_| self.error("The public key is in an unknown format."))?;
 
         Ok(())
-    }
-
-    pub(super) fn build_subscript(
-        &self,
-        sig_bytes: &[u8],
-    ) -> Result<Script, ScriptEvaluationError> {
-        let base_script = match self.context {
-            ExecutionContext::UnlockingScript => self.unlocking_script.as_script().clone(),
-            ExecutionContext::LockingScript => self.locking_script.as_script().clone(),
-        };
-
-        let start_idx = self.last_code_separator.map(|i| i + 1).unwrap_or(0);
-        let chunks = base_script.chunks();
-        let mut subscript_chunks: Vec<ScriptChunk> = chunks.into_iter().skip(start_idx).collect();
-        // When a CHECKSIG executes in the unlocking script, the subscript
-        // continues across the unlock/lock boundary into the full locking
-        // script (legacy combined-script semantics; matches BSV node consensus
-        // and ts-sdk). Without this, signatures taken over such a subscript
-        // (e.g. OP_PUSH_TX-style contracts) are wrongly rejected.
-        if self.context == ExecutionContext::UnlockingScript {
-            subscript_chunks.extend(self.locking_script.as_script().chunks());
-        }
-        let mut subscript = Script::from_chunks(subscript_chunks);
-
-        // CleanupScriptCode (interpreter.cpp:255-263, applied at 1484): the
-        // signature's push is deleted from the scriptCode only when the
-        // signature does not carry SIGHASH_FORKID, in either mode.
-        // A signature that does is hashed with its own push in place, so
-        // a signature whose push appears in the scriptCode cannot verify, as on
-        // the reference. An empty signature carries no hash type and is deleted
-        // as an OP_0 push, as on the reference.
-        if !has_forkid_bit(sig_bytes) {
-            let mut sig_script = Script::new();
-            sig_script.write_bin(sig_bytes);
-            subscript.find_and_delete(&sig_script);
-        }
-
-        Ok(subscript)
     }
 
     pub(super) fn verify_signature(

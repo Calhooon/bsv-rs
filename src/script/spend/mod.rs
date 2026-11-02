@@ -111,6 +111,7 @@ mod limits;
 mod num;
 mod push;
 mod reference_read;
+mod script_code;
 mod signature_encoding;
 mod splice;
 mod stack;
@@ -794,7 +795,6 @@ mod chronicle_tests;
 mod low_s_order_tests;
 
 #[cfg(test)]
-mod script_num_length_tests;
-
-#[cfg(test)]
 mod fixed_width_operand_tests;
+#[cfg(test)]
+mod script_num_length_tests;
