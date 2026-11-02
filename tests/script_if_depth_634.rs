@@ -1,16 +1,16 @@
 //! #634: a stray `OP_ENDIF` before `OP_RETURN`. `Script::parse_chunks`
 //! counts an IF depth as it reads and ends the parse at an `OP_RETURN` read
-//! at depth 0, the rest of the script that chunk's data; a stray `OP_ENDIF`
-//! leaves the depth at 0 (`(in_conditional_block - 1).max(0)`), so `686a51`
-//! (`OP_ENDIF OP_RETURN OP_1`) is two chunks here. The reference lets the
-//! depth go negative (`ts-stack@edf6e03` `Script.ts:616`) and ends the parse
-//! only at `=== 0` (`:608`): three chunks. go-sdk@2ca481c's `Script.Chunks()`
-//! (`DecodeScript`) lets it go negative too (`script/script_chunk.go:255-257`)
-//! but reads `OP_RETURN` as an opcode only at `> 0` (`:258-260`): two chunks
-//! on `686a51`, and on a stray `OP_ENDIF` followed by an `OP_IF` around the
-//! `OP_RETURN` (depth -1 + 1 = 0) both other readers end the parse where this
-//! crate's (depth 0 + 1 = 1) does not. go-sdk's interpreter's legacy parser
-//! clamps at 0 as this crate does (`interpreter/opcodeparser.go:389-401`); its
+//! at depth 0, the rest of the script that chunk's data. As the reference
+//! does (`ts-stack@edf6e03` `Script.ts:599-631`), a stray `OP_ENDIF` takes the
+//! depth below 0 (`:616`) and only `=== 0` ends the parse (`:608`), so
+//! `686a51` (`OP_ENDIF OP_RETURN OP_1`) is three chunks (#634's fold; until
+//! then this crate clamped the depth at 0 and read two). go-sdk@2ca481c's
+//! `Script.Chunks()` (`DecodeScript`) lets it go negative too
+//! (`script/script_chunk.go:255-257`) but reads `OP_RETURN` as an opcode only
+//! at `> 0` (`:258-260`): two chunks on `686a51`, and on a stray `OP_ENDIF`
+//! followed by an `OP_IF` around the `OP_RETURN` (depth -1 + 1 = 0) it ends
+//! the parse as the reference does. go-sdk's interpreter's legacy parser
+//! clamps at 0 (`interpreter/opcodeparser.go:389-401`); its
 //! `ToASM` reader and its engine's parser count no depth and fold nothing
 //! (`script_chunk.go:25-115`, `opcodeparser.go:218-266`); those are read from
 //! the source, not recorded.
@@ -26,10 +26,10 @@
 //! The vector `tests/vectors/script_if_depth_634.json` is the reference's
 //! reading of fifteen shapes (its chunks, `toASM`, its `Spend` verdict at
 //! versions 1 and 2), written by `tests/support/script_if_depth_634.mjs` under
-//! Node 22, with go-sdk's reading transcribed from its source (not run). The
-//! shapes are this crate's writer's bytes. No behaviour changes here: the
-//! difference is stated (`CLAUDE.md`'s divergence list) and its door is the
-//! reads' call. The verdicts are pinned in every mode, and pinned not to
+//! Node 22, with go-sdk's reading transcribed from its source (run once by
+//! the cold read of #652). The shapes are this crate's writer's bytes. The
+//! difference from go-sdk is stated (`CLAUDE.md`'s divergence list). The
+//! verdicts are pinned in every mode, and pinned not to
 //! depend on the chunking: the interpreter reaches a stray `OP_ENDIF` (and
 //! refuses the script) before any `OP_RETURN` the readers fold differently.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -169,8 +169,7 @@ const UNBALANCED_END: &str =
     "Every OP_IF, OP_NOTIF, or OP_ELSE must be terminated with OP_ENDIF prior to the end of the script.";
 
 /// The shapes with an `OP_ENDIF` no conditional is open for, before an
-/// `OP_RETURN`: the reference's chunking of each is not this crate's, and
-/// go-sdk's is not on the two of `GO_DIFFERS`.
+/// `OP_RETURN`: the clamp's chunking of each was not the reference's.
 const STRAY_ENDIF_BEFORE_RETURN: [&str; 8] = [
     "endif-return-op1",
     "endif-return-push",
@@ -182,46 +181,38 @@ const STRAY_ENDIF_BEFORE_RETURN: [&str; 8] = [
     "balanced-endif-if-return-op1-endif",
 ];
 
-/// Where go-sdk's chunks are not this crate's: a stray `OP_ENDIF` then an
-/// `OP_IF` around the `OP_RETURN`, the depth -1 + 1 = 0 there.
-const GO_DIFFERS: [&str; 2] = [
+/// Where go-sdk's chunks equal the reference's although a stray `OP_ENDIF`
+/// comes first: an `OP_IF` around the `OP_RETURN`, the depth -1 + 1 = 0.
+const GO_AGREES_AFTER_A_STRAY_ENDIF: [&str; 2] = [
     "endif-if-return-op1-endif",
     "balanced-endif-if-return-op1-endif",
 ];
 
-/// The issue's script: two chunks here, the `OP_RETURN` at the clamped depth
-/// 0 ending the parse with `OP_1` its data; three in the reference, whose
-/// depth is -1 there; two in go-sdk, whose `> 0` test reads -1 as the top
-/// level.
+/// The issue's script: three chunks, as the reference reads it (its depth
+/// -1 at the `OP_RETURN`); two in go-sdk, whose `> 0` test reads -1 as the
+/// top level, and two with the clamp this crate had until #634's fold.
 #[test]
-fn a_stray_endif_before_op_return_parses_as_two_chunks_the_if_depth_clamped_at_0_634() {
+fn a_stray_endif_before_op_return_parses_as_three_chunks_the_if_depth_negative_634() {
     let s = shape("endif-return-op1");
     assert_eq!(s["hex"], "686a51");
     let script = Script::from_hex("686a51").unwrap();
     assert_eq!(
         reading_of(&script.chunks()),
-        vec![(0x68, None), (0x6a, Some("51".to_string()))]
-    );
-    assert_eq!(script.to_asm(), "OP_ENDIF 51");
-    assert_eq!(
-        reference(&s),
         vec![(0x68, None), (0x6a, None), (0x51, None)]
     );
+    assert_eq!(script.to_asm(), "OP_ENDIF OP_RETURN OP_1");
+    assert_eq!(reference(&s), reading_of(&script.chunks()));
     assert_eq!(s["ts"]["asm"], "OP_ENDIF OP_RETURN OP_1");
-    assert_eq!(go(&s), reading_of(&script.chunks()));
+    assert_eq!(go(&s), vec![(0x68, None), (0x6a, Some("51".to_string()))]);
     // The issue's other two forms: a push after the OP_RETURN, and a balanced
     // OP_IF OP_ENDIF before the stray one.
-    for (id, ours_n, reference_n) in [
-        ("endif-return-push", 2, 3),
-        ("if-endif-endif-return-push", 4, 5),
-        ("return-push", 1, 1),
+    for (id, n) in [
+        ("endif-return-push", 3),
+        ("if-endif-endif-return-push", 5),
+        ("return-push", 1),
     ] {
         let s = shape(id);
-        assert_eq!(
-            (ours(&s).len(), reference(&s).len()),
-            (ours_n, reference_n),
-            "{id}"
-        );
+        assert_eq!((ours(&s).len(), reference(&s).len()), (n, n), "{id}");
     }
 }
 
@@ -252,35 +243,60 @@ fn each_shape_is_this_crates_writers_bytes_and_every_chunking_writes_them_back_6
     }
 }
 
-/// The three readers on every shape: this crate's chunks equal the
-/// reference's exactly where no stray `OP_ENDIF` comes before the
-/// `OP_RETURN`, and go-sdk's everywhere but the two shapes whose stray
-/// `OP_ENDIF` is followed by an `OP_IF` around the `OP_RETURN`.
+/// The three readers on every shape: this crate's chunks are the reference's
+/// on all fifteen, and go-sdk's everywhere but the six shapes whose
+/// `OP_RETURN` follows a stray `OP_ENDIF` at a negative depth.
 #[test]
-fn the_readers_differ_only_after_a_stray_endif_634() {
+fn the_chunks_are_the_references_and_part_from_go_sdk_after_a_stray_endif_634() {
     for s in shapes() {
         let id = s["id"].as_str().unwrap();
-        let stray = STRAY_ENDIF_BEFORE_RETURN.contains(&id);
-        assert_eq!(
-            ours(&s) == reference(&s),
-            !stray,
-            "{id} against the reference"
-        );
-        assert_eq!(
-            ours(&s) == go(&s),
-            !GO_DIFFERS.contains(&id),
-            "{id} against go-sdk"
-        );
+        assert_eq!(ours(&s), reference(&s), "{id} against the reference");
+        let parts =
+            STRAY_ENDIF_BEFORE_RETURN.contains(&id) && !GO_AGREES_AFTER_A_STRAY_ENDIF.contains(&id);
+        assert_eq!(ours(&s) != go(&s), parts, "{id} against go-sdk");
     }
-    // The three-way shape: five chunks here, three in both others.
+    // The shape row 26 asks of the reference: an OP_IF is open at the
+    // OP_RETURN, yet the depth -1 + 1 = 0 reads it as the top level.
     let s = shape("endif-if-return-op1-endif");
     assert_eq!(s["hex"], "68636a5168");
-    assert_eq!(ours(&s).len(), 5);
     assert_eq!(reference(&s), go(&s));
     assert_eq!(
-        reference(&s),
+        ours(&s),
         vec![(0x68, None), (0x63, None), (0x6a, Some("5168".to_string()))]
     );
+}
+
+/// `from_asm(to_asm(s))` is `s` on every shape. A folded `OP_RETURN` is written
+/// as `OP_RETURN` and the rest's own ASM (`OP_ENDIF OP_IF OP_RETURN OP_1
+/// OP_ENDIF` on `68636a5168`); the reference writes the rest's hex alone
+/// (`Script.ts:668-677`), `OP_ENDIF OP_IF 5168`, which its `fromASM` reads
+/// back as a push (`:108-117`), as this crate's does: `6863025168`. A rest
+/// whose ASM would not read back is written as raw bytes (`OP_RETURN 0x..`).
+#[test]
+fn the_asm_round_trips_on_every_shape_both_readings_of_op_return_included_634() {
+    for s in shapes() {
+        let (id, hex) = (s["id"].as_str().unwrap(), s["hex"].as_str().unwrap());
+        let asm = Script::from_hex(hex).unwrap().to_asm();
+        assert_eq!(Script::from_asm(&asm).unwrap().to_hex(), hex, "{id}: {asm}");
+    }
+    let asm = |hex: &str| Script::from_hex(hex).unwrap().to_asm();
+    assert_eq!(asm("686a51"), "OP_ENDIF OP_RETURN OP_1");
+    assert_eq!(asm("68636a5168"), "OP_ENDIF OP_IF OP_RETURN OP_1 OP_ENDIF");
+    let theirs = shape("endif-if-return-op1-endif")["ts"]["asm"].clone();
+    assert_eq!(theirs, "OP_ENDIF OP_IF 5168");
+    let back = Script::from_asm(theirs.as_str().unwrap()).unwrap();
+    assert_eq!(back.to_hex(), "6863025168");
+    // A rest no ASM reads back (a truncated push), and a nested fold.
+    for (hex, want) in [
+        ("6a05aabb", "OP_RETURN 0x05aabb"),
+        ("006a0568656c6c6f", "0 OP_RETURN 68656c6c6f"),
+        ("6a6a6a51", "OP_RETURN OP_RETURN OP_RETURN OP_1"),
+    ] {
+        assert_eq!(asm(hex), want);
+        assert_eq!(Script::from_asm(want).unwrap().to_hex(), hex);
+    }
+    assert!(Script::from_asm("OP_1 0x51").is_err());
+    assert!(Script::from_asm("OP_RETURN 0x51 OP_1").is_err());
 }
 
 /// The interpreter refuses every shape whose walk reaches the stray
