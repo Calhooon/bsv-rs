@@ -39,8 +39,9 @@ and an empty rest as `OP_RETURN` alone (the reference writes `""` for `6a`,
 which reads back as `00`); `from_asm` reads a `0x<hex>` token as the raw rest
 when it is the last token and follows an `OP_RETURN` (`OP_RETURN 0x` is the
 bare `OP_RETURN`), and refuses it anywhere else (it was refused everywhere;
-the reference's `fromASM` refuses `0x` as invalid hex). The rest is written with no fold and no recursion, linear in its
-length, and reads back byte for byte whatever it holds; a chunk before it that
+the reference's `fromASM` refuses `0x` as invalid hex). The rest is written
+with no fold and no recursion, linear in its length, and reads back byte for
+byte whatever it holds; a chunk before it that
 `to_asm` cannot write back (a non-minimal push, `4c01aa` reading back as
 `01aa`; an undefined opcode) is as before. `ScriptChunk::to_asm` is unchanged.
 
@@ -116,8 +117,14 @@ data: its `toASM` writes the rest's hex alone, its `fromASM` reads it as a
 push (`Script.ts:108-117`); recorded under Node v22.18.0 on the fifteen shapes
 (`6a0568656c6c6f`, `5163686a51`, `6a6851`, `5163516368686a51`, `68636a5168`,
 `5163686851636a5168` fail; `68636a5168` reads back as `6863025168`) and on
-`006a0568656c6c6f` (read back as `00060568656c6c6f`). This crate's `to_asm`
-parts from `toASM` on every such script, the rest reading back whole.
+`006a0568656c6c6f` (read back as `00060568656c6c6f`). It fails on a bare
+`OP_RETURN` too: its parser gives one an empty data array (`Script.ts:609`),
+which `_chunkToString` writes as nothing (`:668-677`), so `toASM` gives `""`
+for `6a` and `"OP_0 "` for `006a`, read back as `00` and `0000`, and its
+`fromASM` refuses `OP_RETURN 0x` (`toArray`'s invalid hex, `:111-117`);
+recorded under Node v22.18.0 at `edf6e03`. This crate's `to_asm` parts from
+`toASM` on every such script, the rest reading back whole and a bare
+`OP_RETURN` written as `OP_RETURN`.
 
 ### Fixed: MerklePath's constructors refuse a level 0 of duplicate flags alone, as the reference's constructor does (#641)
 
