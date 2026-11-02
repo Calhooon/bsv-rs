@@ -30,7 +30,7 @@ const RUN_APART: &[(&str, &str, &str)] = &[
 /// The feature set CLAUDE.md's numbers and the lanes' gates use.
 const HOUSE_FEATURES: &str = "full,http,websocket";
 
-/// One `cargo test` invocation of ci.yml.
+/// One `cargo test` or `cargo nextest run` invocation of ci.yml.
 #[derive(Debug)]
 struct Step {
     line: usize,
@@ -121,7 +121,8 @@ fn resolve(
     on
 }
 
-/// Every `cargo test` of this crate in ci.yml. A `--manifest-path` run tests
+/// Every `cargo test` or `cargo nextest run` of this crate in ci.yml. A
+/// `--manifest-path` run tests
 /// another crate (`tools/bench-compare`) and is not a step of this one.
 fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
     let lines: Vec<&str> = ci.lines().collect();
@@ -140,10 +141,15 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
         if command.starts_with('#') {
             continue;
         }
-        let Some(start) = command.find("cargo test") else {
+        // `cargo nextest run` takes `cargo test`'s target selectors and
+        // features (speed round 1); either is a step of this crate.
+        let Some(rest) = ["cargo test", "cargo nextest run"]
+            .iter()
+            .find_map(|run| command.find(run).map(|at| &command[at + run.len()..]))
+        else {
             continue;
         };
-        let words = words(&command[start + "cargo test".len()..]);
+        let words = words(rest);
         let words: Vec<&str> = words
             .iter()
             .map(String::as_str)
@@ -499,4 +505,25 @@ fn library_doc_and_named_runs_are_not_whole_suite_steps() {
     let whole: Vec<bool> = found.iter().map(|s| s.whole_suite).collect();
     assert_eq!(whole, [false, false, false, true]);
     assert!(found[3].features.contains("primitives") && !found[3].features.contains("wallet"));
+}
+
+#[test]
+fn a_nextest_run_is_a_step_as_cargo_test_is() {
+    let table = feature_table(MANIFEST);
+    let ci = "run: cargo nextest run --lib --all-features --no-fail-fast\nrun: cargo nextest run --features \"full,http\" --tests --no-fail-fast --cargo-verbose\nrun: cargo nextest run --test memory_profiling --all-features\nrun: cargo test --doc";
+    let found = steps(ci, &table);
+    let whole: Vec<bool> = found.iter().map(|s| s.whole_suite).collect();
+    assert_eq!(whole, [false, true, false, false]);
+    assert!(found[1].features.contains("wallet") && found[1].features.contains("http"));
+    assert_eq!(found[2].named, ["memory_profiling"]);
+    let files = [
+        file("a", ""),
+        file("memory_profiling", "#![cfg(feature = \"dhat-profiling\")]"),
+        file("wire_tracing_sink", "#![cfg(feature = \"tracing\")]"),
+    ];
+    let errors = refusals(ci, MANIFEST, &files);
+    assert_eq!(
+        errors,
+        ["tests/wire_tracing_sink.rs: allowlisted as run apart by `--test wire_tracing_sink`, but no ci.yml step runs that on a feature set that compiles it"]
+    );
 }

@@ -202,8 +202,11 @@ sections 1 to 5, this rule reads no library source. It reads
 top-level `tests/*.rs` (each an integration binary; `support/`,
 `arch_support/` and the other directories are modules, not binaries).
 
-Each `cargo test` line of ci.yml is a step (a `--manifest-path` run tests
-another crate and is skipped). A step is a whole-suite step when it carries
+Each `cargo test` or `cargo nextest run` line of ci.yml is a step (a
+`--manifest-path` run tests another crate and is skipped); nextest takes
+`cargo test`'s target selectors and features, and the Test Suite runs under it
+since speed round 1 (`docs/lanes/ci-speed-1.md`), its doc tests alone under
+`cargo test --doc`. A step is a whole-suite step when it carries
 `--tests` or `--all-targets`, or no target selector at all, and names no
 `--test`. Its feature set is its flags closed over the table (`--all-features`
 is every feature). A file's gate is its file-level `#![cfg(...)]` attributes,

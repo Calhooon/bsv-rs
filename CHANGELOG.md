@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the Test Suite job builds from a dependency cache keyed by the lockfile and rustc and runs under nextest, without debuginfo (speed round 1, cut 1)
+
+What was slow: `Test Suite (ubuntu-latest, stable)` took 26 of a run's 29
+minutes (run 41537280176) and is every landing's critical path. 2:45 went to
+restoring a 7,350 MB `actions/cache` archive that an exact hit never
+refreshed, 4:15 to compiles, 18:49 to tests run one binary at a time (the
+memory step's 13 on one thread). What changed, in the `test` job alone:
+`Swatinem/rust-cache` v2.9.3 (sha-pinned) caches the dependencies' build,
+keyed by rustc's version, host and hash, the `CARGO*`/`RUST*` environment and
+the lockfile, saved on a pull request and on a push to a line;
+`CARGO_PROFILE_DEV_DEBUG`, `CARGO_PROFILE_TEST_DEBUG` and `CARGO_INCREMENTAL`
+are 0 in the job's env (a developer's `cargo test` keeps its debuginfo);
+`cargo-nextest` 0.9.150 (by `taiki-e/install-action` v2.89.1, sha-pinned)
+runs the lib, integration, memory and tracing steps with `--no-fail-fast`;
+the linker stays rustc's default rust-lld on Linux. What did not change:
+every test runs once per step as before, on the same features, target
+selectors and steps, hermetic as before; doc tests stay `cargo test --doc`.
+The memory tests' isolation is now nextest's process per test, not
+`--test-threads=1`. `tests/arch_ci_runs_every_test.rs` (#146) reads a
+`cargo nextest run` line as a step as it reads `cargo test`
+(`a_nextest_run_is_a_step_as_cargo_test_is`; the base guard refuses all 272
+files against the new workflow). The record, with the split per step and the
+sharding rule (the memory step's one 5:36 test and the doc tests already put
+the job past 8 minutes, so the next round splits it by step), is
+`docs/lanes/ci-speed-1.md`.
+
 ### Added: src/transaction/beef_stream.rs's surviving mutants, shard S4 (the judge and the remainder), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left

@@ -197,6 +197,14 @@ jobs:
   test:
     name: Test Suite
     runs-on: ${{ matrix.os }}
+    # Speed round 1, cut 1 (docs/lanes/ci-speed-1.md): no debuginfo and no incremental state in
+    # the job's builds (env, so a developer's `cargo test` keeps both); a panic keeps its
+    # file:line (std::panic::Location is data, not debuginfo), a backtrace's frames lose theirs.
+    # The linker is rustc's own rust-lld, the default on x86_64-unknown-linux-gnu since 1.90.
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     strategy:
       fail-fast: false
       # a pull request and a push to a line run the required cell alone, Test Suite
@@ -213,35 +221,49 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      # The dependencies' build, keyed by the runner's OS, rustc's version, host and commit hash,
+      # the CARGO*/RUST* environment (RUSTFLAGS and the profile above), and Cargo.lock/Cargo.toml;
+      # the workspace crate is rebuilt every run. One shared key for the job's feature sets. A
+      # pull request restores its base line's cache by the action's restore keys and saves one
+      # of its own only on a miss; a dispatch or a tag's call restores and never saves (the
+      # repository's 10 GB budget stays with the required cell).
+      - name: Cache the dependencies' build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.rust }}-
+          prefix-key: v1-rust
+          shared-key: test-suite
+          cache-bin: "false"
+          cache-on-failure: "true"
+          save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/main')) }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
+        with:
+          tool: nextest@0.9.150
 
       - name: Run unit tests
-        run: cargo test --lib --all-features --verbose
+        run: cargo nextest run --lib --all-features --no-fail-fast --cargo-verbose
 
       # Every integration binary, on the feature set the lanes' gates and
       # CLAUDE.md's numbers use (dhat-profiling stays out: its global
       # allocator is why memory_profiling runs alone below). An enumerated
-      # list of binaries drifted to 34 of 73 files (#146).
+      # list of binaries drifted to 34 of 73 files (#146). nextest runs the
+      # binaries' tests side by side, each test in a process of its own.
       - name: Run every integration test
-        run: cargo test --features "full,http,websocket" --tests --no-fail-fast --verbose
+        run: cargo nextest run --features "full,http,websocket" --tests --no-fail-fast --cargo-verbose
 
+      # nextest runs each test in a process of its own, so each has dhat's
+      # global allocator and its one profiler to itself: the isolation
+      # `--test-threads=1` gave, without running the thirteen one at a time.
       - name: Run the memory profiling tests
-        run: cargo test --test memory_profiling --all-features --verbose -- --test-threads=1
+        run: cargo nextest run --test memory_profiling --all-features --no-fail-fast --cargo-verbose
 
       # The `tracing` sink (#212) is outside `full`: its event, and the wire's
       # frames with the feature on, the same bytes as without it.
       - name: Run the tracing sink tests
-        run: cargo test --features "full,http,tracing" --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --verbose
+        run: cargo nextest run --features "full,http,tracing" --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --no-fail-fast --cargo-verbose
 
+      # nextest runs no doc tests
       - name: Run doc tests
         run: cargo test --doc --all-features
 
