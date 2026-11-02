@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a MerklePath with no levels at all is refused at every door and panics no walk (#649)
+
+A `MerklePath` whose `path` is empty (no levels), held through the public
+fields, panicked in every walk that read level 0: `compute_root` (with no
+txid at `self.path[0]`, with one in `index_of`), `combine` (through
+`compute_root`), `trim`, `contains`, `contains_and_mark`, `txids`, and so
+`Transaction::verify` on a transaction carrying one as its proof and
+`Beef::merge_bump` beside a transaction no bump proves (`update_bump_indices`,
+`src/transaction/beef.rs`). `CLAUDE.md` rule 5: nothing panics on input. The
+#648 cold read found it in `compute_root`.
+
+The reference refuses the shape at its constructor (`ts-stack@edf6e03`
+`MerklePath.ts:198-200`):
+
+```ts
+if (!Array.isArray(path) || path.length === 0 || path.length > 54) {
+  throw new Error('Merkle Path must contain between 1 and 54 levels')
+}
+```
+
+and `fromHex` of its bytes the same, its reader building the path a tree
+height of 0 gives and handing it to that constructor (`:104-168`). Its walks
+on one held through the public field read `path[0]` unasked (`computeRoot`
+`:375-382`, `indexOf` `:327-333`, `combine` `:508-537`, `trim` `:544-600`)
+and throw the runtime's `TypeError` (`Cannot read properties of undefined
+(reading 'find')`, `(reading 'length')` for `trim`), words of no rule.
+
+Doors, before and after:
+
+- `new`, `new_unchecked`: refused before, `Path cannot be empty`; refused now
+  in the reference's sentence with this crate's bound, `Merkle Path must
+  contain between 1 and 64 levels` (BRC-74's 64 where the reference holds 54,
+  #603's stated divergence; `merkle_path_legal::no_levels`).
+- `from_binary`, `from_hex`, `from_reader`, the streaming reader,
+  `Beef::from_binary`: refused before and after in the stream's words,
+  `TreeHeightZero` at the tree-height byte (#167); unchanged, now pinned.
+- `compute_root`: panicked; now refuses as the reference's `computeRoot`
+  refuses a level 0 with no leaf to climb from, `No valid leaf found in the
+  Merkle Path` (`:378-379`), and, given a txid, as its `indexOf` refuses a
+  txid level 0 does not carry, `Transaction ID <txid> not found in the Merkle
+  Path` (`:330`). `combine` refuses either way through it, both paths
+  unchanged; `Transaction::verify` carries the `indexOf` words.
+- `trim`: panicked; now leaves the path as it is. `contains` and
+  `contains_and_mark` answer `false`, `txids` none, `Beef::merge_bump` adds
+  the bump and proves no transaction by it.
+
+Every walk now reads level 0 through one accessor, `MerklePath::level0`
+(`src/transaction/merkle_path_legal.rs`), never `path[0]`; `contains` is
+`index_of(..).is_ok()`, the same scan.
+
+The witnesses are `tests/merkle_path_649.rs`: `an_empty_path_is_refused_at_new`,
+`…_at_new_unchecked`, `…_at_from_binary`, `…_at_the_stream`,
+`…_at_compute_root`, `…_at_combine`, `…_at_transaction_verify`,
+`an_empty_path_does_not_panic_at_trim_or_the_leaf_queries`,
+`an_empty_path_does_not_panic_in_a_beef` and
+`the_shapes_bytes_are_this_crates_writers`, against two shapes in
+`tests/vectors/merkle_path_649.json` (no levels at block heights 1 and
+813706), recorded by `tests/support/merkle_path_649.mjs` from `@bsv/sdk` at
+`ts-stack@edf6e03` bundled with bun under Node v22.18.0: the constructor with
+its defaults and with `legalOffsetsOnly` false, `fromHex` of the bytes,
+`computeRoot()` and `computeRoot(txid)`, `trim()` and `combine` either way,
+the words and the error class; each shape's bytes (`0100`, `fe8a6a0c0000`) are
+this crate's writer's. RED on `b9f78224` (the test file on the unchanged
+tree): 7 of 10, the two constructor tests on the words (`Path cannot be
+empty`), the five walk tests as panics (`index out of bounds` at
+`merkle_path.rs:365` in `compute_root`, `:456` in `trim`, `:339` in
+`index_of`); the `beef.rs` hunk RED alone in a scratch copy with only it
+removed (`beef.rs:372:45`); the `from_binary` and stream tests and the bytes
+test green on both.
+
+### Notes: cross-SDK parity
+
+The constructors' sentence is the reference's with this crate's bound, `64`
+where the reference's says `54` (`MerklePath.ts:198-200`), the row of the
+height bound the divergence list already carries (BRC-74's 64, ts-stack
+#1469). Where the reference throws a `TypeError` of its runtime (a defect,
+no verdict), no reference words exist for that shape, and each door here
+answers on its own terms: `compute_root` with no txid refuses in
+`computeRoot`'s words for a level 0 with no leaf (`:378-379`), with a txid in
+`indexOf`'s (`:330`), `combine` and `Transaction::verify` through it (the
+reference's `combine`, `:508-537`, throws at its `computeRoot`); `trim`
+returns with the path unchanged where the reference's throws `(reading
+'length')` (`:544-600`), as Go's returns; `contains`, `contains_and_mark`,
+`txids` and `Beef::merge_bump` find no leaf. The readers (`from_binary`,
+`from_hex`, `from_reader`) keep the stream's `TreeHeightZero` where the
+reference's `fromHex` throws its constructor's sentence, as #641 left the
+readers in the stream's words; the verdict is the same. Go (`go-sdk@2ca481c`,
+v1.7.2) checks nothing at `NewMerklePath` (`transaction/merklepath.go:149`),
+reads a tree height of 0 into a path with no levels
+(`NewMerklePathFromReader`, `:209-218`), refuses it at `ComputeRoot` (`merkle
+path has no leaves`, `:340-341`) and returns from `trim` (`:688-690`).
+
+Semver: no type changed. The constructors' text for an empty path changed
+from `Path cannot be empty` (the words stay in one place, the 0.3.34
+constructor kept verbatim in `merkle_path.rs`'s `linear_root_equivalence_tests`
+as the equivalence oracle, whose generator builds no empty path); no
+downstream on this host matches it
+(`bsv-overlay-cloudflare`, `rust-message-box` searched; `rust-chaintracks`
+and `bsv-middleware-cloudflare-public` are not on this host). A walk that
+panicked now answers.
+
 ### Added: src/script/script.rs's surviving mutants, shard A (the ASM parser and the predicates), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129) left 115 of the file's 448 viable mutants

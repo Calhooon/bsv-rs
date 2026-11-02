@@ -1,0 +1,103 @@
+{
+  "description": "bsv-rs#649: a path with no levels as @bsv/sdk reads it. Each shape is the BUMP the reference writes for a path whose levels were emptied through the public field (hex); checked is the constructor with its defaults, unchecked with legalOffsetsOnly false, from_hex is fromHex of the bytes; compute_root is computeRoot() and compute_root_txid computeRoot(txid) on the emptied path, trim its trim(), combine_into_empty a one-leaf path of the same height combined into it, combine_empty_into it combined into that path: accepted, or the words thrown and the error class. Written by tests/support/merkle_path_649.mjs.",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/MerklePath.ts",
+  "node": "v22.18.0",
+  "shapes": [
+    {
+      "name": "no-levels-at-1",
+      "note": "block height 1, no levels",
+      "block_height": 1,
+      "path": [],
+      "txid": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "hex": "0100",
+      "checked": {
+        "accepted": false,
+        "refusal": "Merkle Path must contain between 1 and 54 levels",
+        "class": "Error"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Merkle Path must contain between 1 and 54 levels",
+        "class": "Error"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Merkle Path must contain between 1 and 54 levels",
+        "class": "Error"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      },
+      "compute_root_txid": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      },
+      "trim": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'length')",
+        "class": "TypeError"
+      },
+      "combine_into_empty": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      },
+      "combine_empty_into": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      }
+    },
+    {
+      "name": "no-levels-at-813706",
+      "note": "block height 813706, no levels",
+      "block_height": 813706,
+      "path": [],
+      "txid": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "hex": "fe8a6a0c0000",
+      "checked": {
+        "accepted": false,
+        "refusal": "Merkle Path must contain between 1 and 54 levels",
+        "class": "Error"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Merkle Path must contain between 1 and 54 levels",
+        "class": "Error"
+      },
+      "from_hex": {
+        "accepted": false,
+        "refusal": "Merkle Path must contain between 1 and 54 levels",
+        "class": "Error"
+      },
+      "compute_root": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      },
+      "compute_root_txid": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      },
+      "trim": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'length')",
+        "class": "TypeError"
+      },
+      "combine_into_empty": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      },
+      "combine_empty_into": {
+        "accepted": false,
+        "refusal": "Cannot read properties of undefined (reading 'find')",
+        "class": "TypeError"
+      }
+    }
+  ]
+}

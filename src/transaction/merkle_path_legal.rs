@@ -90,3 +90,26 @@ pub(super) fn with_a_hashed_leaf<T>(path: &[Vec<super::MerklePathLeaf>], value: 
         "Transaction ID is undefined".to_string(),
     ))
 }
+
+/// A path with no levels, refused by both constructors in the reference's
+/// sentence (`ts-stack@edf6e03` `MerklePath.ts:198-200`) with this crate's
+/// bound, BRC-74's 64 where the reference holds 54 (#603's stated
+/// divergence) (#649).
+pub(super) fn no_levels() -> crate::Error {
+    crate::Error::MerklePathError(format!(
+        "Merkle Path must contain between 1 and {} levels",
+        super::merkle_path::MAX_TREE_HEIGHT
+    ))
+}
+
+impl super::MerklePath {
+    /// Level 0's leaves, none for a path with no levels: every walk reads
+    /// level 0 through this, never `path[0]`, so a path held with no levels
+    /// through the public fields panics nowhere (`compute_root` refusing it
+    /// as the reference's `computeRoot` refuses a level 0 with no leaf,
+    /// `MerklePath.ts:375-382`, where the reference's own walks throw the
+    /// runtime's `TypeError`) (#649).
+    pub(super) fn level0(&self) -> &[super::MerklePathLeaf] {
+        self.path.first().map_or(&[], Vec::as_slice)
+    }
+}

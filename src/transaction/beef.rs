@@ -369,8 +369,11 @@ impl Beef {
                 let txid = tx.txid();
                 // Only assign if the leaf has txid=true (a proper proven tx,
                 // not just a sibling hash used for proof computation)
-                let is_txid_leaf = bump.path[0]
-                    .iter()
+                let is_txid_leaf = bump
+                    .path
+                    .first()
+                    .into_iter()
+                    .flatten()
                     .any(|l| l.txid && l.hash.as_deref() == Some(&txid));
                 if is_txid_leaf {
                     tx.set_bump_index(Some(bump_index));
