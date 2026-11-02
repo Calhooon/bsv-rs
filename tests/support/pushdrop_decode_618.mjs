@@ -6,6 +6,7 @@
 // field is a point, the empty script, one chunk that is no key; and (the
 // fold) a DROP or 2DROP that ends the read, a field before a DROP, an
 // OP_RESERVED field, and OP_0 and OP_1 fields, each at both positions.
+// `locks_603` and `two_chunks_603` (#603) are described where they are made.
 //
 // Each token is the reference's own `lock` (a ProtoWallet on the scalar 9,
 // no signature), its chunks then replaced, removed or cut with the
@@ -47,7 +48,7 @@ Object.defineProperty(globalThis, 'crypto', {
 
 const [sdkPath] = process.argv.slice(2)
 const {
-  ProtoWallet, PrivateKey, PushDrop, LockingScript, Transaction, IdentityClient,
+  ProtoWallet, PrivateKey, PublicKey, PushDrop, LockingScript, Transaction, IdentityClient,
   LookupResolver, RegistryClient, decodeAndVerifyRegistryToken, decodeAndVerifyKVStoreToken,
   OverlayAdminTokenTemplate, decodeAndVerifyUHRPAdvertisement, StorageDownloader, Utils, OP
 } = await import(pathToFileURL(sdkPath).href)
@@ -228,11 +229,55 @@ for (const entry of recorded537.sites) {
     reference_outcome: entry.reference_outcome, cases: siteCases })
 }
 
+// #603: the reference's own `lock` (`PushDrop.ts:146-201`, no signature)
+// of the fields `createMinimallyEncodedScriptChunk` (`:20-51`) encodes
+// apart, an empty field and a zero byte `OP_0` (`:21-28`) and a zero
+// byte with others a push (`:37-41`), at both positions, and its tokens
+// that differ from one another in the key alone (key ID '2'), the fields
+// alone, the position alone, or the key's encoding alone (the first chunk
+// the same point uncompressed), each read back at its position.
+const MINIMAL = [[], [0], [0, 1], [0, 0], [1], [16], [0x81], [17], [0x68, 0x69]]
+const lockWith = async (fields, position, keyID) => await new PushDrop(wallet).lock(
+  fields.map((field) => [...field]), PROTOCOL, keyID, 'self', false, false, position
+)
+const minimalBefore = await lockWith(MINIMAL, 'before', KEY_ID)
+const uncompressedKey = PublicKey.fromString(Utils.toHex(minimalBefore.chunks[0].data)).encode(false)
+const lockDefinitions = [
+  ['minimal_pushes_before', MINIMAL, 'before', KEY_ID, minimalBefore],
+  ['minimal_pushes_after', MINIMAL, 'after', KEY_ID, await lockWith(MINIMAL, 'after', KEY_ID)],
+  ['minimal_pushes_before_other_key', MINIMAL, 'before', '2', await lockWith(MINIMAL, 'before', '2')],
+  ['other_fields_before', [[0x68, 0x69]], 'before', KEY_ID, await lockWith([[0x68, 0x69]], 'before', KEY_ID)],
+  ['minimal_pushes_before_uncompressed_key', MINIMAL, 'before', KEY_ID,
+    script([{ op: 65, data: uncompressedKey }, ...minimalBefore.chunks.slice(1)])]
+]
+const locks603 = lockDefinitions.map(([name, fields, position, keyID, locking]) => ({
+  name,
+  fields: fields.map((field) => Utils.toHex(field)),
+  position,
+  key_id: keyID,
+  locking_script: locking.toHex(),
+  reading: read(locking, position)
+}))
+
+// #603: two-chunk scripts whose first chunk is no key, read at 'after'
+// (`PushDrop.ts:79-94`): the reference refuses each for its last chunk or
+// its key, never for its length.
+const twoChunks603 = [
+  ['op_1_op_1', [{ op: OP.OP_1 }, { op: OP.OP_1 }]],
+  ['op_1_checksig', [{ op: OP.OP_1 }, { op: OP.OP_CHECKSIG }]],
+  ['short_push_checksig', [{ op: 5, data: [1, 2, 3, 4, 5] }, { op: OP.OP_CHECKSIG }]]
+].map(([name, chunks]) => {
+  const locking = script(chunks)
+  return { name, locking_script: locking.toHex(), before: read(locking, 'before'), after: read(locking, 'after') }
+})
+
 process.stdout.write(JSON.stringify({
   issue: 618,
   reference: 'ts-stack@edf6e03 packages/sdk/src/script/templates/PushDrop.ts:63-121',
   runtime: `node ${process.version}`,
   fields: FIELDS.map((field) => Utils.toHex(field)),
   cases,
-  sites
+  sites,
+  locks_603: locks603,
+  two_chunks_603: twoChunks603
 }, null, 2) + '\n')
