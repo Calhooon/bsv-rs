@@ -58,4 +58,19 @@ exclude_re = [
   '''^src/transaction/merkle_path\.rs:660:27: replace match guard \*root != working_hash with true in RootWalker<'a>::root_from$''',
   '''^src/transaction/merkle_path\.rs:660:27: replace match guard \*root != working_hash with false in RootWalker<'a>::root_from$''',
   '''^src/transaction/merkle_path\.rs:660:33: replace != with == in RootWalker<'a>::root_from$''',
+  # src/script/script.rs:793:45 (`>` to `>=`), 806:41, 814:17, 815:17, 816:17 (`|` to `^`), all in
+  # truncated_push_index (#603, PR #638). The size bytes each sit in their own lane: every operand
+  # of the four `|` sites is a `u8` zero-extended by `as usize` and shifted by 0, 8, 16 or 24, no
+  # bit shared, so `^` equals `|` (bitcoin-sv v1.2.3 script.h:177-189, GetScriptOp's size reads;
+  # bsv-script-lean lean/BsvScript/Machine.lean:39,43). The zero-size push's index is unchanged by
+  # the comparison: `>=` only lets OP_0 take the direct-push arm with Some(0), and after the opcode
+  # is read pos <= length, so pos + 0 > length never holds and both trees count it once
+  # (Machine.lean:32,49). Three reads: the cold read (MERGE, 0.93), the adversarial read with
+  # 1,068,663 observations byte-identical on the tree and each mutant (EQUIVALENT x5, 0.97), the
+  # rule read (EQUIVALENT x5, 0.97).
+  '^src/script/script\.rs:793:45: replace > with >= in truncated_push_index$',
+  '^src/script/script\.rs:806:41: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:814:17: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:815:17: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:816:17: replace \| with \^ in truncated_push_index$',
 ]
