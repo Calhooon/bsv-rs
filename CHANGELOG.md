@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the nightly incremental by the reach rule, the figures carried with their run's sha, the complete run per prerelease, a fixed fuzz budget, the bench weekly (speed round 1, cut 7)
+
+The last nightly, run 41347058507 (dispatched 2026-11-01 20:28Z at
+`9640eaa7`, measured `42a74f1b`), took 10h43m from creation: 3h23m queued
+behind the concurrency group, 3h12m of twenty mutation shards at six at a
+time (script 128 to 136 minutes a shard, BEEF 36 to 43, Merkle 5 to 6, wire 20
+to 24, substrates 36 to 44; 4,843 mutants over 93 files), then 4h07m of
+nineteen fuzz targets at an hour each. Its twenty baselines succeeded; the
+score job failed on eleven gate-path files below 80 (#603's standing list).
+On the owner's word of 2026-11-02 ("even the nightly... is all that
+necessary? or maybe a fraction"):
+
+- **The reach rule** (`nightly_mutants.py plan`): a night mutates only the
+  measured files the changes since the last complete run reach (a measured
+  file; a selection test's `tests/CLAUDE.md` row or its surfaces; a vector or
+  support file through the sources that name it; a module's other sources;
+  an exclusion's file), and carries every other figure. `Cargo.toml`,
+  `Cargo.lock`, `build.rs`, `.cargo/*`, `src/lib.rs`, `src/error.rs`, the
+  nightly's workflow, script and memory-ceiling runner reach everything and
+  make the night complete; documentation reaches nothing. On beta's last ten
+  commits: two plan nothing, five plan three or four files, one plans the
+  script surface's 50 (its row naming none), two (the nightly's own script)
+  plan the complete run (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
+- **The reach rule's five holes, closed (PR #666's fold)**, each pinned by a
+  `test_fold_*` case in `test_nightly_mutants.py` that failed on the cut's
+  script: a deleted selection test is judged by the base's selection and row
+  (`git rm tests/script_script_603_a.rs` planned nothing, now the script
+  surface's 40); a data file is named by its whole name or a directory two
+  deep (`tests/fixtures/wire/createAction.json`, read through a
+  `format!`-built path, planned nothing, now the wire surface's 15) and a
+  support `.rs` by the `#[path]` or `mod` line that compiles it in (a change
+  to `tests/support/fixtures/*` or `tests/vectors/sighash.json` was a
+  complete run through the bare word `fixtures`, now 15 and 55 files); a
+  changed source of an unmeasured module re-measures, one level, the measured
+  files that name it by `crate::<m>` (`CALLEE_RULE`: an edit to
+  `src/primitives/hash.rs` planned nothing, now 39 files in 16 shards); a row
+  naming a test-only file reaches the files it tests; the thirteen
+  `#[cfg(test)]` modules under the globs are tests of their surface, never
+  measured (82 measured files, not 95). Beta's last ten commits: 29 shards
+  over the eight incremental ones before, 34 after.
+- **The record**: the `mutation-record` artifact (90 days), found by the
+  source job through the artifacts API, never a commit (no write permission
+  on beta, no race with the sequencer): per file the figure, the counts,
+  `night` or `carried`, and the run id and sha it came from, beside the
+  complete run's `Cargo.lock`, which every night builds. The scoreboard gains
+  a Figure column and names the complete run it carries from; a carried
+  figure below its floor is listed as a finding with its run, never a
+  failure of the night.
+- **The complete run** (`-f mode=complete`, at each prerelease pin and before
+  a minor tag, `RELEASING.md` step 3): twenty shards in one wave (eleven
+  script, three BEEF, one Merkle, two wire, three substrates, about 50
+  minutes each by run 41347058507's rates) in place of the surfaces by four.
+- **The fuzz budget**: `FUZZ_MINUTES`, 10 minutes per target by default
+  (the repository variable `NIGHTLY_FUZZ_MINUTES`), every target every night;
+  it was an hour.
+- **The bench weekly**: the `weekly` input dispatches `bench.yml` on the line
+  (`gh workflow run nightly.yml --ref beta -f weekly=true`, the captain's
+  Sunday line); the workflow still has no schedule.
+
+Pinned by `.github/scripts/test_nightly_mutants.py` (23 new tests: each reach
+rule on a fixture tree and its diffs, the plan's modes and sizes, the merge of
+a night onto a complete run, the provenance column, the carried-below-floor
+finding, an empty plan, an empty shard, the record's lookup). The record of
+the cut is `docs/lanes/ci-speed-7.md`.
+
 ### Added: src/transaction/beef_stream.rs's surviving mutants, shard S4 (the judge and the remainder), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left

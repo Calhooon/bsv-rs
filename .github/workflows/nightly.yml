@@ -5,8 +5,12 @@ name: Nightly oracles
 # line (a pull request runs only its line's required set; the owner's word of
 # 2026-10-26). Never on a push or a PR: the gate is ci.yml. On demand only,
 # never on a schedule (the owner's word of 2026-10-27: the nightly runs were a
-# waste of resources): one dispatched measurement before each minor tag, none
-# for a prerelease.
+# waste of resources). Since cut 7 (the owner's word of 2026-11-02, "or maybe
+# a fraction"): a night mutates only the files the reach rule names since the
+# last complete run and carries every other figure with its run's id and sha
+# (`nightly_mutants.py plan`); the complete run is `mode: complete`, at each
+# prerelease pin and by hand; the fuzz targets run a fixed budget each; the
+# bench runs on the `weekly` input.
 on:
   workflow_dispatch:
     inputs:
@@ -14,6 +18,15 @@ on:
         description: The commit to measure, a full sha on the dispatched line (empty for the line's commit at the dispatch, #629)
         required: false
         default: ''
+      mode:
+        description: incremental (the night, the reach rule's files) or complete (every measured file, twenty shards; a prerelease pin)
+        type: choice
+        options: [incremental, complete]
+        default: incremental
+      weekly:
+        description: Also dispatch bench.yml on the line (the captain's Sunday dispatch; the workflow has no schedule)
+        type: boolean
+        default: false
 
 # Every job names its own permissions; only the fuzz job, which files its
 # crashes, may write issues.
@@ -34,6 +47,11 @@ env:
   # night's build does not move under the corpus.
   FUZZ_TOOLCHAIN: nightly-2026-10-19
   CARGO_FUZZ_VERSION: 0.13.2
+  # Cut 7: each target's fixed budget, in minutes (60 until 2026-11-02; run
+  # 41347058507's 19 targets took 60 to 63 minutes each, four waves of six,
+  # 4h07m). The repository variable NIGHTLY_FUZZ_MINUTES moves it, at most 30
+  # under the fuzz job's 45-minute timeout.
+  FUZZ_MINUTES: ${{ vars.NIGHTLY_FUZZ_MINUTES || '10' }}
 
 jobs:
   # The full matrix on each line when this workflow is dispatched. A dispatch runs
@@ -58,14 +76,37 @@ jobs:
           LINE: ${{ matrix.line }}
         run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
 
-  source:
-    name: Pin the run to one source commit
+  # Cut 7: the bench weekly. The workflow has no schedule, so "weekly" is the
+  # dispatcher's input; bench.yml runs at the line's tip (a dispatch names a
+  # ref, never a sha).
+  bench:
+    name: Bench (weekly)
+    if: ${{ inputs.weekly }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: write
+    steps:
+      - name: Dispatch bench.yml on the line
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINE: ${{ github.ref_name }}
+        run: gh workflow run bench.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
+
+  source:
+    name: Pin the run to one source commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
       contents: read
+      # The record the night carries from is a run artifact, read through the API.
+      actions: read
     outputs:
       commit: ${{ steps.source.outputs.commit }}
+      mode: ${{ steps.plan.outputs.mode }}
+      shards: ${{ steps.plan.outputs.shards }}
+      max_parallel: ${{ steps.plan.outputs.max_parallel }}
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       # #629: the pin is the dispatch's commit (the input's, else github.sha,
       # which GitHub fixes when it creates the run), never the line's tip when
@@ -87,27 +128,90 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      # The record is an artifact, never a commit: no write permission on beta,
+      # no race with the sequencer. The newest `mutation-record` of the line
+      # whose run measured an ancestor of the pin; none, and the night runs
+      # complete.
+      - name: Find the record the night carries from
+        if: ${{ inputs.mode != 'complete' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ steps.source.outputs.commit }}
+          LINE: ${{ github.ref_name }}
+        run: |
+          python3 .github/scripts/nightly_mutants.py latest-record --line "$LINE" \
+            --commit "$COMMIT" --dest "$RUNNER_TEMP/plan/base"
+
+      - name: Plan the night by the reach rule
+        id: plan
+        env:
+          COMMIT: ${{ steps.source.outputs.commit }}
+          MODE: ${{ inputs.mode || 'incremental' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/plan/base"
+          python3 .github/scripts/nightly_mutants.py plan --commit "$COMMIT" --mode "$MODE" \
+            --base-record "$RUNNER_TEMP/plan/base" --output "$RUNNER_TEMP/plan/plan.json"
+
+      - name: Install Rust
+        if: ${{ steps.plan.outputs.lockfile == 'generate' }}
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      # This library does not commit Cargo.lock. A complete run resolves it once
+      # here, so every shard builds one graph under `--locked` (#574); a night
+      # builds the complete run's graph, kept in the record, so a crate released
+      # since cannot move a carried figure's oracle unseen (a manifest change
+      # re-measures everything with a fresh resolution).
+      - name: Resolve or carry the mutation lockfile
+        env:
+          LOCKFILE: ${{ steps.plan.outputs.lockfile }}
+        run: |
+          if [[ "$LOCKFILE" == generate ]]; then
+            cargo generate-lockfile
+            cp Cargo.lock "$RUNNER_TEMP/plan/Cargo.lock"
+          else
+            want=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["complete_run"]["lockfile_sha256"])' "$RUNNER_TEMP/plan/base/record.json")
+            have=$(sha256sum "$RUNNER_TEMP/plan/base/Cargo.lock" | cut -d' ' -f1)
+            if [[ "$want" != "$have" ]]; then
+              echo "::error::the record's Cargo.lock is not the complete run's ($have, not $want)"
+              exit 1
+            fi
+            cp "$RUNNER_TEMP/plan/base/Cargo.lock" "$RUNNER_TEMP/plan/Cargo.lock"
+          fi
+
+      - name: Upload the plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-plan
+          path: ${{ runner.temp }}/plan/
+          if-no-files-found: error
+          retention-days: 30
+
   mutants:
-    name: Mutants (${{ matrix.surface }}, ${{ matrix.shard }}/4)
+    name: Mutants (${{ matrix.surface }}, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     needs: source
+    # An empty plan (a night of documentation) runs no shard; the score job
+    # carries every figure.
+    if: ${{ needs.source.outputs.shards != '0' }}
     timeout-minutes: 360
     permissions:
       contents: read
-    # The night's heavy work holds at most six of the account's twenty concurrent
-    # slots (the owner's balance rule of 2026-10-26, the keeper's reading): six
-    # shards at a time here, the fuzz targets after them at six, so a pull
-    # request's run at 03:00 UTC starts within minutes; the shards finish later
-    # in the night and decide the same.
+    # The plan's matrix (cut 7). A night's heavy work holds at most six of the
+    # account's twenty concurrent slots (the owner's balance rule of 2026-10-26,
+    # the keeper's reading), the fuzz targets after it at six; the complete run
+    # is twenty shards in one wave (the keeper's cut 5), each one job on its own
+    # runner under the memory ceiling below.
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: ${{ fromJSON(needs.source.outputs.max_parallel) }}
       matrix:
-        surface: [script, beef, merkle, wire, substrates]
-        shard: [0, 1, 2, 3]
+        include: ${{ fromJSON(needs.source.outputs.matrix) }}
     env:
       SURFACE: ${{ matrix.surface }}
       SHARD: ${{ matrix.shard }}
+      LABEL: ${{ matrix.label }}
       SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
       # The conformance suites in the script, BEEF and Merkle selections skip
       # without the corpus, so the oracle reads it as ci.yml's vectors job does,
@@ -150,11 +254,17 @@ jobs:
             --root "$RUNNER_TEMP/tools" --target-dir "$RUNNER_TEMP/tool-target"
           echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
 
-      # This library does not commit Cargo.lock: resolve once in the checkout,
-      # so the copy cargo-mutants makes carries the lock and the baseline and
-      # every mutant of the shard build one graph under `--locked` (#574).
-      - name: Resolve the mutation lockfile
-        run: cargo generate-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mutation-plan
+          path: ${{ runner.temp }}/plan
+
+      # This library does not commit Cargo.lock: the plan's (resolved once by
+      # the source job, or carried from the complete run) goes into the
+      # checkout, so the copy cargo-mutants makes carries it and the baseline
+      # and every mutant of every shard build one graph under `--locked` (#574).
+      - name: Place the mutation lockfile
+        run: cp "$RUNNER_TEMP/plan/Cargo.lock" Cargo.lock
 
       # A mutant that stops a parser's position advancing (`+=` to `*=` in
       # `Script::from_asm`, `Script::parse_chunks`, the HTTP substrate's
@@ -204,8 +314,9 @@ jobs:
         run: |
           status=0
           python3 .github/scripts/nightly_mutants.py run \
-            --surface "$SURFACE" --shard "$SHARD/4" --commit "$SOURCE_COMMIT" \
-            --output "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" || status=$?
+            --surface "$SURFACE" --shard "$SHARD" --commit "$SOURCE_COMMIT" \
+            --plan "$RUNNER_TEMP/plan/plan.json" \
+            --output "$RUNNER_TEMP/mutations/$LABEL" || status=$?
           # Misses (2) and timeouts (3) are judged by the per-file floor below.
           # Baseline, setup and runner failures remain failures of this job.
           if [[ "$status" != 0 && "$status" != 2 && "$status" != 3 ]]; then
@@ -216,14 +327,14 @@ jobs:
         if: always()
         run: |
           python3 .github/scripts/nightly_mutants.py package \
-            --run "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" \
+            --run "$RUNNER_TEMP/mutations/$LABEL" \
             --output "$RUNNER_TEMP/mutation-artifact"
 
       - name: Upload mutation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: mutants-${{ matrix.surface }}-${{ matrix.shard }}
+          name: mutants-${{ matrix.label }}
           path: ${{ runner.temp }}/mutation-artifact/
           if-no-files-found: error
           retention-days: 30
@@ -231,7 +342,7 @@ jobs:
   mutation-score:
     name: Mutation score floor
     needs: [source, mutants]
-    if: always()
+    if: ${{ always() && needs.source.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -244,6 +355,12 @@ jobs:
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
+          name: mutation-plan
+          path: ${{ runner.temp }}/plan
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: ${{ needs.source.outputs.shards != '0' }}
+        with:
           pattern: mutants-*
           path: ${{ runner.temp }}/mutation-results
           merge-multiple: true
@@ -252,16 +369,34 @@ jobs:
       # src/transaction/merkle_path.rs); elsewhere the floor is the checked-out
       # ratchet record's `mutation_floors` member, the measured score rounded
       # down with its improvement issue, which `tools/ratchet/run --check
-      # --against` refuses to lower or remove.
+      # --against` refuses to lower or remove. Cut 7: the night's files are
+      # judged as before; a carried figure below its floor is listed with its
+      # run, a finding and never a failure of the night. The merged record (every
+      # file's figure, `night` or `carried`, with its run's id and sha) is the
+      # `mutation-record` artifact the next night carries from.
       - name: Publish every file's score and enforce its floor
         if: always()
         env:
           SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
         run: |
+          mkdir -p "$RUNNER_TEMP/mutation-results" "$RUNNER_TEMP/record"
           python3 .github/scripts/nightly_mutants.py report \
-            --input "$RUNNER_TEMP/mutation-results" --expected-shards 4 \
+            --input "$RUNNER_TEMP/mutation-results" --plan "$RUNNER_TEMP/plan/plan.json" \
+            --base-record "$RUNNER_TEMP/plan/base" --lockfile "$RUNNER_TEMP/plan/Cargo.lock" \
+            --record-output "$RUNNER_TEMP/record/record.json" \
             --floors docs/ratchets.json --commit "$SOURCE_COMMIT" \
             --output "$RUNNER_TEMP/mutation-summary.json"
+
+      # 90 days, the longest an artifact is kept: a night re-uploads the whole
+      # record, so the chain lives while a run lands inside each 90 days.
+      - name: Upload the record
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-record
+          path: ${{ runner.temp }}/record/
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Upload the scoreboard
         if: always()
@@ -281,7 +416,7 @@ jobs:
     # the heavy work never holds more than six slots (see `mutants`).
     needs: [source, mutants]
     if: ${{ !cancelled() && needs.source.result == 'success' }}
-    timeout-minutes: 90
+    timeout-minutes: 45
     permissions:
       contents: read
       issues: write
@@ -352,16 +487,16 @@ jobs:
           export PATH="$RUNNER_TEMP/tools/bin:$PATH"
           cargo fuzz build -O -s "$FUZZ_SANITIZER" "${{ matrix.target }}"
 
-      # One hour from the checked-in corpus. New entries are written to
-      # $RUNNER_TEMP/new (the leading corpus directory); a crash's input to
-      # $RUNNER_TEMP/artifacts, and the run goes on (-ignore_crashes).
-      - name: Fuzz for an hour
+      # FUZZ_MINUTES from the checked-in corpus (cut 7). New entries are
+      # written to $RUNNER_TEMP/new (the leading corpus directory); a crash's
+      # input to $RUNNER_TEMP/artifacts, and the run goes on (-ignore_crashes).
+      - name: Fuzz for the night's budget
         run: |
           export PATH="$RUNNER_TEMP/tools/bin:$PATH"
           mkdir -p "$RUNNER_TEMP/new" "$RUNNER_TEMP/artifacts" "fuzz/corpus/${{ matrix.target }}"
           status=0
           cargo fuzz run -O -s "$FUZZ_SANITIZER" "${{ matrix.target }}" "$RUNNER_TEMP/new" "fuzz/corpus/${{ matrix.target }}" -- \
-            -fork=2 -ignore_crashes=1 -max_total_time=3600 \
+            -fork=2 -ignore_crashes=1 -max_total_time=$((FUZZ_MINUTES * 60)) \
             -artifact_prefix="$RUNNER_TEMP/artifacts/" > "$RUNNER_TEMP/fuzz.log" 2>&1 || status=$?
           tail -n 40 "$RUNNER_TEMP/fuzz.log"
           echo "libFuzzer exited $status (a crash is judged by the next steps)"
