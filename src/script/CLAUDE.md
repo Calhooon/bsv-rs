@@ -138,6 +138,8 @@ impl ScriptChunk {
 // Implements Default (OP_0), Debug, Clone, PartialEq, Eq
 ```
 
+What the public constructors accept and what they write (#661): `ScriptChunk::new` and `Script::from_chunks` (and `LockingScript`'s, `UnlockingScript`'s) hold any `{ op, data }`, as the reference's `new Script(chunks)` does (`ts-stack@edf6e03` `ScriptChunk.ts`, no check). The bytes are the reference's `#writeChunkData` (`Script.ts:539-562`): the data after an opcode below `OP_PUSHDATA1` bare, after a PUSHDATA opcode with its length, after an `OP_RETURN` carrying data bare with nothing written after it, after any other opcode not at all. The ASM is the reference's `#_chunkToString` (`:668-677`): a chunk with data writes its data's hex alone whatever its opcode (`OP_1` with `Some(vec![])` writes `""` and the bytes `51`; `OP_DUP` with `[1, 2]` writes `0102` and the bytes `76`), save #634's `OP_RETURN` writer, `0`/`-1` for `OP_0`/`OP_1NEGATE` and `OP_UNKNOWN<n>` for a direct push without data. A chunk whose opcode and data disagree does not read back as its script here or in the reference; this crate refuses none (the reference's answer, not a stricter one), and go-sdk normalizes them at its writer (`NewScriptFromScriptOps`). Pinned by `tests/script_chunk_asm_661.rs` against `tests/vectors/script_chunk_asm_661.json`.
+
 ### Script
 
 Core script type with lazy parsing and serialization caching using `RefCell`:
