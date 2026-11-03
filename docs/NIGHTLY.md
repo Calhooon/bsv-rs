@@ -254,7 +254,8 @@ declares; a row shared by several files names each file's apart (`` `a.rs`:
 their twelve binaries in the `identity`, `kvstore`, `registry` and `storage` sets
 (five #544 files in `primitives`) their sources never name.
 `tests/arch_tests_claude_rows_name_modules_706.rs` refuses a binary without a row,
-a row naming fewer and a shared row without a part per file;
+a row naming fewer, a shared row without a part per file and a stem named in
+two rows (#712: every reader keys by the stem and keeps the last copy);
 `.github/scripts/rows_from_sources.py` writes the cells, and its `--check`, the
 guard's refusals in Python, runs in the Test Suite's plan step beside the plan's
 own tests. That clause moves no selection: `Tree.uses` reads the source already.

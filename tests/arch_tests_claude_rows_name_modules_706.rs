@@ -326,24 +326,71 @@ fn ticked(text: &str) -> Vec<&str> {
     text.split('`').skip(1).step_by(2).collect()
 }
 
-/// `tests/CLAUDE.md`'s file table: each test file's stem to its row.
-fn test_rows(text: &str) -> BTreeMap<String, String> {
-    let (mut rows, mut inside) = (BTreeMap::new(), false);
-    for line in text.lines() {
+/// A file's stem, the key every reader of the table uses: `support/a.rs` and `a.rs` are `a`.
+fn stem(name: &str) -> &str {
+    let file = name.strip_suffix(".rs").unwrap_or(name);
+    file.rsplit('/').next().unwrap_or(file)
+}
+
+/// `tests/CLAUDE.md`'s `## Files` rows: each row's line number, its text and its File cell's
+/// `.rs` names, the one reading of the table for `test_rows` and `doubled_rows` (#712).
+fn table_rows(text: &str) -> Vec<(usize, &str, Vec<&str>)> {
+    let (mut rows, mut inside) = (Vec::new(), false);
+    for (index, line) in text.lines().enumerate() {
         if line.starts_with("## ") {
             inside = line.trim() == "## Files";
         } else if inside && line.starts_with("| `") {
             let file_cell = line.split('|').nth(1).unwrap_or("");
-            for name in ticked(file_cell)
-                .into_iter()
-                .filter_map(|n| n.strip_suffix(".rs"))
-            {
-                let stem = name.rsplit('/').next().unwrap_or(name);
-                rows.insert(stem.to_string(), line.to_string());
-            }
+            let names = ticked(file_cell).into_iter().filter(|n| n.ends_with(".rs"));
+            rows.push((index + 1, line, names.collect()));
         }
     }
     rows
+}
+
+/// `tests/CLAUDE.md`'s file table: each test file's stem to its row.
+fn test_rows(text: &str) -> BTreeMap<String, String> {
+    let mut rows = BTreeMap::new();
+    for (_, line, names) in table_rows(text) {
+        for name in names {
+            rows.insert(stem(name).to_string(), line.to_string());
+        }
+    }
+    rows
+}
+
+/// The stems named in two or more rows of the table (#712): every reader keys the rows by
+/// the stem (`test_rows` here, `rows[Path(name).stem]` in the scripts) and keeps the last, so
+/// an edit to another copy is never read, `support/a.rs` beside `a.rs` included. One refusal
+/// per stem, naming its files and each row's line in `tests/CLAUDE.md`.
+fn doubled_rows(text: &str) -> Vec<String> {
+    let mut seen: BTreeMap<&str, (Vec<&str>, Vec<usize>)> = BTreeMap::new();
+    for (number, _, names) in table_rows(text) {
+        for name in names {
+            let (files, at) = seen.entry(stem(name)).or_default();
+            if !files.contains(&name) {
+                files.push(name);
+            }
+            if at.last() != Some(&number) {
+                at.push(number);
+            }
+        }
+    }
+    seen.into_iter()
+        .filter(|(_, (_, at))| at.len() > 1)
+        .map(|(stem, (files, at))| {
+            let files: Vec<String> = files.iter().map(|f| format!("tests/{f}")).collect();
+            let at: Vec<String> = at.iter().map(usize::to_string).collect();
+            format!(
+                "{}: {} rows of the stem `{stem}` in tests/CLAUDE.md's ## Files table, at \
+                 lines {}; one row per stem (the readers key the rows by the stem and keep \
+                 the last)",
+                files.join(" and "),
+                at.len(),
+                at.join(" and ")
+            )
+        })
+        .collect()
 }
 
 /// A shared row's Modules cell, file by file (`` `a.rs`: `m`, `n`; `b.rs`: none ``): each
@@ -355,8 +402,8 @@ fn shared_cell(cell: &str) -> Option<BTreeMap<String, Vec<String>>> {
     let mut parts = BTreeMap::new();
     for part in cell.split(';') {
         let names = ticked(part);
-        if let Some(file) = names.first().and_then(|n| n.strip_suffix(".rs")) {
-            let stem = file.rsplit('/').next().unwrap_or(file);
+        if let Some(file) = names.first().filter(|n| n.ends_with(".rs")) {
+            let stem = stem(file);
             let own = names[1..].iter().filter(|n| !n.ends_with(".rs"));
             parts.insert(stem.to_string(), own.map(|n| n.to_string()).collect());
         }
@@ -504,13 +551,15 @@ fn every_tests_claude_row_names_the_modules_its_source_names_706() {
         "the walk found {} binaries",
         sources.len()
     );
-    let rows = test_rows(&read(&root.join("tests/CLAUDE.md")));
+    let table = read(&root.join("tests/CLAUDE.md"));
+    let rows = test_rows(&table);
     let pinned = frozen(&read(&root.join(FROZEN)));
     assert!(pinned.len() >= 6, "{FROZEN} holds {} pairs", pinned.len());
-    let refused = refusals(&sources, &rows, &modules, &pinned);
+    let mut refused = doubled_rows(&table);
+    refused.extend(refusals(&sources, &rows, &modules, &pinned));
     assert!(
         refused.is_empty(),
-        "{} of {} binaries refused (.github/scripts/rows_from_sources.py writes the cells):\n{}",
+        "{} refusals over {} binaries (.github/scripts/rows_from_sources.py writes the cells):\n{}",
         refused.len(),
         sources.len(),
         refused.join("\n")
@@ -747,4 +796,39 @@ fn the_crate_root_re_exports_resolve_to_their_modules() {
             "{name}"
         );
     }
+}
+
+#[test]
+fn a_file_named_in_two_rows_is_refused_with_both_lines_712() {
+    let text = "| `a.rs` | 1 | d | `script` | d |\n## Files\n| File | Tests |\n\
+        | `a.rs` | 1 | d | `script` | d |\n| `b.rs`, `a.rs` | 1 each | d | `b.rs`: none; `a.rs`: none | d |\n\
+        | `c.rs` | 1 | d | none | names `a.rs` in its description |\n| `c.rs` | 1 | d | none | d |\n\
+        ## Next\n| `c.rs` | 1 | d | none | d |\n";
+    assert_eq!(
+        doubled_rows(text),
+        [
+            "tests/a.rs: 2 rows of the stem `a` in tests/CLAUDE.md's ## Files table, at lines \
+             4 and 5; one row per stem (the readers key the rows by the stem and keep the last)",
+            "tests/c.rs: 2 rows of the stem `c` in tests/CLAUDE.md's ## Files table, at lines \
+             6 and 7; one row per stem (the readers key the rows by the stem and keep the last)",
+        ]
+    );
+    assert!(doubled_rows("## Files\n| `a.rs` | 1 |\n| `b.rs` | 1 |\n").is_empty());
+}
+
+#[test]
+fn a_support_file_beside_a_top_level_file_of_its_stem_is_two_rows_712() {
+    let text = "## Files\n| `a.rs` | 1 | d | none | d |\n| `b.rs` | 1 | d | none | d |\n\
+        | `support/a.rs` | 1 | none | none | d |\n";
+    // the readers hold one row for the stem, the later one
+    assert_eq!(test_rows(text).len(), 2);
+    assert!(test_rows(text)["a"].starts_with("| `support/a.rs`"));
+    assert_eq!(
+        doubled_rows(text),
+        [
+            "tests/a.rs and tests/support/a.rs: 2 rows of the stem `a` in tests/CLAUDE.md's \
+             ## Files table, at lines 2 and 4; one row per stem (the readers key the rows by the \
+             stem and keep the last)"
+        ]
+    );
 }

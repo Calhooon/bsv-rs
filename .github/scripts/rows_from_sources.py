@@ -23,8 +23,8 @@ Without `--check` the script writes the cells (adding the column to the table wh
 has none) and keeps every module a cell already names for the file (a shared row's union
 cell is not kept: it is no file's); it never writes a description, so a binary without a
 row is printed, not added. With `--check` it writes nothing and refuses a binary without a
-row, a row naming fewer modules than its source, a shared row without a part per file and
-a row dropping a frozen module: the reading `tests/arch_tests_claude_rows_name_modules_706.rs`
+row, a stem named in two rows (#712), a row naming fewer modules than its source, a shared
+row without a part per file and a row dropping a frozen module: the reading `tests/arch_tests_claude_rows_name_modules_706.rs`
 pins in the Rust suite, and CI runs `--check` beside the plan's own tests.
 """
 
@@ -172,14 +172,34 @@ def write(root):
     return "\n".join(lines), counts
 
 
+def doubled_rows(text):
+    """The stems named in two or more rows of the `## Files` table (#712): every reader keys
+    the rows by the stem (`nightly.table_rows`, this check's reading too) and keeps the last,
+    so an edit to another copy is never read, `support/a.rs` beside `a.rs` included. One
+    refusal per stem, naming its files and each row's line in `tests/CLAUDE.md`."""
+    seen = {}
+    for number, _, files in affected.nightly.table_rows(text):
+        for name, stem in files:
+            names, at = seen.setdefault(stem, ([], []))
+            if name not in names:
+                names.append(name)
+            if not at or at[-1] != number:
+                at.append(number)
+    return [f"{' and '.join(f'tests/{name}' for name in names)}: {len(at)} rows of the stem "
+            f"`{stem}` in tests/CLAUDE.md's ## Files table, at lines "
+            f"{' and '.join(map(str, at))}; one row per stem (the readers key the rows by the "
+            f"stem and keep the last)"
+            for stem, (names, at) in sorted(seen.items()) if len(at) > 1]
+
+
 def check(root):
-    """The refusals: a binary without a row, a row naming fewer modules than its source, a
+    """The refusals: a stem named in two rows (#712), a binary without a row, a row naming fewer modules than its source, a
     shared row without a part for the file, a row dropping a frozen module, a frozen pair
     naming no binary."""
     reading = Reading(root)
     rows = reading.tree.rows
     pinned = frozen(root)
-    refusals = []
+    refusals = doubled_rows((root / "tests" / "CLAUDE.md").read_text())
     for binary in reading.tree.binaries:
         if binary not in rows:
             refusals.append(f"tests/{binary}.rs: no row in tests/CLAUDE.md's ## Files table; {SENTENCE}")

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: one row per file in `tests/CLAUDE.md` (#712)
+
+- Three files had two rows each in the `## Files` table:
+  `script_int64_operand_witness.rs`, `script_shift_count_witness.rs` and
+  `transport_fault_wallet.rs`. Every reader (the #706 guard, `rows_from_sources.py`,
+  the plan's and the night's `test_rows`) keys the table by the file's stem and keeps the
+  last copy; the shift row read was the stale one (the default mode "shifts by any
+  count", before #383). Each pair is merged to the copy its file's tests pin
+  (`docs/lanes/fix-712.md`); the Modules cells were equal, so no plan selection moves.
+- `tests/arch_tests_claude_rows_name_modules_706.rs` and
+  `rows_from_sources.py --check` refuse a stem named in two rows, naming its files and
+  each row's line (`a_file_named_in_two_rows_is_refused_with_both_lines_712`, its Python
+  twin in `test_affected_tests.py`); RED on `472c2fd8` with three refusals, green after.
+  The check keys by the stem, as the readers do, through the readers' own table reading
+  (`table_rows` in the guard, `nightly_mutants.table_rows` in Python), so a
+  `support/a.rs` row beside an `a.rs` row, one row to every reader, is refused as two
+  (`a_support_file_beside_a_top_level_file_of_its_stem_is_two_rows_712` in both; RED
+  on the name-keyed check of the review's `67ad7d28`, which returned no refusal).
+
 ### CI: the cap guard reads every workflow for a heavy dispatch or `uses:`, pins `!cancelled()` after the shards, the give-up bound and the wait's `--workflow` (#709)
 
 - The rule read of #683's landing found five ways a later edit could put two
