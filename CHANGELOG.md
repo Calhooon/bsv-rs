@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the contacts manager reads a listed token as the reference's `PushDrop.decode` does, so its count, bounds and envelope refuse in the reference's order and words (#718)
+
+- #717's rule read checked the shared canonical refusal against
+  `decodeCanonicalPushDrop` (`ts-stack@edf6e03` `PushDropValidation.ts:54-79`) at
+  its five callers, but not the identity and contacts sites. None of those calls
+  it; each reference counterpart reads with `PushDrop.decode` at its default
+  position (`PushDrop.ts:63-121`, the second chunk never read) and runs its own
+  checks. The four sites are read in `docs/lanes/fix-718.md`, with a table:
+  the contacts manager's `authenticate_contact`
+  (`#authenticateContactScript`, `ContactsManager.ts:431-466`), the identity
+  revocation's lookup loop (`IdentityClient.ts:768-829`), and the two
+  `ls_identity` parsers (the toolbox's `decodeIdentityOutput`,
+  `identityUtils.ts:497-559`). Each site's limits equal its counterpart's: two
+  fields; a contact ciphertext of 1 to 66,560 bytes and a signature of 8 to 80;
+  an identity certificate of 1 to 262,144 bytes and a signature of 8 to 80.
+- The contacts site differed. Its read was the canonical lock-before decode
+  (`PushDrop::decode_before`), which refuses four kinds of token in its own
+  words before the count, the bounds and the envelope: an empty script, a key
+  alone, a `05` key, and a token without `OP_CHECKSIG` second. That is the
+  issue's envelope-before-bounds class, in the decode's form.
+  `authenticate_contact` now reads as the reference does, using the reference
+  decode's own words for the read's refusals and `decode_reference_before`
+  (#618's reading, crate-visible now) for the fields. A token without
+  `OP_CHECKSIG` second with an oversized ciphertext is now refused as
+  `contact ciphertext must contain 1-66560 bytes`; before, it was
+  `Expected OP_CHECKSIG after pubkey`. The words reach no caller: the listing
+  drops the output, and the update and removal replace the error with the
+  reference's outer words, as before.
+- The identity sites agree with the reference. Every refusal is a skip on both
+  sides, and the revocation's run words are the reference's
+  (`No authenticated revelation output matches the requested certificate.`).
+  The parsers check the record before the envelope, where the toolbox checks
+  the envelope first; no caller can see that order.
+- The witness is `tests/vectors/identity_contacts_canonical_718.json`, written
+  by `tests/support/identity_contacts_canonical_718.mjs` against the whole SDK
+  at `edf6e03` under Node v22.18.0; two runs are byte-identical. It holds ten
+  shapes, each with the reference's `getContacts` drop words and its
+  revocation's run words. The tokens are built by this crate's PushDrop writer
+  and pinned to the recorded SHA-256.
+- The unit test `src/identity/contacts_auth_718_tests.rs` is RED on 8 of the 10
+  shapes with the read put back to `decode_before`, and GREEN after.
+  `tests/identity_contacts_canonical_718.rs` pins the agreement at the
+  revocation, both parsers and the contacts listing; it is GREEN on both.
+- No public API change.
+
+### Notes: cross-SDK parity (#718)
+
+Two residues at the contacts site, both older than #718. A compressed key with
+x at or above p is reduced by the reference and read on; this crate's
+`from_bytes` refuses it in native words (the #498 and #183 rows). The
+reference's update and removal refusals carry the inner words as `cause`; this
+crate's `Error` has no cause chain, so the outer words alone reach the caller.
+go-sdk@2ca481c has no contacts manager or identity revocation.
+
 ### CI: a `CHANGELOG.md` change reaches no binary through an assertion's literal, and a module's `CLAUDE.md` reaches nothing (#689's two remaining rows)
 
 - The Test Suite's plan (`.github/scripts/affected_tests.py`) read every
