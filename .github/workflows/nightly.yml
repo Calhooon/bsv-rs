@@ -59,22 +59,110 @@ jobs:
   # of ci.yml changes for it; a workflow_call from here would run this run's ref
   # (main's on a schedule) and share its concurrency group with main's pushes.
   # A dispatch made with the GITHUB_TOKEN starts a run, as the sync's does.
-  ci-full:
-    name: CI full set (${{ matrix.line }})
+  # After the heavy work (the fold of #682): each dispatch starts a whole
+  # ci.yml run, so beside the shards a complete run held 14 + up to 22 of the
+  # twenty. After the shards and the fuzz targets, whatever their result.
+  # Beta's run, then main's (#682's second fold, the keeper's word (a) of
+  # 2026-11-03): beta's dispatched run holds up to 9 jobs at once and main's,
+  # on main's ci.yml, up to 22 (16 before the dependents start), together 31,
+  # so the two never run at once. The order lives here and not in a ci.yml
+  # concurrency group: a dispatch on main runs main's ci.yml, whose group is
+  # per event and ref, so a group added on beta would not hold main's run
+  # until main carried it. The cost: this job's one runner, held for beta's
+  # run (22m42s in run 41579716973). tests/arch_nightly_cap.rs refuses an
+  # edge removed, the wait removed or a dispatch job with a matrix.
+  ci-full-beta:
+    name: CI full set (beta)
+    needs: [mutants, fuzz]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    # beta's run alone took 22m42s; the wait gives up at 55 minutes, inside
+    # the job's 60, and main's dispatch follows anyway
+    timeout-minutes: 60
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch ci.yml on beta, wait for that run and read its conclusion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Under -euo pipefail (#682's fourth fold): a failing `list | jq` in the
+          # poll is an error at once, not an empty count and a "no new run" later.
+          set -euo pipefail
+          # The run is ours by identity (#682's third fold): a dispatch by this
+          # job's token is github-actions[bot]'s, so a hand dispatch is never
+          # taken, and a run listed before the dispatch is never taken.
+          since="$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)"
+          list() {
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch beta \
+              --event workflow_dispatch --user 'github-actions[bot]' --created ">=$since" \
+              --limit 20 --json databaseId,createdAt
+          }
+          before="$(list)"
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref beta
+          run=""
+          for _ in $(seq 1 30); do
+            new="$(list | jq -c --argjson before "$before" \
+              '[.[] | select(.databaseId as $id | [$before[].databaseId] | index($id) | not)]')"
+            count="$(jq length <<<"$new")"
+            if [ "$count" -gt 1 ]; then
+              echo "::warning::$count new ci.yml dispatch runs on beta by github-actions[bot]: $(jq -c '[.[].databaseId]' <<<"$new"); watching the one created nearest after the dispatch"
+            fi
+            if [ "$count" -ge 1 ]; then
+              run="$(jq 'min_by(.createdAt) | .databaseId' <<<"$new")"
+              break
+            fi
+            sleep 10
+          done
+          if [ -z "$run" ]; then
+            echo "::error::no new ci.yml dispatch run on beta by github-actions[bot] in five minutes since $since"
+            exit 1
+          fi
+          echo "beta's ci.yml run: $run $(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          # Give up at 55 minutes of this job, said in the log, so the job ends
+          # before its timeout and main's dispatch follows.
+          budget="$((55 * 60 - SECONDS))"
+          [ "$budget" -gt 0 ] || budget=1
+          watched=0
+          timeout "$budget" gh run watch "$run" --repo "$GITHUB_REPOSITORY" \
+            --interval 60 > /dev/null || watched=$?
+          # 124 is the give-up alone: a warning, then the conclusion read (still
+          # "" while the run is in progress, so no verdict). Any other failure of
+          # the watch (the API, the network) is an error: it must not leave the
+          # night green without beta's verdict (#682's fourth fold).
+          case "$watched" in
+            0) ;;
+            124) echo "::warning::gave up waiting for beta's run $run at 55 minutes (exit 124); main's dispatch follows" ;;
+            *)
+              echo "::error::watching beta's run $run failed (exit $watched)"
+              exit 1 ;;
+          esac
+          # The night surfaces beta's CI verdict: a red run fails this job
+          # (main's still runs, under !cancelled()).
+          conclusion="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
+          echo "beta's ci.yml run $run: ${conclusion:-in progress}"
+          case "$conclusion" in
+            success) ;;
+            failure | timed_out | startup_failure)
+              echo "::error::beta's ci.yml run $run concluded $conclusion"
+              exit 1 ;;
+            "") echo "::warning::beta's ci.yml run $run is still in progress, no verdict" ;;
+            *) echo "::warning::beta's ci.yml run $run concluded $conclusion, no verdict" ;;
+          esac
+
+  ci-full-main:
+    name: CI full set (main)
+    needs: [ci-full-beta]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       actions: write
-    strategy:
-      fail-fast: false
-      matrix:
-        line: [beta, main]
     steps:
-      - name: Dispatch ci.yml on the line
+      - name: Dispatch ci.yml on main
         env:
           GH_TOKEN: ${{ github.token }}
-          LINE: ${{ matrix.line }}
-        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main
 
   # Cut 7: the bench weekly. The workflow has no schedule, so "weekly" is the
   # dispatcher's input; bench.yml runs at the line's tip (a dispatch names a
@@ -214,8 +302,16 @@ jobs:
     # The plan's matrix (cut 7). A night's heavy work holds at most six of the
     # account's twenty concurrent slots (the owner's balance rule of 2026-10-26,
     # the keeper's reading), the fuzz targets after it at six; the complete run
-    # is twenty shards in one wave (the keeper's cut 5), each one job on its own
-    # runner under the memory ceiling below.
+    # is twenty shards (the keeper's cut 5), each one job on its own runner under
+    # the memory ceiling below, at most fourteen at a time.
+    # The fleet's runner cap (the keeper's line, 2026-11-03): every heavy run on
+    # the runners holds at most 14 of the twenty, so six stay for the pull
+    # request and queue runs of bsv-rs, the CLI, the toolbox and the stack. GitHub
+    # reads no `env` in `strategy`, so the number lives in one place, the plan's
+    # HEAVY_MAX_PARALLEL (.github/scripts/nightly_mutants.py), read here through
+    # the pin job's `max_parallel` output; its owner is loop four's #675, which
+    # reads the account's occupancy from the API and moves it.
+    # tests/arch_nightly_cap.rs refuses this line removed or a cap above 14.
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.source.outputs.max_parallel) }}
@@ -435,6 +531,8 @@ jobs:
       issues: write
     strategy:
       fail-fast: false
+      # Six, under the fleet's runner cap of 14 (the keeper's line, 2026-11-03;
+      # its owner loop four's #675; tests/arch_nightly_cap.rs).
       max-parallel: 6
       matrix:
         target:

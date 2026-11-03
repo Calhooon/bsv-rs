@@ -559,14 +559,17 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertIn("Cargo.toml changed", planned["why_complete"])
         self.assertEqual(planned["lockfile"], "generate")
         self.assertEqual(sum(1 for m in planned["matrix"]), 11 + 3 + 1 + 2 + 3)
-        self.assertEqual(planned["max_parallel"], nightly.SLOT_LIMIT)
+        self.assertEqual(planned["max_parallel"], nightly.HEAVY_MAX_PARALLEL)
         self.assertEqual(self.plan(record=False)["why_complete"],
                          "no record of a complete run on the line to carry from")
         self.assertEqual(self.plan(mode="complete")["mode"], "complete")
 
-    def test_the_complete_run_fills_the_twenty_slots_in_one_wave(self):
+    def test_the_complete_run_is_twenty_shards_in_two_waves_under_the_cap(self):
         self.assertEqual(sum(nightly.COMPLETE_SHARDS.values()), nightly.SLOT_LIMIT)
         self.assertEqual(set(nightly.COMPLETE_SHARDS), set(nightly.SURFACES))
+        # The fleet's runner cap (2026-11-03): six of the twenty stay for the fleet.
+        self.assertEqual(nightly.HEAVY_MAX_PARALLEL, 14)
+        self.assertLessEqual(nightly.NIGHT_PARALLEL, nightly.HEAVY_MAX_PARALLEL)
 
     # PR #666's fold: the five holes the reads found, each on the fixture tree.
     def put(self, path, body):

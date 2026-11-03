@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: every heavy run on the runners carries max-parallel 14 (the fleet's runner cap, 2026-11-03)
+
+The account's twenty hosted runners are one pool across bsv-rs, the CLI,
+the toolbox and the stack: the complete nightly 41579707627 asked for its
+twenty shards in one wave and PR #679's run, created 05:05:32Z, finished 52
+minutes later. The nightly's `mutants` matrix now holds at most 14 (the
+plan's `HEAVY_MAX_PARALLEL` for a complete run, read through the pin job's
+`max_parallel` output; a night stays at 6), and the `fuzz` matrix keeps its
+6, so six runners stay for the fleet's pull request and queue runs. The cost:
+a complete run's shards go 14 then 6, about 35 minutes longer (41579707627's
+shard times replayed on 14 slots: about 100 minutes against 65). Pinned by
+`tests/arch_nightly_cap.rs` (a heavy matrix without `max-parallel` or above
+14, in any workflow, refused; two heavy jobs of the nightly with no `needs:`
+path between them refused). The dispatch of the two whole `ci.yml` runs now
+runs after the shards and the fuzz targets, and one run after the other
+(the keeper's word (a)): beta's run holds up to 9 jobs at once and main's,
+on main's `ci.yml`, up to 22 (16 before its seven dependents start), up to
+31 together where the shards had held them to about 12. `ci-full` is split
+into `ci-full-beta`, which dispatches beta's run and waits for it (the run
+it dispatched, found among the bot's runs not listed before the dispatch,
+so a hand dispatch on beta is never the run watched; a `failure`
+conclusion fails the job, the give-up at 55 minutes a warning with no verdict
+and any other failed watch an error, the step under `set -euo pipefail`; one runner for its 23 minutes; a concurrency group in `ci.yml` would not hold
+main's run, which reads main's own file), and `ci-full-main`, which needs
+it; `ci.yml`'s Test Suite and dependents matrices carry `max-parallel: 14`
+(at most seven wide, so nothing moves today). The residual: a matrix cap
+does not bound singleton jobs, so main's run holds up to 22 for about a
+minute and a half. The CI phase in sequence is about 39 minutes replayed
+from the measured jobs (beta's 22m42s, then main's 16m32s alone), an hour
+and 23 minutes at the hour main's run took beside the shards (04:43Z to
+05:43Z in 41579707627); the next complete run measures it. The record and the stagger slots are
+`docs/lanes/ci-speed-7.md`, "The fleet's runner cap". The number's owner is
+loop four's #675.
+
 ### Tests: src/script/spend/key_point.rs's survivors of the complete run killed (#681)
 
 - The complete nightly (run 41579707627 on `e3fef6dc`) measured `key_point.rs` at 25.00%
