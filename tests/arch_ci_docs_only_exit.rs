@@ -2,7 +2,9 @@
 //! cache, installs nothing and builds nothing when its plan reaches no target (`build`
 //! false), and reports green from a last step; `lint` and `checks` install and build nothing
 //! when the plan reads the change as docs only (`docs_only`), their gates skipped and read
-//! as `SKIP` by the verdict step, `secrets` still scanning the commits. Each step after the
+//! as `SKIP` by the verdict step, `secrets` still scanning the commits; `semver` installs
+//! and checks nothing on a docs-only change and reports green from a last step (#689). Each
+//! step after the
 //! plan carries the condition or a condition that implies it: a step without one would
 //! restore, install or build on a docs-only run. Read at the string level as
 //! `arch_ci_runs_every_test.rs` reads ci.yml; no network, no environment.
@@ -87,6 +89,10 @@ const NOT_DOCS: &str = "steps.plan.outputs.docs_only != 'true'";
 const READY: &str = "${{ !cancelled() && steps.ready.outcome == 'success' }}";
 const SECRETS: &str = "${{ !cancelled() && (steps.ready.outcome == 'success' || steps.plan.outputs.docs_only == 'true') }}";
 const VERDICT: &str = "${{ !cancelled() }}";
+const DOCS: &str = "steps.plan.outputs.docs_only == 'true'";
+const SEMVER_INSTALL: &str =
+    "steps.plan.outputs.docs_only != 'true' && steps.semver-tool.outputs.cache-hit != 'true'";
+const SEMVER_CHECK: &str = "check-release --baseline-rev \"$baseline\" --all-features";
 
 /// A test-step condition that is `build` or implies it, read whole (the #688 fold: a
 /// condition read by substring passed `build == 'true' || always()`): `build`, the reached-set
@@ -203,10 +209,46 @@ fn gate_job_refusals(ci: &str, name: &str) -> Vec<String> {
     errors
 }
 
+/// `semver`'s refusals (#689): each step after the plan under `docs_only`'s negation (the
+/// tool's install under it and its cache miss), the check unchanged, the last step the green
+/// report under `docs_only`.
+fn semver_refusals(ci: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let found = after_plan(steps(job(ci, "semver")), "semver", &mut errors);
+    let Some((last, before)) = found.split_last() else {
+        return errors;
+    };
+    for step in before {
+        let condition = step.condition.as_deref().unwrap_or_default();
+        let install = step.text.contains("cargo install cargo-semver-checks");
+        let ok = condition == NOT_DOCS || (install && condition == SEMVER_INSTALL);
+        if !ok {
+            errors.push(format!(
+                "semver: `{}` runs under `{condition}`, not `{NOT_DOCS}`: a docs-only run would reach it",
+                step.name
+            ));
+        }
+    }
+    if !before.iter().any(|s| s.text.contains(SEMVER_CHECK)) {
+        errors.push(format!(
+            "semver: no step runs `{SEMVER_CHECK}` after the plan"
+        ));
+    }
+    if last.condition.as_deref() != Some(DOCS) || !last.text.contains("docs-only: no API to check")
+    {
+        errors.push(format!(
+            "semver: the last step `{}` is not the docs-only report under `{DOCS}`",
+            last.name
+        ));
+    }
+    errors
+}
+
 fn refusals(ci: &str) -> Vec<String> {
     let mut errors = test_suite_refusals(ci);
     errors.extend(gate_job_refusals(ci, "lint"));
     errors.extend(gate_job_refusals(ci, "checks"));
+    errors.extend(semver_refusals(ci));
     errors
 }
 
@@ -218,7 +260,7 @@ fn every_step_after_the_plan_carries_the_docs_only_exit() {
 #[test]
 fn the_plan_steps_read_the_runs_and_the_docs_only_flag() {
     let ci = ci_yml();
-    for name in ["lint", "checks"] {
+    for name in ["lint", "checks", "semver"] {
         let plan = steps(job(&ci, name))
             .into_iter()
             .find(|s| s.id.as_deref() == Some("plan"))
@@ -286,6 +328,22 @@ fn a_step_without_the_exit_is_refused_by_name() {
             "      - name: Cache the Clippy and ratchet builds\n        if: steps.plan.outputs.docs_only != 'true' || always()\n",
             "lint: `Cache the Clippy and ratchet builds` runs under",
         ),
+        // #689: the semver exit
+        (
+            "        if: steps.plan.outputs.docs_only != 'true'\n        env:\n          BASE_REV:",
+            "        env:\n          BASE_REV:",
+            "semver: `Check against the last tag reachable from the PR base` runs under ``",
+        ),
+        (
+            "        if: steps.plan.outputs.docs_only != 'true' && steps.semver-tool.outputs.cache-hit != 'true'\n",
+            "        if: steps.semver-tool.outputs.cache-hit != 'true'\n",
+            "semver: `Install cargo-semver-checks 0.51.0` runs under",
+        ),
+        (
+            "        if: steps.plan.outputs.docs_only == 'true'\n        run: |\n          echo \"docs-only: no API to check\"",
+            "        run: |\n          echo \"docs-only: no API to check\"",
+            "semver: the last step `No API to check` is not the docs-only report",
+        ),
     ];
     for (old, new, refusal) in cases {
         assert_eq!(ci.matches(old).count(), 1, "{old}");
@@ -298,8 +356,8 @@ fn a_step_without_the_exit_is_refused_by_name() {
 }
 
 /// A step placed before the plan runs on a docs-only change whatever it carries (#688
-/// fold): the Test Suite's cache restore moved above its plan, and a cargo run before
-/// `lint`'s, are refused by name.
+/// fold): the Test Suite's cache restore moved above its plan, a cargo run before `lint`'s,
+/// and `semver`'s scratch step above its checkout (#689), are refused by name.
 #[test]
 fn a_step_before_the_plan_is_refused_by_name() {
     let ci = ci_yml();
@@ -340,6 +398,28 @@ fn a_step_before_the_plan_is_refused_by_name() {
         errors
             .iter()
             .any(|e| e.starts_with("lint: `Fetch early` runs before the plan")),
+        "{errors:?}"
+    );
+
+    // #689: semver's scratch step where it stood before the exit, above its checkout
+    let scratch = "      - name: Keep build output in runner scratch\n        if: steps.plan.outputs.docs_only != 'true'\n";
+    let semver = ci.find("\n  semver:\n").expect("semver");
+    let checkout = semver
+        + ci[semver..]
+            .find("      - uses: actions/checkout@")
+            .expect("semver's checkout");
+    assert_eq!(ci.matches(scratch).count(), 1);
+    let mut early = ci.replacen(scratch, "      - name: Moved\n", 1);
+    early.insert_str(
+        checkout,
+        "      - name: Keep build output in runner scratch\n        run: echo \"TMPDIR=$RUNNER_TEMP\" >> \"$GITHUB_ENV\"\n\n",
+    );
+    let errors = refusals(&early);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e
+                .starts_with("semver: `Keep build output in runner scratch` runs before the plan")),
         "{errors:?}"
     );
 }

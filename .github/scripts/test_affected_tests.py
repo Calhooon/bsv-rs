@@ -284,7 +284,7 @@ class WorkflowKeyTests(unittest.TestCase):
                 push = PUSH_PATH.search(step)
                 self.assertIsNotNone(push, f"{name}: a plan step without its push branch")
                 found[name] = (job, push.group(1), PUSH_PATH.sub("", step, count=1))
-        self.assertEqual(sorted(found), ["checks", "lint", "test"])
+        self.assertEqual(sorted(found), ["checks", "lint", "semver", "test"])
         return found
 
     def test_every_plan_key_a_pull_request_reads_is_one_the_plan_writes(self):

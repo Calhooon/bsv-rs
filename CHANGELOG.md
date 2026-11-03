@@ -27,6 +27,22 @@ when a read shows the p95 under 10. Pinned by `tests/arch_nightly_cap.rs`
 restored to 14). The record is `docs/lanes/ci-speed-7.md`, "The fleet's
 runner cap".
 
+### CI: a docs-only pull request's `semver` job checks nothing (speed loop two, #689)
+
+#690, the earliest docs-only pull request under #668's exit, ran 4m43s
+(run 41617426467) against #669's 10m05s: the Test Suite 8 s, `lint` 9 s,
+`checks` 30 s, `main-in-beta` 5 s, and `semver` 4m39s, the one job the exit
+left alone. `semver` now runs lint's plan step after its own checkout and
+every step after it carries `docs_only != 'true'` (the tool's install with
+its cache miss), a last step printing `docs-only: no API to check` so the
+required context reports green; on every other pull request it runs as
+before, against the same baseline tag. Read from its own plan rather than
+the Test Suite's through `needs`, which would hold `semver` behind the
+suite on every code change. Pinned by `tests/arch_ci_docs_only_exit.rs`
+(`semver_refusals`, RED with the check's condition removed and on the base's
+`ci.yml`) and `test_affected_tests.py`'s plan-key tests. The record is
+`docs/lanes/ci-speed-loop2-docs-only.md`, "The semver exit".
+
 ### CI: a docs-only pull request's Test Suite, lint and checks build nothing (speed loop two, #668)
 
 #669, a pull request of `CHANGELOG.md` and a lane record, ran the whole set
