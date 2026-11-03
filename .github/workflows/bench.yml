@@ -104,7 +104,7 @@ jobs:
             > "$BSV_SCRIPT_CORPUS/seed.jsonl"
           test -s "$BSV_SCRIPT_CORPUS/seed.jsonl"
 
-      # This library does not commit Cargo.lock (the deny job's rule): resolve
+      # This library does not commit Cargo.lock (the rule of the deny step in ci.yml's lint job): resolve
       # once so the gate's `cargo bench --locked` measures one graph.
       - name: Resolve the benchmark lockfile
         run: cargo generate-lockfile

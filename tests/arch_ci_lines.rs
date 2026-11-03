@@ -18,6 +18,12 @@
 //! without `-x`, rebuilds a branch holding beta's tip, falls back to main's
 //! tip, keeps the checkout's credentials, cannot create its label, or opens
 //! its PR anywhere but from `sync/main-into-beta` into `beta`.
+//!
+//! The bundled gates (CI speed round 1, cut 2; `docs/lanes/ci-speed-2.md`): `lint` and
+//! `checks` each carry their gates as steps of one runner, one setup each, and are refused
+//! when a gate is gone, would stop running after an earlier gate failed, prints no
+//! `PASS`/`FAIL` line of its own, or is missing from the last step that names every gate
+//! that did not pass; a job with a matrix or a second cache restore is refused too.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::fs;
@@ -480,5 +486,208 @@ fn the_shape_check_names_a_job_with_no_runner_and_an_unpinned_action() {
             "x.yml: `- uses: actions/checkout@v4` is not pinned by sha".to_owned(),
             "x.yml: job `b` has no `runs-on` or `uses`".to_owned(),
         ]
+    );
+}
+
+/// The gates of each bundled job: (job, [(step id, gate)]). The gate is the line's word, the
+/// context each step replaced.
+const BUNDLES: &[(&str, &[(&str, &str)])] = &[
+    (
+        "lint",
+        &[
+            ("fmt", "Rustfmt"),
+            ("clippy", "Clippy"),
+            ("deny", "deny"),
+            ("ratchet", "ratchet"),
+        ],
+    ),
+    (
+        "checks",
+        &[
+            ("vectors", "vectors"),
+            ("fixtures", "fixtures"),
+            ("secrets", "secrets"),
+            ("docs", "Documentation"),
+            ("wasm32", "wasm32 (combined)"),
+        ],
+    ),
+];
+
+/// The steps of a job: each from its `- ` line at six spaces to the next.
+fn steps(job: &[&str]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in job {
+        if line.starts_with("      - ") {
+            out.push(String::new());
+        }
+        if let Some(step) = out.last_mut() {
+            step.push_str(line);
+            step.push('\n');
+        }
+    }
+    out
+}
+
+/// What a bundled job of ci.yml must hold: every gate a step that runs after an earlier
+/// failure and prints its own line, one cache restore, no matrix, and a last step that runs
+/// whatever failed and names every gate whose step did not succeed.
+fn bundle(ci: &str, id: &str, gates: &[(&str, &str)]) -> Vec<String> {
+    let Some(job) = block(ci, 2, &format!("{id}:")) else {
+        return vec![format!("ci.yml: no `{id}` job")];
+    };
+    let mut errors = Vec::new();
+    if job.iter().any(|l| l.trim_start().starts_with("strategy:")) {
+        errors.push(format!("{id}: a matrix; the gates are steps of one runner"));
+    }
+    let caches = job
+        .iter()
+        .filter(|l| l.contains("uses: Swatinem/rust-cache@"))
+        .count();
+    if caches != 1 {
+        errors.push(format!("{id}: {caches} cache restores, not one"));
+    }
+    let steps = steps(&job);
+    let gated: Vec<&str> = steps
+        .iter()
+        .filter_map(|s| {
+            s.lines()
+                .find_map(|l| l.trim().strip_prefix("id: "))
+                .filter(|i| *i != "ready")
+        })
+        .collect();
+    for gate_id in &gated {
+        if !gates.iter().any(|(g, _)| g == gate_id) {
+            errors.push(format!(
+                "{id}: step `{gate_id}` is no gate of the verdict list"
+            ));
+        }
+    }
+    for (step_id, gate) in gates {
+        let Some(step) = steps
+            .iter()
+            .find(|s| s.lines().any(|l| l.trim() == format!("id: {step_id}")))
+        else {
+            errors.push(format!("{id}: no step `{step_id}` for the gate {gate}"));
+            continue;
+        };
+        if !step.contains("        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}\n") {
+            errors.push(format!(
+                "{id}: `{step_id}` does not run after an earlier gate failed (`!cancelled()`)"
+            ));
+        }
+        let line = format!(
+            "trap 'if [ $? -eq 0 ]; then echo \"PASS {gate}\"; else echo \"FAIL {gate}\"; fi' EXIT"
+        );
+        if !step.contains(&line) {
+            errors.push(format!(
+                "{id}: `{step_id}` prints no PASS/FAIL line of its own"
+            ));
+        }
+    }
+    let Some(last) = steps.last() else {
+        errors.push(format!("{id}: no steps"));
+        return errors;
+    };
+    if !last.contains("- name: Every gate passed\n        if: ${{ !cancelled() }}\n") {
+        errors.push(format!(
+            "{id}: the last step is not `Every gate passed` on `!cancelled()`"
+        ));
+    }
+    for (step_id, gate) in gates {
+        if !last.contains(&format!("${{{{ steps.{step_id}.outcome }}}} {gate}\n")) {
+            errors.push(format!("{id}: the last step does not judge `{gate}`"));
+        }
+    }
+    for needle in ["echo \"FAIL $gate", "failed+=(\"$gate\")", "exit 1"] {
+        if !last.contains(needle) {
+            errors.push(format!(
+                "{id}: the last step does not fail naming the gate (`{needle}`)"
+            ));
+        }
+    }
+    errors
+}
+
+#[test]
+fn the_bundled_gates_each_run_and_report_and_the_last_step_names_every_failure() {
+    let ci = read(".github/workflows/ci.yml");
+    let mut errors = Vec::new();
+    for (id, gates) in BUNDLES {
+        errors.extend(bundle(&ci, id, gates));
+    }
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    // the contexts a bundle replaced are gone as jobs: one runner per bundle, not two
+    for gone in [
+        "\n  clippy:\n",
+        "\n  fmt:\n",
+        "\n  deny:\n",
+        "\n  ratchet:\n",
+        "\n  vectors:\n",
+        "\n  fixtures:\n",
+        "\n  secrets:\n",
+        "\n  docs:\n",
+        "\n  wasm32:\n",
+    ] {
+        assert!(!ci.contains(gone), "a bundled gate is a job again: {gone}");
+    }
+}
+
+#[test]
+fn a_bundle_with_a_gate_stopped_unreported_or_unjudged_is_refused() {
+    let ci = read(".github/workflows/ci.yml");
+    let (_, lint) = BUNDLES[0];
+    let (_, checks) = BUNDLES[1];
+    let stopping = ci.replacen(
+        "        id: deny\n        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}\n",
+        "        id: deny\n",
+        1,
+    );
+    assert_eq!(
+        bundle(&stopping, "lint", lint),
+        ["lint: `deny` does not run after an earlier gate failed (`!cancelled()`)"]
+    );
+    let silent = ci.replacen(
+        "          trap 'if [ $? -eq 0 ]; then echo \"PASS fixtures\"; else echo \"FAIL fixtures\"; fi' EXIT\n",
+        "",
+        1,
+    );
+    assert_eq!(
+        bundle(&silent, "checks", checks),
+        ["checks: `fixtures` prints no PASS/FAIL line of its own"]
+    );
+    let unjudged = ci.replacen(
+        "            ${{ steps.docs.outcome }} Documentation\n",
+        "",
+        1,
+    );
+    assert_eq!(
+        bundle(&unjudged, "checks", checks),
+        ["checks: the last step does not judge `Documentation`"]
+    );
+    let gone = ci.replacen("        id: ratchet\n", "        id: ratchet-gone\n", 1);
+    assert_eq!(
+        bundle(&gone, "lint", lint),
+        [
+            "lint: step `ratchet-gone` is no gate of the verdict list",
+            "lint: no step `ratchet` for the gate ratchet",
+        ]
+    );
+    let twice = ci.replacen(
+        "      - name: Cache the checks' builds\n",
+        "      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3\n      - name: Cache the checks' builds\n",
+        1,
+    );
+    assert_eq!(
+        bundle(&twice, "checks", checks),
+        ["checks: 2 cache restores, not one"]
+    );
+    let lenient = ci.replacen(
+        "      - name: Every gate passed\n        if: ${{ !cancelled() }}\n",
+        "      - name: Every gate passed\n",
+        1,
+    );
+    assert_eq!(
+        bundle(&lenient, "lint", lint),
+        ["lint: the last step is not `Every gate passed` on `!cancelled()`"]
     );
 }

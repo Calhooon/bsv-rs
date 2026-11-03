@@ -231,10 +231,37 @@ an OS) is a finding, never a pass. The guard refuses, naming the file:
 To add a test file: nothing. The `cargo nextest run --features
 "full,http,websocket" --tests` step runs every file that feature set compiles, this guard included.
 A file gated on a feature outside that set is refused until a step covers it.
-To run a file apart as well (the `vectors` job's `--nocapture` runs, the
-`fixtures` job): name it in that step AND leave it covered by the whole suite.
+To run a file apart as well (the `vectors` step's `--nocapture` runs, the
+`fixtures` step, both of the `checks` job): name it in that step AND leave it covered by the whole suite.
 Only a file that cannot run in the whole suite belongs in the allowlist, with
 its reason and its step.
+
+## 7. The small gates are steps of `lint` and `checks`
+
+`tests/arch_ci_lines.rs` (`BUNDLES`) pins the bundling of CI speed round 1,
+cut 2 (`docs/lanes/ci-speed-2.md`). The gates that were each a runner of
+their own, its setup longer than the gate for most of them, are steps of two
+jobs, one checkout, one toolchain setup and one `Swatinem/rust-cache` restore
+each: `lint` carries Rustfmt, Clippy (`--all-targets --all-features`, then
+each published slice alone), deny and ratchet; `checks` carries vectors,
+fixtures, secrets, Documentation and wasm32 (combined). `main-in-beta`,
+`semver`, `beta-born` and the dependents jobs stay jobs of their own, on
+their own events. The guard refuses, naming the job and the gate:
+
+- a gate whose step is gone, or a step with an `id:` that no verdict names;
+- a gate that does not run after an earlier gate failed (its `if:` is
+  `${{ !cancelled() && steps.ready.outcome == 'success' }}`, the setup green);
+- a gate that prints no `PASS <gate>` or `FAIL <gate>` line of its own (its
+  exit trap);
+- a last step that is not `Every gate passed` on `!cancelled()`, does not
+  judge every gate's outcome, or does not fail naming the gates that did not
+  pass;
+- a matrix on either job, or a second cache restore;
+- a bundled gate back as a job of its own.
+
+The required contexts become `lint` and `checks` in place of the nine;
+`tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` (five) and
+`REQUIRED_ON_MAIN` (six) carry them.
 
 ## Feature and wasm builds
 
@@ -247,7 +274,7 @@ cargo hack check --each-feature --no-dev-deps
 
 It checks all 21 declared features, plus cargo-hack's empty and all-feature
 cases, without dev-dependency feature unification. The six `wasm32` slices
-(`wasm32 (combined)` in `ci.yml` on every event, the other five in
+(`wasm32 (combined)`, a step of `ci.yml`'s `checks` on every event, the other five in
 `features.yml`) use `--target wasm32-unknown-unknown --no-default-features`:
 
 | Consumer | Features |
