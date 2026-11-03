@@ -18,12 +18,10 @@ request and a push run only the line's required set). The other measurements
 are workflows of their own, dispatched on the line and called by `release.yml`
 before every tag: `bench.yml` (build and scoreboard; comparisons only on branch
 dispatches), `msrv.yml`, `features.yml`, `machete.yml`, `docs.yml` (actionlint).
-`Documentation` is a required job in `ci.yml` on both lines after #515's
-protection update: it also runs on pull requests and pushes, with
-`cargo doc --no-deps --all-features` under `RUSTDOCFLAGS: -Dwarnings`.
-The captain adds that context to `beta`'s protection at the landing and to
-`main`'s once `main`'s `ci.yml` carries the job, reading each back, then
-updates the sequencer's required-check list. The constants
+Documentation is a step of `ci.yml`'s required `checks` job on both lines
+since the small gates were bundled (`docs/lanes/ci-speed-2.md`): it runs on
+pull requests and pushes, with `cargo doc --no-deps --all-features` under
+`RUSTDOCFLAGS: -Dwarnings`. The constants
 in `tests/arch_ci_pr_runs_the_required_set.rs` name that intended set.
 **The pin (#629).** A run measures the commit it was dispatched on, never
 the line's tip when its pin job dequeues. The `source` job pins
@@ -117,7 +115,7 @@ The globs include files directly in each directory and its descendants.
 `tests/CLAUDE.md` documents these suites. The conformance targets read the
 ts-stack corpus and skip, passing vacuously, when `BSV_CONFORMANCE_DIR` names
 no `META.json`. Since #602 each mutation job checks the corpus out as `ci.yml`'s
-`vectors` job does (`bsv-blockchain/ts-stack` at
+`checks` job does for its vectors step (`bsv-blockchain/ts-stack` at
 `edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`, the commit the pinned totals were
 audited against, sparse `conformance`, no credentials, `path: ts-stack`), sets
 `BSV_CONFORMANCE_DIR` to `$GITHUB_WORKSPACE/ts-stack/conformance` in the job's

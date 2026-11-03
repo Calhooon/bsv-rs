@@ -140,12 +140,13 @@ workflows (`bench.yml`, `msrv.yml`, `features.yml`, `machete.yml`,
 `docs.yml` for actionlint, off the push run since 2026-10-27) and publishes through
 crates.io trusted publishing, nothing from a laptop. A beta tag is never
 admitted to the stack's line. [RELEASING.md](../RELEASING.md), [NORTH-STAR.md](NORTH-STAR.md).
-`Documentation` returns to `ci.yml` as a required PR and push check on both
-lines after #515's protection update; tag calls run it through CI too.
+Documentation runs in `ci.yml` on every pull request and push of both lines,
+a step of the required `checks` job since the small gates were bundled
+(`docs/lanes/ci-speed-2.md`); tag calls run it through CI too.
 Benchmark regression comparisons skip tag refs and remain on branch dispatches;
 the tag still builds the benchmarks and collects the scoreboard.
 
-**The ratchet.** The `ratchet` job measures the library (files over 800
+**The ratchet.** The ratchet step of the `lint` job measures the library (files over 800
 lines, `unwrap`/`expect` calls, functions over 60 lines, cognitive complexity,
 missing docs, duplicate token windows, pedantic warnings) and compares with
 `docs/ratchets.json`; an increase fails with the counter and the excess, a
@@ -211,7 +212,7 @@ cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test re
 The conformance files skipped their external corpus in this run (no
 `BSV_CONFORMANCE_DIR`, no `../ts-stack` beside a lane worktree); their pinned
 constants (5,116 evaluation vectors) hold whenever the corpus is present, and
-CI's `vectors` job checks it out. The 7 `memory_profiling` tests sit behind
+CI's `checks` job checks it out for its vectors step. The 7 `memory_profiling` tests sit behind
 `dhat-profiling` and run alone, outside the sum.
 
 The source, the vectors, the surfaces:

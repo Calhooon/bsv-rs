@@ -110,7 +110,7 @@ jobs:
       SHARD: ${{ matrix.shard }}
       SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
       # The conformance suites in the script, BEEF and Merkle selections skip
-      # without the corpus, so the oracle reads it as ci.yml's vectors job does,
+      # without the corpus, so the oracle reads it as ci.yml's vectors step does,
       # at the commit the pinned totals were audited against (#602, #31). The
       # runner hands its environment to cargo-mutants, which hands it to every
       # test run in its copy of the tree; the path is the checkout's, not the copy's.

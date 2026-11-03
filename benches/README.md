@@ -23,7 +23,7 @@ cargo run --locked --manifest-path tools/bench-compare/Cargo.toml
 ```
 
 The tool runs `cargo bench --locked`, so the root lockfile must exist; CI
-resolves it in the job, as the `deny` job does. The tool's own lockfile is
+resolves it in the job, as the deny step of `ci.yml`'s `lint` job does. The tool's own lockfile is
 committed (`tools/bench-compare/Cargo.lock`).
 
 On a host without `/Volumes/Lanes`, select an external target and artifact

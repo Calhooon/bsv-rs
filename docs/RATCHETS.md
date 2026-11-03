@@ -1,6 +1,6 @@
 # Code-health ratchets
 
-The `ratchet` job in [.github/workflows/ci.yml](../.github/workflows/ci.yml)
+The ratchet step of the `lint` job in [.github/workflows/ci.yml](../.github/workflows/ci.yml)
 measures the library and compares it with [ratchets.json](ratchets.json).
 An increase fails with the counter, its limit and the excess. Each existing
 oversized file also has its own line limit; a new oversized file is refused
@@ -129,7 +129,7 @@ branches contribute to the source census. Compiler counters instead measure
 the native library with all features enabled, not tests or dependencies.
 The measured lints are forced warnings, so source-level lint allows cannot
 hide them. Other lints are capped to allow in this measurement pass; the
-ordinary Clippy CI job still enforces the library's lint policy. Using
+ordinary Clippy step of CI's `lint` job still enforces the library's lint policy. Using
 `-A warnings -W ...` would incorrectly suppress the wanted warnings too.
 A warning is
 deduplicated by lint code, primary locations and diagnostic message, so a

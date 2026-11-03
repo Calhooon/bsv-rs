@@ -15,7 +15,8 @@
 //! matrix. The jobs that judge something other than the commit live in
 //! workflows of their own (bench.yml, msrv.yml, features.yml, machete.yml,
 //! docs.yml for actionlint), which no push and no pull request starts.
-//! Documentation belongs to ci.yml's required set on both lines (#515).
+//! Documentation belongs to ci.yml's required set on both lines (#515), a step of `checks`
+//! since the small gates were bundled into `lint` and `checks` (docs/lanes/ci-speed-2.md).
 //!
 //! This guard reads `.github/workflows/*.yml` (no network, no environment)
 //! at the string level and evaluates each job's `if:` and its
@@ -39,43 +40,31 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-/// `beta`'s required contexts as they will be after #515 lands, not a live snapshot.
-/// Existing protection read 2026-10-30 by
-/// `gh api repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --jq '.contexts'`.
-/// The captain adds `Documentation` and reads the protection back after landing.
+/// `beta`'s required contexts as they will be after the speed cut lands
+/// (docs/lanes/ci-speed-2.md), not a live snapshot: `lint` carries Rustfmt, Clippy, deny and
+/// ratchet, `checks` carries vectors, fixtures, secrets, Documentation and wasm32 (combined),
+/// each a step with its own `PASS`/`FAIL` line; `main-in-beta` stays a job of its own (beta's
+/// alone, on its own events). The twelve before, read 2026-11-02 by
+/// `gh api repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --jq '.contexts'`:
+/// the five below less `lint` and `checks`, plus the nine contexts they replace. The captain
+/// PATCHes the protection at the landing and reads it back.
 const REQUIRED_ON_BETA: &[&str] = &[
     "Test Suite (ubuntu-latest, stable)",
-    "Clippy",
-    "Rustfmt",
-    "Documentation",
-    "vectors",
-    "deny",
+    "lint",
+    "checks",
     "main-in-beta",
-    "ratchet",
-    "fixtures",
-    "secrets",
     "semver",
-    "wasm32 (combined)",
 ];
 
-/// `main`'s required contexts as they will be after #515 reaches `main`, not a live snapshot.
-/// Existing protection read 2026-10-30 by
-/// `gh api repos/Calhooon/bsv-rs/branches/main/protection/required_status_checks --jq '.contexts'`.
-/// The captain adds `Documentation` once `main`'s `ci.yml` carries the job, and reads it back.
+/// `main`'s required contexts once `main`'s `ci.yml` carries `lint` and `checks`, not a live
+/// snapshot; until then `main`'s protection keeps the contexts its own `ci.yml` reports.
 const REQUIRED_ON_MAIN: &[&str] = &[
     "Test Suite (ubuntu-latest, stable)",
-    "Clippy",
-    "Rustfmt",
-    "Documentation",
-    "vectors",
-    "deny",
+    "lint",
+    "checks",
     "dependents",
     "semver",
     "beta-born",
-    "ratchet",
-    "fixtures",
-    "secrets",
-    "wasm32 (combined)",
 ];
 
 /// Required contexts a push cannot run, with the reason: (context, reason).
@@ -116,8 +105,9 @@ const NOT_ON_THE_FULL_SET: &[(&str, &str, &str)] = &[
     ),
 ];
 
-/// The cells of each matrix job on the full set (the five other wasm32 slices are features.yml's).
-const FULL_MATRIX: &[(&str, usize)] = &[("test", 6), ("wasm32", 1)];
+/// The cells of each matrix job on the full set (`wasm32 (combined)` is a step of `checks`; the
+/// five other wasm32 slices are features.yml's).
+const FULL_MATRIX: &[(&str, usize)] = &[("test", 6)];
 
 fn read(path: &str) -> String {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -765,11 +755,20 @@ fn documentation_is_a_pr_and_push_gate_with_warnings_denied() {
     let ci = read(".github/workflows/ci.yml");
     assert!(ci.contains("  pull_request:\n    branches: [main, beta]\n"));
     assert!(ci.contains("  push:\n    branches: [main, beta]\n"));
-    assert!(ci.contains(
-        "        run: cargo doc --no-deps --all-features\n        env:\n          RUSTDOCFLAGS: -Dwarnings\n"
+    // a step of `checks`, its warnings denied
+    let checks = ci
+        .split("\n  checks:\n")
+        .nth(1)
+        .expect("a `checks` job")
+        .split("\n  main-in-beta:\n")
+        .next()
+        .unwrap_or_default();
+    assert!(checks.contains(
+        "      - name: Documentation\n        id: docs\n        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}\n        env:\n          RUSTDOCFLAGS: -Dwarnings\n"
     ));
+    assert!(checks.contains("          cargo doc --no-deps --all-features\n"));
     for (line, required) in [("beta", REQUIRED_ON_BETA), ("main", REQUIRED_ON_MAIN)] {
-        assert!(required.contains(&"Documentation"));
+        assert!(required.contains(&"checks"));
         assert!(pr_refusals(&ci, line, required).is_empty());
         assert!(push_refusals(&ci, line, required).is_empty());
     }
@@ -892,7 +891,7 @@ fn edited(text: &str, old: &str, new: &str) -> String {
 
 #[test]
 fn a_required_job_gated_off_pull_requests_is_refused() {
-    for (id, name) in [("clippy", "Clippy"), ("docs", "Documentation")] {
+    for (id, name) in [("lint", "lint"), ("checks", "checks")] {
         let ci = edited(
             &read(".github/workflows/ci.yml"),
             &format!("  {id}:\n    name: {name}\n"),
@@ -972,12 +971,12 @@ fn a_pull_request_only_job_on_a_push_is_refused() {
 #[test]
 fn a_stale_full_set_exception_is_refused_naming_the_entry() {
     let mut excuses = NOT_ON_THE_FULL_SET.to_vec();
-    excuses.push(("clippy", "*", "clippy runs on every full set"));
+    excuses.push(("lint", "*", "lint runs on every full set"));
     excuses.push(("gone", "tag", "no such job"));
     assert_eq!(
         full_refusals(&read(".github/workflows/ci.yml"), &excuses),
         [
-            "full-set exception `clippy` on *: the job runs (or may) on beta-dispatch; delete or narrow the entry",
+            "full-set exception `lint` on *: the job runs (or may) on beta-dispatch; delete or narrow the entry",
             "full-set exception `gone` on tag names no job of ci.yml; delete the entry",
         ]
     );
@@ -1022,8 +1021,8 @@ fn a_job_on_a_condition_the_parser_cannot_decide_is_refused_both_ways() {
     );
     let ci = edited(
         &read(".github/workflows/ci.yml"),
-        "  clippy:\n    name: Clippy\n",
-        "  clippy:\n    name: Clippy\n    if: contains(github.event.pull_request.body, '[lint]')\n",
+        "  lint:\n    name: lint\n",
+        "  lint:\n    name: lint\n    if: contains(github.event.pull_request.body, '[lint]')\n",
     );
     assert_eq!(pr_refusals(&ci, "beta", REQUIRED_ON_BETA).len(), 1);
 }
