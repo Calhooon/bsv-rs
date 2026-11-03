@@ -11,6 +11,12 @@
 //! request and on a pull request labeled `full-suite` (the landing run), and the
 //! reached step runs beside a check that the reached set lies within the whole.
 //! [`reached_refusals`] pins that shape.
+//!
+//! Since speed loop three (#672) the whole-suite step names `--test '*'`, cargo's glob over the
+//! integration binaries, so the lib's unit tests run once (the unit step's), and the named and
+//! doc steps build on one feature set, so they share one library build. [`shared_build_refusals`]
+//! pins both, and [`dependency_profile_refusals`] the dependencies' opt-level in the test profile
+//! (a step writing the cargo home's configuration from a name rust-cache hashes into its key).
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::collections::BTreeSet;
@@ -48,6 +54,10 @@ struct Step {
     condition: Option<String>,
     /// Its binaries come from the plan (a `$VARIABLE` among its words): the reached set.
     reached: bool,
+    /// It runs the lib's unit target: `--lib`, `--tests`, `--all-targets`, or no selector.
+    lib: bool,
+    /// It runs the doc tests (`--doc`).
+    doc: bool,
 }
 
 /// Splits a shell line into words, keeping a double-quoted span whole.
@@ -179,6 +189,7 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
         }
         let (mut named, mut asked) = (Vec::new(), Vec::new());
         let (mut all, mut default, mut tests, mut selector) = (false, true, false, false);
+        let (mut lib, mut doc, mut glob) = (false, false, false);
         let reached = words.iter().any(|w| w.starts_with('$'));
         let mut i = 0;
         while i < words.len() {
@@ -193,7 +204,12 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
                 })
             };
             match flag {
-                "--test" => named.push(value().expect("--test takes a name")),
+                // `--test '*'` is cargo's glob over every integration binary, the lib not
+                // among them (#672)
+                "--test" => match value().expect("--test takes a name") {
+                    name if name == "*" => glob = true,
+                    name => named.push(name),
+                },
                 "--features" | "-F" => asked.extend(
                     value()
                         .expect("--features takes a list")
@@ -203,9 +219,12 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
                 ),
                 "--all-features" => all = true,
                 "--no-default-features" => default = false,
-                "--tests" | "--all-targets" => tests = true,
-                "--lib" | "--bins" | "--bin" | "--examples" | "--example" | "--benches"
-                | "--bench" | "--doc" => selector = true,
+                "--tests" | "--all-targets" => (tests, lib) = (true, true),
+                "--lib" => (selector, lib) = (true, true),
+                "--doc" => (selector, doc) = (true, true),
+                "--bins" | "--bin" | "--examples" | "--example" | "--benches" | "--bench" => {
+                    selector = true
+                }
                 _ => {}
             }
             i += 1;
@@ -213,7 +232,8 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
         // `--tests` builds every integration binary; so does a bare
         // `cargo test` with no target selector. A `--test <name>` alongside
         // is read as a named run, the brief's narrower form.
-        let whole_suite = named.is_empty() && !reached && (tests || !selector);
+        let whole_suite = named.is_empty() && !reached && (tests || glob || !selector);
+        let lib = lib || (named.is_empty() && !reached && !glob && !selector);
         out.push(Step {
             line: number,
             whole_suite,
@@ -221,6 +241,8 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
             features: resolve(table, &asked, all, default),
             condition: condition.clone(),
             reached,
+            lib,
+            doc,
         });
     }
     out
@@ -507,6 +529,94 @@ fn reached_refusals(ci: &str, table: &[(String, Vec<String>)]) -> Vec<String> {
     errors
 }
 
+/// Speed loop three (#672): in the Test Suite job exactly one step runs the lib's unit tests (the
+/// unit step's `--lib`; a whole-suite `--tests` runs them again, `--test '*'` does not, so a job
+/// without the unit step runs them nowhere: the #691 fold's refusal), and the
+/// steps that name binaries (`--test <name>`) and the doc step build on one feature set, so the
+/// library is built once for them. Each refusal one line.
+fn shared_build_refusals(ci: &str, table: &[(String, Vec<String>)]) -> Vec<String> {
+    let mut errors = Vec::new();
+    let (from, to) = test_job(ci);
+    let found: Vec<Step> = steps(ci, table)
+        .into_iter()
+        .filter(|s| (from..to).contains(&s.line))
+        .collect();
+    let libs: Vec<&Step> = found.iter().filter(|s| s.lib).collect();
+    if libs.is_empty() {
+        errors.push(
+            "ci.yml: no Test Suite step runs the lib's unit tests (`--lib`); a whole-suite `--test '*'` does not run them".to_owned(),
+        );
+    }
+    for step in libs.iter().skip(1) {
+        errors.push(format!(
+            "ci.yml:{}: the lib's unit tests run again (ci.yml:{} runs them); a whole-suite step names `--test '*'`, not `--tests`",
+            step.line, libs[0].line
+        ));
+    }
+    let named: Vec<&Step> = found
+        .iter()
+        .filter(|s| s.doc || (!s.named.is_empty() && !s.reached))
+        .collect();
+    for step in named.iter().skip(1) {
+        if step.features != named[0].features {
+            errors.push(format!(
+                "ci.yml:{}: builds the library on {:?}, beside ci.yml:{}'s {:?}: a second library build; the named and doc steps share one feature set",
+                step.line, step.features, named[0].line, named[0].features
+            ));
+        }
+    }
+    errors
+}
+
+/// The job's name for the dependencies' level and the configuration table the step writes.
+const LEVEL_NAME: &str = "CARGO_DEPENDENCIES_TEST_OPT_LEVEL";
+const PACKAGE_TABLE: &str = "[profile.test.package.\"*\"]";
+
+/// Speed loop three (#672): the Test Suite job names the dependencies' level in its `env`, and
+/// a step before the cache's and before every build writes it into the cargo home's
+/// configuration (cargo reads a package's profile from no environment variable; rust-cache
+/// hashes every `CARGO*` variable into its key, so another level misses). Each refusal one line.
+fn dependency_profile_refusals(ci: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let (from, to) = test_job(ci);
+    let lines: Vec<(usize, &str)> = ci
+        .lines()
+        .enumerate()
+        .map(|(at, line)| (at + 1, line.trim()))
+        .filter(|(number, _)| (from..to).contains(number))
+        .collect();
+    let env = format!("{LEVEL_NAME}: \"1\"");
+    if !lines.iter().any(|(_, line)| *line == env) {
+        errors.push(format!(
+            "ci.yml: the Test Suite job's env does not set `{env}`"
+        ));
+    }
+    let writer = lines.iter().find(|(_, line)| {
+        line.starts_with("run: printf")
+            && line.contains(PACKAGE_TABLE)
+            && line.contains(&format!("\"${LEVEL_NAME}\""))
+            && line.contains("config.toml")
+    });
+    let Some((at, _)) = writer else {
+        errors.push(format!(
+            "ci.yml: no Test Suite step writes `{PACKAGE_TABLE}` from `${LEVEL_NAME}` into the cargo home's config.toml"
+        ));
+        return errors;
+    };
+    for (number, line) in &lines {
+        let builds = line.contains("uses: Swatinem/rust-cache@")
+            || ["cargo test", "cargo nextest run", "cargo build"]
+                .iter()
+                .any(|run| line.contains(run) && !line.starts_with('#'));
+        if builds && number < at {
+            errors.push(format!(
+                "ci.yml:{number}: runs before ci.yml:{at} writes the dependencies' level"
+            ));
+        }
+    }
+    errors
+}
+
 /// The top-level `tests/*.rs`, each an integration binary; module
 /// directories (`support/`, `arch_support/`, ...) are not binaries.
 fn tree() -> (String, String, Vec<(String, String)>) {
@@ -535,6 +645,10 @@ fn ci_runs_every_integration_test_binary() {
     let errors = refusals(&ci, &manifest, &files);
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     let errors = reached_refusals(&ci, &feature_table(&manifest));
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let errors = shared_build_refusals(&ci, &feature_table(&manifest));
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let errors = dependency_profile_refusals(&ci);
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     let asked: Vec<String> = HOUSE_FEATURES.split(',').map(str::to_owned).collect();
     let house = resolve(&feature_table(&manifest), &asked, false, true);
@@ -775,4 +889,79 @@ fn a_landing_or_a_push_that_could_run_a_subset_is_refused() {
     assert!(reached_refusals(&subset_only, &table)
         .iter()
         .any(|e| e.contains("a landing runs a subset")));
+}
+
+#[test]
+fn the_lib_runs_once_and_the_named_steps_share_one_build() {
+    let table = feature_table(MANIFEST);
+    let ci = "run: cargo nextest run --lib --all-features\nrun: cargo nextest run --features \"full,http\" --test '*' --no-fail-fast\nrun: cargo nextest run --test memory_profiling --all-features\nrun: cargo nextest run --all-features --test wire_tracing_sink\nrun: cargo test --doc --all-features";
+    let found = steps(ci, &table);
+    let whole: Vec<bool> = found.iter().map(|s| s.whole_suite).collect();
+    assert_eq!(whole, [false, true, false, false, false]);
+    let lib: Vec<bool> = found.iter().map(|s| s.lib).collect();
+    assert_eq!(lib, [true, false, false, false, false]);
+    assert!(found[1].named.is_empty());
+    assert!(shared_build_refusals(ci, &table).is_empty());
+    let files = [
+        file("a", ""),
+        file("memory_profiling", "#![cfg(feature = \"dhat-profiling\")]"),
+        file("wire_tracing_sink", "#![cfg(feature = \"tracing\")]"),
+    ];
+    assert!(refusals(ci, MANIFEST, &files).is_empty());
+
+    // `--tests` runs the lib's unit target a second time
+    let twice = ci.replace("--test '*'", "--tests");
+    let errors = shared_build_refusals(&twice, &table);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].starts_with("ci.yml:2: the lib's unit tests run again (ci.yml:1 runs them)"));
+
+    // without the unit step `--test '*'` runs the lib's unit tests nowhere (the #691 fold)
+    let nowhere = ci.replace("run: cargo nextest run --lib --all-features\n", "");
+    let errors = shared_build_refusals(&nowhere, &table);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].starts_with("ci.yml: no Test Suite step runs the lib's unit tests"));
+
+    // the tracing step on its own feature set builds the library a second time
+    let apart = ci.replace(
+        "--all-features --test wire_tracing_sink",
+        "--features \"full,tracing\" --test wire_tracing_sink",
+    );
+    let errors = shared_build_refusals(&apart, &table);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].starts_with("ci.yml:4: builds the library on"));
+}
+
+#[test]
+fn the_dependencies_level_is_written_before_the_cache_and_every_build() {
+    let ci = r#"  test:
+    env:
+      CARGO_DEPENDENCIES_TEST_OPT_LEVEL: "1"
+    steps:
+      - name: Optimize the dependencies in the test profile
+        run: printf '[profile.test.package."*"]\nopt-level = %s\n' "$CARGO_DEPENDENCIES_TEST_OPT_LEVEL" >> "${CARGO_HOME:-$HOME/.cargo}/config.toml"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo nextest run --lib --all-features
+"#;
+    assert!(dependency_profile_refusals(ci).is_empty());
+
+    let unnamed = ci.replace("CARGO_DEPENDENCIES_TEST_OPT_LEVEL: \"1\"", "OTHER: \"1\"");
+    let errors = dependency_profile_refusals(&unnamed);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].contains("does not set `CARGO_DEPENDENCIES_TEST_OPT_LEVEL: \"1\"`"));
+
+    let unwritten = ci.replace("[profile.test.package.\"*\"]", "[profile.test]");
+    let errors = dependency_profile_refusals(&unwritten);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(errors[0].starts_with("ci.yml: no Test Suite step writes"));
+
+    let lines: Vec<&str> = ci.lines().collect();
+    let late = [&lines[..4], &lines[6..7], &lines[4..6], &lines[7..]]
+        .concat()
+        .join("\n");
+    let errors = dependency_profile_refusals(&late);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].starts_with("ci.yml:5: runs before ci.yml:7 writes"),
+        "{errors:?}"
+    );
 }
