@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the nightly incremental by the reach rule, the figures carried with their run's sha, the complete run per prerelease, a fixed fuzz budget, the bench weekly (speed round 1, cut 7)
+
+The last nightly, run 41347058507 (dispatched 2026-11-01 20:28Z at
+`9640eaa7`, measured `42a74f1b`), took 10h43m from creation: 3h23m queued
+behind the concurrency group, 3h12m of twenty mutation shards at six at a
+time (script 128 to 136 minutes a shard, BEEF 36 to 43, Merkle 5 to 6, wire 20
+to 24, substrates 36 to 44; 4,843 mutants over 93 files), then 4h07m of
+nineteen fuzz targets at an hour each. Its twenty baselines succeeded; the
+score job failed on eleven gate-path files below 80 (#603's standing list).
+On the owner's word of 2026-11-02 ("even the nightly... is all that
+necessary? or maybe a fraction"):
+
+- **The reach rule** (`nightly_mutants.py plan`): a night mutates only the
+  measured files the changes since the last complete run reach (a measured
+  file; a selection test's `tests/CLAUDE.md` row or its surfaces; a vector or
+  support file through the sources that name it; a module's other sources;
+  an exclusion's file), and carries every other figure. `Cargo.toml`,
+  `Cargo.lock`, `build.rs`, `.cargo/*`, `src/lib.rs`, `src/error.rs`, the
+  nightly's workflow, script and memory-ceiling runner reach everything and
+  make the night complete; documentation reaches nothing. On beta's last ten
+  commits, with the two folds below: two plan nothing, one plans three
+  files, three plan nine (the four BEEF and Merkle files and the five
+  substrates files that call `crate::transaction`), one forty (its row naming
+  a test-only file; the measured script files it changes reaching their
+  module's callers), one 43 (the script surface's 40, its row naming none,
+  and the three BEEF files naming `crate::script`), two (the nightly's own
+  script) plan the complete run
+  (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
+- **The reach rule's five holes, closed (PR #666's fold)**, each pinned by a
+  `test_fold_*` case in `test_nightly_mutants.py` that failed on the cut's
+  script: a deleted selection test is judged by the base's selection and row
+  (`git rm tests/script_script_603_a.rs` planned nothing, now the script
+  surface's 40); a data file is named by its whole name or a directory two
+  deep (`tests/fixtures/wire/createAction.json`, read through a
+  `format!`-built path, planned nothing, now the wire surface's 15) and a
+  support `.rs` by the `#[path]` or `mod` line that compiles it in (a change
+  to `tests/support/fixtures/*` or `tests/vectors/sighash.json` was a
+  complete run through the bare word `fixtures`, now 15 and 55 files); a
+  changed source of an unmeasured module re-measures, one level, the measured
+  files that name it by `crate::<m>` (`CALLEE_RULE`: an edit to
+  `src/primitives/hash.rs` planned nothing, now 39 files in 16 shards); a row
+  naming a test-only file reaches the files it tests; the thirteen
+  `#[cfg(test)]` modules under the globs are tests of their surface, never
+  measured (82 measured files, not 95). Beta's last ten commits: 29 shards
+  over the eight incremental ones before, 34 after.
+- **The callee rule's letter and its count per night (PR #666's second
+  fold)**, on the keeper's word ("the record names per night how many files
+  the cure added"; a changed module re-measures every measured file that
+  names it). The rule now reaches from every changed source under
+  `src/<m>/`, measured or not (a test-only one excepted), where the fold
+  applied it to an unmeasured source alone: an edit to the measured
+  `src/transaction/beef.rs` planned 1 file and plans 7 (it, `beef_tx.rs` and
+  the five substrates files that `use crate::transaction`), one to
+  `src/script/spend/flow.rs` 1 and 29. Of beta's last ten, `script-a` moves
+  from 40 files in 11 shards to 43 in 14 and `script-c` from 15 in 5 to 40 in
+  14, the eight incremental nights from 34 shards to 46; the cold read's
+  three probes are unchanged (40, 15, 39). The plan's JSON carries
+  `callee_rule` and `callee_added` (the files the rule reached that no other
+  rule did, by the reach run again with the rule off), the record's `runs[]`
+  entry the count under its run id and sha, and the scoreboard's header "The
+  callee rule added N files tonight (<mode>)" with their names; a complete
+  run prints 0. On the sample: 5 for `ffff16d0..84a01d2a`, 3 for `script-a`,
+  25 for `script-c`, 39 for the `primitives/hash.rs` probe, 0 for a
+  documentation night. Pinned by three `test_fold2_*` cases that failed on
+  the fold's script (the count absent; a measured file reaching no caller).
+- **The record**: the `mutation-record` artifact (90 days), found by the
+  source job through the artifacts API, never a commit (no write permission
+  on beta, no race with the sequencer): per file the figure, the counts,
+  `night` or `carried`, and the run id and sha it came from, beside the
+  complete run's `Cargo.lock`, which every night builds. The scoreboard gains
+  a Figure column and names the complete run it carries from; a carried
+  figure below its floor is listed as a finding with its run, never a
+  failure of the night.
+- **The complete run** (`-f mode=complete`, at each prerelease pin and before
+  a minor tag, `RELEASING.md` step 3): twenty shards in one wave (eleven
+  script, three BEEF, one Merkle, two wire, three substrates, about 50
+  minutes each by run 41347058507's rates) in place of the surfaces by four.
+- **The fuzz budget**: `FUZZ_MINUTES`, 10 minutes per target by default
+  (the repository variable `NIGHTLY_FUZZ_MINUTES`), every target every night;
+  it was an hour.
+- **The bench weekly**: the `weekly` input dispatches `bench.yml` on the line
+  (`gh workflow run nightly.yml --ref beta -f weekly=true`, the captain's
+  Sunday line); the workflow still has no schedule.
+
+Pinned by `.github/scripts/test_nightly_mutants.py` (23 new tests: each reach
+rule on a fixture tree and its diffs, the plan's modes and sizes, the merge of
+a night onto a complete run, the provenance column, the carried-below-floor
+finding, an empty plan, an empty shard, the record's lookup). The record of
+the cut is `docs/lanes/ci-speed-7.md`.
+
 ### Changed: CI's small gates are steps of two jobs, `lint` and `checks`, one setup each; the required contexts re-pointed (CI speed round 1, cuts 2 and 3)
 
 What was wasteful: a pull request into `beta` ran twelve jobs, ten of them small
