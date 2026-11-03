@@ -182,6 +182,7 @@ class ScoreTests(unittest.TestCase):
     def test_the_beef_selection_runs_the_streams_603_files(self):
         args = nightly.mutation_args("beef", "0/4")
         self.assertIn("--cargo-arg=--test=beef_stream_603_s3", args)
+        self.assertIn("--cargo-arg=--test=beef_stream_603_s1", args)
         self.assertIn("--cargo-arg=--test=beef_stream", args)
         self.assertNotIn("--cargo-arg=--test=beef_stream_603_s3", nightly.mutation_args("merkle", "0/4"))
 
