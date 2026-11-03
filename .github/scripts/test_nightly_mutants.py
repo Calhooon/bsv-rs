@@ -180,11 +180,12 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(nightly.load_floors(record), {})
 
     def test_the_beef_selection_runs_the_streams_603_files(self):
-        args = nightly.mutation_args("beef", "0/4")
-        self.assertIn("--cargo-arg=--test=beef_stream_603_s3", args)
-        self.assertIn("--cargo-arg=--test=beef_stream_603_s1", args)
-        self.assertIn("--cargo-arg=--test=beef_stream", args)
-        self.assertNotIn("--cargo-arg=--test=beef_stream_603_s3", nightly.mutation_args("merkle", "0/4"))
+        # #685: the BEEF and the Merkle readers are one module's, so one set.
+        for surface in ("beef", "merkle"):
+            args = nightly.mutation_args(surface, "0/4")
+            self.assertIn("--cargo-arg=--test=beef_stream_603_s3", args)
+            self.assertIn("--cargo-arg=--test=beef_stream_603_s1", args)
+            self.assertIn("--cargo-arg=--test=beef_stream", args)
 
     def test_a_file_whose_mutants_are_all_unviable_has_no_score(self):
         path = self.fixture(["CaughtMutant", "Unviable"])
@@ -395,10 +396,12 @@ class ReachRuleFixture(unittest.TestCase):
             ""]),
         "tests/script_parse_603.rs": "// reads vectors/script_parse_603.json, recorded by support/script_parse_603.mjs\n",
         "tests/script_flow_603.rs": "#[test] fn flow() {}\n",
-        "tests/script_row_less.rs": "#[test] fn row_less() {}\n",
-        "tests/transaction_tests.rs": "// vectors/beef_shared.json\n",
-        "tests/wallet_tests.rs": "#[path = \"support/wallet_helper.rs\"]\nmod wallet_helper;\n",
+        "tests/script_row_less.rs": "use bsv_rs::script::Script;\n#[test] fn row_less() {}\n",
+        "tests/transaction_tests.rs": "use bsv_rs::transaction::Beef;\n// vectors/beef_shared.json\n",
+        "tests/wallet_tests.rs": "use bsv_rs::wallet::Wallet;\n"
+                                 "#[path = \"support/wallet_helper.rs\"]\nmod wallet_helper;\n",
         "tests/unrelated_tests.rs": "// vectors/beef_shared.json\n",
+        "tests/doc_lint.rs": "// vectors/beef_shared.json, no crate path, no row\n",
         "tests/support/script_parse_603.mjs": "// the recorder\n",
         "tests/support/recorder_only.mjs": "// a recorder no test names\n",
         "tests/support/wallet_helper.rs": "pub fn helper() {}\n",
@@ -467,8 +470,11 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertEqual(self.files("tests/transaction_tests.rs"), self.TRANSACTION)
 
     def test_a_test_no_selection_runs_re_measures_nothing(self):
-        # Its row names a measured module's source, but it never meets a mutant.
-        self.assertEqual(self.files("tests/unrelated_tests.rs"), set())
+        # No crate path and no row: no file's selection runs it, so it never meets a mutant.
+        self.assertEqual(self.files("tests/doc_lint.rs"), set())
+        # #685: a row naming a module's source puts the binary in that module's files'
+        # selection (until #685 no fixed list held it, and it reached nothing).
+        self.assertEqual(self.files("tests/unrelated_tests.rs"), self.TRANSACTION)
 
     def test_a_vector_or_support_file_reaches_through_what_names_it(self):
         self.assertEqual(self.files("tests/vectors/script_parse_603.json"), {"src/script/script.rs"})
@@ -538,9 +544,14 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertEqual(planned["base"]["commit"], self.base)
         self.assertEqual(planned["files"], {"script": ["src/script/script.rs"],
                                             "beef": ["src/transaction/beef.rs"]})
-        # 400 script mutants at 0.25 minutes each: three shards of 45 minutes.
+        # #685: the night's script shard runs its file's three targets, the BEEF one its two.
+        self.assertEqual(planned["surface_tests"], {
+            "script": ["script_flow_603", "script_parse_603", "script_row_less"],
+            "beef": ["transaction_tests", "unrelated_tests"]})
+        # 400 script mutants at the minutes of three targets each: two shards of 45 minutes.
+        self.assertEqual(nightly.minutes_per_mutant("script", 3), 0.125)
         self.assertEqual([(m["surface"], m["shard"]) for m in planned["matrix"]], [
-            ("script", "0/3"), ("script", "1/3"), ("script", "2/3"), ("beef", "0/1")])
+            ("script", "0/2"), ("script", "1/2"), ("beef", "0/1")])
         self.assertEqual(planned["max_parallel"], nightly.NIGHT_PARALLEL)
         self.assertEqual(len(planned["carried"]), 6)
         self.assertEqual(planned["lockfile"], "carry")
@@ -558,14 +569,16 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertEqual(planned["mode"], "complete")
         self.assertIn("Cargo.toml changed", planned["why_complete"])
         self.assertEqual(planned["lockfile"], "generate")
-        self.assertEqual(sum(1 for m in planned["matrix"]), 11 + 3 + 1 + 2 + 3)
+        self.assertEqual(sum(1 for m in planned["matrix"]), 8 + 3 + 1 + 3 + 8)
         self.assertEqual(planned["max_parallel"], nightly.HEAVY_MAX_PARALLEL)
         self.assertEqual(self.plan(record=False)["why_complete"],
                          "no record of a complete run on the line to carry from")
         self.assertEqual(self.plan(mode="complete")["mode"], "complete")
 
-    def test_the_complete_run_is_twenty_shards_in_four_waves_under_the_cap(self):
-        self.assertEqual(sum(nightly.COMPLETE_SHARDS.values()), nightly.SLOT_LIMIT)
+    def test_the_complete_run_is_twenty_three_shards_in_four_waves_under_the_cap(self):
+        # The method's twenty and the ceiling's three more (#703's second fold).
+        self.assertEqual(nightly.SLOT_LIMIT, 20)
+        self.assertEqual(sum(nightly.COMPLETE_SHARDS.values()), 23)
         self.assertEqual(set(nightly.COMPLETE_SHARDS), set(nightly.SURFACES))
         # The fleet's runner cap (10:0xZ 2026-11-03, the opening occupancy read): six of the twenty.
         self.assertEqual(nightly.HEAVY_MAX_PARALLEL, 6)
@@ -578,16 +591,19 @@ class ReachRuleFixture(unittest.TestCase):
 
     def test_fold_1_a_deleted_selection_test_re_measures_what_its_base_row_named(self):
         self.git("rm", "-q", "tests/script_parse_603.rs", "tests/script_row_less.rs",
-                 "tests/unrelated_tests.rs")
+                 "tests/doc_lint.rs")
         self.git("commit", "-q", "-m", "three tests deleted")
         planned = self.plan()
         # script_parse_603's base row names script.rs; script_row_less's names
-        # nothing (its surface); unrelated_tests is in no selection (nothing).
+        # nothing (its base text's `bsv_rs::script`: the module's files); doc_lint
+        # was in no selection (nothing).
         self.assertEqual(planned["files"], {"script": sorted(self.SCRIPT)})
         self.assertIn("removed", planned["reach"]["tests/script_parse_603.rs"]["why"])
         self.assertEqual(planned["reach"]["tests/script_parse_603.rs"]["files"],
                          ["src/script/script.rs"])
-        self.assertEqual(planned["reach"]["tests/unrelated_tests.rs"]["files"], [])
+        self.assertEqual(planned["reach"]["tests/script_row_less.rs"]["files"],
+                         sorted(self.SCRIPT))
+        self.assertEqual(planned["reach"]["tests/doc_lint.rs"]["files"], [])
 
     def test_fold_2_a_fixture_read_through_a_built_path_reaches_through_its_directory(self):
         self.put("tests/fixtures/wire/createAction.json", "{}\n")
@@ -695,6 +711,140 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertEqual(self.plan(mode="complete")["callee_added"], [])
         with patch.object(nightly, "CALLEE_RULE", False):
             self.assertEqual(self.plan()["callee_rule"], False)
+
+
+    # #685: a measured file's targets are the reach rule's, not a list per surface.
+    def test_685_a_file_s_targets_are_the_binaries_naming_its_module(self):
+        chosen = nightly.selection(nightly.measured_files(self.repo), self.repo)
+        self.assertEqual(chosen["src/script/script.rs"],
+                         ["script_flow_603", "script_parse_603", "script_row_less"])
+        # A row naming a module's source (`src/transaction/broadcaster.rs`) selects it.
+        self.assertEqual(chosen["src/transaction/merkle_path.rs"],
+                         ["transaction_tests", "unrelated_tests"])
+
+    def test_685_fold_a_module_s_callers_binaries_are_not_in_its_files_selection(self):
+        # The keeper's word (11-03 16:1xZ): the run takes the direct reading; a wallet
+        # source naming `crate::script` brings no wallet binary into a script file's set,
+        # which a pull request's plan still reaches (the callers' level is the plan's).
+        import affected_tests
+        self.put("src/wallet/wire/mod.rs", "use crate::script::Script;\n")
+        chosen = nightly.selection(nightly.measured_files(self.repo), self.repo)
+        self.assertNotIn("wallet_tests", chosen["src/script/spend/flow.rs"])
+        pull = affected_tests.reach(["src/script/spend/flow.rs"], self.repo)["binaries"]
+        self.assertIn("wallet_tests", pull)
+        # A changed test reaches the files whose run selects it: the wallet's alone.
+        self.assertEqual(self.files("tests/wallet_tests.rs"),
+                         {"src/wallet/wire/mod.rs", "src/wallet/substrates/mod.rs"})
+
+    def test_685_a_module_no_binary_reaches_keeps_the_lib_alone_and_the_plan_names_it(self):
+        self.land("tests/wallet_tests.rs", self.FILES["tests/wallet_tests.rs"].replace(
+            "use bsv_rs::wallet::Wallet;\n", ""))
+        planned = self.plan(mode="complete")
+        wallet = ["src/wallet/substrates/mod.rs", "src/wallet/wire/mod.rs"]
+        self.assertEqual(planned["lib_only"], wallet)
+        self.assertEqual({f: planned["selection"][f] for f in wallet}, {f: [] for f in wallet})
+        self.assertEqual((planned["surface_tests"]["wire"], planned["surface_tests"]["substrates"]),
+                         ([], []))
+        self.assertIn("--lib alone: `src/wallet/substrates/mod.rs`, `src/wallet/wire/mod.rs`",
+                      nightly.selection_line(planned))
+        args = nightly.mutation_args("wire", "0/1", wallet[1:], [])
+        self.assertIn("--cargo-arg=--lib", args)
+        self.assertFalse([a for a in args if a.startswith("--cargo-arg=--test=")])
+
+    def test_685_a_source_text_walker_a_cost_check_and_an_apart_binary_are_never_selected(self):
+        import affected_tests
+        self.put("tests/arch_walk.rs", 'fn walk() { std::fs::read_dir("src").unwrap(); }\n')
+        self.put("tests/beef_deep_chain.rs", "use bsv_rs::transaction::Beef;\n")
+        self.put("tests/memory_profiling.rs", "use bsv_rs::script::Script;\n")
+        # A pull request changing the file runs all three (the walker reads its text).
+        pull = affected_tests.reach(["src/script/script.rs"], self.repo)["binaries"]
+        self.assertIn("arch_walk", pull)
+        chosen = nightly.selection(nightly.measured_files(self.repo), self.repo)
+        for stem in ("arch_walk", "beef_deep_chain", "memory_profiling"):
+            self.assertFalse([f for f, t in chosen.items() if stem in t], stem)
+            self.assertEqual(self.files(f"tests/{stem}.rs"), set())
+
+    def test_685_a_row_whose_modules_change_re_measures_the_files_they_select(self):
+        self.land("tests/CLAUDE.md", self.FILES["tests/CLAUDE.md"].replace(
+            "| `unrelated_tests.rs`",
+            "| `doc_lint.rs` | 1 | default | lints `src/wallet/` docs |\n| `unrelated_tests.rs`"))
+        planned = self.plan()
+        self.assertEqual(planned["files"], {"wire": ["src/wallet/wire/mod.rs"],
+                                            "substrates": ["src/wallet/substrates/mod.rs"]})
+        # A row whose words change and whose modules do not moves no selection.
+        self.base = self.git("rev-parse", "HEAD")
+        self.land("tests/CLAUDE.md", (self.repo / "tests/CLAUDE.md").read_text().replace(
+            "lints `src/wallet/` docs", "lints the `src/wallet/` docs"))
+        self.assertEqual(self.plan()["files"], {})
+
+    def test_685_the_timeout_scales_with_the_shard_s_baseline_over_the_old_floor(self):
+        self.assertEqual(nightly.MINIMUM_TEST_TIMEOUT,
+                         {"script": 120, "beef": 300, "merkle": 120, "wire": 120,
+                          "substrates": 120})
+        self.assertEqual(set(nightly.MINIMUM_TEST_TIMEOUT), set(nightly.SURFACES))
+        self.assertGreater(nightly.TEST_TIMEOUT_MULTIPLIER, 1)
+
+
+class SelectionWitnesses685(unittest.TestCase):
+    """#685's two findings on the tree: the tests that kill a file's mutants are in its
+    shard's command. Until #685 the script surface's fixed list held neither."""
+
+    def targets(self, file):
+        return [a.removeprefix("--cargo-arg=--test=") for a in nightly.mutation_args(
+            "script", "0/1", [file]) if a.startswith("--cargo-arg=--test=")]
+
+    def test_key_point_s_shard_runs_the_660_tests(self):
+        targets = self.targets("src/script/spend/key_point.rs")
+        self.assertIn("pubkey_encoding_660", targets)
+        self.assertIn("pubkey_point_shapes_660_adv", targets)
+
+    def test_multisig_s_shard_runs_the_625_tests(self):
+        self.assertIn("p2pk_hybrid_625", self.targets("src/script/templates/multisig.rs"))
+
+    def test_the_complete_run_s_shards_stay_under_the_job_s_minutes_by_the_estimate(self):
+        measured = nightly.measured_files()
+        chosen = nightly.selection(measured)
+        by_surface = {}
+        for file, surface in sorted(measured.items()):
+            by_surface.setdefault(surface, []).append(file)
+        matrix = nightly.shard_matrix(by_surface, "complete", None, {
+            s: len(nightly.shard_tests(chosen, f)) for s, f in by_surface.items()})
+        self.assertEqual(len(matrix), sum(nightly.COMPLETE_SHARDS.values()))
+        late = [m for m in matrix if m["estimated_minutes"] >= nightly.JOB_MINUTES]
+        self.assertEqual(late, [])
+
+    def test_703_fold_2_the_complete_split_is_the_record_s_method_over_the_direct_reading(self):
+        # The record's largest remainder over the fold's estimate (8, 3, 1, 3, 5), each
+        # surface raised to its two-part ceiling (substrates 8); the fold before kept 9, 3,
+        # 1, 3, 4 from the callers' level, which the method does not give.
+        self.assertEqual(nightly.complete_split(nightly.ESTIMATE_TARGETS), nightly.COMPLETE_SHARDS)
+
+    def test_703_fold_2_no_complete_shard_s_two_part_estimate_passes_the_ceiling(self):
+        self.assertLess(nightly.SHARD_CEILING_MINUTES, nightly.JOB_MINUTES)
+        over = {s: round(nightly.COMPLETE_RUN_MUTANTS[s] * nightly.two_part_minutes_per_mutant(
+                    s, nightly.ESTIMATE_TARGETS[s]) / nightly.COMPLETE_SHARDS[s])
+                for s in nightly.SURFACES}
+        self.assertEqual({s: m for s, m in over.items() if m >= nightly.SHARD_CEILING_MINUTES}, {})
+
+    def test_685_fold_transaction_s_binaries_are_in_a_script_file_s_set_only_by_naming_script(self):
+        # The direct reading (the keeper's word, 11-03 16:1xZ): a binary that uses
+        # `transaction` (a caller of `script`) and names `script` neither by a path nor
+        # in its row is not in a script file's set; the branch's callers' level put it there.
+        import affected_tests
+        tree = affected_tests.Tree(Path("."))
+        targets = set(self.targets("src/script/templates/multisig.rs"))
+        transaction_only = {b for b in tree.direct("transaction") if "script" not in tree.uses[b]}
+        self.assertTrue(transaction_only - affected_tests.APART - nightly.COST_CHECKS)
+        self.assertEqual(targets & transaction_only, set())
+        self.assertEqual({t for t in targets if "script" not in tree.uses[t]}, set())
+
+    def test_the_fixed_lists_targets_are_all_in_the_reach_sets(self):
+        # The script surface's former named five and every `tests/script_*.rs` among them.
+        targets = set(self.targets("src/script/spend/key_point.rs"))
+        former = {"template_tests", "sighash_tests", "resource_limits", "conformance_scripts",
+                  "identity_spend_witness", *(p.stem for p in Path("tests").glob("script_*.rs"))}
+        self.assertEqual(former - targets, set())
+        self.assertFalse(targets & nightly.COST_CHECKS)
 
 
 class RecordCarriesTheFigures(unittest.TestCase):
