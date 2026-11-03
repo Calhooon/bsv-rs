@@ -12,7 +12,8 @@
 // expectation is the reference's `Beef.ts` (`packages/sdk/src/transaction/Beef.ts`
 // at edf6e03) on them. The tests are `src/transaction/beef/reference_603_tests.rs`
 // and, for the `stream_s2_*` cases (#603 shard S2 of `beef_stream.rs`, rows byte-identical
-// at bsv-script-lean@5dc337e1), `tests/beef_stream_603_s2.rs`.
+// at bsv-script-lean@5dc337e1), `tests/beef_stream_603_s2.rs`; the `stream` cases
+// (beef_stream.rs's shard S1) are read by `tests/beef_stream_603_s1.rs`.
 import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
@@ -30,8 +31,13 @@ const ROWS = [
 // these rows join the recording; the cases below are `s4_*`, the tests
 // `tests/beef_stream_603_s4.rs`.
 ROWS.push('beef-031', 'atomic-beef-023', 'atomic-beef-025')
+// beef_stream.rs's shard S1 (the stream's cursor and element reading): these rows
+// join the recording (beef-026, beef-031 and atomic-beef-023 are above); the cases
+// below are `stream`, `stream_txids` and `bump_offset_outside_its_level`, the tests
+// `tests/beef_stream_603_s1.rs`.
+ROWS.push('beef-024', 'beef-025', 'bump-003')
 const rows = {}
-for (const file of ['beef.jsonl', 'atomic-beef.jsonl']) {
+for (const file of ['beef.jsonl', 'atomic-beef.jsonl', 'bump.jsonl']) {
   for (const line of fs.readFileSync(path.join(corpusDir, file), 'utf8').split('\n')) {
     if (line.trim() === '') continue
     const row = JSON.parse(line)
@@ -450,6 +456,91 @@ cases.s4_named_subject_absent = {
 
 // A truncated BEEF (beef-031) is refused by the reader (Beef.fromBinary, :1240-1309).
 cases.s4_truncated = { row: 'beef-031', read: outcome(() => read('beef-031').toHex()) }
+
+// beef_stream.rs's shard S1: the reference's reading of each row, element by
+// element (Beef.fromReader, :1240-1284, its loop unrolled to keep the reader's
+// position after the header and after each BUMP and transaction it reads).
+{
+  const reading = id => {
+    const br = new Utils.Reader(bytes(id))
+    const out = { row: id, ends: [], kinds: [] }
+    try {
+      let version = br.readUInt32LE()
+      if (version === 0x01010101) {
+        out.atomic_txid = Utils.toHex(br.readReverse(32))
+        version = br.readUInt32LE()
+      }
+      out.version = version
+      const nBumps = br.readVarIntNumStrict(false)
+      for (let i = 0; i < nBumps; i++) {
+        MerklePath.fromReader(br, false)
+        out.ends.push(br.pos)
+        out.kinds.push('bump')
+      }
+      const nTxs = br.readVarIntNumStrict(false)
+      for (let i = 0; i < nTxs; i++) {
+        const t = BeefTx.fromReader(br, version)
+        out.ends.push(br.pos)
+        out.kinds.push(t.isTxidOnly ? 'txid' : 'tx')
+      }
+      out.left = br.bin.length - br.pos
+      out.error = null
+      // verifyValid (:1054-1110), txid-only entries not allowed (its default).
+      out.verify_valid = read(id).verifyValid(false).valid
+    } catch (e) {
+      out.error = String(e.message)
+    }
+    return out
+  }
+  cases.stream = {}
+  for (const id of ['beef-001', 'beef-023', 'beef-024', 'beef-025', 'beef-026', 'beef-031', 'atomic-beef-023']) {
+    cases.stream[id] = reading(id)
+  }
+  // The reference's own reading of the whole row, for the txids.
+  cases.stream_txids = {}
+  for (const id of ['beef-023', 'beef-025', 'beef-026', 'atomic-beef-023']) {
+    cases.stream_txids[id] = read(id).txs.map(t => t.txid)
+  }
+}
+
+// A BUMP leaf at an offset outside its level (BRC-74, 0074.md:59-79: a level
+// is 2^(tree height - level) wide): bump-003 (tree height 2) with its first
+// level-1 leaf's offset set to 2, the level's width. The reference's reader
+// refuses it (MerklePath.fromReader, legalOffsetsOnly, :161-168, :230-235).
+{
+  const bin = bytes('bump-003')
+  const br = new Utils.Reader(bin)
+  br.readVarIntNum()
+  const height = br.readUInt8()
+  const skipLeaf = () => {
+    br.readVarIntNum()
+    const flags = br.readUInt8()
+    if ((flags & 1) === 0) br.read(32)
+  }
+  const n0 = br.readVarIntNum()
+  for (let i = 0; i < n0; i++) skipLeaf()
+  br.readVarIntNum()
+  const at = br.pos
+  br.readVarIntNum()
+  const after = br.pos
+  const width = 2 ** (height - 1)
+  const mutated = [...bin.slice(0, at), ...new Utils.Writer().writeVarIntNum(width).toArray(), ...bin.slice(after)]
+  let refused = null
+  try {
+    MerklePath.fromBinary(mutated)
+  } catch (e) {
+    refused = String(e.message)
+  }
+  cases.bump_offset_outside_its_level = {
+    row: 'bump-003',
+    tree_height: height,
+    level: 1,
+    offset: width,
+    leaf_at: at,
+    hex: Utils.toHex(mutated),
+    refused
+  }
+}
 
 console.log(
   JSON.stringify(
