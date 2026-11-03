@@ -35,7 +35,26 @@ scoreboard, and its own one runner), and `ci-full-main` needs it too, so
 the order is the shards, the fuzz targets, beta's run, the bench's run,
 main's; until #683 it dispatched beside the opening wave of shards, with no
 `needs`. `tests/arch_nightly_cap.rs` reads a job that dispatches any
-workflow as heavy, so a new one without its edge is refused by name. `ci.yml`'s two
+workflow as heavy, so a new one without its edge is refused by name.
+`tests/arch_nightly_cap_rules_709.rs` (#709) reads four rules more from the
+YAML: every workflow is read for a dispatch (`gh workflow run`, a
+`gh api .../dispatches`) or a reusable call (`uses: ./.github/workflows/...`),
+a call in the nightly a heavy job as a dispatch is, one outside it refused
+unless its workflow starts by a hand act alone (`workflow_dispatch`, a push
+of tags: `release.yml`'s calls on a version tag) or the record names it
+(today the sync's dispatch of `ci.yml` on a push to main, not sequenced with
+the nightly, a stated residual); every heavy job after the shards keeps
+`!cancelled()` in its `if:`; every wait gives up at or under its job's
+`timeout-minutes` minus five (the 55-minute budget and the 30 × 10 s poll
+under 60); and every wait's `--workflow` names the file its job dispatched,
+both directions since #713's fold (two dispatches with one listed refused,
+`-w` read, a `WF=bench.yml` variable read through its one assignment).
+`tests/arch_nightly_cap_watch_713.rs` adds the watch rule: every dispatch job
+of the nightly with a job after it carries a `gh run watch` per dispatch
+(today `ci-full-beta` and `bench`), each under `timeout "$budget"`, the
+`budget` the one `$((N * 60 - SECONDS))` the give-up rule reads, so a watch
+dropped, unbounded or bounded by a doubled budget is refused.
+`ci.yml`'s two
 matrices carry `max-parallel: 6` (the keeper's line of 10:0xZ 2026-11-03;
 14 before it), so the seven dependents run six, then one, wherever they run; main's run, on main's file, still holds
 up to 22 for a minute and a half at its start, the residual the next complete run
