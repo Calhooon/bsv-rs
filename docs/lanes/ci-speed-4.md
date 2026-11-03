@@ -79,7 +79,9 @@ reason per binary, `everything`, `lib`, `doc`, `memory`, `tracing`. Per changed 
   naming a directory, in a source that calls `read_dir`: `src` for the arch rules, `tests`
   for #146's guard, `examples` for the README's). Names are read in string literals only
   (a small lexer past comments, char literals and raw strings): prose mentions of
-  `CHANGELOG.md` or `CLAUDE.md` reach nothing. A library source naming the path (an
+  `CHANGELOG.md` or `CLAUDE.md` reach nothing, and so does a literal holding whitespace,
+  an assertion's needle or a message (#689). A Markdown file under `src/` reaches none of
+  the binaries that walk `src/`: they read its `.rs` files (#689). A library source naming the path (an
   `include_str!` of a vector) adds the unit and doc tests.
 
 The run-apart binaries (`memory_profiling`, `wire_tracing_sink`) leave the integration

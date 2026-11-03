@@ -226,8 +226,10 @@ def literals(text):
 
 def literal_text(text):
     """The source's string literals alone, one per line: a file is read by a literal,
-    never by a comment that names it."""
-    return "\n".join(strings(text))
+    never by a comment that names it, nor by a literal holding whitespace, which is a
+    sentence, a message or a command (#689: `arch_ci_lines`'s needle `case "$file" in
+    Cargo.toml | CHANGELOG.md) ;;` and its message read no file; no tracked path holds a space)."""
+    return "\n".join(s for s in strings(text) if not re.search(r"\s", s))
 
 
 def names_path(text, path):
@@ -353,7 +355,10 @@ def reach(changed, root=Path("."), base_rows=None, tree=None):
             plan["reasons"][path] = {"reaches": "everything", "why": whole}
             continue
         reached, why = set(), []
-        walkers = tree.walkers(path)
+        # the walkers of src/ read its Rust sources (`tests/arch_support/mod.rs` keeps the `.rs`
+        # files; `arch_tests_claude_rows_name_modules_706` lists the module directories): a
+        # module's Markdown is documentation no walk reads (#689)
+        walkers = set() if path.startswith("src/") and is_documentation(path) else tree.walkers(path)
         namers = tree.namers(path) - walkers
         if path.startswith("src/") and not nightly.is_doc(path):
             plan["lib"] = plan["doc"] = True
