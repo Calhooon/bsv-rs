@@ -466,6 +466,23 @@ jobs:
         id: ready
         run: test -f Cargo.lock || cargo generate-lockfile
 
+      # every .cargo/mutants.toml equivalence entry names exactly one listed mutant (#663): a
+      # stale entry excludes nothing and its file reads below its true figure in the nightly.
+      # A listing builds nothing (seven files, about six seconds). cargo-mutants is the
+      # nightly's version, installed as the nightly installs it (`cargo install --locked`) into
+      # the cargo home; the cache above keeps ~/.cargo/bin but saves only on a beta push whose
+      # key missed, so the build (about 1m 15s) recurs until the key next moves
+      - name: mutants-entries
+        id: mutants-entries
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        env:
+          CARGO_MUTANTS_VERSION: '27.1.0'
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS mutants-entries"; else echo "FAIL mutants-entries"; fi' EXIT
+          python3 -B -m unittest discover -s .github/scripts -p 'test_mutants_entries.py'
+          cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked
+          python3 .github/scripts/mutants_entries.py
+
       # the conformance vectors as one named gate: the shared JSON under tests/vectors/ and the
       # ts-stack corpus
       - name: vectors
@@ -552,6 +569,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           VERDICTS: |
+            ${{ steps.mutants-entries.outcome }} mutants-entries
             ${{ steps.vectors.outcome }} vectors
             ${{ steps.fixtures.outcome }} fixtures
             ${{ steps.secrets.outcome }} secrets

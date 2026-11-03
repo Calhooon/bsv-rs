@@ -243,8 +243,8 @@ cut 2 (`docs/lanes/ci-speed-2.md`). The gates that were each a runner of
 their own, its setup longer than the gate for most of them, are steps of two
 jobs, one checkout, one toolchain setup and one `Swatinem/rust-cache` restore
 each: `lint` carries Rustfmt, Clippy (`--all-targets --all-features`, then
-each published slice alone), deny and ratchet; `checks` carries vectors,
-fixtures, secrets, Documentation and wasm32 (combined). `main-in-beta`,
+each published slice alone), deny and ratchet; `checks` carries mutants-entries (#663),
+vectors, fixtures, secrets, Documentation and wasm32 (combined). `main-in-beta`,
 `semver`, `beta-born` and the dependents jobs stay jobs of their own, on
 their own events. The guard refuses, naming the job and the gate:
 
@@ -258,6 +258,15 @@ their own events. The guard refuses, naming the job and the gate:
   pass;
 - a matrix on either job, or a second cache restore;
 - a bundled gate back as a job of its own.
+
+The mutants-entries gate (#663) runs `.github/scripts/mutants_entries.py`:
+every `.cargo/mutants.toml` equivalence entry must name exactly one mutant
+of `cargo mutants --list --file <file> --no-config` (a listing, nothing
+built), at the nightly's `CARGO_MUTANTS_VERSION`. The same file's
+`every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663`
+refuses a `checks` job without it, a nightly pin job that does not run it
+before its plan, a workflow that passes `--fix`, and two versions of
+cargo-mutants between `ci.yml` and `nightly.yml`.
 
 The required contexts become `lint` and `checks` in place of the nine;
 `tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` (five) and

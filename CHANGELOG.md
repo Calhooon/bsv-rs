@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: every `.cargo/mutants.toml` equivalence entry checked against the mutant list in `checks` and the nightly's pin job (#663)
+
+An `exclude_re` entry names one mutant by file, line, column and text. A line
+shift leaves it naming a line that holds no such mutant: it excludes nothing,
+the equivalent mutant runs at its new line and survives, and the file reads
+below its true figure. Beta carried fifteen stale `script.rs` entries after
+#639 (found by #652's rebase lane), three stale `merkle_path.rs` entries
+(#677) and one stale `beef.rs` entry since #651 (#678), each found by hand.
+
+- `.github/scripts/mutants_entries.py` lists the mutants of every file the
+  entries name (`cargo mutants --list --file <file> --no-config`: a listing
+  from the source, nothing built; seven files, 1,302 mutants, about six
+  seconds locally) and fails when an entry matches no listed mutant
+  (`STALE entry`, then `re-point to <line>:<col>` when one free listed mutant
+  of the same text, at the same column, else any, is the only candidate, or
+  every candidate) or more than one (`DOUBLE match`, every line). Stale
+  entries of one text pair with as many free candidates in line order, the
+  order a shift keeps. `--fix` rewrites each uniquely re-pointed entry and the
+  `<line>:<col>` its comment names, for the captain's hand use. A script of
+  its own, not a subcommand of `nightly_mutants.py` (whose change reaches
+  every measured file and makes the next night complete) and not a ratchet
+  counter (the ratchet compares counters with a recorded baseline; this is
+  an absolute check against a listing).
+- Two gates: `mutants-entries`, a step of CI's `checks` job on every pull
+  request and push (`PASS mutants-entries`/`FAIL mutants-entries`, named by
+  the last step on failure), and `Refuse a stale equivalence entry` in the
+  nightly's `source` job before its plan, so a stale entry refuses the run
+  before any shard. Both run cargo-mutants 27.1.0, the nightly's
+  `CARGO_MUTANTS_VERSION`, installed by `cargo install --locked` as the
+  nightly's shards install it (in `checks` into the cargo home; rust-cache
+  keeps `~/.cargo/bin` but saves only on a beta push whose key missed, so the
+  build, 1m 15s on PR #679's run, recurs until the key next moves); the
+  script refuses another version. The listing runs under `NO_COLOR=1` and
+  `--colors=never`: ci.yml's `CARGO_TERM_COLOR=always` styles cargo-mutants'
+  `--list` lines, and PR #679's own `checks` run read all 27 entries as
+  STALE before it. The pin job's timeout moves
+  from 10 to 20 minutes for the build, and its Rust install is unconditional.
+- The `beef.rs` `Beef::sort_txs` entry re-pointed from 912:33 to 915:33, the
+  script's `--fix` output byte for byte as PR #678's change, so beta passes
+  the new gate whichever lands second.
+
+Pinned by `.github/scripts/test_mutants_entries.py` (13 tests: a colored
+listing environment listing plain lines, a match, a
+miss with a unique re-point, a miss with two candidates, a double match, a
+triple-quoted entry with a lifetime, a shift under entries of one text, a
+held line, `--fix` on the entries and their comment, a one-line shift under
+adjacent entries, a repeated entry, an unreadable entry, the repository's
+entries readable) and by `tests/arch_ci_lines.rs` (`BUNDLES` names the new
+gate; `every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663`
+refuses a `checks` job without the check, a pin job without it before its
+plan, a workflow passing `--fix`, and two cargo-mutants versions).
+
 ### CI: the nightly incremental by the reach rule, the figures carried with their run's sha, the complete run per prerelease, a fixed fuzz budget, the bench weekly (speed round 1, cut 7)
 
 The last nightly, run 41347058507 (dispatched 2026-11-01 20:28Z at

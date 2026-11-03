@@ -96,7 +96,8 @@ jobs:
   source:
     name: Pin the run to one source commit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20 since #663: the entries' check builds cargo-mutants from its source
+    timeout-minutes: 20
     permissions:
       contents: read
       # The record the night carries from is a run artifact, read through the API.
@@ -128,6 +129,24 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
 
+      # The mutant listing below and a complete run's lockfile both need cargo.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      # #663: every .cargo/mutants.toml equivalence entry names exactly one
+      # mutant of the pin's listing (`cargo mutants --list`, nothing built), or
+      # the run is refused before any shard: a stale entry excludes nothing, its
+      # mutant runs and survives, and the file reads below its true figure. The
+      # same check as ci.yml's `checks` job; the message names the re-point.
+      - name: Refuse a stale equivalence entry
+        run: |
+          python3 -B -m unittest discover -s .github/scripts -p 'test_mutants_entries.py'
+          cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked \
+            --root "$RUNNER_TEMP/tools" --target-dir "$RUNNER_TEMP/tool-target"
+          PATH="$RUNNER_TEMP/tools/bin:$PATH" python3 .github/scripts/mutants_entries.py
+
       # The record is an artifact, never a commit: no write permission on beta,
       # no race with the sequencer. The newest `mutation-record` of the line
       # whose run measured an ancestor of the pin; none, and the night runs
@@ -151,12 +170,6 @@ jobs:
           mkdir -p "$RUNNER_TEMP/plan/base"
           python3 .github/scripts/nightly_mutants.py plan --commit "$COMMIT" --mode "$MODE" \
             --base-record "$RUNNER_TEMP/plan/base" --output "$RUNNER_TEMP/plan/plan.json"
-
-      - name: Install Rust
-        if: ${{ steps.plan.outputs.lockfile == 'generate' }}
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
 
       # This library does not commit Cargo.lock. A complete run resolves it once
       # here, so every shard builds one graph under `--locked` (#574); a night
