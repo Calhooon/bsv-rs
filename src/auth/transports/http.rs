@@ -520,9 +520,10 @@ impl std::fmt::Debug for SimplifiedFetchTransport {
 
 impl SimplifiedFetchTransport {
     /// Creates a new HTTP transport with this crate's client: a 30 s request
-    /// and 10 s connect timeout, no idle connection reuse, and no redirect
-    /// followed (a redirect status is refused, bsv-rs#320). To set the
-    /// client's policy, use [`SimplifiedFetchTransport::with_client`].
+    /// timeout (`REQUEST_TIMEOUT`) and a 10 s connect timeout, no idle
+    /// connection reuse, and no redirect followed (a redirect status is
+    /// refused, bsv-rs#320). To set the client's policy, use
+    /// [`SimplifiedFetchTransport::with_client`].
     ///
     /// # Arguments
     /// * `base_url` - Base URL of the remote server (e.g., `https://example.com`)

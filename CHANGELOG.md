@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the ten slowest tests made fast, each with the kill it guards kept (speed loop two, #670)
+
+What was slow: by nextest's per-test timings in the Test Suite job of runs
+41558273855, 41560881228 and 41563214016, ten tests took 804 s (their
+medians), 45% of each run's 1,396 to 1,793 test-seconds: the memory step's
+`test_http_json_success_tx_in_the_array_form_costs_the_typed_reading` alone
+339 s of a 363 s step, the rest in the integration step (70 s to 30 s each).
+What changed, tests only (no source behaviour, no workflow line; the one
+source line of the fold names the transport's timeout, below): each test
+asks the same thing of a smaller input, the bound unchanged where it is a
+ratio; every one of the ten took that cut, made fast, none made
+nightly-only and none fixed (an `#[ignore]` would leave a test no job runs).
+The array-form answer's `tx` is 128 KiB, not 1 MiB (`TX_PUSH`; the
+peak under four times the text at both sizes, 13.2 MB against 1.9 MB with
+the typed reading skipped). The streaming BEEF heap test reads 1,000, 4,000
+and 16,000 links, not to 100,000: the index's table doubles, so its peak is
+a step of the depth, and at 1,000 times a power of two each depth sits at
+the same point of the step (351 B per element at all three, where 10,000
+read 281 and 100,000 read 225). The same per-element bounds, and a new check
+that the marginal cost per element from 4,000 to 16,000 is within 1.25 of
+that from 1,000 to 4,000 (the #676 fold; a kept spent output RED at 1,000; a
+planted per-link allocation growing with the index, about 0.008 B times n
+squared, RED at 16,000, 470 B per element, where 1,000, 3,000 and 10,000
+passed it). The two readers' sweeps (`beef_two_readers_agree`,
+`merkle_path_two_readers_agree`) cut and change every byte but bytes 2 to 30
+of each 32-byte hash of a well-formed seed, which neither reader reads apart
+from the hash (`tests/support/hash_interiors.rs`; RED on a `>=` to `>` in
+`verify_structure`'s BUMP index check and on a truncation offset moved in
+`MerklePath::from_reader`). The three `linear_root_equivalence_tests` draw
+compound blocks of at most 32 leaves in two of their three block arms, not
+80 and 64; the third keeps 80, so partial blocks of 33 to 80 leaves are
+still drawn (the #676 fold); the rounds unchanged
+(cargo-mutants on `find_or_compute_once` and `root_from`, 23 mutants:
+18 caught, 4 missed, 1 unviable before and after). `merkle_path_cost`'s compound BUMP
+asks the root of nine txids spread over the block, the last included, not of
+every 97th. The deep chain's `to_beef` round trip runs 25,000 links on a
+256 KiB stack, the links per byte of 100,000 on 1 MiB (a recursion per link
+planted in `to_beef` overflows it). The auth transport's timeout test uses a
+client of a one-second timeout through `with_client`, the class the error's
+(the transport's own 30 s client is no longer waited on). Its 30 s is
+pinned without the wait instead (the #676 fold): `REQUEST_TIMEOUT` in
+`src/auth/transports/http/client.rs`, which `default_client` builds with
+through the `default_client_with(timeout)` seam, a unit test asserting the
+constant, the default's construction through the seam at it, and the seam's
+timeout ending a request the far side never answers (1 s against 5 s). On
+this host the ten went from 612 s to 92 s, and to about 108 s with the
+fold's 80-leaf arm and 16,000-link depth; the record, `docs/lanes/ci-speed-loop2-slowest.md`, has
+each test's seconds, the cut, the RED, the runner ratio and the five figures.
+
 ### CI: every `.cargo/mutants.toml` equivalence entry checked against the mutant list in `checks` and the nightly's pin job (#663)
 
 An `exclude_re` entry names one mutant by file, line, column and text. A line

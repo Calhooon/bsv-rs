@@ -216,15 +216,25 @@ fn a_deep_chain_verify_valid_on_a_small_stack() {
     assert_eq!(txs, n);
 }
 
+/// The serializers' walk at a quarter of the depth on a quarter of the
+/// stack: the same links per byte of stack as 100,000 on 1 MiB, so a walk
+/// that recurses once per link overflows here as it would there (speed loop
+/// two, #670; the chain's set-up was five of the test's seven seconds).
+const ROUND_TRIP_DEPTH: usize = DEFAULT_DEPTH / 4;
+
+/// The stack of the round trip's walk: `SMALL_STACK / 4`, 256 KiB.
+const ROUND_TRIP_STACK: usize = SMALL_STACK / 4;
+
 #[test]
 fn a_deep_chain_round_trips_through_to_beef_on_a_small_stack() {
-    let n = depth(DEFAULT_DEPTH);
+    let n = depth(ROUND_TRIP_DEPTH);
     let (original, subject) = on_big_stack(move || chain_bytes(n));
     let tx = linked_chain(n);
-    let ((tx, beef, atomic), elapsed) = on_small_stack("to_beef", move || {
+    let ((tx, beef, atomic), elapsed) = on_stack("to_beef", ROUND_TRIP_STACK, move || {
+        let started = Instant::now();
         let beef = tx.to_beef(false).expect("to_beef");
         let atomic = tx.to_atomic_beef(false).expect("to_atomic_beef");
-        (tx, beef, atomic)
+        ((tx, beef, atomic), started.elapsed())
     });
     println!("to_beef + to_atomic_beef: N={n} in {elapsed:?}");
     drop_on_big_stack(tx);

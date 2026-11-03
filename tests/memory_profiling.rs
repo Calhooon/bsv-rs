@@ -345,9 +345,14 @@ fn test_hashing_allocations() {
 /// The streaming BEEF reader holds one element and its index (bsv-stack-lean,
 /// the no-limits program NL-3; the Lean's `memory_bounded_per_element`).
 ///
-/// The P0-5 deep chain is read at 1,000, 10,000 and 100,000 links from a
-/// source that writes itself link by link, so the heap holds no BEEF and the
-/// peak is the reader's own. Three readings at each depth:
+/// The P0-5 deep chain is read at 1,000, 4,000 and 16,000 links (1,000,
+/// 10,000 and 100,000 until speed loop two, #670; 1,000, 3,000 and 10,000 in
+/// #670 itself) from a source that writes itself link by link, so the heap
+/// holds no BEEF and the peak is the reader's own. The index's table doubles,
+/// so its peak is a step of the depth: at 1,000 times a power of two every
+/// depth sits at the same point of the step, 351 B per element at each
+/// (the #676 fold), where 3,000 and 10,000 read 234 and 281 and 100,000 read
+/// 225, the step's slack and no fixed overhead. Three readings at each depth:
 ///
 /// - the stream alone, each element dropped as it is yielded: one chunk and
 ///   one element, with exactly the same peak at every depth under
@@ -380,7 +385,7 @@ fn test_beef_stream_memory_is_flat_per_element() {
 
     println!("\n=== BEEF stream, the P0-5 deep chain ===");
     let mut rows = Vec::new();
-    for n in [1_000usize, 10_000, 100_000] {
+    for n in [1_000usize, 4_000, 16_000] {
         let tip = subject(n);
         let headers = HashMap::from([(HEIGHT, funding_root())]);
         let source = ChainSource::new(n);
@@ -441,13 +446,29 @@ fn test_beef_stream_memory_is_flat_per_element() {
             (*full - *structure) * *n as f64
         );
     }
-    // Flat: a hundred times the depth costs no more per element.
-    let (_, _, at_1_000, _) = rows[0];
-    let (_, _, at_100_000, _) = rows[2];
+    // Flat: sixteen times the depth costs no more per element, and the
+    // elements from 4,000 to 16,000 cost no more each than those from 1,000
+    // to 4,000 (the marginal cost, the #676 fold: a term growing with the
+    // depth shows in it undiluted by the shallower elements).
+    let (_, _, at_1_000, full_1_000) = rows[0];
+    let (_, _, at_4_000, full_4_000) = rows[1];
+    let (_, _, at_16_000, full_16_000) = rows[2];
     assert!(
-        at_100_000 <= at_1_000 * 1.25,
-        "the bytes per element grew with the depth: {at_1_000} then {at_100_000}"
+        at_16_000 <= at_1_000 * 1.25,
+        "the bytes per element grew with the depth: {at_1_000} then {at_16_000}"
     );
+    for (what, a, b, c) in [
+        ("structure", at_1_000, at_4_000, at_16_000),
+        ("scripts", full_1_000, full_4_000, full_16_000),
+    ] {
+        let early = (b * 4_000.0 - a * 1_000.0) / 3_000.0;
+        let late = (c * 16_000.0 - b * 4_000.0) / 12_000.0;
+        assert!(
+            late <= early * 1.25,
+            "{what}: the marginal bytes per element grew with the depth: \
+             {early:.1} from 1,000 to 4,000, then {late:.1} to 16,000"
+        );
+    }
 }
 
 /// The streaming reader on a BEEF made of proven transactions with many
@@ -688,13 +709,21 @@ fn test_beef_stream_memory_on_a_reversed_chain() {
     }
 }
 
+/// The pushed bytes of the answer's `tx` in the array-form test: 128 KiB
+/// (speed loop two, #670; 1 MiB until then). The bound is a ratio to the
+/// text, so a smaller `tx` asks the same: at 1 MiB the array form peaked at
+/// 2.25 times its text and the object form at 19 times it, at 128 KiB at
+/// 2.86 and 20.6 times, under the bound of 4 at both.
+#[cfg(all(feature = "wallet", feature = "http"))]
+const TX_PUSH: usize = 1 << 17;
+
 /// `HttpWalletJson` reads a createAction answer's `tx` in the array form at
 /// the cost of the typed reading (#339): the byte reader's `Value` tree
 /// (about 32 bytes a byte, 48 MB at its peak for a 1 MiB `tx`, the second
 /// fold's) is built only for an answer the typed reading refuses (the
 /// historical object form, a byte written `1.0`). The peak counts the
-/// mock's copy of the body and the client's: the 1 MiB `tx` is about
-/// 3.6 MB of text.
+/// mock's copy of the body and the client's: a `tx` of `TX_PUSH` bytes is
+/// about 3.6 bytes of text a byte.
 #[cfg(all(feature = "wallet", feature = "http"))]
 #[test]
 fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
@@ -710,11 +739,11 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         .unwrap();
     // Row R28 (#432) refuses a `tx` that is not a complete, exactly framed
     // BEEF transaction, and the evidence row asks every input of a completed
-    // transaction for its source: the answer is a real transaction of 1 MiB
+    // transaction for its source: the answer is a real transaction of 128 KiB
     // framed as the reference's atomic BEEF with its own txid, spending one
     // output of a proven funding transaction (the one transaction of its
     // block, as `examples/transaction.rs` builds it) into one OP_FALSE
-    // OP_RETURN output pushing 1 MiB of `i % 256`.
+    // OP_RETURN output pushing `TX_PUSH` bytes of `i % 256`.
     let (txid, tx) = {
         use bsv_rs::script::{LockingScript, UnlockingScript};
         use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
@@ -735,8 +764,8 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         input.unlocking_script = Some(UnlockingScript::new());
         spend.add_input(input).unwrap();
         let mut script = vec![0x00, 0x6a, 0x4e];
-        script.extend_from_slice(&(1u32 << 20).to_le_bytes());
-        script.extend((0..1usize << 20).map(|i| (i % 256) as u8));
+        script.extend_from_slice(&(TX_PUSH as u32).to_le_bytes());
+        script.extend((0..TX_PUSH).map(|i| (i % 256) as u8));
         spend
             .add_output(TransactionOutput::new(
                 0,
@@ -769,7 +798,8 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
             let wallet =
                 HttpWalletJson::new(Some("example.com".into()), Some(server.uri())).unwrap();
             let args: CreateActionArgs =
-                serde_json::from_value(serde_json::json!({ "description": "a 1 MiB tx" })).unwrap();
+                serde_json::from_value(serde_json::json!({ "description": "a 128 KiB tx" }))
+                    .unwrap();
             let _profiler = dhat::Profiler::builder().testing().build();
             let result = wallet.create_action(args, None).await.unwrap();
             assert_eq!(result.tx.as_deref(), Some(&tx[..]));
@@ -777,7 +807,7 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         })
     };
 
-    println!("\n=== HttpWalletJson, a createAction answer's 1 MiB tx ===");
+    println!("\n=== HttpWalletJson, a createAction answer's {TX_PUSH} B tx ===");
     let array_peak = peak(&array);
     println!(
         "  array form ({} B of text): peak {array_peak} B",

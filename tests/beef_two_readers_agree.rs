@@ -42,6 +42,8 @@ use bsv_rs::transaction::{verify_stream_structure, Beef, BeefStream, Element, Ki
 
 #[path = "support/beef_chain.rs"]
 mod beef_chain;
+#[path = "support/hash_interiors.rs"]
+mod hash_interiors;
 
 use beef_chain::Hash32;
 
@@ -364,10 +366,13 @@ fn inputs() -> Vec<(String, Vec<u8>)> {
             inputs.push((format!("{name} reversed"), r));
         }
         if bytes.len() <= 2_048 {
-            for len in 0..bytes.len() {
+            // Every byte but a hash's interior (#670, `support/hash_interiors.rs`).
+            let skipped =
+                hash_interiors::of_beef(&bytes).unwrap_or_else(|| vec![false; bytes.len() + 1]);
+            for len in (0..bytes.len()).filter(|&len| !skipped[len]) {
                 inputs.push((format!("{name} cut at {len}"), bytes[..len].to_vec()));
             }
-            for at in 0..bytes.len() {
+            for at in (0..bytes.len()).filter(|&at| !skipped[at]) {
                 for (what, change) in [("0x00", 0u8), ("0xff", 0xff)] {
                     if bytes[at] != change {
                         let mut b = bytes.clone();

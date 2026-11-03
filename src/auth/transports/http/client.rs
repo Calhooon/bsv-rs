@@ -17,7 +17,13 @@ use reqwest::Response;
 use super::SimplifiedFetchTransport;
 use crate::{Error, Result};
 
-/// The client [`SimplifiedFetchTransport::new`] builds.
+/// The request timeout of the client [`SimplifiedFetchTransport::new`]
+/// builds: 30 s, the bound on the cosigner hang of [`default_client`]
+/// (pinned by this file's tests, #676).
+pub(super) const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The client [`SimplifiedFetchTransport::new`] builds, its request timeout
+/// [`REQUEST_TIMEOUT`].
 ///
 /// Egress-NAT'd hosts (e.g. Cloudflare Containers) silently drop idle
 /// keep-alive sockets. reqwest's default pool then reuses a half-dead
@@ -28,8 +34,14 @@ use crate::{Error, Result};
 /// keep-alive forces a fresh connection instead of a hang. Redirects are not
 /// followed (#320): a hop would replay the signed request to another host.
 pub(super) fn default_client() -> reqwest::Client {
+    default_client_with(REQUEST_TIMEOUT)
+}
+
+/// [`default_client`] with a request timeout of `timeout`, the seam its
+/// tests read the timeout through without waiting 30 s.
+pub(super) fn default_client_with(timeout: std::time::Duration) -> reqwest::Client {
     reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(timeout)
         .connect_timeout(std::time::Duration::from_secs(10))
         .pool_max_idle_per_host(0)
         .redirect(reqwest::redirect::Policy::none())
@@ -43,14 +55,14 @@ impl SimplifiedFetchTransport {
     ///
     /// The client is used as given: its timeouts, pool, proxy, resolution
     /// and redirect policy are the caller's. [`SimplifiedFetchTransport::new`]
-    /// builds one with a 30 s request and 10 s connect timeout, no idle
-    /// connection reuse and no redirect followed. Whatever the client, an
-    /// answer with a redirect status (301, 302, 303, 307, 308) is refused as
-    /// [`Error::AuthError`] on the handshake and the general path alike, as
-    /// the reference's `redirect: 'error'` refuses it; a client that follows
-    /// redirects itself has followed them before the transport sees the
-    /// answer, so a caller who supplies one supplies its policy too
-    /// (`reqwest::redirect::Policy::none()` keeps the default's).
+    /// builds one with a 30 s request timeout (`REQUEST_TIMEOUT`) and a 10 s
+    /// connect timeout, no idle connection reuse and no redirect followed.
+    /// Whatever the client, an answer with a redirect status (301, 302, 303,
+    /// 307, 308) is refused as [`Error::AuthError`] on the handshake and the
+    /// general path alike, as the reference's `redirect: 'error'` refuses it;
+    /// a client that follows redirects itself has followed them before the
+    /// transport sees the answer, so a caller who supplies one supplies its
+    /// policy too (`reqwest::redirect::Policy::none()` keeps the default's).
     ///
     /// # Arguments
     /// * `base_url` - Base URL of the remote server (e.g., `https://example.com`)
@@ -81,4 +93,46 @@ pub(super) fn refuse_redirect(url: &str, response: &Response) -> Result<()> {
         "Network error while sending authenticated request to {}: fetch failed",
         url
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    use super::*;
+
+    // reqwest has no getter for a client's timeout, and its `Debug` names the
+    // field by `type_name`, which Rust does not promise to keep: the pins are
+    // the constant, the construction path (the default's `Debug` that of the
+    // seam at the constant, never `Client::new()`'s) and the seam's timeout
+    // read on the wire.
+    #[test]
+    fn the_default_client_times_a_request_out_at_thirty_seconds() {
+        assert_eq!(REQUEST_TIMEOUT, Duration::from_secs(30));
+        let default = format!("{:?}", default_client());
+        assert_eq!(
+            default,
+            format!("{:?}", default_client_with(REQUEST_TIMEOUT))
+        );
+        assert!(default.contains("30s"), "{default}");
+        assert_ne!(default, format!("{:?}", reqwest::Client::new()));
+    }
+
+    #[tokio::test]
+    async fn the_default_clients_timeout_ends_a_request_the_far_side_never_answers() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+            .mount(&server)
+            .await;
+        let err = default_client_with(Duration::from_secs(1))
+            .post(server.uri())
+            .send()
+            .await
+            .unwrap_err();
+        assert!(err.is_timeout(), "{err:?}");
+    }
 }
