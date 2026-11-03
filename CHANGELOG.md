@@ -135,6 +135,22 @@ docs-only pull request's run.
   `src/wallet/substrates/CLAUDE.md:15`, which now states the cost. The wiremock figure stays printed and is held
   under five times the text, a stated bound naming the extra copy (9,345,126 B on the RED). The fixture moved to
   `tests/support/http_json_answer_697.rs`. Record: `docs/lanes/fix-697.md`.
+- `src/script/spend/script_code.rs`'s survivors of the complete run killed (#681): ten library tests in
+  `src/script/spend/script_code_tests.rs` pin the scriptCode's writer and walker against bitcoin-sv `879fc8b`
+  `src/script/script.h` (`operator<<` at 102-130, `GetOp2` at 163-198, `FindAndDelete` at 200-224): `push_of`'s
+  header byte for byte at 0, 1, 75, 76, 255, 256, 65535 and 65536 bytes; `find_and_delete`'s walk stepping over
+  a direct, PUSHDATA1, PUSHDATA2 and PUSHDATA4 push whose data holds the pattern (minimal at each boundary size and
+  non-minimal) and deleting the copy after it; a PUSHDATA2 of `0x0100` read as 256 bytes; a one-byte push cut
+  short at the last byte kept. The six timeouts of the issue's run (eight on this host's baseline) are answered by
+  a bound, not a longer timeout: `find_and_delete`'s two loops now run over ranges of the script's length (a walk
+  that advances ends inside them, `the_bound_never_cuts_short_a_walk_of_one_byte_steps_681`), so a walker that
+  returns its own position or one behind it ends and answers another script
+  (`a_copy_after_two_instructions_is_deleted_by_a_walk_that_advances_681`, which hangs on seven of the eight
+  without the bound). The bound adds no mutant (51 before and after). 15 of the 16 survivors and all 8 timeouts
+  killed, each RED on its mutant; `104:26` (`<` to `<=` in `next_op`'s cut-push check) is named an equivalence
+  candidate (it differs only at the script's last instruction, where breaking and stepping keep the same bytes).
+  The file: 27 caught, 16 missed, 8 timeouts (52.94%) on this host's baseline (the issue's run: 29, 16, 6,
+  56.86%); 50 caught, 1 missed (98.04%) after. Record: `docs/lanes/kill-script-code.md`.
 - `src/script/templates/multisig.rs`'s survivors of the complete run killed (#681): six tests in the file's own
   module pin the m-of-n edges against the node's `GetScriptForMultisig` form (bitcoin-sv `879fc8b`
   `src/script/standard.cpp:315-324`): the bytes of a 1-of-1 and a 2-of-3 on both lock paths, m = n written and

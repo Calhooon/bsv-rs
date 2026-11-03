@@ -117,9 +117,16 @@ pub(super) fn find_and_delete(script: &[u8], b: &[u8]) -> Vec<u8> {
     let mut result = Vec::with_capacity(script.len());
     let mut found = false;
     let (mut pc, mut pc2) = (0usize, 0usize);
-    loop {
+    // Every step advances a byte at least, so the walk ends within one step
+    // more than the script has bytes, and a copy of `b` (one byte at least)
+    // repeats at most that many times: the two bounds end a walk that does
+    // not advance, and never cut short one that does (#681).
+    for _ in 0..=script.len() {
         result.extend_from_slice(script.get(pc2..pc).unwrap_or_default());
-        while script.get(pc..pc + b.len()) == Some(b) {
+        for _ in 0..script.len() {
+            if script.get(pc..pc + b.len()) != Some(b) {
+                break;
+            }
             pc += b.len();
             found = true;
         }
