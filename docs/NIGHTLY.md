@@ -17,9 +17,20 @@ step 3 names the dispatch: this workflow is not callable, so `release.yml`
 cannot run it before a tag). The rule, the record and the dispatch lines are
 in "Incremental nights and the complete run (cut 7)" below. A push to a
 protected branch runs `ci.yml`'s required set, nothing more (the owner's word
-of 2026-10-27). Its `ci-full` job dispatches `ci.yml` on `beta` and on `main`,
-so each line's whole test matrix and `dependents` run at its tip (a pull
-request and a push run only the line's required set). The other measurements
+of 2026-10-27). Its `ci-full-beta` and `ci-full-main` jobs dispatch `ci.yml`
+on `beta` and on `main`, so each line's whole test matrix and `dependents` run
+at its tip (a pull request and a push run only the line's required set). They
+run after the shards and the fuzz targets, whatever their result, and one
+after the other: `ci-full-beta` waits for beta's run, the one it dispatched
+(listed before the dispatch, the bot's alone; `gh run watch`, one runner for
+its 23 minutes, given up at 55 minutes with a warning and no verdict, any
+other failed watch an error; a `failure` conclusion fails the job, #682's
+third and fourth folds) before `ci-full-main` dispatches main's, since
+beta's run holds up to 9 jobs at once and main's up to 22 (31 together; the
+fleet's runner cap, #682's two folds, the keeper's word (a)). `ci.yml`'s two
+matrices carry `max-parallel: 14`; main's run, on main's file, still holds
+up to 22 for a minute and a half at its start, the residual the next complete run
+measures (`docs/lanes/ci-speed-7.md`, "The fleet's runner cap"). The other measurements
 are workflows of their own, dispatched on the line and called by `release.yml`
 before every tag: `bench.yml` (build and scoreboard; comparisons only on branch
 dispatches), `msrv.yml`, `features.yml`, `machete.yml`, `docs.yml` (actionlint).
@@ -84,8 +95,10 @@ job, which files its crashes as issues, adds `issues: write`.
 beside it, following `ci.yml`. The mutation jobs' token has only `contents: read`.
 
 The shards are the plan's (cut 7, below): a complete run is twenty, eleven
-script, three BEEF, one Merkle, two wire and three substrates, in one wave; a
-night is as many as its files' estimated minutes need, at six at a time.
+script, three BEEF, one Merkle, two wire and three substrates, at fourteen at
+a time (the fleet's runner cap of 2026-11-03, `HEAVY_MAX_PARALLEL`; a wave of
+14, then 6); a night is as many as its files' estimated minutes need, at six
+at a time.
 Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a 120-second
 test timeout (300 seconds for BEEF) and a 300-second build timeout per mutant. A job is limited to
 six hours. A failed baseline, interrupted job or missing shard fails the score
@@ -438,7 +451,9 @@ gh workflow run nightly.yml --ref beta -f mode=complete
 gh workflow run nightly.yml --ref beta -f weekly=true
 ```
 
-A complete run is twenty shards in one wave (the keeper's cut 5): the
+A complete run is twenty shards (the keeper's cut 5), at most fourteen at a
+time since the fleet's runner cap of 2026-11-03 (`docs/lanes/ci-speed-7.md`,
+"The fleet's runner cap"; until then one wave of twenty): the
 measured minutes of run 41347058507 (script 130 per 515 mutants, BEEF 37 per
 187, Merkle 3 per 25, wire 19.5 per 198, substrates 36.5 per 286; 901
 shard-minutes) shared out by the largest remainder, about 47, 50, 11, 39 and

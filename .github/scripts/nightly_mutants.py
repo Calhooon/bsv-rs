@@ -409,7 +409,7 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
 # changes, so the nightly mutates the files the reach rule names since the last
 # complete run and carries every other figure with its run's id and sha.
 #
-# The complete run fills the account's twenty slots in one wave. Minutes per
+# The complete run is twenty shards, one per slot of the account. Minutes per
 # mutant, from run 41347058507's shards (the scoped step's minutes over the
 # shard's mutants, at 42a74f1b): script 130/515, BEEF 37/187, Merkle 3/25, wire
 # 19.5/198, substrates 36.5/286; 901 shard-minutes in all, shared out by the
@@ -420,8 +420,17 @@ MINUTES_PER_MUTANT = {"script": 0.25, "beef": 0.20, "merkle": 0.12, "wire": 0.10
                       "substrates": 0.13}
 NIGHT_SHARD_MINUTES = 45
 # The night shares the account with pull requests and the fleet's other nights
-# (the balance rule of 2026-10-26): six slots; the complete run takes the twenty.
+# (the balance rule of 2026-10-26): six slots.
 NIGHT_PARALLEL = 6
+# The fleet's runner cap (the keeper's line of 2026-11-03): the account's twenty
+# hosted runners are one pool across bsv-rs, the CLI, the toolbox and the stack,
+# so a heavy run holds at most fourteen and six stay for the fleet's pull request
+# and queue runs; the complete run's twenty shards go in two waves, 14 then 6.
+# The one place the number lives (GitHub reads no `env` in `strategy`; the
+# mutants job reads it from the plan's `max_parallel` output); its owner is loop
+# four's #675, which reads the account's occupancy from the API and moves it.
+# tests/arch_nightly_cap.rs refuses it above 14.
+HEAVY_MAX_PARALLEL = 14
 RECORD_ARTIFACT = "mutation-record"
 # A change to these reaches every measured file, whatever it touches.
 EVERYTHING = {
@@ -772,7 +781,7 @@ def plan(args):
     result["matrix"] = shard_matrix(by_surface, result["mode"],
                                     base_record["files"] if base_record else None)
     result["shards"] = len(result["matrix"])
-    result["max_parallel"] = SLOT_LIMIT if result["mode"] == "complete" else NIGHT_PARALLEL
+    result["max_parallel"] = HEAVY_MAX_PARALLEL if result["mode"] == "complete" else NIGHT_PARALLEL
     result["carried"] = sorted(set(measured) - files)
     write_json(args.output, result)
     print(json.dumps({k: result[k] for k in ("mode", "why_complete", "base", "files", "matrix",

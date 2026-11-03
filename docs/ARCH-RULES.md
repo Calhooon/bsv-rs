@@ -291,6 +291,26 @@ The required contexts become `lint` and `checks` in place of the nine;
 `tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` (five) and
 `REQUIRED_ON_MAIN` (six) carry them.
 
+## 8. A heavy run leaves six runners for the fleet
+
+Every matrix that is a heavy run on the account's runners (a job that runs
+mutants or fuzzes) carries `max-parallel` at most 14, a literal or the
+mutation plan's `HEAVY_MAX_PARALLEL`, so six of the twenty runners stay for
+the fleet's pull request and queue runs (`tests/arch_nightly_cap.rs`; the
+keeper's line of 2026-11-03, `docs/lanes/ci-speed-7.md`). In the nightly no
+two heavy jobs (a heavy matrix or a dispatch of `ci.yml`, a whole run of up
+to 22 jobs) can hold the runners at once: each pair is ordered by a `needs:`
+path; fuzz, the score job and `ci-full-beta` need the shards, `ci-full-beta`
+the fuzz targets too, and `ci-full-main` needs `ci-full-beta`, which waits
+for beta's run (`gh run watch`), the one it dispatched (the runs listed
+before the dispatch, the bot's alone), and fails on its `failure`
+conclusion (#682's third fold) and on a failed watch other than the
+give-up, the step under `set -euo pipefail` (#682's fourth fold); no dispatch of `ci.yml` sits in a matrix.
+`ci.yml`'s matrices (the Test Suite cells, the dependents) carry
+`max-parallel` at most 14, which a dispatch reads (the keeper's word (a),
+#682's second fold). A matrix cap does not bound a run's singleton jobs:
+main's dispatched run holds up to 22 for about a minute and a half.
+
 ## Feature and wasm builds
 
 The `features` job (`features.yml`, on dispatch and before every tag) builds cargo-hack **0.6.45** from source using its release

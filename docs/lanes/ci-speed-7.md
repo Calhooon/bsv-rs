@@ -235,3 +235,200 @@ The dispatch that follows the landing is complete by the rule (the
 nightly's workflow and script changed, and no record exists): `gh workflow run
 nightly.yml --ref beta -f mode=complete`. The incremental nights begin with
 the one after it.
+
+## The fleet's runner cap
+
+The keeper's line, 06:2xZ 2026-11-03: every heavy run on the runners
+carries `max-parallel: 14`, so six of the account's twenty hosted runners
+stay for the pull request and queue runs of the four repositories (bsv-rs,
+the CLI, the toolbox, the stack), which share them as one pool.
+
+The fact, 2026-11-03. This crate's complete nightly, run 41579707627
+(dispatched 04:42:51Z on beta, `mode: complete`, at `e3fef6dc`), asked for
+its twenty shards in one wave; they started between 04:44:45Z and 05:32:12Z
+as runners came free, and the run held the pool until 06:23:10Z. PR #679's
+run, 41581840579, created 05:05:32Z, started its Test Suite at 05:36:33Z
+(31 minutes queued for a 15m21s job) and its `checks` at 05:54:05Z, and
+finished at 05:57:44Z, 52 minutes after it was created (`gh run view
+41581840579 --json jobs`). The same night the CLI's fifty-shard run made
+every CLI pull request run wait 40 to 50 minutes on a five-minute job until
+05:48Z (the keeper's reading). A night on one repository costs the others'
+pull requests the same minutes.
+
+The line. The nightly's `mutants` matrix reads its `max-parallel` from the
+pin job's `max_parallel` output, and the plan hands out
+`HEAVY_MAX_PARALLEL = 14` for a complete run (`NIGHT_PARALLEL = 6` for a
+night, unchanged), so both modes of #666 sit under the cap. GitHub reads no
+`env` in `strategy` (`${{ fromJSON(env.HEAVY_MAX_PARALLEL) }}` is refused
+there), so the number lives in one place, the plan's constant in
+`.github/scripts/nightly_mutants.py`, read through the job output the matrix
+already used; its owner is loop four's #675, which will read the account's
+occupancy from the API and move it. The `fuzz` matrix keeps its literal 6.
+`tests/arch_nightly_cap.rs` refuses a heavy matrix in any workflow without
+`max-parallel`, a literal above 14, a reading other than the plan's output,
+and a plan constant above 14.
+
+The `ci-full` edge (the fold of #682). Each matrix under 14 alone is not the
+line: `ci-full` started two whole `ci.yml` runs at the dispatch, beside the
+shards (before the cap, 17 of its jobs at 04:48Z and 19 at 05:15Z). It now
+runs after the shards and the fuzz targets, whatever their result, under
+`if: ${{ !cancelled() }}`.
+
+The two runs one after the other (#682's second fold, the keeper's word (a)
+of 07:1xZ 2026-11-03). The fold's check read the two runs' `needs:` graphs:
+the "about 12" measured in run 41579707627 was held down by the shards
+filling the pool, not the runs' width. Beta's dispatched run (beta's
+`ci.yml`) starts six test cells, `lint`, `checks` and the dependents' plan
+at once, 9; the dependents are skipped on beta. Main's dispatched run reads
+main's own `ci.yml` (`origin/main`, still the nine separate gates): six
+cells, nine gates and the plan at once, 16, then the seven dependents after
+the plan, up to 22. Together they asked for up to 31, the whole pool. The
+word: a dispatched whole `ci.yml` run is a heavy run; the nightly runs
+beta's, then main's, and the matrices carry `max-parallel` 14 under a
+dispatch.
+
+The mechanism: `ci-full` split into `ci-full-beta` (`needs: [mutants,
+fuzz]`; it dispatches beta's run, finds it by identity, waits with `gh
+run watch` and reads its conclusion; the rule below, #682's third fold) and `ci-full-main` (`needs: [ci-full-beta]`, both under
+`!cancelled()`, so main's follows a failed, timed-out or red beta). The
+cost: the waiting job's one runner for beta's run (22m42s in run
+41579716973), beside beta's 9 and then 6. The other mechanism, a
+`concurrency` group shared by the two dispatch runs (one running, one
+pending, which costs no runner while it waits), does not work here: a
+dispatch on main runs main's `ci.yml`, whose group is
+`ci-${{ github.event_name }}-${{ github.ref }}`, so a group added on beta
+would not hold main's run until main carried the file; GitHub's rule that a
+group holds one running and one pending run, the older pending one
+cancelled when a third arrives ("Using concurrency", GitHub Actions docs),
+would also let a hand dispatch on either line cancel main's pending run, and
+the group needs `cancel-in-progress: false` where `ci.yml`'s is true off
+tags. One runner for 23 minutes buys an order that holds tonight.
+
+The matrices: `ci.yml`'s Test Suite (six cells on a dispatch) and
+dependents (seven) carry the literal `max-parallel: 14`. Both are at most
+seven wide, so the literal changes nothing for a pull request, a push or a
+dispatch today; it holds the cap if either grows. GitHub reads the `github`
+context in `strategy`, so the expression form
+`${{ github.event_name == 'workflow_dispatch' && 14 || N }}` is legal too,
+and the guard accepts it; the literal is plainer. The cap reaches main's
+dispatched run only when main's `ci.yml` carries it (the direction rule).
+
+The widths by phase, by the `needs:` graphs, with the replay of the
+measured job durations of beta's run 41579716973 and main's 41579745459
+(every job without `needs` at the run's start, the dependents 5 seconds
+later, the plan's length; runner start-up ignored):
+
+| Phase | Before the second fold | After it |
+| --- | --- | --- |
+| the pin job (`source`) | 1 | 1 |
+| the shards (`mutants`) | 14 | 14 |
+| the fuzz targets and the score job | 6 + 1 | 6 + 1 |
+| beta's `ci.yml` run | 9 (beside main's), then 6 | 9 + the waiting job, 10 for 2m30s; then 7 to 22m42s |
+| main's `ci.yml` run (main's file) | 16, then 22 (beside beta's: up to 31) | 16, then up to 22 (21 in the replay), above 14 for about 89 seconds; 13 by 2m08s; ends at 16m32s |
+| main's run once main carries beta's file | | 9, then 15, above 14 for about 73 seconds |
+
+The residual: a `max-parallel` caps one matrix, not the sum of a run's
+singleton jobs. Main's run on main's file holds up to 22 for a minute
+and a half at its start (the nine gates, the longest `deny` 2m08s and Clippy
+2m07s, beside the six cells and the seven dependents), 15 on beta's file;
+the word leaves it, and the next complete run measures it.
+
+The run watched (#682's third fold, the second fold's scoped check): the
+lookup was the newest beta dispatch of `ci.yml` created in the minute
+before ours, whoever made it, so a hand dispatch in that minute (ours not
+yet listed at the poll) or just after ours (`--limit 1` taking the newer)
+was the run watched; ours then cancels the hand run (`ci.yml`'s group,
+`cancel-in-progress: true`), the watch ends at once and main's run starts
+beside beta's. The rule now: the job lists the bot's `workflow_dispatch`
+runs of `ci.yml` on beta before the dispatch (`--user
+'github-actions[bot]'`, the identity of the job's token, read on the
+night's runs: every dispatch since 2026-11-01 has it as actor and
+triggering actor; `gh run list` has no `actor` field, so the filter is the
+flag, the API's `actor` query; that query matches wider than the run's
+`actor` field, read on 2026-11-03: `--user Calgooon` also returns the five
+bot dispatches made by the nightlies Calgooon dispatched, while `--user
+'github-actions[bot]'` returns 14 of the 17 `ci.yml` dispatches and leaves
+out the three hand ones of 2026-10-27, so the bot filter excludes a hand
+dispatch as the rule needs); it polls ten seconds apart for a new id not in that list, five
+minutes then the job fails; more than one new run is a warning naming every
+id, the one created nearest after the dispatch watched; the id and url are
+printed; the step runs under `set -euo pipefail`, so a failing `list | jq`
+in the poll fails the job at once instead of reading as an empty count and
+a misleading "no new run" five minutes later. The watch gives up at 55
+minutes of the job (`timeout`, its budget clamped to at least a second),
+inside its 60: exit 124, the give-up alone, is a warning and the conclusion
+read still runs, which prints `in progress` while the run is unfinished (its
+`conclusion` is `""` then, read on 2026-11-03 with gh 2.82.1 on an
+in-progress run), so the job ends with the warning and no verdict and main's
+dispatch follows; any other non-zero exit of the watch (the API, the
+network) is an error with its code and fails the job, so a failed watch
+never leaves the night green without beta's verdict (#682's fourth fold;
+until it every non-zero exit was a warning and `exit 0`). Then the run's conclusion
+is read (`gh run view --json conclusion`) and printed: `failure`,
+`timed_out` or `startup_failure` fails the job, so the night shows beta's
+CI verdict (`ci-full-main` still runs under `!cancelled()`); `cancelled`
+or another conclusion is a warning, no verdict. What remains: a dispatch of
+`ci.yml` on beta by the same bot identity in the same minute (another
+workflow of this repository dispatching it, or a second nightly) is a
+second new run, named in the warning, and the older is watched, which may
+be the other's; the other run, being a dispatch on beta, still cancels or
+is cancelled by ours through `ci.yml`'s group.
+
+The cost replayed on 14 slots. The shards' second wave, about 35 minutes
+(below). The CI phase in sequence: beta's run, 22m42s by its longest cell,
+then main's, 16m32s by its longest cell when it runs alone and up to the
+hour measured beside the shards (04:43Z to 05:43Z in run 41579707627):
+about 39 minutes replayed, an hour and 23 minutes at the measured bound.
+The next complete run in the 00:00Z slot is the measurement.
+
+The guard: `tests/arch_nightly_cap.rs` reads the nightly's `needs:` graph
+and refuses two heavy jobs (a heavy matrix or a dispatch of `ci.yml`) with
+no `needs:` path between them and any of the five edges that keep the
+sequence (fuzz needs mutants, the score job needs mutants, `ci-full-beta`
+needs mutants and fuzz, `ci-full-main` needs `ci-full-beta`) removed,
+naming the pair and the edge; it refuses a dispatch of `ci.yml` in a
+matrix, a dispatch job naming another line than its own, `ci-full-beta`
+without its `gh run watch`, without the before-list or the bot's filter
+in its lookup, or without its conclusion read and a `failure` failing it
+(the third fold, RED with the filter removed and with the read removed), and a `ci.yml` matrix without `max-parallel` or
+above 14 (the literal or the dispatch value of the expression). RED on a
+scratch copy five ways: the wait removed, `ci-full-main`'s edge removed,
+`ci-full-beta`'s edge removed, the Test Suite's cap removed, the
+dependents' cap removed. Not seen: the weekly `bench` job's dispatch of
+`bench.yml`, which still starts at the dispatch beside the pin job and so
+beside the shards on a Sunday night.
+
+The sites judged:
+
+| Workflow | Matrix | Heavy | Verdict |
+| --- | --- | --- | --- |
+| `nightly.yml` | `mutants` (both modes) | yes | capped at 14 through the plan (was 20 complete, 6 night) |
+| `nightly.yml` | `fuzz` (19 targets) | yes | left at 6 (under the cap, the balance rule's) |
+| `nightly.yml` | `ci-full-beta`, `ci-full-main` (was the `ci-full` matrix) | yes, by the word (a) | after the heavy work (the fold), then beta's run and main's one after the other (the second fold): each a job starting a whole `ci.yml` run (run 41579707627's: beta's 41579716973, 10 jobs, 04:43Z to 05:05Z, up to 9 at once by its graph; main's 41579745459, 24 jobs with seven dependents, 04:43Z to 05:43Z, up to 22 at once by its graph, 6 measured beside the shards) |
+| `ci.yml` | Test Suite (OS × toolchain), dependents | on a dispatch | `max-parallel: 14`, a literal (six cells and seven consumers, so nothing moves today); main's run takes it when main's `ci.yml` does |
+| `features.yml` | `wasm32-slices` (5) | no | left: build checks on dispatch and before a tag, five cells |
+| `bench.yml`, `msrv.yml`, `machete.yml`, `docs.yml`, `release.yml`, `sync-main-into-beta.yml` | none | no | no matrix |
+
+The cost. A complete run's twenty shards run as 14, then 6 as the
+earliest finish: the night's wall clock grows by about one shard's length.
+Run 41579707627's twenty shards (`gh run view 41579707627 --json jobs`,
+each job's `completedAt` less its `startedAt`): the longest 65m02s (script
+1/11), the median 50m45s, the shortest 10m22s (merkle 0/1). Replayed in
+the plan's matrix order on 14 slots (script 11 and BEEF 3 in the first
+wave, the other six as the earliest finish, at 41m), the shards' span is
+about 100 minutes against 65 on twenty free slots: about 35 minutes more,
+on a night whose shards took 1h40m from the dispatch to the last shard's
+end because the pool never gave the one wave its twenty (at most 17 of the
+run's jobs at once).
+
+The gain. Six runners free for the fleet's pull request and queue runs
+throughout a complete run, where the one wave of twenty left none.
+
+Both are measured at the next complete run: its wall clock against
+41579707627's, and the queue wait of the pull request runs created while it
+holds the pool.
+
+The stagger slots. A complete run takes its slot alone: this crate's at
+00:00Z, the CLI's at 03:00Z, the toolbox's at 06:00Z. A complete run never
+overlaps another repository's complete run or a sibling's dispatch, and a
+dispatch outside the slot is not run.

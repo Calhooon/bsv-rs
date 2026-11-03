@@ -80,6 +80,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # The fleet's runner cap on a dispatch (#682's second fold, the keeper's word (a) of
+      # 2026-11-03): a literal, the seven consumers being under it, so it changes nothing for a
+      # pull request or a push; tests/arch_nightly_cap.rs refuses it removed or above 14.
+      max-parallel: 14
       matrix: ${{ fromJSON(needs.dependents-plan.outputs.matrix) }}
     steps:
       - name: Keep build output in runner scratch
@@ -213,6 +217,9 @@ jobs:
       CARGO_PROFILE_TEST_DEBUG: "0"
     strategy:
       fail-fast: false
+      # The fleet's runner cap on a dispatch (#682's second fold): a literal, the six cells being
+      # under it (tests/arch_nightly_cap.rs)
+      max-parallel: 14
       # a pull request and a push to a line run the required cell alone, Test Suite
       # (ubuntu-latest, stable); a dispatch and a tag's call (whose event is the tag's push) the
       # six. GitHub names a cell by its values in the keys' order, so no name moves
