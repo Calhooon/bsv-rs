@@ -1,0 +1,12 @@
+# The caller clause's pairs, frozen (#706, the #708 fold): a binary whose source names a
+# module's caller and not the module, its row's description saying it exercises the module,
+# names the module in its tests/CLAUDE.md row. The clause is a judgment, applied once by
+# .github/scripts/rows_from_sources.py's CALLER_WORDS; these pairs are what it decided, and
+# tests/arch_tests_claude_rows_name_modules_706.rs and `rows_from_sources.py --check` refuse a
+# row that drops one. The writer always writes them. One `<stem> <module>` per line.
+auth_fetch_423_payment transaction  # "reused transaction" (the weakest of the six)
+beef_order_held script  # "a signed family", ANYONECANPAY
+beef_stream_603_s4 script  # "the first pass's spends"
+registry_integration_tests script  # "PushDrop roundtrips"
+wallet_http_json_pending_432 transaction  # BEEF bindings
+wallet_http_json_success_bytes_365 transaction  # listOutputs' BEEF

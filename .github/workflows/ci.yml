@@ -330,6 +330,10 @@ jobs:
             exit 0
           fi
           python3 -B -m unittest discover -s .github/scripts -p 'test_affected_tests.py'
+          # the rows' Python reading on the tree, the twin of the Rust guard
+          # tests/arch_tests_claude_rows_name_modules_706.rs, so the two cannot drift unnoticed;
+          # here, before the docs-only exit, on every pull request, before the plan and its docs-only exit, with no build (#708)
+          python3 -B .github/scripts/rows_from_sources.py --check
           plan="$RUNNER_TEMP/affected.json"
           echo "file=$plan" >> "$GITHUB_OUTPUT"
           # read live at the job's start; a failed read fails the job, never a narrower run

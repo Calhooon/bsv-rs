@@ -89,22 +89,107 @@ def reexports(root):
     names = {}
     for module, body in re.findall(r"pub use ([a-z_]+)::(\{[^}]*\}|[A-Za-z_]+)", text):
         for item in re.split(r"[{},\s]+", body):
-            if item and item != "as" and item[0].isupper():
+            # a function as a type: `bsv_rs::sha256`, `bsv_rs::sign` (#708 fold: the fourteen
+            # lowercase names went uncounted, against the convention's "a crate-root re-export")
+            if item and item != "as" and (item[0].isupper() or re.fullmatch(r"[a-z_][a-z0-9_]*", item)):
                 names[item] = module
     return names
 
 
+def crate_groups(text, crate):
+    """The bodies of `<crate>::{...}` groups, nested braces kept."""
+    bodies = []
+    for match in re.finditer(rf"\b{re.escape(crate)}::\{{", text):
+        depth, end = 1, match.end()
+        while end < len(text) and depth:
+            depth += {"{": 1, "}": -1}.get(text[end], 0)
+            end += 1
+        bodies.append(text[match.end():end - 1])
+    return bodies
+
+
+def group_heads(body):
+    """The leading name of each top-level item of a `use` group (`script::{A, B}` gives `script`)."""
+    heads, depth, item = [], 0, ""
+    for c in re.sub(r"//[^\n]*", "", body) + ",":
+        depth += {"{": 1, "}": -1}.get(c, 0)
+        if c == "," and depth == 0:
+            head = re.match(r"\s*([A-Za-z_]\w*)", item)
+            heads += [head.group(1)] if head else []
+            item = ""
+        else:
+            item += c
+    return heads
+
+
 def used_modules(text, modules, exported):
-    """The crate's top-level modules a test source names: `bsv_rs::<m>`, or a root re-export."""
-    found = {m for m in re.findall(r"\bbsv_rs::([a-z_]+)", text) if m in modules}
-    if re.search(r"\bbsv_rs::(?:\{|[A-Z])", text) and exported:
-        words = re.compile(r"\b(" + "|".join(map(re.escape, sorted(exported))) + r")\b")
-        found |= {exported[name] for name in words.findall(text)}
+    """The crate's top-level modules a test source names: a `bsv_rs::<m>` path, or a root
+    re-export named through the crate (`bsv_rs::Name`, an item of a `bsv_rs::{...}` group;
+    `bsv_rs as x` reads `x::` the same). A re-exported name met anywhere else is no use (#706:
+    the word reading took `WalletFaultFamily::Transport` for `auth` and a comment's "Address"
+    for `script`); a glob `bsv_rs::*` keeps the word reading, the names it imports unlisted."""
+    found = set()
+    for crate in {"bsv_rs", *re.findall(r"\bbsv_rs\s+as\s+([a-z_]\w*)", text)}:
+        heads = re.findall(rf"\b{re.escape(crate)}::([A-Za-z_]\w*)", text)
+        for body in crate_groups(text, crate):
+            heads += group_heads(body)
+        found |= {m for m in heads if m in modules}
+        found |= {exported[name] for name in heads if name in exported}
+        if re.search(rf"\b{re.escape(crate)}::\*", text) and exported:
+            types = sorted(n for n in exported if n[0].isupper())
+            calls = sorted(n for n in exported if not n[0].isupper())
+            if types:
+                words = re.compile(r"\b(" + "|".join(map(re.escape, types)) + r")\b")
+                found |= {exported[name] for name in words.findall(text)}
+            if calls:
+                # a function the glob imports is a bare call: `sign(`, never `.sign(`,
+                # `x::sign(` or `fn sign(`
+                bare = re.compile(r"(?<![\w.:])(?<!fn )(" + "|".join(map(re.escape, calls)) + r")\s*\(")
+                found |= {exported[name] for name in bare.findall(text)}
     return found
 
 
-def row_modules(row, modules):
-    """The modules a `tests/CLAUDE.md` row names, by the night's two patterns."""
+# The `## Files` table's columns (#706): the module naming is the fourth cell.
+MODULES_CELL = 4
+
+
+def row_cells(row):
+    """A table row's cells, the outer pipes dropped (a `\\|` inside a cell kept)."""
+    return [c.strip() for c in re.split(r"(?<!\\)\|", row.strip())[1:-1]]
+
+
+def shared_cell(cell):
+    """A shared row's Modules cell, file by file (#708 fold): `` `a.rs`: `m`, `n`; `b.rs`: none ``
+    gives each file's stem to its modules' names; None when the cell names no file."""
+    if not re.search(r"`[^`]+\.rs`", cell):
+        return None
+    parts = {}
+    for part in cell.split(";"):
+        names = re.findall(r"`([^`]+)`", part)
+        if names and names[0].endswith(".rs"):
+            parts[Path(names[0]).stem] = {n for n in names[1:] if not n.endswith(".rs")}
+    return parts
+
+
+def row_modules(row, modules, stem=None):
+    """The modules a `tests/CLAUDE.md` row names: the backticked names of its Modules cell
+    (#706). A path in the description (`src/<m>/`, `` `<m>::` ``) names nothing: the rows
+    point at other files' witnesses that way (`src/identity/client_field_value_261_tests.rs`
+    in an auth binary's row), which put a binary in a module it never reaches. A row of
+    four cells is the table before #706 (read at an older commit, or a fixture of its
+    shape), read by the night's two patterns as it was then; the guard refuses one in the
+    tree (`tests/arch_tests_claude_rows_name_modules_706.rs`). A row shared by several files
+    names each file's modules apart (`shared_cell`), and `stem`'s part is its reading: the
+    row's union is no file's (#708 fold: the #537 and #544 rows put twelve binaries in
+    modules their sources never name)."""
+    cells = row_cells(row)
+    if len(cells) > MODULES_CELL:
+        cell = cells[MODULES_CELL - 1]
+        shared = shared_cell(cell)
+        if shared is not None:
+            chosen = shared.get(stem, set()) if stem else set().union(*shared.values())
+            return chosen & modules
+        return set(re.findall(r"`([a-z_]+)`", cell)) & modules
     named = set(re.findall(r"src/([a-z_]+)/", row)) | set(
         re.findall(r"`(?:crate::|bsv_rs::|bsv::)?([a-z_]+)::", row))
     return named & modules
@@ -182,7 +267,7 @@ class Tree:
                       for b, sources in self.sources.items()}
         self.literal_texts = {b: literal_text(t) for b, t in self.texts.items()}
         self.uses = {b: used_modules(t, self.modules, self.exported) | row_modules(
-            self.rows.get(b, ""), self.modules) for b, t in self.texts.items()}
+            self.rows.get(b, ""), self.modules, b) for b, t in self.texts.items()}
         # `os.path.isdir`, never `Path.is_dir`: a literal longer than a file name (a BEEF hex
         # string) raises `OSError` (ENAMETOOLONG) from `Path.is_dir` on Python 3.11 to 3.13,
         # the runner's 3.12 among them; `os.path.isdir` answers False on any `OSError` (#680 fold)
