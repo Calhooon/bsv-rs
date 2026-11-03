@@ -7,9 +7,9 @@ Suite's compile 4m15s cold and 2m47s on a cache hit at loop one's close,
 
 | Row | What | State |
 | --- | --- | --- |
-| #672 | the compile time by evidence: the Test Suite's build steps, the lint job's Clippy and ratchet | this record |
+| #672 | the compile time by evidence: the Test Suite's build steps, the lint job's Clippy and ratchet | landed as PR #691 (`55424846`, 13:10Z 2026-11-03); its after columns below, from the cache-hit witness |
 | #673 | the reads share the lane's build | open; nothing here |
-| #696 | the semver tool's cache seeded from a push to a line | the section below |
+| #696 | the semver tool's cache seeded from a push to a line | landed as PR #700 (`e9dc9a4a`, 13:40Z); the section below, the seed's miss and save measured |
 
 ## The measurement before: CI
 
@@ -152,14 +152,53 @@ the lib's test target leaving the integration build are not counted. A miss
 on CI adds the dependencies' build at level 1, unmeasured on the runner (71 s
 more on this host at 2 jobs).
 
-| Step | Before (41606020511) | After |
-| --- | ---: | --- |
-| Test Suite job | 448 | (from the PR's CI run) |
-| Integration: build, run | 82, 181 | (from the PR's CI run) |
-| Unit: run | 34 | (from the PR's CI run) |
-| Memory: run | 35 | (from the PR's CI run) |
-| Tracing: build | 18 | (from the PR's CI run) |
-| Integration binaries | 284 (283 and the lib's) | 283 |
+| Step | Before (41606020511) | After, the hit (41646365090) | After, beta's miss (41641964966) |
+| --- | ---: | ---: | ---: |
+| Test Suite job | 448 | 237 | 477 |
+| Cache restore | 4 | 3 | none found |
+| Unit tests: step | 64 | 37 | 181 |
+| Unit tests: build | 29 | 16.8 | 153 (the dependencies rebuilt at level 1) |
+| Unit: run | 34 | 18.9 | 25.5 |
+| Integration: step | 265 | 137 | 197 |
+| Integration: build, run | 82, 181 | 64, 72.3 | 87, 107.8 |
+| Memory: run | 35 | 13.3 | 18.8 |
+| Tracing: build | 18 | 2.1 | 3.0 |
+| Doc tests: step | 29 | 21 | 29 |
+| Integration binaries | 284 (283 and the lib's) | 283 (3,128 tests) | 283 (3,125 tests) |
+
+The after columns, read from the API on 2026-11-03 (`gh run view <id>
+--json jobs`, each step's `completedAt` less its `startedAt`; a build is the
+step's `Finished` line and a run its nextest `Summary`, from
+`gh api repos/Calhooon/bsv-rs/actions/jobs/<job>/logs`). The hit is beta's
+second push run after the landing, as defined below: 41646365090 on
+`e9dc9a4a`, its log `Restored from cache key
+"v1-rust-test-suite-Linux-x64-26c38808-cbf959cb" full match: true.`; its
+run 5m06s, the Test Suite 3m57s (the restore 3 s, the unit tests 37 s, the
+integration step 2m17s, the memory step 27 s, the tracing step 5 s, the doc
+tests 21 s). Beta's landing push run 41641964966 on `55424846` misses
+(`No cache found.`, 254 `Compiling` lines): the run 8m00s, the Test Suite
+7m57s (the unit tests 3m01s with the dependencies rebuilt, the integration
+step 3m17s, the memory step 38 s, the doc tests 29 s).
+
+The projection held: 448, 548 and 389 s before (the Test Suite on the three
+beta runs above), about 328, 393 and 288 s projected, 237 s measured on the
+hit. The hit's run is under every projection; the steps beat the
+projection's fractions (the integration run 72 s against 181, the unit run
+19 s against 34), more than the level alone accounts for on this host, so
+part of it is the runner's: one hit, not a mean.
+
+The PR's own runs. Its opening run 41624795016 (`dd1630d5`) is the PR-side
+miss (`No cache found.`, 254 `Compiling` lines; the unit build 1m33s): the
+run 5m55s, the Test Suite 5m13s. Its last run 41640765441 (`0aff5a26`) is
+not a miss: its log reads `Restored from cache key
+"v1-rust-test-suite-Linux-x64-26c38808-cbf959cb" full match: true.`, the
+entry an earlier run of the same pull request saved under its own ref (the
+key unchanged between the two heads), so it is a second hit on the new
+key: the run 6m26s, the Test Suite 5m54s (the unit tests 1m03s, their build
+36 s, the integration step 3m23s, the memory step 38 s, the doc tests
+28 s). Its unit build's 36 s against the beta hit's 17 s is the lib built
+on another runner at another hour, not a rebuild (four `Compiling` lines in
+each). The lane's local figures stand as measured.
 
 The PR's own run misses the cache (the key moves with the new variable) and
 builds the dependencies at the new level: its Test Suite carries the miss.
@@ -245,11 +284,11 @@ finding on the rebase onto `7896671d`).
 
 | Figure | Before | After |
 | --- | --- | --- |
-| A PR's CI wall clock | push runs 450, 552, 391 s (41606020511, 41602618009, 41599782319) | (from the PR's CI run) |
-| The queue wait | 1 s each | (from the PR's CI run) |
-| The nightly's length | 2h28m (41579707627, complete, 04:42:51Z to 07:10:57Z) | unchanged by this loop (no `nightly.yml` line) |
-| A cold read's length | not measured by this lane | |
-| The landing latency | not measured by this lane (loop four, #675) | |
+| A PR's CI wall clock | push runs 450, 552, 391 s (41606020511, 41602618009, 41599782319) | 306 s (5m06s) on the hit (41646365090, beta's push); 386 s (6m26s) on the PR's last run, a hit on its own ref's entry (41640765441); 480 s (8m00s) on beta's miss (41641964966); 355 s (5m55s) on the PR's opening miss (41624795016) |
+| The queue wait | 1 s each | 2, 1 and 29 s (41646365090, 41641964966, 41640765441; to the earliest job that ran 4, 2 and 31 s) |
+| The nightly's length | 2h28m (41579707627, complete, 04:42:51Z to 07:10:57Z) | unchanged by this loop (no `nightly.yml` line); the next figure the complete run at 07:00Z 2026-11-04 at the cap of six (`docs/lanes/ci-speed-7.md`) |
+| A cold read's length | not measured by this lane | 10 to 16 minutes (the captain's count over this loop's reads) |
+| The landing latency | not measured by this lane (loop four, #675) | lane DONE to the merge on beta, the captain's count: 15 min (#700), 28 min (#698), 100 min (#694), 156 min (#691; the last two with the flake's hour inside). The API's opening to merge: #700 13:28:39Z to 13:39:57Z (11m18s), #698 12:20:00Z to 12:47:39Z (27m39s), #694 11:21:05Z to 13:00:14Z (99m09s), #691 10:35:14Z to 13:10:18Z (155m04s) |
 
 ## #696: the semver tool's cache seeded from a push to a line
 
@@ -350,11 +389,18 @@ request's context is still `semver`.
 
 | Figure | Before | After |
 | --- | --- | --- |
-| `semver`'s install on a pull request's opening run | 241 s, 285 s, 294 s (41634821365, 41624795016, 41621814166; #694's 5m08s) | (from the earliest pull request after a beta push under this change) |
-| `semver`'s job on a pull request's opening run | 299 s, 351 s, 358 s | (from the earliest pull request after a beta push under this change) |
-| The seed job on a push, hit / miss | none | (from beta's push runs after the landing) |
+| `semver`'s install on a pull request's opening run | 241 s, 285 s, 294 s (41634821365, 41624795016, 41621814166; #694's 5m08s) | (from the earliest code pull request into `beta` opened after 13:45:06Z, read in at its landing) |
+| `semver`'s job on a pull request's opening run | 299 s, 351 s, 358 s | (the same run) |
+| The seed job on a push, hit / miss | none | miss 301 s (5m01s) on beta's push 41646365090 (`e9dc9a4a`, the landing's): `Cache not found for input keys: semver-checks-0.51.0-rust-1.95.0-Linux-X64`, the toolchain 8 s, the install 289 s (4m49s, once), then `Cache saved with key: semver-checks-0.51.0-rust-1.95.0-Linux-X64`; hit (from beta's next push run) |
 
 This pull request's own run is a pull request: its `semver` misses as today.
-The landing's push to `beta` runs the seed, which misses and saves; the
-witness is the earliest pull request into `beta` opened after that push.
+The landing's push to `beta` ran the seed, which missed and saved (above);
+the witness is the earliest pull request into `beta` opened after that push
+whose change is not docs only. A docs-only pull request's `semver` exits
+after its plan (#689) and never reaches the cache step (`if:
+steps.plan.outputs.docs_only != 'true'` on the restore and the install), so
+the record's own pull request (`lane/docs-loop3-after`, docs only) measures #689's exit, not this row: its
+figure goes to `docs/lanes/ci-speed-loop2-docs-only.md`. No pull request
+was opened between the push and 13:48Z (`gh pr list`, `gh run list
+--event pull_request`).
 

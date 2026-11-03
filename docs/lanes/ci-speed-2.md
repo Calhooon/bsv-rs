@@ -208,6 +208,23 @@ three rows and their outcomes:
 | A cold read | about 16 minutes; reads without cargo 3 to 7 minutes | unchanged |
 | The landing latency, lane DONE to landed | 39, 46 and 64 minutes (#676, #684, #680) | unchanged; a docs-only landing's read in at this record's landing |
 
+## Loop three, rows one and two landed
+
+#672 (PR #691, `55424846`, 13:10Z 2026-11-03) and #696 (PR #700, `e9dc9a4a`,
+13:40Z); the step figures and their run ids are `docs/lanes/ci-speed-3.md`'s,
+read from `gh run view <id> --json jobs` and the jobs' logs on 2026-11-03.
+The loop stays open: #693 (the binaries' measurement) and #699 (the checks
+cache key) open, #673 next.
+
+| Figure | Loop two closed | Loop three, rows one and two landed |
+|---|---|---|
+| A PR's CI wall clock | unchanged for a code PR (9m36s to 11m09s whole) | 5m06s whole on a cache hit (beta's push 41646365090); 6m26s on PR #691's last run (41640765441, a hit on its own ref's entry, not a miss: its log reads `full match: true`); on a miss 8m00s (beta's landing push 41641964966) and 5m55s (PR #691's opening run 41624795016). A docs-only PR: 4m43s before the semver exit (#690, run 41617426467), after measured by this record's pull request's run, read in at its landing |
+| The Test Suite | 9m10s whole | 3m57s whole on a hit (41646365090), against 9m10s to 9m11s at loop two's close (runs 41587646252, 41590906372) and 15m26s before loop one; 5m54s on PR #691's last run; on a miss 7m57s (41641964966) and 5m13s (41624795016) |
+| The queue wait | 0m02s to 1m57s to the Test Suite | 1 to 29 s (to the earliest job that ran 2 to 31 s) on the three runs above |
+| The nightly | 2h28m06s (run 41579707627) | unchanged until the 07:00Z complete run at the cap of six (2026-11-04) |
+| A cold read | about 16 minutes | 10 to 16 minutes |
+| The landing latency, lane DONE to landed | 39, 46 and 64 minutes | 15 min (#700), 28 min (#698), 100 min (#694), 156 min (#691), the last two with the flake's hour inside (the captain's count; the API's opening to merge 11m18s, 27m39s, 99m09s and 155m04s) |
+
 ## The four loops
 
 The speed line runs as four numbered loops (the keeper's word of 2026-11-03 02:1xZ on the
@@ -218,7 +235,7 @@ loop's recorded figures.
 |---|---|---|
 | One | the seven cuts (#665, #664, #666, #667) | closed ("Loop one closed" above) |
 | Two | the docs-only exit (#668), the ten slowest tests (#670), the shard by step (#671) | closed ("Loop two closed" above) |
-| Three | compile time by evidence; the reads sharing the lane's build | open: #672 in its lane, #673 next |
+| Three | compile time by evidence; the reads sharing the lane's build | open: rows one and two landed (#672 as #691, #696 as #700; "Loop three, rows one and two landed" above); #693 (the binaries' measurement) and #699 (the checks cache key) open; #673 next |
 | Four | the landing latency measured and cut; the slot occupancy by hour and the quiet hours | open: #674 (the landing latency's definition and figures), #675 (the occupancy read, now the fleet tool's) |
 
 ## Verified here, and not
