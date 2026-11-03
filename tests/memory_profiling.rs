@@ -1,6 +1,7 @@
 //! Detailed heap analysis tests using dhat profiler.
 //!
 //! Run with: cargo test --test memory_profiling --all-features -- --test-threads=1
+//! CI runs: RUST_TEST_THREADS=1 cargo nextest run --test memory_profiling --all-features
 //!
 //! These tests provide detailed heap allocation tracking:
 //! - Total allocations per operation
@@ -8,8 +9,10 @@
 //! - Allocation hotspot identification
 //!
 //! Note: Only one dhat profiler can be active at a time (a second one panics), so every test
-//! here holds `PROFILER` for its whole body. The harness can still allocate concurrently;
-//! the streaming BEEF heap pin is judged under `--test-threads=1`, as in CI.
+//! here holds `PROFILER` for its whole body. In CI nextest runs each test in a process of its
+//! own, and `RUST_TEST_THREADS=1` on the step keeps libtest inside it on its synchronous path,
+//! so the harness allocates nothing concurrently (no 60-second warning, #372); the streaming
+//! BEEF heap pin is judged under that condition, or under `--test-threads=1` with `cargo test`.
 
 #![cfg(feature = "dhat-profiling")]
 
@@ -348,13 +351,15 @@ fn test_hashing_allocations() {
 ///
 /// - the stream alone, each element dropped as it is yielded: one chunk and
 ///   one element, with exactly the same peak at every depth under
-///   `--test-threads=1`, as in CI (#372);
+///   one libtest thread (`RUST_TEST_THREADS=1` on CI's nextest step,
+///   `--test-threads=1` under `cargo test`; #372);
 /// - the structure verdict and the full verdict (scripts executed, each
 ///   parent output kept until it is spent): the peak over the stream's is
 ///   the index, a bounded number of bytes per element at every depth.
 ///
 /// Judge this pin with `cargo test --test memory_profiling --all-features --
-/// --test-threads=1`. Libtest 1.95.0's timeout warning allocates only on the
+/// --test-threads=1`, or as CI does with `RUST_TEST_THREADS=1 cargo nextest run
+/// --test memory_profiling --all-features`. Libtest 1.95.0's timeout warning allocates only on the
 /// concurrent path (`library/test/src/lib.rs:437-460`); a default-harness run
 /// with tests reaching the 60-second warning is outside this pin's condition.
 #[cfg(feature = "transaction")]
@@ -413,7 +418,8 @@ fn test_beef_stream_memory_is_flat_per_element() {
         assert_eq!(
             *stream_only, first,
             "the stream's peak differs at N={n}: {stream_only} vs {first} B; \
-             this pin is judged under --test-threads=1, as in CI; libtest's concurrent \
+             this pin is judged on one libtest thread (RUST_TEST_THREADS=1 in CI, \
+             --test-threads=1 under cargo test); libtest's concurrent \
              60-second warning allocates in the process-wide profile (#372)"
         );
         assert!(

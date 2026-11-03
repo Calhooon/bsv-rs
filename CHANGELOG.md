@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the Test Suite job builds from a dependency cache keyed by rustc, `Cargo.toml` and a lockfile generated in the job and runs under nextest, without debuginfo (speed round 1, cut 1)
+
+What was slow: `Test Suite (ubuntu-latest, stable)` took 26 of a run's 29
+minutes (run 41537280176) and is every landing's critical path. 2:45 went to
+restoring a 7,350 MB `actions/cache` archive that an exact hit never
+refreshed, 4:15 to compiles, 18:49 to tests run one binary at a time (the
+memory step's 13 on one thread). What changed, in the `test` job alone:
+`Swatinem/rust-cache` v2.9.3 (sha-pinned) caches the dependencies' build,
+keyed by rustc's version, host and hash, the `CARGO*`/`RUST*` environment,
+`Cargo.toml` and the lockfile `cargo generate-lockfile` writes in the job just
+before it (no lockfile is tracked, so without that step a dependency's
+compatible release would be rebuilt on every exact hit; with it the key
+moves, one miss, a rebuild and a save), saved on a pull request and on a push
+to a line;
+`CARGO_PROFILE_DEV_DEBUG`, `CARGO_PROFILE_TEST_DEBUG` and `CARGO_INCREMENTAL`
+are 0 in the job's env (a developer's `cargo test` keeps its debuginfo);
+`cargo-nextest` 0.9.150 (by `taiki-e/install-action` v2.89.1, sha-pinned)
+runs the lib, integration, memory and tracing steps with `--no-fail-fast`;
+the linker stays rustc's default rust-lld on Linux. What did not change:
+every test runs once per step as before, on the same features, target
+selectors and steps, hermetic as before; doc tests stay `cargo test --doc`.
+The memory tests' isolation is now nextest's process per test, not
+`--test-threads=1`, with `RUST_TEST_THREADS=1` on that step so libtest
+inside each process keeps its synchronous path and no 60-second warning
+allocates in the profile (#372). `tests/arch_ci_runs_every_test.rs` (#146) reads a
+`cargo nextest run` line as a step as it reads `cargo test`
+(`a_nextest_run_is_a_step_as_cargo_test_is`; the base guard refuses all 272
+files against the new workflow). The record, with the split per step and the
+sharding rule (the memory step's one 5:36 test and the doc tests already put
+the job past 8 minutes, so the next round splits it by step), is
+`docs/lanes/ci-speed-1.md`.
+
 ### Fixed: the CHECKSIG scriptCode built from the bytes as the node builds it, so an unlocking-script check after a codeseparator keeps the locking script whatever chunk follows (#654)
 
 The scriptCode of `OP_CHECKSIG`, `OP_CHECKSIGVERIFY`, `OP_CHECKMULTISIG` and
