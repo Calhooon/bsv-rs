@@ -487,6 +487,10 @@ files against the new workflow). The record, with the split per step and the
 sharding rule (the memory step's one 5:36 test and the doc tests already put
 the job past 8 minutes, so the next round splits it by step), is
 `docs/lanes/ci-speed-1.md`.
+Measured after: the Test Suite went from 26m01s to 15m26s on a cache hit (beta's
+push run 41563214016) and 16m06s cold (run 41558273855), and a landing's run from
+29m11s to 20m05s (run 41558273855); a fast runner's miss took 12m45s (run
+41560881228), so the job is test-bound and the cache saves about 40 seconds.
 
 ### Fixed: the CHECKSIG scriptCode built from the bytes as the node builds it, so an unlocking-script check after a codeseparator keeps the locking script whatever chunk follows (#654)
 
