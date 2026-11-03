@@ -137,7 +137,7 @@ with 19); within those, the stem's leading word and the cell together give
 45 families of more than one (219 binaries, four of them of eight to twelve
 files).
 
-| Scope | Binaries removed | This host (0.25 to 0.28 s of unit time each) | #691's local fit (0.49 s) | CI (#691's 0.19 to 0.26 s of wall each) | The reach rule's loss |
+| Scope | Binaries removed | This host (0.25 to 0.28 s of unit time each) | #691's local fit (0.49 s) | CI, the fixed part (#691's 0.19 to 0.26 s of wall each; the low bound the fixed 0.19 s, not this host's 0.13 s) | The reach rule's loss |
 | --- | ---: | ---: | ---: | ---: | --- |
 | this family | 9 | 2.2 to 2.5 s (1.2 s of wall measured) | 4.4 s | 1.7 to 2.3 s | none on a library change; a test-only change to one part runs the ten (about 3 s here) |
 | the 45 prefix-and-cell families | 174 | 44 to 49 s | 85 s | 33 to 45 s | none on a library change where the plan shows equal reach; a test-only change runs its family |

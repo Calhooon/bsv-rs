@@ -399,7 +399,7 @@ docs-only pull request's run.
   `tests/support/http_json_answer_697.rs`. Record: `docs/lanes/fix-697.md`.
 - `src/script/spend/script_code.rs`'s survivors of the complete run killed (#681): ten library tests in
   `src/script/spend/script_code_tests.rs` pin the scriptCode's writer and walker against bitcoin-sv `879fc8b`
-  `src/script/script.h` (`operator<<` at 102-130, `GetOp2` at 163-198, `FindAndDelete` at 200-224): `push_of`'s
+  `src/script/script.h` (`operator<<` at 102-130, `GetOp2` at 163-198, `FindAndDelete` at 200-222): `push_of`'s
   header byte for byte at 0, 1, 75, 76, 255, 256, 65535 and 65536 bytes; `find_and_delete`'s walk stepping over
   a direct, PUSHDATA1, PUSHDATA2 and PUSHDATA4 push whose data holds the pattern (minimal at each boundary size and
   non-minimal) and deleting the copy after it; a PUSHDATA2 of `0x0100` read as 256 bytes; a one-byte push cut

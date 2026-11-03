@@ -9,8 +9,8 @@ Suite's compile 4m15s cold and 2m47s on a cache hit at loop one's close,
 | --- | --- | --- |
 | #672 | the compile time by evidence: the Test Suite's build steps, the lint job's Clippy and ratchet | landed as PR #691 (`55424846`, 13:10Z 2026-11-03); its after columns below, from the cache-hit witness |
 | #673 | the reads share the lane's build | open; nothing here |
-| #696 | the semver tool's cache seeded from a push to a line | landed as PR #700 (`e9dc9a4a`, 13:40Z); the section below, the seed's miss and save measured |
-| #699 | the `checks` job's cache keyed by the cargo-mutants version it installs | committed on `lane/ci-mutants-cache` over `ec36c02e`, not yet landed; the section below, the before measured, the after from the landing's push |
+| #696 | the semver tool's cache seeded from a push to a line | landed as PR #700 (`e9dc9a4a`, 13:40Z); the section below, the seed's miss, save and hit measured, a pull request's hit read on #702's opening run (`semver` 52 s against 299 s to 358 s) |
+| #699 | the `checks` job's cache keyed by the cargo-mutants version it installs | landed as PR #704 (`ba0952c9`, 17:03Z); the section below, the before measured, the after from beta's three push runs (the landing's miss and save, two full matches: mutants-entries 52 s, then 10 s and 8 s) |
 | #693 | one merged integration binary measured against its parts (the ten `tests/script_*witness*.rs`, one equal Modules cell) | measured on `lane/ci-merged-binary` over `c46a3b29`, nothing restructured: 0.25 s of rustc per binary removed (0.15 s the link), no reach loss on a library change, a test-only change runs the group; the record `docs/lanes/ci-merged-binary.md` |
 
 ## The measurement before: CI
@@ -391,9 +391,9 @@ request's context is still `semver`.
 
 | Figure | Before | After |
 | --- | --- | --- |
-| `semver`'s install on a pull request's opening run | 241 s, 285 s, 294 s (41634821365, 41624795016, 41621814166; #694's 5m08s) | (from the earliest code pull request into `beta` opened after 13:45:06Z, read in at its landing) |
-| `semver`'s job on a pull request's opening run | 299 s, 351 s, 358 s | (the same run) |
-| The seed job on a push, hit / miss | none | miss 301 s (5m01s) on beta's push 41646365090 (`e9dc9a4a`, the landing's): `Cache not found for input keys: semver-checks-0.51.0-rust-1.95.0-Linux-X64`, the toolchain 8 s, the install 289 s (4m49s, once), then `Cache saved with key: semver-checks-0.51.0-rust-1.95.0-Linux-X64`; hit (from beta's next push run) |
+| `semver`'s install on a pull request's opening run | 241 s, 285 s, 294 s (41634821365, 41624795016, 41621814166; #694's 5m08s) | skipped on PR #702's opening run 41659003881 (`lane/kill-script-code`, opened 14:58:22Z, the earliest code pull request into `beta` after 13:45:06Z; attempt 1): `Cache hit for: semver-checks-0.51.0-rust-1.95.0-Linux-X64`, the install step skipped |
+| `semver`'s job on a pull request's opening run | 299 s, 351 s, 358 s | 52 s (the same run: the toolchain 8 s, the check 35 s; its Test Suite 220 s) |
+| The seed job on a push, hit / miss | none | miss 301 s (5m01s) on beta's push 41646365090 (`e9dc9a4a`, the landing's): `Cache not found for input keys: semver-checks-0.51.0-rust-1.95.0-Linux-X64`, the toolchain 8 s, the install 289 s (4m49s, once), then `Cache saved with key: semver-checks-0.51.0-rust-1.95.0-Linux-X64`; hit 6 s on beta's next push 41648342758 (`Cache hit for: semver-checks-0.51.0-rust-1.95.0-Linux-X64`, `lookup-only: true`, the toolchain and the install skipped) |
 
 This pull request's own run is a pull request: its `semver` misses as today.
 The landing's push to `beta` ran the seed, which missed and saved (above);
@@ -497,7 +497,10 @@ fills, GitHub evicts the least recently used. The new key adds one
 `checks` entry per line that pushes (`beta` at the landing, `main` at its
 next push; about 584 MB plus the cargo-mutants binary each). The old `beta`
 entry is read by no `beta` run after the landing (its restore-key prefix
-carries the old environment hash); 35 of the 39 entries were last read before
+carries the old environment hash; the rule is per line: `main`'s `ci.yml` has
+no `checks` job until the port, its gates separate jobs on their own cache
+keys, and `gh cache list --ref refs/heads/main` at 20:42Z holds no
+`v0-rust-checks` entry); 35 of the 39 entries were last read before
 it, so it is not the eviction's next candidate, and an open pull request on
 the old workflow keeps its hash alive until that branch rebases (the evidence
 read's correction of "the least recently used"); it leaves at the latest
@@ -513,10 +516,23 @@ on every run. Nothing lands for the budget.
 
 ### After
 
-| Figure | Before | After |
-| --- | --- | --- |
-| The install in mutants-entries | 64 s, 68 s, 71 s (41672716963, 41648342758, 41646365090) | (from beta's push run after the landing: the miss, the install's seconds and `Cache saved with key: v0-rust-checks-Linux-x64-<new hash>-...`; then the first run after it: `full match: true` and the install's seconds) |
-| The mutants-entries step | 74 s, 78 s, 80 s | (the same runs) |
-| The `checks` job | 218 s, 234 s, 228 s | (the same runs; the landing's push a cold build of the whole target) |
-| The account's cache usage | 10,690,699,350 bytes, 38 entries (16:31:43Z) | (read after the landing's save) |
+beta's three push runs after the landing (`gh run view <id> --json jobs`, the
+`checks` job's log through `gh api repos/Calhooon/bsv-rs/actions/jobs/<job>/logs`):
+41680292632 (`ba0952c9`, the landing's push, 17:02:39Z), 41685108182
+(`51016018`, at #703's landing, 17:31:44Z) and 41689853266 (`f482f25a`, after
+#707, 18:01:45Z). The landing's restore step lists `CARGO_MUTANTS_VERSION`
+among the key's variables and finds nothing on
+`v0-rust-checks-Linux-x64-7c242812`; its post step tars and sends
+587,059,261 bytes; the two after restore
+`v0-rust-checks-Linux-x64-7c242812-227349d2` (`Cache Size: ~560 MB
+(587059261 B)`, `full match: true`), cargo reports ``package `cargo-mutants
+v27.1.0` is already installed``, and the post step says `Cache up-to-date.`
 
+| Figure | Before | After (41680292632 / 41685108182 / 41689853266) |
+| --- | --- | --- |
+| The restore step | full match on `c2e3c2da` | `No cache found.` 1 s / `Cache hit for: v0-rust-checks-Linux-x64-7c242812-227349d2`, full match, 8 s / the same, 11 s |
+| The install in mutants-entries | 64 s, 68 s, 71 s (41672716963, 41648342758, 41646365090) | `Finished release profile ... in 46.57s` (the build, once) / none (already installed) / none (already installed) |
+| The mutants-entries step | 74 s, 78 s, 80 s | 52 s / 10 s / 8 s |
+| The post-cache step | `Cache up-to-date.` | 9 s (the save, 587,059,261 bytes) / 0 s, `Cache up-to-date.` / 0 s, `Cache up-to-date.` |
+| The `checks` job | 218 s, 234 s, 228 s | 247 s (the landing's push a cold build of the whole target) / 180 s / 188 s |
+| The account's cache usage | 10,690,699,350 bytes, 38 entries (16:31:43Z) | 11,277,758,611 bytes, 39 entries at 20:42:05Z (`gh api repos/Calhooon/bsv-rs/actions/cache/usage`), above the 10 GiB budget by 540,340,371 bytes; the old entry `c2e3c2da` last read at 16:27:16Z, before the landing, the new one at 20:40:21Z |

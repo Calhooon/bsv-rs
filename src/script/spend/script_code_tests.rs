@@ -5,7 +5,7 @@
 //! walk through a top-level `OP_RETURN` the chunk parser folds (#654); the
 //! writer's and the walker's push-size boundaries and the walk's bound, read
 //! at bitcoin-sv `879fc8b` (`src/script/script.h`: `operator<<` at 102-130,
-//! `GetOp2` at 163-198, `FindAndDelete` at 200-224), the survivors and
+//! `GetOp2` at 163-198, `FindAndDelete` at 200-222), the survivors and
 //! timeouts of the complete mutation run (#681).
 
 use super::{find_and_delete, push_of};
@@ -118,7 +118,7 @@ fn a_push_of_65535_bytes_takes_pushdata2_and_of_65536_pushdata4_681() {
 
 /// A copy of the pattern inside a push's data is not at an instruction
 /// boundary, and the node's walk steps over it (`GetOp2`'s length read at
-/// `script.h:172-193`, `FindAndDelete`'s walk at `:206-215`); the copy after
+/// `script.h:172-193`, `FindAndDelete`'s walk at `:206-214`); the copy after
 /// the push is deleted. A walker that misreads the length lands inside the
 /// data or stops before the copy.
 fn the_walk_steps_over(push: &[u8]) {
@@ -174,8 +174,8 @@ fn a_pushdata2_of_0x0100_is_256_bytes_not_1_681() {
 
 #[test]
 fn a_one_byte_push_cut_short_at_the_last_byte_is_kept_681() {
-    // `GetOp2` fails on the push (`script.h:189-190`), the walk ends and the
-    // bytes from it on are kept (`:217-220`).
+    // `GetOp2` fails on the push (`script.h:190-191`), the walk ends and the
+    // bytes from it on are kept (`:217-219`).
     assert_eq!(find_and_delete(&[0x51, 0x01], &[0x51]), [0x01]);
     assert_eq!(find_and_delete(&[0x51, 0x4c], &[0x51]), [0x4c]);
 }
