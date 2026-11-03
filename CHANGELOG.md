@@ -27,9 +27,9 @@ necessary? or maybe a fraction"):
   `Cargo.lock`, `build.rs`, `.cargo/*`, `src/lib.rs`, `src/error.rs`, the
   nightly's workflow, script and memory-ceiling runner reach everything and
   make the night complete; documentation reaches nothing. On beta's last ten
-  commits: three plan nothing, five plan three or four files (one the
-  script surface's 50, its row naming none), two (the nightly's own script)
-  plan the complete run. The table and the reasons are in `docs/NIGHTLY.md`.
+  commits: two plan nothing, five plan three or four files, one plans the
+  script surface's 50 (its row naming none), two (the nightly's own script)
+  plan the complete run (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
 - **The record**: the `mutation-record` artifact (90 days), found by the
   source job through the artifacts API, never a commit (no write permission
   on beta, no race with the sequencer): per file the figure, the counts,
