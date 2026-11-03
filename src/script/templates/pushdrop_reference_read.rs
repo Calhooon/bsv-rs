@@ -3,8 +3,10 @@
 //! refuses: the reference's `PushDrop.decode` at its default position
 //! (`ts-stack@edf6e03` `PushDrop.ts:63-121`); and the field loop every path
 //! of `decode` reads with (`:96-115`, #618's fold). The canonical path
-//! (`PushDrop::decode_before`, the identity and contacts envelope checks)
-//! still refuses both, as each site's reference counterpart does.
+//! (`PushDrop::decode_before`, the identity clients' envelope checks) still
+//! refuses both, a skip there as at each site's reference counterpart; the
+//! contacts manager reads with this decode since #718, as its counterpart's
+//! `PushDrop.decode` does, and refuses both after the read in its words.
 
 use super::{LockPosition, PushDrop};
 use crate::primitives::PublicKey;
@@ -16,7 +18,7 @@ impl PushDrop {
     /// The key the first chunk (`PushDrop.ts:73-77`), the second chunk
     /// never read, the fields from the third: each chunk pushed, then the
     /// read ends where the *next* chunk is a DROP (`:96-115`).
-    pub(super) fn decode_reference_before(chunks: &[ScriptChunk]) -> Result<Self> {
+    pub(crate) fn decode_reference_before(chunks: &[ScriptChunk]) -> Result<Self> {
         let key = chunks
             .first()
             .and_then(|chunk| chunk.data.as_deref())

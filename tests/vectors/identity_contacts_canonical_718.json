@@ -1,0 +1,185 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk (bun build entry718.ts), Node v22.18.0",
+  "key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "bad_key": "056161616161616161616161616161616161616161616161616161616161616161",
+  "field_byte": 97,
+  "key_id": "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=",
+  "serial_number": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+  "cases": [
+    {
+      "name": "empty_script",
+      "first": "none",
+      "second_op": null,
+      "field_lengths": [],
+      "script_bytes": 0,
+      "script_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "Cannot read properties of undefined (reading 'data')"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "key_only",
+      "first": "key",
+      "second_op": null,
+      "field_lengths": [],
+      "script_bytes": 34,
+      "script_sha256": "eb095d01687299a200d7e9424139d809fb91a2c8cd67920e806316ff1ce3e3d8",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "Invalid contact PushDrop field count"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "first_chunk_without_data",
+      "first": "nop",
+      "second_op": 172,
+      "field_lengths": [
+        10,
+        8
+      ],
+      "script_bytes": 23,
+      "script_sha256": "647d9a296d65c32c4f1a66d8507062365642e1e8d22ad281e951e6a507b13fd0",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "script.chunks[0].data must have value"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "tag_05_key",
+      "first": "bad_key",
+      "second_op": 97,
+      "field_lengths": [
+        10,
+        8
+      ],
+      "script_bytes": 56,
+      "script_sha256": "fd5ccda176e7bebc916a4de64b5e68009ac5a83a90e36bbc0a143234d045d0df",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "Unknown point format"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "no_checksig_in_bounds",
+      "first": "key",
+      "second_op": 97,
+      "field_lengths": [
+        10,
+        8
+      ],
+      "script_bytes": 56,
+      "script_sha256": "96b67c9b8b6d22db67378c00a3fe72b6e9d0a856e3fecf3d4c0743933df93668",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "Contact output must use the canonical signed PushDrop script"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "no_checksig_oversized_ciphertext",
+      "first": "key",
+      "second_op": 97,
+      "field_lengths": [
+        66561,
+        8
+      ],
+      "script_bytes": 66611,
+      "script_sha256": "6a2d720de031d1dd555fd62cfaaf2b92d0916c6aa32d49145d70e71b8cbc0b8e",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "contact ciphertext must contain 1-66560 bytes"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "no_checksig_short_signature",
+      "first": "key",
+      "second_op": 97,
+      "field_lengths": [
+        10,
+        7
+      ],
+      "script_bytes": 55,
+      "script_sha256": "61a6fa91581b5dfa9458146216c569d525dee3fb58155dbb5f6cc320ca946cf4",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "contact signature must contain 8-80 bytes"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "no_checksig_three_fields_oversized",
+      "first": "key",
+      "second_op": 97,
+      "field_lengths": [
+        66561,
+        8,
+        8
+      ],
+      "script_bytes": 66621,
+      "script_sha256": "d8f97a7938aae96ac02244657a96494d4f4a3be1a6de71ad649f789cacd2b803",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "Invalid contact PushDrop field count"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "checksig_oversized_ciphertext",
+      "first": "key",
+      "second_op": 172,
+      "field_lengths": [
+        66561,
+        8
+      ],
+      "script_bytes": 66611,
+      "script_sha256": "77145b36be9084a1f24fec140496834c121e109b89e669bab85055c970a2ab80",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "contact ciphertext must contain 1-66560 bytes"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    },
+    {
+      "name": "checksig_in_bounds",
+      "first": "key",
+      "second_op": 172,
+      "field_lengths": [
+        10,
+        8
+      ],
+      "script_bytes": 56,
+      "script_sha256": "c9b59313b35ed2dc17c0ef8eecd9ac8a302d77d4afa3747f1634e68edaa05ae0",
+      "contacts": {
+        "contacts": 0,
+        "dropped": [
+          "Contact output is not locked to its declared keyID"
+        ]
+      },
+      "revocation_words": "No authenticated revelation output matches the requested certificate."
+    }
+  ]
+}

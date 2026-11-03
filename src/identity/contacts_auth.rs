@@ -1,10 +1,15 @@
 //! A listed contact token authenticated and opened as the reference's
 //! manager does (#544): `#authenticateContactScript`
 //! (`ts-stack@edf6e03` `ContactsManager.ts:431-466`), then the decryption
-//! and `#parseContactPlaintext` (`:468-472`, `:489-503`).
+//! and `#parseContactPlaintext` (`:468-472`, `:489-503`). The token is read
+//! as `PushDrop.decode` reads it (#718), so a key alone or a key without
+//! `OP_CHECKSIG` second reaches the count, the bounds and the envelope in
+//! the reference's order and words.
 use super::record::{self, ContactRecord, MAX_CIPHERTEXT};
 use super::ContactsManager;
 use crate::identity::token_envelope::is_canonical_signed_pushdrop;
+use crate::primitives::PublicKey;
+use crate::script::templates::pushdrop_position::point_message;
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::{Counterparty, DecryptArgs, WalletInterface};
@@ -13,6 +18,32 @@ use crate::{Error, Result};
 
 fn refused(words: impl Into<String>) -> Error {
     Error::IdentityError(words.into())
+}
+
+/// `PushDrop.decode(lockingScript)` at its default position, as
+/// `#authenticateContactScript` calls it (`ContactsManager.ts:432`;
+/// `PushDrop.ts:63-121`): the key the first chunk, refused in the words its
+/// read and `Point.fromDER` throw (`Point.ts:303-325`), the second chunk
+/// never read, the fields from the third. A key the reference reads and
+/// this crate refuses (#498's row) keeps the native words.
+fn decode(script: &LockingScript) -> Result<PushDrop> {
+    let chunks = script.chunks();
+    let Some(first) = chunks.first() else {
+        return Err(refused(
+            "Cannot read properties of undefined (reading 'data')",
+        ));
+    };
+    let Some(key) = first.data.as_deref() else {
+        return Err(refused("script.chunks[0].data must have value"));
+    };
+    if let Some(words) = PublicKey::from_bytes(key)
+        .is_err()
+        .then(|| point_message(key))
+        .flatten()
+    {
+        return Err(refused(words));
+    }
+    PushDrop::decode_reference_before(&chunks)
 }
 
 /// `bytes(value, field, minimum, maximum)` (`ContactsManager.ts:200-216`).
@@ -34,7 +65,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         script: &LockingScript,
         key_id: &str,
     ) -> Result<Vec<u8>> {
-        let decoded = PushDrop::decode_before(script)?;
+        let decoded = decode(script)?;
         if decoded.fields.len() != 2 {
             return Err(refused("Invalid contact PushDrop field count"));
         }
@@ -109,3 +140,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         record::parse_plaintext(&plaintext)
     }
 }
+
+#[cfg(test)]
+#[path = "contacts_auth_718_tests.rs"]
+mod canonical_718_tests;

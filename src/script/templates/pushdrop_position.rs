@@ -15,7 +15,9 @@ impl PushDrop {
     /// read. [`PushDrop::decode`] still reads both positions. A key alone and
     /// a key without `OP_CHECKSIG` second are refused here, the canonical
     /// path: every caller's counterpart refuses them after its read, where
-    /// [`PushDrop::decode`] reads them as the reference does (#618).
+    /// [`PushDrop::decode`] reads them as the reference does (#618). The
+    /// contacts manager reads with the reference's decode instead, so its
+    /// own checks refuse them in its counterpart's words (#718).
     pub(crate) fn decode_before(script: &LockingScript) -> Result<Self> {
         let chunks = script.chunks();
         if chunks.len() < 2 {
