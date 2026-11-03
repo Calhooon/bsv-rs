@@ -27,7 +27,15 @@ its 23 minutes, given up at 55 minutes with a warning and no verdict, any
 other failed watch an error; a `failure` conclusion fails the job, #682's
 third and fourth folds) before `ci-full-main` dispatches main's, since
 beta's run holds up to 9 jobs at once and main's up to 22 (31 together; the
-fleet's runner cap, #682's two folds, the keeper's word (a)). `ci.yml`'s two
+fleet's runner cap, #682's two folds, the keeper's word (a)). On a Sunday
+night (`-f weekly=true`) the `bench` job sits between them (#683): it
+dispatches `bench.yml` after the shards, the fuzz targets and beta's run,
+waits for that run under `ci-full-beta`'s rule (two jobs, then the
+scoreboard, and its own one runner), and `ci-full-main` needs it too, so
+the order is the shards, the fuzz targets, beta's run, the bench's run,
+main's; until #683 it dispatched beside the opening wave of shards, with no
+`needs`. `tests/arch_nightly_cap.rs` reads a job that dispatches any
+workflow as heavy, so a new one without its edge is refused by name. `ci.yml`'s two
 matrices carry `max-parallel: 6` (the keeper's line of 10:0xZ 2026-11-03;
 14 before it), so the seven dependents run six, then one, wherever they run; main's run, on main's file, still holds
 up to 22 for a minute and a half at its start, the residual the next complete run
@@ -526,7 +534,7 @@ table, never a new failure of the night.
 gh workflow run nightly.yml --ref beta
 # The complete run (the fleet's slot, 07:00Z, alone): at each prerelease pin (RELEASING.md step 3), before a minor tag, by hand.
 gh workflow run nightly.yml --ref beta -f mode=complete
-# The captain's Sunday night: the night and the bench.
+# The captain's Sunday night: the night, then the bench after beta's run, then main's (#683).
 gh workflow run nightly.yml --ref beta -f weekly=true
 ```
 
@@ -631,6 +639,9 @@ the record at those rates (since #685 at the minutes of the night's sets,
 count per surface, six at a time (the balance rule of 2026-10-26). An empty
 plan runs no shard; the score job carries every figure. The bench is the
 `weekly` input: the workflow has no schedule, so "weekly" is the dispatcher's
+word, and the job dispatches `bench.yml` at the line's tip, after beta's
+`ci.yml` run and before main's dispatch, waiting for its own run (#683).
+
 word, and the job dispatches `bench.yml` at the line's tip. The cold read of `59eeedcc` on the Studio, with the corpus (4,120 vectors
 run, load 5 to 10), measured the direct reading's 137 binaries at 94.5 and
 95.2 s on fresh links and 43.6 and 50.2 s warm, the fixed list's 46 at 33.7 s
