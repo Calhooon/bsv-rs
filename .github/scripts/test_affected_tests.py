@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -69,6 +70,39 @@ class ReachTests(unittest.TestCase):
         self.assertFalse(plan["lib"] or plan["doc"] or plan["memory"] or plan["tracing"])
         # src/script/CLAUDE.md lies under `src`, which arch_f walks; nothing else reads either
         self.assertEqual(plan["integration"], ["arch_f"])
+
+    def test_a_docs_only_change_builds_nothing_and_exits(self):
+        # #668: docs/ alone reaches nothing, so the Test Suite builds nothing
+        plan = self.plan(["docs/notes.md"])
+        self.assertFalse(plan["build"])
+        self.assertTrue(affected.docs_only(plan))
+        # CHANGELOG.md is named by arch_f: the Test Suite builds it, and a job running
+        # arch_f by name is no docs-only job
+        plan = self.plan(["CHANGELOG.md", "docs/notes.md"])
+        self.assertTrue(plan["build"])
+        self.assertTrue(affected.docs_only(plan, ["vec_e"]))
+        self.assertFalse(affected.docs_only(plan, ["vec_e", "arch_f"]))
+
+    def test_code_the_measured_readme_or_nothing_is_no_docs_only_change(self):
+        for changed in (["src/script/spend.rs"], ["docs/notes.md", "tests/tx_b.rs"],
+                        ["Cargo.toml"], ["README.md"], ["docs/notes.md", ".github/x.yml"], []):
+            with self.subTest(changed=changed):
+                self.assertFalse(affected.docs_only(self.plan(changed)))
+        self.assertTrue(self.plan(["src/script/spend.rs"])["build"])
+        self.assertTrue(self.plan(["Cargo.toml"])["build"])
+
+    def test_a_data_file_under_docs_or_the_ratchet_code_is_no_docs_only_change(self):
+        # #688 fold: a file under docs/ that is not Markdown is data a tool reads
+        # (docs/ratchets.json the ratchet's record, which `lint` checks), and the ratchet's
+        # own tree is its code, Markdown included: neither is ever docs only
+        for changed in (["docs/ratchets.json"], ["docs/notes.md", "docs/ratchets.json"],
+                        ["docs/dependents.lock"], ["docs/census/legs-2026-11-01.json"],
+                        ["tools/ratchet/README.md"], ["tools/ratchet/run"],
+                        ["tools/ratchet/src/main.rs"], ["tools/ratchet/library.Cargo.lock"]):
+            with self.subTest(changed=changed):
+                self.assertFalse(affected.docs_only(self.plan(changed)))
+                self.assertEqual(affected.outputs(self.plan(changed))["docs_only"], "false")
+        self.assertTrue(affected.docs_only(self.plan(["docs/notes.md", "docs/lanes/x.md"])))
 
     def test_a_file_named_only_in_prose_is_not_read(self):
         self.assertEqual(self.plan(["docs/notes.md"])["integration"], [])
@@ -198,6 +232,77 @@ class PlanOutputTests(unittest.TestCase):
             self.assertEqual(result["integration"], ["a"])
             self.assertTrue(result["memory"])
             json.dumps(result)
+
+
+CI_YML = Path(__file__).resolve().parents[1] / "workflows" / "ci.yml"
+
+
+def jobs(text):
+    """ci.yml's jobs, each name to its text (a two-space `<name>:` line under `jobs:`)."""
+    body = text.split("\njobs:\n", 1)[1]
+    found = {}
+    for match in re.finditer(r"^  ([A-Za-z0-9_-]+):\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)", body,
+                             re.MULTILINE | re.DOTALL):
+        found[match.group(1)] = match.group(2)
+    return found
+
+
+def plan_step(job):
+    """The text of a job's step that carries `id: plan`, or None."""
+    for step in re.split(r"^      - ", job, flags=re.MULTILINE)[1:]:
+        if re.search(r"^        id: plan$", step, re.MULTILINE):
+            return step
+    return None
+
+
+PUSH_PATH = re.compile(r'^ *if \[ "\$EVENT" != pull_request \]; then\n(.*?)^ *fi\n',
+                       re.MULTILINE | re.DOTALL)
+
+
+def shell_keys(text):
+    """The `<key>=` names a shell text writes to $GITHUB_OUTPUT."""
+    return {key for line in text.splitlines() if "$GITHUB_OUTPUT" in line
+            for key in re.findall(r"(?<![\w$-])([a-z_]+)=", line)}
+
+
+def reads(job):
+    return set(re.findall(r"steps\.plan\.outputs\.([A-Za-z0-9_]+)", job))
+
+
+class WorkflowKeyTests(unittest.TestCase):
+    """Every `steps.plan.outputs.<key>` a job of ci.yml reads is a key its plan step writes
+    (#688 fold): on a pull request the script's `outputs` and the step's own writes after the
+    push branch; on a push the push branch's writes. A key renamed on one side alone is read
+    as empty: `build` empty skips every build step, so a code change would build nothing and
+    the Test Suite report green."""
+
+    def planned_jobs(self):
+        found = {}
+        for name, job in jobs(CI_YML.read_text()).items():
+            step = plan_step(job)
+            if step is not None and "affected_tests.py plan" in step and reads(job):
+                push = PUSH_PATH.search(step)
+                self.assertIsNotNone(push, f"{name}: a plan step without its push branch")
+                found[name] = (job, push.group(1), PUSH_PATH.sub("", step, count=1))
+        self.assertEqual(sorted(found), ["checks", "lint", "test"])
+        return found
+
+    def test_every_plan_key_a_pull_request_reads_is_one_the_plan_writes(self):
+        result = affected.finish({"everything": None, "lib": True, "doc": True, "binaries": {},
+                                  "reasons": {}, "all_binaries": []}, [], "a reason")
+        script = set(affected.outputs(result))
+        for name, (job, _, pull_request) in self.planned_jobs().items():
+            with self.subTest(job=name):
+                self.assertEqual(reads(job) - script - shell_keys(pull_request), set())
+
+    def test_every_plan_key_a_push_reads_is_one_the_push_branch_writes(self):
+        # `reached`, `tests` and `file` are read on a pull request's subset alone: a push
+        # writes `whole=true`, and every step reading them carries `whole != 'true'` or the
+        # pull_request event
+        for name, (job, push, _) in self.planned_jobs().items():
+            with self.subTest(job=name):
+                self.assertEqual(reads(job) - {"reached", "tests", "file"} - shell_keys(push),
+                                 set())
 
 
 if __name__ == "__main__":

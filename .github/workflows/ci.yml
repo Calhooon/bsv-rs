@@ -239,6 +239,13 @@ jobs:
       # plan's script), and once per landing: the sequencer labels the PR `full-suite` before it
       # pushes the rebased head, and the label is read live here, never by a `labeled` trigger
       # (a second run per label, the toolbox's twin runs). The plan's own tests run before it.
+      # Speed round 2 (#668, docs/lanes/ci-speed-loop2-docs-only.md): a plan that reaches
+      # nothing (no unit, doc or integration target: `build` false) restores no cache, installs
+      # nothing and builds nothing; every step after this one carries `build` or a flag that
+      # implies it (each condition one of the exact forms tests/arch_ci_docs_only_exit.rs
+      # names; only the checkout runs before this step), and the last step reports the job
+      # green. The keys this step writes are tied to the ones read below
+      # (test_affected_tests.py, the #688 fold).
       - name: Plan the targets the change reaches
         id: plan
         shell: bash
@@ -251,7 +258,7 @@ jobs:
           set -euo pipefail
           if [ "$EVENT" != pull_request ]; then
             echo "a $EVENT run: the whole suite"
-            printf '%s\n' whole=true lib=true doc=true memory=true tracing=true >> "$GITHUB_OUTPUT"
+            printf '%s\n' whole=true build=true lib=true doc=true memory=true tracing=true >> "$GITHUB_OUTPUT"
             exit 0
           fi
           python3 -B -m unittest discover -s .github/scripts -p 'test_affected_tests.py'
@@ -267,6 +274,7 @@ jobs:
           fi
 
       - name: Install Rust
+        if: steps.plan.outputs.build == 'true'
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: ${{ matrix.rust }}
@@ -277,6 +285,7 @@ jobs:
       # Cargo.toml changed. With it a compatible release moves the key: one miss, a restore by
       # the restore key, a rebuild of the changed dependencies and a save under the new key.
       - name: Resolve dependencies when no lock is committed
+        if: steps.plan.outputs.build == 'true'
         run: test -f Cargo.lock || cargo generate-lockfile
 
       # The dependencies' build, keyed by the runner's OS, rustc's version, host and commit hash,
@@ -291,6 +300,7 @@ jobs:
       # key, every later run's exact hit; the landing run carries `full-suite`, so a complete
       # cache is still saved once per landing.
       - name: Cache the dependencies' build
+        if: steps.plan.outputs.build == 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           prefix-key: v1-rust
@@ -300,6 +310,7 @@ jobs:
           save-if: ${{ (github.event_name == 'pull_request' && steps.plan.outputs.whole == 'true') || (github.event_name == 'push' && (github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/main')) }}
 
       - name: Install cargo-nextest
+        if: steps.plan.outputs.build == 'true'
         uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           tool: nextest@0.9.150
@@ -308,7 +319,7 @@ jobs:
       # without building one (`cargo nextest list` would build all of them, the cost the
       # reached run saves); every reached name is a target, and a library change reaches some.
       - name: Check the reached set within the whole
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.plan.outputs.build == 'true'
         shell: bash
         run: |
           cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
@@ -362,6 +373,12 @@ jobs:
         if: steps.plan.outputs.doc == 'true'
         run: cargo test --doc --all-features
 
+      # #668: the plan reached nothing; the required context reports green
+      - name: Nothing to build
+        if: steps.plan.outputs.build != 'true'
+        run: |
+          echo "docs-only: nothing to build (the plan reaches no unit, doc or integration target)"
+
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -371,15 +388,40 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Speed round 2 (#668, docs/lanes/ci-speed-loop2-docs-only.md): a docs-only pull request
+      # (every changed path a *.md other than README.md, which the ratchet measures, and
+      # outside tools/ratchet/, the ratchet's own code; a file under docs/ that is not Markdown
+      # is never docs only: docs/ratchets.json is the ratchet's record, the #688 fold; no unit
+      # or doc test; none of the binaries this workflow runs by `--test` reached) installs and
+      # builds nothing here: every step after the plan carries `docs_only` or waits on `ready`,
+      # which carries it; `secrets` still scans its commits. Only a checkout runs before the
+      # plan, and every condition is one of the exact forms tests/arch_ci_docs_only_exit.rs
+      # names; the keys the plan writes are tied to the ones read here (test_affected_tests.py).
+      - name: Plan whether the change is docs only
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          runs=$(grep -o -- '--test [a-z0-9_]*' .github/workflows/ci.yml | awk '{print $2}' | sort -u | paste -sd, -)
+          python3 -B .github/scripts/affected_tests.py plan --range HEAD^1..HEAD --runs "$runs" --output "$RUNNER_TEMP/affected.json"
+
       # ratchet's diagnostics are compiler-version dependent; it keeps the baseline's toolchain.
       # The stable toolchain is installed after it, so it is the default every other gate runs
       - name: Install the measurement toolchain
+        if: steps.plan.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: "1.95.0"
           components: clippy, rustfmt
 
       - name: Install Rust
+        if: steps.plan.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
@@ -388,6 +430,7 @@ jobs:
 
       # the release binary, checked against the action's manifest, in place of a 2-minute build
       - name: Install cargo-deny 0.20.2
+        if: steps.plan.outputs.docs_only != 'true'
         uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           tool: cargo-deny@0.20.2
@@ -395,6 +438,7 @@ jobs:
       # the cache holds Clippy's --all-targets --all-features build (and each slice's), plus
       # ratchet's measurement build outside the checkout
       - name: Cache the Clippy and ratchet builds
+        if: steps.plan.outputs.docs_only != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: lint
@@ -405,6 +449,7 @@ jobs:
       # Clippy builds on it and deny keeps it unchanged (--locked) for all three graphs
       - name: Resolve the lockfile
         id: ready
+        if: steps.plan.outputs.docs_only != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/bsv-rs-ratchet-target"
           cargo generate-lockfile
@@ -472,6 +517,7 @@ jobs:
       - name: Every gate passed
         if: ${{ !cancelled() }}
         env:
+          DOCS_ONLY: ${{ steps.plan.outputs.docs_only }}
           VERDICTS: |
             ${{ steps.fmt.outcome }} Rustfmt
             ${{ steps.clippy.outcome }} Clippy
@@ -493,6 +539,8 @@ jobs:
               failed+=("gate $pos (no name)")
             elif [ "$outcome" = success ]; then
               echo "PASS $gate"
+            elif [ "$outcome" = skipped ] && [ "$DOCS_ONLY" = true ] && [ "$gate" != secrets ]; then
+              echo "SKIP $gate (docs-only: nothing to build, #668)"
             else
               echo "FAIL $gate (gate $pos: ${outcome:-not run})"
               failed+=("$gate")
@@ -515,10 +563,34 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Speed round 2 (#668, docs/lanes/ci-speed-loop2-docs-only.md): a docs-only pull request
+      # (every changed path a *.md other than README.md, which the ratchet measures, and
+      # outside tools/ratchet/, the ratchet's own code; a file under docs/ that is not Markdown
+      # is never docs only: docs/ratchets.json is the ratchet's record, the #688 fold; no unit
+      # or doc test; none of the binaries this workflow runs by `--test` reached) installs and
+      # builds nothing here: every step after the plan carries `docs_only` or waits on `ready`,
+      # which carries it; `secrets` still scans its commits. Only a checkout runs before the
+      # plan, and every condition is one of the exact forms tests/arch_ci_docs_only_exit.rs
+      # names; the keys the plan writes are tied to the ones read here (test_affected_tests.py).
+      - name: Plan whether the change is docs only
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          runs=$(grep -o -- '--test [a-z0-9_]*' .github/workflows/ci.yml | awk '{print $2}' | sort -u | paste -sd, -)
+          python3 -B .github/scripts/affected_tests.py plan --range HEAD^1..HEAD --runs "$runs" --output "$RUNNER_TEMP/affected.json"
+
       # vectors: the ts-stack corpus at the commit the pinned totals were audited against
       # (5,116 evaluation vectors); the conformance files skip when it is absent
       # (Calhooon/bsv-rs#31), so the vectors gate asserts its presence before the tests run
       - name: Check out the ts-stack conformance corpus
+        if: steps.plan.outputs.docs_only != 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: bsv-blockchain/ts-stack
@@ -528,12 +600,14 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
+        if: steps.plan.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
 
       - name: Cache the checks' builds
+        if: steps.plan.outputs.docs_only != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: checks
@@ -543,6 +617,7 @@ jobs:
       # unchanged; otherwise lock this job's resolve (after the cache's key is taken)
       - name: Resolve dependencies when no lock is committed
         id: ready
+        if: steps.plan.outputs.docs_only != 'true'
         run: test -f Cargo.lock || cargo generate-lockfile
 
       # every .cargo/mutants.toml equivalence entry names exactly one listed mutant (#663): a
@@ -591,7 +666,7 @@ jobs:
       # gitleaks is built from its release source, the tarball pinned by sha256 (no third-party action)
       - name: Scan the commits the event brings
         id: secrets
-        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.ready.outcome == 'success' || steps.plan.outputs.docs_only == 'true') }}
         env:
           GITLEAKS_VERSION: 8.30.1
           GITLEAKS_SHA256: e90fb266d75837e75894c778bf594ab8e2787f12dce5a62651f21b893eaf9abb
@@ -647,6 +722,7 @@ jobs:
       - name: Every gate passed
         if: ${{ !cancelled() }}
         env:
+          DOCS_ONLY: ${{ steps.plan.outputs.docs_only }}
           VERDICTS: |
             ${{ steps.mutants-entries.outcome }} mutants-entries
             ${{ steps.vectors.outcome }} vectors
@@ -670,6 +746,8 @@ jobs:
               failed+=("gate $pos (no name)")
             elif [ "$outcome" = success ]; then
               echo "PASS $gate"
+            elif [ "$outcome" = skipped ] && [ "$DOCS_ONLY" = true ] && [ "$gate" != secrets ]; then
+              echo "SKIP $gate (docs-only: nothing to build, #668)"
             else
               echo "FAIL $gate (gate $pos: ${outcome:-not run})"
               failed+=("$gate")

@@ -126,14 +126,16 @@ for the ten, the runner's estimate about 246 s by the same ratios.
 
 | Figure | Before | After |
 | --- | --- | --- |
-| A PR's CI wall clock | 20m05s (cold) | (from the PR's CI run) |
-| The queue wait | four to nine minutes | (from the PR's CI run) |
-| The nightly | 10h43m (until #666 lands) | (from the PR's CI run) |
-| A cold read | 16m49s | (from the PR's CI run) |
-| The landing latency, lane DONE to landed | five landings: 113, 124, 181, 186 and 219 minutes (#665 the 113, #659 the 219) | (from the PR's CI run) |
+| A PR's CI wall clock | 20m05s (cold) | 9m36s, the landing run 41587646252 (whole): the Test Suite 9m10s (unit 1m09s, integration 5m40s, memory 1m06s, tracing 25s, doc 35s), against 15m26s on a cache hit before |
+| The queue wait | four to nine minutes | 25s to the Test Suite (run 41587646252) |
+| The nightly | 10h43m (until #666 lands) | unchanged by this cut (#666's figure: 2h28m06s, run 41579707627, `docs/lanes/ci-speed-2.md`) |
+| A cold read | 16m49s | unchanged by this cut (about 16 minutes; reads without cargo 3 to 7 minutes) |
+| The landing latency, lane DONE to landed | five landings: 113, 124, 181, 186 and 219 minutes (#665 the 113, #659 the 219) | 39 minutes for this PR (#676; the captain's count, 2026-11-03 morning, from the fold: the pull request opened 03:39:28Z and merged 06:15:19Z, 155m51s, `docs/lanes/ci-speed-2.md`) |
 
-The Suite on a cache hit after this cut, and whether the shard by step is
-still due (the brief's eight-minute line), are the PR's run's to say.
+The Suite after this cut is 9m10s on the whole suite and 7m40s on a one-module
+subset (#684's run 41598630196, `docs/lanes/ci-speed-4.md`): the whole suite still
+sits above the eight-minute line, the subset below it; the shard by step is loop
+two's to decide on those figures.
 
 ## Logs
 

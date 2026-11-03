@@ -553,7 +553,8 @@ fn bundle(ci: &str, id: &str, gates: &[(&str, &str)]) -> Vec<String> {
         .filter_map(|s| {
             s.lines()
                 .find_map(|l| l.trim().strip_prefix("id: "))
-                .filter(|i| *i != "ready")
+                // the lockfile step and the docs-only plan (#668) are no gates
+                .filter(|i| *i != "ready" && *i != "plan")
         })
         .collect();
     for gate_id in &gated {
@@ -571,7 +572,12 @@ fn bundle(ci: &str, id: &str, gates: &[(&str, &str)]) -> Vec<String> {
             errors.push(format!("{id}: no step `{step_id}` for the gate {gate}"));
             continue;
         };
-        if !step.contains("        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}\n") {
+        // `secrets` also runs on a docs-only change, whose `ready` is skipped (#668)
+        let runs_after = step
+            .contains("        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}\n")
+            || (*step_id == "secrets"
+                && step.contains("        if: ${{ !cancelled() && (steps.ready.outcome == 'success' || steps.plan.outputs.docs_only == 'true') }}\n"));
+        if !runs_after {
             errors.push(format!(
                 "{id}: `{step_id}` does not run after an earlier gate failed (`!cancelled()`)"
             ));

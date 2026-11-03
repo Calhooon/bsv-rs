@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: a docs-only pull request's Test Suite, lint and checks build nothing (speed loop two, #668)
+
+#669, a pull request of `CHANGELOG.md` and a lane record, ran the whole set
+for 10m05s (run 41574976294); after cut 4 the Test Suite's plan already ran
+no test for such a change, but every job still restored its cache, installed
+its tools and built. Now the Test Suite's plan writes `build` (some unit, doc
+or integration target reached) and every step after it carries `build` or a
+flag that implies it, a last step printing `docs-only: nothing to build` so
+the required context reports green; `lint` and `checks` plan too and read
+`docs_only` (every changed path a `*.md` other than `README.md`, which the
+ratchet measures, and outside `tools/ratchet/`, the ratchet's code; a file
+under `docs/` that is not Markdown, `docs/ratchets.json` the ratchet's record
+above all, is never docs only; no unit or doc test; none of the binaries
+`ci.yml` runs by `--test` reached): their toolchain, cache and
+lockfile steps skip, their gates skip with them, and the verdict step reads a
+skipped gate as `SKIP` on a docs-only change alone. `secrets` still scans the
+pull request's commits. A change to `CHANGELOG.md` still reaches
+`arch_ci_lines` (its needle names the file), so the Test Suite builds and runs
+that one binary there; `semver` (about 50 s on a cache hit) and
+`main-in-beta` (seconds) run as before. Pinned by
+`tests/arch_ci_docs_only_exit.rs` (each step after a plan carries its
+condition, read whole, never by substring; only a checkout before a plan;
+each refusal shown on a mutated `ci.yml`; `arch_ci_lines`' bundle
+rule reads the plan step as no gate and admits `secrets`' docs-only arm) and
+the plan's unit tests
+in `.github/scripts/test_affected_tests.py` (the ratchet's record and code
+never docs only; every `steps.plan.outputs` key `ci.yml` reads one the plan
+writes, on a pull request and on a push). The record is
+`docs/lanes/ci-speed-loop2-docs-only.md`; the after figure is the next
+docs-only pull request's run.
+
 ### Tests
 
 - `src/script/templates/multisig.rs`'s survivors of the complete run killed (#681): six tests in the file's own

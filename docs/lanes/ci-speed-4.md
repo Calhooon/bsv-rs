@@ -208,15 +208,28 @@ included: the read is live, not the event's payload).
 
 | Figure | Before | After |
 |---|---|---|
-| A PR's CI wall clock | 12m09s (#664, run 41571159770), 16m48s (#666, run 41573018866), 10m05s (#669 docs, run 41574976294) | (from the PR's CI run) |
-| Queue wait | 0m03s, 1m32s and 0m17s to the Test Suite on those three runs (the hour's load, not the workflow) | (from the PR's CI run) |
-| The nightly | 10h43m (run 41347058507, the last complete one; run 41579707627, the earliest incremental, in progress at 05:39Z) | unchanged by this cut |
+| A PR's CI wall clock | 12m09s (#664, run 41571159770), 16m48s (#666, run 41573018866), 10m05s (#669 docs, run 41574976294) | 11m09s whole (this PR's landing run 41590906372, planned whole by the `full-suite` label: the Test Suite 9m11s); 7m43s on a one-module PR (#684's run 41598630196: 6 changed files, 228 of 280 binaries reached, the Test Suite 7m40s) |
+| Queue wait | 0m03s, 1m32s and 0m17s to the Test Suite on those three runs (the hour's load, not the workflow) | 1m57s (run 41590906372) and 0m02s (run 41598630196), the hour's load |
+| The nightly | 10h43m (run 41347058507, the last complete one; run 41579707627, the earliest incremental, in progress at 05:39Z) | unchanged by this cut (run 41579707627 ended at 2h28m06s, loop one's record in `docs/lanes/ci-speed-2.md`) |
 | A cold read | 16m49s (the #660 cold read) | unchanged by this cut |
-| The landing latency, lane DONE to landed | five landings: 113, 124, 181, 186 and 219 minutes (loop one's record, `docs/lanes/ci-speed-loop2-slowest.md` "The five figures", on `beta` since `3b29b3eb`, #670); the landing run now costs one whole Suite where a PR and its landing cost two | (from the PR's CI run) |
+| The landing latency, lane DONE to landed | five landings: 113, 124, 181, 186 and 219 minutes (loop one's record, `docs/lanes/ci-speed-loop2-slowest.md` "The five figures", on `beta` since `3b29b3eb`, #670); the landing run now costs one whole Suite where a PR and its landing cost two | 64 minutes for this PR (#680), 46 for #684 (the captain's count, 2026-11-03 morning) |
 
 The after source is this PR's CI run. Its run 41585824405 (on `f39d4a95`) failed at the plan
 step after ten seconds (the fold, below), so the after figures are the fold's run's. The
 after figures for a docs-only PR and a manifest PR come from the next PRs of each kind.
+
+The after figures, read from `gh run view <id> --json jobs` on 2026-11-03 (the step lines
+are `/Volumes/Lanes/out/bsv-rs/ci-speed-loop1-close/steps.txt`):
+
+| Run | PR | Plan | Run wall | Test Suite | Plan step | Unit | Integration | Memory | Tracing | Doc |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 41590906372 | #680 (this PR) | everything (the `full-suite` label: the landing run) | 11m09s | 9m11s | 1s | 1m15s | 5m38s whole | 1m06s | 26s | 34s |
+| 41598630196 | #684 (`src/script/spend/`, its tests) | 6 files, 228 of 280 | 7m43s | 7m40s | 3s | 1m15s | 4m04s reached | 1m06s | 25s | 34s |
+
+The setup steps still sum to about 10 s. The sequencer's label: since `sequencer9` it is set
+before the sequencer's first poll; #684's landing run, under `sequencer8`, ran the subset
+(the label came after the run started), and the whole suite ran on `beta`'s push run
+41599782319 after the merge (its Test Suite 6m29s).
 
 ## The #680 fold
 
