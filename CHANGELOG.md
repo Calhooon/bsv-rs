@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: every heavy run capped at six on the opening occupancy read, the complete dispatch at 07:00Z (the fleet's runner cap, 2026-11-03)
+
+The keeper's line of 10:0xZ, on the opening API read of the pool (12,251 jobs
+over three days): the twenty runners sit at twenty in 22 of 24 hours, the
+non-heavy p95 is 14 slots, and a job queued beside a heavy run waits a median
+of 0:38 (worst 88:53) against 0:02 (worst 3:16) beside none. The cap of 14
+below becomes 6: the plan's `HEAVY_MAX_PARALLEL` for a complete run (a night
+stays at `NIGHT_PARALLEL` 6), the `fuzz` matrix's 6, and `ci.yml`'s Test
+Suite and dependents literals, so the seven dependents run six, then one,
+on a dispatch, a tag, a push to main and a pull request into main (the
+seventh's 1m37s after bsv-tracker's 1m13s, inside the toolbox's 7m08s in
+run 41579745459: no longer by the replay). The cost: a complete run's twenty
+shards in four waves, about 3h07m replayed from run 41579707627's shard
+times against 1h40m on 14. The complete dispatch moves from 00:00Z to
+07:00Z, alone (the toolbox's 16:00Z, the CLI's 17:30Z); the cap rises only
+when a read shows the p95 under 10. Pinned by `tests/arch_nightly_cap.rs`
+(a cap above 6 refused, RED with the plan's constant and a matrix literal
+restored to 14). The record is `docs/lanes/ci-speed-7.md`, "The fleet's
+runner cap".
+
 ### CI: a docs-only pull request's Test Suite, lint and checks build nothing (speed loop two, #668)
 
 #669, a pull request of `CHANGELOG.md` and a lane record, ran the whole set

@@ -303,15 +303,17 @@ jobs:
     # account's twenty concurrent slots (the owner's balance rule of 2026-10-26,
     # the keeper's reading), the fuzz targets after it at six; the complete run
     # is twenty shards (the keeper's cut 5), each one job on its own runner under
-    # the memory ceiling below, at most fourteen at a time.
-    # The fleet's runner cap (the keeper's line, 2026-11-03): every heavy run on
-    # the runners holds at most 14 of the twenty, so six stay for the pull
-    # request and queue runs of bsv-rs, the CLI, the toolbox and the stack. GitHub
+    # the memory ceiling below, at most six at a time.
+    # The fleet's runner cap (the keeper's line of 10:0xZ 2026-11-03, on the
+    # opening API read of the pool; 14 from 06:2xZ): every heavy run on the
+    # runners holds at most 6 of the twenty, the pool's non-heavy p95 being 14,
+    # for the pull request and queue runs of bsv-rs, the CLI, the toolbox and
+    # the stack; it rises when a read shows that p95 under 10. GitHub
     # reads no `env` in `strategy`, so the number lives in one place, the plan's
     # HEAVY_MAX_PARALLEL (.github/scripts/nightly_mutants.py), read here through
     # the pin job's `max_parallel` output; its owner is loop four's #675, which
     # reads the account's occupancy from the API and moves it.
-    # tests/arch_nightly_cap.rs refuses this line removed or a cap above 14.
+    # tests/arch_nightly_cap.rs refuses this line removed or a cap above 6.
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.source.outputs.max_parallel) }}
@@ -531,8 +533,8 @@ jobs:
       issues: write
     strategy:
       fail-fast: false
-      # Six, under the fleet's runner cap of 14 (the keeper's line, 2026-11-03;
-      # its owner loop four's #675; tests/arch_nightly_cap.rs).
+      # Six, at the fleet's runner cap of 6 (the keeper's line, 10:0xZ
+      # 2026-11-03; its owner loop four's #675; tests/arch_nightly_cap.rs).
       max-parallel: 6
       matrix:
         target:
