@@ -16,6 +16,13 @@
 //! and `BUMP.lean:108-115` (a BUMP's levels). A fixture the reference has no row for is
 //! built by this crate's writer (`Beef::to_writer`, `Transaction::to_binary`)
 //! from the rows' shapes.
+//!
+//! The mutants' lines the doc comments name are the base's (`6fe627df`). The
+//! second fold's two rustdoc lines (`Cursor::to_binary`'s and
+//! `Cursor::from_binary`'s) put every site from line 2587 on two lines
+//! later: the BSC2 guard at `2771:22` (`2769:22` is then the BSC4 guard's),
+//! the flags check at 2830, the raw bit at 2863, the edge check at 2888, the
+//! pause at 2935 and 2943, the verifier at 3177 and 3216.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
