@@ -243,7 +243,10 @@ every heavy run on the runners carries `max-parallel: 6` (14 from the line
 of 06:2xZ until then), for the pull request and queue runs of the four
 repositories (bsv-rs, the CLI, the toolbox, the stack), which share the
 account's twenty hosted runners as one pool; and this crate's complete
-dispatch takes the 07:00Z slot (00:00Z until then).
+dispatch takes the 07:00Z slot (00:00Z until then). The day's dispatch rule
+(the keeper's correction at this file's next touch, 2026-11-03): one hand
+dispatch a day at 07:00Z, incremental by default, complete at a pin and
+after a measured cap change; the 00:00Z slot retired.
 
 The read (the toolbox's loop-four tool, 12,251 jobs over three days, the
 keeper's figures): the twenty runners peak at exactly twenty in 22 of 24
@@ -467,7 +470,7 @@ order), the score job and the CI phase (about 39 minutes replayed) follow
 unchanged, so the night's wall clock grows by those 88 minutes: a complete
 run dispatched at 07:00Z ends its shards near 10:07Z, its fuzz targets
 near 10:54Z and its CI phase near 11:33Z, by the replay, before the
-toolbox's 16:00Z slot. The computation reads `gh run view 41579707627
+CLI's 17:00Z slot. The computation reads `gh run view 41579707627
 --json jobs` (each job's `completedAt` less its `startedAt`); runner
 start-up and queue waits are ignored.
 
@@ -481,7 +484,8 @@ holds the pool.
 
 The stagger slots (the line of 10:0xZ, on the read's lightest hours). A
 complete run takes its slot alone: this crate's at 07:00Z (00:00Z until
-the line, the hour the read measured hottest), the toolbox's at 16:00Z,
-the CLI's at 17:30Z. A complete run never
+the line, the hour the read measured hottest), the CLI's at 17:00Z, the
+toolbox's at 18:00Z (the keeper's correction of 2026-11-03; this record had
+the toolbox at 16:00Z and the CLI at 17:30Z). A complete run never
 overlaps another repository's complete run or a sibling's dispatch, and a
 dispatch outside the slot is not run.

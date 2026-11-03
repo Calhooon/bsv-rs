@@ -131,7 +131,7 @@ change are never docs only).
 | Figure | Before | After |
 |---|---|---|
 | A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | 4m43s (#690, run 41617426467 on `849ff87e`: the Test Suite 8 s, lint 9 s, checks 30 s, main-in-beta 5 s, semver 4m39s) |
-| A docs-only PR's `semver` job (#689) | 4m39s (#690, run 41617426467) | (from the next docs-only PR's run) |
+| A docs-only PR's `semver` job (#689) | 4m39s (#690, run 41617426467) | measured by the pull request of `lane/docs-loop3-after` (the earliest docs-only one after #689 landed at `ec14da1c`, 13:00Z 2026-11-03), read in at its landing |
 | The queue wait | 0m02s to 1m57s (loop one closed) | (from the next docs-only PR's run) |
 | The nightly | 2h28m06s (run 41579707627) | unchanged by this cut |
 | A cold read | about 16 minutes; reads without cargo 3 to 7 minutes | unchanged by this cut |
