@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: one merged integration binary measured against its parts (speed loop three, #693)
+
+- `docs/lanes/ci-merged-binary.md`: the ten `tests/script_*witness*.rs` binaries
+  (one gate, one Modules cell) built and run as one scratch binary on the Studio:
+  about 0.25 s of rustc per binary removed (0.15 s of it the link), the same 100
+  tests, no reach loss on a library change, a test-only change running the
+  group; projected 39 to 53 s of a CI build over the 35 equal-cell groups. A
+  measurement row: no test, source or manifest changes.
+
 ### Tests: every `tests/CLAUDE.md` row names the modules its file reaches, pinned by a guard; the rows completed from the sources (#706)
 
 - The nightly's run selection (#685, PR #703) reads a measured file's targets
