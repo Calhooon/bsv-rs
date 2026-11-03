@@ -291,15 +291,11 @@ impl Spend {
             let sig_bytes = &sigs[sig_idx];
             let pubkey_bytes = &pubkeys[key_idx];
 
-            // Validate encodings
-            if self.check_signature_encoding(sig_bytes).is_err()
-                || self.check_public_key_encoding(pubkey_bytes).is_err()
-            {
-                return Err(self.error(&format!(
-                    "{} requires correct encoding for the public key and signature.",
-                    opcode_to_name(opcode).unwrap_or("OP_CHECKMULTISIG")
-                )));
-            }
+            // Validate encodings: each helper's own refusal, as OP_CHECKSIG
+            // returns it (Spend.ts:1809-1815, the wrapper unreachable there;
+            // interpreter.cpp:1605-1615; #657).
+            self.check_signature_encoding(sig_bytes)?;
+            self.check_public_key_encoding(pubkey_bytes)?;
 
             let sig_valid = if sig_bytes.is_empty() {
                 false

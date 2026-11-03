@@ -48,18 +48,6 @@ fn issue_429_former_forkid_mismatches_and_empty_word_rows_match_recorded_default
             .unwrap();
         let want = match case["default"]["valid"].as_bool() {
             Some(valid) => Ok(valid),
-            None if id == "node.tx-valid.shared.0097" => {
-                // Rust's existing CHECKMULTISIG wrapper differs from the
-                // SDK's DER wrapper. Pin both texts without changing verdicts.
-                assert_eq!(
-                    s(&case["default"], "error"),
-                    "Script evaluation error: The signature format is invalid."
-                );
-                Err(
-                    "OP_CHECKMULTISIG requires correct encoding for the public key and signature."
-                        .to_owned(),
-                )
-            }
             None => Err(s(&case["default"], "error")
                 .strip_prefix("Script evaluation error: ")
                 .unwrap()

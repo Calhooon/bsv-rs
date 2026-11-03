@@ -500,13 +500,13 @@ fn the_multisig_sweep_follows_the_reachability_rule_and_the_reference_625() {
 /// `Script` writer and signed by `Multisig::sign_with_sighash`: refused in
 /// every mode, as the node checks each key it compares
 /// (`interpreter.cpp:1611`); the compressed control valid in every mode.
-/// Green before and after #625. The words are this crate's CHECKMULTISIG
-/// wrapper's; the reference's visible words are its key check's, `The public
-/// key is in an unknown format.` (`Spend.ts:1808-1814`, the check throwing
-/// before the wrapper; the sweep's dead shapes record them), a difference of
-/// words left to #657. `ScriptEvaluationError` carries no variant for the
-/// refusal (its `message` is the verdict's only name), so the words stay
-/// here: #657's fix changes them and this assertion with it.
+/// Green before and after #625. The words are the key check's, `The public
+/// key is in an unknown format.`, as the reference's are (`Spend.ts:1808-1814`,
+/// the check throwing before the wrapper; the sweep's dead shapes record
+/// them), since #657 (`tests/vectors/pubkey_words_657.json`, the hybrid tags
+/// at CHECKMULTISIG); until #657 they were this crate's CHECKMULTISIG
+/// wrapper's. `ScriptEvaluationError` carries no variant for the refusal (its
+/// `message` is the verdict's only name), so the words stay here.
 #[test]
 fn the_spend_of_a_retagged_multisig_lock_is_refused_under_every_word_625() {
     let v = vector();
@@ -548,13 +548,10 @@ fn the_spend_of_a_retagged_multisig_lock_is_refused_under_every_word_625() {
                 // The other parity names another point: a valid encoding
                 // whose signature does not verify (NULLFAIL under a word)
                 0x02 => assert!(got.is_err(), "tag {tag:02x} {mode:?}"),
-                // #657: the words move to the reference's when it lands
+                // #657: the key check's words, as the reference's
                 _ => assert_eq!(
                     got,
-                    Err(
-                        "OP_CHECKMULTISIG requires correct encoding for the public key and signature."
-                            .to_string()
-                    ),
+                    Err("The public key is in an unknown format.".to_string()),
                     "tag {tag:02x} {mode:?}"
                 ),
             }

@@ -436,8 +436,9 @@ fn is_p2sh_hex(script_pubkey_hex: &str) -> bool {
 /// check encodings for (sig, key) pairs actually evaluated — empty sigs and
 /// keys skipped after an early exit are never encoding-checked. Fixtures with
 /// e.g. 20 empty sigs against garbage pubkeys wrapped in NOT are consensus-
-/// VALID but bsv-rs rejects them ("OP_CHECKMULTISIG requires correct
-/// encoding..."). ***
+/// VALID but bsv-rs rejects them (since #657 in the encoding check's own
+/// words, as OP_CHECKSIG does; "OP_CHECKMULTISIG requires correct
+/// encoding..." until then). ***
 ///
 /// *** BUG 2 (script-012) — FIXED 2026-07-08: Script::from_binary([0x4c])
 /// (truncated OP_PUSHDATA1) used to PANIC; it now parses to an empty-data

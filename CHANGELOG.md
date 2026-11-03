@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: OP_CHECKMULTISIG refuses a badly encoded public key or signature in the encoding check's own words, as OP_CHECKSIG does (#657)
+
+Under STRICTENC (every default-mode spend and every supported word),
+`OP_CHECKMULTISIG` and `OP_CHECKMULTISIGVERIFY` swallowed the refusal of
+`check_signature_encoding` and `check_public_key_encoding` and wrote their own
+sentence in its place (`src/script/spend/crypto.rs`, `op_checkmultisig`):
+
+- before: `OP_CHECKMULTISIG requires correct encoding for the public key and signature.`
+  (`OP_CHECKMULTISIGVERIFY ...` for the other opcode), whatever the fault;
+- after: the check's own words, the ones `OP_CHECKSIG` already returned:
+  `The public key is in an unknown format.` (a hybrid `06`/`07` key, a `05`
+  tag, a key off the curve), `The non-compressed public key must be 65 bytes.`
+  (a 33-byte `04` key, a 66-byte one), `The compressed public key must be 33
+  bytes.`, `The public key is too short, it must be at least 33 bytes.`,
+  `Public key is empty.`, `The signature format is invalid.` (a signature
+  that is no DER), `The public key must be compressed.` under
+  COMPRESSED_PUBKEYTYPE, and every other sentence of the signature check
+  (low S, hash type, FORKID under a word).
+
+The reference throws from its helpers (`ts-stack@edf6e03` `Spend.ts:606-629`,
+`#checkSignatureEncoding`; `:687-718`, `#checkPublicKeyEncoding`), so its
+wrapper sentence at the CHECKMULTISIG site (`:1809-1815`) and the CHECKSIG one
+(`:1669-1673`) is never reached (its own comment: "Fallback, should be
+unreachable"). The node returns the helper's error at both sites too
+(`bitcoin-sv` v1.2.3 `interpreter.cpp:1459-1469`, `:1605-1615`;
+`CheckPubKeyEncoding` `:312-327` over `IsCompressedOrUncompressedPubKey`
+`:132-152`), `SCRIPT_ERR_PUBKEYTYPE`, an error code and no contract sentence
+(`script_error.cpp:90-91`'s text is a debug string); this crate's
+`ScriptEvaluationError` carries no code, so its words are the contract and they
+are now the reference's at both sites. The signature is judged before the key,
+the order both references keep. No verdict moved.
+
+Pinned by `tests/pubkey_words_657.rs` against
+`tests/vectors/pubkey_words_657.json` (348 cases recorded from the unmodified
+reference under Node v22.18.0 by `tests/support/pubkey_words_657.mjs`, two runs
+byte-identical; every lock and unlock rebuilt by this crate's writer): thirteen
+key shapes (two controls, hybrid `06` and `07`, a 33-byte `04` and `05`, a
+34-byte compressed, a 66-byte uncompressed, a 32-byte key, empty, a compressed
+and an uncompressed key off the curve, `02` with x = p + 1) by a DER signature
+and an empty one, three keys by a truncated DER signature, at the four
+signature opcodes, in the default mode at versions 1 and 2 and under an
+explicit word with STRICTENC. On `e49cf55d` 3 of the 4 tests RED (the
+CHECKMULTISIG key and signature tests and the census: `left:
+Err("OP_CHECKMULTISIG requires correct encoding for the public key and
+signature.")`, `right: Err("The public key is in an unknown format.")`); the
+CHECKSIG test green on both, the statement that CHECKSIG matched already.
+
+The ripple: `tests/support/conformance_forkid_gate_429.rs` no longer special-cases
+`node.tx-valid.shared.0097` (this crate now says the recorded `The signature
+format is invalid.`), `tests/support/conformance_signature_words_417.rs`
+matches that sentence alone, and `tests/conformance_scripts.rs`'s BUG 1 comment
+quotes the new words. The census with `BSV_CONFORMANCE_DIR` at `edf6e03`'s
+`conformance/` is unchanged base against tip: 5,116 total, 4,120 run, 4,109
+passed, 959 unsupported, 37 skipped, 11 known failures, every class count the
+same. No dependent matched the old words (bsv-overlay-cloudflare,
+rust-message-box, bsv-wallet-toolbox-rs, rust-chaintracks,
+bsv-middleware-cloudflare-public).
+
+Migration: a caller matching `requires correct encoding for the public key and
+signature.` matches the encoding check's sentences above instead (the
+`OP_CHECKSIG` ones, unchanged).
+
+### Notes: cross-SDK parity (#657)
+
+The census row `node.tx-valid.shared.0097` (#429, #434) is closed: its words
+are now the reference's. One key shape keeps other words at both sites, older
+than #657: `02` with x = p + 1. The reference reduces x modulo p
+(`Point.ts:365-367`), passes the encoding check and fails the signature
+(`The top stack element must be truthy after script evaluation.` and the
+VERIFY opcodes' sentences); this crate's `PublicKey::from_bytes` refuses the key
+at the encoding check, `The public key is in an unknown format.` (#183's
+residue; enumerated as `READ_OTHERWISE` in the test, 24 cases).
+
 ### Changed: the chunker reads the IF depth as the reference does, three chunks on `686a51`; the ASM round trip fixed on both shapes (#634)
 
 A public behaviour change, semver minor: `Script::chunks`, `Script::to_asm`,
@@ -399,13 +472,14 @@ divergence (a row in `CLAUDE.md`'s list), not a verdict that differs. Every
 column refuses the spend of a P2PK lock of a hybrid key and of a dead
 Multisig lock; a Multisig lock whose bad keys a spend can avoid is written
 here and spent by every column, so its verdict does not differ either.
-Multisig's spend reaching a retagged key is refused here in this crate's
+Multisig's spend reaching a retagged key was refused here in this crate's
 CHECKMULTISIG words (`OP_CHECKMULTISIG requires correct encoding for the
 public key and signature.`); the reference's visible words are its key
 check's (`The public key is in an unknown format.`, or for a 33-byte `04`
 key `The non-compressed public key must be 65 bytes.`, thrown inside
 `#checkPublicKeyEncoding` before its wrapper at `Spend.ts:1808-1814`; the
-sweep records them): a pre-existing difference of words, #657.
+sweep records them): a pre-existing difference of words, closed by #657,
+whose site returns the key check's words.
 
 Semver: no type changed. A caller that locked a hybrid key with `P2PK::lock`,
 or with `Multisig::lock` a set of keys every spend of which reaches one
@@ -7277,7 +7351,7 @@ messages are now pinned; no interpreter behavior is changed for that row.
 
 Census (#375; current reading, historical account above retained):
 
-- Row 11: Ours: the existing native CHECKMULTISIG diagnostic on the same refusal; node.tx-valid.shared.0097 in tests/vectors/script_forkid_census_429.json and the #434 parity note pin both messages.
+- Row 11: closed by #657: `node.tx-valid.shared.0097` is refused in the reference's `The signature format is invalid.` at the CHECKMULTISIG site too, pinned by tests/support/conformance_forkid_gate_429.rs and tests/pubkey_words_657.rs.
 
 ### Added: typed wallet faults and stored abort acceptance (#439)
 

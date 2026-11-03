@@ -31,13 +31,7 @@ pub(super) fn classify_signature_words_417(
     id: &str,
     ctx: &MismatchContext<'_>,
 ) -> Option<&'static str> {
-    if !ctx.expected_valid
-        || !matches!(
-            ctx.error_message,
-            "The signature format is invalid."
-                | "OP_CHECKMULTISIG requires correct encoding for the public key and signature."
-        )
-    {
+    if !ctx.expected_valid || ctx.error_message != "The signature format is invalid." {
         return None;
     }
     let has = |flag: &str| ctx.flags.iter().any(|f| f == flag);
