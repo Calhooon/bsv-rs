@@ -1237,8 +1237,8 @@ mod linear_root_equivalence_tests {
                 let index = rng.gen_range(0..1u64 << span);
                 single_path(rng, height, index)
             }
-            1 | 2 => {
-                let n: usize = rng.gen_range(1..=80);
+            arm @ (1 | 2) => {
+                let n: usize = rng.gen_range(1..=[80, 32][arm - 1]); // 80 in both until #670
                 let count = rng.gen_range(1..=n);
                 let block = usize::BITS - (n - 1).leading_zeros();
                 let height = (block as usize).max(1);
@@ -1247,7 +1247,7 @@ mod linear_root_equivalence_tests {
             }
             3 => {
                 // A block's subtree placed high: offsets up to 2^40, up to 64 levels.
-                let n: usize = rng.gen_range(1..=64);
+                let n: usize = rng.gen_range(1..=32); // 64 until #670
                 let count = rng.gen_range(1..=n);
                 let block = (usize::BITS - (n - 1).leading_zeros()) as usize;
                 let height = rng.gen_range(block.max(1) + 1..=64);

@@ -104,17 +104,23 @@ async fn a_connection_lost_after_the_request_was_written_may_have_been_received(
     peer.join().unwrap();
 }
 
-/// The transport's client times out at 30 s (`SimplifiedFetchTransport::new`
-/// takes no client), so this test waits that long.
+/// A client of one second's timeout (`with_client`), the fault read where
+/// the transport's own 30 s client would read it: the class is the error's,
+/// not the clock's (speed loop two, #670; until then the test waited the
+/// 30 s of `SimplifiedFetchTransport::new`).
 #[tokio::test]
 async fn a_timeout_after_the_request_was_written_may_have_been_received() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/.well-known/auth"))
-        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(40)))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
         .mount(&server)
         .await;
-    let err = SimplifiedFetchTransport::new(&server.uri())
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(1))
+        .build()
+        .unwrap();
+    let err = SimplifiedFetchTransport::with_client(&server.uri(), client)
         .send(&handshake())
         .await
         .unwrap_err();

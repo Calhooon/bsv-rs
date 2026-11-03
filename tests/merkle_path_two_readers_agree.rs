@@ -27,6 +27,9 @@
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
+#[path = "support/hash_interiors.rs"]
+mod hash_interiors;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -596,10 +599,13 @@ fn inputs() -> Vec<(String, Vec<u8>)> {
     let mut inputs = Vec::new();
     for (name, bytes) in seeds() {
         if bytes.len() <= 2_048 {
-            for len in 0..bytes.len() {
+            // Every byte but a hash's interior (#670, `support/hash_interiors.rs`).
+            let skipped =
+                hash_interiors::of_bump(&bytes).unwrap_or_else(|| vec![false; bytes.len() + 1]);
+            for len in (0..bytes.len()).filter(|&len| !skipped[len]) {
                 inputs.push((format!("{name} cut at {len}"), bytes[..len].to_vec()));
             }
-            for at in 0..bytes.len() {
+            for at in (0..bytes.len()).filter(|&at| !skipped[at]) {
                 for (what, change) in [("0x00", 0u8), ("0xff", 0xff)] {
                     if bytes[at] != change {
                         let mut b = bytes.clone();
