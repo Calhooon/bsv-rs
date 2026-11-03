@@ -160,35 +160,59 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Keep build output in runner scratch
-        run: |
-          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/semver-target" >> "$GITHUB_ENV"
-          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
-
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
 
+      # Speed loop two (#689, docs/lanes/ci-speed-loop2-docs-only.md): a docs-only pull request
+      # has no API to check, and this job bounded its run (4m39s of 4m43s on #690). The plan is
+      # lint's own step (one second, this job's own checkout), read here rather than through
+      # `needs: test`, which would start this job only after the Test Suite ends and add the
+      # suite's minutes to every code change's wall clock. Every step after it carries
+      # `docs_only` (the install also its cache miss); the last reports green.
+      - name: Plan whether the change is docs only
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          runs=$(grep -o -- '--test [a-z0-9_]*' .github/workflows/ci.yml | awk '{print $2}' | sort -u | paste -sd, -)
+          python3 -B .github/scripts/affected_tests.py plan --range HEAD^1..HEAD --runs "$runs" --output "$RUNNER_TEMP/affected.json"
+
+      - name: Keep build output in runner scratch
+        if: steps.plan.outputs.docs_only != 'true'
+        run: |
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/semver-target" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
       - name: Install the Rust version supported by the pinned semver tool
+        if: steps.plan.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: 1.95.0
 
       - name: Cache the pinned semver tool
         id: semver-tool
+        if: steps.plan.outputs.docs_only != 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ runner.temp }}/tools
           key: semver-checks-0.51.0-rust-1.95.0-${{ runner.os }}-${{ runner.arch }}
 
       - name: Install cargo-semver-checks 0.51.0
-        if: steps.semver-tool.outputs.cache-hit != 'true'
+        if: steps.plan.outputs.docs_only != 'true' && steps.semver-tool.outputs.cache-hit != 'true'
         env:
           RUSTFLAGS: ""
         run: cargo install cargo-semver-checks --version 0.51.0 --locked --root "$RUNNER_TEMP/tools"
 
       - name: Check against the last tag reachable from the PR base
+        if: steps.plan.outputs.docs_only != 'true'
         env:
           BASE_REV: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -201,6 +225,11 @@ jobs:
           # Cargo.toml (a 0.x minor bump is semver's major): a breaking change passes only when the
           # version says so, an additive one only when it says at least minor (#87's 0.9.0).
           "$RUNNER_TEMP/tools/bin/cargo-semver-checks" check-release --baseline-rev "$baseline" --all-features
+
+      - name: No API to check
+        if: steps.plan.outputs.docs_only == 'true'
+        run: |
+          echo "docs-only: no API to check"
 
   test:
     name: Test Suite

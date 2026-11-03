@@ -35,9 +35,11 @@ code change.
   vectors, fixtures, Documentation and wasm32 skip. `secrets` runs on `ready` or a docs-only
   change (gitleaks needs Go, not the crate). The verdict step reads a skipped gate as `SKIP`
   when `DOCS_ONLY` is true and the gate is not `secrets`; any other skip stays a FAIL.
-- **Not exited.** `semver` (49 to 51 s on a cache hit, 6m03s on a miss: runs 41590906372,
-  41598630196, 41587646252) and `main-in-beta` (7 to 10 s) run as before; #668 names both,
-  and either is the next cut if a docs-only run's wall clock sits on it.
+- **Not exited by #668.** `semver` (49 to 51 s on a cache hit, 6m03s on a miss: runs
+  41590906372, 41598630196, 41587646252) and `main-in-beta` (7 to 10 s) ran as before; #668
+  named both, and either was the next cut if a docs-only run's wall clock sat on it. The
+  next docs-only run's wall clock sat on `semver` (below, "The opening measurement"), and
+  #689 exits it; `main-in-beta` (5 s there) stays.
 - **The `CHANGELOG.md` residue.** `arch_ci_lines` holds `Cargo.toml | CHANGELOG.md)` as a
   needle of `ci.yml`'s text, and the plan's lexer reads it as a read of the file, so a
   pull request touching `CHANGELOG.md` reaches that binary: its Test Suite builds and runs
@@ -45,6 +47,44 @@ code change.
   locally: #669's diff (`fdbaa858^..fdbaa858`) gives `build=true`, `docs_only=true`; this
   branch's docs commit gives `build=false`, `docs_only=true`; #681's code landing
   (`b680d59f`) `build=true`, `docs_only=false`.
+
+## The opening measurement (#690)
+
+#690, the earliest docs-only pull request under the exit (run 41617426467 on `849ff87e`,
+beta `7a9030d4`): the Test Suite 8 s, `lint` 9 s, `checks` 30 s, `main-in-beta` 5 s,
+`semver` 4m39s; the run's wall clock 4m43s against #669's 10m05s. The three exited jobs
+end inside half a minute; `semver`, untouched by #668, bounds the run.
+
+## The semver exit (#689)
+
+`semver` runs lint's plan step itself, after its own checkout (the script is pure Python
+over `git diff`, a second or so), and every step after it carries
+`steps.plan.outputs.docs_only != 'true'`: the scratch-directory step (moved below the
+plan, since only a checkout may run before one), the 1.95.0 toolchain, the tool's cache
+restore, the tool's install (`docs_only != 'true' && cache-hit != 'true'`: on a docs-only
+run the skipped cache step leaves `cache-hit` empty, which alone would install) and the
+check. A last step under `docs_only == 'true'` prints `docs-only: no API to check`, so the
+required context reports green. On every other pull request the steps, the baseline (`git
+describe` of the PR base's last tag), the `--baseline-rev` form and the release type read
+from the version change are the ones before; nothing is read from the registry.
+
+Not `needs: test` with the Test Suite's plan output: `semver` would start only when the
+Test Suite ends, adding its minutes to every code change's wall clock where today the two
+run side by side; the Test Suite's plan writes `build` (a target reached), not `docs_only`,
+and a `CHANGELOG.md` change reaches `arch_ci_lines` there, so `semver` would never exit on
+a changelog edit. Planned locally on #690's commit
+(`849ff87e^..849ff87e`): `build=false docs_only=true`; on #681's code landing
+(`b680d59f`): `build=true docs_only=false`.
+
+The guard: `tests/arch_ci_docs_only_exit.rs`'s `semver_refusals` holds each step after the
+plan to `docs_only != 'true'` (the install to the combined form alone), the check's
+`check-release --baseline-rev "$baseline" --all-features` after the plan, and the last step
+to the report under `docs_only == 'true'`; three mutations in the file's third test (the
+check's condition removed, the install's `docs_only` arm removed, the report's condition
+removed) and the scratch step above the checkout in its fourth; `WorkflowKeyTests` in
+`test_affected_tests.py` reads `semver`'s plan keys with the other three jobs'. RED on a
+scratch copy of the tip with the check's condition removed (the check named, running under
+an empty condition), and on the base's `ci.yml` (`semver: no plan step`).
 
 ## The ratchet record rule (the #688 fold)
 
@@ -90,7 +130,8 @@ change are never docs only).
 
 | Figure | Before | After |
 |---|---|---|
-| A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | measured by the loop's close, the pull request carrying `docs/lanes/ci-speed-2.md`'s "Loop two closed" (the earliest docs-only one under the exit), its run's seconds written by the captain at its landing in the next docs pass |
+| A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | 4m43s (#690, run 41617426467 on `849ff87e`: the Test Suite 8 s, lint 9 s, checks 30 s, main-in-beta 5 s, semver 4m39s) |
+| A docs-only PR's `semver` job (#689) | 4m39s (#690, run 41617426467) | (from the next docs-only PR's run) |
 | The queue wait | 0m02s to 1m57s (loop one closed) | (from the next docs-only PR's run) |
 | The nightly | 2h28m06s (run 41579707627) | unchanged by this cut |
 | A cold read | about 16 minutes; reads without cargo 3 to 7 minutes | unchanged by this cut |
