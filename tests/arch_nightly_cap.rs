@@ -20,7 +20,10 @@
 //! whole file on each line: they carry `max-parallel` at most 6 too, and the nightly dispatches
 //! beta's run, waits for it, then main's (#682's second fold, the keeper's word (a)); the run
 //! waited for is the one it dispatched, its conclusion read (#682's third fold), and a failed
-//! watch other than the give-up fails the job (#682's fourth fold).
+//! watch other than the give-up fails the job (#682's fourth fold). A job that dispatches any
+//! workflow is a heavy job of the nightly (#683: the weekly bench dispatched `bench.yml` beside
+//! the opening wave of shards), ordered by `needs:` with every other, and one that another job runs
+//! after waits for the run it dispatched under the same rule as `ci-full-beta`.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::fs;
@@ -178,8 +181,8 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
 
 /// The nightly's edges that keep its heavy work in sequence, `(job, the job it needs)`:
 /// fuzz after the shards (6 + 6 would be twelve), the score job after them (6 + 1), beta's
-/// dispatch of `ci.yml` after both, and main's after beta's (#682's second fold, the keeper's
-/// word (a)). The two dispatched runs ask for up to 9 jobs at once (beta's: six test cells,
+/// dispatch of `ci.yml` after both, the weekly bench after beta's run (#683), and main's after
+/// beta's and the bench's (#682's second fold, the keeper's word (a)). The two dispatched runs ask for up to 9 jobs at once (beta's: six test cells,
 /// `lint`, `checks`, the plan) and up to 22 (main's, on main's `ci.yml`: six cells, nine gates
 /// and the plan, 16, then the seven dependents after the plan), 31 together, so they run one
 /// after the other: 9 (10 with the waiting job), then 22. A `max-parallel` caps one matrix, not
@@ -187,13 +190,33 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
 /// about a minute and a half, and a run on beta's file holds up to 14 (six cells, six
 /// dependents, `lint`, `checks`) under matrix caps of 6 (`docs/lanes/ci-speed-7.md`, "The
 /// fleet's runner cap", the residual).
-const HEAVY_EDGES: [(&str, &str); 5] = [
+const HEAVY_EDGES: [(&str, &str); 9] = [
     ("fuzz", "mutants"),
     ("mutation-score", "mutants"),
     ("ci-full-beta", "mutants"),
     ("ci-full-beta", "fuzz"),
+    ("bench", "mutants"),
+    ("bench", "fuzz"),
+    ("bench", "ci-full-beta"),
     ("ci-full-main", "ci-full-beta"),
+    ("ci-full-main", "bench"),
 ];
+
+/// The workflow a job dispatches (`gh workflow run <file>`), from a line that is not a comment.
+fn dispatched_workflow(lines: &[&str]) -> Option<String> {
+    lines
+        .iter()
+        .map(|line| line.trim())
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| line.split_once("gh workflow run ").map(|(_, rest)| rest))
+        .find_map(|rest| rest.split_whitespace().next().map(str::to_owned))
+}
+
+/// A heavy job of the nightly: a heavy matrix, or a job that dispatches any workflow (a whole
+/// run on the runners: `ci.yml`'s 9 or 22, `bench.yml`'s two and its scoreboard; #683).
+fn is_heavy_job(lines: &[&str]) -> bool {
+    is_heavy(lines) || dispatched_workflow(lines).is_some()
+}
 
 /// A job's `needs:` (a name or a flow list), at four spaces.
 fn needs(lines: &[&str]) -> Vec<String> {
@@ -234,7 +257,7 @@ fn reaches(graph: &[(String, Vec<String>)], job: &str, ancestor: &str) -> bool {
 }
 
 /// What is wrong with the order of the nightly's heavy work: an edge of [`HEAVY_EDGES`]
-/// missing, or two heavy jobs (a heavy matrix, a dispatch of `ci.yml`) with no `needs:`
+/// missing, or two heavy jobs (a heavy matrix, a dispatch of any workflow) with no `needs:`
 /// path between them, so the two can hold the runners at once.
 fn edge_errors(nightly: &str) -> Vec<String> {
     let parsed = jobs(nightly);
@@ -254,12 +277,7 @@ fn edge_errors(nightly: &str) -> Vec<String> {
     }
     let heavy: Vec<&String> = parsed
         .iter()
-        .filter(|(_, lines)| {
-            is_heavy(lines)
-                || lines.iter().any(|line| {
-                    !line.trim().starts_with('#') && line.contains("gh workflow run ci.yml")
-                })
-        })
+        .filter(|(_, lines)| is_heavy_job(lines))
         .map(|(name, _)| name)
         .collect();
     for (i, a) in heavy.iter().enumerate() {
@@ -348,9 +366,9 @@ fn no_two_heavy_jobs_of_the_nightly_hold_the_runners_at_once() {
     assert!(nightly.contains(ci_edge));
     let ci_free = nightly.replacen(ci_edge, "", 1);
     let errors = edge_errors(&ci_free);
-    assert_eq!(errors.len(), 6, "{errors:?}");
+    assert_eq!(errors.len(), 4, "{errors:?}");
     assert!(errors.contains(&"nightly.yml ci-full-beta and fuzz can overlap: no `needs: fuzz` edge on ci-full-beta (its needs: [])".to_owned()));
-    let main_edge = "    needs: [ci-full-beta]\n";
+    let main_edge = "    needs: [ci-full-beta, bench]\n";
     assert!(nightly.contains(main_edge));
     let main_free = nightly.replacen(main_edge, "", 1);
     let errors = edge_errors(&main_free);
@@ -479,7 +497,7 @@ fn the_dispatched_ci_runs_go_beta_then_main_each_matrix_capped() {
     assert_eq!(dispatch_errors(&nightly), Vec::<String>::new());
     assert_eq!(ci_matrix_errors(&ci), Vec::<String>::new());
     let watch = " gh run watch \"$run\"";
-    assert_eq!(nightly.matches(watch).count(), 1);
+    assert_eq!(nightly.matches(watch).count(), 2);
     let no_wait = nightly.replacen(watch, " true \"$run\"", 1);
     assert_eq!(
         dispatch_errors(&no_wait),
@@ -540,20 +558,18 @@ const BOT_FILTER: &str = "--user 'github-actions[bot]'";
 /// taken by a newest-run lookup, was watched in its place, and cancelled by ours); and the
 /// run's conclusion is read after the watch, a `failure` failing the job, so the night
 /// shows beta's CI verdict (`gh run watch` alone ends 0 on a red run).
-fn wait_errors(nightly: &str) -> Vec<String> {
-    let Some((_, lines)) = jobs(nightly)
-        .into_iter()
-        .find(|(name, _)| name == "ci-full-beta")
-    else {
-        return vec!["nightly.yml ci-full-beta: not found".to_owned()];
+fn wait_errors(nightly: &str, job: &str) -> Vec<String> {
+    let Some((_, lines)) = jobs(nightly).into_iter().find(|(name, _)| name == job) else {
+        return vec![format!("nightly.yml {job}: not found")];
     };
+    let what = job.strip_prefix("ci-full-").unwrap_or(job);
     let code: Vec<&str> = lines
         .iter()
         .map(|line| line.trim())
         .filter(|line| !line.starts_with('#'))
         .collect();
     let at = |needle: &str| code.iter().position(|line| line.contains(needle));
-    let dispatch = at("gh workflow run ci.yml").unwrap_or(usize::MAX);
+    let dispatch = at("gh workflow run ").unwrap_or(usize::MAX);
     let watch = at("gh run watch").unwrap_or(usize::MAX);
     let mut errors = Vec::new();
     let listed_before = at("before=").is_some_and(|i| i < dispatch)
@@ -562,10 +578,10 @@ fn wait_errors(nightly: &str) -> Vec<String> {
             .skip(dispatch)
             .any(|line| line.contains("$before"));
     if !listed_before {
-        errors.push("nightly.yml ci-full-beta: no list of the runs before the dispatch, so a run that existed before it can be watched".to_owned());
+        errors.push(format!("nightly.yml {job}: no list of the runs before the dispatch, so a run that existed before it can be watched"));
     }
     if at(BOT_FILTER).is_none() {
-        errors.push(format!("nightly.yml ci-full-beta: the lookup keeps no actor ({BOT_FILTER}), so a hand dispatch can be watched"));
+        errors.push(format!("nightly.yml {job}: the lookup keeps no actor ({BOT_FILTER}), so a hand dispatch can be watched"));
     }
     let read = code
         .iter()
@@ -575,7 +591,7 @@ fn wait_errors(nightly: &str) -> Vec<String> {
         .windows(3)
         .any(|w| w[0].starts_with("failure") && w.iter().any(|line| line.contains("exit 1")));
     if !read || !failing {
-        errors.push("nightly.yml ci-full-beta: the run's conclusion is not read after the watch with a failure failing the job, so a red beta run leaves the night green".to_owned());
+        errors.push(format!("nightly.yml {job}: the run's conclusion is not read after the watch with a failure failing the job, so a red {what} run leaves the night green"));
     }
     errors
 }
@@ -583,12 +599,12 @@ fn wait_errors(nightly: &str) -> Vec<String> {
 #[test]
 fn the_beta_wait_watches_the_run_it_dispatched_and_fails_on_its_failure() {
     let nightly = read(".github/workflows/nightly.yml");
-    assert_eq!(wait_errors(&nightly), Vec::<String>::new());
+    assert_eq!(wait_errors(&nightly, "ci-full-beta"), Vec::<String>::new());
 
     let no_actor = nightly.replacen(&format!(" {BOT_FILTER}"), "", 1);
     assert_ne!(no_actor, nightly);
     assert_eq!(
-        wait_errors(&no_actor),
+        wait_errors(&no_actor, "ci-full-beta"),
         ["nightly.yml ci-full-beta: the lookup keeps no actor (--user 'github-actions[bot]'), so a hand dispatch can be watched"]
     );
 
@@ -596,7 +612,7 @@ fn the_beta_wait_watches_the_run_it_dispatched_and_fails_on_its_failure() {
     assert!(nightly.contains(before));
     let no_before = nightly.replacen(before, "", 1);
     assert_eq!(
-        wait_errors(&no_before),
+        wait_errors(&no_before, "ci-full-beta"),
         ["nightly.yml ci-full-beta: no list of the runs before the dispatch, so a run that existed before it can be watched"]
     );
 
@@ -611,7 +627,7 @@ fn the_beta_wait_watches_the_run_it_dispatched_and_fails_on_its_failure() {
     assert_ne!(green, nightly);
     for text in [unread, green] {
         assert_eq!(
-            wait_errors(&text),
+            wait_errors(&text, "ci-full-beta"),
             ["nightly.yml ci-full-beta: the run's conclusion is not read after the watch with a failure failing the job, so a red beta run leaves the night green"]
         );
     }
@@ -623,12 +639,9 @@ fn the_beta_wait_watches_the_run_it_dispatched_and_fails_on_its_failure() {
 /// through to the conclusion read, and any other non-zero exit (the API, the network) is
 /// `exit 1`, with no `exit 0` before the read (the swallow: every failed watch was warned
 /// and the night left green without beta's verdict).
-fn watch_exit_errors(nightly: &str) -> Vec<String> {
-    let Some((_, lines)) = jobs(nightly)
-        .into_iter()
-        .find(|(name, _)| name == "ci-full-beta")
-    else {
-        return vec!["nightly.yml ci-full-beta: not found".to_owned()];
+fn watch_exit_errors(nightly: &str, job: &str) -> Vec<String> {
+    let Some((_, lines)) = jobs(nightly).into_iter().find(|(name, _)| name == job) else {
+        return vec![format!("nightly.yml {job}: not found")];
     };
     let code: Vec<&str> = lines
         .iter()
@@ -638,7 +651,7 @@ fn watch_exit_errors(nightly: &str) -> Vec<String> {
     let at = |needle: &str| code.iter().position(|line| line.contains(needle));
     let mut errors = Vec::new();
     if at("set -euo pipefail").is_none() {
-        errors.push("nightly.yml ci-full-beta: the step is not under set -euo pipefail, so a failing poll reads as no new run".to_owned());
+        errors.push(format!("nightly.yml {job}: the step is not under set -euo pipefail, so a failing poll reads as no new run"));
     }
     let watch = at("gh run watch").unwrap_or(code.len());
     let read = at("--json conclusion").unwrap_or(code.len());
@@ -649,7 +662,7 @@ fn watch_exit_errors(nightly: &str) -> Vec<String> {
         .any(|w| w[0].starts_with("*)") && w.iter().any(|line| line.contains("exit 1")));
     let swallow = arms.iter().any(|line| line.contains("exit 0"));
     if !give_up || !other || swallow {
-        errors.push("nightly.yml ci-full-beta: the watch's exit is not read as 124 the give-up and any other failure exit 1, so a failed watch leaves the night green".to_owned());
+        errors.push(format!("nightly.yml {job}: the watch's exit is not read as 124 the give-up and any other failure exit 1, so a failed watch leaves the night green"));
     }
     errors
 }
@@ -657,7 +670,10 @@ fn watch_exit_errors(nightly: &str) -> Vec<String> {
 #[test]
 fn a_failed_watch_other_than_the_give_up_fails_the_beta_job() {
     let nightly = read(".github/workflows/nightly.yml");
-    assert_eq!(watch_exit_errors(&nightly), Vec::<String>::new());
+    assert_eq!(
+        watch_exit_errors(&nightly, "ci-full-beta"),
+        Vec::<String>::new()
+    );
 
     let arm = "            *)\n              echo \"::error::watching beta's run $run failed (exit $watched)\"\n              exit 1 ;;\n";
     assert!(nightly.contains(arm));
@@ -671,7 +687,7 @@ fn a_failed_watch_other_than_the_give_up_fails_the_beta_job() {
     assert_ne!(no_give_up, nightly);
     for text in [swallowed, unarmed, no_give_up] {
         assert_eq!(
-            watch_exit_errors(&text),
+            watch_exit_errors(&text, "ci-full-beta"),
             ["nightly.yml ci-full-beta: the watch's exit is not read as 124 the give-up and any other failure exit 1, so a failed watch leaves the night green"]
         );
     }
@@ -679,7 +695,114 @@ fn a_failed_watch_other_than_the_give_up_fails_the_beta_job() {
     let lax = nightly.replacen("          set -euo pipefail\n", "", 1);
     assert_ne!(lax, nightly);
     assert_eq!(
-        watch_exit_errors(&lax),
+        watch_exit_errors(&lax, "ci-full-beta"),
         ["nightly.yml ci-full-beta: the step is not under set -euo pipefail, so a failing poll reads as no new run"]
+    );
+}
+
+/// The dispatch jobs another job of the nightly runs after: each must wait for the run it
+/// dispatched (#683), or the job after it starts beside that run.
+fn waiting_dispatches(nightly: &str) -> Vec<String> {
+    let parsed = jobs(nightly);
+    let graph: Vec<(String, Vec<String>)> = parsed
+        .iter()
+        .map(|(name, lines)| (name.clone(), needs(lines)))
+        .collect();
+    parsed
+        .iter()
+        .filter(|(_, lines)| dispatched_workflow(lines).is_some())
+        .map(|(name, _)| name)
+        .filter(|name| graph.iter().any(|(other, _)| reaches(&graph, other, name)))
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn the_weekly_bench_runs_after_the_shards_fuzz_and_beta_and_waits_for_its_run_683() {
+    let nightly = read(".github/workflows/nightly.yml");
+    assert_eq!(edge_errors(&nightly), Vec::<String>::new());
+    assert_eq!(waiting_dispatches(&nightly), ["ci-full-beta", "bench"]);
+    for job in waiting_dispatches(&nightly) {
+        assert_eq!(wait_errors(&nightly, &job), Vec::<String>::new(), "{job}");
+        assert_eq!(
+            watch_exit_errors(&nightly, &job),
+            Vec::<String>::new(),
+            "{job}"
+        );
+    }
+
+    // The bench as it was before #683: no edge, so it dispatched beside the opening wave.
+    let bench_edge = "    needs: [mutants, fuzz, ci-full-beta]\n";
+    assert_eq!(nightly.matches(bench_edge).count(), 1);
+    let bench_free = nightly.replacen(bench_edge, "", 1);
+    let errors = edge_errors(&bench_free);
+    for expected in [
+        "nightly.yml bench and mutants can overlap: no `needs: mutants` edge on bench (its needs: [])",
+        "nightly.yml bench and fuzz can overlap: no `needs: fuzz` edge on bench (its needs: [])",
+        "nightly.yml bench and ci-full-beta can overlap: no `needs: ci-full-beta` edge on bench (its needs: [])",
+        "nightly.yml ci-full-beta and bench can overlap: no `needs:` path between them",
+        "nightly.yml bench and mutants can overlap: no `needs:` path between them",
+        "nightly.yml bench and fuzz can overlap: no `needs:` path between them",
+    ] {
+        assert!(errors.contains(&expected.to_owned()), "{expected} not in {errors:?}");
+    }
+    assert_eq!(errors.len(), 6, "{errors:?}");
+
+    // Main's dispatch no longer after the bench: the bench's run and main's 22 at once.
+    let main_edge = "    needs: [ci-full-beta, bench]\n";
+    let main_beside = nightly.replacen(main_edge, "    needs: [ci-full-beta]\n", 1);
+    assert_eq!(
+        edge_errors(&main_beside),
+        [
+            "nightly.yml ci-full-main and bench can overlap: no `needs: bench` edge on ci-full-main (its needs: [\"ci-full-beta\"])",
+            "nightly.yml ci-full-main and bench can overlap: no `needs:` path between them",
+        ]
+    );
+
+    // A new job that dispatches a workflow, named by no list, is refused by its name.
+    let extra = nightly.replacen(
+        "  source:\n",
+        "  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: gh workflow run msrv.yml --ref beta\n\n  source:\n",
+        1,
+    );
+    assert_ne!(extra, nightly);
+    let errors = edge_errors(&extra);
+    assert!(
+        errors.contains(
+            &"nightly.yml bench and extra can overlap: no `needs:` path between them".to_owned()
+        ),
+        "{errors:?}"
+    );
+    assert!(errors.iter().all(|e| e.contains(" extra ")), "{errors:?}");
+
+    // The bench's wait removed: main's dispatch would follow the dispatch, not the run.
+    let watch = " gh run watch \"$run\"";
+    let at = nightly.rfind(watch).expect("the bench's watch");
+    let no_wait = format!(
+        "{} true \"$run\"{}",
+        &nightly[..at],
+        &nightly[at + watch.len()..]
+    );
+    assert_eq!(
+        watch_exit_errors(&no_wait, "bench"),
+        ["nightly.yml bench: the watch's exit is not read as 124 the give-up and any other failure exit 1, so a failed watch leaves the night green"]
+    );
+    assert_eq!(
+        wait_errors(&no_wait, "bench"),
+        ["nightly.yml bench: the run's conclusion is not read after the watch with a failure failing the job, so a red bench run leaves the night green"]
+    );
+
+    // The bench's lookup without the actor: a hand dispatch of bench.yml could be watched.
+    let job = nightly.find("\n  bench:\n").expect("the bench job");
+    let no_actor = format!(
+        "{}{}",
+        &nightly[..job],
+        nightly[job..].replacen(&format!(" {BOT_FILTER}"), "", 1)
+    );
+    assert_ne!(no_actor, nightly);
+    assert_eq!(wait_errors(&no_actor, "ci-full-beta"), Vec::<String>::new());
+    assert_eq!(
+        wait_errors(&no_actor, "bench"),
+        ["nightly.yml bench: the lookup keeps no actor (--user 'github-actions[bot]'), so a hand dispatch can be watched"]
     );
 }

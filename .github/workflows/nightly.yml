@@ -150,9 +150,12 @@ jobs:
             *) echo "::warning::beta's ci.yml run $run concluded $conclusion, no verdict" ;;
           esac
 
+  # After the weekly bench too (#683): on a Sunday night main's 22 would
+  # otherwise start beside the bench's run; skipped on another night, which
+  # !cancelled() lets through.
   ci-full-main:
     name: CI full set (main)
-    needs: [ci-full-beta]
+    needs: [ci-full-beta, bench]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -166,20 +169,83 @@ jobs:
 
   # Cut 7: the bench weekly. The workflow has no schedule, so "weekly" is the
   # dispatcher's input; bench.yml runs at the line's tip (a dispatch names a
-  # ref, never a sha).
+  # ref, never a sha). A heavy job (#683): it dispatched bench.yml at the
+  # start of the run, beside the opening wave of shards, with no needs. It now
+  # runs after the shards, the fuzz targets and beta's ci.yml run, whatever
+  # their result, and waits for the run it dispatched as ci-full-beta does
+  # (the bot's run alone, listed before the dispatch; the give-up at 55
+  # minutes; the conclusion read), so main's dispatch never starts beside it:
+  # the bench's run holds two jobs, then the scoreboard, and this job's one
+  # runner. tests/arch_nightly_cap.rs refuses the edge or the wait removed.
   bench:
     name: Bench (weekly)
-    if: ${{ inputs.weekly }}
+    needs: [mutants, fuzz, ci-full-beta]
+    if: ${{ !cancelled() && inputs.weekly }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The wait gives up at 55 minutes, inside the job's 60, and main's
+    # dispatch follows anyway
+    timeout-minutes: 60
     permissions:
       actions: write
     steps:
-      - name: Dispatch bench.yml on the line
+      - name: Dispatch bench.yml on the line, wait for that run and read its conclusion
         env:
           GH_TOKEN: ${{ github.token }}
           LINE: ${{ github.ref_name }}
-        run: gh workflow run bench.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
+        run: |
+          # The same wait as ci-full-beta's (#682's third and fourth folds).
+          set -euo pipefail
+          since="$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)"
+          list() {
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow bench.yml --branch "$LINE" \
+              --event workflow_dispatch --user 'github-actions[bot]' --created ">=$since" \
+              --limit 20 --json databaseId,createdAt
+          }
+          before="$(list)"
+          gh workflow run bench.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
+          run=""
+          for _ in $(seq 1 30); do
+            new="$(list | jq -c --argjson before "$before" \
+              '[.[] | select(.databaseId as $id | [$before[].databaseId] | index($id) | not)]')"
+            count="$(jq length <<<"$new")"
+            if [ "$count" -gt 1 ]; then
+              echo "::warning::$count new bench.yml dispatch runs on $LINE by github-actions[bot]: $(jq -c '[.[].databaseId]' <<<"$new"); watching the one created nearest after the dispatch"
+            fi
+            if [ "$count" -ge 1 ]; then
+              run="$(jq 'min_by(.createdAt) | .databaseId' <<<"$new")"
+              break
+            fi
+            sleep 10
+          done
+          if [ -z "$run" ]; then
+            echo "::error::no new bench.yml dispatch run on $LINE by github-actions[bot] in five minutes since $since"
+            exit 1
+          fi
+          echo "the bench's run: $run $(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          budget="$((55 * 60 - SECONDS))"
+          [ "$budget" -gt 0 ] || budget=1
+          watched=0
+          timeout "$budget" gh run watch "$run" --repo "$GITHUB_REPOSITORY" \
+            --interval 60 > /dev/null || watched=$?
+          case "$watched" in
+            0) ;;
+            124) echo "::warning::gave up waiting for the bench's run $run at 55 minutes (exit 124); main's dispatch follows" ;;
+            *)
+              echo "::error::watching the bench's run $run failed (exit $watched)"
+              exit 1 ;;
+          esac
+          # A red bench run fails this job (main's dispatch still runs, under
+          # !cancelled()).
+          conclusion="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)"
+          echo "the bench's run $run: ${conclusion:-in progress}"
+          case "$conclusion" in
+            success) ;;
+            failure | timed_out | startup_failure)
+              echo "::error::the bench's run $run concluded $conclusion"
+              exit 1 ;;
+            "") echo "::warning::the bench's run $run is still in progress, no verdict" ;;
+            *) echo "::warning::the bench's run $run concluded $conclusion, no verdict" ;;
+          esac
 
   source:
     name: Pin the run to one source commit

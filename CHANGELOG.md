@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the nightly's weekly bench runs after the shards, the fuzz targets and beta's run, under the cap guard's rule (#683)
+
+- The nightly's `bench` job (`-f weekly=true`, the captain's Sunday night)
+  dispatched `bench.yml` with no `needs`, so its run (`Benchmarks Build` and
+  the regression check at once, then the scoreboard) started beside the
+  opening wave of shards, and `tests/arch_nightly_cap.rs` counted only a heavy
+  matrix or a dispatch of `ci.yml` as heavy. The job now needs `mutants`,
+  `fuzz` and `ci-full-beta` under `if: ${{ !cancelled() && inputs.weekly }}`,
+  waits for the run it dispatched as `ci-full-beta` waits for beta's (the
+  runs listed before the dispatch, the bot's alone, the give-up at 55
+  minutes, the conclusion read, a `failure` failing the job, under
+  `set -euo pipefail`), and `ci-full-main` needs it too, so main's 22 never
+  start beside it; on another night the job is skipped and main's dispatch
+  follows beta's as before. The cost on a Sunday: main's dispatch waits for
+  the bench's run, and this job holds one runner while it does.
+
+Pinned by `tests/arch_nightly_cap.rs` (7 tests, 6 before): a job that
+dispatches any workflow is a heavy job of the nightly, ordered by `needs:`
+with every other, and a dispatch job another job runs after is held to
+`ci-full-beta`'s wait rules; RED on `ba0952c9`'s nightly (`nightly.yml bench
+and mutants can overlap: no `needs: mutants` edge on bench (its needs: [])`
+and seven more), each refusal shown on a mutated text (the bench's edge
+removed, main's edge on it removed, a new dispatch job named by no list,
+the bench's watch and actor filter removed). The record is
+`docs/lanes/fix-683.md`.
+
 ### CI: a measured file's test surface is every target the reach rule names for it, not a fixed list per surface (the oracle, #685)
 
 The keeper's row of 2026-11-03: #681's opening lane (PR #684) found the #660
