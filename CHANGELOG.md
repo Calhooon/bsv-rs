@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the semver tool's cache seeded from a push to a line, every pull request's opening `semver` run a restore (speed loop three, #696)
+
+- `semver` runs on pull requests alone, and a pull request's cache is read by
+  that pull request's re-runs only, so every pull request's opening `semver`
+  run built cargo-semver-checks 0.51.0: 241 s, 285 s and 294 s of a 299 s to
+  358 s job (runs 41634821365, 41624795016, 41621814166), against 65 s on a
+  hit. A job of its own, `semver-tool-seed` (`semver tool cache`), runs on a
+  push to `beta` or `main`, looks up `semver`'s key (`lookup-only`, nothing
+  downloaded on a hit) and on a miss installs the tool as `semver` does,
+  saving it in the line's scope, which every pull request into the line
+  reads. No required context added: five on `beta`, six on `main`.
+
+Pinned by `tests/arch_ci_semver_tool_seed.rs` (the seed's action, path, key,
+toolchain and install equal to `semver`'s) and `PUSH_SEEDS` in
+`tests/arch_ci_pr_runs_the_required_set.rs`. cargo-deny is a release binary
+and the ratchet's build is seeded by `lint`'s push saves; the `checks` cache
+on `beta` predates #663 and carries no cargo-mutants, so its 68 s build
+recurs on every run until the key moves: `docs/lanes/ci-speed-3.md`.
+
 ### CI: the compile time by evidence: the lib's unit tests run once, the tracing step shares the library build, the dependencies at opt-level 1 in the test profile (speed loop three, #672)
 
 - The integration step names `--test '*'` (cargo's glob over the integration

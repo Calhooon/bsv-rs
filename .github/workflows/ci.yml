@@ -22,7 +22,8 @@ permissions:
 # 2026-10-27 for a push): a pull request runs exactly the required contexts of its base line's
 # protection (and the jobs `dependents` needs to decide), one test cell, `lint` and `checks`
 # among them; a push to beta or main runs the same set for its line, less the jobs that read a
-# pull request (`semver`, `beta-born`). A dispatch (the nightly's on each line, the sync's on its
+# pull request (`semver`, `beta-born`), plus the seed of `semver`'s tool cache (#696), which
+# judges nothing. A dispatch (the nightly's on each line, the sync's on its
 # branch) and a tag's call from release.yml add the five other test cells and run `dependents` on
 # any line. Every job that judges something other than the commit is in a workflow of its own,
 # run on dispatch and called by release.yml before a tag: bench.yml (benchmark builds and the
@@ -230,6 +231,38 @@ jobs:
         if: steps.plan.outputs.docs_only == 'true'
         run: |
           echo "docs-only: no API to check"
+
+  # Speed loop three (#696, docs/lanes/ci-speed-3.md): `semver` runs on pull requests alone, and
+  # a pull request's cache is read by that pull request's own re-runs only, so every pull
+  # request's opening run built the tool (241 to 294 s). A push to a line saves it under the key
+  # `semver` restores, in the line's scope, which every pull request into the line reads. The
+  # lookup downloads nothing on a hit; it judges nothing and is no required context.
+  # tests/arch_ci_semver_tool_seed.rs pins the action, the path, the key, the toolchain and the
+  # install to `semver`'s.
+  semver-tool-seed:
+    name: semver tool cache
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache the pinned semver tool
+        id: semver-tool
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/tools
+          key: semver-checks-0.51.0-rust-1.95.0-${{ runner.os }}-${{ runner.arch }}
+          lookup-only: true
+
+      - name: Install the Rust version supported by the pinned semver tool
+        if: steps.semver-tool.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: 1.95.0
+
+      - name: Install cargo-semver-checks 0.51.0
+        if: steps.semver-tool.outputs.cache-hit != 'true'
+        env:
+          RUSTFLAGS: ""
+        run: cargo install cargo-semver-checks --version 0.51.0 --locked --root "$RUNNER_TEMP/tools"
 
   test:
     name: Test Suite

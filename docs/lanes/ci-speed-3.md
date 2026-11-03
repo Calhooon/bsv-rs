@@ -9,6 +9,7 @@ Suite's compile 4m15s cold and 2m47s on a cache hit at loop one's close,
 | --- | --- | --- |
 | #672 | the compile time by evidence: the Test Suite's build steps, the lint job's Clippy and ratchet | this record |
 | #673 | the reads share the lane's build | open; nothing here |
+| #696 | the semver tool's cache seeded from a push to a line | the section below |
 
 ## The measurement before: CI
 
@@ -249,3 +250,111 @@ finding on the rebase onto `7896671d`).
 | The nightly's length | 2h28m (41579707627, complete, 04:42:51Z to 07:10:57Z) | unchanged by this loop (no `nightly.yml` line) |
 | A cold read's length | not measured by this lane | |
 | The landing latency | not measured by this lane (loop four, #675) | |
+
+## #696: the semver tool's cache seeded from a push to a line
+
+Base `origin/beta` at `55424846`. GitHub's cache rule: a run restores a
+cache created on its own ref, its pull request's base branch or the default
+branch (`main`); a pull request's cache is scoped to `refs/pull/<n>/merge`
+and read by that pull request's re-runs alone. `semver` runs on pull
+requests only, so nothing on `beta` or `main` ever saved its tool: `gh cache
+list` on 2026-11-03 holds twenty `semver-checks-0.51.0-rust-1.95.0-Linux-X64`
+entries (7.7 MB each), every one on a `refs/pull/<n>/merge`, none on a
+branch. Every pull request's opening run built cargo-semver-checks.
+
+### The measurement before
+
+The `semver` job of six pull-request runs (`gh run view <id> --json jobs`;
+the restore step reports success either way, the install's skip is the hit):
+
+| Run | Branch | Restore | Install (s) | Check (s) | Job (s) |
+| --- | --- | --- | ---: | ---: | ---: |
+| 41621814166 | `lane/ci-cap-6` | miss (the PR's opening run) | 294 | 48 | 358 |
+| 41624795016 | `lane/ci-speed-loop3-compile` | miss (the PR's opening run) | 285 | 47 | 351 |
+| 41634821365 | `lane/fix-697` | miss (the PR's opening run) | 241 | 41 | 299 |
+| 41637251653 | `lane/fix-697` | hit (the same PR's later run) | skipped | 47 | 65 |
+| 41638823920 | `lane/ci-semver-exit` | hit (the same PR's later run) | skipped | 48 | 66 |
+| 41640765441 | `lane/ci-speed-loop3-compile` | hit (the same PR's later run) | skipped | 49 | 66 |
+
+PR #694's own read was 5m08s for the install. An opening run's job is 299 s to
+358 s, a hit's 65 s to 66 s: the install is 241 s to 294 s of it.
+
+### The cut
+
+A job of its own, `semver-tool-seed` (`name: semver tool cache`), on a push
+to a branch (`github.event_name == 'push' && startsWith(github.ref,
+'refs/heads/')`: both lines, since `main`'s protection carries `semver` as
+`beta`'s does; a tag's push and a dispatch seed nothing a pull request
+reads). Its cache step is `semver`'s (the same `actions/cache` sha, v4.3.0,
+the same `path: ${{ runner.temp }}/tools`, the same key) with
+`lookup-only: true`: on a hit it downloads nothing and saves nothing (one
+lookup, no checkout, no toolchain); on a miss it installs Rust 1.95.0 and
+`cargo install cargo-semver-checks --version 0.51.0 --locked` as `semver`
+does, and the action's post step saves the entry in the line's scope. A
+pull request into `beta` then restores `beta`'s entry (or `main`'s, the
+default branch's), one into `main` `main`'s.
+
+The shape that costs less: the separate job. `semver` itself on a push with
+its check skipped would need its full-history checkout (`fetch-depth: 0`)
+and its plan on every push, report a `semver` check run on the push's
+commit, and break the guard's rule that a push runs no context which reads a
+pull request (`PULL_REQUEST_ONLY`); the seed job's hit is one cache lookup.
+The seed reports `semver tool cache`, no required context: the protection's
+required contexts stay five on `beta` and six on `main`, and the pull
+request's context is still `semver`.
+
+### The guards
+
+- `tests/arch_ci_semver_tool_seed.rs` pins the seed's cache step to
+  `semver`'s (`uses:`, `path:`, `key:` equal), the toolchain step's
+  `uses:` and `toolchain:`, the install's `RUSTFLAGS:` and `run:` lines
+  equal, the seed alone `lookup-only: true`, the key naming 0.51.0 on Rust
+  1.95.0 and the install pinned to `--version 0.51.0 --locked`. RED on a
+  scratch copy with the seed's key changed to `rust-1.96.0` (`the cache
+  step's key: differs`); each drift (the key, the path, the version, the
+  toolchain, the lookup) refused on a mutated text in the file's second
+  test.
+- `tests/arch_ci_pr_runs_the_required_set.rs` carries `PUSH_SEEDS`: a job a
+  push to either line runs beside its required set, proven to run there (an
+  entry whose job does not is refused as stale), off pull requests by the
+  exact-set rule, off the full set by its `NOT_ON_THE_FULL_SET` entry
+  (`a_push_seed_off_the_push_or_on_a_pull_request_is_refused`). Base's
+  `ci.yml` under the tip's guard: 10 of 17 RED (`push seed
+  semver-tool-seed is not proven to run on a push to beta`, the full-set
+  entry naming no job).
+
+### The other tools
+
+- **cargo-deny** (`lint`): `taiki-e/install-action` downloads the release
+  binary; no cache involved, 1 s on PR run 41637251653 and 0 s on beta's
+  push 41641964966. Nothing to seed.
+- **The ratchet's build** (`lint`): `Swatinem/rust-cache` with
+  `shared-key: lint` and the ratchet's target in `cache-directories`, saved
+  on a push to a branch; the entry `v0-rust-lint-Linux-x64-7f9a22ea-227349d2`
+  sits on `refs/heads/beta` (and a ratchet entry on `main`), restored by a
+  full match on PR run 41637251653 (`Restored from cache key ... full match:
+  true`); the ratchet step 40 s there, 31 s on the push. Seeded.
+- **cargo-mutants** (`checks`, the mutants-entries gate, #663): not seeded,
+  a finding left to a follow-up. The `checks` entry
+  `v0-rust-checks-Linux-x64-c2e3c2da-227349d2` on `refs/heads/beta` was
+  saved at 03:39Z, before #663 landed (`d778651d`, 05:58Z), so it carries no
+  cargo-mutants binary; rust-cache saves only on a miss, and every run since
+  restores that entry by a full match and builds cargo-mutants 27.1.0 again
+  (`Finished release profile ... in 1m 08s` on PR run 41637251653, the step
+  78 s; 78 s on beta's push 41641964966, its post-cache step saving
+  nothing). It recurs until the key next moves (the step's own comment says
+  so). The cut for it is the same shape or the release binary through
+  `taiki-e/install-action`, not this row's.
+
+### After
+
+| Figure | Before | After |
+| --- | --- | --- |
+| `semver`'s install on a pull request's opening run | 241 s, 285 s, 294 s (41634821365, 41624795016, 41621814166; #694's 5m08s) | (from the earliest pull request after a beta push under this change) |
+| `semver`'s job on a pull request's opening run | 299 s, 351 s, 358 s | (from the earliest pull request after a beta push under this change) |
+| The seed job on a push, hit / miss | none | (from beta's push runs after the landing) |
+
+This pull request's own run is a pull request: its `semver` misses as today.
+The landing's push to `beta` runs the seed, which misses and saves; the
+witness is the earliest pull request into `beta` opened after that push.
+

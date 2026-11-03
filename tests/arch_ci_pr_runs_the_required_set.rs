@@ -77,6 +77,17 @@ const PULL_REQUEST_ONLY: &[(&str, &str)] = &[
     ("beta-born", "it judges a pull request into main"),
 ];
 
+/// Jobs a push to either line runs beside its required set, with the reason: (job id, reason).
+/// A seed judges nothing and reports no required context: it saves a cache under the key a
+/// pull-request-only job restores, in the line's scope, since a pull request's own cache is read
+/// by that pull request's re-runs alone. Each is proven to run on a push to both lines (an entry
+/// whose job does not is refused as stale), stays off pull requests by the exact-set rule and
+/// off the full set by [`NOT_ON_THE_FULL_SET`].
+const PUSH_SEEDS: &[(&str, &str)] = &[(
+    "semver-tool-seed",
+    "it saves the semver tool under the key `semver` restores; no pull request can seed another (#696)",
+)];
+
 /// Jobs a dispatch or a tag's call does not run, with the reason: (job id,
 /// event label or `*` for every one, reason). Nothing else belongs here: an
 /// entry naming no job, or a job that runs (or may) on an event it covers, is
@@ -88,6 +99,11 @@ const NOT_ON_THE_FULL_SET: &[(&str, &str, &str)] = &[
         "it reads the pull request's base; no dispatch and no tag has one",
     ),
     ("beta-born", "*", "it judges a pull request into main"),
+    (
+        "semver-tool-seed",
+        "*",
+        "a push to a line seeds the line's cache; a dispatch's or a tag's seeds none a pull request reads",
+    ),
     (
         "main-in-beta",
         "main-dispatch",
@@ -545,20 +561,21 @@ fn runs(all: &[Job], event: &Event) -> BTreeMap<String, Option<bool>> {
 /// The refusals of the exact-set rule on a pull request into `line`.
 fn pr_refusals(ci: &str, line: &'static str, required: &[&str]) -> Vec<String> {
     let label = format!("a pull request into {line}");
-    exact_refusals(ci, &pull_request(line), line, &label, required, &[])
+    exact_refusals(ci, &pull_request(line), line, &label, required, &[], &[])
 }
 
 /// The refusals of the exact-set rule on a push to `line`: its required set less
-/// [`PULL_REQUEST_ONLY`], which must not run.
+/// [`PULL_REQUEST_ONLY`], which must not run, plus the [`PUSH_SEEDS`], which must.
 fn push_refusals(ci: &str, line: &'static str, required: &[&str]) -> Vec<String> {
     let label = format!("a push to {line}");
     let absent: Vec<&str> = PULL_REQUEST_ONLY.iter().map(|(c, _)| *c).collect();
-    exact_refusals(ci, &push(line), line, &label, required, &absent)
+    let seeds: Vec<&str> = PUSH_SEEDS.iter().map(|(id, _)| *id).collect();
+    exact_refusals(ci, &push(line), line, &label, required, &absent, &seeds)
 }
 
 /// The refusals of the exact-set rule for `event`: every context of `required` but
-/// those of `absent` proven to run, no job proven to run `absent`'s, and no other
-/// context run (the jobs a deciding job needs aside).
+/// those of `absent` proven to run, no job proven to run `absent`'s, every job of `seeds`
+/// proven to run, and no other context run (the jobs a deciding job needs aside).
 fn exact_refusals(
     ci: &str,
     event: &Event,
@@ -566,6 +583,7 @@ fn exact_refusals(
     label: &str,
     required: &[&str],
     absent: &[&str],
+    seeds: &[&str],
 ) -> Vec<String> {
     let all = jobs(ci);
     let ran = runs(&all, event);
@@ -610,7 +628,7 @@ fn exact_refusals(
         if ran.get(&job.id) == Some(&Some(false)) {
             continue;
         }
-        let helper = helpers.contains(&job.id);
+        let helper = helpers.contains(&job.id) || seeds.contains(&job.id.as_str());
         match contexts(job, event) {
             Ok(names) => {
                 for name in names.iter().filter(|n| !required.contains(n.as_str())) {
@@ -632,6 +650,13 @@ fn exact_refusals(
                 job.id
             )),
             Err(_) => {}
+        }
+    }
+    for seed in seeds {
+        if ran.get(*seed) != Some(&Some(true)) {
+            errors.push(format!(
+                "push seed `{seed}` is not proven to run on {label}; delete the entry or restore the job"
+            ));
         }
     }
     errors
@@ -840,6 +865,9 @@ fn a_dispatch_and_a_tags_call_run_every_job_and_the_whole_matrix() {
     for (context, reason) in PULL_REQUEST_ONLY {
         assert!(!reason.is_empty(), "{context} names no reason");
     }
+    for (id, reason) in PUSH_SEEDS {
+        assert!(!reason.is_empty(), "{id} names no reason");
+    }
 }
 
 /// The measurement workflows: none starts on a push or a pull request, each runs on
@@ -964,6 +992,31 @@ fn a_pull_request_only_job_on_a_push_is_refused() {
         push_refusals(&ci, "beta", REQUIRED_ON_BETA),
         ["job `semver` may run `semver` on a push to beta, which cannot judge it"]
     );
+}
+
+/// #696: the seed off a push is a stale entry, and on a pull request a context no line requires.
+#[test]
+fn a_push_seed_off_the_push_or_on_a_pull_request_is_refused() {
+    let seed = "    name: semver tool cache\n    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')\n";
+    let ci = edited(
+        &read(".github/workflows/ci.yml"),
+        seed,
+        "    name: semver tool cache\n    if: github.event_name == 'pull_request'\n",
+    );
+    for (line, required) in [("beta", REQUIRED_ON_BETA), ("main", REQUIRED_ON_MAIN)] {
+        assert_eq!(
+            push_refusals(&ci, line, required),
+            [format!(
+                "push seed `semver-tool-seed` is not proven to run on a push to {line}; delete the entry or restore the job"
+            )]
+        );
+        assert_eq!(
+            pr_refusals(&ci, line, required),
+            [format!(
+                "job `semver-tool-seed` runs `semver tool cache` on a pull request into {line}, not a required context there"
+            )]
+        );
+    }
 }
 
 /// #347: a full-set exception naming no job, or a job that runs on an event it
