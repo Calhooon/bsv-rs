@@ -36,14 +36,20 @@ below its true figure. Beta carried fifteen stale `script.rs` entries after
   nightly's `source` job before its plan, so a stale entry refuses the run
   before any shard. Both run cargo-mutants 27.1.0, the nightly's
   `CARGO_MUTANTS_VERSION`, installed by `cargo install --locked` as the
-  nightly's shards install it (in `checks` into the cargo home its cache
-  keeps); the script refuses another version. The pin job's timeout moves
+  nightly's shards install it (in `checks` into the cargo home; rust-cache
+  keeps `~/.cargo/bin` but saves only on a beta push whose key missed, so the
+  build, 1m 15s on PR #679's run, recurs until the key next moves); the
+  script refuses another version. The listing runs under `NO_COLOR=1` and
+  `--colors=never`: ci.yml's `CARGO_TERM_COLOR=always` styles cargo-mutants'
+  `--list` lines, and PR #679's own `checks` run read all 27 entries as
+  STALE before it. The pin job's timeout moves
   from 10 to 20 minutes for the build, and its Rust install is unconditional.
 - The `beef.rs` `Beef::sort_txs` entry re-pointed from 912:33 to 915:33, the
   script's `--fix` output byte for byte as PR #678's change, so beta passes
   the new gate whichever lands second.
 
-Pinned by `.github/scripts/test_mutants_entries.py` (12 tests: a match, a
+Pinned by `.github/scripts/test_mutants_entries.py` (13 tests: a colored
+listing environment listing plain lines, a match, a
 miss with a unique re-point, a miss with two candidates, a double match, a
 triple-quoted entry with a lifetime, a shift under entries of one text, a
 held line, `--fix` on the entries and their comment, a one-line shift under

@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -146,6 +147,33 @@ class Entries(unittest.TestCase):
         status, out, _ = run(config, LISTING)
         self.assertEqual(status, 1)
         self.assertIn("DUPLICATE entry: ^src/a\\.rs:10:5:", out)
+
+    def test_a_colored_listing_environment_still_lists_plain_lines(self):
+        # ci.yml sets CARGO_TERM_COLOR=always for the whole run, and cargo-mutants 27.1.0 reads
+        # it as `--colors` (src/main.rs:443) and styles every `--list` line unless NO_COLOR is set
+        # (src/options.rs:257-268, src/list.rs:25-29): PR #679's own `checks` run read all 27
+        # entries as STALE. The fake follows that rule; the listing must come out plain.
+        def fake_run(args, env=None, **_):
+            env = os.environ if env is None else env
+            if args[2] == "--version":
+                return unittest.mock.Mock(stdout="cargo-mutants 27.1.0\n")
+            colors = next((a.split("=", 1)[1] for a in args if a.startswith("--colors=")),
+                          env.get("CARGO_TERM_COLOR", "auto"))
+            styled = "NO_COLOR" not in env and (colors == "always" or "CLICOLOR_FORCE" in env)
+            lines = LISTING.get(args[args.index("--file") + 1], [])
+            if styled:
+                lines = [f"\x1b[33m{line}\x1b[0m" for line in lines]
+            return unittest.mock.Mock(stdout="".join(f"{line}\n" for line in lines))
+
+        env = {"CARGO_TERM_COLOR": "always", "CARGO_MUTANTS_VERSION": "27.1.0"}
+        with tempfile.TemporaryDirectory() as tmp, \
+                unittest.mock.patch.dict(os.environ, env), \
+                unittest.mock.patch.object(mutants_entries.subprocess, "run", fake_run):
+            path = Path(tmp) / "mutants.toml"
+            path.write_text(CONFIG)
+            out = io.StringIO()
+            status = mutants_entries.main(["--config", str(path)], out=out)
+        self.assertEqual(status, 0, out.getvalue())
 
     def test_the_repository_entries_are_all_readable(self):
         root = Path(__file__).resolve().parents[2]

@@ -78,14 +78,19 @@ def entries_of(text):
 
 def cargo_listing(file):
     """The mutants cargo-mutants lists for one file, nothing built."""
+    # Plain lines whatever the job's environment: ci.yml sets CARGO_TERM_COLOR=always, which
+    # cargo-mutants reads as `--colors` and styles every listed line; NO_COLOR outranks it and
+    # CLICOLOR_FORCE (cargo-mutants 27.1.0 src/options.rs:257-268).
+    env = {**os.environ, "NO_COLOR": "1"}
     want = os.environ.get("CARGO_MUTANTS_VERSION")
     if want:
         have = subprocess.run(["cargo", "mutants", "--version"], check=True,
-                              capture_output=True, text=True).stdout.split()
+                              capture_output=True, text=True, env=env).stdout.split()
         if have[-1:] != [want]:
             raise RuntimeError(f"cargo-mutants {' '.join(have[1:])} is not the nightly's {want}")
-    out = subprocess.run(["cargo", "mutants", "--list", "--file", file, "--no-config"],
-                         check=True, capture_output=True, text=True).stdout
+    out = subprocess.run(["cargo", "mutants", "--list", "--file", file, "--no-config",
+                          "--colors=never"],
+                         check=True, capture_output=True, text=True, env=env).stdout
     return [line for line in out.splitlines() if line.strip()]
 
 
