@@ -60,6 +60,18 @@ docs-only pull request's run.
 
 ### Tests
 
+- The HTTP wallet's typed reading measured apart from the transport, the array-form pin deterministic (#697):
+  `test_http_json_success_tx_in_the_array_form_costs_the_typed_reading` measured the four-times bound through a
+  wiremock server, so its peak counted the transport's buffers, and on a loaded runner one more body's worth was
+  alive at it (2,218,461 B for 468,692 B of text, 4.73 times, on PR #691's run and #694's re-run, green on the
+  same code otherwise). The bound now sits on the typed reading alone,
+  `the_typed_reading_of_a_create_action_answer_costs_under_four_times_its_text_apart_from_the_transport_697`:
+  `serde_json::from_slice::<CreateActionResult>` on the body in memory, the reading
+  `src/wallet/substrates/http_json/answer.rs:89` does (its function `pub(super)`), 262,240 B on every run, RED at
+  8,519,898 B with the `tx` read through a `Value`; a crate-contract pin labeled with
+  `src/wallet/substrates/CLAUDE.md:15`, which now states the cost. The wiremock figure stays printed and is held
+  under five times the text, a stated bound naming the extra copy (9,345,126 B on the RED). The fixture moved to
+  `tests/support/http_json_answer_697.rs`. Record: `docs/lanes/fix-697.md`.
 - `src/script/templates/multisig.rs`'s survivors of the complete run killed (#681): six tests in the file's own
   module pin the m-of-n edges against the node's `GetScriptForMultisig` form (bitcoin-sv `879fc8b`
   `src/script/standard.cpp:315-324`): the bytes of a 1-of-1 and a 2-of-3 on both lock paths, m = n written and

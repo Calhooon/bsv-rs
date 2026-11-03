@@ -24,6 +24,10 @@ mod beef_chain;
 #[path = "support/wire_result_cost_487.rs"]
 mod wire_result_cost_487;
 
+#[cfg(feature = "wallet")]
+#[path = "support/http_json_answer_697.rs"]
+mod http_json_answer_697;
+
 use bsv_rs::primitives::bsv::shamir::split_private_key;
 use bsv_rs::primitives::ec::PrivateKey;
 use bsv_rs::primitives::hash;
@@ -709,21 +713,57 @@ fn test_beef_stream_memory_on_a_reversed_chain() {
     }
 }
 
-/// The pushed bytes of the answer's `tx` in the array-form test: 128 KiB
-/// (speed loop two, #670; 1 MiB until then). The bound is a ratio to the
-/// text, so a smaller `tx` asks the same: at 1 MiB the array form peaked at
-/// 2.25 times its text and the object form at 19 times it, at 128 KiB at
-/// 2.86 and 20.6 times, under the bound of 4 at both.
-#[cfg(all(feature = "wallet", feature = "http"))]
-const TX_PUSH: usize = 1 << 17;
+/// The typed reading of a createAction answer costs under four times its text
+/// (#339), measured on the body in memory with no server and no client in the
+/// window (#697): the substrate reads a 200 answer's bytes with
+/// `serde_json::from_slice::<R>` (`src/wallet/substrates/http_json/answer.rs:89`,
+/// `R` the public `CreateActionResult` for createAction; the reader itself,
+/// `answer::success`, is `pub(super)`), the same reading here, so the peak is
+/// the reading's alone and the same on every run. Crate-contract pin, stated:
+/// `src/wallet/substrates/CLAUDE.md:15` ("the typed reading costs under four
+/// times the body's text, no `Value` per byte"). A `Value` tree, about 32 bytes
+/// a byte, is more than four times the text; the object form, which the typed
+/// reading refuses, is #365's fallback's to read.
+#[cfg(feature = "wallet")]
+#[test]
+fn the_typed_reading_of_a_create_action_answer_costs_under_four_times_its_text_apart_from_the_transport_697(
+) {
+    use bsv_rs::wallet::CreateActionResult;
+
+    let _serial = serial();
+    let answer = http_json_answer_697::answer();
+    let read = |body: &[u8]| {
+        let _profiler = dhat::Profiler::builder().testing().build();
+        let result = serde_json::from_slice::<CreateActionResult>(body).map(|r| r.tx);
+        (result, dhat::HeapStats::get().max_bytes as u64)
+    };
+    let (tx, array_peak) = read(&answer.array);
+    assert_eq!(tx.unwrap().as_deref(), Some(&answer.tx[..]));
+    let (object, object_peak) = read(&answer.object);
+    println!(
+        "\n=== the typed reading of a createAction answer's {} B tx (#697) ===\n  \
+         array form ({} B of text): peak {array_peak} B\n  \
+         object form ({} B of text): peak {object_peak} B, refused",
+        http_json_answer_697::TX_PUSH,
+        answer.array.len(),
+        answer.object.len()
+    );
+    assert!(
+        array_peak < 4 * answer.array.len() as u64,
+        "array form: the typed reading peaks at {array_peak} B for {} B of text",
+        answer.array.len()
+    );
+    assert!(object.is_err(), "the typed reading took the object form");
+}
 
 /// `HttpWalletJson` reads a createAction answer's `tx` in the array form at
-/// the cost of the typed reading (#339): the byte reader's `Value` tree
-/// (about 32 bytes a byte, 48 MB at its peak for a 1 MiB `tx`, the second
-/// fold's) is built only for an answer the typed reading refuses (the
-/// historical object form, a byte written `1.0`). The peak counts the
-/// mock's copy of the body and the client's: a `tx` of `TX_PUSH` bytes is
-/// about 3.6 bytes of text a byte.
+/// the cost of the typed reading (#339), end to end through a wiremock server:
+/// the byte reader's `Value` tree (about 32 bytes a byte, 48 MB at its peak
+/// for a 1 MiB `tx`, the second fold's) is built only for an answer the typed
+/// reading refuses (the historical object form, a byte written `1.0`). The
+/// peak counts the mock's copy of the body and the client's beside the typed
+/// reading's, so it is the transport's too: the typed reading's own bound is
+/// the test above (#697).
 #[cfg(all(feature = "wallet", feature = "http"))]
 #[test]
 fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
@@ -737,54 +777,7 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         .enable_all()
         .build()
         .unwrap();
-    // Row R28 (#432) refuses a `tx` that is not a complete, exactly framed
-    // BEEF transaction, and the evidence row asks every input of a completed
-    // transaction for its source: the answer is a real transaction of 128 KiB
-    // framed as the reference's atomic BEEF with its own txid, spending one
-    // output of a proven funding transaction (the one transaction of its
-    // block, as `examples/transaction.rs` builds it) into one OP_FALSE
-    // OP_RETURN output pushing `TX_PUSH` bytes of `i % 256`.
-    let (txid, tx) = {
-        use bsv_rs::script::{LockingScript, UnlockingScript};
-        use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
-        let mut funding = Transaction::new();
-        let mut mined = TransactionInput::new("11".repeat(32), 0);
-        mined.unlocking_script = Some(UnlockingScript::new());
-        funding.add_input(mined).unwrap();
-        funding
-            .add_output(TransactionOutput::new(
-                1_000,
-                LockingScript::from_binary(&[0x51]).unwrap(),
-            ))
-            .unwrap();
-        let funding_txid = funding.id();
-        funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
-        let mut spend = Transaction::new();
-        let mut input = TransactionInput::with_source_transaction(funding, 0);
-        input.unlocking_script = Some(UnlockingScript::new());
-        spend.add_input(input).unwrap();
-        let mut script = vec![0x00, 0x6a, 0x4e];
-        script.extend_from_slice(&(TX_PUSH as u32).to_le_bytes());
-        script.extend((0..TX_PUSH).map(|i| (i % 256) as u8));
-        spend
-            .add_output(TransactionOutput::new(
-                0,
-                LockingScript::from_binary(&script).unwrap(),
-            ))
-            .unwrap();
-        (spend.id(), spend.to_atomic_beef(true).unwrap())
-    };
-    let answer = |tx: serde_json::Value| {
-        serde_json::to_vec(&serde_json::json!({ "txid": txid, "tx": tx })).unwrap()
-    };
-    let array = answer(serde_json::json!(tx));
-    let object = answer(serde_json::Value::Object(
-        tx.iter()
-            .enumerate()
-            .map(|(i, b)| (i.to_string(), serde_json::json!(b)))
-            .collect(),
-    ));
-
+    let answer = http_json_answer_697::answer();
     let peak = |body: &[u8]| -> u64 {
         runtime.block_on(async {
             let server = MockServer::start().await;
@@ -802,29 +795,38 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
                     .unwrap();
             let _profiler = dhat::Profiler::builder().testing().build();
             let result = wallet.create_action(args, None).await.unwrap();
-            assert_eq!(result.tx.as_deref(), Some(&tx[..]));
+            assert_eq!(result.tx.as_deref(), Some(&answer.tx[..]));
             dhat::HeapStats::get().max_bytes as u64
         })
     };
 
-    println!("\n=== HttpWalletJson, a createAction answer's {TX_PUSH} B tx ===");
-    let array_peak = peak(&array);
+    println!(
+        "\n=== HttpWalletJson, a createAction answer's {} B tx ===",
+        http_json_answer_697::TX_PUSH
+    );
+    let array_peak = peak(&answer.array);
     println!(
         "  array form ({} B of text): peak {array_peak} B",
-        array.len()
+        answer.array.len()
     );
-    let object_peak = peak(&object);
+    let object_peak = peak(&answer.object);
     println!(
         "  object form ({} B of text): peak {object_peak} B",
-        object.len()
+        answer.object.len()
     );
-    // The body's text twice (the mock's copy and the client's) and the
-    // bytes read, with room for the client's buffers; the `Value` tree is
-    // more than four times the text.
+    // Five times the text, a stated bound (#697): the mock's copy, the
+    // client's and the typed reading (2.86 times on a quiet host); on a
+    // loaded runner one more body's worth may be alive at the peak (the
+    // mock's write buffer and the client's accumulator growing chunk by
+    // chunk, as the scheduling falls), 2,218,461 B for 468,692 B of text
+    // (4.73 times) on PR #691's and #694's runs. A `Value` reading stays
+    // far past it (9,345,126 B, 19.9 times, with the `tx` read through a
+    // `Value` in #697's RED), so the substrate's order (the typed reading
+    // first) is still pinned here.
     assert!(
-        array_peak < 4 * array.len() as u64,
+        array_peak < 5 * answer.array.len() as u64,
         "array form: peak {array_peak} B for {} B of text",
-        array.len()
+        answer.array.len()
     );
 }
 
