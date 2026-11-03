@@ -188,6 +188,39 @@ read from `gh run view <id> --json jobs` on 2026-11-03; the raw lines are under
 | A cold read | 16m49s (#660) | unchanged: about 16 minutes; reads without cargo 3 to 7 minutes |
 | The landing latency, lane DONE to landed | 113 to 219 minutes (five landings) | 39, 46 and 64 minutes this morning (#676, #684, #680; the captain's count, not read from the API here). The API gives the pull requests' opening to merge: #676 03:39:28Z to 06:15:19Z (155m51s), #680 05:46:03Z to 06:48:38Z (62m35s), #684 07:14:53Z to 07:57:33Z (42m40s); #676's 39 fits its fold (the head commit authored 05:38:25Z, 36m54s before the merge), not its lane's DONE, which preceded the 03:39Z opening |
 
+## Loop two closed
+
+Closed in the records on the keeper's word of 10:1xZ 2026-11-03 on #671. The loop's
+three rows and their outcomes:
+
+| Row | Outcome |
+|---|---|
+| #670, the ten slowest tests | Landed as #676: the Test Suite 9m10s whole against 15m26s on a cache hit before (run 41587646252), the memory step 1m06s from about five minutes (`docs/lanes/ci-speed-loop2-slowest.md`) |
+| #668, a docs-only pull request's exit | Landed as #688 (`docs/lanes/ci-speed-loop2-docs-only.md`); its after column measured by the loop's close, the pull request carrying this record (the earliest docs-only one under the exit), read into the record at its landing |
+| #671, the shard by step | Closed without the shard on the keeper's word, the figures as the reason: a three-way split (unit; integration; memory with doc) saves about three minutes of one PR's wall clock and spends two more slots on a pool at its ceiling of twenty in 22 of 24 hours, where a job queued beside a heavy run waits a median of 38 seconds and a worst of 89 minutes; the affected-tests cut already gives 7m40s on a one-module PR (run 41598630196). The row reopens on evidence alone: the 48-hour occupancy read's non-heavy p95 under 10, or a measured whole run above the eight-minute line for a week |
+
+| Figure | Loop one closed | Loop two closed |
+|---|---|---|
+| A PR's CI wall clock | 7m43s subset (run 41598630196); 9m36s to 11m09s whole | unchanged for a code PR (#676's 9m36s is in loop one's figure); a docs-only PR: 10m05s before (#669, run 41574976294), after measured by the pull request carrying this record, read in at its landing |
+| The Test Suite | 7m40s subset, 9m10s whole | unchanged (the 9m10s is #676's, loop two's cut, already read into loop one's close) |
+| The queue wait | 0m02s to 1m57s to the Test Suite | unchanged |
+| The nightly | 2h28m06s (run 41579707627) | unchanged |
+| A cold read | about 16 minutes; reads without cargo 3 to 7 minutes | unchanged |
+| The landing latency, lane DONE to landed | 39, 46 and 64 minutes (#676, #684, #680) | unchanged; a docs-only landing's read in at this record's landing |
+
+## The four loops
+
+The speed line runs as four numbered loops (the keeper's word of 2026-11-03 02:1xZ on the
+owner's "do 3 or 4 loops"): measure, cut, measure, record, each opening from the previous
+loop's recorded figures.
+
+| Loop | Rows | State |
+|---|---|---|
+| One | the seven cuts (#665, #664, #666, #667) | closed ("Loop one closed" above) |
+| Two | the docs-only exit (#668), the ten slowest tests (#670), the shard by step (#671) | closed ("Loop two closed" above) |
+| Three | compile time by evidence; the reads sharing the lane's build | open: #672 in its lane, #673 next |
+| Four | the landing latency measured and cut; the slot occupancy by hour and the quiet hours | open: #674 (the landing latency's definition and figures), #675 (the occupancy read, now the fleet tool's) |
+
 ## Verified here, and not
 
 Locally (a scratch copy, its own target directory, `CARGO_BUILD_JOBS=4`, one cargo at a

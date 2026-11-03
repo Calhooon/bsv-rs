@@ -90,7 +90,7 @@ change are never docs only).
 
 | Figure | Before | After |
 |---|---|---|
-| A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | (from the next docs-only PR's run) |
+| A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | measured by the loop's close, the pull request carrying `docs/lanes/ci-speed-2.md`'s "Loop two closed" (the earliest docs-only one under the exit), its run's seconds written by the captain at its landing in the next docs pass |
 | The queue wait | 0m02s to 1m57s (loop one closed) | (from the next docs-only PR's run) |
 | The nightly | 2h28m06s (run 41579707627) | unchanged by this cut |
 | A cold read | about 16 minutes; reads without cargo 3 to 7 minutes | unchanged by this cut |
