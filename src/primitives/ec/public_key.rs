@@ -95,7 +95,7 @@ impl PublicKey {
 
     /// Reads key bytes as the reference's `Point.fromDER` does: `from_hex`'s
     /// reading after the hex is decoded (#498).
-    #[cfg(feature = "overlay")]
+    #[cfg(any(feature = "overlay", feature = "script"))]
     pub(crate) fn from_reference_der(bytes: &[u8]) -> Result<Self> {
         super::public_key_forms::from_reference_der(bytes)
     }

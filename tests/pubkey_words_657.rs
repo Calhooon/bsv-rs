@@ -37,11 +37,23 @@ struct Case {
     error: Option<String>,
 }
 
-/// The one shape both sides refuse in other words: a compressed key whose x
-/// is the field prime plus one. The reference reduces x modulo p
-/// (`Point.ts:365-367`), passes the encoding check and fails the signature;
-/// this crate's `PublicKey::from_bytes` refuses the key (#183's residue).
-const READ_OTHERWISE: &str = "compressed-x-p-plus-1";
+/// The two shapes #660 states as a divergence (`CHANGELOG.md`'s #660 entry,
+/// its parity paragraph; `CLAUDE.md`'s row for #660): a 33- or 65-byte key
+/// with the right prefix whose point is off the curve. The reference's
+/// `#checkPublicKeyEncoding` parses the point and refuses it
+/// (`Spend.ts:687-718`, `The public key is in an unknown format.`, the
+/// recorded words, kept as recorded); this crate reads the length and the
+/// prefix alone, as the node's `IsCompressedOrUncompressedPubKey` does
+/// (`interpreter.cpp:132-152` at v1.2.3), and the signature check answers
+/// false (`pubkey.cpp:183-194`): the node's verdict, the control key's with
+/// the same signature. The vector's one shape at or past p, `02` with x = p + 1,
+/// is no longer read otherwise: the reference reduces x and fails the
+/// signature, this crate fails the signature, so the verdict and the words
+/// are the reference's on all 24 of its cases (#183's residue closed by #660).
+/// The claim is bounded by the vector: it carries no signature made for the
+/// reduced point (x = 1), which the reference verifies and this crate fails
+/// (k256 refuses x at or past p), the #660 entry's stated divergence.
+const NODE_READ_660: [&str; 2] = ["compressed-off-curve", "uncompressed-off-curve"];
 
 fn recording() -> Recording {
     let r: Recording = serde_json::from_str(include_str!("vectors/pubkey_words_657.json")).unwrap();
@@ -136,23 +148,57 @@ fn multisig(c: &Case) -> bool {
     c.opcode.starts_with("OP_CHECKMULTISIG")
 }
 
+fn node_read_660(c: &Case) -> bool {
+    NODE_READ_660.contains(&key_shape(c))
+}
+
+/// The node's verdict on a #660 shape: the recorded verdict of the control
+/// key of the same form, with the same signature, mode and opcode (the
+/// signature verifies for neither key), never a refusal at the encoding check.
+fn assert_the_node_verdict_660(r: &Recording, c: &Case) {
+    assert_eq!(
+        want(c),
+        Err("The public key is in an unknown format.".to_owned()),
+        "{}",
+        c.name
+    );
+    let control_name = c.name.replace("-off-curve", "-control");
+    let control = r.cases.iter().find(|k| k.name == control_name).unwrap();
+    assert_eq!(control.sig, c.sig, "{}", c.name);
+    let got = run(c);
+    assert_ne!(
+        got,
+        Err("The public key is in an unknown format.".to_owned()),
+        "{}",
+        c.name
+    );
+    assert_eq!(got, want(control), "{}", c.name);
+}
+
 #[test]
 fn a_badly_encoded_public_key_at_checkmultisig_is_refused_in_the_reference_words_657() {
     let r = recording();
-    let mut judged = 0;
+    let (mut judged, mut node_read) = (0, 0);
     for c in r.cases.iter().filter(|c| {
         multisig(c)
             && c.sig != "3006020101020141"
             && !key_shape(c).ends_with("-control")
-            && key_shape(c) != READ_OTHERWISE
+            && key_shape(c) != "compressed-x-p-plus-1"
     }) {
+        if node_read_660(c) {
+            assert_the_node_verdict_660(&r, c);
+            node_read += 1;
+            continue;
+        }
         let words = want(c).unwrap_err();
         assert!(!words.starts_with("OP_CHECKMULTISIG"), "{}", c.name);
         assert_eq!(run(c), Err(words), "{}", c.name);
         judged += 1;
     }
-    // Ten bad key shapes, two signatures, two opcodes, three modes.
-    assert_eq!(judged, 120);
+    // Eight bad key shapes, two signatures, two opcodes, three modes; the
+    // two off-curve shapes the node's verdict (#660).
+    assert_eq!(judged, 96);
+    assert_eq!(node_read, 24);
 }
 
 #[test]
@@ -180,41 +226,37 @@ fn a_badly_encoded_signature_at_checkmultisig_is_refused_in_the_reference_words_
 #[test]
 fn checksig_already_refuses_in_the_reference_words_657() {
     let r = recording();
-    let mut judged = 0;
-    for c in r
-        .cases
-        .iter()
-        .filter(|c| !multisig(c) && key_shape(c) != READ_OTHERWISE)
-    {
-        assert_eq!(run(c), want(c), "{}", c.name);
-        judged += 1;
+    let (mut judged, mut node_read) = (0, 0);
+    for c in r.cases.iter().filter(|c| !multisig(c)) {
+        if node_read_660(c) {
+            assert_the_node_verdict_660(&r, c);
+            node_read += 1;
+        } else {
+            assert_eq!(run(c), want(c), "{}", c.name);
+            judged += 1;
+        }
     }
-    assert_eq!(judged, 162);
+    // x = p + 1 among the judged since #660 (12 cases).
+    assert_eq!(judged, 150);
+    assert_eq!(node_read, 24);
 }
 
 #[test]
-fn every_recorded_case_is_judged_as_the_reference_judges_it_save_one_shape_657() {
+fn every_recorded_case_is_judged_as_the_reference_judges_it_save_the_shapes_660_states_657() {
     let r = recording();
     assert_eq!(
         r.field_prime,
         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
     );
-    let mut otherwise = 0;
+    let mut node_read = 0;
     for c in &r.cases {
-        if key_shape(c) == READ_OTHERWISE {
-            // Both refuse; the reference after the signature check, here at
-            // the key's encoding.
-            assert!(want(c).is_err(), "{}", c.name);
-            assert_eq!(
-                run(c),
-                Err("The public key is in an unknown format.".to_owned()),
-                "{}",
-                c.name
-            );
-            otherwise += 1;
+        if node_read_660(c) {
+            assert_the_node_verdict_660(&r, c);
+            node_read += 1;
         } else {
             assert_eq!(run(c), want(c), "{}", c.name);
         }
     }
-    assert_eq!(otherwise, 24);
+    // Two shapes, two signatures, four opcodes, three modes.
+    assert_eq!(node_read, 48);
 }

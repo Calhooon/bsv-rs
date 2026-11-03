@@ -789,6 +789,136 @@ a sha off the line, a ref name and a short sha are refused; a shard and the
 report refuse another commit), red on the pre-fix script (no `pin`, no
 `checkout_commit`, a report that names no commit), green after.
 
+### Fixed: the public key encoding check reads a key's length and prefix as the node reads it; the curve and the range are the signature check's (#660)
+
+`check_public_key_encoding` (`src/script/spend/crypto.rs`), at both signature
+sites (`OP_CHECKSIG`/`OP_CHECKSIGVERIFY` and `OP_CHECKMULTISIG`/`VERIFY`),
+parsed the key's point after its length and prefix checks and refused a 33-
+or 65-byte key whose point is off the curve or whose x (or y) is at or past
+the field prime: `The public key is in an unknown format.` at CHECKSIG,
+`OP_CHECKMULTISIG requires correct encoding for the public key and
+signature.` at CHECKMULTISIG, in every mode. The node reads the length and
+the prefix alone. Its STRICTENC check (bitcoin-sv v1.2.3
+`interpreter.cpp:312-327`, `CheckPubKeyEncoding`) is
+`IsCompressedOrUncompressedPubKey` (`:132-152`): at least 33 bytes; `04` at
+65; `02`/`03` at 33; any other prefix refused. Such a key passes, and the
+signature check answers false: `CheckSig` (`:2133-2163`) returns false where
+`CPubKey::Verify` cannot parse the point (`pubkey.cpp:183-194`,
+`secp256k1_ec_pubkey_parse`). With an empty signature no NULLFAIL applies
+(`interpreter.cpp:1491-1497,1641-1646`), so `<key> OP_CHECKSIG OP_NOT` and
+its 1-of-1 CHECKMULTISIG form are valid at the node. Under `ScriptFlags::block`
+and `standard`, in both eras, at versions 1 and 2, this crate refused 120 such
+spends (the #660 probe, 2026-11-02 22:4xZ). A consensus parity defect under
+the block word; the interpreter follows the node in every mode (0.3.27).
+
+The fix: the encoding check keeps its length, prefix and
+COMPRESSED_PUBKEYTYPE refusals in their words, unchanged, and reads nothing of
+the point; `verify_signature` reads it, and a key that is no point is the
+check's false (`Ok(false)`, never a refusal or a panic, rule 5). The reading
+of the point is one place, `src/script/spend/key_point.rs`: the switch
+`reads_the_reference_point` (`false`, the node's reading in every mode),
+`check_public_key_point` (the encoding check's share, nothing under the
+node's reading) and `signature_key` (the key the signature check verifies
+against). A fold to the reference's reading in the default mode alone
+returns `self.flags.is_none()` from the switch: the encoding check then
+refuses a point the reference's `PublicKey.fromDER` cannot read in its
+words, and the signature check verifies against the reduced point
+(`PublicKey::from_reference_der`, #498's reader); measured in a scratch copy,
+the default mode then matches the reference's verdict on every recorded
+cell, the CHECKMULTISIG cells in this crate's wrapper words. A key that
+parses is judged as before: a valid signature verifies and a wrong one
+fails, NULLFAIL under a word unchanged.
+
+Verdicts, before and after (the six points: `02`/`03` with x = 5, off the
+curve; `02` with x = p; `02` with x = p + 1; `03` with x = 2^256 - 1; `04`
+with G.x and G.y + 1, off the curve; the four shapes: `<key> OP_CHECKSIG
+OP_NOT` and `1 <key> 1 OP_CHECKMULTISIG OP_NOT`, each with an empty
+signature and with a strict-DER `r = 1, s = 1` ALL|FORKID one):
+
+- Under a word (both words, both eras, versions 1 and 2; 192 cells): every
+  cell refused before at the encoding check. Now the empty-signature cells
+  and the DER cells at post-Chronicle version 2 (Chronicle relaxes NULLFAIL,
+  `interpreter.cpp:40-44`) are valid, 120 cells; the other 72 are refused in
+  NULLFAIL's words (`OP_CHECKSIG requires failing signatures to be empty.`,
+  `OP_CHECKMULTISIG ...`), the node's `SCRIPT_ERR_SIG_NULLFAIL`. The
+  sibling's Lean evaluator (`bsv-script-lean@387dab35`, `spec@387dab35`,
+  `eval/bsvs eval`) answers the same on all 224 word cells with the control
+  key, 140 valid and 84 `SCRIPT_ERR_SIG_NULLFAIL`.
+- In the default mode (48 cells): every cell refused before; all valid now
+  (no NULLFAIL without a word). The reference's default at `ts-stack@edf6e03`
+  answers valid on the x = p + 1 and x = 2^256 - 1 cells (it reduces x modulo
+  p) and refuses the four off-curve and x = p points' 32 cells at its
+  encoding check, `The public key is in an unknown format.` (the parity
+  paragraph below).
+
+The witnesses are `tests/pubkey_encoding_660.rs`:
+`an_off_curve_or_over_range_key_fails_the_signature_check_not_the_encoding_check_660`
+(the probe's evidence test, the 192 word cells swept: 120 valid, 72 in
+NULLFAIL's words), `the_default_mode_reads_the_point_as_the_node_reads_it_660`
+(its verdict one function, `default_valid`, a fold's to switch),
+`the_vector_carries_this_crates_cells_and_the_lean_agrees_with_the_node_660`,
+`the_reference_default_refuses_an_off_curve_point_a_stated_divergence_660`,
+`a_wrong_length_or_prefix_is_still_refused_at_the_encoding_check_660` and
+`a_key_on_the_curve_verifies_its_signature_and_refuses_a_wrong_one_660`,
+against `tests/vectors/pubkey_encoding_660.json`: 280 cells (the control and
+the six points, four shapes, five modes, two versions), their bytes this
+crate's writer's (the ignored `record_the_cells_660`), the node's verdict
+derived from its code, the Lean's under each word and the reference's under
+its default (Node v22.18.0, the bun bundle of `packages/sdk`), recorded by
+`tests/support/pubkey_encoding_660.mjs`; two runs byte-identical. RED on
+`e49cf55d` (the test file and the vector on the unchanged tree): 4 of 6, the
+sweep and the default (`Err("The public key is in an unknown format.")`
+where `Ok(true)`), the vector's Lean comparison and the divergence census
+(the x = p + 1 cells refused here, valid in the reference); the two controls
+green on both.
+
+The census: `conformance_scripts` with `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03`'s `conformance` holds 5,116 total, 4,120 run, 4,109
+passed, 959 unsupported, 37 skipped, 11 known failures, every class pin
+unmoved; no evaluation row of the corpus pushes a 33- or 65-byte `02`/`03`/`04`
+key that is no point (a scan of every direct push), so no row could move.
+The hybrid-key rows (`node.script.bitcoin-sv.1426`, `.1430`, teranode's
+`1377`, `1381`) stay refused at the prefix.
+
+Downstreams: a host running scripts (the overlay engine's submit door,
+`Transaction::verify`, and the streaming reader under a live word) refused
+before a spend whose script checks an off-curve or out-of-range key against
+an empty signature and inverts the answer, which the node accepts; it
+accepts it now. No consumer on this host matches either refusal's words
+(`bsv-overlay-cloudflare`, `rust-message-box` searched). A spend with a valid
+key judges as before.
+
+### Notes: cross-SDK parity (#660)
+
+Under a word the crate now reads the key as bitcoin-sv v1.2.3 does, and the
+sibling's Lean agrees cell for cell. In the default mode the crate reads it
+as the node does too, where the reference's default reads the point at its
+encoding check (`ts-stack@edf6e03` `Spend.ts:687-718`,
+`#checkPublicKeyEncoding`, `PublicKey.fromDER` under its `try`): an off-curve
+point, or x = p (x = 0 has no point), is refused there in `The public key is
+in an unknown format.`, and an x past p is reduced modulo p
+(`Point.ts:365-367`) and read as the point it names, the reduction the
+filed quirk of the divergence list's key-forms row (queue row 18, ts-stack
+#1467). On the recorded cells the verdicts agree for x past p (the signature
+fails either way) and differ for the four refused points (32 cells, valid
+here). A signature made for the reduced point verifies there and fails here.
+The #657 vector is the divergence's recorded witness: its
+`compressed-off-curve` and `uncompressed-off-curve` cases (48 of 348, both
+signatures, the four opcodes, the three modes) keep the reference's `unknown
+format` and are judged here as the control key with the same signature is
+(`NODE_READ_660` in `tests/pubkey_words_657.rs`), and its 24 x = p + 1
+cases, enumerated apart until now, take the reference's verdict and words.
+Ours: the node's reading in every mode, the default included, by the
+keeper's word of 2026-11-02 23:2xZ (`CLAUDE.md`'s line that the interpreter
+follows the node); the reference's reading stays one switch away
+(`reads_the_reference_point`). Go (`go-sdk@2ca481c`)
+not measured.
+
+Semver: no public type or signature changed. The refusal words for a wrong
+length or prefix are unchanged; the `unknown format` and CHECKMULTISIG
+encoding refusals no longer fire for a key of the right length and prefix
+that is no point.
+
 ### Fixed: a MerklePath with no levels at all is refused at every door and panics no walk (#649)
 
 A `MerklePath` whose `path` is empty (no levels), held through the public
