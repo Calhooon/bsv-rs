@@ -154,4 +154,15 @@ exclude_re = [
   # and the mutant's tables with the same SHA-256 and 10,773 reaching the arm with identical
   # errors (EQUIVALENT, 0.96), the rule read (EQUIVALENT, 0.96).
   '^src/transaction/beef_stream\.rs:788:9: replace BeefDecoder::take_deferred -> Option<Refusal> with None$',
+  # src/script/spend/key_point.rs:39:9, `Spend::check_public_key_point` replaced by `Ok(())` (#681,
+  # PR #684; 37:9 before the fold's rustdoc note). The switch `reads_the_reference_point` is the
+  # literal `false` (key_point.rs:26-28), the node's reading in every mode (#660: bitcoin-sv
+  # v1.2.3 interpreter.cpp:132-152,312-327, `IsCompressedOrUncompressedPubKey` reading a key's
+  # length and prefix alone), so the `&&` short-circuits, `from_reference_der` is never evaluated
+  # and the body is `Ok(())` on every input; the function reads `&self` only and its one caller
+  # (crypto.rs) passes the result through. Three reads, 2026-11-03: the rule read (DECLARE,
+  # 0.96), the adversarial read (EQUIVALENT, 0.97), the design read (DECLARE, 0.85). The entry is
+  # removed when the switch reads a flag or a feature (the rustdoc's fold to
+  # `self.flags.is_none()`), where the #681 kills cover the mutant in the default mode.
+  '^src/script/spend/key_point\.rs:39:9: replace Spend::check_public_key_point -> Result<\(\), ScriptEvaluationError> with Ok\(\(\)\)$',
 ]
