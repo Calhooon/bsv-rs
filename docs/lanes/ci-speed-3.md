@@ -10,6 +10,7 @@ Suite's compile 4m15s cold and 2m47s on a cache hit at loop one's close,
 | #672 | the compile time by evidence: the Test Suite's build steps, the lint job's Clippy and ratchet | landed as PR #691 (`55424846`, 13:10Z 2026-11-03); its after columns below, from the cache-hit witness |
 | #673 | the reads share the lane's build | open; nothing here |
 | #696 | the semver tool's cache seeded from a push to a line | landed as PR #700 (`e9dc9a4a`, 13:40Z); the section below, the seed's miss and save measured |
+| #699 | the `checks` job's cache keyed by the cargo-mutants version it installs | committed on `lane/ci-mutants-cache` over `ec36c02e`, not yet landed; the section below, the before measured, the after from the landing's push |
 
 ## The measurement before: CI
 
@@ -403,4 +404,118 @@ the record's own pull request (`lane/docs-loop3-after`, docs only) measures #689
 figure goes to `docs/lanes/ci-speed-loop2-docs-only.md`. No pull request
 was opened between the push and 13:48Z (`gh pr list`, `gh run list
 --event pull_request`).
+
+## #699: the `checks` job's cache keyed by the tool it installs
+
+Base `origin/beta` at `ec36c02e`. The #696 section's last finding: the
+mutants-entries gate of `checks` (#663, landed `d778651d` at 05:58Z) runs
+`cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked`
+after the job's `Swatinem/rust-cache` step (`shared-key: checks`), and the
+action saves only on a miss (`src/save.ts`: `Cache up-to-date.` and return
+after an exact hit), so the entry `v0-rust-checks-Linux-x64-c2e3c2da-227349d2`,
+saved on `refs/heads/beta` at 03:39:25Z before the gate existed, is restored
+by a full match on every run and never saved again: no run carries the tool.
+
+### The measurement before
+
+The `checks` job of three runs (`gh run view <id> --json jobs`, the job log
+through `gh api repos/Calhooon/bsv-rs/actions/jobs/<job>/logs`); each
+restored `v0-rust-checks-Linux-x64-c2e3c2da-227349d2` with `full match:
+true`, and the install's own line is cargo's `Finished release profile`:
+
+| Run | Event | Restore | Install (s) | mutants-entries step (s) | Job (s) | Post-cache |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| 41672716963 | pull request (`lane/kill-script-code`) | full match | 64 (1m 04s) | 74 | 218 | no save (a pull request) |
+| 41648342758 | push to `beta` | full match | 68 (1m 08s) | 78 | 234 | `Cache up-to-date.` |
+| 41646365090 | push to `beta` | full match | 71 (1m 11s) | 80 | 228 | `Cache up-to-date.` |
+
+The tool is 64 s to 71 s of a 74 s to 80 s step and about 30 percent of the
+job, on every run, a push to the line included.
+
+### The cut
+
+`CARGO_MUTANTS_VERSION: '27.1.0'` moves from the mutants-entries step's
+`env:` to the `checks` job's `env:`; the install reads the same variable, so
+one bump moves the install and the key. rust-cache v2.9.3 (the pinned
+`d1527c8f`) hashes every set variable whose name starts with `CARGO`, `CC`,
+`CFLAGS`, `CXX`, `CMAKE` or `RUST` into the key's environment part
+(`src/config.ts:110-126`, `add-rust-environment-hash-key` on by default),
+and the step's own environment is the job's. The `key:` input the brief
+offered first does not work here: the action reads `key` only when no
+`shared-key` is set (`src/config.ts:75-82`), and `checks` sets
+`shared-key: checks`; putting the version in `shared-key` would need the
+same job-level variable to interpolate. The nightly already sets the
+variable at its workflow level (`nightly.yml:45`), and cargo-mutants runs
+under it there.
+
+The bin directory: `cache-bin` defaults to true, the paths include
+`~/.cargo/bin`, `.crates.toml` and `.crates2.json` (`src/config.ts:264-272`),
+and before saving the action removes only the binaries present when it
+started (`cleanBin`, the rustup proxies; `src/cleanup.ts:83-98`), so the
+cargo-mutants installed after it is saved. On a restore the install finds
+`.crates2.json` naming 27.1.0 and builds nothing.
+
+The cost of the move: the environment hash is in the restore key too, so
+the landing's push misses outright (no partial restore of the old entry)
+and builds the whole `checks` target once (vectors, fixtures, the
+documentation and the wasm32 slice), then saves. A version bump does the
+same once.
+
+### The guard
+
+`tests/arch_ci_tool_cache_key.rs`: in every job of `ci.yml` with a
+rust-cache step, each `cargo install` after it names a `--version` the key
+carries: a variable set at the job or workflow level under a hashed prefix
+(or listed in `env-vars:`) and not shadowed at the step, or the version (or
+`${{ env.NAME }}` of a set variable) in `prefix-key:`/`shared-key:`; a
+`key:` beside `shared-key:` refused as ignored; `cache-bin: "false"` and
+`add-rust-environment-hash-key: "false"` refused under an install; the
+`checks` install must be found (no vacuous pass). RED on a scratch copy of
+`ec36c02e` with the file added, own target dir (`` `checks`'s install of
+cargo-mutants sets CARGO_MUTANTS_VERSION at step level, outside the cache
+key ``); each refusal shown on a mutated text in the file's second test.
+
+The other tools installed after a cache step: in `test`, cargo-nextest
+through `taiki-e/install-action` (a release binary; the cache step has
+`cache-bin: "false"`, nothing to key); in `lint`, cargo-deny the same
+(before the cache step), and the ratchet's build is seeded by `lint`'s push
+saves (#700's evidence: `v0-rust-lint-Linux-x64-7f9a22ea-227349d2` on
+`refs/heads/beta`, a full match on PR run 41637251653). In `checks`,
+gitleaks is a Go build of the pinned tarball (the step 28 s on the pull
+request runs, 43 s on the pushes above); rust-cache never held Go's build
+cache, so a key does not help it: a row of its own if wanted (a prebuilt
+release checked by sha256), not this one.
+
+### The budget
+
+`gh api repos/Calhooon/bsv-rs/actions/cache/usage` at 16:31:43Z:
+10,690,699,350 bytes over 38 entries (10,934,221,375 at 13:27Z): under the
+10 GiB budget (10,737,418,240 bytes) by 46,718,890 bytes and over 10^10 bytes
+(the evidence read's correction of "above the budget"); when the budget
+fills, GitHub evicts the least recently used. The new key adds one
+`checks` entry per line that pushes (`beta` at the landing, `main` at its
+next push; about 584 MB plus the cargo-mutants binary each). The old `beta`
+entry is read by no `beta` run after the landing (its restore-key prefix
+carries the old environment hash); 35 of the 39 entries were last read before
+it, so it is not the eviction's next candidate, and an open pull request on
+the old workflow keeps its hash alive until that branch rebases (the evidence
+read's correction of "the least recently used"); it leaves at the latest
+seven days after its last read: a transient 584 MB on `beta`. The pull-request-scoped semver entries stopped growing with #700:
+18 at 7.7 MB (139 MB), the newest `refs/pull/700/merge` at 13:34:31Z, none
+since (PR run 41672716963 at 16:17Z saved none); they age out over seven
+days. `cache-on-failure` is unset in `checks` (false), so a failed gate on a
+push saves nothing; setting it would add saves, never trim one. One
+workspace, and its `target/` holds what the next run reads (the vectors and
+fixtures test builds, the documentation, the wasm32 slice); a smaller
+`workspaces` or `cache-targets: false` trims the entry by rebuilding those
+on every run. Nothing lands for the budget.
+
+### After
+
+| Figure | Before | After |
+| --- | --- | --- |
+| The install in mutants-entries | 64 s, 68 s, 71 s (41672716963, 41648342758, 41646365090) | (from beta's push run after the landing: the miss, the install's seconds and `Cache saved with key: v0-rust-checks-Linux-x64-<new hash>-...`; then the first run after it: `full match: true` and the install's seconds) |
+| The mutants-entries step | 74 s, 78 s, 80 s | (the same runs) |
+| The `checks` job | 218 s, 234 s, 228 s | (the same runs; the landing's push a cold build of the whole target) |
+| The account's cache usage | 10,690,699,350 bytes, 38 entries (16:31:43Z) | (read after the landing's save) |
 

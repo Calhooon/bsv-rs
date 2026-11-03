@@ -643,6 +643,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BSV_CONFORMANCE_DIR: ${{ github.workspace }}/ts-stack/conformance
+      # the mutants-entries gate's tool, at the job level so the cache step's key carries it
+      # (rust-cache hashes the job's CARGO* variables into its key and ignores a `key:` input
+      # beside `shared-key:`): a version bump misses once, builds the tool and saves it under
+      # ~/.cargo/bin, every run after restores it (#699; tests/arch_ci_tool_cache_key.rs)
+      CARGO_MUTANTS_VERSION: '27.1.0'
     steps:
       # the full history: secrets scans the line's history on a push and a dispatch
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -711,13 +716,12 @@ jobs:
       # stale entry excludes nothing and its file reads below its true figure in the nightly.
       # A listing builds nothing (seven files, about six seconds). cargo-mutants is the
       # nightly's version, installed as the nightly installs it (`cargo install --locked`) into
-      # the cargo home; the cache above keeps ~/.cargo/bin but saves only on a beta push whose
-      # key missed, so the build (about 1m 15s) recurs until the key next moves
+      # the cargo home; the cache above keeps ~/.cargo/bin and its key carries the job's
+      # CARGO_MUTANTS_VERSION, so the build (about 1m 08s) runs once per version on a line's
+      # push and the install finds the restored binary after (#699)
       - name: mutants-entries
         id: mutants-entries
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
-        env:
-          CARGO_MUTANTS_VERSION: '27.1.0'
         run: |
           trap 'if [ $? -eq 0 ]; then echo "PASS mutants-entries"; else echo "FAIL mutants-entries"; fi' EXIT
           python3 -B -m unittest discover -s .github/scripts -p 'test_mutants_entries.py'
