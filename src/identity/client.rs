@@ -14,7 +14,7 @@ use crate::overlay::{
 };
 use crate::primitives::PrivateKey;
 use crate::script::templates::PushDrop;
-use crate::transaction::{Beef, Broadcaster, Transaction};
+use crate::transaction::{Broadcaster, Transaction};
 use crate::wallet::{
     CreateActionArgs, CreateActionOptions, CreateActionOutput, ProtoWallet, ProveCertificateArgs,
     WalletCertificate, WalletInterface,
@@ -913,19 +913,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         output: &OutputListItem,
     ) -> Result<Option<IdentityCertificate>> {
-        // Step 1: Parse BEEF to get the transaction
-        let beef = match Beef::from_binary(&output.beef) {
-            Ok(b) => b,
-            Err(_) => return Ok(None), // Failed to parse BEEF
-        };
-
-        // Get the transaction from the BEEF
-        let tx = match beef.txs.first() {
-            Some(beef_tx) => match beef_tx.tx() {
-                Some(t) => t,
-                None => return Ok(None), // No transaction data in BEEF
-            },
-            None => return Ok(None), // No transactions in BEEF
+        // Step 1: The BEEF's subject, its atomic txid else the last on the
+        // wire, as the toolbox's evidence loader reads it
+        // (TransactionEvidence.ts:116-126, #721)
+        let Ok(tx) = Transaction::from_beef(&output.beef, None) else {
+            return Ok(None);
         };
 
         // Step 2: Get the output at the specified index
@@ -1008,19 +1000,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         output: &OutputListItem,
     ) -> Result<Option<VerifiableCertificate>> {
-        // Step 1: Parse BEEF to get the transaction
-        let beef = match Beef::from_binary(&output.beef) {
-            Ok(b) => b,
-            Err(_) => return Ok(None), // Failed to parse BEEF
-        };
-
-        // Get the transaction from the BEEF
-        let tx = match beef.txs.first() {
-            Some(beef_tx) => match beef_tx.tx() {
-                Some(t) => t,
-                None => return Ok(None), // No transaction data in BEEF
-            },
-            None => return Ok(None), // No transactions in BEEF
+        // Step 1: The BEEF's subject, its atomic txid else the last on the
+        // wire, as the toolbox's evidence loader reads it
+        // (TransactionEvidence.ts:116-126, #721)
+        let Ok(tx) = Transaction::from_beef(&output.beef, None) else {
+            return Ok(None);
         };
 
         // Step 2: Get the output at the specified index
