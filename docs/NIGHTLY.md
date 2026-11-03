@@ -585,9 +585,9 @@ table, never a new failure of the night.
 **The modes and the dispatch lines.**
 
 ```sh
-# The night (the fleet's slot, 00:00Z): the reach rule's files, the rest carried.
+# The night (by hand in the fleet's one daily slot, 07:00Z; 00:00Z retired 2026-11-03): the reach rule's files, the rest carried.
 gh workflow run nightly.yml --ref beta
-# The complete run (the fleet's slot, 07:00Z, alone): at each prerelease pin (RELEASING.md step 3), before a minor tag, by hand.
+# The complete run (the day's one dispatch in the 07:00Z slot, in place of the night, alone): at each prerelease pin (RELEASING.md step 3), after a measured cap change, before a minor tag, by hand.
 gh workflow run nightly.yml --ref beta -f mode=complete
 # The captain's Sunday night: the night, then the bench after beta's run, then main's (#683).
 gh workflow run nightly.yml --ref beta -f weekly=true
@@ -597,8 +597,8 @@ A complete run was twenty shards (the keeper's cut 5; twenty-three since
 #703's second fold, below), at most six at a
 time since the fleet's runner cap of 10:0xZ 2026-11-03 (fourteen from
 06:2xZ, one wave of twenty before; `docs/lanes/ci-speed-7.md`, "The fleet's
-runner cap"), dispatched in the 07:00Z slot, alone (the toolbox's 16:00Z,
-the CLI's 17:30Z): the
+runner cap"), dispatched in the 07:00Z slot, alone (the CLI's 17:00Z,
+the toolbox's 18:00Z): the
 measured minutes of run 41347058507 (script 130 per 515 mutants, BEEF 37 per
 187, Merkle 3 per 25, wire 19.5 per 198, substrates 36.5 per 286; 901
 shard-minutes) shared out by the largest remainder, about 47, 50, 11, 39 and
