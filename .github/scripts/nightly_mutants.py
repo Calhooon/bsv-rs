@@ -22,24 +22,14 @@ import tomllib
 import zipfile
 
 
+# Each surface's globs. Its tests are no list of its own since #685: a measured file's
+# are the integration targets the reach rule names for it (`selection`).
 SURFACES = {
-    "script": (["src/script/**/*.rs"], [
-        "template_tests", "sighash_tests", "resource_limits", "conformance_scripts",
-        "identity_spend_witness",
-    ]),
-    "beef": (["src/transaction/beef*.rs"], [
-        "transaction_tests", "beef_stream", "beef_limits",
-        "beef_atomic_graph", "conformance_beef",
-    ]),
-    "merkle": (["src/transaction/merkle_path.rs"], [
-        "transaction_tests", "merkle_path_lone_leaf", "conformance_beef",
-    ]),
-    "wire": (["src/wallet/wire/**/*.rs"], [
-        "wallet_tests", "wire_method_roundtrip_tests", "wallet_wire_cross_sdk_tests",
-    ]),
-    "substrates": (["src/wallet/substrates/**/*.rs"], [
-        "wallet_tests", "wallet_http_json_busy_tests",
-    ]),
+    "script": ["src/script/**/*.rs"],
+    "beef": ["src/transaction/beef*.rs"],
+    "merkle": ["src/transaction/merkle_path.rs"],
+    "wire": ["src/wallet/wire/**/*.rs"],
+    "substrates": ["src/wallet/substrates/**/*.rs"],
 }
 # #602: 80 percent caught on the interpreter and the BEEF and Merkle readers,
 # never lowered; elsewhere the floor is the ratchet's record, the measured value.
@@ -87,7 +77,10 @@ def test_skips(surface):
         skip += [f"{root}::{name}::" for name in modules(f"src/{root}/mod.rs")
                  if not (name == keep or surface == "merkle" and name.startswith(keep))]
     if surface == "beef":
-        skip += ["transaction::merkle_path::", "the_whole_path_walks_a_wide_bump_in_linear_time"]
+        skip.append("transaction::merkle_path::")
+    # A wall-clock bound never counts as a caught mutant; since #685 `beef_stream` is in
+    # every selection that reaches `transaction` (the script surface's among them).
+    skip.append("the_whole_path_walks_a_wide_bump_in_linear_time")
     if surface == "merkle":
         # The three randomized equivalence runs are exercised by the full CI
         # library gate, not repeated for every mutation in the nightly loop.
@@ -117,28 +110,62 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
-# The selections read by glob from `tests/`: every script witness, and #603's
-# `beef_stream.rs` shards, each killing its survivors in a file of its own.
-SELECTION_GLOBS = {"script": "script_*.rs", "beef": "beef_stream_603_*.rs"}
+# #685 (the keeper's row, 2026-11-03): a measured file's test surface is every
+# integration target that names its module, the direct reading `affected_tests.py`
+# makes for a pull request that changes the file (#680) before its callers' step:
+# the binaries whose sources name the module (a `bsv_rs::<m>` path, a crate-root
+# re-export) or whose `tests/CLAUDE.md` row names it or a file of it
+# (`Tree.direct`), with `--lib`. The callers' level (one level of the modules
+# naming `crate::<module>`, `Tree.users`) is the plan's and a pull request's, where
+# a build and not a run per mutant is the cost; in the run it put 216 of the 283
+# binaries in a script file's set, 5,237 to 8,090 estimated shard-minutes against
+# 903 (the keeper's word of 11-03 16:1xZ; docs/NIGHTLY.md). Until #685 each surface ran
+# a fixed list (the script surface `tests/script_*.rs` and five named targets), so
+# the #660 tests never met `src/script/spend/key_point.rs`'s mutants nor #625's
+# `src/script/templates/multisig.rs`'s, and the measured score left their kills out.
+# Two of the pull request's readings are left out: a binary that reads a source's
+# text (an `arch_*` walk of `src/`, a literal naming the file), since a mutant
+# rewrites the text it reads and its verdict on the text tests no behaviour; and the
+# binaries run apart (`APART`: the memory profile, the tracing sink); and the cost
+# checks (`COST_CHECKS`). Every source of
+# a module reaches the same binaries, so the sets differ by module alone. cargo-mutants
+# runs one test command per shard, so a shard runs the union of its files' sets.
+# The stress suites and wall-clock or time-ratio bounds the mutation loop has always
+# left to the full-suite gate (docs/NIGHTLY.md): a bound on time is no verdict on a
+# mutant, and on a loaded runner it can fail the baseline. `wallet_http_json_linear_432`
+# (#432's time ratios) joins the five the BEEF and Merkle surfaces left out since #685
+# brought it into the wallet surfaces' reach.
+COST_CHECKS = {"merkle_path_cost", "beef_deep_chain", "beef_stream_deep", "beef_stream_pause",
+               "beef_stream_linear_spend", "wallet_http_json_linear_432"}
 
 
-def surface_tests(surface, root=Path(".")):
-    """The integration targets a surface's mutants are tested by, in the run's order."""
-    tests = SURFACES[surface][1]
-    if surface in SELECTION_GLOBS:
-        tests = tests + sorted(p.stem for p in (root / "tests").glob(SELECTION_GLOBS[surface]))
-    return tests
+def selection(files, root=Path("."), tree=None):
+    """Each measured file to the integration targets naming its module (#685, the direct
+    reading: no callers' level)."""
+    import affected_tests  # here, not at the top: it imports this module
+    tree = tree or affected_tests.Tree(root)
+    by_module = {}
+    for file in files:
+        module = file.split("/")[1]
+        if module not in by_module:
+            by_module[module] = sorted(tree.direct(module) - affected_tests.APART - COST_CHECKS)
+    return {file: by_module[file.split("/")[1]] for file in sorted(files)}
 
 
-def selects(surface, stem):
-    """True when the surface's selection runs `tests/<stem>.rs`, present or not."""
-    return stem in SURFACES[surface][1] or (
-        surface in SELECTION_GLOBS and Path(f"{stem}.rs").match(SELECTION_GLOBS[surface]))
+def shard_tests(chosen, files):
+    """The union of `files`' sets in `chosen`: the one test command their shard runs."""
+    return sorted({test for file in files for test in chosen.get(file, ())})
 
 
-def mutation_args(surface, shard, files=()):
-    patterns = SURFACES[surface][0]
-    tests = surface_tests(surface)
+def mutation_args(surface, shard, files=(), tests=None):
+    """The shard's cargo-mutants command; `tests` the plan's union for it, else the union
+    of the selections of the surface's measured files that `files` (paths or globs) name."""
+    patterns = SURFACES[surface]
+    if tests is None:
+        named = {str(p) for pattern in files for p in Path().glob(pattern)}
+        measured = [f for f, s in measured_files().items()
+                    if s == surface and (not files or f in named)]
+        tests = shard_tests(selection(measured), measured)
     args = ["cargo", "mutants", "--no-shuffle", "--sharding", "round-robin", "--shard", shard,
             "--features", "full,http"]
     for pattern in files or patterns:
@@ -179,11 +206,21 @@ def checkout_commit(pinned):
     return head if pinned is None else pinned
 
 
+# A mutant's test timeout (#685): its shard's baseline test time times the multiplier,
+# never under the surface's floor (until #685 the floor was the fixed timeout). A
+# shard runs its files' whole set, 104 to 136 targets at 2d3f5fd1 under the direct
+# reading (166 to 216 with the callers' level) where the script surface ran 45: a fixed
+# 120 seconds read a survivor whose run outlasts it as a timeout (`multisig.rs:108:19`,
+# 168 s on one host at 136), and a mutant only a late binary catches as one too.
+MINIMUM_TEST_TIMEOUT = {"script": 120, "beef": 300, "merkle": 120, "wire": 120, "substrates": 120}
+TEST_TIMEOUT_MULTIPLIER = 3
+
+
 def run(args):
     root = args.output.resolve()
     # Never let an interrupted retry inherit an older run's successful evidence.
     root.mkdir(parents=True, exist_ok=False)
-    files, allow_empty = list(args.file), False
+    files, allow_empty, tests = list(args.file), False, None
     plan_path = getattr(args, "plan", None)
     if plan_path is not None:
         # Cut 7: an incremental plan names the files to mutate; a complete one, the globs.
@@ -192,7 +229,9 @@ def run(args):
             files, allow_empty = night["files"].get(args.surface, []), True
             if not files:
                 raise SystemExit(f"the plan measures no file of {args.surface}: no shard of it runs")
-    command = mutation_args(args.surface, args.shard, files)
+        # #685: the plan's per-file sets, the union over the surface's files tonight.
+        tests = night["surface_tests"][args.surface]
+    command = mutation_args(args.surface, args.shard, files, tests)
     environment = dict(os.environ, CARGO_INCREMENTAL="1")
     print(shlex.join(command), flush=True)
     # A separate manifest exists even if the baseline or a worker fails.
@@ -209,7 +248,7 @@ def run(args):
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CARGO_PROFILE_TEST_DEBUG",
             "CARGO_TARGET_DIR", "CARGO_INCREMENTAL",
         )},
-        "files": sorted({str(p) for pattern in files or SURFACES[args.surface][0]
+        "files": sorted({str(p) for pattern in files or SURFACES[args.surface]
                          for p in Path().glob(pattern)}),
     }
     if not candidates and allow_empty:
@@ -220,7 +259,8 @@ def run(args):
         print(f"{args.surface} {args.shard}: no mutant in this shard of the night's files")
         return 0
     write_json(root / "run.json", metadata)
-    command += ["--timeout", "300" if args.surface == "beef" else "120", "--build-timeout", "300",
+    command += ["--minimum-test-timeout", str(MINIMUM_TEST_TIMEOUT[args.surface]),
+                "--timeout-multiplier", str(TEST_TIMEOUT_MULTIPLIER), "--build-timeout", "300",
                 "--jobs", "1", "--output", str(root)]
     print(shlex.join(command), flush=True)
     result = subprocess.run(command, check=False, env=environment)
@@ -409,15 +449,57 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
 # changes, so the nightly mutates the files the reach rule names since the last
 # complete run and carries every other figure with its run's id and sha.
 #
-# The complete run is twenty shards, one per slot of the account. Minutes per
+# The complete run's shards, one job each on its own runner. Minutes per
 # mutant, from run 41347058507's shards (the scoped step's minutes over the
 # shard's mutants, at 42a74f1b): script 130/515, BEEF 37/187, Merkle 3/25, wire
 # 19.5/198, substrates 36.5/286; 901 shard-minutes in all, shared out by the
 # largest remainder with one shard at least: about 47, 50, 11, 39 and 49 minutes.
+# Since #685 each shard runs its files' sets (the direct reading, the keeper's word of
+# 11-03 16:1xZ), and `complete_split` sets the shards (#703's second fold, 2026-11-03):
+# the method, the record's own (SLOT_LIMIT's twenty shared out by the slope's estimate:
+# floors, one shard at least, then the largest remainders), run over the direct
+# reading's sets on the fold's tip (ESTIMATE_TARGETS: 136, 104, 104, 134 and 134
+# targets at f7ea87ae), whose estimate is 1,585, 520, 63, 599 and 902 shard-minutes,
+# 3,669 in all, gives 8, 3, 1, 3 and 5; then the ceiling: no shard's two-part estimate
+# past SHARD_CEILING_MINUTES, the job's 360 with a margin, so a surface takes the
+# method's count or its two-part minutes over 300 rounded up, whichever is more
+# (1,880, 693, 90, 852 and 2,203: 7, 3, 1, 3 and 8). That is 8, 3, 1, 3 and 8,
+# twenty-three shards: about 198, 173, 63, 200 and 113 minutes a shard by the slope,
+# 235, 231, 90, 284 and 275 in two parts. The fold before kept the callers' level's
+# 9, 3, 1, 3 and 4 (5,237 shard-minutes then), which the method does not give over
+# 3,669 and which put the substrates shards at 551 minutes in two parts; the old
+# 11, 3, 1, 2 and 3 put wire and substrates past the job's 360 by the slope.
 SLOT_LIMIT = 20
-COMPLETE_SHARDS = {"script": 11, "beef": 3, "merkle": 1, "wire": 2, "substrates": 3}
+COMPLETE_SHARDS = {"script": 8, "beef": 3, "merkle": 1, "wire": 3, "substrates": 8}
+ESTIMATE_TARGETS = {"script": 136, "beef": 104, "merkle": 104, "wire": 134, "substrates": 134}
+SHARD_CEILING_MINUTES = 300
 MINUTES_PER_MUTANT = {"script": 0.25, "beef": 0.20, "merkle": 0.12, "wire": 0.10,
                       "substrates": 0.13}
+# Those rates are at that run's selections (42a74f1b: the script surface's five
+# named targets and 27 `tests/script_*.rs`); since #685 a shard runs its files'
+# sets (104 to 136 targets at 2d3f5fd1), and a mutant's minutes move with the
+# count of targets its shard builds and runs: the run's own slope, script against
+# wire, (0.25 - 0.10) / (32 - 3), about 0.005 minutes a target, which one host's
+# rebuild after a one-line change matches (13 s for 45 targets, 63 s for 221:
+# 0.28 s a target; docs/lanes/fix-685.md).
+SELECTION_AT_RATES = {"script": 32, "beef": 5, "merkle": 3, "wire": 3, "substrates": 2}
+MINUTES_PER_TARGET = 0.005
+# The slope is a line through two points (script and wire) that the other three
+# surfaces miss (BEEF 0.20 at 5 targets, Merkle 0.12 at 3, substrates 0.13 at 2), not
+# a validated rate; the box's multisig run measured 0.845 minutes a mutant where it
+# gives 0.77. Read in two parts instead: every mutant rebuilds each target more (0.28 s
+# a target) and each survivor runs it (0.64 s a target, the Studio's, likely an upper
+# reading), at run 41347058507's survivor shares; the ceiling is set on this reading.
+REBUILD_SECONDS_PER_TARGET = 0.28
+SURVIVOR_SECONDS_PER_TARGET = 0.64
+SURVIVOR_SHARE = {"script": 0.16, "beef": 0.25, "merkle": 0.28, "wire": 0.26,
+                  "substrates": 0.84}
+# A complete run's mutants per surface when no record names them: run 41347058507's
+# (docs/lanes/ci-speed-7.md, 4,843 in all).
+COMPLETE_RUN_MUTANTS = {"script": 2059, "beef": 748, "merkle": 101, "wire": 793,
+                        "substrates": 1142}
+# A hosted job's limit (`timeout-minutes: 360` on the mutants job).
+JOB_MINUTES = 360
 NIGHT_SHARD_MINUTES = 45
 # The night shares the account with pull requests and the fleet's other nights
 # (the balance rule of 2026-10-26): six slots.
@@ -426,7 +508,7 @@ NIGHT_PARALLEL = 6
 # API read of the pool; 14 from 06:2xZ until then): the account's twenty hosted
 # runners are one pool across bsv-rs, the CLI, the toolbox and the stack, peaking
 # at twenty in 22 of 24 hours with a non-heavy p95 of 14, so a heavy run holds at
-# most six; the complete run's twenty shards go in four waves, 6, 6, 6 and 2. It
+# most six; the complete run's twenty-three shards go in four waves, 6, 6, 6 and 5. It
 # rises only when an occupancy read shows the p95 under 10.
 # The one place the number lives (GitHub reads no `env` in `strategy`; the
 # mutants job reads it from the plan's `max_parallel` output); its owner is loop
@@ -443,6 +525,7 @@ EVERYTHING = {
     "src/error.rs": "the one Error every module returns and every test compares",
     ".github/workflows/nightly.yml": "the oracle's jobs, toolchain, corpus pin, timeouts and memory ceiling",
     ".github/scripts/nightly_mutants.py": "the selection, the skips and the score",
+    ".github/scripts/affected_tests.py": "the reach rule's reading of the targets that test a file (#685)",
     ".github/scripts/test-runner-memory-ceiling.sh": "the ceiling decides a runaway mutant's outcome",
 }
 
@@ -475,7 +558,7 @@ def is_test_only(path, root=Path(".")):
 
 def measured_files(root=Path(".")):
     """Every file a complete run mutates and scores, with its surface; test-only files are not."""
-    return {str(p.relative_to(root)): surface for surface, (patterns, _) in SURFACES.items()
+    return {str(p.relative_to(root)): surface for surface, patterns in SURFACES.items()
             for pattern in patterns for p in sorted(root.glob(pattern))
             if not is_test_only(str(p.relative_to(root)), root)}
 
@@ -557,19 +640,33 @@ def callers(module, measured, text):
 
 
 def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows=None,
-          callee=None):
+          callee=None, base_text=None):
     """The reach rule: each changed path to the measured files it re-measures.
 
     Returns (everything, reasons, files): `everything` names the path that reaches
     every file, `reasons` maps each changed path to what it reaches and why.
-    `callee` switches the callee rule (`CALLEE_RULE` when None).
+    `callee` switches the callee rule (`CALLEE_RULE` when None). `base_text` reads a
+    path at the complete run's commit (None when absent there): a test's base reading
+    decides which files' selections held it (#685).
     """
+    import affected_tests  # here, not at the top: it imports this module
     if callee is None:
         callee = CALLEE_RULE
     measured = measured_files(root)
     rows = test_rows(root)
-    selections = {surface: set(surface_tests(surface, root)) for surface in SURFACES}
+    tree = affected_tests.Tree(root)
     texts = {}
+
+    def selecting(uses):
+        """The measured files whose selection runs a binary naming `uses`' modules (#685: a
+        file's selection is the binaries naming its own module, the direct reading)."""
+        return {f for f in measured if f.split("/")[1] in uses}
+
+    def base_uses(stem, row_table):
+        """A binary's modules as the base read them: its text's paths and its base row's."""
+        body = base_text(f"tests/{stem}.rs") if base_text else None
+        return (affected_tests.used_modules(body or "", tree.modules, tree.exported)
+                | affected_tests.row_modules(row_table.get(stem, ""), tree.modules))
 
     def text(path):
         path = root / path
@@ -612,25 +709,41 @@ def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows
 
     def reach_test(path):
         stem = Path(path).stem
+        base_table = test_rows(root, base_rows) if base_rows is not None else {}
+        if stem in affected_tests.APART or stem in COST_CHECKS:
+            return set(), "a binary run apart or a cost check: no selection runs it"
         if (root / path).exists():
-            surfaces, row_table = [s for s, tests in selections.items() if stem in tests], rows
-            removed = ""
+            # #685: the files whose selection runs it now, or ran it at the base.
+            scope, row_table, removed = selecting(tree.uses.get(stem, set())), rows, ""
+            if base_text:
+                scope |= selecting(base_uses(stem, base_table))
         else:
             # #666 fold, hole 1: a deleted test is judged by the base's selection
             # and its base row: the mutants it killed are measured again.
-            surfaces = [s for s in SURFACES if selects(s, stem)]
-            row_table = test_rows(root, base_rows) if base_rows is not None else {}
+            scope, row_table = selecting(base_uses(stem, base_table)), base_table
             removed = "removed; by the base's selection and row: "
-        if not surfaces:
-            return set(), "a test no surface's selection runs: it never meets a mutant"
-        scope = {f for f, s in measured.items() if s in surfaces}
+        if not scope:
+            return set(), "a test no file's selection runs: it never meets a mutant"
+        surfaces = "/".join(s for s in SURFACES if any(measured[f] == s for f in scope))
         named = (row_reach(row_table[stem], measured, root) & scope
                  if stem in row_table else set())
         if named:
-            return named, (f"{removed}its tests/CLAUDE.md row, within the "
-                           f"{'/'.join(surfaces)} selection")
-        return scope, (f"{removed}in the {'/'.join(surfaces)} selection; its row names "
+            return named, f"{removed}its tests/CLAUDE.md row, within the {surfaces} selection"
+        return scope, (f"{removed}in the {surfaces} selection; its row names "
                        f"no measured file or module")
+
+    def reach_rows():
+        """#685: a changed row moves the files whose selection its modules decide."""
+        base_table = test_rows(root, base_rows) if base_rows is not None else rows
+        found = set()
+        for stem in affected_tests.changed_rows(base_table, rows):
+            if stem in affected_tests.APART or stem in COST_CHECKS:
+                continue
+            own = affected_tests.used_modules(tree.texts.get(stem, ""), tree.modules, tree.exported)
+            found |= (selecting(own | affected_tests.row_modules(rows.get(stem, ""), tree.modules))
+                      ^ selecting(own | affected_tests.row_modules(base_table.get(stem, ""),
+                                                                   tree.modules)))
+        return found, "the rows whose modules changed: the files whose selection they decide"
 
     def reach_one(path, seen):
         if path in seen:
@@ -638,6 +751,8 @@ def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows
         seen.add(path)
         if path in EVERYTHING:
             return None, EVERYTHING[path]
+        if path == "tests/CLAUDE.md":
+            return reach_rows()
         if is_doc(path):
             return set(), "documentation: never compiled"
         if path == ".cargo/mutants.toml":
@@ -700,25 +815,68 @@ def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows
     return None, reasons, files
 
 
-def shard_matrix(files_by_surface, mode, base_files=None):
-    """The matrix: twenty shards for a complete run, the night's by its estimated minutes."""
+def minutes_per_mutant(surface, targets):
+    """A mutant's estimated minutes when its shard runs `targets` integration binaries (#685):
+    the rate measured at the selection of its run, and each target more or fewer at the
+    measured cost of one."""
+    extra = targets - SELECTION_AT_RATES[surface]
+    return max(MINUTES_PER_MUTANT[surface] + extra * MINUTES_PER_TARGET, MINUTES_PER_MUTANT[surface] / 2)
+
+
+def two_part_minutes_per_mutant(surface, targets):
+    """A mutant's estimated minutes read in two parts (#703's second fold): the rate at its
+    run's selection, each target more rebuilt by every mutant and run by each survivor."""
+    extra = targets - SELECTION_AT_RATES[surface]
+    seconds = REBUILD_SECONDS_PER_TARGET + SURVIVOR_SHARE[surface] * SURVIVOR_SECONDS_PER_TARGET
+    return MINUTES_PER_MUTANT[surface] + extra * seconds / 60
+
+
+def complete_split(targets):
+    """The complete run's shards over a reading's sets: SLOT_LIMIT shared out by the
+    slope's estimate (floors, one shard at least, the largest remainders), then each
+    surface raised until no shard's two-part estimate passes SHARD_CEILING_MINUTES."""
+    minutes = {s: COMPLETE_RUN_MUTANTS[s] * minutes_per_mutant(s, targets[s]) for s in SURFACES}
+    share = {s: minutes[s] * SLOT_LIMIT / sum(minutes.values()) for s in SURFACES}
+    count = {s: max(1, math.floor(share[s])) for s in SURFACES}
+    by_remainder = sorted(SURFACES, key=lambda s: share[s] - math.floor(share[s]), reverse=True)
+    for surface in by_remainder[:max(0, SLOT_LIMIT - sum(count.values()))]:
+        count[surface] += 1
+    return {s: max(count[s], math.ceil(COMPLETE_RUN_MUTANTS[s]
+                                       * two_part_minutes_per_mutant(s, targets[s])
+                                       / SHARD_CEILING_MINUTES)) for s in SURFACES}
+
+
+def surface_minutes(surface, files, mode, base_files=None, targets=None):
+    """A surface's estimated shard-minutes tonight: its files' mutants (the record's, else
+    the record's mean per file, else a complete run's) at the minutes of its set (#685)."""
+    known = [row["generated"] for row in (base_files or {}).values()
+             if row.get("surface") == surface]
+    if mode == "complete" and not known:
+        mutants = COMPLETE_RUN_MUTANTS[surface]
+    else:
+        mean = sum(known) / len(known) if known else 20
+        mutants = sum((base_files or {}).get(f, {}).get("generated", mean) for f in files)
+    if targets is None:
+        targets = SELECTION_AT_RATES[surface]
+    return mutants * minutes_per_mutant(surface, targets)
+
+
+def shard_matrix(files_by_surface, mode, base_files=None, surface_targets=None):
+    """The matrix: COMPLETE_SHARDS for a complete run, the night's by its estimated minutes."""
     matrix = []
     for surface in SURFACES:
         files = files_by_surface.get(surface, [])
         if not files:
             continue
+        minutes = surface_minutes(surface, files, mode, base_files,
+                                  (surface_targets or {}).get(surface))
         if mode == "complete":
             count = COMPLETE_SHARDS[surface]
         else:
-            known = [row["generated"] for row in (base_files or {}).values()
-                     if row.get("surface") == surface]
-            mean = sum(known) / len(known) if known else 20
-            mutants = sum((base_files or {}).get(f, {}).get("generated", mean) for f in files)
-            minutes = mutants * MINUTES_PER_MUTANT[surface]
             count = min(COMPLETE_SHARDS[surface], max(1, math.ceil(minutes / NIGHT_SHARD_MINUTES)))
         # The label names the shard's artifact, which may not carry a slash.
-        matrix += [{"surface": surface, "shard": f"{i}/{count}", "label": f"{surface}-{i}-{count}"}
-                   for i in range(count)]
+        matrix += [{"surface": surface, "shard": f"{i}/{count}", "label": f"{surface}-{i}-{count}",
+                    "estimated_minutes": round(minutes / count)} for i in range(count)]
     return matrix
 
 
@@ -762,14 +920,21 @@ def plan(args):
                 base_rows = git(repo, "show", f"{base['commit']}:tests/CLAUDE.md")
             except subprocess.CalledProcessError:
                 base_rows = ""
-            everything, reasons, files = reach(changed, repo, base_mutants, base_rows=base_rows)
+            def base_text(path, at=base["commit"]):
+                shown = subprocess.run(["git", "show", f"{at}:{path}"], cwd=repo, text=True,
+                                       capture_output=True, check=False)
+                return shown.stdout if shown.returncode == 0 else None
+
+            everything, reasons, files = reach(changed, repo, base_mutants, base_rows=base_rows,
+                                               base_text=base_text)
             result["reach"] = reasons
             if everything:
                 why = f"{everything} changed: {reasons[everything]['why']}"
             elif CALLEE_RULE:
                 # The keeper's count (#666 second fold): the files the callee rule
                 # reached that no other rule did.
-                without = reach(changed, repo, base_mutants, base_rows=base_rows, callee=False)[2]
+                without = reach(changed, repo, base_mutants, base_rows=base_rows, callee=False,
+                                base_text=base_text)[2]
                 result["callee_added"] = sorted(files - without)
     if why:
         result.update(mode="complete", why_complete=why, callee_added=[])
@@ -780,8 +945,14 @@ def plan(args):
     for file in sorted(files):
         by_surface.setdefault(measured[file], []).append(file)
     result["files"] = by_surface
+    # #685: each measured file's targets, and each surface's union over tonight's files.
+    chosen = selection(measured, repo)
+    result["selection"] = chosen
+    result["surface_tests"] = {s: shard_tests(chosen, f) for s, f in by_surface.items()}
+    result["lib_only"] = sorted(f for f in measured if not chosen[f])
     result["matrix"] = shard_matrix(by_surface, result["mode"],
-                                    base_record["files"] if base_record else None)
+                                    base_record["files"] if base_record else None,
+                                    {s: len(t) for s, t in result["surface_tests"].items()})
     result["shards"] = len(result["matrix"])
     result["max_parallel"] = HEAVY_MAX_PARALLEL if result["mode"] == "complete" else NIGHT_PARALLEL
     result["carried"] = sorted(set(measured) - files)
@@ -790,6 +961,7 @@ def plan(args):
                                               "shards", "max_parallel")}, indent=2))
     print(f"{sum(map(len, by_surface.values()))} files measured tonight, "
           f"{len(result['carried'])} carried")
+    print(selection_line(result))
     print(callee_line(result))
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a") as output:
@@ -799,6 +971,18 @@ def plan(args):
             output.write(f"lockfile={result['lockfile']}\n")
             output.write(f"matrix={json.dumps(result['matrix'], separators=(',', ':'))}\n")
     return 0
+
+
+def selection_line(the_plan):
+    """The plan's line on the targets (#685): each surface's union, the per-file sizes, and
+    the files the reach rule names no target for (`--lib` alone)."""
+    sizes = sorted(len(the_plan["selection"][f]) for f in the_plan["measured"])
+    unions = ", ".join(f"{s} {len(t)}" for s, t in the_plan["surface_tests"].items())
+    lone = ", ".join(f"`{f}`" for f in the_plan["lib_only"]) or "none"
+    median = sizes[len(sizes) // 2] if sizes else 0
+    return (f"Targets per measured file (#685): {sizes[0] if sizes else 0} to "
+            f"{sizes[-1] if sizes else 0}, median {median}; tonight's unions: "
+            f"{unions or 'none'}; --lib alone: {lone}.")
 
 
 def callee_line(the_plan):

@@ -95,15 +95,18 @@ job, which files its crashes as issues, adds `issues: write`.
 --version 27.1.0 --locked`. Every action is pinned to a commit with its version
 beside it, following `ci.yml`. The mutation jobs' token has only `contents: read`.
 
-The shards are the plan's (cut 7, below): a complete run is twenty, eleven
-script, three BEEF, one Merkle, two wire and three substrates, at six at a
+The shards are the plan's (cut 7, below): a complete run is twenty-three, eight
+script, three BEEF, one Merkle, three wire and eight substrates since #703's
+second fold (twenty before it: eleven, three, one, two and three until #685), at six at a
 time (the fleet's runner cap, `HEAVY_MAX_PARALLEL`: 6 since the keeper's
 line of 10:0xZ 2026-11-03 on the opening occupancy read, 14 from 06:2xZ; four
-waves, 6, 6, 6 and 2, about 3h07m replayed from run 41579707627's shard
+waves, 6, 6, 6 and 5; the twenty of the fixed lists replayed at about 3h07m from run 41579707627's shard
 times, `docs/lanes/ci-speed-7.md`); a night is as many as its files' estimated minutes need, at six
 at a time.
-Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a 120-second
-test timeout (300 seconds for BEEF) and a 300-second build timeout per mutant. A job is limited to
+Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a test timeout
+of three times its baseline's test time, never under 120 seconds (300 for BEEF;
+`MINIMUM_TEST_TIMEOUT`'s floors, the fixed timeouts until #685), and a 300-second
+build timeout per mutant. A job is limited to
 six hours. A failed baseline, interrupted job or missing shard fails the score
 check. These limits bound work; they never turn an unfinished run into a score.
 
@@ -115,7 +118,8 @@ The mutation runner enables `CARGO_INCREMENTAL=1`, including when the host
 environment disables it, so each mutation can reuse the baseline's compilation.
 
 The test command is `cargo test --features "full,http" --locked --lib`, followed
-by one `--test NAME` for every suite in the row below. The same target selection
+by one `--test NAME` for every target of the shard's selection (below, "The
+selection", #685). The same target selection
 applies to `cargo test --no-run`. The library commits no `Cargo.lock`, so each
 mutation job runs `cargo generate-lockfile` in its checkout before cargo-mutants
 copies it: `--locked` then holds the baseline and every mutant to one graph
@@ -141,21 +145,89 @@ rescans take minutes in a debug build, and retains its focused unit tests and
 the three integration suites below. The full CI library gate and the lane's
 full-suite check retain those randomized tests; a mutation score never claims
 they ran for each mutant. The mutation loop also omits `merkle_path_cost`,
-`beef_deep_chain`, `beef_stream_deep`, `beef_stream_pause` and
-`beef_stream_linear_spend`: these include
-large stress cases and wall-clock bounds, which remain in the lane's full-suite
+`beef_deep_chain`, `beef_stream_deep`, `beef_stream_pause`,
+`beef_stream_linear_spend` and (since #685 brought it into the wallet surfaces'
+reach) `wallet_http_json_linear_432` (`COST_CHECKS`): these include
+large stress cases, wall-clock bounds and time ratios, which remain in the lane's full-suite
 gate. Within `beef_stream`, `the_whole_path_walks_a_wide_bump_in_linear_time`
-also stays in that gate, so its wall-clock bound cannot count as a caught mutant.
+also stays in that gate on every surface, so its wall-clock bound cannot count as a caught mutant.
 HTTP tests use `wiremock`; the job has no wallet
 credentials and makes no live wallet call.
 
-| Surface | Files mutated | Integration test targets |
+| Surface | Files mutated | Integration test targets at `2d3f5fd1` (#685, the direct reading) |
 | --- | --- | --- |
-| script | `src/script/**/*.rs` | Every `tests/script_*.rs`, `template_tests`, `sighash_tests`, `resource_limits`, `conformance_scripts`, `identity_spend_witness` |
-| BEEF | `src/transaction/beef*.rs` | `transaction_tests`, `beef_stream`, `beef_limits`, `beef_atomic_graph`, `conformance_beef`, every `tests/beef_stream_603_*.rs` |
-| merkle path | `src/transaction/merkle_path.rs` | `transaction_tests`, `merkle_path_lone_leaf`, `conformance_beef` |
-| wallet wire | `src/wallet/wire/**/*.rs` | `wallet_tests`, `wire_method_roundtrip_tests`, `wallet_wire_cross_sdk_tests` |
-| wallet substrates | `src/wallet/substrates/**/*.rs` | `wallet_tests`, `wallet_http_json_busy_tests` |
+| script | `src/script/**/*.rs` | 136: the binaries naming `script` (a `bsv_rs::script` path, a crate-root re-export of it, or a row naming it or a file of it) |
+| BEEF | `src/transaction/beef*.rs` | 104: those naming `transaction` |
+| merkle path | `src/transaction/merkle_path.rs` | the BEEF surface's 104 (one module) |
+| wallet wire | `src/wallet/wire/**/*.rs` | 134: those naming `wallet` |
+| wallet substrates | `src/wallet/substrates/**/*.rs` | the wire surface's 134 (one module) |
+
+**The selection** (#685, the keeper's row of 2026-11-03 and word of
+16:1xZ; `selection` in `nightly_mutants.py`). A measured file's test targets are
+every integration binary that names its module, with `--lib`: the direct
+reading (`Tree.direct` in `affected_tests.py`, the run's alone), the binaries
+whose sources name the module by a `bsv_rs::<m>` path or a crate-root
+re-export, or whose `tests/CLAUDE.md` row names it or a file of it. A pull
+request's plan (`reach`, #680) reads `Tree.users` instead: those binaries and,
+one level, the binaries of the modules whose library code names `crate::<m>`;
+the run does not take the callers' level, where a build and not a run per
+mutant is the cost. The branch's reading before the fold took it and put 216
+of the 283 binaries in a script file's set, about 5,237 to 8,090 estimated
+shard-minutes against the 903 of the last complete run (below). Three of that reading's targets are
+left out: a binary reached only by reading the source's text (the six `arch_*`
+walks of `src/`, a literal naming the file), since a mutant rewrites the text it
+reads and its verdict on the text tests no behaviour; the binaries the Test Suite
+runs apart (`memory_profiling`, `wire_tracing_sink`); and the cost checks
+above. Every source of a module reaches the same binaries, so the 85 measured
+files' sets are three: 136 for the 43 script files, 104 for the four BEEF and
+Merkle files, 134 for the 38 wire and substrates files (median 136; with the
+callers' level they were 216, 206 and 166). A file the
+rule names no binary for runs `--lib` alone and the plan names it (`lib_only`;
+none at `2d3f5fd1`). Both findings' tests are in the direct sets by their
+`bsv_rs::script` paths: `tests/pubkey_encoding_660.rs`,
+`tests/pubkey_point_shapes_660_adv.rs` and `tests/p2pk_hybrid_625.rs` name
+`bsv_rs::script` items, and their `tests/CLAUDE.md` rows name no module (the
+rule read of `59eeedcc`; the fold's text had said the rows name `script` and
+the templates). cargo-mutants runs one test command per shard, so a shard
+runs the union of its files' sets (`surface_tests` in the plan, the night's
+files' union; a complete run's is the surface's). Until #685 each surface ran
+the fixed list its row named (the script surface `tests/script_*.rs` and five
+targets, 45 at `55424846`): the #660 tests (`tests/pubkey_encoding_660.rs`,
+`tests/pubkey_point_shapes_660_adv.rs`) never met `src/script/spend/key_point.rs`'s
+mutants nor `tests/p2pk_hybrid_625.rs` `src/script/templates/multisig.rs`'s, so the
+measured scores left out kills the suite had (#681's opening lane, PR #684). Every
+target of the five fixed lists is in its surface's set.
+
+**Two readings, two rules.** The callee rule (2026-11-03 00:1xZ, #666) is the
+PLAN's: which measured files a night re-measures, a changed file's own and those
+of the modules naming its module (`callee_added` in the plan). The direct rule
+(#685, the keeper's word of 2026-11-03 16:1xZ) is the RUN's: which targets a
+mutant's tests are, the binaries naming the file's own module, no caller's. No
+reader takes the one for the other: a caller's files are re-measured when its
+callee changes, and its binaries are not run against the callee's mutants. One side effect stays: the
+unit-test `--skip` prefixes apply to every binary of the command, and on the
+script surface they skip six integration tests (of 2,503 listed on one host),
+all in `wallet_originator_option_329` (its `auth::`, `identity::`, `kvstore::` and
+`registry::` modules); the fixed lists' targets were under the same prefixes.
+
+**What the direct reading leaves uncounted: the reading's stated limit.** The
+score is the measured file's under the targets that name its module, not the
+whole crate's; no reader takes it for the whole. The guard row #706 (every row
+names the modules its file reaches) narrows the limit. A binary that reaches a module
+only through a caller (it names `bsv_rs::transaction` and the transaction code
+calls `crate::script`) is not in that module's set, by construction: its kills
+of the module's mutants are not counted. The rule read of `59eeedcc`
+(2026-11-03) counted 80 script, 102 transaction and 32 wallet binaries of that
+class (`Tree.users(m)` less `Tree.direct(m)`, less the `arch_*` walkers, the two
+apart and `COST_CHECKS`), and found no guard pinning the row convention, so a
+row that names no module adds nothing to a set. The docs fold recomputed them
+from `affected_tests.py`'s `Tree` on `59eeedcc` (a read-only script; the figures
+reproduce: 81, 103 and 33 before the exclusions, one cost check each). Of the 259 `tests/CLAUDE.md` rows, 256 belong to a binary of the tree,
+and 233 of those name no module by `row_modules` (a `src/<m>/` path or a
+`` `<m>::`` path in the row); the rule read gave 223 of 256, which the fold did
+not reproduce by that reading or a looser one. The rows decide little: no
+script or transaction binary is in its set by its row alone, one wallet binary
+is (`primitives_public_key_forms_498`).
 
 The globs include files directly in each directory and its descendants.
 `tests/CLAUDE.md` documents these suites. The conformance targets read the
@@ -318,9 +390,10 @@ sibling, the directory's `mod.rs` or the parent's `<dir>.rs`).
 | Changed path | Re-measures | Why |
 | --- | --- | --- |
 | a measured file under `src/<m>/` | itself, and (the callee rule) every measured file whose text names `<m>` by a `crate::<m>` path or inside a `use crate::{...}` group, one level, its own module's included | its own mutants, and the code that calls its module |
-| `tests/<name>.rs` in a surface's selection | the measured files its `tests/CLAUDE.md` row names (`## Files` table), within that selection, a test-only file it names counting as the files that file tests; a row naming a module (`src/<m>/`, `` `<m>::` ``), every measured file of the module; no row, or a row naming neither, every file of the surfaces whose selection runs it | a test reaches the files it tests |
-| `tests/<name>.rs` deleted | the same, judged by the base: the surfaces whose selection held it at the complete run's sha (the named targets, the `script_*.rs` and `beef_stream_603_*.rs` globs) and its row in that sha's `tests/CLAUDE.md` | the mutants it killed are measured again without it |
-| `tests/<name>.rs` in no selection | nothing | it never runs against a mutant, so no score can move |
+| `tests/<name>.rs` in a file's selection, at the head or at the complete run's sha | the measured files its `tests/CLAUDE.md` row names (`## Files` table), within the files whose selection runs it, a test-only file it names counting as the files that file tests; a row naming a module (`src/<m>/`, `` `<m>::` ``), every measured file of the module; no row, or a row naming neither, every file whose selection runs it (#685: the selection read with the binary's text and row at both commits) | a test reaches the files it tests |
+| `tests/<name>.rs` deleted | the same, judged by the base: the files whose selection held it at the complete run's sha (its text's `bsv_rs::` paths and its row in that sha's `tests/CLAUDE.md`) | the mutants it killed are measured again without it |
+| `tests/<name>.rs` in no selection (a cost check, a binary run apart, one naming no module) | nothing | it never runs against a mutant, so no score can move |
+| `tests/CLAUDE.md` | for each binary whose row changed, the files whose selection the change moves: those its row's modules at the head select and those at the base do not, or the reverse (#685) | a row's modules decide a binary's selection; a row whose words change and whose modules do not moves nothing |
 | a `.rs` file elsewhere under `tests/` (`support/`, `chain_vectors/`, ...) | what the sources that compile it in reach, followed through: a `#[path]` or `include!` string resolving to it, or the `mod` line of its parent module (`mod binary;` in `support/fixtures/mod.rs`); compiled in by none, nothing | a support module reaches a mutant only through the test that includes it; a bare word (`fixtures`, `binary`) in a source is not an inclusion |
 | any other file under `tests/` (`vectors/`, `fixtures/`, `support/*.mjs`, ...) | what the compiled sources naming it reach, followed through: its name whole in a source's text (`vectors/sighash.json`, not `tx-sequence-zero-sighash.json`), or its directory's path when that is two or more deep under `tests/` (`fixtures/wire/`, read through `format!("{}/tests/fixtures/wire/{call}.json")`); named by none, nothing | a vector reaches a mutant only through the test that reads it; a recorder (`.mjs`, `.lean`) is never compiled; a one-deep directory (`vectors/`) is every vector's, so it names none |
 | a test-only source under `src/` | the files it tests (never their callers) | its tests run against those files' mutants; it compiles into no caller |
@@ -328,8 +401,8 @@ sibling, the directory's `mod.rs` or the parent's `<dir>.rs`).
 | `src/lib.rs`, `src/error.rs` | everything | the crate root (the unit-test skips are read from it) and the one `Error` every module returns |
 | `Cargo.toml`, `Cargo.lock`, `build.rs`, `.cargo/*` but `mutants.toml` | everything | a dependency, feature, profile or build change reaches every file that uses it |
 | `.cargo/mutants.toml` | the files its added or removed `exclude_re` entries name (`^src/...\.rs:`); any other setting, or an entry naming no file, everything | an exclusion moves its file's candidates alone |
-| `.github/workflows/nightly.yml`, `.github/scripts/nightly_mutants.py`, `.github/scripts/test-runner-memory-ceiling.sh` | everything | the jobs, toolchain, corpus pin, selection, skips, score and the ceiling that decides a runaway mutant |
-| `docs/`, any `.md` | nothing | never compiled |
+| `.github/workflows/nightly.yml`, `.github/scripts/nightly_mutants.py`, `.github/scripts/affected_tests.py`, `.github/scripts/test-runner-memory-ceiling.sh` | everything | the jobs, toolchain, corpus pin, selection (since #685 read through `affected_tests.py`), skips, score and the ceiling that decides a runaway mutant |
+| `docs/`, any other `.md` | nothing | never compiled |
 | anything else (`fuzz/`, `benches/`, `examples/`, `tools/`, other workflows, the scripts' own tests) | nothing | no selection compiles it |
 
 A path that reaches everything makes the night a complete run (`why_complete`
@@ -395,9 +468,12 @@ alias, `use crate::primitives as p;`, and a `$crate::<m>` in the file's own
 macro are read). A test-only file's tests reaching past its directory (the
 interpreter's `spend/tests.rs` drives `crate::script` from `spend/`). A file a
 source reads through a path built from one-deep pieces (`vectors/` and a name
-computed at run time). A test of one surface that kills another's mutant
-outside its selection (the oracle is `--lib` plus the selection; such a kill is
-never counted). The toolchain: the nightly runs the unpinned `stable`, so a
+computed at run time). A test outside a file's selection that kills its mutant
+(the oracle is `--lib` plus the selection; such a kill is never counted): since
+#685 the selection is the direct reading, so this is a binary reaching the file
+only through another module (a caller's binary driving it through `transaction`
+or `wallet`, the direct rule leaves out by the keeper's word on the cost) or
+through no module path (a source-text reader). The toolchain: the nightly runs the unpinned `stable`, so a
 compiler release between the complete run and a night can move a figure no
 path in the diff reaches. Each lasts until the next complete run.
 
@@ -454,7 +530,8 @@ gh workflow run nightly.yml --ref beta -f mode=complete
 gh workflow run nightly.yml --ref beta -f weekly=true
 ```
 
-A complete run is twenty shards (the keeper's cut 5), at most six at a
+A complete run was twenty shards (the keeper's cut 5; twenty-three since
+#703's second fold, below), at most six at a
 time since the fleet's runner cap of 10:0xZ 2026-11-03 (fourteen from
 06:2xZ, one wave of twenty before; `docs/lanes/ci-speed-7.md`, "The fleet's
 runner cap"), dispatched in the 07:00Z slot, alone (the toolbox's 16:00Z,
@@ -464,15 +541,104 @@ measured minutes of run 41347058507 (script 130 per 515 mutants, BEEF 37 per
 shard-minutes) shared out by the largest remainder, about 47, 50, 11, 39 and
 49 minutes per shard, so each wave ends within the hour (four waves on six
 slots, about 3h07m replayed, where the surfaces-by-four matrix at six took
-3h12m). Each shard is one job on its own
+3h12m).
+
+**The cost of #685's selection** (`docs/lanes/fix-685.md`). A mutant rebuilds and
+links every target of its shard, and a survivor runs them all: run 41347058507's
+rates against their selections (script 0.25 minutes a mutant at 32 targets, wire
+0.10 at 3) give about 0.005 minutes a target (`MINUTES_PER_TARGET`), which one
+host's rebuild after a one-line change in `multisig.rs` matches (13 s for the
+script surface's former 45 targets, 63 s for 221, two jobs). The run's reading
+is the direct one (the keeper's word of 2026-11-03 16:1xZ: 136, 104 and 134
+targets): by those rates about 0.77, 0.70, 0.63, 0.76 and 0.79 minutes a mutant
+for the five surfaces, 1,585, 520, 63, 599 and 902 shard-minutes, 3,669 in all
+where the rates gave 903 (4.1 times). The slope is a line through two points
+(script and wire) that the other three surfaces miss (BEEF 0.20 minutes a mutant
+at 5 targets, Merkle 0.12 at 3, substrates 0.13 at 2), not a validated rate; the
+box's `multisig.rs` run measured 0.845 minutes a mutant where it gives 0.77. The
+slope averages the record's survivors, and a survivor runs every target: read in
+two parts instead (0.28 s a target to rebuild, 0.64 s a target to run a
+survivor's whole set, both on one host; each surface's survivor share from run
+41347058507, the substrates' 84 percent the largest), about 5,717 shard-minutes
+(script 1,880, BEEF 693, Merkle 90, wire 852, substrates 2,203).
+
+The split (#703's second fold, `complete_split`): the record's own method, the
+twenty shared out by the slope's estimate (floors, one shard at least, then the
+largest remainders), run over the direct reading's sets on the fold's tip
+(`ESTIMATE_TARGETS`, 2026-11-03 at `f7ea87ae`), gives eight, three, one, three and
+five; then a ceiling, no shard's two-part estimate past 300 minutes (the job's 360,
+GitHub's six-hour cap on a hosted job, with a margin;
+`SHARD_CEILING_MINUTES`): each surface takes the method's count or its two-part
+minutes over 300 rounded up, whichever is more (seven, three, one, three and
+eight), so eight, three, one, three and eight, twenty-three shards. A shard is
+about 198, 173, 63, 200 and 113 minutes by the slope (the longest wire's 200) and
+235, 231, 90, 284 and 275 in two parts (the longest wire's 284); replayed in the
+matrix's order at six slots, about 11h24m by the slope and 17h05m in two parts
+(10h12m and 15h53m if perfectly packed), past the 187-minute replay of the fixed
+lists (run 41579707627's shard times at six, 3h07m; 3h02m by the same model): the
+complete run does not fit the 07:00Z slot alone. `tests` pins the split (the
+method recomputed from the constants), the ceiling (every surface's two-part
+minutes over its shards under 300) and every complete shard under `JOB_MINUTES`
+by the slope. The fold before kept the callers' level's nine, three, one, three
+and four, which the method does not give over 3,669: its substrates shards were
+226 minutes by the slope and 551 in two parts, past 360, its replay 12h55m and
+20h52m. A night scales the same way (its shards at 45 minutes each, at most the
+complete count). The estimate leaves out each shard's setup (about 3 minutes).
+
+The 07:00Z complete run at six slots under this split is expected to take about
+11h24m by the slope or about 17h05m in two parts (the two-part reading likely an
+upper bound, its 0.64 s a target the Studio's); neither is measured on a runner,
+that run measures them, and the cost falls as the kill lanes (#681) close
+survivors. The 07:00Z complete run of 2026-11-04 is checkpointed at 12:00Z (the keeper's
+word of 2026-11-03 17:1xZ): the shards' measured rate projects the whole run; a
+projection past twelve hours of six slots cancels the run (`gh run cancel`), the
+record keeping the measured per-mutant rate per surface as the figure that
+settles the slope, and the retry goes to the weekend slot (2026-11-08 07:00Z)
+after the survivor-term row #705 lands; a projection under twelve hours lets it
+run to the end, and the record carries the figure.
+
+The branch's reading before the fold, with one level of callers (216, 206 and
+166 targets), is superseded; its figures stay as the reason for the fold. It
+estimated about 1.17, 1.21, 1.14, 0.92 and 0.95 minutes a mutant, 5,237
+shard-minutes (5.8 times 903); shared out as before, its wire and substrates
+shards would have passed the job's 360 minutes (362 each), so it re-split the
+twenty nine, three, one, three and four, about 268, 300, 115, 242 and 271
+minutes a shard, the longest the BEEF shards at 300, and its replay at six slots
+was about 17h30m: it no longer fitted the 07:00Z slot alone and held six of the
+fleet's twenty runners through the toolbox's and the CLI's slots. Read in two
+parts it was about 8,090 shard-minutes, the BEEF shards about 420 minutes and the
+substrates' about 674, and about 24 hours at six. The direct reading is 0.70 of
+its 5,237.
+
+One host's measure on `multisig.rs` under the direct reading (47 mutants, 137
+binaries): a baseline of 65.5 s; 39 of 47 mutants in 1,977 s (about 0.85
+minutes a mutant), 37 caught, one unviable, the one survivor (`108:19`) 34 s
+to build and 168 s to test. That baseline ran without the conformance corpus
+(the host lacks it; `conformance_scripts` and `conformance_beef` skipped),
+which the record's 65 s for the fixed list's 45 targets included; the corpus is
+about 1 percent of a baseline (on Linux runner job 125937464890, at `55424846`
+with 4,120 vectors run, `conformance_scripts` finished in 0.60 s and
+`conformance_beef` in 0.01 s), so it does not explain the two baselines lining
+up: the Studio's per-target test cost runs high (macOS's scan of a freshly
+linked binary on its opening run, and the load), and the measure is noisy (the
+survivor's full run 168 s against the same 137 binaries' 65.5 s baseline).
+Each shard is one job on its own
 runner, one mutation worker, under the same `ulimit -v` of 4,000,000 KB through
 the runner hook (above): the ceiling is per test binary, so a narrower shard
 changes nothing about it. A night's shards are sized by its files' mutants in
-the record at those rates, 45 minutes a shard, at most the complete run's
+the record at those rates (since #685 at the minutes of the night's sets,
+`surface_minutes`; each matrix entry carries its `estimated_minutes`), 45 minutes a shard, at most the complete run's
 count per surface, six at a time (the balance rule of 2026-10-26). An empty
 plan runs no shard; the score job carries every figure. The bench is the
 `weekly` input: the workflow has no schedule, so "weekly" is the dispatcher's
-word, and the job dispatches `bench.yml` at the line's tip.
+word, and the job dispatches `bench.yml` at the line's tip. The cold read of `59eeedcc` on the Studio, with the corpus (4,120 vectors
+run, load 5 to 10), measured the direct reading's 137 binaries at 94.5 and
+95.2 s on fresh links and 43.6 and 50.2 s warm, the fixed list's 46 at 33.7 s
+fresh and 23.6 s warm, the corpus about 0.5 s of either; a survivor costs
+0.69 s a target on fresh links (the fold's 0.64) and 0.34 s warm, so the
+two-part estimate is about 5,900 shard-minutes fresh or about 4,600 warm,
+within a third of the fold's figure; `108:19` Missed at 27 s to build and
+99 s to test, two caught mutants at about 27 s plus 3 s each.
 
 The hermetic pass over survivors: the nightly has no job of that name at
 `84a01d2a`; the survivors' evidence is each shard's diffs, so a night's

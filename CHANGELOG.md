@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: a measured file's test surface is every target the reach rule names for it, not a fixed list per surface (the oracle, #685)
+
+The keeper's row of 2026-11-03: #681's opening lane (PR #684) found the #660
+tests (`tests/pubkey_encoding_660.rs`, `tests/pubkey_point_shapes_660_adv.rs`)
+asserting what two of `src/script/spend/key_point.rs`'s survivors break, and
+`tests/p2pk_hybrid_625.rs` the same for `src/script/templates/multisig.rs`,
+while the script surface's fixed list (`tests/script_*.rs` and five targets,
+45) never ran them, so the measured scores left out kills the suite had.
+
+- A measured file's targets are the integration binaries naming its module,
+  the direct reading (`Tree.direct` in `affected_tests.py`, the run's alone: a
+  `bsv_rs::<m>` path, a crate-root re-export, a `tests/CLAUDE.md` row naming
+  the module or a file of it; the keeper's word of 2026-11-03 16:1xZ), less
+  a binary that only reads source text (the six `arch_*` walks of `src/`), the two run apart and the cost checks (the five stress and
+  wall-clock suites the loop always left out, and `wallet_http_json_linear_432`);
+  `--lib` alone where none (`lib_only` in the plan; none at `55424846`). The
+  plan writes each file's set (`selection`), each surface's union over the
+  night's files (`surface_tests`, the shard's `--test` list) and prints the
+  sizes: 136 targets for the 43 script files, 104 for the four BEEF and Merkle
+  files, 134 for the 38 wire and substrates files.
+- The callers' level (one level of the modules naming `crate::<m>`,
+  `Tree.users`) stays a pull request's plan (`reach`), where a build and not a
+  run per mutant is the cost; the branch's reading before the fold took it in
+  the run, 216, 206 and 166 targets and about 5,237 to 8,090 estimated
+  shard-minutes against 903. Two readings, two
+  rules: the callee rule (11-03 00:1xZ, #666) decides which files a night
+  re-measures (the PLAN), the direct rule which targets a mutant's tests are
+  (the RUN); no reader takes the one for the other. Both findings' tests are
+  in the direct sets by their `bsv_rs::script` paths; their `tests/CLAUDE.md`
+  rows name no module (the rule read of `59eeedcc`).
+- Left uncounted by construction: a binary reaching a module only through a
+  caller, 80 script, 102 transaction and 32 wallet binaries by the rule read of
+  `59eeedcc` (reproduced by the docs fold from `Tree`); 233 of the 256 rows of
+  the tree's binaries name no module (the rule read gave 223), and no guard
+  pins the row convention (`docs/NIGHTLY.md`, "What the direct reading leaves
+  uncounted").
+- A test's change re-measures the files whose selection runs it, at the head
+  or at the complete run's sha; a `tests/CLAUDE.md` row whose modules change
+  re-measures the files whose selection that moves; `affected_tests.py` now
+  reaches everything.
+- A mutant's test timeout is three times its shard's baseline test time, the
+  old fixed 120 s (300 for BEEF) its floor: a survivor running 216 targets
+  outlasts 120 s and was read as a timeout (`multisig.rs:108:19` on one host;
+  under the direct reading at a 200 s timeout, a Missed at 168 s of tests).
+- The cost: about 0.005 minutes a target a mutant (the record's own slope, a
+  line through two points, script and wire, that the other three surfaces
+  miss; one host's `multisig.rs` run measured 0.845 minutes a mutant where it
+  gives 0.77), 3,669 estimated shard-minutes under the direct reading against
+  903 (5,237 with the callers' level); read in two parts (0.28 s a target
+  rebuilt by every mutant, 0.64 s a target run by each survivor; the
+  substrates' share is 84 percent), about 5,717. Each matrix entry carries
+  its `estimated_minutes`.
+- The complete run's shards (`complete_split`, #703's second fold): the
+  record's own method (the twenty shared out by the slope's estimate: floors,
+  one shard at least, the largest remainders) over the direct reading's sets
+  at `f7ea87ae` gives eight, three, one, three and five, and a ceiling raises
+  a surface until no shard's two-part estimate passes 300 minutes (the job's
+  360 with a margin): eight, three, one, three and eight, twenty-three shards,
+  about 198, 173, 63, 200 and 113 minutes a shard by the slope and 235, 231,
+  90, 284 and 275 in two parts. Replayed at six slots, about 11h24m by the
+  slope and 17h05m in two parts, against the fixed lists' 187 minutes (run
+  41579707627's shards at six): the 07:00Z complete run is expected to take
+  that, and measures it, checkpointed at 12:00Z under the keeper's word of
+  2026-11-03 17:1xZ (a projection past twelve hours of six slots cancels the run
+  and keeps the measured per-mutant rate per surface as the figure; the retry at
+  the weekend slot after the survivor-term row #705). The fold before kept the callers' level's nine,
+  three, one, three and four, which the method does not give; its substrates
+  shards were 551 minutes in two parts, past the job's 360. The conformance
+  corpus is about 1 percent of a baseline (`conformance_scripts` 0.60 s and
+  `conformance_beef` 0.01 s on runner job 125937464890).
+
+Pinned by `.github/scripts/test_nightly_mutants.py` (`SelectionWitnesses685`:
+the two findings, RED on the fixed lists; the complete shards under
+`JOB_MINUTES`; the split recomputed by the method and every surface's
+two-part shard under 300 minutes, RED on nine, three, one, three, four; `transaction`'s binaries out of a script file's set unless they
+name `script`, RED on the callers' level; the fixture's `test_685_*`, a
+caller's binaries out of its callee's selection and still in a pull request's
+reach, RED on the callers' level). The record
+is `docs/lanes/fix-685.md`; `docs/NIGHTLY.md`, "The selection" and "The cost
+of #685's selection".
+
 ### CI: the `checks` job's cache keyed by the cargo-mutants version it installs, the tool built once per key and restored after (speed loop three, #699)
 
 - `Swatinem/rust-cache` saves on a miss alone, and `checks`' entry on `beta`

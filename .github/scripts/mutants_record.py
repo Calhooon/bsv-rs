@@ -155,7 +155,10 @@ def provenance(run_dir, label):
     for path in (run_dir / "shards").rglob("run.json"):
         data = json.loads(path.read_text())
         command = data["command"]
-        timeouts[data["surface"]] = int(command[command.index("--timeout") + 1])
+        # A run before #685 names its fixed `--timeout`; one since, its floor (the
+        # timeout is then the shard's baseline test time times the multiplier, at least it).
+        flag = "--timeout" if "--timeout" in command else "--minimum-test-timeout"
+        timeouts[data["surface"]] = int(command[command.index(flag) + 1])
     jobs = shard["command"][shard["command"].index("--jobs") + 1]
     return {
         "label": label, "run_id": meta["run_id"], "commit": meta["commit"],

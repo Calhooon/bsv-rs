@@ -19,7 +19,7 @@ on:
         required: false
         default: ''
       mode:
-        description: incremental (the night, the reach rule's files) or complete (every measured file, twenty shards; a prerelease pin)
+        description: incremental (the night, the reach rule's files) or complete (every measured file, twenty-three shards; a prerelease pin)
         type: choice
         options: [incremental, complete]
         default: incremental
@@ -302,7 +302,8 @@ jobs:
     # The plan's matrix (cut 7). A night's heavy work holds at most six of the
     # account's twenty concurrent slots (the owner's balance rule of 2026-10-26,
     # the keeper's reading), the fuzz targets after it at six; the complete run
-    # is twenty shards (the keeper's cut 5), each one job on its own runner under
+    # is twenty-three shards (the plan's COMPLETE_SHARDS: twenty since the keeper's
+    # cut 5, three more for #703's ceiling), each one job on its own runner under
     # the memory ceiling below, at most six at a time.
     # The fleet's runner cap (the keeper's line of 10:0xZ 2026-11-03, on the
     # opening API read of the pool; 14 from 06:2xZ): every heavy run on the

@@ -210,6 +210,19 @@ class Tree:
         calling = nightly.callers(module, sources, lambda f: self.library[f])
         return {f.split("/")[1] for f in calling} - {module}
 
+    def direct(self, module):
+        """The binaries that name `module` themselves: a `bsv_rs::<module>` path, a crate-root
+        re-export of it, or their `tests/CLAUDE.md` row naming it or a file of it. The night's
+        selection for its files (#685, the keeper's word of 2026-11-03 16:1xZ)."""
+        return {b for b, used in self.uses.items() if module in used}
+
+    def users(self, module):
+        """The modules naming `crate::<module>` and the binaries that use `module` or one of
+        them: a library change's reach on a pull request, where a build and not a run per
+        mutant is the cost (the night's selection is `direct`, without the callers' level)."""
+        calling = self.callers(module)
+        return calling, {b for b, used in self.uses.items() if used & ({module} | calling)}
+
     def library_names(self, path):
         """True when a library source names `path` (an `include_str!` of a vector, a unit test's
         fixture), so the unit tests can see it."""
@@ -228,7 +241,7 @@ def changed_rows(base_rows, head_rows):
             if base_rows.get(stem) != head_rows.get(stem)}
 
 
-def reach(changed, root=Path("."), base_rows=None):
+def reach(changed, root=Path("."), base_rows=None, tree=None):
     """Each changed path to the targets it reaches.
 
     Returns the plan: `everything` (the path that reaches every target, or None),
@@ -236,9 +249,10 @@ def reach(changed, root=Path("."), base_rows=None):
     and `reasons` (each changed path to what it reaches and why). `base_rows` is the
     base's `tests/CLAUDE.md` text: a changed row reaches its binary, and the rows
     decide nothing else here than which binaries a library change reaches, which the
-    head's rows decide (None when the base has none: every row is new).
+    head's rows decide (None when the base has none: every row is new). `tree` is the
+    head tree's readings when the caller holds them already (the night's selection, #685).
     """
-    tree = Tree(root)
+    tree = tree or Tree(root)
     plan = {"everything": None, "lib": False, "doc": False, "binaries": {}, "reasons": {}}
 
     def add(binary_set, path, why):
@@ -262,9 +276,7 @@ def reach(changed, root=Path("."), base_rows=None):
             if path.endswith(".rs") and nightly.is_test_only(path, root):
                 why.append("a test-only module: the unit tests alone compile it")
             elif module in tree.modules:
-                calling = tree.callers(module)
-                scope = {module} | calling
-                users = {b for b, used in tree.uses.items() if used & scope}
+                calling, users = tree.users(module)
                 reached |= users
                 why.append(f"src/{module}/ and, one level, the modules naming crate::{module} "
                            f"({', '.join(sorted(calling)) or 'none'}): {len(users)} binaries use them")
