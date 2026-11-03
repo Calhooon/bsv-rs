@@ -47,6 +47,24 @@ dequeued after #613 landed and measured `42a74f1b` while its `head_sha` named
 has no schedule; were one restored, its `github.sha` is the default branch's
 commit at the run's creation, so it would pin `main`, never `beta`.
 
+**The entries (#663).** An `exclude_re` entry of `.cargo/mutants.toml` names
+one mutant by file, line, column and text; a line shift leaves it naming
+nothing, so it excludes nothing, the equivalent mutant runs and survives,
+and the file reads below its true figure (fifteen `script.rs` entries after
+#639, three `merkle_path.rs` entries, #677, one `beef.rs` entry, #678). The
+`source` job runs `.github/scripts/mutants_entries.py` before its plan: it
+lists the mutants of every file the entries name (`cargo mutants --list
+--file <file> --no-config`, nothing built, about six seconds for the seven
+files) and refuses the run, before any shard, when an entry matches no listed
+mutant or more than one, printing the entry and its re-point (`STALE entry
+(no listed mutant): <entry>` then `re-point to <line>:<col>: <listed
+mutant>`, or every candidate when none is unique). CI's `checks` job runs the
+same check on every pull request and push, so a change that shifts a line
+under an entry re-points it in the same commit; `mutants_entries.py --fix`
+rewrites each uniquely re-pointed entry and the `<line>:<col>` its comment
+names, by hand, never in a workflow. The job builds cargo-mutants for it, so
+its timeout is 20 minutes.
+
 GitHub requires the workflow on the default branch (`main`) to enable manual
 dispatch, so the file lives on both lines, ported by `git cherry-pick -x`.
 See [manual dispatch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
