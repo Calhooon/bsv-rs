@@ -207,8 +207,10 @@ Each `cargo test` or `cargo nextest run` line of ci.yml is a step (a
 `cargo test`'s target selectors and features, and the Test Suite runs under it
 since speed round 1 (`docs/lanes/ci-speed-1.md`), its doc tests alone under
 `cargo test --doc`. A step is a whole-suite step when it carries
-`--tests` or `--all-targets`, or no target selector at all, and names no
-`--test`. Its feature set is its flags closed over the table (`--all-features`
+`--tests` or `--all-targets`, or `--test '*'` (cargo's glob over the
+integration binaries, the lib's unit target not among them; the whole-suite
+step's form since speed loop three, #672), or no target selector at all, and
+names no other `--test`. Its feature set is its flags closed over the table (`--all-features`
 is every feature). A file's gate is its file-level `#![cfg(...)]` attributes,
 evaluated on `feature`, `all`, `any` and `not`; any other predicate (a target,
 an OS) is a finding, never a pass. The guard refuses, naming the file:
@@ -226,10 +228,10 @@ an OS) is a finding, never a pass. The guard refuses, naming the file:
 | File | Step | Reason |
 | --- | --- | --- |
 | `tests/memory_profiling.rs` | `--test memory_profiling --all-features` (nextest, `RUST_TEST_THREADS=1` on the step) | `dhat-profiling` installs a global allocator; its step runs it alone, nextest giving each test a process of its own and `RUST_TEST_THREADS=1` keeping libtest single-threaded |
-| `tests/wire_tracing_sink.rs` | `--features "full,http,tracing" --test wire_tracing_sink` | the `tracing` feature is a diagnostics sink outside `full` (#212); its step adds it |
+| `tests/wire_tracing_sink.rs` | `--all-features --test wire_tracing_sink` (since speed loop three, #672: the memory and doc steps' feature set, one library build) | the `tracing` feature is a diagnostics sink outside `full` (#212); its step adds it |
 
 To add a test file: nothing. The `cargo nextest run --features
-"full,http,websocket" --tests` step runs every file that feature set compiles, this guard included.
+"full,http,websocket" --test '*'` step runs every file that feature set compiles, this guard included.
 A file gated on a feature outside that set is refused until a step covers it.
 To run a file apart as well (the `vectors` step's `--nocapture` runs, the
 `fixtures` step, both of the `checks` job): name it in that step AND leave it covered by the whole suite.

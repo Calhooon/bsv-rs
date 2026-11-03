@@ -45,7 +45,7 @@ EVERYTHING_UNDER = {
 }
 # Run apart from the integration step, each by a step of its own (tests/arch_ci_runs_every_test.rs).
 APART = {"memory_profiling", "wire_tracing_sink"}
-# The tracing step's three binaries (`--features "full,http,tracing"`).
+# The tracing step's three binaries (`--all-features`, which carries `tracing`; #672).
 TRACING = ("wire_tracing_sink", "wire_error_frames", "fixtures_replay")
 # Names too common to stand for one file when a source names them alone.
 GENERIC_NAMES = {"CLAUDE.md", "README.md", "mod.rs", "main.rs", "lib.rs", "Cargo.toml"}

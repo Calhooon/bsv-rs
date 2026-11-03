@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the compile time by evidence: the lib's unit tests run once, the tracing step shares the library build, the dependencies at opt-level 1 in the test profile (speed loop three, #672)
+
+- The integration step names `--test '*'` (cargo's glob over the integration
+  binaries) where `--tests` also ran the lib's 1,725 unit tests a second time
+  after the unit step's: 16 percent of the step's test-seconds in three beta
+  runs (24 s to 37 s of its run) and a 20-second build beside the binaries.
+  On one host after a one-line change: build 97.1 s to 92.8, run 98.0 s to
+  80.3.
+- The tracing step builds on `--all-features` (which carries `tracing`), the
+  library the memory step built, where `full,http,tracing` built one of its
+  own: 17.5 s to 3.2 on one host, 18 s of CI's step.
+- The dependencies build at opt-level 1 in the Test Suite's test profile,
+  the crate at 0: a step writes `[profile.test.package."*"]` into the cargo
+  home's configuration from the job's `CARGO_DEPENDENCIES_TEST_OPT_LEVEL`
+  (cargo reads a package's profile from no environment variable; rust-cache
+  hashes the `CARGO` name into its key, so another level misses). On one
+  host: integration run 81.0 s to 50.3, unit 20.2 to 14.4, memory 61.7 to
+  47.0, the warm build 93.7 to 90.1; a cache miss builds the dependencies in
+  208 s for 137. The crate at 1 as well cost 214 s of build for 47 of run:
+  not taken. The PR's own run carries the miss, and so does the landing's
+  `beta` push (a pull request's cache is its ref's alone): the hit is the
+  second `beta` run after the landing.
+
+Pinned by `tests/arch_ci_runs_every_test.rs` (`shared_build_refusals`,
+`dependency_profile_refusals`). Clippy's feature set, the ratchet's build,
+`CARGO_INCREMENTAL`, unused dependencies (machete finds none) and merging
+binaries measured and left: `docs/lanes/ci-speed-3.md`.
+
 ### CI: every heavy run capped at six on the opening occupancy read, the complete dispatch at 07:00Z (the fleet's runner cap, 2026-11-03)
 
 The keeper's line of 10:0xZ, on the opening API read of the pool (12,251 jobs

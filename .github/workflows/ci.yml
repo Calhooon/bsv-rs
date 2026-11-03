@@ -243,10 +243,13 @@ jobs:
     # the job's builds (env, so a developer's `cargo test` keeps both); a panic keeps its
     # file:line (std::panic::Location is data, not debuginfo), a backtrace's frames lose theirs.
     # The linker is rustc's own rust-lld, the default on x86_64-unknown-linux-gnu since 1.90.
+    # Speed loop three (#672, docs/lanes/ci-speed-3.md): the dependencies at opt-level 1 in the
+    # test profile, the crate itself at 0; the level is the step below's, read from this name
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_DEPENDENCIES_TEST_OPT_LEVEL: "1"
     strategy:
       fail-fast: false
       # The fleet's runner cap on a dispatch (#682's second fold; six since the keeper's line of
@@ -311,6 +314,19 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
+      # The dependencies are built once per cache key and run in every test, the crate built every
+      # run: opt-level 1 for every package but this one cut the integration run by 38 percent
+      # (81 s to 50 s on one host), the unit and memory steps by 29 and 24, with the crate's
+      # build unchanged (94 s to 90 s after a one-line change); a cache miss builds the
+      # dependencies in 208 s for 137 (speed loop three, #672). Cargo reads a package's profile
+      # from a configuration file, never the environment, so this step writes the cargo home's
+      # from the job's CARGO_DEPENDENCIES_TEST_OPT_LEVEL, a name rust-cache hashes into its key:
+      # another level misses, never an exact hit on dependencies built at the old one.
+      - name: Optimize the dependencies in the test profile
+        if: steps.plan.outputs.build == 'true'
+        shell: bash
+        run: printf '[profile.test.package."*"]\nopt-level = %s\n' "$CARGO_DEPENDENCIES_TEST_OPT_LEVEL" >> "${CARGO_HOME:-$HOME/.cargo}/config.toml"
+
       # This library tracks no Cargo.lock, so the job resolves one before the cache step and the
       # action hashes it: without it the key would hold Cargo.toml alone, and a dependency's
       # compatible release would be rebuilt on every exact hit (which saves nothing) until
@@ -366,9 +382,13 @@ jobs:
       # allocator is why memory_profiling runs alone below). An enumerated
       # list of binaries drifted to 34 of 73 files (#146). nextest runs the
       # binaries' tests side by side, each test in a process of its own.
+      # `--test '*'`, cargo's glob over every `tests/*.rs`, not `--tests`, which adds the lib's
+      # unit target: the unit step above runs those 1,725 tests on --all-features, and a
+      # second run here cost 24 to 37 s of the step and a 20-second build (speed loop three,
+      # #672, docs/lanes/ci-speed-3.md)
       - name: Run every integration test
         if: steps.plan.outputs.whole == 'true'
-        run: cargo nextest run --features "full,http,websocket" --tests --no-fail-fast --cargo-verbose
+        run: cargo nextest run --features "full,http,websocket" --test '*' --no-fail-fast --cargo-verbose
 
       # The plan's binaries as `--test` names: cargo builds those alone (an `-E 'binary(..)'`
       # filter after `--tests` would build every binary and run some); nextest keeps
@@ -395,10 +415,12 @@ jobs:
         run: cargo nextest run --test memory_profiling --all-features --no-fail-fast --cargo-verbose
 
       # The `tracing` sink (#212) is outside `full`: its event, and the wire's
-      # frames with the feature on, the same bytes as without it.
+      # frames with the feature on, the same bytes as without it. --all-features, which
+      # carries `tracing`, as the memory and doc steps build: the three share one library build
+      # (16 to 18 s on its own feature set; speed loop three, #672)
       - name: Run the tracing sink tests
         if: steps.plan.outputs.tracing == 'true'
-        run: cargo nextest run --features "full,http,tracing" --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --no-fail-fast --cargo-verbose
+        run: cargo nextest run --all-features --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --no-fail-fast --cargo-verbose
 
       # nextest runs no doc tests
       - name: Run doc tests
