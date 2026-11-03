@@ -11,6 +11,7 @@ Suite's compile 4m15s cold and 2m47s on a cache hit at loop one's close,
 | #673 | the reads share the lane's build | open; nothing here |
 | #696 | the semver tool's cache seeded from a push to a line | landed as PR #700 (`e9dc9a4a`, 13:40Z); the section below, the seed's miss and save measured |
 | #699 | the `checks` job's cache keyed by the cargo-mutants version it installs | committed on `lane/ci-mutants-cache` over `ec36c02e`, not yet landed; the section below, the before measured, the after from the landing's push |
+| #693 | one merged integration binary measured against its parts (the ten `tests/script_*witness*.rs`, one equal Modules cell) | measured on `lane/ci-merged-binary` over `c46a3b29`, nothing restructured: 0.25 s of rustc per binary removed (0.15 s the link), no reach loss on a library change, a test-only change runs the group; the record `docs/lanes/ci-merged-binary.md` |
 
 ## The measurement before: CI
 
