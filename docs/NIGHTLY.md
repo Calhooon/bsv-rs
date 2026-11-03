@@ -327,7 +327,17 @@ test-only file).
 **What is still carried that could move.** A callee two levels down: a change
 in `primitives` read only through `transaction` by a measured file reaches the
 files that name `crate::primitives`, not the ones that reach it through
-`transaction`. A test-only file's tests reaching past its directory (the
+`transaction`. A callee that is itself measured: the callee rule follows an
+unmeasured source alone, so an edit to `src/transaction/beef.rs` re-measures
+`beef.rs`, not the substrates files that `use crate::transaction::Beef`
+(`http_json/review_actions.rs`), where an edit to its unmeasured sibling
+`beef_stream/reason.rs` reaches those five; the same for a measured
+`src/script/` file and the wire and substrates files naming `crate::script`.
+A caller that names its callee by no `crate::` path in its own text: a
+`super::super::<m>` path, `bsv_rs::<m>`, or a macro defined in another
+module expanding `$crate::<m>` (none at `84a01d2a` in the measured files; an
+alias, `use crate::primitives as p;`, and a `$crate::<m>` in the file's own
+macro are read). A test-only file's tests reaching past its directory (the
 interpreter's `spend/tests.rs` drives `crate::script` from `spend/`). A file a
 source reads through a path built from one-deep pieces (`vectors/` and a name
 computed at run time). A test of one surface that kills another's mutant

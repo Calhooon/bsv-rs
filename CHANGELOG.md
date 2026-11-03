@@ -27,9 +27,12 @@ necessary? or maybe a fraction"):
   `Cargo.lock`, `build.rs`, `.cargo/*`, `src/lib.rs`, `src/error.rs`, the
   nightly's workflow, script and memory-ceiling runner reach everything and
   make the night complete; documentation reaches nothing. On beta's last ten
-  commits: two plan nothing, five plan three or four files, one plans the
-  script surface's 50 (its row naming none), two (the nightly's own script)
-  plan the complete run (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
+  commits, with the fold below: two plan nothing, one plans three files,
+  three plan nine (the four BEEF and Merkle files and the five substrates
+  files that call `crate::transaction`), one fifteen (its row naming a
+  test-only file), one the script surface's 40 (its row naming none), two
+  (the nightly's own script) plan the complete run
+  (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
 - **The reach rule's five holes, closed (PR #666's fold)**, each pinned by a
   `test_fold_*` case in `test_nightly_mutants.py` that failed on the cut's
   script: a deleted selection test is judged by the base's selection and row
