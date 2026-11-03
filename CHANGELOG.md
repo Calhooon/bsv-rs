@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the `checks` job's cache keyed by the cargo-mutants version it installs, the tool built once per key and restored after (speed loop three, #699)
+
+- `Swatinem/rust-cache` saves on a miss alone, and `checks`' entry on `beta`
+  was saved at 03:39Z 2026-11-03, before the mutants-entries gate (#663)
+  installed cargo-mutants; every run restored it by a full match and built
+  cargo-mutants 27.1.0 again: 64 s, 68 s and 71 s of a 74 s to 80 s step
+  (runs 41672716963, 41648342758, 41646365090). `CARGO_MUTANTS_VERSION`
+  moves from the step's `env:` to the job's, a `CARGO*` name the action
+  hashes into its key, so the key moves with the version: one miss on the
+  line's push builds the tool and saves `~/.cargo/bin` with the entry, every
+  run after restores it. A `key:` input would not do it: the action ignores
+  `key` beside `shared-key` (rust-cache v2.9.3 `src/config.ts:75-82`).
+
+Pinned by `tests/arch_ci_tool_cache_key.rs`: every `cargo install` after a
+rust-cache step names a version its cache key carries (a hashed job or
+workflow variable, or the version in `prefix-key`/`shared-key`), with
+`cache-bin` and the environment hash on; RED on the base's `ci.yml`
+(`sets CARGO_MUTANTS_VERSION at step level, outside the cache key`). The
+before, the budget and the after: `docs/lanes/ci-speed-3.md`.
+
 ### CI: the semver tool's cache seeded from a push to a line, every pull request's opening `semver` run a restore (speed loop three, #696)
 
 - `semver` runs on pull requests alone, and a pull request's cache is read by
