@@ -25,7 +25,9 @@ the linker stays rustc's default rust-lld on Linux. What did not change:
 every test runs once per step as before, on the same features, target
 selectors and steps, hermetic as before; doc tests stay `cargo test --doc`.
 The memory tests' isolation is now nextest's process per test, not
-`--test-threads=1`. `tests/arch_ci_runs_every_test.rs` (#146) reads a
+`--test-threads=1`, with `RUST_TEST_THREADS=1` on that step so libtest
+inside each process keeps its synchronous path and no 60-second warning
+allocates in the profile (#372). `tests/arch_ci_runs_every_test.rs` (#146) reads a
 `cargo nextest run` line as a step as it reads `cargo test`
 (`a_nextest_run_is_a_step_as_cargo_test_is`; the base guard refuses all 272
 files against the new workflow). The record, with the split per step and the

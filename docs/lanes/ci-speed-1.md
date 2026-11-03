@@ -50,7 +50,7 @@ memory step ran its 13 tests on one thread; one of them,
 | A PR's CI wall clock | 29:11 (run 41537280176, created 22:26:27Z, last job done 22:55:38Z) | (from the PR's CI run) |
 | Queue wait | 3:10 (created 22:26:27Z; the earliest job that ran, the Test Suite, started 22:29:37Z; four skipped jobs are stamped at creation) | (from the PR's CI run) |
 | The nightly | 10:43:05 (run 41347058507 on beta, 2026-11-01 20:28:54Z to 2026-11-02 07:11:59Z, complete, conclusion failure; no later run is complete) | (from the PR's CI run) |
-| A cold read | about 14 minutes (`/Volumes/Lanes/out/bsv-rs/review-fix-654/`: no REPORT file is in the folder, so the span of its files' stamps, 22:10:38Z to 22:24:34Z, a lower bound) | (from the PR's CI run) |
+| A cold read | 16:49 (the #660 cold read on the Studio, by its run record; the span of `review-fix-654`'s file stamps, about 14 minutes, is a lower bound only, that folder holding no REPORT) | (from the PR's CI run) |
 
 ## What changed in the job
 
@@ -115,6 +115,19 @@ rustc lines). nextest runs every test in a process of its own and binaries
 side by side. The memory step keeps its own step: each test now has dhat's
 global allocator and its one profiler to itself in its own process, the
 isolation `--test-threads=1` gave, without running the 13 one at a time.
+The step also sets `RUST_TEST_THREADS: "1"` (the cold read's fold): nextest
+starts each test as `<binary> --exact <name> --nocapture` with no thread
+count, so libtest inside the process takes the core count and runs the one
+test on its concurrent path, whose 60-second warning allocates in the
+profile (#372; `test_beef_stream_memory_is_flat_per_element` printed it at
+67 s on the Studio); libtest reads the variable and runs the test on its
+synchronous path, while nextest's own count is untouched by it (nextest
+0.9.150 measured: `NEXTEST_TEST_THREADS` stays the core count). Locally the
+twelve tests other than the array-form one took 74 s under nextest's default
+count and 105 s under `--test-threads=1`, with the variable set and no
+warning; each test's resident peak is under 1 GB (the 64 MiB wire test
+955 MB, the array-form test 572 MB when stopped at 560 s), so four at once
+sit far below the runner's 16 GB.
 Doc tests stay `cargo test --doc --all-features` (nextest runs none). The
 #146 guard is unchanged in what it demands (`--tests`, no enumeration); it
 now reads a `cargo nextest run` line as a step, as it read `cargo test`

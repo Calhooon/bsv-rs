@@ -255,7 +255,13 @@ jobs:
       # nextest runs each test in a process of its own, so each has dhat's
       # global allocator and its one profiler to itself: the isolation
       # `--test-threads=1` gave, without running the thirteen one at a time.
+      # RUST_TEST_THREADS reaches libtest inside each process, not nextest's
+      # own count: with one thread libtest runs the test on its synchronous
+      # path, without the 60-second warning that allocates in the profile
+      # (#372; nextest passes `--exact <name>` and no thread count).
       - name: Run the memory profiling tests
+        env:
+          RUST_TEST_THREADS: "1"
         run: cargo nextest run --test memory_profiling --all-features --no-fail-fast --cargo-verbose
 
       # The `tracing` sink (#212) is outside `full`: its event, and the wire's
