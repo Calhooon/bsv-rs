@@ -1,10 +1,12 @@
-//! Every heavy run on the runners leaves six of the account's twenty for the fleet.
+//! Every heavy run on the runners holds at most six of the account's twenty.
 //!
-//! The fleet's runner cap (the keeper's line, 2026-11-03; `docs/lanes/ci-speed-7.md`,
-//! "The fleet's runner cap"): the account's twenty hosted runners are one pool across
-//! bsv-rs, the CLI, the toolbox and the stack, and a complete nightly that put its twenty
-//! shards on them in one wave (run 41579707627) held PR #679's twelve-minute job 52
-//! minutes in the queue. Every matrix that is a heavy run (a job that runs mutants or
+//! The fleet's runner cap (the keeper's line of 10:0xZ 2026-11-03, on the opening API read of
+//! the pool, after 14 from 06:2xZ; `docs/lanes/ci-speed-7.md`, "The fleet's runner cap"): the
+//! account's twenty hosted runners are one pool across bsv-rs, the CLI, the toolbox and the
+//! stack, at twenty in 22 of 24 hours with a non-heavy p95 of 14 slots, and a complete
+//! nightly that put its twenty shards on them in one wave (run 41579707627) held PR #679's
+//! twelve-minute job 52 minutes in the queue. The cap rises when a read shows that p95
+//! under 10. Every matrix that is a heavy run (a job that runs mutants or
 //! fuzzes) carries `max-parallel` at most [`HEAVY_MAX_PARALLEL`]. GitHub reads no `env`
 //! in `strategy`, so a matrix writes the literal or reads the mutation plan's output,
 //! whose number is `HEAVY_MAX_PARALLEL` in `.github/scripts/nightly_mutants.py` (its
@@ -15,7 +17,7 @@
 //! complete run does not take `HEAVY_MAX_PARALLEL`, and the two heavy jobs gone from the
 //! nightly (so the guard cannot pass by finding nothing). `ci.yml`'s two matrices (the Test
 //! Suite cells, the dependents) are not heavy on a pull request, but the nightly dispatches the
-//! whole file on each line: they carry `max-parallel` at most 14 too, and the nightly dispatches
+//! whole file on each line: they carry `max-parallel` at most 6 too, and the nightly dispatches
 //! beta's run, waits for it, then main's (#682's second fold, the keeper's word (a)); the run
 //! waited for is the one it dispatched, its conclusion read (#682's third fold), and a failed
 //! watch other than the give-up fails the job (#682's fourth fold).
@@ -24,8 +26,8 @@
 use std::fs;
 use std::path::PathBuf;
 
-/// The cap: six of the twenty runners stay for the fleet's pull request and queue runs.
-const HEAVY_MAX_PARALLEL: u32 = 14;
+/// The cap: a heavy run holds at most six of the twenty runners.
+const HEAVY_MAX_PARALLEL: u32 = 6;
 
 /// The one reading of the plan the mutants matrix may make.
 const PLAN_READING: &str = "${{ fromJSON(needs.source.outputs.max_parallel) }}";
@@ -175,14 +177,16 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
 }
 
 /// The nightly's edges that keep its heavy work in sequence, `(job, the job it needs)`:
-/// fuzz after the shards (14 + 6 is the twenty), the score job after them (14 + 1), beta's
+/// fuzz after the shards (6 + 6 would be twelve), the score job after them (6 + 1), beta's
 /// dispatch of `ci.yml` after both, and main's after beta's (#682's second fold, the keeper's
 /// word (a)). The two dispatched runs ask for up to 9 jobs at once (beta's: six test cells,
 /// `lint`, `checks`, the plan) and up to 22 (main's, on main's `ci.yml`: six cells, nine gates
 /// and the plan, 16, then the seven dependents after the plan), 31 together, so they run one
 /// after the other: 9 (10 with the waiting job), then 22. A `max-parallel` caps one matrix, not
-/// the sum of a run's singleton jobs: main's run stays above 14 for about a minute and a half
-/// (`docs/lanes/ci-speed-7.md`, "The fleet's runner cap", the residual).
+/// the sum of a run's singleton jobs: main's run, on main's uncapped file, stays above 14 for
+/// about a minute and a half, and a run on beta's file holds up to 14 (six cells, six
+/// dependents, `lint`, `checks`) under matrix caps of 6 (`docs/lanes/ci-speed-7.md`, "The
+/// fleet's runner cap", the residual).
 const HEAVY_EDGES: [(&str, &str); 5] = [
     ("fuzz", "mutants"),
     ("mutation-score", "mutants"),
@@ -286,7 +290,7 @@ fn with_nightly(edit: impl Fn(&str) -> String) -> Vec<(String, String)> {
 }
 
 #[test]
-fn every_heavy_matrix_carries_max_parallel_at_most_fourteen() {
+fn every_heavy_matrix_carries_max_parallel_at_most_six() {
     let plan = read(".github/scripts/nightly_mutants.py");
     assert_eq!(cap_errors(&workflows(), &plan), Vec::<String>::new());
     assert_eq!(
@@ -312,13 +316,13 @@ fn the_cap_removed_or_raised_is_refused() {
     );
     let fuzz_raised = with_nightly(|text| {
         assert!(text.contains(fuzz_six));
-        text.replacen(fuzz_six, "      max-parallel: 15\n", 1)
+        text.replacen(fuzz_six, "      max-parallel: 7\n", 1)
     });
     assert_eq!(cap_errors(&fuzz_raised, &plan).len(), 1);
     let literal_twenty =
         with_nightly(|text| text.replacen(&mutants_line, "      max-parallel: 20\n", 1));
     assert_eq!(cap_errors(&literal_twenty, &plan).len(), 1);
-    let raised = plan.replacen("HEAVY_MAX_PARALLEL = 14\n", "HEAVY_MAX_PARALLEL = 20\n", 1);
+    let raised = plan.replacen("HEAVY_MAX_PARALLEL = 6\n", "HEAVY_MAX_PARALLEL = 14\n", 1);
     assert_ne!(raised, plan);
     assert_eq!(cap_errors(&workflows(), &raised).len(), 1);
     let slots = plan.replacen(PLAN_LINE, "result[\"max_parallel\"] = SLOT_LIMIT", 1);
@@ -501,7 +505,7 @@ fn the_dispatched_ci_runs_go_beta_then_main_each_matrix_capped() {
         "{:?}",
         dispatch_errors(&both)
     );
-    let cap = "      max-parallel: 14\n";
+    let cap = "      max-parallel: 6\n";
     assert_eq!(ci.matches(cap).count(), 2);
     let uncapped = ci.replacen(cap, "", 1);
     assert_eq!(
@@ -510,7 +514,7 @@ fn the_dispatched_ci_runs_go_beta_then_main_each_matrix_capped() {
         "{:?}",
         ci_matrix_errors(&uncapped)
     );
-    let raised = ci.replacen(cap, "      max-parallel: 20\n", 1);
+    let raised = ci.replacen(cap, "      max-parallel: 14\n", 1);
     assert_eq!(
         ci_matrix_errors(&raised).len(),
         1,
@@ -519,11 +523,11 @@ fn the_dispatched_ci_runs_go_beta_then_main_each_matrix_capped() {
     );
     let expression = ci.replacen(
         cap,
-        "      max-parallel: ${{ github.event_name == 'workflow_dispatch' && 14 || 6 }}\n",
+        "      max-parallel: ${{ github.event_name == 'workflow_dispatch' && 6 || 4 }}\n",
         1,
     );
     assert_eq!(ci_matrix_errors(&expression), Vec::<String>::new());
-    let expression_raised = expression.replacen("&& 14 ||", "&& 15 ||", 1);
+    let expression_raised = expression.replacen("&& 6 ||", "&& 7 ||", 1);
     assert_eq!(ci_matrix_errors(&expression_raised).len(), 1);
 }
 

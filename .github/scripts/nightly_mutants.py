@@ -422,15 +422,17 @@ NIGHT_SHARD_MINUTES = 45
 # The night shares the account with pull requests and the fleet's other nights
 # (the balance rule of 2026-10-26): six slots.
 NIGHT_PARALLEL = 6
-# The fleet's runner cap (the keeper's line of 2026-11-03): the account's twenty
-# hosted runners are one pool across bsv-rs, the CLI, the toolbox and the stack,
-# so a heavy run holds at most fourteen and six stay for the fleet's pull request
-# and queue runs; the complete run's twenty shards go in two waves, 14 then 6.
+# The fleet's runner cap (the keeper's line of 10:0xZ 2026-11-03, on the opening
+# API read of the pool; 14 from 06:2xZ until then): the account's twenty hosted
+# runners are one pool across bsv-rs, the CLI, the toolbox and the stack, peaking
+# at twenty in 22 of 24 hours with a non-heavy p95 of 14, so a heavy run holds at
+# most six; the complete run's twenty shards go in four waves, 6, 6, 6 and 2. It
+# rises only when an occupancy read shows the p95 under 10.
 # The one place the number lives (GitHub reads no `env` in `strategy`; the
 # mutants job reads it from the plan's `max_parallel` output); its owner is loop
 # four's #675, which reads the account's occupancy from the API and moves it.
-# tests/arch_nightly_cap.rs refuses it above 14.
-HEAVY_MAX_PARALLEL = 14
+# tests/arch_nightly_cap.rs refuses it above 6.
+HEAVY_MAX_PARALLEL = 6
 RECORD_ARTIFACT = "mutation-record"
 # A change to these reaches every measured file, whatever it touches.
 EVERYTHING = {

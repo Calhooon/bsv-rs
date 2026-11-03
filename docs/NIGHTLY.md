@@ -28,7 +28,8 @@ other failed watch an error; a `failure` conclusion fails the job, #682's
 third and fourth folds) before `ci-full-main` dispatches main's, since
 beta's run holds up to 9 jobs at once and main's up to 22 (31 together; the
 fleet's runner cap, #682's two folds, the keeper's word (a)). `ci.yml`'s two
-matrices carry `max-parallel: 14`; main's run, on main's file, still holds
+matrices carry `max-parallel: 6` (the keeper's line of 10:0xZ 2026-11-03;
+14 before it), so the seven dependents run six, then one, wherever they run; main's run, on main's file, still holds
 up to 22 for a minute and a half at its start, the residual the next complete run
 measures (`docs/lanes/ci-speed-7.md`, "The fleet's runner cap"). The other measurements
 are workflows of their own, dispatched on the line and called by `release.yml`
@@ -95,9 +96,11 @@ job, which files its crashes as issues, adds `issues: write`.
 beside it, following `ci.yml`. The mutation jobs' token has only `contents: read`.
 
 The shards are the plan's (cut 7, below): a complete run is twenty, eleven
-script, three BEEF, one Merkle, two wire and three substrates, at fourteen at
-a time (the fleet's runner cap of 2026-11-03, `HEAVY_MAX_PARALLEL`; a wave of
-14, then 6); a night is as many as its files' estimated minutes need, at six
+script, three BEEF, one Merkle, two wire and three substrates, at six at a
+time (the fleet's runner cap, `HEAVY_MAX_PARALLEL`: 6 since the keeper's
+line of 10:0xZ 2026-11-03 on the opening occupancy read, 14 from 06:2xZ; four
+waves, 6, 6, 6 and 2, about 3h07m replayed from run 41579707627's shard
+times, `docs/lanes/ci-speed-7.md`); a night is as many as its files' estimated minutes need, at six
 at a time.
 Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a 120-second
 test timeout (300 seconds for BEEF) and a 300-second build timeout per mutant. A job is limited to
@@ -445,20 +448,23 @@ table, never a new failure of the night.
 ```sh
 # The night (the fleet's slot, 00:00Z): the reach rule's files, the rest carried.
 gh workflow run nightly.yml --ref beta
-# The complete run: at each prerelease pin (RELEASING.md step 3), before a minor tag, by hand.
+# The complete run (the fleet's slot, 07:00Z, alone): at each prerelease pin (RELEASING.md step 3), before a minor tag, by hand.
 gh workflow run nightly.yml --ref beta -f mode=complete
 # The captain's Sunday night: the night and the bench.
 gh workflow run nightly.yml --ref beta -f weekly=true
 ```
 
-A complete run is twenty shards (the keeper's cut 5), at most fourteen at a
-time since the fleet's runner cap of 2026-11-03 (`docs/lanes/ci-speed-7.md`,
-"The fleet's runner cap"; until then one wave of twenty): the
+A complete run is twenty shards (the keeper's cut 5), at most six at a
+time since the fleet's runner cap of 10:0xZ 2026-11-03 (fourteen from
+06:2xZ, one wave of twenty before; `docs/lanes/ci-speed-7.md`, "The fleet's
+runner cap"), dispatched in the 07:00Z slot, alone (the toolbox's 16:00Z,
+the CLI's 17:30Z): the
 measured minutes of run 41347058507 (script 130 per 515 mutants, BEEF 37 per
 187, Merkle 3 per 25, wire 19.5 per 198, substrates 36.5 per 286; 901
 shard-minutes) shared out by the largest remainder, about 47, 50, 11, 39 and
-49 minutes per shard, so the wave ends within the hour where the
-surfaces-by-four matrix at six took 3h12m. Each shard is one job on its own
+49 minutes per shard, so each wave ends within the hour (four waves on six
+slots, about 3h07m replayed, where the surfaces-by-four matrix at six took
+3h12m). Each shard is one job on its own
 runner, one mutation worker, under the same `ulimit -v` of 4,000,000 KB through
 the runner hook (above): the ceiling is per test binary, so a narrower shard
 changes nothing about it. A night's shards are sized by its files' mutants in
