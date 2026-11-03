@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: PushDrop's canonical refusal checks the field bounds before the envelope (#616)
+
+- A token this crate's lock-before read refuses (no `OP_CHECKSIG` second) is refused
+  in `decodeCanonicalPushDrop`'s words (`ts-stack@edf6e03`
+  `PushDropValidation.ts:54-79`) by `canonical_refusal`
+  (`src/script/templates/pushdrop_position.rs`). It read the first chunk, the key and
+  the field count, then answered the envelope's words whatever the fields held; the
+  reference checks each field against `maximumFieldBytes` and the running payload
+  against `maximumPayloadBytes` before the envelope (`:63-73`). A no-CHECKSIG token
+  with the right field count and one field past its bound now refuses with
+  `PushDrop token contains an oversized field`, one whose payload passes its bound
+  with `PushDrop token payload is too large`, and the envelope's words stay for a token
+  whose fields are in bounds. The fields' lengths are `PushDrop.decode`'s
+  (`PushDrop.ts:96-115`: a push's data, one byte for `OP_0`, `OP_1NEGATE` and the
+  opcodes 80 to 96). Each of the five sites passes its own limits, the reference's
+  at its counterpart: the local store (2 MiB, 2 MiB + 1 KiB), the kvstore interpreter
+  (1 MiB, 1 MiB + 64 KiB), the registry (16 KiB, 64 KiB), the overlay admin token
+  (4 KiB, 8 KiB) and the storage downloader (2 KiB, 2 KiB + 256 bytes).
+- `tests/script_pushdrop_canonical_bounds_616.rs` (4 tests) reads four registry basket
+  tokens built by this crate's PushDrop writer through
+  `decode_and_verify_registry_token`, their bytes pinned by the SHA-256 the reference
+  recorded for the same shape (`tests/vectors/pushdrop_canonical_bounds_616.json`,
+  written by `tests/support/pushdrop_canonical_bounds_616.mjs` from a bundle of
+  `packages/sdk` at `edf6e03` under Node v22.18.0, two runs byte-identical; each case
+  the words of `decodeCanonicalPushDrop` with the registry's limits and of
+  `decodeAndVerifyRegistryToken('basket', ..)`, equal). The oversized-field and
+  payload tests RED on `9cf60844` (`left: RegistryError("PushDrop token must use the
+  canonical PushDrop envelope")`); the in-bounds no-CHECKSIG token keeps the
+  envelope's words and the CHECKSIG control keeps the bounds' words, green on both.
+- The strength fold adds five tests (9 in the file), the vector's seven new shapes
+  recorded by the same script (the earlier four byte-identical): six fields with an
+  oversized one keep the count's words, a payload exactly at 65,536 bytes keeps the
+  envelope's, an oversized field that also crosses the payload is the field's, an
+  `OP_1` field counts one byte toward the payload, and the overlay admin token's
+  static decode (`decode_overlay_admin_token`, 4096 and 8192 bytes,
+  `OverlayAdminTokenTemplate.ts:29-30,159-167`) refuses at its own bounds, a second
+  site wired to the shared check. Each is RED on a scratch copy of the tip with the
+  order or limit it pins changed (the bounds before the count, the payload's `>=`, the
+  payload before the field, an opcode field as no byte, the site's limits swapped).
+- No public type or signature changes: `canonical_refusal` is crate-visible, and an
+  error's text is not a type. A caller matching the envelope's words on a token with
+  an oversized field or payload and no `OP_CHECKSIG` second now reads the bounds'
+  words. No difference with the reference remains on this input class; the
+  `CLAUDE.md` row 93 residue is closed (`docs/lanes/fix-616.md`).
+
 ### Tests: one row per file in `tests/CLAUDE.md` (#712)
 
 - Three files had two rows each in the `## Files` table:

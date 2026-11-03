@@ -12,7 +12,7 @@ use crate::{Error, Result};
 use std::collections::HashSet;
 
 pub(super) const MAX_LOCAL_OUTPUTS: u32 = 10_000;
-const MAX_LOCAL_TOKEN_BYTES: usize = 2 * 1024 * 1024;
+pub(super) const MAX_LOCAL_TOKEN_BYTES: usize = 2 * 1024 * 1024;
 const MAX_LOCAL_BEEF_BYTES: usize = 256 * 1024 * 1024;
 
 /// Private lookup state, including the wallet's total for removal batches.

@@ -59,8 +59,10 @@ pub fn decode_and_verify_registry_token(
 ) -> Result<Vec<String>> {
     let (data_fields, protocol) = shape(definition_type);
     let count = data_fields + 1;
-    let token = PushDrop::decode_before(locking_script)
-        .map_err(|error| canonical_refusal(locking_script, &[count]).map_or(error, refused))?;
+    let token = PushDrop::decode_before(locking_script).map_err(|error| {
+        canonical_refusal(locking_script, &[count], MAX_FIELD_BYTES, MAX_TOKEN_BYTES)
+            .map_or(error, refused)
+    })?;
     // `Point.fromDER`'s read of the locking key (`PushDropValidation.ts:59`, `PushDrop.ts:74-75`):
     // k256 reads a `05` prefix as a compact point the reference refuses.
     let lock_key = locking_script.chunks().first().and_then(|c| c.data.clone());

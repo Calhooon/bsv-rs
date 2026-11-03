@@ -1,0 +1,211 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk (bun build mod.ts), Node v22.18.0",
+  "key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "field_byte": 97,
+  "limits": {
+    "registry": {
+      "fieldCount": 7,
+      "maximumFieldBytes": 16384,
+      "maximumPayloadBytes": 65536
+    },
+    "overlay_admin_token": {
+      "fieldCount": 5,
+      "maximumFieldBytes": 4096,
+      "maximumPayloadBytes": 8192
+    }
+  },
+  "cases": [
+    {
+      "name": "no_checksig_oversized_field",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        16385,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "script_bytes": 16445,
+      "script_sha256": "b1b9fad6a1b2a5a5fe661b1f4bda48e30991b114255d2ed6ca3ce6179e5eaa03",
+      "canonical_words": "PushDrop token contains an oversized field",
+      "site_words": "PushDrop token contains an oversized field"
+    },
+    {
+      "name": "no_checksig_payload_too_large",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        16384,
+        16384,
+        16384,
+        16384,
+        16384,
+        16384,
+        16384
+      ],
+      "script_bytes": 114748,
+      "script_sha256": "e452891229abbe37b45df0f01ef3c61f0b57cb81b95b11c0dad2ad4c68a8eae3",
+      "canonical_words": "PushDrop token payload is too large",
+      "site_words": "PushDrop token payload is too large"
+    },
+    {
+      "name": "no_checksig_in_bounds",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "script_bytes": 60,
+      "script_sha256": "6d19d8456692138466c2e64bedb25fbb7440eb334415d00dc8f79b094ee73d9a",
+      "canonical_words": "PushDrop token must use the canonical PushDrop envelope",
+      "site_words": "PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "checksig_oversized_field",
+      "site": "registry",
+      "second_op": 172,
+      "field_lengths": [
+        16385,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "script_bytes": 16445,
+      "script_sha256": "f7c3a61b74afe8728de779465c2a4e011969f837a01724862b97897a5195a9d6",
+      "canonical_words": "PushDrop token contains an oversized field",
+      "site_words": "PushDrop token contains an oversized field"
+    },
+    {
+      "name": "no_checksig_wrong_count_oversized_field",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        16385,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "script_bytes": 16441,
+      "script_sha256": "dbd53a0a4ff75fb7e0a6a0a9ba6da789ccf92a8862b554de7e1cc825d0e42aca",
+      "canonical_words": "Unexpected PushDrop token field count",
+      "site_words": "Unexpected PushDrop token field count"
+    },
+    {
+      "name": "no_checksig_payload_at_bound",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        16384,
+        16384,
+        16384,
+        16381,
+        1,
+        1,
+        1
+      ],
+      "script_bytes": 65590,
+      "script_sha256": "32c8df58a8f4daa558b77513eca927d911263991f4c7d80a3722969f383e8d8e",
+      "canonical_words": "PushDrop token must use the canonical PushDrop envelope",
+      "site_words": "PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "no_checksig_oversized_field_crossing_payload",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        16384,
+        16384,
+        16384,
+        16385,
+        2,
+        2,
+        2
+      ],
+      "script_bytes": 65597,
+      "script_sha256": "110ed9a4a64c7d1b4b5ec79b3d540742aac04200856388bd9ce182b459541081",
+      "canonical_words": "PushDrop token contains an oversized field",
+      "site_words": "PushDrop token contains an oversized field"
+    },
+    {
+      "name": "no_checksig_op_1_field_crossing_payload",
+      "site": "registry",
+      "second_op": 97,
+      "field_lengths": [
+        16384,
+        16384,
+        16384,
+        16382,
+        1,
+        1,
+        1
+      ],
+      "last_field_byte": 1,
+      "script_bytes": 65590,
+      "script_sha256": "5290a3ce6653369c9a565c90a764606882974a38cb6d6b84281610f43ba2f0c1",
+      "canonical_words": "PushDrop token payload is too large",
+      "site_words": "PushDrop token payload is too large"
+    },
+    {
+      "name": "admin_token_no_checksig_at_bounds",
+      "site": "overlay_admin_token",
+      "second_op": 97,
+      "field_lengths": [
+        4096,
+        4093,
+        1,
+        1,
+        1
+      ],
+      "script_bytes": 8239,
+      "script_sha256": "c0064f798ffdeecf66c169f6be7f9f29bed5c0a45a43e6c824e0afe9cd53b1d9",
+      "canonical_words": "PushDrop token must use the canonical PushDrop envelope",
+      "site_words": "PushDrop token must use the canonical PushDrop envelope"
+    },
+    {
+      "name": "admin_token_no_checksig_oversized_field",
+      "site": "overlay_admin_token",
+      "second_op": 97,
+      "field_lengths": [
+        4097,
+        1,
+        1,
+        1,
+        1
+      ],
+      "script_bytes": 4146,
+      "script_sha256": "ad579a21245c235e837d2d5afa4bbcb01360a3569fb20ec2aa0268d5011171e1",
+      "canonical_words": "PushDrop token contains an oversized field",
+      "site_words": "PushDrop token contains an oversized field"
+    },
+    {
+      "name": "admin_token_no_checksig_payload_too_large",
+      "site": "overlay_admin_token",
+      "second_op": 97,
+      "field_lengths": [
+        4096,
+        4096,
+        1,
+        1,
+        1
+      ],
+      "script_bytes": 8242,
+      "script_sha256": "12c7f74b6d55a10d2b34e9ce9cc17f2c02be40347d25d40a60983ce3d7dcb172",
+      "canonical_words": "PushDrop token payload is too large",
+      "site_words": "PushDrop token payload is too large"
+    }
+  ]
+}

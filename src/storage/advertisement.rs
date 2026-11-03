@@ -34,8 +34,9 @@ pub(crate) struct Advertisement {
 
 /// `decodeCanonicalPushDrop(script, { fieldCount: 6, ... })` (`:40-44`).
 fn canonical(script: &LockingScript) -> Result<PushDrop> {
-    let token = PushDrop::decode_before(script)
-        .map_err(|error| canonical_refusal(script, &[6]).map_or(error, refused))?;
+    let token = PushDrop::decode_before(script).map_err(|error| {
+        canonical_refusal(script, &[6], MAX_URL_BYTES, MAX_PAYLOAD_BYTES).map_or(error, refused)
+    })?;
     if token.fields.len() != 6 {
         return Err(refused("Unexpected PushDrop token field count"));
     }
