@@ -630,6 +630,15 @@ with 4,120 vectors run, `conformance_scripts` finished in 0.60 s and
 up: the Studio's per-target test cost runs high (macOS's scan of a freshly
 linked binary on its opening run, and the load), and the measure is noisy (the
 survivor's full run 168 s against the same 137 binaries' 65.5 s baseline).
+The cold read of `59eeedcc` on the Studio, with the corpus (4,120 vectors
+run, load 5 to 10), measured the direct reading's 137 binaries at 94.5 and
+95.2 s on fresh links and 43.6 and 50.2 s warm, the fixed list's 46 at 33.7 s
+fresh and 23.6 s warm, the corpus about 0.5 s of either; a survivor costs
+0.69 s a target on fresh links (the fold's 0.64) and 0.34 s warm, so the
+two-part estimate is about 5,900 shard-minutes fresh or about 4,600 warm,
+within a third of the fold's figure; `108:19` Missed at 27 s to build and
+99 s to test, two caught mutants at about 27 s plus 3 s each.
+
 Each shard is one job on its own
 runner, one mutation worker, under the same `ulimit -v` of 4,000,000 KB through
 the runner hook (above): the ceiling is per test binary, so a narrower shard
@@ -641,15 +650,6 @@ plan runs no shard; the score job carries every figure. The bench is the
 `weekly` input: the workflow has no schedule, so "weekly" is the dispatcher's
 word, and the job dispatches `bench.yml` at the line's tip, after beta's
 `ci.yml` run and before main's dispatch, waiting for its own run (#683).
-
-word, and the job dispatches `bench.yml` at the line's tip. The cold read of `59eeedcc` on the Studio, with the corpus (4,120 vectors
-run, load 5 to 10), measured the direct reading's 137 binaries at 94.5 and
-95.2 s on fresh links and 43.6 and 50.2 s warm, the fixed list's 46 at 33.7 s
-fresh and 23.6 s warm, the corpus about 0.5 s of either; a survivor costs
-0.69 s a target on fresh links (the fold's 0.64) and 0.34 s warm, so the
-two-part estimate is about 5,900 shard-minutes fresh or about 4,600 warm,
-within a third of the fold's figure; `108:19` Missed at 27 s to build and
-99 s to test, two caught mutants at about 27 s plus 3 s each.
 
 The hermetic pass over survivors: the nightly has no job of that name at
 `84a01d2a`; the survivors' evidence is each shard's diffs, so a night's
