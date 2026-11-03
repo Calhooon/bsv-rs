@@ -455,4 +455,146 @@ mod tests {
         assert!(small_int_to_opcode(0).is_err());
         assert!(small_int_to_opcode(17).is_err());
     }
+
+    // The m-of-n edges (#681). The node writes a multisig lock as
+    // `CScript() << m << keys... << n << OP_CHECKMULTISIG` (bitcoin-sv
+    // 879fc8b src/script/standard.cpp:315-324), a count of 1 to 16 as OP_1 to
+    // OP_16 (src/script/script.cpp:224-229) and reads 1 <= m <= n
+    // (standard.cpp:135). Its key bound is 20 before Genesis and UINT32_MAX
+    // after (src/consensus/consensus.h:50,55; interpreter.cpp:1531-1532); this
+    // template's own bound is 16, the small-integer counts ("Must have 1-16
+    // keys, and threshold <= N", `lock_from_keys`'s rustdoc). The TypeScript
+    // SDK has no Multisig template, so its citation is left out.
+
+    /// Private key `k` (1, 2, 3...): its public key is `k * G`.
+    fn key(k: u32) -> PrivateKey {
+        PrivateKey::from_hex(&format!("{k:064x}")).unwrap()
+    }
+
+    /// `n` compressed keys, `1 * G`, `2 * G`, `3 * G` in turn, the one at
+    /// `bad` retagged 0x06 (a hybrid tag, neither 02 nor 03).
+    fn params(n: usize, bad: Option<usize>) -> Vec<u8> {
+        let mut out = Vec::with_capacity(n * 33);
+        for i in 0..n {
+            let mut pk = key(i as u32 % 3 + 1).public_key().to_compressed();
+            if bad == Some(i) {
+                pk[0] = 0x06;
+            }
+            out.extend_from_slice(&pk);
+        }
+        out
+    }
+
+    const G: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    const G2: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
+    const G3: &str = "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
+
+    #[test]
+    fn a_one_of_one_and_a_two_of_three_lock_write_the_nodes_cscript_bytes() {
+        // GetScriptForMultisig's bytes (standard.cpp:315-324) for 1*G, 2*G, 3*G
+        let one = format!("5121{G}51ae");
+        let two_of_three = format!("5221{G}21{G2}21{G3}53ae");
+        assert_eq!(
+            Multisig::new(1).lock(&params(1, None)).unwrap().to_hex(),
+            one
+        );
+        let keys = [key(1).public_key()];
+        assert_eq!(
+            Multisig::new(1).lock_from_keys(&keys).unwrap().to_hex(),
+            one
+        );
+        let keys = [
+            key(1).public_key(),
+            key(2).public_key(),
+            key(3).public_key(),
+        ];
+        let lock = Multisig::new(2).lock(&params(3, None)).unwrap();
+        assert_eq!(lock.to_hex(), two_of_three);
+        let lock = Multisig::new(2).lock_from_keys(&keys).unwrap();
+        assert_eq!(lock.to_hex(), two_of_three);
+    }
+
+    #[test]
+    fn a_threshold_equal_to_the_key_count_is_written_and_one_above_is_refused() {
+        // 1 <= m <= n (standard.cpp:135; `lock_from_keys`'s "threshold <= N"):
+        // the node's rule, its m = n edge the kills of 241:38. The n = 16 cell
+        // also pins the 16-key bound (238:14): crate-contract pin, no sibling
+        // rule, stated: `multisig.rs:103`
+        for n in [1usize, 2, 3, 16] {
+            let m = n as u8;
+            let lock = Multisig::new(m).lock(&params(n, None)).unwrap();
+            assert_eq!(lock.as_script().is_multisig(), Some((m, m)));
+            let refused = Multisig::new(m + 1).lock(&params(n, None));
+            assert!(
+                matches!(refused, Err(Error::CryptoError(_))),
+                "{m}+1 of {n}"
+            );
+        }
+        let keys = [key(1).public_key(), key(2).public_key()];
+        assert!(Multisig::new(2).lock_from_keys(&keys).is_ok());
+        let refused = Multisig::new(3).lock_from_keys(&keys);
+        assert!(matches!(refused, Err(Error::CryptoError(_))));
+    }
+
+    #[test]
+    fn sixteen_of_sixteen_writes_op_16_twice_and_seventeen_keys_are_refused() {
+        // The template's bound, 16 keys as OP_16 (script.cpp:226-228)
+        // crate-contract pin, no sibling rule, stated: `multisig.rs:103`
+        let lock = Multisig::new(16).lock(&params(16, None)).unwrap();
+        let bytes = lock.to_binary();
+        assert_eq!(bytes.len(), 16 * 34 + 3);
+        assert_eq!(bytes[0], OP_16);
+        assert_eq!(&bytes[bytes.len() - 2..], &[OP_16, OP_CHECKMULTISIG]);
+        let keys: Vec<PublicKey> = (0..16).map(|i| key(i % 3 + 1).public_key()).collect();
+        assert_eq!(
+            Multisig::new(16).lock_from_keys(&keys).unwrap().to_binary(),
+            bytes
+        );
+
+        let refused = Multisig::new(1).lock(&params(17, None));
+        assert!(matches!(refused, Err(Error::CryptoError(_))));
+        let keys: Vec<PublicKey> = (0..17).map(|_| key(1).public_key()).collect();
+        let refused = Multisig::new(1).lock_from_keys(&keys);
+        assert!(matches!(refused, Err(Error::CryptoError(_))));
+    }
+
+    #[test]
+    fn a_key_count_of_257_is_refused_not_written_as_a_count_of_one() {
+        // 257 as u8 is 1: a count past the bound must be refused before the
+        // OP_N is written ("Must have 1-16 keys"), or the lock would read
+        // 1-of-1 over 257 keys
+        // crate-contract pin, no sibling rule, stated: `multisig.rs:103`
+        let refused = Multisig::new(1).lock(&params(257, None));
+        assert!(matches!(refused, Err(Error::CryptoError(_))));
+        let keys: Vec<PublicKey> = (0..257).map(|_| key(1).public_key()).collect();
+        let refused = Multisig::new(1).lock_from_keys(&keys);
+        assert!(matches!(refused, Err(Error::CryptoError(_))));
+    }
+
+    #[test]
+    fn the_last_key_retagged_in_a_one_of_two_is_refused_as_every_spend_reaches_it() {
+        // `lock`'s rustdoc (#625): the walk starts at the last key
+        // (interpreter.cpp:1588-1611 at 879fc8b, CheckPubKeyEncoding under
+        // STRICTENC, :312-315), so with j = n - 1 no key after it can meet the
+        // threshold 1. Every spend fails, and the lock is refused
+        // crate-contract pin, no sibling rule, stated: `multisig.rs:224-229`
+        let refused = Multisig::new(1).lock(&params(2, Some(1)));
+        assert!(matches!(refused, Err(Error::InvalidPublicKey(_))));
+        let refused = Multisig::new(2).lock(&params(3, Some(1)));
+        assert!(matches!(refused, Err(Error::InvalidPublicKey(_))));
+    }
+
+    #[test]
+    fn a_retagged_key_with_enough_keys_after_it_is_avoidable_and_written() {
+        // `lock`'s rustdoc (#625): refused only "when the n - 1 - j keys after
+        // it cannot meet the threshold"; here exactly m keys follow it
+        // crate-contract pin, no sibling rule, stated: `multisig.rs:224-229`
+        for (m, n, j) in [(1u8, 2usize, 0usize), (2, 3, 0), (1, 3, 1)] {
+            let given = params(n, Some(j));
+            let lock = Multisig::new(m).lock(&given).unwrap();
+            let bytes = lock.to_binary();
+            assert_eq!(bytes[1 + j * 34 + 1], 0x06, "{m}-of-{n}, key {j}");
+            assert_eq!(lock.as_script().is_multisig(), Some((m, n as u8)));
+        }
+    }
 }

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+
+- `src/script/templates/multisig.rs`'s survivors of the complete run killed (#681): six tests in the file's own
+  module pin the m-of-n edges against the node's `GetScriptForMultisig` form (bitcoin-sv `879fc8b`
+  `src/script/standard.cpp:315-324`): the bytes of a 1-of-1 and a 2-of-3 on both lock paths, m = n written and
+  m = n + 1 refused, 16-of-16 as `OP_16` twice with 17 keys refused, 257 keys refused (a count cast to `u8` would
+  read 1), and the #625 reachability rule at its edge (`n - 1 - j < m` refused, `= m` written). 12 of the 13
+  survivors killed, each RED on its mutant: two on the node's rule (`241:38`, m <= n, `standard.cpp:135`) and
+  ten crate-contract pins counted apart (the keeper's ruling), each test labeled with its documenting line
+  (`multisig.rs:103`'s 16-key bound for `114:19` and `238:14`; `multisig.rs:224-229`'s #625 refusal for the seven
+  of `266`-`267`). The one survivor, `108:19` (`||` to `&&` on the threshold), is named an equivalence
+  candidate for the captain's reads (every threshold it lets past is refused later as `CryptoError`, the error
+  message the only difference). The
+  file: 33 caught, 13 missed (71.74%) before; 45 caught, 1 missed, 1 unviable (97.83%) after. Record:
+  `docs/lanes/kill-multisig.md`.
+
 ### CI: every heavy run on the runners carries max-parallel 14 (the fleet's runner cap, 2026-11-03)
 
 The account's twenty hosted runners are one pool across bsv-rs, the CLI,
