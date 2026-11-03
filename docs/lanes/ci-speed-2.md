@@ -172,6 +172,22 @@ left the standing rule. To keep every push run of a line, the one-line change is
 | The nightly's length | run 41347058507 (`beta`, conclusion failure: 42 of 43 jobs green), the last complete one: created 2026-11-01T20:28:54Z, its earliest job started 23:52:16Z (queued 3 h 23 m behind run 41327640129, which ended 23:52:15Z), its last job ended 2026-11-02T07:11:58Z: 10 h 43 m from creation, 7 h 19 m 42 s running | (from the next nightly) |
 | A cold read's length | 16 m 49 s: the #660 cold read on the Studio, 23:16Z to 23:33Z | (from the next cold read) |
 
+## Loop one closed
+
+The five figures before the loop (the table above, `docs/lanes/ci-speed-4.md` and
+`docs/lanes/ci-speed-loop2-slowest.md`) and after its cuts (#665, #664, #666, #667),
+read from `gh run view <id> --json jobs` on 2026-11-03; the raw lines are under
+`/Volumes/Lanes/out/bsv-rs/ci-speed-loop1-close/`.
+
+| Figure | Before | Loop one closed |
+|---|---|---|
+| A PR's CI wall clock | 12m09s to 16m48s (runs 41571159770 and 41573018866); 29m11s on the cold run above | 7m43s on a one-module PR, the subset (#684, run 41598630196); 9m36s to 11m09s whole (#676, run 41587646252; #680, run 41590906372) |
+| The Test Suite | 15m26s on a cache hit | 7m40s subset (run 41598630196), 9m10s whole (run 41587646252) |
+| The queue wait | 0m03s to 3m10s | 0m02s to 1m57s to the Test Suite on the three runs (the hour's load) |
+| The nightly | 10h43m (run 41347058507) | 2h28m06s (run 41579707627, created 04:42:51Z, its last job 07:10:56Z; 20 mutants shards and 19 fuzz targets; the longest shard 65m02s, the median 50m45s; the shards done 1h40m19s after the dispatch; conclusion failure on the mutation score floor, every shard green) |
+| A cold read | 16m49s (#660) | unchanged: about 16 minutes; reads without cargo 3 to 7 minutes |
+| The landing latency, lane DONE to landed | 113 to 219 minutes (five landings) | 39, 46 and 64 minutes this morning (#676, #684, #680; the captain's count, not read from the API here). The API gives the pull requests' opening to merge: #676 03:39:28Z to 06:15:19Z (155m51s), #680 05:46:03Z to 06:48:38Z (62m35s), #684 07:14:53Z to 07:57:33Z (42m40s); #676's 39 fits its fold (the head commit authored 05:38:25Z, 36m54s before the merge), not its lane's DONE, which preceded the 03:39Z opening |
+
 ## Verified here, and not
 
 Locally (a scratch copy, its own target directory, `CARGO_BUILD_JOBS=4`, one cargo at a

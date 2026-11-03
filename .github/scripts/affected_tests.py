@@ -50,6 +50,11 @@ TRACING = ("wire_tracing_sink", "wire_error_frames", "fixtures_replay")
 # Names too common to stand for one file when a source names them alone.
 GENERIC_NAMES = {"CLAUDE.md", "README.md", "mod.rs", "main.rs", "lib.rs", "Cargo.toml"}
 LABEL = "full-suite"
+# The one Markdown file a gate of `lint` reads: the ratchet measures it (tools/ratchet/src/tree.rs).
+MEASURED_MARKDOWN = {"README.md"}
+# The trees a gate of `lint` runs as its own code: the ratchet's (tools/ratchet/run), whose
+# Markdown is never docs only either (#688 fold).
+GATE_TREES = ("tools/ratchet/",)
 
 
 def binaries(root):
@@ -288,7 +293,8 @@ def reach(changed, root=Path("."), base_rows=None):
             why.append(f"under a directory {len(walkers)} binaries walk")
         if not why:
             why.append("no target compiles or names it" if not nightly.is_doc(path)
-                       else "documentation no test reads")
+                       else "documentation no test reads" if is_documentation(path)
+                       else "no test reads it; a gate's record or tree, never docs only")
         add(reached, path, "; ".join(why))
         plan["reasons"][path] = {"reaches": sorted(reached & set(tree.binaries)),
                                  "why": "; ".join(why)}
@@ -317,10 +323,32 @@ def finish(plan, changed, whole_reason=None):
         "memory": "memory_profiling" in reached,
         "tracing": any(b in reached for b in TRACING),
         "src_changed": any(p.startswith("src/") and not nightly.is_doc(p) for p in changed),
+        "build": plan["everything"] is not None or plan["lib"] or plan["doc"] or bool(reached),
         "reached": {b: plan["binaries"][b] for b in reached},
         "total": len(plan["all_binaries"]),
         "reasons": plan["reasons"],
     }
+
+
+def is_documentation(path):
+    """A path a docs-only change may touch (#668, the #688 fold): Markdown (`*.md`, under
+    `docs/` or anywhere), other than the Markdown a gate measures and any file of a gate's
+    own tree. A file under `docs/` that is not Markdown is data a tool reads, never docs only:
+    `docs/ratchets.json` is the ratchet's record (`tools/ratchet/src/tree.rs`), and a pull
+    request loosening it that skipped the ratchet would land red on the line's push run;
+    `docs/dependents.lock` is the dependents job's list, the census JSON the oracle's."""
+    return (path.endswith(".md") and path not in MEASURED_MARKDOWN
+            and not path.startswith(GATE_TREES))
+
+
+def docs_only(result, runs=()):
+    """A docs-only change (#668): every changed path documentation (`is_documentation`),
+    nothing everything, no unit or doc test, and none of `runs` (the binaries a job runs by
+    name) reached. An empty change is not docs-only."""
+    return (bool(result["changed"])
+            and all(is_documentation(p) for p in result["changed"])
+            and not result["everything"] and not result["lib"] and not result["doc"]
+            and not set(result["reached"]) & set(runs))
 
 
 def changed_files(repo, revisions):
@@ -359,17 +387,27 @@ def plan_command(args):
           f"tracing: {result['tracing']}")
     print(f"integration binaries reached: {len(result['integration'])} of "
           f"{result['total'] - len(APART)}")
+    runs = [r for r in (args.runs or "").split(",") if r]
+    print(f"build: {result['build']}; docs only: {docs_only(result, runs)}")
     for path, why in result["reasons"].items():
         print(f"  {path}: {why['why']}")
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-            whole = "true" if result["everything"] else "false"
-            output.write(f"whole={whole}\n")
-            for key in ("lib", "doc", "memory", "tracing"):
-                output.write(f"{key}={'true' if result[key] else 'false'}\n")
-            output.write(f"reached={len(result['integration'])}\n")
-            output.write("tests=" + " ".join(f"--test {b}" for b in result["integration"]) + "\n")
+            output.writelines(f"{key}={value}\n" for key, value in outputs(result, runs).items())
     return 0
+
+
+def outputs(result, runs=()):
+    """The step outputs the workflow's conditions read (`steps.plan.outputs.<key>`); every key
+    a condition of `ci.yml` names is one of these or one its plan step writes itself
+    (test_affected_tests.py, `WorkflowKeyTests`)."""
+    flag = {True: "true", False: "false"}
+    written = {"whole": flag[bool(result["everything"])], "build": flag[bool(result["build"])],
+               "docs_only": flag[docs_only(result, runs)]}
+    written.update({key: flag[bool(result[key])] for key in ("lib", "doc", "memory", "tracing")})
+    written["reached"] = str(len(result["integration"]))
+    written["tests"] = " ".join(f"--test {b}" for b in result["integration"])
+    return written
 
 
 def check(plan, metadata):
@@ -407,6 +445,8 @@ def main():
     planner.add_argument("--git", type=Path,
                          help="the repository the diff is read from (default: --repo)")
     planner.add_argument("--output", type=Path, required=True)
+    planner.add_argument("--runs", help="the binaries the job runs by name, comma-separated: "
+                                        "a docs-only change reaches none of them (#668)")
     checker = subs.add_parser("check", help="the reached set within the whole")
     checker.add_argument("--plan", type=Path, required=True)
     checker.add_argument("--metadata", type=Path, required=True,
