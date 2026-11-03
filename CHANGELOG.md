@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the cap guard reads every workflow for a heavy dispatch or `uses:`, pins `!cancelled()` after the shards, the give-up bound and the wait's `--workflow` (#709)
+
+- The rule read of #683's landing found five ways a later edit could put two
+  heavy runs on the twenty runners with `tests/arch_nightly_cap.rs` green: a
+  dispatch from a workflow other than `nightly.yml`, a reusable call
+  (`uses: ./.github/workflows/<file>`) in place of a `gh workflow run` line,
+  `!cancelled()` dropped from a job after the shards, the wait's give-up
+  raised past its job's timeout, and the wait's `--workflow` naming another
+  file. No workflow changes; the guard reads each from the YAML by a rule.
+  The rule's reading of today's files: `release.yml`'s six calls start on a
+  push of tags alone, the owner's release ritual, and pass by their trigger;
+  `sync-main-into-beta.yml`'s dispatch of `ci.yml` on a push to main is named
+  in the guard's record with its reason, not sequenced with the nightly (a
+  stated residual for the keeper); an `echo`'s text and a comment are no
+  dispatch.
+
+Pinned by `tests/arch_nightly_cap_rules_709.rs` (5 tests): each rule RED on a
+mutation of the tip's YAML with the old guard green on it (a `gh workflow
+run bench.yml` step and a `uses:` job in `ci.yml`, `!cancelled()` dropped
+from the bench's `if:`, the bench's budget at 58 minutes, its `--workflow`
+at `ci.yml`, a `uses:` job in the nightly with no `needs`). The record is
+`docs/lanes/fix-709.md`.
+
+The fold on PR #713 (the strength read's holes): a dispatch job of the nightly
+with a job after it must carry a `gh run watch` per dispatch, each watch under
+`timeout "$budget"` with `budget` the one `$((N * 60 - SECONDS))` the give-up
+rule reads (a watch dropped, its `timeout` dropped, a literal `timeout 7200` or
+a budget doubled inside `$((...))` refused; a `sleep 2m` refused as unreadable,
+a decoy `sleep` before the loop no reading); the wait's list equals the set its
+job dispatched in both directions (two dispatches with one listed refused, `-w`
+and `--workflow=` read, a `WF=bench.yml` variable read through its one literal
+assignment, else refused as unreadable); the absent-`if:` and the give-up
+refusals reworded (``with no `if:` ``, and ``the wait can run N minutes (the
+larger of the budget's B and the poll's P × I s, M)``, the larger term named). Pinned by
+`tests/arch_nightly_cap_watch_713.rs` (4 tests), each new rule RED on a mutation
+of the real YAML (the bench's watch deleted, its `timeout` dropped,
+`ci-full-beta`'s budget doubled, a second dispatch in the bench, its list on
+`-w ci.yml`), the last four green on the old guard; the bench's watch deleted
+was refused by the old guard already, in its conclusion-after-the-watch words.
+The readers move to `tests/support/nightly_cap_rules.rs`. The lane record's
+sync line corrected: the sync's dispatched `ci.yml` run is on the sync branch
+built from beta (both matrices at six, at most nine jobs at once, not main's
+22), fired zero times on record.
+
+The second fold (the scoped check of the fold): rule 5's reusable-call
+exemption read any `uses:` line, so a step's `uses: actions/checkout` in a
+dispatch job exempted it; it reads the job-level `uses` field now, pinned by
+`a_steps_uses_does_not_make_a_dispatch_job_a_reusable_call_713` (RED before).
+A `(( budget *= 2 ))` after the budget's assignment is read by no rule, a
+stated residue in the record.
+
 ### Docs: one merged integration binary measured against its parts (speed loop three, #693)
 
 - `docs/lanes/ci-merged-binary.md`: the ten `tests/script_*witness*.rs` binaries
