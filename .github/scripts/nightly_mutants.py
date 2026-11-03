@@ -576,19 +576,23 @@ def tested_by(path, measured, root=Path(".")):
     return {f for f in measured if Path(f).parent == source.parent or Path(f) in parents}
 
 
-def test_rows(root=Path("."), text=None):
-    """`tests/CLAUDE.md`'s file table: each test file's stem to the text of its row."""
-    rows, inside = {}, False
-    if text is None:
-        text = (root / "tests" / "CLAUDE.md").read_text()
-    for line in text.splitlines():
+def table_rows(text):
+    """`tests/CLAUDE.md`'s `## Files` rows: each row's line number, its text and its File
+    cell's files as `(name, stem)`, the stem the key every reader of the table uses (#712)."""
+    inside = False
+    for number, line in enumerate(text.splitlines(), 1):
         if line.startswith("## "):
             inside = line.strip() == "## Files"
         elif inside and line.startswith("| `"):
-            cell = line.split("|")[1]
-            for name in re.findall(r"`([^`]+)\.rs`", cell):
-                rows[Path(name).stem] = line
-    return rows
+            names = re.findall(r"`([^`]+)\.rs`", line.split("|")[1])
+            yield number, line, [(f"{name}.rs", Path(name).stem) for name in names]
+
+
+def test_rows(root=Path("."), text=None):
+    """`tests/CLAUDE.md`'s file table: each test file's stem to the text of its row."""
+    if text is None:
+        text = (root / "tests" / "CLAUDE.md").read_text()
+    return {stem: line for _, line, files in table_rows(text) for _, stem in files}
 
 
 def row_reach(row, measured, root=Path(".")):

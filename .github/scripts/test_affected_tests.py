@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 import affected_tests as affected
+import nightly_mutants as nightly
 import rows_from_sources as rows
 
 ROWS = """# tests
@@ -318,6 +319,29 @@ class RowsFromSourcesTests(unittest.TestCase):
         self.assertIn(f"tests/vec_e.rs: no row in tests/CLAUDE.md's ## Files table; {rows.SENTENCE}",
                       refusals)
         self.assertNotIn("rowonly_g", "\n".join(refusals))
+
+    def test_a_file_named_in_two_rows_is_refused_with_both_lines_712(self):
+        doubled = self.OLD_ROWS + "| `script_a.rs` | 1 | none | the interpreter again |\n"
+        (self.root / "tests" / "CLAUDE.md").write_text(doubled)
+        line = len(doubled.splitlines())
+        self.assertIn(f"tests/script_a.rs: 2 rows of the stem `script_a` in tests/CLAUDE.md's "
+                      f"## Files table, at lines 7 and {line}; one row per stem (the readers key "
+                      f"the rows by the stem and keep the last)",
+                      rows.check(self.root))
+        # a description naming the file, a shared row's own repeat and another section are no row
+        self.assertEqual(rows.doubled_rows(
+            "| `a.rs` | 1 |\n## Files\n| `a.rs`, `a.rs` | 1 | names `b.rs` |\n| `b.rs` | 1 |\n"
+            "## Next\n| `b.rs` | 1 |\n"), [])
+
+    def test_a_support_file_beside_a_top_level_file_of_its_stem_is_two_rows_712(self):
+        text = ("## Files\n| `a.rs` | 1 | none | d |\n| `b.rs` | 1 | none | d |\n"
+                "| `support/a.rs` | 1 | none | d |\n")
+        # the readers hold one row for the stem, the later one
+        self.assertEqual(sorted(nightly.test_rows(text=text)), ["a", "b"])
+        self.assertEqual(rows.doubled_rows(text), [
+            "tests/a.rs and tests/support/a.rs: 2 rows of the stem `a` in tests/CLAUDE.md's "
+            "## Files table, at lines 2 and 4; one row per stem (the readers key the rows by the "
+            "stem and keep the last)"])
 
     def test_the_writer_adds_the_column_from_the_sources_and_keeps_the_descriptions(self):
         text, counts = rows.write(self.root)
