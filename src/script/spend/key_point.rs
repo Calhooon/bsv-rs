@@ -30,6 +30,8 @@ impl Spend {
     /// The encoding check's part of the point: nothing under the node's
     /// reading; under the reference's, a point its `fromDER` cannot read is
     /// refused in its words.
+    /// The refusal is unreachable while the switch is the literal `false`, so the
+    /// `Ok(())` mutant is a declared equivalence (`.cargo/mutants.toml`, #684).
     pub(super) fn check_public_key_point(
         &self,
         pubkey: &[u8],
@@ -50,3 +52,7 @@ impl Spend {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "key_point_tests.rs"]
+mod tests;

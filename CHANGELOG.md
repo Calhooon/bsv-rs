@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: src/script/spend/key_point.rs's survivors of the complete run killed (#681)
+
+- The complete nightly (run 41579707627 on `e3fef6dc`) measured `key_point.rs` at 25.00%
+  (1 caught, 3 missed, 1 unviable): the #660 pins live in `tests/pubkey_encoding_660.rs` and
+  `tests/pubkey_point_shapes_660_adv.rs`, outside the script surface's selection (`--lib`
+  and `tests/script_*.rs`), so no test the oracle runs read the switch. Three library tests,
+  `src/script/spend/key_point_tests.rs`: `a_key_that_is_no_point_passes_the_encoding_check_and_checks_false_in_every_mode_681`
+  (seven non-points, `<key> OP_CHECKSIG OP_NOT` and the CHECKMULTISIG form valid under an
+  empty signature in the default mode and the block and standard words at both eras, the
+  node's `IsCompressedOrUncompressedPubKey` and `CPubKey::Verify` at `879fc8b`) kills
+  `&&` to `||` in `check_public_key_point` and `reads_the_reference_point` to `true`;
+  `an_x_past_the_field_prime_is_no_signature_key_in_every_mode_681` (`03||p+1`, a point
+  to a reducing reader) kills `true` at `signature_key` alone;
+  `a_wrong_length_or_prefix_is_refused_as_the_scripts_error_in_every_mode_681` pins the
+  error class of a 33-byte `04`, a 65-byte `02` and a 32-byte key and kills nothing here.
+  After: 3 caught, 1 missed, 1 unviable, 75.00%. The one survivor,
+  `check_public_key_point` to `Ok(())` (`key_point.rs:39:9`), is declared equivalent in
+  `.cargo/mutants.toml` on three reads of 2026-11-03 (DECLARE 0.96, EQUIVALENT 0.97,
+  DECLARE 0.85): the switch is the literal `false`, so the body is `Ok(())` on every input;
+  the entry is removed when the switch reads a flag or a feature. With it the file reads
+  3 of 3 viable, 100% (`docs/lanes/kill-key-point.md`).
+
 ### CI: a pull request's Test Suite runs the test targets its changed files reach; the whole suite once per landing by the `full-suite` label (speed loop one, cut 4, #667)
 
 Before this cut a pull request's run and the sequencer's landing run each ran the whole
