@@ -7,10 +7,15 @@ for [bsv-rs #82](https://github.com/Calhooon/bsv-rs/issues/82), part of
 Never on a push or a PR: the gate is `ci.yml`. It runs on demand only,
 `workflow_dispatch` on the line to measure (`gh workflow run nightly.yml --ref
 beta`), never on a schedule: the owner's word of 2026-10-27 (the nightly runs
-were a waste of resources) took the 03:00 UTC cron off both lines. One
-dispatched measurement before each minor tag (0.9.0 to `main` gets one), none
-for a prerelease (`RELEASING.md` step 3 names the dispatch: this workflow is
-not callable, so `release.yml` cannot run it before a tag). A push to a
+were a waste of resources) took the 03:00 UTC cron off both lines. Since cut 7
+(the owner's word of 2026-11-02, "even the nightly... is all that necessary?
+or maybe a fraction"), a night is incremental: it mutates the files the reach
+rule names since the last complete run and carries every other file's figure
+with that run's id and sha; the complete run (`-f mode=complete`) is
+dispatched at each prerelease pin and before each minor tag (`RELEASING.md`
+step 3 names the dispatch: this workflow is not callable, so `release.yml`
+cannot run it before a tag). The rule, the record and the dispatch lines are
+in "Incremental nights and the complete run (cut 7)" below. A push to a
 protected branch runs `ci.yml`'s required set, nothing more (the owner's word
 of 2026-10-27). Its `ci-full` job dispatches `ci.yml` on `beta` and on `main`,
 so each line's whole test matrix and `dependents` run at its tip (a pull
@@ -55,7 +60,9 @@ job, which files its crashes as issues, adds `issues: write`.
 --version 27.1.0 --locked`. Every action is pinned to a commit with its version
 beside it, following `ci.yml`. The mutation jobs' token has only `contents: read`.
 
-There are four disjoint shards per surface, at most twenty concurrent jobs.
+The shards are the plan's (cut 7, below): a complete run is twenty, eleven
+script, three BEEF, one Merkle, two wire and three substrates, in one wave; a
+night is as many as its files' estimated minutes need, at six at a time.
 Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a 120-second
 test timeout (300 seconds for BEEF) and a 300-second build timeout per mutant. A job is limited to
 six hours. A failed baseline, interrupted job or missing shard fails the score
@@ -194,8 +201,8 @@ Unviable mutants are reported but excluded from the denominator. A timeout is
 not a caught mutant. A file with generated mutants but no viable result fails.
 Files generating no mutants are listed as `NO MUTANTS`, without a numeric score.
 The check requires every candidate to have exactly one recognized outcome,
-successful baselines, matching tool versions, matching source commits and all
-20 shards. Duplicate, missing, corrupt or unfinished evidence fails closed.
+successful baselines, matching tool versions, matching source commits and
+every shard of the plan (`report --plan`; a local replay's `--expected-shards`). Duplicate, missing, corrupt or unfinished evidence fails closed.
 The integer comparison avoids accepting a displayed percentage rounded upward.
 
 A file whose generated mutants are all unviable (each replacement refused by
@@ -244,6 +251,198 @@ narrow run's 643 killed by the corpus, all in the script and BEEF/Merkle
 surfaces; two timeouts new to the widened run, both caught in the narrow
 one). They stay red until #603's lanes land: that is the gate.
 
+## Incremental nights and the complete run (cut 7)
+
+**The rule** (the keeper's word, 2026-11-02): a file's mutation score moves
+only when the file or the tests that reach it change. A night therefore
+mutates only the files changed since the last complete run, judges them
+against their floors, and carries every other file's figure forward from the
+record with the run's id and sha named per file. The complete run over every
+measured file is once per prerelease (at the pin, when the figure is cut into
+the record) and by hand, never nightly. The fuzz targets keep a fixed small
+budget each; the bench is weekly.
+
+**The reach rule** (`nightly_mutants.py plan`, `reach`). The changed paths are
+`git diff --name-only --no-renames <complete run's sha>..<pin>`; each maps to
+the measured files it re-measures, and the plan prints why:
+
+A **measured file** is one a surface's glob names that is not test-only. A
+**test-only** file (`is_test_only`) opens with `#![cfg(test)]` before its first
+item, or is named `tests.rs` or `*_tests.rs`: cargo-mutants generates no mutant
+in a `#[cfg(test)]` module, so such a file has no shard, no carried figure and no scoreboard row
+(thirteen under the globs at `84a01d2a`, `spend/tests.rs`, `flag_tests.rs` and
+the `*_603_tests.rs` among them; 82 measured files, not 95). The files a
+test-only file **tests** (`tested_by`) are its directory's measured files and
+the module that declares it (its `mod` line, or a `#[path]` naming it, in a
+sibling, the directory's `mod.rs` or the parent's `<dir>.rs`).
+
+| Changed path | Re-measures | Why |
+| --- | --- | --- |
+| a measured file under `src/<m>/` | itself, and (the callee rule) every measured file whose text names `<m>` by a `crate::<m>` path or inside a `use crate::{...}` group, one level, its own module's included | its own mutants, and the code that calls its module |
+| `tests/<name>.rs` in a surface's selection | the measured files its `tests/CLAUDE.md` row names (`## Files` table), within that selection, a test-only file it names counting as the files that file tests; a row naming a module (`src/<m>/`, `` `<m>::` ``), every measured file of the module; no row, or a row naming neither, every file of the surfaces whose selection runs it | a test reaches the files it tests |
+| `tests/<name>.rs` deleted | the same, judged by the base: the surfaces whose selection held it at the complete run's sha (the named targets, the `script_*.rs` and `beef_stream_603_*.rs` globs) and its row in that sha's `tests/CLAUDE.md` | the mutants it killed are measured again without it |
+| `tests/<name>.rs` in no selection | nothing | it never runs against a mutant, so no score can move |
+| a `.rs` file elsewhere under `tests/` (`support/`, `chain_vectors/`, ...) | what the sources that compile it in reach, followed through: a `#[path]` or `include!` string resolving to it, or the `mod` line of its parent module (`mod binary;` in `support/fixtures/mod.rs`); compiled in by none, nothing | a support module reaches a mutant only through the test that includes it; a bare word (`fixtures`, `binary`) in a source is not an inclusion |
+| any other file under `tests/` (`vectors/`, `fixtures/`, `support/*.mjs`, ...) | what the compiled sources naming it reach, followed through: its name whole in a source's text (`vectors/sighash.json`, not `tx-sequence-zero-sighash.json`), or its directory's path when that is two or more deep under `tests/` (`fixtures/wire/`, read through `format!("{}/tests/fixtures/wire/{call}.json")`); named by none, nothing | a vector reaches a mutant only through the test that reads it; a recorder (`.mjs`, `.lean`) is never compiled; a one-deep directory (`vectors/`) is every vector's, so it names none |
+| a test-only source under `src/` | the files it tests (never their callers) | its tests run against those files' mutants; it compiles into no caller |
+| a source under `src/<m>/` that is neither measured nor test-only | every measured file of `src/<m>/`, and (the callee rule, `CALLEE_RULE`, `callers`) every measured file whose text names `<m>` by a `crate::<m>` path or inside a `use crate::{...}` group, one level | the module's code, and the code that calls it |
+| `src/lib.rs`, `src/error.rs` | everything | the crate root (the unit-test skips are read from it) and the one `Error` every module returns |
+| `Cargo.toml`, `Cargo.lock`, `build.rs`, `.cargo/*` but `mutants.toml` | everything | a dependency, feature, profile or build change reaches every file that uses it |
+| `.cargo/mutants.toml` | the files its added or removed `exclude_re` entries name (`^src/...\.rs:`); any other setting, or an entry naming no file, everything | an exclusion moves its file's candidates alone |
+| `.github/workflows/nightly.yml`, `.github/scripts/nightly_mutants.py`, `.github/scripts/test-runner-memory-ceiling.sh` | everything | the jobs, toolchain, corpus pin, selection, skips, score and the ceiling that decides a runaway mutant |
+| `docs/`, any `.md` | nothing | never compiled |
+| anything else (`fuzz/`, `benches/`, `examples/`, `tools/`, other workflows, the scripts' own tests) | nothing | no selection compiles it |
+
+A path that reaches everything makes the night a complete run (`why_complete`
+names it). The two risks the keeper scored: a dependency bump re-measures
+everything (`Cargo.toml`; the library commits no `Cargo.lock`, so a night
+builds the complete run's own lockfile, kept in the record, and a crate
+released since cannot move a carried figure's oracle unseen), and a test
+change re-measures the files it reaches (the rows above). The literal rule
+(any change under `tests/support/` or `tests/vectors/` re-measures
+everything) would have made eight of the last ten beta commits a complete
+run, because each #603 and #6xx landing adds a recorder and a vector; the
+table follows those files to what reads them instead. At `84a01d2a` a change
+to any of `tests/support/fixtures/*` reaches the wire surface's 15 files
+(through `wallet_wire_cross_sdk_tests`), `tests/vectors/sighash.json` 55 (the
+script surface's 40 through `sighash_tests`, the wire's 15 through
+`support/fixtures/binary.rs`), a wire fixture the wire's 15; under cut 7's
+word match the two first were complete runs and the third nothing.
+
+**The callee rule's cost** (PR #666's fold; one function, `callers`, behind
+`CALLEE_RULE`, so a fold can switch it off or narrow it). The keeper's letter
+(2026-11-03 00:1xZ): a changed module re-measures every measured file that
+names it, so since PR #666's second fold the rule reaches from every changed
+source under `src/<m>/`, measured or not, where the fold applied it to an
+unmeasured source alone. At `84a01d2a` the
+measured files calling `crate::primitives` are 39 of 82, `crate::transaction`
+7, `crate::block` 4. A `primitives` change re-measures the 39 in 16 shards of
+the complete run's 20. On `origin/beta` from 2026-10-03 to 2026-11-02, 25 of
+1,033 commits changed `src/primitives/` (12 of the 25 days with a commit; 2 of
+the last 50 commits), 36 changed `primitives` or `block`, and 9 changed
+nothing compiled but those two. Beta's last ten commits each planned alone:
+29 shards over the eight incremental ones under cut 7, 34 under the fold (each
+BEEF or Merkle landing adds the 5 substrates files that call
+`crate::transaction`; `script-c` grows from 3 files to 15, its row naming a
+test-only file), 46 under the second fold (`script-a` 40 files in 11 shards to
+43 in 14, the three BEEF files naming `crate::script`; `script-c` 15 in 5 to
+40 in 14, the measured `src/script/` files it changes reaching the 22 script
+files and the three BEEF files that name `crate::script`). An edit to the
+measured `src/transaction/beef.rs` alone re-measures 7 files in 2 shards (it,
+`beef_tx.rs` and the five substrates callers), one to
+`src/script/spend/flow.rs` 29 in 10.
+
+**The count per night** (`callee_added`, the keeper's word: "the record names
+per night how many files the cure added"). The plan's JSON carries
+`callee_rule` (the switch's value) and `callee_added`, the sorted names of the
+files the rule reached that no other row of the table reached (the reach run
+again with the rule off, the difference); a complete run carries an empty list.
+The record's `runs[]` entry carries the count under the run's `run_id` and
+`commit`; the scoreboard's header prints it beside the mode ("The callee rule
+added 5 files tonight (incremental): ..." with the names; "added 0 files
+tonight (complete: every file measured)"; "The callee rule is off" when
+`CALLEE_RULE` is). On the sample: `ffff16d0..84a01d2a` adds 5 (the substrates
+callers of `crate::transaction`), `script-a` 3, `script-c` 25, the
+`primitives/hash.rs` probe 39 (every file it plans), a documentation night 0.
+
+**What is still carried that could move.** A callee two levels down: a change
+in `primitives` read only through `transaction` by a measured file reaches the
+files that name `crate::primitives`, not the ones that reach it through
+`transaction`. (A callee that is itself measured was in this list until the
+second fold: the rule now reaches from a changed measured file too.) A caller that names its callee by no `crate::` path in its own text: a
+`super::super::<m>` path, `bsv_rs::<m>`, or a macro defined in another
+module expanding `$crate::<m>` (none at `84a01d2a` in the measured files; an
+alias, `use crate::primitives as p;`, and a `$crate::<m>` in the file's own
+macro are read). A test-only file's tests reaching past its directory (the
+interpreter's `spend/tests.rs` drives `crate::script` from `spend/`). A file a
+source reads through a path built from one-deep pieces (`vectors/` and a name
+computed at run time). A test of one surface that kills another's mutant
+outside its selection (the oracle is `--lib` plus the selection; such a kill is
+never counted). The toolchain: the nightly runs the unpinned `stable`, so a
+compiler release between the complete run and a night can move a figure no
+path in the diff reaches. Each lasts until the next complete run.
+
+**The record.** A run artifact, `mutation-record` (`record.json` and the
+`Cargo.lock` every shard built), never a commit: a committed file needs the
+workflow's write permission on `beta` and would race the sequencer; an
+artifact needs neither. The source job finds the newest unexpired
+`mutation-record` of the line whose run measured an ancestor of the pin
+(`nightly_mutants.py latest-record`, through `gh api
+repos/Calhooon/bsv-rs/actions/artifacts?name=mutation-record`); none, and the
+night runs complete. Each run uploads the whole merged record for 90 days, the
+longest GitHub keeps one, so the chain lives while a run lands inside each 90
+days. Its shape:
+
+```json
+{
+  "schema_version": 1,
+  "commit": "<this run's pin>",
+  "complete_run": {"run_id": "...", "commit": "<sha>", "lockfile_sha256": "..."},
+  "runs": [{"run_id": "...", "commit": "<sha>", "mode": "complete", "files": 82,
+            "callee_added": 0}, "..."],
+  "lockfile_sha256": "...",
+  "files": {
+    "src/transaction/beef.rs": {
+      "surface": "beef", "generated": 0, "caught": 0, "missed": 0, "timeout": 0,
+      "unviable": 0, "viable": 0, "score_percent": 0.0, "no_viable": false,
+      "provenance": "night", "run_id": "...", "commit": "<sha>"
+    }
+  }
+}
+```
+
+`provenance` is `night` for a file this run measured and `carried` for one it
+took from the record, whose `run_id` and `commit` name the run that measured
+it. A run whose evidence is incomplete (a missing shard, a failed baseline)
+writes no record; a run whose floors fail writes one (the figures are
+measured). `docs/ratchets.json` keeps its shape: the floors stay there.
+
+**The scoreboard.** `report --plan` judges the night's files against their
+floors as before and lists every carried figure with its provenance
+(`carried: run <id> at <sha>`) and the complete run it carries from, and its
+header names how many files the callee rule added tonight, and which. A carried
+figure below its floor is a finding with its run named, listed under the
+table, never a new failure of the night.
+
+**The modes and the dispatch lines.**
+
+```sh
+# The night (the fleet's slot, 00:00Z): the reach rule's files, the rest carried.
+gh workflow run nightly.yml --ref beta
+# The complete run: at each prerelease pin (RELEASING.md step 3), before a minor tag, by hand.
+gh workflow run nightly.yml --ref beta -f mode=complete
+# The captain's Sunday night: the night and the bench.
+gh workflow run nightly.yml --ref beta -f weekly=true
+```
+
+A complete run is twenty shards in one wave (the keeper's cut 5): the
+measured minutes of run 41347058507 (script 130 per 515 mutants, BEEF 37 per
+187, Merkle 3 per 25, wire 19.5 per 198, substrates 36.5 per 286; 901
+shard-minutes) shared out by the largest remainder, about 47, 50, 11, 39 and
+49 minutes per shard, so the wave ends within the hour where the
+surfaces-by-four matrix at six took 3h12m. Each shard is one job on its own
+runner, one mutation worker, under the same `ulimit -v` of 4,000,000 KB through
+the runner hook (above): the ceiling is per test binary, so a narrower shard
+changes nothing about it. A night's shards are sized by its files' mutants in
+the record at those rates, 45 minutes a shard, at most the complete run's
+count per surface, six at a time (the balance rule of 2026-10-26). An empty
+plan runs no shard; the score job carries every figure. The bench is the
+`weekly` input: the workflow has no schedule, so "weekly" is the dispatcher's
+word, and the job dispatches `bench.yml` at the line's tip.
+
+The hermetic pass over survivors: the nightly has no job of that name at
+`84a01d2a`; the survivors' evidence is each shard's diffs, so a night's
+evidence holds the night's files' survivors alone.
+
+To plan a night by hand (no cargo; the record from a run's artifact):
+
+```sh
+python3 .github/scripts/nightly_mutants.py latest-record --line beta \
+  --commit "$(git rev-parse origin/beta)" --dest "$RUN_ROOT/base"
+python3 .github/scripts/nightly_mutants.py plan --commit "$(git rev-parse origin/beta)" \
+  --base-record "$RUN_ROOT/base" --output "$RUN_ROOT/plan.json"
+```
+
 ## Local replay
 
 Use the pinned tool, set `CARGO_TARGET_DIR` to a dedicated directory under
@@ -288,7 +487,7 @@ The fuzz job files its own crashes (below).
 
 ## Fuzz (#82)
 
-**What runs.** One job per target of `fuzz/Cargo.toml` (19 today, pinned to the matrix by `tests/arch_fuzz_targets_dispatched.rs`; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (AddressSanitizer, but `-s none` for `fuzz_script_spend_default`, whose 128 MiB budget ASan's resident set takes past the 2,048 MB RSS limit, #398) (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for one hour from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=3600`): a crash is recorded and the run goes on.
+**What runs.** One job per target of `fuzz/Cargo.toml` (19 today, pinned to the matrix by `tests/arch_fuzz_targets_dispatched.rs`; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (AddressSanitizer, but `-s none` for `fuzz_script_spend_default`, whose 128 MiB budget ASan's resident set takes past the 2,048 MB RSS limit, #398) (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for a fixed budget from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=$((FUZZ_MINUTES * 60))`): a crash is recorded and the run goes on. The budget is `FUZZ_MINUTES`, 10 minutes per target by default, set by the repository variable `NIGHTLY_FUZZ_MINUTES` (at most 30, under the job's 45-minute timeout); until cut 7 it was an hour (run 41347058507: 19 targets of 60 to 63 minutes each, six at a time, 4h07m of the night). Every target runs every night within the budget.
 
 **Where the results land.**
 
