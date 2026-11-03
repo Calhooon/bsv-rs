@@ -4,6 +4,13 @@
 //! 73 files. This guard reads `.github/workflows/ci.yml`, `Cargo.toml` and
 //! the top-level `tests/*.rs` (nothing else; no network, no environment) and
 //! refuses, naming the file, any binary no step runs.
+//!
+//! Since cut 4 (#667) a pull request runs the binaries its changed files reach
+//! (`.github/scripts/affected_tests.py`): the whole-suite step runs under the
+//! plan's `whole` flag, which the plan sets on every run that is not a pull
+//! request and on a pull request labeled `full-suite` (the landing run), and the
+//! reached step runs beside a check that the reached set lies within the whole.
+//! [`reached_refusals`] pins that shape.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::collections::BTreeSet;
@@ -37,6 +44,10 @@ struct Step {
     whole_suite: bool,
     named: Vec<String>,
     features: BTreeSet<String>,
+    /// The step's `if:`, when it has one.
+    condition: Option<String>,
+    /// Its binaries come from the plan (a `$VARIABLE` among its words): the reached set.
+    reached: bool,
 }
 
 /// Splits a shell line into words, keeping a double-quoted span whole.
@@ -128,9 +139,17 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
     let lines: Vec<&str> = ci.lines().collect();
     let mut out = Vec::new();
     let mut at = 0;
+    let mut condition = None;
     while at < lines.len() {
         let number = at + 1;
-        let mut command = lines[at].trim().to_owned();
+        let trimmed = lines[at].trim();
+        if trimmed.starts_with("- ") {
+            condition = None;
+        }
+        if let Some(test) = trimmed.strip_prefix("if:") {
+            condition = Some(test.trim().to_owned());
+        }
+        let mut command = trimmed.to_owned();
         while command.ends_with('\\') && at + 1 < lines.len() {
             command.pop();
             at += 1;
@@ -160,6 +179,7 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
         }
         let (mut named, mut asked) = (Vec::new(), Vec::new());
         let (mut all, mut default, mut tests, mut selector) = (false, true, false, false);
+        let reached = words.iter().any(|w| w.starts_with('$'));
         let mut i = 0;
         while i < words.len() {
             let (flag, inline) = match words[i].split_once('=') {
@@ -193,12 +213,14 @@ fn steps(ci: &str, table: &[(String, Vec<String>)]) -> Vec<Step> {
         // `--tests` builds every integration binary; so does a bare
         // `cargo test` with no target selector. A `--test <name>` alongside
         // is read as a named run, the brief's narrower form.
-        let whole_suite = named.is_empty() && (tests || !selector);
+        let whole_suite = named.is_empty() && !reached && (tests || !selector);
         out.push(Step {
             line: number,
             whole_suite,
             named,
             features: resolve(table, &asked, all, default),
+            condition: condition.clone(),
+            reached,
         });
     }
     out
@@ -352,6 +374,139 @@ fn refusals(ci: &str, manifest: &str, files: &[(String, String)]) -> Vec<String>
     errors
 }
 
+/// The Test Suite job's lines, 1-based and half open (`  test:` to the next job); the whole
+/// text when there is no such job (a fixture of steps alone).
+fn test_job(ci: &str) -> (usize, usize) {
+    let lines: Vec<&str> = ci.lines().collect();
+    let Some(start) = lines.iter().position(|l| *l == "  test:") else {
+        return (1, lines.len() + 1);
+    };
+    let end = lines[start + 1..]
+        .iter()
+        .position(|l| {
+            l.len() > 3
+                && l.starts_with("  ")
+                && !l.starts_with("   ")
+                && l.trim_end().ends_with(':')
+        })
+        .map_or(lines.len(), |at| start + 1 + at);
+    (start + 1, end + 1)
+}
+
+/// The plan's condition on the whole-suite step, and the reached step's.
+const WHOLE: &str = "steps.plan.outputs.whole == 'true'";
+const REACHED: &str = "steps.plan.outputs.whole != 'true'";
+
+/// The cut-4 shape (#667): every test step runs on a push, a dispatch and a tag's call, and on
+/// a pull request labeled `full-suite`; a pull request otherwise runs the reached set beside
+/// the subset check. Each refusal one line.
+fn reached_refusals(ci: &str, table: &[(String, Vec<String>)]) -> Vec<String> {
+    let mut errors = Vec::new();
+    let (from, to) = test_job(ci);
+    let found: Vec<Step> = steps(ci, table)
+        .into_iter()
+        .filter(|s| (from..to).contains(&s.line))
+        .collect();
+    let mut flags = BTreeSet::new();
+    for step in &found {
+        let Some(condition) = &step.condition else {
+            continue;
+        };
+        if step.reached {
+            if !condition.starts_with(REACHED) {
+                errors.push(format!(
+                    "ci.yml:{}: the reached step runs under `{condition}`, not `{REACHED} && ...`",
+                    step.line
+                ));
+            }
+            continue;
+        }
+        let flag = condition
+            .strip_prefix("steps.plan.outputs.")
+            .and_then(|rest| rest.strip_suffix(" == 'true'"))
+            .filter(|flag| flag.chars().all(|c| c.is_ascii_lowercase()));
+        match flag {
+            Some(flag) => {
+                flags.insert(flag.to_owned());
+            }
+            None => errors.push(format!(
+                "ci.yml:{}: a test step under `{condition}`; a test step runs always or under a plan flag (`steps.plan.outputs.<flag> == 'true'`)",
+                step.line
+            )),
+        }
+        if step.whole_suite && condition != WHOLE {
+            errors.push(format!(
+                "ci.yml:{}: the whole-suite step runs under `{condition}`, not `{WHOLE}`",
+                step.line
+            ));
+        }
+    }
+    let whole_steps = found.iter().filter(|s| s.whole_suite).count();
+    let reached_steps = found.iter().filter(|s| s.reached).count();
+    if reached_steps > 0 && whole_steps == 0 {
+        errors.push(
+            "ci.yml: a reached step and no whole-suite step: a landing runs a subset".to_owned(),
+        );
+    }
+    if flags.is_empty() && reached_steps == 0 {
+        return errors;
+    }
+    // the plan's path for every run that is not a pull request: every flag true
+    let push_path = ci
+        .lines()
+        .find(|line| line.contains("whole=true") && line.contains(">> \"$GITHUB_OUTPUT\""));
+    match push_path {
+        None => errors.push(
+            "ci.yml: no plan line writes whole=true to GITHUB_OUTPUT for a run that is not a pull request".to_owned(),
+        ),
+        Some(line) => {
+            for flag in &flags {
+                if !line.split_whitespace().any(|w| w == format!("{flag}=true")) {
+                    errors.push(format!(
+                        "ci.yml: the plan's whole path does not set {flag}=true: a push skips that step"
+                    ));
+                }
+            }
+        }
+    }
+    for (needle, why) in [
+        (
+            "if [ \"$EVENT\" != pull_request ]; then",
+            "the plan's whole path keyed on the event",
+        ),
+        (
+            "gh api \"repos/$REPOSITORY/pulls/$PR\"",
+            "the label read live through the API",
+        ),
+        (
+            "*\",full-suite,\"*",
+            "the full-suite label selecting the whole suite",
+        ),
+        (
+            "affected_tests.py check",
+            "the check that the reached set lies within the whole",
+        ),
+        (
+            "test_affected_tests.py",
+            "the plan's own tests before the plan",
+        ),
+    ] {
+        if !ci.contains(needle) {
+            errors.push(format!("ci.yml: no `{needle}` ({why})"));
+        }
+    }
+    if ci
+        .lines()
+        .take_while(|l| !l.starts_with("jobs:"))
+        .any(|l| l.contains("labeled"))
+    {
+        errors.push(
+            "ci.yml: a `labeled` trigger: a label starts a second run; the job reads the label live".to_owned(),
+        );
+    }
+    errors
+}
+
 /// The top-level `tests/*.rs`, each an integration binary; module
 /// directories (`support/`, `arch_support/`, ...) are not binaries.
 fn tree() -> (String, String, Vec<(String, String)>) {
@@ -378,6 +533,8 @@ fn tree() -> (String, String, Vec<(String, String)>) {
 fn ci_runs_every_integration_test_binary() {
     let (ci, manifest, files) = tree();
     let errors = refusals(&ci, &manifest, &files);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let errors = reached_refusals(&ci, &feature_table(&manifest));
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     let asked: Vec<String> = HOUSE_FEATURES.split(',').map(str::to_owned).collect();
     let house = resolve(&feature_table(&manifest), &asked, false, true);
@@ -526,4 +683,96 @@ fn a_nextest_run_is_a_step_as_cargo_test_is() {
         errors,
         ["tests/wire_tracing_sink.rs: allowlisted as run apart by `--test wire_tracing_sink`, but no ci.yml step runs that on a feature set that compiles it"]
     );
+}
+
+/// The cut-4 workflow's test steps, in ci.yml's form (#667).
+const REACHED_CI: &str = r#"
+      - name: Plan the targets the change reaches
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            printf '%s\n' whole=true lib=true doc=true memory=true tracing=true >> "$GITHUB_OUTPUT"
+          fi
+          python3 -B -m unittest discover -s .github/scripts -p 'test_affected_tests.py'
+          labels=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq '[.labels[].name] | join(",")')
+          if [[ ",$labels," == *",full-suite,"* ]]; then
+      - name: Check the reached set within the whole
+        run: python3 -B .github/scripts/affected_tests.py check --plan p --metadata m
+      - name: Run unit tests
+        if: steps.plan.outputs.lib == 'true'
+        run: cargo nextest run --lib --all-features
+      - name: Run every integration test
+        if: steps.plan.outputs.whole == 'true'
+        run: cargo nextest run --features "full,http" --tests --no-fail-fast
+      - name: Run the integration tests the change reaches
+        if: steps.plan.outputs.whole != 'true' && steps.plan.outputs.reached != '0'
+        run: cargo nextest run --features "full,http" $REACHED_TESTS --no-fail-fast
+      - name: Run the memory profiling tests
+        if: steps.plan.outputs.memory == 'true'
+        run: cargo nextest run --test memory_profiling --all-features
+"#;
+
+#[test]
+fn a_reached_step_is_no_whole_suite_step_and_the_plan_shape_passes() {
+    let table = feature_table(MANIFEST);
+    let found = steps(REACHED_CI, &table);
+    let reached: Vec<bool> = found.iter().map(|s| s.reached).collect();
+    let whole: Vec<bool> = found.iter().map(|s| s.whole_suite).collect();
+    assert_eq!(reached, [false, false, true, false]);
+    assert_eq!(whole, [false, true, false, false]);
+    assert_eq!(found[1].condition.as_deref(), Some(WHOLE));
+    assert_eq!(reached_refusals(REACHED_CI, &table), Vec::<String>::new());
+    let files = [
+        file("a", ""),
+        file("memory_profiling", "#![cfg(feature = \"dhat-profiling\")]"),
+        file("wire_tracing_sink", "#![cfg(feature = \"tracing\")]"),
+    ];
+    let traced = format!(
+        "{REACHED_CI}      - name: Run the tracing sink tests\n        if: steps.plan.outputs.tracing == 'true'\n        run: cargo nextest run --features \"full,tracing\" --test wire_tracing_sink\n"
+    );
+    assert_eq!(refusals(&traced, MANIFEST, &files), Vec::<String>::new());
+    assert_eq!(reached_refusals(&traced, &table), Vec::<String>::new());
+    // outside the Test Suite job, another job's conditional cargo step is not judged
+    let jobs = format!("jobs:\n  test:\n{traced}  checks:\n    steps:\n      - name: x\n        if: always()\n        run: cargo test --doc\n");
+    assert_eq!(reached_refusals(&jobs, &table), Vec::<String>::new());
+}
+
+#[test]
+fn a_landing_or_a_push_that_could_run_a_subset_is_refused() {
+    let table = feature_table(MANIFEST);
+    // the whole-suite step under another condition: a push would skip it
+    let other = REACHED_CI.replace(
+        "if: steps.plan.outputs.whole == 'true'",
+        "if: github.event_name == 'push'",
+    );
+    assert!(reached_refusals(&other, &table)
+        .iter()
+        .any(|e| e.contains("the whole-suite step runs under")));
+    // the plan's push path leaving a flag false
+    let skipped = REACHED_CI.replace(" memory=true", "");
+    assert_eq!(
+        reached_refusals(&skipped, &table),
+        ["ci.yml: the plan's whole path does not set memory=true: a push skips that step"]
+    );
+    // no subset check, no live label read, a labeled trigger
+    let unchecked = REACHED_CI.replace("affected_tests.py check", "affected_tests.py");
+    assert!(reached_refusals(&unchecked, &table)
+        .iter()
+        .any(|e| e.contains("lies within the whole")));
+    let unlabeled = REACHED_CI.replace("full-suite", "full");
+    assert!(reached_refusals(&unlabeled, &table)
+        .iter()
+        .any(|e| e.contains("full-suite label")));
+    let triggered =
+        format!("on:\n  pull_request:\n    types: [opened, labeled]\njobs:\n{REACHED_CI}");
+    assert!(reached_refusals(&triggered, &table)
+        .iter()
+        .any(|e| e.contains("a `labeled` trigger")));
+    // a reached step and no whole-suite step
+    let subset_only = REACHED_CI.replace(
+        "run: cargo nextest run --features \"full,http\" --tests --no-fail-fast",
+        "run: echo none",
+    );
+    assert!(reached_refusals(&subset_only, &table)
+        .iter()
+        .any(|e| e.contains("a landing runs a subset")));
 }
