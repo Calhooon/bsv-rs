@@ -2584,7 +2584,8 @@ impl Cursor {
     /// [`from_binary`](Self::from_binary) reads a BSC2 cursor as BSC3 with no
     /// edge for a transaction read before it: the walk reaches less, so it
     /// only refuses more, never accepts wrongly. BSC1 is refused: restart
-    /// its reading.
+    /// its reading. A transaction's flags byte this writes is 0 or 2;
+    /// [`from_binary`](Self::from_binary) refuses any other.
     /// A paused cursor appends the transaction and the input reached.
     pub fn to_binary(&self) -> Vec<u8> {
         fn put_hash(w: &mut Writer, h: &Option<Hash32>) {
@@ -2744,7 +2745,8 @@ impl Cursor {
         w.into_bytes()
     }
 
-    /// A cursor from its bytes.
+    /// A cursor from its bytes. A BSC3 (and BSC4, BSC5) transaction's flags
+    /// byte is 0 or 2, the raw bit; any other value is refused.
     pub fn from_binary(bin: &[u8]) -> crate::Result<Self> {
         fn bad(what: &str) -> crate::Error {
             crate::Error::BeefError(format!("not a cursor: {what}"))
