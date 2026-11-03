@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the `ls_identity` parsers read the output from the BEEF's subject, as the reference's discovery does (#721)
+
+- #720's rule read found both `ls_identity` parsers
+  (`parse_output_to_certificate`, `parse_output_to_verifiable_certificate`)
+  taking the transaction of a lookup output's BEEF by `beef.txs.first()`. The
+  reference's discovery (the toolbox's `IdentityEvidenceVerifier.parse`,
+  `identityUtils.ts:600-612` at `ts-stack@edf6e03`) loads
+  `beef.atomicTxid ?? beef.txs.at(-1)?.txid` through `findAtomicTransaction`
+  and reads `outputIndex` on it (`TransactionEvidence.ts:110-127`), the rule of
+  `Transaction.fromBEEF` and of this crate's `Transaction::from_beef(_, None)`,
+  which the revocation already used. Every writer (TS 2, TS 3, this crate)
+  lists parents first, so for a revelation whose own transaction is unproven
+  (its BEEF carries a parent, proven or not) the parsers read the parent and
+  skipped the token; and a
+  BEEF listing the subject before its parent with no atomic header was read
+  where the reference reads the parent and skips. Both parsers now read
+  through `Transaction::from_beef(&output.beef, None)`; a BEEF it refuses is a
+  skip. The table of shapes is `docs/lanes/fix-721.md`.
+- The witness is `tests/vectors/identity_beef_subject_721.json`, written by
+  `tests/support/identity_beef_subject_721.mjs` against #553's bundle (the SDK
+  and the toolbox's `identityUtils.ts` at `edf6e03`, `parseEvidence`
+  exported) under Node v22.18.0; two runs are byte-identical. Five shapes of
+  one proven parent and one subject carrying the reference's revelation token
+  (#553's), each with the bytes, the selected txid and `parseResults`' outcome.
+  `tests/identity_beef_subject_721.rs` rebuilds each with this crate's BEEF
+  writer to the recorded bytes and serves it through `resolve_by_attributes`
+  and `discover_certificates`: RED on `0d8546c0` on 3 of 5 shapes (parent
+  first, atomic parent first: skipped where the reference reads; subject first
+  without a header: read where it skips), GREEN after; the lone subject and the
+  atomic subject first agree on both.
+- No public API change. The results of `resolve_by_identity_key`,
+  `resolve_by_attributes`, `query`, `discover_certificates` and
+  `discover_certificates_by_type` move for a multi-transaction BEEF: a
+  revelation whose own transaction is unproven is now returned, and one listed
+  before its parent in a non-atomic BEEF is now skipped. No error text changes.
+
 ### Tests: a script built by hand from chunks with empty or misplaced data is the reference's, its ASM pinned (#661)
 
 No behaviour change. #652's re-read found `Script::from_chunks` with
