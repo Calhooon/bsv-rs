@@ -86,6 +86,36 @@ removed) and the scratch step above the checkout in its fourth; `WorkflowKeyTest
 scratch copy of the tip with the check's condition removed (the check named, running under
 an empty condition), and on the base's `ci.yml` (`semver: no plan step`).
 
+## The two remaining rows (#689)
+
+Branch `lane/fix-689` from `origin/beta` at `ba59e71d`. Planned on the tip tree, one
+changed path each, with the plan step's reading (`reach` and `finish` on the tree, the
+tree's `tests/CLAUDE.md` as the base rows):
+
+| Changed path | Before (`ba59e71d`'s script) | After |
+|---|---|---|
+| `CHANGELOG.md` | `integration binaries reached: 1 of 288`, `build: True; docs only: True`; `named by 1 binaries' sources` (`arch_ci_lines`) | `integration binaries reached: 0 of 288`, `build: False; docs only: True`; `documentation no test reads` |
+| `src/script/CLAUDE.md` | `integration binaries reached: 7 of 288`, `build: True; docs only: True`; `under a directory 7 binaries walk` (`arch_arc_deprecated`, `arch_network_sites`, `arch_no_env`, `arch_no_string_errors`, `arch_no_system_time`, `arch_no_unwrap`, `arch_tests_claude_rows_name_modules_706`) | `integration binaries reached: 0 of 288`, `build: False; docs only: True`; `documentation no test reads` |
+| `src/script/spend/mod.rs` | `unit: True; doc: True; memory: True; tracing: True`, `integration binaries reached: 227 of 288`, `build: True; docs only: False` | the same lines, the same 229 binaries |
+
+- **The changelog row: fixed at the planner, not by splitting the string.** The reach rule's
+  record (`docs/lanes/ci-speed-4.md`, "Any other path") reads names in string literals so
+  that prose reaches nothing; an assertion's needle and its message are prose that happens
+  to sit in a literal. Splitting `arch_ci_lines`'s needle would leave the next needle or
+  message naming a file to trip the same reading. A literal holding whitespace now names no
+  file (`literal_text`); no tracked path holds a space. Across the 3,934 tracked paths the
+  rule drops 98 (binary, path) pairs over 20 paths' reach (with the walker
+  rule below, 297 pairs over 48 paths), every one a word in a message or a needle (no
+  binary of the 98 pairs opens or runs the file it drops); it adds none. No `tests/arch_*.rs` reads
+  `CHANGELOG.md`: `arch_ci_lines` names it in a needle of `ci.yml`, and four other test
+  files in comments, so a changelog change keeps no binary.
+- **The module `CLAUDE.md` row: open on the tip, now closed.** The docs-only reading
+  (`is_documentation`) already counted `src/**/CLAUDE.md` as Markdown no gate reads, so
+  `lint`, `checks` and `semver` exited on it; the Test Suite did not, since the fixture
+  clause's walk reached the seven walkers of `src/`. Every one reads `.rs` files alone
+  (`tests/arch_support/mod.rs`) or lists the module directories; a Markdown file under
+  `src/` (28 on the tip) reaches no walker now.
+
 ## The ratchet record rule (the #688 fold)
 
 The cold read's FIX: under the reading above as the lane wrote it (`docs/` or a `*.md`), a

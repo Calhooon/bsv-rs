@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: a `CHANGELOG.md` change reaches no binary through an assertion's literal, and a module's `CLAUDE.md` reaches nothing (#689's two remaining rows)
+
+- The Test Suite's plan (`.github/scripts/affected_tests.py`) read every
+  string literal of a test source as a read of the path it names, so
+  `tests/arch_ci_lines.rs`'s needle of `ci.yml`'s text (`case "$file" in
+  Cargo.toml | CHANGELOG.md) ;; ...`) put that binary in the plan of every
+  pull request touching the changelog. A literal holding whitespace is now a
+  sentence, a message or a command, never a path read: no tracked path holds
+  a space. On the tip a `CHANGELOG.md`-only change plans `integration
+  binaries reached: 0 of 288`, `build: False` (1 before). No test reads
+  `CHANGELOG.md` (four name it in comments, `arch_ci_lines` in a needle).
+  Across the 3,934 tracked paths the rule drops 98 (binary, path) pairs over
+  20 paths' reach, each a word in a message or a needle (`docs/FIXTURES.md` in
+  a stub's label, a recorder's `.mjs` named in its test's message, the fuzz
+  corpora's `hex` and `base64`, `tools/ratchet/run`'s `run`); none of those
+  binaries opens or runs the file.
+- A module's Markdown under `src/` (`src/<m>/CLAUDE.md`, 28 files) reached
+  the seven binaries that walk `src/`, every one of which reads the `.rs`
+  files alone (`tests/arch_support/mod.rs`) or the module directories
+  (`arch_tests_claude_rows_name_modules_706`). It reaches no walker now:
+  `src/script/CLAUDE.md` alone plans 0 of 288, `build: False` (7 before). A
+  source under `src/` reaches the same set as before (`src/script/spend/mod.rs`:
+  229 binaries, unit, doc, memory and tracing, before and after).
+
+Pinned by `.github/scripts/test_affected_tests.py`:
+`test_a_path_only_in_an_assertions_literal_is_not_read_689` (a fixture with
+the path only in an assertion's needle, its message and a `format!` reaches
+nothing; `include_str!` and `Path::new` of it reach) and
+`test_a_module_claude_md_reaches_no_walker_of_src_689` (a module's `CLAUDE.md`
+and another Markdown under `src/` reach nothing, a Rust source beside them and
+Markdown under a walked `tests/` tree still do), each RED on the base's script;
+`test_a_docs_only_change_reaches_nothing` now asserts no binary and no build.
+No Rust file changes.
+
 ### Fixed: PushDrop's canonical refusal checks the field bounds before the envelope (#616)
 
 - A token this crate's lock-before read refuses (no `OP_CHECKSIG` second) is refused

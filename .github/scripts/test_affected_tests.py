@@ -71,8 +71,39 @@ class ReachTests(unittest.TestCase):
         plan = self.plan(["docs/notes.md", "src/script/CLAUDE.md"])
         self.assertFalse(plan["everything"])
         self.assertFalse(plan["lib"] or plan["doc"] or plan["memory"] or plan["tracing"])
-        # src/script/CLAUDE.md lies under `src`, which arch_f walks; nothing else reads either
+        # src/script/CLAUDE.md lies under `src`, which arch_f walks for Rust sources (#689)
+        self.assertEqual(plan["integration"], [])
+        self.assertFalse(plan["build"])
+
+    def test_a_module_claude_md_reaches_no_walker_of_src_689(self):
+        # #689: the walkers of src/ read its `.rs` files; a module's Markdown is documentation
+        # there, while a Rust source beside it, or Markdown under a walked tests/ tree, is reached
+        for path in ("src/script/CLAUDE.md", "src/wallet/notes.md"):
+            with self.subTest(path=path):
+                plan = self.plan([path])
+                self.assertEqual(plan["integration"], [])
+                self.assertEqual(plan["reasons"][path]["why"], "documentation no test reads")
+        self.assertIn("arch_f", self.plan(["src/script/spend.rs"])["integration"])
+        (self.root / "tests/walk_i.rs").write_text(
+            'fn w() { std::fs::read_dir("tests/data").unwrap(); }\n')
+        (self.root / "tests/data/notes.md").write_text("x\n")
+        # vec_e by its `format!` template under tests/data, walk_i by its walk
+        self.assertEqual(self.plan(["tests/data/notes.md"])["integration"], ["vec_e", "walk_i"])
+
+    def test_a_path_only_in_an_assertions_literal_is_not_read_689(self):
+        # #689: arch_ci_lines holds `Cargo.toml | CHANGELOG.md)` as a needle of ci.yml's text;
+        # a literal holding whitespace is a sentence, a message or a command, never a path read
+        (self.root / "tests/needle_h.rs").write_text(
+            'fn n(ci: &str) {\n    assert!(ci.contains("case \\"$file\\" in Cargo.toml | CHANGELOG.md) ;;"),\n'
+            '        "a release commit touches Cargo.toml and CHANGELOG.md alone");\n'
+            '    let _ = format!("{} names CHANGELOG.md", ci);\n}\n')
+        plan = self.plan(["CHANGELOG.md"])
+        # arch_f reads the file (`fs::read_to_string("CHANGELOG.md")`): still reached
         self.assertEqual(plan["integration"], ["arch_f"])
+        (self.root / "tests/reader_j.rs").write_text(
+            'const C: &str = include_str!("../CHANGELOG.md");\n'
+            'fn r() { let _ = std::path::Path::new("CHANGELOG.md"); }\n')
+        self.assertEqual(self.plan(["CHANGELOG.md"])["integration"], ["arch_f", "reader_j"])
 
     def test_a_docs_only_change_builds_nothing_and_exits(self):
         # #668: docs/ alone reaches nothing, so the Test Suite builds nothing
@@ -171,7 +202,7 @@ class ReachTests(unittest.TestCase):
         # `Path.is_dir` on it raised ENAMETOOLONG on Python 3.11 to 3.13, the runner's 3.12
         (self.root / "tests/walk_h.rs").write_text(
             "fn w() { std::fs::read_dir(\"src\").unwrap(); let _ = \"" + "ab" * 150 + "\"; }\n")
-        self.assertIn("walk_h", self.plan(["src/script/CLAUDE.md"])["integration"])
+        self.assertIn("walk_h", self.plan(["src/script/spend.rs"])["integration"])
 
     def test_a_readme_change_reaches_the_binary_that_reads_it(self):
         # one literal per line in the joined text: `$` matched before the newline after
