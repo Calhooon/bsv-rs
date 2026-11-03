@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: a script built by hand from chunks with empty or misplaced data is the reference's, its ASM pinned (#661)
+
+No behaviour change. #652's re-read found `Script::from_chunks` with
+`ScriptChunk::new` holding chunks no parser produces (`Some(vec![])` on `OP_1`,
+`OP_0`, `0x01` or `OP_PUSHDATA1`, which writes `""`; data on `OP_DUP`, which
+writes `0102`; an `OP_RETURN` with data followed by more chunks, which the
+serializer drops and `to_asm` writes) and asked for a rule: refuse at
+construction, or write what the serializer writes. The reference does
+neither: `new Script(chunks)` holds any `{ op, data? }` (`ts-stack@edf6e03`
+`ScriptChunk.ts`), its bytes are `#writeChunkData`'s
+(`Script.ts:474-490,539-562`: the data after an opcode below `OP_PUSHDATA1`,
+after a PUSHDATA opcode with its length, after an `OP_RETURN` with nothing
+after it, after any other opcode none) and its ASM `#_chunkToString`'s
+(`:668-677`: a chunk with data its data's hex alone, whatever the opcode), so it
+round-trips none of these shapes either. This crate already writes the
+reference's bytes on every one of them and its ASM save the eight texts the
+parity note names, and its answer stays the reference's, not a stricter one:
+`from_chunks` refuses nothing, `to_binary` writes the reference's bytes and
+`to_asm` its text but for those eight.
+
+`tests/script_chunk_asm_661.rs` (five tests) against
+`vectors/script_chunk_asm_661.json` (twenty-four shapes recorded by
+`support/script_chunk_asm_661.mjs` under Node v22.18.0, two runs
+byte-identical: the reference's `toHex`, `toASM`, `fromASM` of that text and
+`fromHex` of those bytes): the bytes on all 24; the ASM on 16, the other 8
+enumerated (`ASM_STATED`); `from_asm` of the reference's text the reference's
+bytes on 13, refused by both on 2 (`undefined`), the other 9 #603 shard A's
+stated readings (`READ_BACK_STATED`);
+the round trip holding here on 7 shapes and in the reference on 5, each
+listed; the issue's four empty-data shapes and `OP_DUP` with `[1, 2]` by
+name. Green on `c6781b4a` (nothing to fix). RED under the issue's two other
+rules, planted in a scratch copy: `to_asm` writing the ASM of the serialized
+bytes, 3 of 5; `from_chunks` normalizing as go-sdk's writer does, 5 of 5.
+
+### Notes: cross-SDK parity (#661)
+
+Three texts this crate writes differ from the reference's, all older than #661
+and unchanged by it (the `0`/`-1` and `OP_UNKNOWN<n>` texts stated against the
+reference by this note and its row alone): `OP_0` and `OP_1NEGATE` are `0` and
+`-1` here and `OP_0` and `OP_1NEGATE` there (go-sdk@2ca481c writes `OP_FALSE`
+and `OP_1NEGATE`, `script/opcodes.go:545-546,625`, and its `NewFromASM` cannot
+read `0` or `-1`, `script/script.go:46-63`), a public output of every script
+holding them, open for the keeper's word; a direct push opcode without data is
+`OP_UNKNOWN<n>` here and `undefined` there (`OP[op]`), neither reading back;
+and #634's `OP_RETURN` writer, stated there (with empty data, #603 shard B's
+bare `OP_RETURN` row). go-sdk holds no such chunk in a script:
+`NewScriptFromScriptOps` (`script/script_chunk.go:119-163`) re-encodes a push
+opcode's data as its minimal push (`01` with empty data is `00`, `03` with one
+byte `01aa`, `OP_PUSHDATA1` with one byte `01aa`) and drops data on every other
+opcode but `OP_RETURN`, whose data it appends before it stops, so its bytes
+differ from the reference's and this crate's on 11 of the 24 shapes
+(transcribed in the recorder, not run). The row is in `CLAUDE.md`'s divergence
+list.
+
 ### Fixed: the contacts manager reads a listed token as the reference's `PushDrop.decode` does, so its count, bounds and envelope refuse in the reference's order and words (#718)
 
 - #717's rule read checked the shared canonical refusal against

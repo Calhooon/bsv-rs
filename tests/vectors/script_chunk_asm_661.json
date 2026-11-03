@@ -1,0 +1,508 @@
+{
+ "source": "tests/support/script_chunk_asm_661.mjs",
+ "runtime": "node v22.18.0",
+ "reference": "bsv-blockchain/ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9 packages/sdk (bun bundle)",
+ "go": "bsv-blockchain/go-sdk@2ca481c5931b987a0c8f48bb341c70b7477b6b07 script/script_chunk.go:119-163, transcribed, not run",
+ "shapes": [
+  {
+   "id": "op1-empty-data",
+   "note": "the issue: Some(vec![]) on OP_1",
+   "chunks": [
+    {
+     "op": 81,
+     "data": ""
+    }
+   ],
+   "ts": {
+    "to_hex": "51",
+    "asm": "",
+    "asm_back_hex": "00",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_1"
+   },
+   "go_transcribed": {
+    "to_hex": "51"
+   }
+  },
+  {
+   "id": "op0-empty-data",
+   "note": "the issue: Some(vec![]) on OP_0",
+   "chunks": [
+    {
+     "op": 0,
+     "data": ""
+    }
+   ],
+   "ts": {
+    "to_hex": "00",
+    "asm": "",
+    "asm_back_hex": "00",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_0"
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "push1-empty-data",
+   "note": "the issue: Some(vec![]) on the direct push 0x01",
+   "chunks": [
+    {
+     "op": 1,
+     "data": ""
+    }
+   ],
+   "ts": {
+    "to_hex": "01",
+    "asm": "",
+    "asm_back_hex": "00",
+    "asm_back_error": null,
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "pushdata1-empty-data",
+   "note": "the issue: Some(vec![]) on OP_PUSHDATA1",
+   "chunks": [
+    {
+     "op": 76,
+     "data": ""
+    }
+   ],
+   "ts": {
+    "to_hex": "4c00",
+    "asm": "",
+    "asm_back_hex": "00",
+    "asm_back_error": null,
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "dup-op1empty-dup",
+   "note": "an empty-data OP_1 between two opcodes: a double space",
+   "chunks": [
+    {
+     "op": 118,
+     "data": null
+    },
+    {
+     "op": 81,
+     "data": ""
+    },
+    {
+     "op": 118,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "765176",
+    "asm": "OP_DUP  OP_DUP",
+    "asm_back_hex": "760076",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_DUP OP_1 OP_DUP"
+   },
+   "go_transcribed": {
+    "to_hex": "765176"
+   }
+  },
+  {
+   "id": "op-return-data-then-op1",
+   "note": "the issue: an OP_RETURN with data followed by a chunk",
+   "chunks": [
+    {
+     "op": 106,
+     "data": "51"
+    },
+    {
+     "op": 81,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "6a51",
+    "asm": "51 OP_1",
+    "asm_back_hex": "015151",
+    "asm_back_error": null,
+    "hex_back_asm": "51"
+   },
+   "go_transcribed": {
+    "to_hex": "6a51"
+   }
+  },
+  {
+   "id": "op-return-push-then-dup",
+   "note": "an OP_RETURN carrying a push, then OP_DUP",
+   "chunks": [
+    {
+     "op": 106,
+     "data": "0568656c6c6f"
+    },
+    {
+     "op": 118,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "6a0568656c6c6f",
+    "asm": "0568656c6c6f OP_DUP",
+    "asm_back_hex": "060568656c6c6f76",
+    "asm_back_error": null,
+    "hex_back_asm": "0568656c6c6f"
+   },
+   "go_transcribed": {
+    "to_hex": "6a0568656c6c6f"
+   }
+  },
+  {
+   "id": "op-return-empty-data-then-op1",
+   "note": "an OP_RETURN with empty data followed by a chunk",
+   "chunks": [
+    {
+     "op": 106,
+     "data": ""
+    },
+    {
+     "op": 81,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "6a",
+    "asm": " OP_1",
+    "asm_back_hex": "0051",
+    "asm_back_error": null,
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "6a51"
+   }
+  },
+  {
+   "id": "op-return-empty-data",
+   "note": "an OP_RETURN with empty data alone",
+   "chunks": [
+    {
+     "op": 106,
+     "data": ""
+    }
+   ],
+   "ts": {
+    "to_hex": "6a",
+    "asm": "",
+    "asm_back_hex": "00",
+    "asm_back_error": null,
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "6a"
+   }
+  },
+  {
+   "id": "dup-with-data",
+   "note": "the issue: data on a non-push opcode, OP_DUP with [1, 2]",
+   "chunks": [
+    {
+     "op": 118,
+     "data": "0102"
+    }
+   ],
+   "ts": {
+    "to_hex": "76",
+    "asm": "0102",
+    "asm_back_hex": "020102",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_DUP"
+   },
+   "go_transcribed": {
+    "to_hex": "76"
+   }
+  },
+  {
+   "id": "checksig-with-data",
+   "note": "data on OP_CHECKSIG",
+   "chunks": [
+    {
+     "op": 172,
+     "data": "ab"
+    }
+   ],
+   "ts": {
+    "to_hex": "ac",
+    "asm": "ab",
+    "asm_back_hex": "01ab",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_CHECKSIG"
+   },
+   "go_transcribed": {
+    "to_hex": "ac"
+   }
+  },
+  {
+   "id": "op1negate-with-data",
+   "note": "data on OP_1NEGATE",
+   "chunks": [
+    {
+     "op": 79,
+     "data": "81"
+    }
+   ],
+   "ts": {
+    "to_hex": "4f",
+    "asm": "81",
+    "asm_back_hex": "0181",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_1NEGATE"
+   },
+   "go_transcribed": {
+    "to_hex": "4f"
+   }
+  },
+  {
+   "id": "push1-two-bytes",
+   "note": "a direct push whose data is longer than its opcode says",
+   "chunks": [
+    {
+     "op": 1,
+     "data": "0102"
+    }
+   ],
+   "ts": {
+    "to_hex": "010102",
+    "asm": "0102",
+    "asm_back_hex": "020102",
+    "asm_back_error": null,
+    "hex_back_asm": "01 "
+   },
+   "go_transcribed": {
+    "to_hex": "020102"
+   }
+  },
+  {
+   "id": "push3-one-byte",
+   "note": "a direct push whose data is shorter than its opcode says",
+   "chunks": [
+    {
+     "op": 3,
+     "data": "aa"
+    }
+   ],
+   "ts": {
+    "to_hex": "03aa",
+    "asm": "aa",
+    "asm_back_hex": "01aa",
+    "asm_back_error": null,
+    "hex_back_asm": "aa"
+   },
+   "go_transcribed": {
+    "to_hex": "01aa"
+   }
+  },
+  {
+   "id": "pushdata1-small",
+   "note": "OP_PUSHDATA1 carrying one byte (non-minimal)",
+   "chunks": [
+    {
+     "op": 76,
+     "data": "aa"
+    }
+   ],
+   "ts": {
+    "to_hex": "4c01aa",
+    "asm": "aa",
+    "asm_back_hex": "01aa",
+    "asm_back_error": null,
+    "hex_back_asm": "aa"
+   },
+   "go_transcribed": {
+    "to_hex": "01aa"
+   }
+  },
+  {
+   "id": "pushdata2-small",
+   "note": "OP_PUSHDATA2 carrying two bytes (non-minimal)",
+   "chunks": [
+    {
+     "op": 77,
+     "data": "aabb"
+    }
+   ],
+   "ts": {
+    "to_hex": "4d0200aabb",
+    "asm": "aabb",
+    "asm_back_hex": "02aabb",
+    "asm_back_error": null,
+    "hex_back_asm": "aabb"
+   },
+   "go_transcribed": {
+    "to_hex": "02aabb"
+   }
+  },
+  {
+   "id": "push1-no-data",
+   "note": "a direct push opcode with no data",
+   "chunks": [
+    {
+     "op": 1,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "01",
+    "asm": "undefined",
+    "asm_back_hex": null,
+    "asm_back_error": "Invalid hex string",
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "push4b-no-data",
+   "note": "the direct push 0x4b with no data",
+   "chunks": [
+    {
+     "op": 75,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "4b",
+    "asm": "undefined",
+    "asm_back_hex": null,
+    "asm_back_error": "Invalid hex string",
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "pushdata1-no-data",
+   "note": "OP_PUSHDATA1 with no data",
+   "chunks": [
+    {
+     "op": 76,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "4c",
+    "asm": "OP_PUSHDATA1",
+    "asm_back_hex": "4c00",
+    "asm_back_error": null,
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "pushdata4-no-data",
+   "note": "OP_PUSHDATA4 with no data",
+   "chunks": [
+    {
+     "op": 78,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "4e",
+    "asm": "OP_PUSHDATA4",
+    "asm_back_hex": "4e00000000",
+    "asm_back_error": null,
+    "hex_back_asm": ""
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "op0-no-data",
+   "note": "OP_0 as the parser holds it",
+   "chunks": [
+    {
+     "op": 0,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "00",
+    "asm": "OP_0",
+    "asm_back_hex": "00",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_0"
+   },
+   "go_transcribed": {
+    "to_hex": "00"
+   }
+  },
+  {
+   "id": "op1negate-no-data",
+   "note": "OP_1NEGATE as the parser holds it",
+   "chunks": [
+    {
+     "op": 79,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "4f",
+    "asm": "OP_1NEGATE",
+    "asm_back_hex": "4f",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_1NEGATE"
+   },
+   "go_transcribed": {
+    "to_hex": "4f"
+   }
+  },
+  {
+   "id": "undefined-op-ba",
+   "note": "an undefined opcode, 0xba",
+   "chunks": [
+    {
+     "op": 186,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "ba",
+    "asm": "OP_NOP11",
+    "asm_back_hex": "ba",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_NOP11"
+   },
+   "go_transcribed": {
+    "to_hex": "ba"
+   }
+  },
+  {
+   "id": "undefined-op-ff",
+   "note": "an undefined opcode, 0xff",
+   "chunks": [
+    {
+     "op": 255,
+     "data": null
+    }
+   ],
+   "ts": {
+    "to_hex": "ff",
+    "asm": "OP_INVALIDOPCODE",
+    "asm_back_hex": "ff",
+    "asm_back_error": null,
+    "hex_back_asm": "OP_INVALIDOPCODE"
+   },
+   "go_transcribed": {
+    "to_hex": "ff"
+   }
+  }
+ ]
+}
