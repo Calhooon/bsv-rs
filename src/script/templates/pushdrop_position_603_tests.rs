@@ -200,7 +200,7 @@ fn canonical_refusal_is_decode_canonical_pushdrop_kvstore_local_489() {
             continue;
         }
         assert_eq!(
-            canonical_refusal(&script, &[2]),
+            canonical_refusal(&script, &[2], 2 * 1024 * 1024, 2 * 1024 * 1024 + 1024),
             Some(canonical_words(&case)),
             "{}",
             case["name"]

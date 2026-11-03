@@ -1,5 +1,5 @@
 //! Local parser catches: reference words only for failures the reference also has.
-use super::lookup::refused;
+use super::lookup::{refused, MAX_LOCAL_TOKEN_BYTES};
 use crate::primitives::PublicKey;
 use crate::script::templates::pushdrop_position::{canonical_refusal, key_text_refusal};
 use crate::script::{templates::PushDrop, LockingScript};
@@ -41,5 +41,11 @@ fn decode_error(error: Error, script: &LockingScript) -> Error {
         return error;
     }
     // PushDrop.ts:73-77, then PushDropValidation.ts:59-74 with its two fields.
-    canonical_refusal(script, &[2]).map_or_else(|| refused(error.to_string()), refused)
+    canonical_refusal(
+        script,
+        &[2],
+        MAX_LOCAL_TOKEN_BYTES,
+        MAX_LOCAL_TOKEN_BYTES + 1024,
+    )
+    .map_or_else(|| refused(error.to_string()), refused)
 }

@@ -44,8 +44,10 @@ fn strict_utf8(field: &[u8]) -> Result<String> {
 
 /// `decodeCanonicalPushDrop(script, { fieldCount: [5, 6], ... })`.
 fn canonical(script: &LockingScript) -> Result<PushDrop> {
-    let token = PushDrop::decode_before(script)
-        .map_err(|error| canonical_refusal(script, &[5, 6]).map_or(error, refused))?;
+    let token = PushDrop::decode_before(script).map_err(|error| {
+        canonical_refusal(script, &[5, 6], MAX_VALUE_BYTES, MAX_PAYLOAD_BYTES)
+            .map_or(error, refused)
+    })?;
     if !matches!(token.fields.len(), 5 | 6) {
         return Err(refused("Unexpected PushDrop token field count"));
     }

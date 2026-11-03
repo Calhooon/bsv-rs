@@ -44,7 +44,10 @@ fn strict_utf8(field: &[u8]) -> Result<String> {
 /// `decodeCanonicalPushDrop(script, { fieldCount: 5, ... })` (`:163-167`).
 fn canonical(script: &LockingScript) -> Result<PushDrop> {
     let token = PushDrop::decode_before(script).map_err(|_| {
-        refused(canonical_refusal(script, &[5]).unwrap_or("Script is not a valid PushDrop format"))
+        refused(
+            canonical_refusal(script, &[5], MAX_FIELD_BYTES, MAX_PAYLOAD_BYTES)
+                .unwrap_or("Script is not a valid PushDrop format"),
+        )
     })?;
     if let Some(words) = script
         .chunks()

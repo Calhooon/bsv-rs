@@ -71,12 +71,19 @@ pub(crate) fn point_message(bytes: &[u8]) -> Option<&'static str> {
 }
 
 /// The words `decodeCanonicalPushDrop` (`PushDropValidation.ts:54-79`) with
-/// `counts` as its field counts throws for a script this crate's lock-before
-/// read refuses: the first chunk's read, then the key's parse
-/// (`PushDrop.ts:73-77`), then the count of the fields it reads (until the
-/// *next* chunk is a DROP, `:96-115`) and the envelope. `None` where the
-/// reference accepts a key this crate refuses.
-pub(crate) fn canonical_refusal(script: &LockingScript, counts: &[usize]) -> Option<&'static str> {
+/// `counts` as its field counts and `field_bytes` and `payload_bytes` as its
+/// `maximumFieldBytes` and `maximumPayloadBytes` throws for a script this
+/// crate's lock-before read refuses: the first chunk's read, then the key's
+/// parse (`PushDrop.ts:73-77`), then the count of the fields it reads (until
+/// the *next* chunk is a DROP, `:96-115`), each field's bound and the running
+/// payload's (`PushDropValidation.ts:63-73`, before the envelope, #616), and
+/// the envelope. `None` where the reference accepts a key this crate refuses.
+pub(crate) fn canonical_refusal(
+    script: &LockingScript,
+    counts: &[usize],
+    field_bytes: usize,
+    payload_bytes: usize,
+) -> Option<&'static str> {
     let chunks = script.chunks();
     let Some(first) = chunks.first() else {
         return Some("Cannot read properties of undefined (reading 'data')");
@@ -87,9 +94,9 @@ pub(crate) fn canonical_refusal(script: &LockingScript, counts: &[usize]) -> Opt
     if PublicKey::from_bytes(key).is_err() {
         return point_message(key);
     }
-    let mut fields = 0;
+    let mut fields = Vec::new();
     for index in 2..chunks.len() {
-        fields += 1;
+        fields.push(reference_field_len(&chunks[index]));
         if chunks
             .get(index + 1)
             .is_some_and(|chunk| matches!(chunk.op, op::OP_DROP | op::OP_2DROP))
@@ -97,11 +104,30 @@ pub(crate) fn canonical_refusal(script: &LockingScript, counts: &[usize]) -> Opt
             break;
         }
     }
-    Some(if counts.contains(&fields) {
-        "PushDrop token must use the canonical PushDrop envelope"
-    } else {
-        "Unexpected PushDrop token field count"
-    })
+    if !counts.contains(&fields.len()) {
+        return Some("Unexpected PushDrop token field count");
+    }
+    let mut payload = 0;
+    for field in fields {
+        if field > field_bytes {
+            return Some("PushDrop token contains an oversized field");
+        }
+        payload += field;
+        if payload > payload_bytes {
+            return Some("PushDrop token payload is too large");
+        }
+    }
+    Some("PushDrop token must use the canonical PushDrop envelope")
+}
+
+/// The length of the field `PushDrop.decode` reads from a chunk
+/// (`PushDrop.ts:98-109`): its data, else one byte for `OP_0`, `OP_1NEGATE`
+/// and the opcodes 80 to 96, else none.
+fn reference_field_len(chunk: &crate::script::ScriptChunk) -> usize {
+    match chunk.data.as_deref() {
+        Some(data) if !data.is_empty() => data.len(),
+        _ => usize::from(matches!(chunk.op, 0 | 0x4f | 80..=96)),
+    }
 }
 
 #[cfg(test)]
