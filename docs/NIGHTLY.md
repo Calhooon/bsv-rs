@@ -162,20 +162,21 @@ also stays in that gate on every surface, so its wall-clock bound cannot count a
 HTTP tests use `wiremock`; the job has no wallet
 credentials and makes no live wallet call.
 
-| Surface | Files mutated | Integration test targets at `2d3f5fd1` (#685, the direct reading) |
+| Surface | Files mutated | Integration test targets since #706's rows (#685, the direct reading) |
 | --- | --- | --- |
-| script | `src/script/**/*.rs` | 136: the binaries naming `script` (a `bsv_rs::script` path, a crate-root re-export of it, or a row naming it or a file of it) |
-| BEEF | `src/transaction/beef*.rs` | 104: those naming `transaction` |
-| merkle path | `src/transaction/merkle_path.rs` | the BEEF surface's 104 (one module) |
-| wallet wire | `src/wallet/wire/**/*.rs` | 134: those naming `wallet` |
-| wallet substrates | `src/wallet/substrates/**/*.rs` | the wire surface's 134 (one module) |
+| script | `src/script/**/*.rs` | 138: the binaries naming `script` (a `bsv_rs::script` path, a crate-root re-export of it, or a row's Modules cell naming it) |
+| BEEF | `src/transaction/beef*.rs` | 107: those naming `transaction` |
+| merkle path | `src/transaction/merkle_path.rs` | the BEEF surface's 107 (one module) |
+| wallet wire | `src/wallet/wire/**/*.rs` | 131: those naming `wallet` |
+| wallet substrates | `src/wallet/substrates/**/*.rs` | the wire surface's 131 (one module) |
 
 **The selection** (#685, the keeper's row of 2026-11-03 and word of
 16:1xZ; `selection` in `nightly_mutants.py`). A measured file's test targets are
 every integration binary that names its module, with `--lib`: the direct
 reading (`Tree.direct` in `affected_tests.py`, the run's alone), the binaries
 whose sources name the module by a `bsv_rs::<m>` path or a crate-root
-re-export, or whose `tests/CLAUDE.md` row names it or a file of it. A pull
+re-export, or whose `tests/CLAUDE.md` row names it in its Modules cell (since
+#706; a row named it or a file of it anywhere in its text before). A pull
 request's plan (`reach`, #680) reads `Tree.users` instead: those binaries and,
 one level, the binaries of the modules whose library code names `crate::<m>`;
 the run does not take the callers' level, where a build and not a run per
@@ -187,16 +188,17 @@ walks of `src/`, a literal naming the file), since a mutant rewrites the text it
 reads and its verdict on the text tests no behaviour; the binaries the Test Suite
 runs apart (`memory_profiling`, `wire_tracing_sink`); and the cost checks
 above. Every source of a module reaches the same binaries, so the 85 measured
-files' sets are three: 136 for the 43 script files, 104 for the four BEEF and
-Merkle files, 134 for the 38 wire and substrates files (median 136; with the
-callers' level they were 216, 206 and 166). A file the
+files' sets are three: 138 for the 43 script files, 107 for the four BEEF and
+Merkle files, 131 for the 38 wire and substrates files (median 138; 136, 104 and
+134 at `2d3f5fd1`, before #706's rows; with the callers' level 214, 204 and 164,
+216, 206 and 166 before). A file the
 rule names no binary for runs `--lib` alone and the plan names it (`lib_only`;
 none at `2d3f5fd1`). Both findings' tests are in the direct sets by their
 `bsv_rs::script` paths: `tests/pubkey_encoding_660.rs`,
 `tests/pubkey_point_shapes_660_adv.rs` and `tests/p2pk_hybrid_625.rs` name
-`bsv_rs::script` items, and their `tests/CLAUDE.md` rows name no module (the
-rule read of `59eeedcc`; the fold's text had said the rows name `script` and
-the templates). cargo-mutants runs one test command per shard, so a shard
+`bsv_rs::script` items, and their `tests/CLAUDE.md` rows named no module then
+(the rule read of `59eeedcc`; the fold's text had said the rows name `script` and
+the templates); since #706 the three rows name `primitives` and `script`. cargo-mutants runs one test command per shard, so a shard
 runs the union of its files' sets (`surface_tests` in the plan, the night's
 files' union; a complete run's is the surface's). Until #685 each surface ran
 the fixed list its row named (the script surface `tests/script_*.rs` and five
@@ -220,22 +222,54 @@ all in `wallet_originator_option_329` (its `auth::`, `identity::`, `kvstore::` a
 
 **What the direct reading leaves uncounted: the reading's stated limit.** The
 score is the measured file's under the targets that name its module, not the
-whole crate's; no reader takes it for the whole. The guard row #706 (every row
-names the modules its file reaches) narrows the limit. A binary that reaches a module
+whole crate's; no reader takes it for the whole. A binary that reaches a module
 only through a caller (it names `bsv_rs::transaction` and the transaction code
 calls `crate::script`) is not in that module's set, by construction: its kills
-of the module's mutants are not counted. The rule read of `59eeedcc`
-(2026-11-03) counted 80 script, 102 transaction and 32 wallet binaries of that
-class (`Tree.users(m)` less `Tree.direct(m)`, less the `arch_*` walkers, the two
-apart and `COST_CHECKS`), and found no guard pinning the row convention, so a
-row that names no module adds nothing to a set. The docs fold recomputed them
-from `affected_tests.py`'s `Tree` on `59eeedcc` (a read-only script; the figures
-reproduce: 81, 103 and 33 before the exclusions, one cost check each). Of the 259 `tests/CLAUDE.md` rows, 256 belong to a binary of the tree,
-and 233 of those name no module by `row_modules` (a `src/<m>/` path or a
-`` `<m>::`` path in the row); the rule read gave 223 of 256, which the fold did
-not reproduce by that reading or a looser one. The rows decide little: no
-script or transaction binary is in its set by its row alone, one wallet binary
-is (`primitives_public_key_forms_498`).
+of the module's mutants are not counted. Since #706 a row names modules by a
+convention a guard pins (`tests/CLAUDE.md`, "A row's modules"). Its Modules cell
+names at least the modules its binary's source names by a `bsv_rs::<m>` path or a
+crate-root re-export (a type or, since the #708 fold, one of the fourteen
+functions such as `bsv_rs::sha256`), over the binary and the module files it
+declares; a row shared by several files names each file's apart (`` `a.rs`:
+`m`; `b.rs`: none ``), its union no file's, so the #537 and #544 rows no longer put
+their twelve binaries in the `identity`, `kvstore`, `registry` and `storage` sets
+(five #544 files in `primitives`) their sources never name.
+`tests/arch_tests_claude_rows_name_modules_706.rs` refuses a binary without a row,
+a row naming fewer and a shared row without a part per file;
+`.github/scripts/rows_from_sources.py` writes the cells, and its `--check`, the
+guard's refusals in Python, runs in the Test Suite's plan step beside the plan's
+own tests. That clause moves no selection: `Tree.uses` reads the source already.
+What moves one is the caller clause, a module the binary reaches only through a
+caller named where the row's description says the binary exercises it. It is a
+judgment, applied once by the writer's word list (`CALLER_WORDS`; a shared row
+takes none, its description being every file's), and its six pairs are frozen in
+`tests/caller_modules_706.txt`, which the guard and `--check` both read:
+`beef_order_held`, `beef_stream_603_s4` and `registry_integration_tests` in
+`script`, `auth_fetch_423_payment`, `wallet_http_json_pending_432` and
+`wallet_http_json_success_bytes_365` in `transaction`. `affected_tests.py` reads
+the cell alone (`row_modules`; a row of four cells, the table before #706, by the
+old patterns), so a description pointing at another file's witnesses
+(`src/identity/...` in an auth binary's row) puts no binary in that module, and
+reads a re-exported name only through the crate's path (`used_modules`; the word
+reading took `WalletFaultFamily::Transport` for `auth` and a comment's "Address"
+for `script`). The class (`Tree.users(m)` less `Tree.direct(m)`, less the
+`arch_*` walkers, the two apart and `COST_CHECKS`) is 76 script, 97 transaction
+and 33 wallet binaries since #706. Before #706 it was 80, 102 and 32: the rule
+read of `59eeedcc` (2026-11-03), which the docs fold recomputed from
+`affected_tests.py`'s `Tree` on `59eeedcc` (a read-only script; 81, 103 and 33
+before the exclusions, one cost check each); #706's lane before its fold gave 76,
+97 and 27, the six binaries the shared rows' union put in `wallet` since back in
+the class. Every one of the 287 integration binaries has a row, and 19 rows name
+no module (the 17 `arch_*` files, `readme_examples`, `wallet_fault_439`, whose
+names are `error`'s); before #706, 233 of the 256 rows of a binary named none by
+`row_modules` (a `src/<m>/` path or a `` `<m>::`` path in the row; the rule read
+gave 223 of 256, which the docs fold did not reproduce by that reading or a looser
+one). The rows decide little: three script and three transaction binaries are in
+a set by their row alone, the six frozen pairs, and no wallet binary (before #706
+none, none and one, `primitives_public_key_forms_498` by its description's
+pointer). On #703's night a changed row re-measures the files of the modules its
+reading gains or loses: the night after #706 lands re-measures the script, BEEF,
+Merkle, wire and substrates files once (the record: `docs/lanes/fix-706.md`).
 
 The globs include files directly in each directory and its descendants.
 `tests/CLAUDE.md` documents these suites. The conformance targets read the
@@ -255,6 +289,7 @@ not the copy's (cargo-mutants also copies the `ts-stack/` directory, about
 `../ts-stack/conformance` resolves against that copy under `TMPDIR`, never the
 checkout, so a mutation run without the variable reads the narrow figure even
 with ts-stack checked out beside bsv-rs.
+
 The sibling script harness remains the other oracle; production edits under
 `src/script/` or `src/transaction/` still require its before/after seed run.
 
@@ -558,7 +593,8 @@ rates against their selections (script 0.25 minutes a mutant at 32 targets, wire
 host's rebuild after a one-line change in `multisig.rs` matches (13 s for the
 script surface's former 45 targets, 63 s for 221, two jobs). The run's reading
 is the direct one (the keeper's word of 2026-11-03 16:1xZ: 136, 104 and 134
-targets): by those rates about 0.77, 0.70, 0.63, 0.76 and 0.79 minutes a mutant
+targets at `f7ea87ae`, `ESTIMATE_TARGETS`; 138, 107 and 131 since #706's rows,
+the estimate not recomputed): by those rates about 0.77, 0.70, 0.63, 0.76 and 0.79 minutes a mutant
 for the five surfaces, 1,585, 520, 63, 599 and 902 shard-minutes, 3,669 in all
 where the rates gave 903 (4.1 times). The slope is a line through two points
 (script and wire) that the other three surfaces miss (BEEF 0.20 minutes a mutant

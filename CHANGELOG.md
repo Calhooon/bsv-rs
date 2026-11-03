@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: every `tests/CLAUDE.md` row names the modules its file reaches, pinned by a guard; the rows completed from the sources (#706)
+
+- The nightly's run selection (#685, PR #703) reads a measured file's targets
+  from the binaries' `bsv_rs::` paths and their `tests/CLAUDE.md` rows, and
+  no guard pinned what a row names: on `ba0952c9` 235 of the 258 rows of a
+  binary named no module and 28 binaries had no row. The `## Files` table
+  gains a Modules cell (the fourth), and every top-level `tests/*.rs` has a
+  row naming at least the modules its source names (a `bsv_rs::<m>` path or
+  a crate-root re-export named through the crate, over the binary and the
+  module files it declares). `.github/scripts/rows_from_sources.py` wrote
+  the cells (`--check` refuses as the guard does, and runs in the Test
+  Suite's plan step beside the plan's own tests, so the Python and Rust
+  readings cannot drift unnoticed); six rows whose binary reaches a module
+  only through a caller, and whose description says it exercises it, name
+  that module too. That caller clause is a judgment, the one part of the
+  convention that moves a selection: its six pairs are frozen in
+  `tests/caller_modules_706.txt`, which the guard and `--check` read, and a
+  row that drops one is refused. 28 rows added, each from its file's header;
+  no existing row's description changed.
+- A row shared by several files (the #537 and #544 rows, six files each)
+  names each file's modules apart (`` `a.rs`: `m`; `b.rs`: none ``), and a
+  file's part is its reading in the guard, the writer and `row_modules`: the
+  row's union put all twelve binaries in the `identity`, `kvstore`,
+  `registry` and `storage` sets (five in `primitives`) their sources never
+  name, so a pull request touching one of those modules ran up to ten more
+  binaries. A union cell over a shared row is refused.
+- The fourteen lowercase crate-root re-exports (`bsv_rs::sha256`,
+  `bsv_rs::sign`, `get_url_for_file`, `run_dispatch`, ...) count as their
+  module's in both readings, as the convention's "a crate-root re-export"
+  says; a glob import reads them as bare calls. No test names one today: no
+  row moved.
+- Two readings of `affected_tests.py` tightened, each with a test showing what
+  it over-matched: `row_modules` reads the Modules cell alone (a description
+  pointing at another file's witnesses, `src/identity/...` in an auth
+  binary's row, put that binary in identity's set; a row of four cells, the
+  table before #706, keeps the old reading), and `used_modules` reads a
+  re-exported name only through the crate's path (the word reading took
+  `WalletFaultFamily::Transport` for `auth`, a comment's "Address" for
+  `script`, overlay's `Protocol` for `wallet`; an alias of the crate is
+  read).
+- The figures on #685's direct reading: the targets a measured file runs go
+  from 104 to 136 to 107 to 138 (script 138, BEEF and Merkle 107, wire and
+  substrates 131); the binaries reaching a module only through a caller, the
+  reading's stated limit, from 80 script, 102 transaction and 32 wallet to
+  76, 97 and 33 (`docs/NIGHTLY.md`, "What the direct reading leaves
+  uncounted").
+
+Pinned by `tests/arch_tests_claude_rows_name_modules_706.rs`: RED on
+`ba0952c9` with 274 refusals (29 binaries without a row, the guard's own
+among them; 245 rows naming fewer), green after; its unit tests pin the two
+over-matches, the shared row's parts, the lowercase re-exports and the frozen
+pairs, each RED before (a scratch drop of `beef_order_held`'s `script`, the
+#537 row's union restored and the lowercase names left uncounted: 7 refusals
+and the unit test). `tests/arch_ci_runs_every_test.rs` refuses a `ci.yml`
+without the `--check` step. The record: `docs/lanes/fix-706.md`.
+
 ### CI: the nightly's weekly bench runs after the shards, the fuzz targets and beta's run, under the cap guard's rule (#683)
 
 - The nightly's `bench` job (`-f weekly=true`, the captain's Sunday night)

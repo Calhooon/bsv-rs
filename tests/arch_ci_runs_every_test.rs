@@ -512,6 +512,10 @@ fn reached_refusals(ci: &str, table: &[(String, Vec<String>)]) -> Vec<String> {
             "test_affected_tests.py",
             "the plan's own tests before the plan",
         ),
+        (
+            "python3 -B .github/scripts/rows_from_sources.py --check",
+            "the rows' Python reading checked on the tree beside the Rust guard, #708",
+        ),
     ] {
         if !ci.contains(needle) {
             errors.push(format!("ci.yml: no `{needle}` ({why})"));
@@ -807,6 +811,7 @@ const REACHED_CI: &str = r#"
             printf '%s\n' whole=true lib=true doc=true memory=true tracing=true >> "$GITHUB_OUTPUT"
           fi
           python3 -B -m unittest discover -s .github/scripts -p 'test_affected_tests.py'
+          python3 -B .github/scripts/rows_from_sources.py --check
           labels=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq '[.labels[].name] | join(",")')
           if [[ ",$labels," == *",full-suite,"* ]]; then
       - name: Check the reached set within the whole
@@ -872,6 +877,12 @@ fn a_landing_or_a_push_that_could_run_a_subset_is_refused() {
     assert!(reached_refusals(&unchecked, &table)
         .iter()
         .any(|e| e.contains("lies within the whole")));
+    // the rows' two readings left unchecked against each other on the tree (#708)
+    let undrifted = REACHED_CI.replace("rows_from_sources.py --check", "rows_from_sources.py");
+    assert_eq!(
+        reached_refusals(&undrifted, &table),
+        ["ci.yml: no `python3 -B .github/scripts/rows_from_sources.py --check` (the rows' Python reading checked on the tree beside the Rust guard, #708)"]
+    );
     let unlabeled = REACHED_CI.replace("full-suite", "full");
     assert!(reached_refusals(&unlabeled, &table)
         .iter()

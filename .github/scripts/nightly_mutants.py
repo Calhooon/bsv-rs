@@ -666,7 +666,7 @@ def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows
         """A binary's modules as the base read them: its text's paths and its base row's."""
         body = base_text(f"tests/{stem}.rs") if base_text else None
         return (affected_tests.used_modules(body or "", tree.modules, tree.exported)
-                | affected_tests.row_modules(row_table.get(stem, ""), tree.modules))
+                | affected_tests.row_modules(row_table.get(stem, ""), tree.modules, stem))
 
     def text(path):
         path = root / path
@@ -740,9 +740,9 @@ def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows
             if stem in affected_tests.APART or stem in COST_CHECKS:
                 continue
             own = affected_tests.used_modules(tree.texts.get(stem, ""), tree.modules, tree.exported)
-            found |= (selecting(own | affected_tests.row_modules(rows.get(stem, ""), tree.modules))
+            found |= (selecting(own | affected_tests.row_modules(rows.get(stem, ""), tree.modules, stem))
                       ^ selecting(own | affected_tests.row_modules(base_table.get(stem, ""),
-                                                                   tree.modules)))
+                                                                   tree.modules, stem)))
         return found, "the rows whose modules changed: the files whose selection they decide"
 
     def reach_one(path, seen):

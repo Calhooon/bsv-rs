@@ -7,16 +7,18 @@ import tempfile
 import unittest
 
 import affected_tests as affected
+import rows_from_sources as rows
 
 ROWS = """# tests
 
 ## Files
 
-| File | Tests | Feature Gate | Description |
-|------|------:|-------------|-------------|
-| `script_a.rs` | 1 | none | the interpreter, `src/script/spend.rs` |
-| `wallet_c.rs` | 1 | `wallet` | `wallet::` calls |
-| `rowonly_g.rs` | 1 | none | pins `src/wallet/` through a fixture only |
+| File | Tests | Feature Gate | Modules | Description |
+|------|------:|-------------|---------|-------------|
+| `script_a.rs` | 1 | none | `script` | the interpreter, `src/script/spend.rs` |
+| `wallet_c.rs` | 1 | `wallet` | `wallet` | `wallet::` calls |
+| `rowonly_g.rs` | 1 | none | `wallet` | pins `src/wallet/` through a fixture only |
+| `vec_e.rs` | 1 | none | none | the vectors; its unit witnesses are `src/script/spend_tests.rs` |
 """
 
 FILES = {
@@ -209,6 +211,174 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(len(affected.check(plan, self.metadata(["a", "b"]))[0]), 1)
         plan["integration"] = ["a", "b"]
         self.assertEqual(affected.check(plan, self.metadata(["a", "b", "memory_profiling"]))[0], [])
+
+
+class ModuleReadingTests(unittest.TestCase):
+    """#706: the readings a row's Modules cell is held to, each tightened where it over-matched."""
+
+    MODULES = {"auth", "script", "transaction", "wallet"}
+    EXPORTED = {"Address": "script", "Script": "script", "Transaction": "transaction",
+                "Transport": "auth", "Certificate": "auth", "Protocol": "wallet",
+                "WalletFaultFamily": "wallet"}
+
+    def used(self, text):
+        return affected.used_modules(text, self.MODULES, self.EXPORTED)
+
+    def test_a_re_export_met_outside_the_crate_path_is_no_use_706(self):
+        # the word reading took each for a use: wallet_fault_439's variant, integration_tests'
+        # comment, overlay_admin_token_envelope_544's overlay `Protocol`, a doc comment's word
+        self.assertEqual(self.used("use bsv_rs::WalletFaultFamily;\nWalletFaultFamily::Transport"),
+                         {"wallet"})
+        self.assertEqual(self.used("use bsv_rs::{Transaction};\n// WIF and Address Roundtrip"),
+                         {"transaction"})
+        self.assertEqual(self.used("use bsv_rs::script::{Protocol};"), {"script"})
+        self.assertEqual(self.used("//! the Certificate's signature\nuse bsv_rs::wallet::x;"),
+                         {"wallet"})
+
+    def test_a_re_export_named_through_the_crate_is_a_use(self):
+        self.assertEqual(self.used("let t = bsv_rs::Transaction::new();"), {"transaction"})
+        self.assertEqual(self.used("use bsv_rs::{\n    // Certificate\n    Script,\n    auth::{x, y},\n};"),
+                         {"auth", "script"})
+        self.assertEqual(self.used("use bsv_rs as sdk;\nsdk::Certificate::default();"), {"auth"})
+        self.assertEqual(self.used("use bsv_rs::*;\nlet t: Transaction;"), {"transaction"})
+
+    def test_a_lowercase_root_re_export_is_a_use_708(self):
+        # the fourteen lowercase names of src/lib.rs (`sha256`, `sign`, `get_url_for_file`,
+        # `run_dispatch`, ...) went uncounted: `reexports` kept uppercase names alone
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "src").mkdir()
+            (root / "src" / "lib.rs").write_text(
+                "pub use script::{sha256, Script};\npub use wallet::sign;\n")
+            exported = affected.reexports(root)
+        self.assertEqual(exported, {"sha256": "script", "Script": "script", "sign": "wallet"})
+        used = lambda text: affected.used_modules(text, self.MODULES, exported)  # noqa: E731
+        self.assertEqual(used("let h = bsv_rs::sha256(b\"x\");"), {"script"})
+        self.assertEqual(used("use bsv_rs::{sign, Script};"), {"script", "wallet"})
+        # a glob reads a function only as a bare call, never a word, a method or a definition
+        self.assertEqual(used("use bsv_rs::*;\n// sign here\nx.sign();\nfn sign() {}"), set())
+        self.assertEqual(used("use bsv_rs::*;\nlet s = sign(&k);"), {"wallet"})
+
+    def test_a_shared_row_names_each_file_apart_708(self):
+        # the #537 and #544 rows' union put all twelve binaries in modules their sources
+        # never name: a shared row's part is its file's, the union no file's
+        row = ("| `a_537.rs`, `b_537.rs` | 2 each | `auth` | `a_537.rs`: `auth`, `script`; "
+               "`b_537.rs`: `wallet` | d |")
+        self.assertEqual(affected.row_modules(row, self.MODULES, "a_537"), {"auth", "script"})
+        self.assertEqual(affected.row_modules(row, self.MODULES, "b_537"), {"wallet"})
+        self.assertEqual(affected.row_modules(row, self.MODULES, "c_537"), set())
+
+    def test_a_description_path_names_no_module_706(self):
+        # auth_certificate_field_value_261's row points at the identity unit tests; the
+        # description reading put the auth binary in identity's set
+        row = "| `a.rs` | 8 | `auth` | `auth`, `wallet` | witnesses in `src/script/x_tests.rs`, `transaction::Beef` |"
+        self.assertEqual(affected.row_modules(row, self.MODULES), {"auth", "wallet"})
+        # a row of the table before #706 (four cells, an older commit's) keeps its old reading
+        self.assertEqual(affected.row_modules("| `a.rs` | 8 | `auth` | `src/script/x.rs` |",
+                                              self.MODULES), {"script"})
+
+    def test_a_row_pointing_at_another_file_does_not_pull_its_binary_in(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for path, text in FILES.items():
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text(text)
+            tree = affected.Tree(root)
+            self.assertEqual(tree.uses["vec_e"], set())
+            self.assertEqual(tree.uses["rowonly_g"], {"wallet"})
+
+
+class RowsFromSourcesTests(unittest.TestCase):
+    """#706: `rows_from_sources.py` writes each row's Modules cell and `--check` refuses fewer."""
+
+    OLD_ROWS = """# tests
+
+## Files
+
+| File | Tests | Feature Gate | Description |
+|------|------:|-------------|-------------|
+| `script_a.rs` | 1 | none | the interpreter |
+| `tx_b.rs` | 1 | none | a transaction's scripts executed through `Transaction::verify` |
+| `wallet_c.rs` | 1 | `wallet` | `wallet::` calls |
+| `root_d.rs` | 1 | none | the root re-export |
+| `rowonly_g.rs` | 1 | none | pins `src/wallet/` through a fixture only |
+"""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for path, text in {**FILES, "tests/CLAUDE.md": self.OLD_ROWS}.items():
+            (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / path).write_text(text)
+
+    def test_check_refuses_a_missing_row_and_a_row_naming_fewer(self):
+        refusals = rows.check(self.root)
+        self.assertIn(f"tests/script_a.rs: its row does not name script; {rows.SENTENCE}", refusals)
+        self.assertIn(f"tests/vec_e.rs: no row in tests/CLAUDE.md's ## Files table; {rows.SENTENCE}",
+                      refusals)
+        self.assertNotIn("rowonly_g", "\n".join(refusals))
+
+    def test_the_writer_adds_the_column_from_the_sources_and_keeps_the_descriptions(self):
+        text, counts = rows.write(self.root)
+        table = [line for line in text.splitlines() if line.startswith("|")]
+        self.assertEqual(table[0], "| File | Tests | Feature Gate | Modules | Description |")
+        self.assertIn("| `script_a.rs` | 1 | none | `script` | the interpreter |", table)
+        self.assertIn("| `root_d.rs` | 1 | none | `script` | the root re-export |", table)
+        # tx_b names transaction, which calls crate::script, and its row says scripts executed
+        self.assertIn("| `tx_b.rs` | 1 | none | `script`, `transaction` | a transaction's scripts "
+                      "executed through `Transaction::verify` |", table)
+        # a row's description path names nothing: the writer leaves it to its source
+        self.assertIn("| `rowonly_g.rs` | 1 | none | none | pins `src/wallet/` through a fixture only |",
+                      table)
+        self.assertEqual(counts["through callers"]["script"], 1)
+
+    def test_a_shared_row_is_written_file_by_file_and_its_union_not_kept_708(self):
+        (self.root / "tests" / "CLAUDE.md").write_text(self.OLD_ROWS.replace(
+            "| `script_a.rs` | 1 | none | the interpreter |\n",
+            "").replace("| `wallet_c.rs` | 1 | `wallet` | `wallet::` calls |",
+                        "| `script_a.rs`, `wallet_c.rs` | 1 each | none | the wallet's scripts |"))
+        text = rows.write(self.root)[0]
+        self.assertIn("| `script_a.rs`, `wallet_c.rs` | 1 each | none | `script_a.rs`: `script`; "
+                      "`wallet_c.rs`: `wallet` | the wallet's scripts |", text)
+        (self.root / "tests" / "CLAUDE.md").write_text(text)
+        self.assertNotIn("script_a", "\n".join(rows.check(self.root)))
+        # a union cell over the shared row (the table before the fold) is refused, and the
+        # writer does not keep it
+        union = text.replace("`script_a.rs`: `script`; `wallet_c.rs`: `wallet`", "`script`, `wallet`")
+        (self.root / "tests" / "CLAUDE.md").write_text(union)
+        self.assertIn("tests/wallet_c.rs: its row is shared and its Modules cell has no part for it",
+                      "\n".join(rows.check(self.root)))
+        self.assertEqual(rows.write(self.root)[0], text)
+
+    def test_a_row_dropping_a_frozen_caller_module_is_refused_and_rewritten_708(self):
+        text = rows.write(self.root)[0]
+        (self.root / "tests" / "CLAUDE.md").write_text(text)
+        (self.root / rows.FROZEN).write_text("# judged\ntx_b script  # scripts executed\n")
+        self.assertNotIn("tx_b", "\n".join(rows.check(self.root)))
+        dropped = text.replace("| `script`, `transaction` | a transaction's", "| `transaction` | "
+                               "a transaction's").replace("scripts executed", "verified")
+        (self.root / "tests" / "CLAUDE.md").write_text(dropped)
+        self.assertIn("tests/tx_b.rs: its row drops script, frozen in tests/caller_modules_706.txt "
+                      "(the caller clause's judgment)", rows.check(self.root))
+        # the writer re-adds the frozen module though the description no longer says so
+        self.assertIn("| `tx_b.rs` | 1 | none | `script`, `transaction` | a transaction's",
+                      rows.write(self.root)[0])
+        (self.root / rows.FROZEN).write_text("gone_z script\n")
+        self.assertIn("tests/caller_modules_706.txt: gone_z names no integration binary",
+                      rows.check(self.root))
+
+    def test_a_written_cell_is_kept_and_the_writer_is_idempotent(self):
+        (self.root / "tests" / "CLAUDE.md").write_text(rows.write(self.root)[0].replace(
+            "| none | pins", "| `wallet` | pins"))
+        once = rows.write(self.root)[0]
+        self.assertIn("| `rowonly_g.rs` | 1 | none | `wallet` | pins", once)
+        (self.root / "tests" / "CLAUDE.md").write_text(once)
+        self.assertEqual(rows.write(self.root)[0], once)
+        # the binaries the fixture's table has no row for, and no other
+        self.assertEqual({r.split(":")[0] for r in rows.check(self.root)},
+                         {f"tests/{b}.rs" for b in ("arch_f", "memory_profiling", "vec_e",
+                                                    "wire_error_frames")})
 
 
 class LexerTests(unittest.TestCase):
