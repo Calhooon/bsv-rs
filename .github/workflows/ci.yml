@@ -198,6 +198,11 @@ jobs:
   test:
     name: Test Suite
     runs-on: ${{ matrix.os }}
+    # pull-requests: read for the label read below (cut 4, docs/lanes/ci-speed-4.md); release.yml's
+    # call grants the same, a nested job asking more than its caller grants never starts
+    permissions:
+      contents: read
+      pull-requests: read
     # Speed round 1, cut 1 (docs/lanes/ci-speed-1.md): no debuginfo and no incremental state in
     # the job's builds (env, so a developer's `cargo test` keeps both); a panic keeps its
     # file:line (std::panic::Location is data, not debuginfo), a backtrace's frames lose theirs.
@@ -215,7 +220,44 @@ jobs:
         os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
         rust: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '["stable", "beta"]' || '["stable"]') }}
     steps:
+      # two commits deep: a pull request's merge ref and HEAD^1, the base it is tested on
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 2
+
+      # Speed round 1, cut 4 (#667, docs/lanes/ci-speed-4.md): a pull request runs the test
+      # targets its changed files reach (`.github/scripts/affected_tests.py`, the #666 reach
+      # rule read the other way); the whole suite on a push to a line, a dispatch and a tag's
+      # call, when the plan says everything (the manifest, the crate root, this workflow, the
+      # plan's script), and once per landing: the sequencer labels the PR `full-suite` before it
+      # pushes the rebased head, and the label is read live here, never by a `labeled` trigger
+      # (a second run per label, the toolbox's twin runs). The plan's own tests run before it.
+      - name: Plan the targets the change reaches
+        id: plan
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ]; then
+            echo "a $EVENT run: the whole suite"
+            printf '%s\n' whole=true lib=true doc=true memory=true tracing=true >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 -B -m unittest discover -s .github/scripts -p 'test_affected_tests.py'
+          plan="$RUNNER_TEMP/affected.json"
+          echo "file=$plan" >> "$GITHUB_OUTPUT"
+          # read live at the job's start; a failed read fails the job, never a narrower run
+          labels=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq '[.labels[].name] | join(",")')
+          echo "labels: ${labels:-none}"
+          if [[ ",$labels," == *",full-suite,"* ]]; then
+            python3 -B .github/scripts/affected_tests.py plan --whole "the full-suite label: the landing run" --output "$plan"
+          else
+            python3 -B .github/scripts/affected_tests.py plan --range HEAD^1..HEAD --output "$plan"
+          fi
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
@@ -236,7 +278,11 @@ jobs:
       # rebuilt every run. One shared key for the job's feature sets. A pull request restores
       # its base line's cache by the action's restore keys and saves one of its own only on a
       # miss; a dispatch or a tag's call restores and never saves (the repository's 10 GB budget
-      # stays with the required cell).
+      # stays with the required cell). A pull request saves only when its plan is the whole
+      # suite (cut 4; the #680 fold): a plan that builds no library, or a subset that leaves the
+      # memory, tracing or integration build unrun, would save a partial target under the shared
+      # key, every later run's exact hit; the landing run carries `full-suite`, so a complete
+      # cache is still saved once per landing.
       - name: Cache the dependencies' build
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -244,14 +290,25 @@ jobs:
           shared-key: test-suite
           cache-bin: "false"
           cache-on-failure: "true"
-          save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/main')) }}
+          save-if: ${{ (github.event_name == 'pull_request' && steps.plan.outputs.whole == 'true') || (github.event_name == 'push' && (github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/main')) }}
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           tool: nextest@0.9.150
 
+      # The reached set beside the whole: `cargo metadata` lists every integration target
+      # without building one (`cargo nextest list` would build all of them, the cost the
+      # reached run saves); every reached name is a target, and a library change reaches some.
+      - name: Check the reached set within the whole
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
+          python3 -B .github/scripts/affected_tests.py check --plan "${{ steps.plan.outputs.file }}" --metadata "$RUNNER_TEMP/metadata.json"
+
       - name: Run unit tests
+        if: steps.plan.outputs.lib == 'true'
         run: cargo nextest run --lib --all-features --no-fail-fast --cargo-verbose
 
       # Every integration binary, on the feature set the lanes' gates and
@@ -260,7 +317,19 @@ jobs:
       # list of binaries drifted to 34 of 73 files (#146). nextest runs the
       # binaries' tests side by side, each test in a process of its own.
       - name: Run every integration test
+        if: steps.plan.outputs.whole == 'true'
         run: cargo nextest run --features "full,http,websocket" --tests --no-fail-fast --cargo-verbose
+
+      # The plan's binaries as `--test` names: cargo builds those alone (an `-E 'binary(..)'`
+      # filter after `--tests` would build every binary and run some); nextest keeps
+      # `--no-fail-fast` and each test's timing either way.
+      - name: Run the integration tests the change reaches
+        if: steps.plan.outputs.whole != 'true' && steps.plan.outputs.reached != '0'
+        env:
+          REACHED_TESTS: ${{ steps.plan.outputs.tests }}
+        run: |
+          # shellcheck disable=SC2086 # the `--test <name>` words split on purpose
+          cargo nextest run --features "full,http,websocket" $REACHED_TESTS --no-fail-fast --cargo-verbose
 
       # nextest runs each test in a process of its own, so each has dhat's
       # global allocator and its one profiler to itself: the isolation
@@ -270,6 +339,7 @@ jobs:
       # path, without the 60-second warning that allocates in the profile
       # (#372; nextest passes `--exact <name>` and no thread count).
       - name: Run the memory profiling tests
+        if: steps.plan.outputs.memory == 'true'
         env:
           RUST_TEST_THREADS: "1"
         run: cargo nextest run --test memory_profiling --all-features --no-fail-fast --cargo-verbose
@@ -277,10 +347,12 @@ jobs:
       # The `tracing` sink (#212) is outside `full`: its event, and the wire's
       # frames with the feature on, the same bytes as without it.
       - name: Run the tracing sink tests
+        if: steps.plan.outputs.tracing == 'true'
         run: cargo nextest run --features "full,http,tracing" --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --no-fail-fast --cargo-verbose
 
       # nextest runs no doc tests
       - name: Run doc tests
+        if: steps.plan.outputs.doc == 'true'
         run: cargo test --doc --all-features
 
   lint:

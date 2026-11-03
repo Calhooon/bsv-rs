@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: a pull request's Test Suite runs the test targets its changed files reach; the whole suite once per landing by the `full-suite` label (speed loop one, cut 4, #667)
+
+Before this cut a pull request's run and the sequencer's landing run each ran the whole
+Test Suite (12m05s to 15m15s on #664's, #666's and #669's runs, #669 a docs-only change;
+integration and memory 80 to 85 percent of it), so every landing cost two.
+
+- **On a pull request** the job plans before its test steps
+  (`.github/scripts/affected_tests.py`, the #666 reach rule read the other way, reusing
+  `nightly_mutants.py`'s readings) from the merge ref's diff against its base: a library source reaches the unit and doc tests and
+  every integration binary using its module or, one level out, a module naming
+  `crate::<module>` (by `bsv_rs::` paths, crate-root re-exports and the
+  `tests/CLAUDE.md` rows); a test file itself; a changed row its binary; a support file,
+  vector or fixture the binaries that declare it, name it in a string literal or walk its
+  directory; `Cargo.toml`, `Cargo.lock`, `build.rs`, `src/lib.rs`, `src/error.rs`,
+  `.cargo/config*`, the toolchain, `ci.yml` and the plan's script everything. The
+  integration step runs the reached binaries as `--test` names (cargo builds those
+  alone), the unit, memory, tracing and doc steps run when the plan reaches them, and a
+  step checks the reached set against `cargo metadata`'s integration targets. On the
+  last fifty landings: 25 reach 0 to 12 binaries and no unit, doc or memory step, 20
+  library landings reach 103 to 275 (one more, a vector a library source includes, 5),
+  4 plan everything (`docs/lanes/ci-speed-4.md`). A walked literal is tested with
+  `os.path.isdir`, since `Path.is_dir` raises on a name too long on Python 3.11 to 3.13,
+  the runner's 3.12 among them; a path is matched to `\Z`, so a `README.md` change
+  reaches `readme_examples` (#680 fold).
+- **Once per landing** the whole suite: the sequencer labels the PR `full-suite` before
+  it pushes the rebased head, and the job reads the label live through the API at its
+  start (`pull-requests: read`, granted on `release.yml`'s call too), never by a
+  `labeled` trigger. A push to `beta` or `main`, a dispatch and a tag's call run the
+  whole suite as before.
+- A pull request saves the dependency cache only when its plan is the whole suite (an
+  empty or partial target under the shared key, a subset's build without the memory or
+  tracing features, would be every later run's exact hit); the landing run carries
+  `full-suite`, so a complete cache is saved once per landing.
+- **The guard**: `tests/arch_ci_runs_every_test.rs` (#146) reads each step's `if:` and
+  pins the shape (`reached_refusals`): the whole-suite step under the plan's `whole`
+  flag, the reached step beside the subset check, every flag set on a run that is not a
+  pull request, the live label read and no `labeled` trigger;
+  `.github/scripts/test_affected_tests.py` (19 cases on a fixture tree) pins the plan
+  and runs before it on every pull request.
+
 ### CI: the ten slowest tests made fast, each with the kill it guards kept (speed loop two, #670)
 
 What was slow: by nextest's per-test timings in the Test Suite job of runs

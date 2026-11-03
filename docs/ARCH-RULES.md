@@ -236,6 +236,25 @@ To run a file apart as well (the `vectors` step's `--nocapture` runs, the
 Only a file that cannot run in the whole suite belongs in the allowlist, with
 its reason and its step.
 
+Since cut 4 (#667, `docs/lanes/ci-speed-4.md`) a pull request runs the
+binaries its changed files reach (`.github/scripts/affected_tests.py`, its
+tests `test_affected_tests.py`), and the whole suite runs on a push, a
+dispatch, a tag's call, a plan of everything and a pull request labeled
+`full-suite` (the landing run; the label read live through the API). The
+whole-suite step above stays the coverage, under the plan's `whole` flag. A
+step whose words carry a `$VARIABLE` is the reached step, never a whole-suite
+one, and `reached_refusals` refuses, in the Test Suite job:
+
+- a test step under a condition other than a plan flag
+  (`steps.plan.outputs.<flag> == 'true'`), the whole-suite step under any
+  flag but `whole`, the reached step outside `whole != 'true'`;
+- a reached step with no whole-suite step;
+- a plan whose path for a run that is not a pull request leaves a flag a
+  step reads unset (a push would skip that step);
+- a plan without the event test, the live label read, the `full-suite`
+  match, the subset check (`affected_tests.py check`) or its own tests;
+- a `labeled` trigger (a label would start a second run).
+
 ## 7. The small gates are steps of `lint` and `checks`
 
 `tests/arch_ci_lines.rs` (`BUNDLES`) pins the bundling of CI speed round 1,
