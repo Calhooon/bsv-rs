@@ -3,6 +3,8 @@
 # (the node's source at the pin, the sibling bsv-script-lean's definition, the reference's
 # operation) and after three independent reads accept it (the ensemble rule). A line shift makes
 # the entry stop matching and the mutant reappear as a survivor, which is the safe failure.
+# Every entry is checked against the mutant list in CI's `checks` job and the nightly's pin job
+# (`.github/scripts/mutants_entries.py`, #663); `mutants_entries.py --fix` re-points a stale one.
 exclude_re = [
   # src/script/templates/rpuzzle.rs:350:34, `<` to `<=` (#603, PR #615). The comparison bounds a
   # direct push against OP_PUSHDATA1 (76 bytes): at the one length where the two branches differ,

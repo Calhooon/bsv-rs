@@ -504,6 +504,7 @@ const BUNDLES: &[(&str, &[(&str, &str)])] = &[
     (
         "checks",
         &[
+            ("mutants-entries", "mutants-entries"),
             ("vectors", "vectors"),
             ("fixtures", "fixtures"),
             ("secrets", "secrets"),
@@ -689,5 +690,78 @@ fn a_bundle_with_a_gate_stopped_unreported_or_unjudged_is_refused() {
     assert_eq!(
         bundle(&lenient, "lint", lint),
         ["lint: the last step is not `Every gate passed` on `!cancelled()`"]
+    );
+}
+
+/// The cargo-mutants version a workflow names in `CARGO_MUTANTS_VERSION: '<v>'`.
+fn mutants_version(text: &str) -> Option<&str> {
+    let at = text.find("CARGO_MUTANTS_VERSION: '")? + "CARGO_MUTANTS_VERSION: '".len();
+    text[at..].split('\'').next()
+}
+
+/// #663: the equivalence entries' check runs in the `checks` gate and in the nightly's pin
+/// job before the plan (so before any shard), both at the nightly's cargo-mutants version.
+fn mutants_entries(ci: &str, nightly: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let check = "python3 .github/scripts/mutants_entries.py\n";
+    let gate = block(ci, 2, "checks:")
+        .map(|j| steps(&j))
+        .unwrap_or_default();
+    if !gate
+        .iter()
+        .any(|s| s.contains("id: mutants-entries\n") && s.contains(check))
+    {
+        errors.push("checks: the mutants-entries gate does not run mutants_entries.py".to_owned());
+    }
+    let pin = block(nightly, 2, "source:")
+        .map(|j| steps(&j))
+        .unwrap_or_default();
+    let at = pin.iter().position(|s| s.contains(check));
+    let plan = pin.iter().position(|s| s.contains("id: plan\n"));
+    if !matches!((at, plan), (Some(a), Some(p)) if a < p) {
+        errors.push("nightly: the pin job does not check the entries before its plan".to_owned());
+    }
+    if pin.iter().any(|s| s.contains(check) && s.contains("--fix"))
+        || ci.contains("mutants_entries.py --fix")
+    {
+        errors
+            .push("a workflow rewrites the entries (`--fix` is the captain's, by hand)".to_owned());
+    }
+    match (mutants_version(ci), mutants_version(nightly)) {
+        (Some(c), Some(n)) if c == n => {}
+        (c, n) => errors.push(format!(
+            "cargo-mutants {c:?} in ci.yml, {n:?} in the nightly"
+        )),
+    }
+    errors
+}
+
+#[test]
+fn every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663() {
+    let ci = read(".github/workflows/ci.yml");
+    let nightly = read(".github/workflows/nightly.yml");
+    assert_eq!(mutants_entries(&ci, &nightly), Vec::<String>::new());
+    let moved = ci.replacen("CARGO_MUTANTS_VERSION: '", "CARGO_MUTANTS_VERSION: '0.", 1);
+    assert_eq!(mutants_entries(&moved, &nightly).len(), 1);
+    let unchecked = nightly.replacen(
+        "PATH=\"$RUNNER_TEMP/tools/bin:$PATH\" python3 .github/scripts/mutants_entries.py\n",
+        "\n",
+        1,
+    );
+    assert_eq!(
+        mutants_entries(&ci, &unchecked),
+        ["nightly: the pin job does not check the entries before its plan"]
+    );
+    let fixing = ci.replacen(
+        "python3 .github/scripts/mutants_entries.py\n",
+        "python3 .github/scripts/mutants_entries.py --fix\n",
+        1,
+    );
+    assert_eq!(
+        mutants_entries(&fixing, &nightly),
+        [
+            "checks: the mutants-entries gate does not run mutants_entries.py",
+            "a workflow rewrites the entries (`--fix` is the captain's, by hand)",
+        ]
     );
 }
