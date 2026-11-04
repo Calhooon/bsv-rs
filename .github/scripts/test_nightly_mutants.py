@@ -342,6 +342,35 @@ class DerivedFloorsOnlyRise(unittest.TestCase):
         self.assertEqual(recorded["src/wallet/wire/bounds.rs"]["percent"], 68)
 
 
+class TheCompleteRunsSurvivorTerm(unittest.TestCase):
+    def test_the_survivor_term_sums_each_shards_outcomes_measured_and_by_its_rate(self):
+        import mutants_record as record
+        self.assertEqual(record.minutes("2026-11-04T01:27:06Z",
+                                        "2026-11-04T01:30:10.480419729Z"), 184.480419 / 60)
+        def shard(surface, mutants, caught, missed, timeout, unviable, took, spent):
+            return {"surface": surface, "total_mutants": mutants, "caught": caught,
+                    "missed": missed, "timeout": timeout, "unviable": unviable,
+                    "job_minutes": took + 3, "mutants_minutes": took,
+                    "minutes_by_outcome": spent}
+        shards = [
+            shard("wire", 10, 6, 2, 1, 1, 20.0,
+                  {"baseline": 1.0, "caught": 9.0, "survived": 9.5, "unviable": 0.5}),
+            shard("wire", 5, 4, 0, 0, 1, 5.0,
+                  {"baseline": 1.0, "caught": 3.5, "survived": 0.0, "unviable": 0.5}),
+        ]
+        wire = record.survivor_term(shards)["wire"]
+        self.assertEqual((wire["shards"], wire["mutants"], wire["caught"], wire["survived"],
+                          wire["unviable"]), (2, 15, 10, 3, 2))
+        self.assertEqual(wire["measured_minutes"],
+                         {"baseline": 2.0, "caught": 12.5, "survived": 9.5, "unviable": 1.0})
+        # By the rate: one shard's 2.0 minutes a mutant, the other's 1.0.
+        self.assertEqual(wire["rate_minutes"], {"caught": 16.0, "survived": 6.0, "unviable": 3.0})
+        self.assertEqual((wire["minutes_per_kill"], wire["minutes_per_survivor"]), (1.25, 3.17))
+        self.assertEqual(wire["survivor_share_of_viable"], round(3 / 13, 4))
+        self.assertEqual(wire["survivor_share_of_minutes"], round(9.5 / 25, 4))
+        self.assertEqual(record.survivor_term(shards, whole=True)["all"]["mutants"], 15)
+
+
 class SkipsNeverMatchInsideTheKeptRoot(unittest.TestCase):
     def test_skips_never_match_inside_the_kept_root(self):
         import re

@@ -167,79 +167,79 @@
   ],
   "mutation_floors": {
     "src/wallet/substrates/http_json.rs": {
-      "percent": 50,
+      "percent": 92,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/http_json/review_actions.rs": {
-      "percent": 2,
+      "percent": 76,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/http_wire.rs": {
-      "percent": 15,
+      "percent": 93,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values.rs": {
-      "percent": 11,
+      "percent": 85,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/action_binding.rs": {
-      "percent": 0,
+      "percent": 82,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/actions.rs": {
-      "percent": 0,
+      "percent": 87,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/beef.rs": {
-      "percent": 0,
+      "percent": 75,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/boundary.rs": {
-      "percent": 16,
+      "percent": 78,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/bytes.rs": {
-      "percent": 43,
+      "percent": 78,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/certificate.rs": {
-      "percent": 43,
+      "percent": 94,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/certificates.rs": {
-      "percent": 0,
+      "percent": 94,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/identity.rs": {
-      "percent": 0,
+      "percent": 90,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/lists.rs": {
-      "percent": 0,
+      "percent": 100,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/raw_tree.rs": {
-      "percent": 19,
+      "percent": 57,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/review_projection.rs": {
-      "percent": 0,
+      "percent": 84,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/scalars.rs": {
-      "percent": 7,
+      "percent": 95,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/timestamp.rs": {
-      "percent": 0,
+      "percent": 93,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/substrates/result_values/wire.rs": {
-      "percent": 0,
+      "percent": 76,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/bounds.rs": {
-      "percent": 68,
+      "percent": 97,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/diagnostics.rs": {
@@ -247,19 +247,19 @@
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/discovery.rs": {
-      "percent": 0,
+      "percent": 100,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/linkage.rs": {
-      "percent": 0,
+      "percent": 100,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/mod.rs": {
-      "percent": 60,
+      "percent": 97,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/originator.rs": {
-      "percent": 57,
+      "percent": 100,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/processor.rs": {
@@ -267,19 +267,19 @@
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/reader.rs": {
-      "percent": 72,
+      "percent": 97,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/result_validation.rs": {
-      "percent": 12,
+      "percent": 100,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/transceiver.rs": {
-      "percent": 40,
+      "percent": 100,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     },
     "src/wallet/wire/validation.rs": {
-      "percent": 70,
+      "percent": 95,
       "issue": "https://github.com/Calhooon/bsv-rs/issues/602"
     }
   }

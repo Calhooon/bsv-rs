@@ -201,7 +201,8 @@ one level, the binaries of the modules whose library code names `crate::<m>`;
 the run does not take the callers' level, where a build and not a run per
 mutant is the cost. The branch's reading before the fold took it and put 216
 of the 283 binaries in a script file's set, about 5,237 to 8,090 estimated
-shard-minutes against the 903 of the last complete run (below). Three of that reading's targets are
+shard-minutes against the 903 of run 41347058507 (the fixed lists; the complete run 41753882105
+under the direct reading measured 4,438, below). Three of that reading's targets are
 left out: a binary reached only by reading the source's text (the six `arch_*`
 walks of `src/`, a literal naming the file), since a mutant rewrites the text it
 reads and its verdict on the text tests no behaviour; the binaries the Test Suite
@@ -424,6 +425,20 @@ survivors under the widened oracle, 396 of them on those fourteen; 97 of the
 narrow run's 643 killed by the corpus, all in the script and BEEF/Merkle
 surfaces; two timeouts new to the widened run, both caught in the narrow
 one). They stay red until #603's lanes land: that is the gate.
+
+The complete run 41753882105 at `2ff81a44` (dispatched 2026-11-04 01:24:50Z,
+the corpus at `edf6e03`; its record `docs/census/mutants-2026-11-04.md` and
+`.json`, written by `mutants_record.py write --widened <run> --previous
+docs/census/mutants-2026-11-01.json`, the one-run form) measured every gate-path
+file at or above 80: 80 PASS, 0 FAIL and 5 NO MUTANTS under the floors at
+`2ff81a44`, 80 PASS, 0 FAIL, 4 NO MUTANTS and 1 NO VIABLE MUTANTS under its own
+(72 PASS and 8 FAIL at 80 everywhere, the eight the floored files below 80), 332
+survivors where the widened run left 1,583 (152 on the gate paths, 548 then).
+`mutants_record.py floors --write` raised 27 of the 29 entries to its scores
+rounded down (`http_json.rs` 50 to 92, `bounds.rs` 68 to 97, `transceiver.rs` 40
+to 100 among them) and held two at their figure (`wire/diagnostics.rs` 0,
+`wire/processor.rs` 60); no entry was added, and none of the 29 files' source
+changed between `2ff81a44` and `4ed58d05`, where the ratchet holds them.
 
 ## Incremental nights and the complete run (cut 7)
 
@@ -660,6 +675,27 @@ record keeping the measured per-mutant rate per surface as the figure that
 settles the slope, and the retry goes to the weekend slot (2026-11-08 07:00Z)
 after the survivor-term row #705 lands; a projection under twelve hours lets it
 run to the end, and the record carries the figure.
+
+**The measured complete run** (41753882105 at `2ff81a44`, the record
+`docs/census/mutants-2026-11-04.md`, its shard table and survivor term). It
+ran to the end: dispatched 01:24:50Z, the last shard ended 14:59:33Z and the
+score job 14:59:46Z, 13h35m for the mutation part at six slots, past the twelve
+hours the checkpoint named and inside the two-part 17h05m. The checkpoint ran
+under the keeper's bound rule of 2026-11-04 in place of the twelve-hour cancel:
+at 12:00Z the shards' mean rate projected the end before 15:00Z, the bound was
+set at the longest measured end plus thirty minutes, and the run was not
+cancelled; the shards ended 14:59:33Z, inside it (the record's producing run,
+`mutants_record.py write --checkpoint`). Its 23 shards took 4,438 job-minutes
+over 4,902 mutants (1.21 times the slope's 3,669, 0.78 of the two-part 5,717):
+script 1,538 at 0.71 minutes a mutant (the slope's 0.77), BEEF 421 at 0.56
+(0.70), Merkle 36 at 0.37 (0.63), wire 632 at 0.79 (0.76), substrates 1,811 at
+1.57 (0.79); the longest shard wire 2/3 at 245 minutes, every shard under the
+300-minute ceiling. The survivor term (#705): measured by each mutant's phases,
+the 332 survivors took 779 minutes and the 4,136 kills 3,496 (17.8 percent of
+4,369 minutes; 2.35 minutes a survivor against 0.85 a kill), the survivors'
+share 16.7 percent of the script surface's minutes, 4.8 BEEF, 4.1 Merkle, 9.7
+wire and 24.9 substrates: the kills, most of the viable mutants, carry the run,
+where #705's row read the survivors as its cost.
 
 The branch's reading before the fold, with one level of callers (216, 206 and
 166 targets), is superseded; its figures stay as the reason for the fold. It

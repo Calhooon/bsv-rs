@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the complete run's record of 2026-11-04 (run 41753882105 at `2ff81a44`): the scores, the floors raised, the survivors per file, the survivor term for #705 (#602, #705)
+
+The complete run 41753882105 (`nightly.yml -f mode=complete` on beta, pinned
+`2ff81a44`, dispatched 2026-11-04 01:24:50Z, the corpus at ts-stack `edf6e03`,
+cargo-mutants 27.1.0, rustc 1.99.1, 23 shards at six at a time under the
+4,000,000 KB ceiling) is recorded in `docs/census/mutants-2026-11-04.md` and
+`.json`. Its mutation part ran 13h35m (the last shard ended 14:59:33Z, the
+score job 14:59:46Z; the fuzz jobs after it are not the record's), 4,438
+job-minutes over 4,902 mutants. The 12:00Z checkpoint ran under the keeper's
+bound rule of 2026-11-04 in place of the twelve-hour cancel (the end projected
+by the mean before 15:00Z, the bound the longest measured end plus thirty
+minutes, no cancel), and the record's producing run says so (`write
+--checkpoint`). Every one of the 85 measured files passes: 80
+PASS, 0 FAIL and 5 NO MUTANTS under the floors at `2ff81a44`; 80 PASS, 4 NO
+MUTANTS and 1 NO VIABLE MUTANTS under the raised floors; 72 PASS and 8 FAIL at
+80 everywhere (the eight floored files below 80). 332 survivors, 152 on the gate
+paths, where the 2026-11-01 widened run left 1,583 and 548.
+
+The floors: `mutants_record.py floors --write` raised 27 of `docs/ratchets.json`'s
+29 `mutation_floors` entries to the run's scores rounded down (the substrates'
+`http_json.rs` 50 to 92, `http_wire.rs` 15 to 93, `result_values/raw_tree.rs` 19
+to 57; the wire's `bounds.rs` 68 to 97, `mod.rs` 60 to 97, `transceiver.rs` 40
+to 100, among them) and held `wire/diagnostics.rs` at 0 and `wire/processor.rs`
+at 60, their figures; no entry added. None of the 29 files' source moved
+between `2ff81a44` and `4ed58d05`, and the tip's selections hold every target
+the run's did, so the raised floors stand at the tip (`tools/ratchet/run
+--check --against 4ed58d05`: pass).
+
+The survivor term for #705, measured by each mutant's build and test phases:
+the 332 survivors took 779 minutes and the 4,136 kills 3,496, 17.8 percent of
+the 4,369 minutes for the survivors (2.35 minutes a survivor, 0.85 a kill):
+script 252 of 1,513 minutes (16.7 percent), BEEF 20 (4.8), Merkle 1.4 (4.1),
+wire 60 (9.7), substrates 445 of 1,787 (24.9). The kills carry the run, where
+#705's row read the survivors as its cost. The measured rates a mutant (script
+0.71, BEEF 0.56, Merkle 0.37, wire 0.79, substrates 1.57 minutes) set the
+complete run at 1.21 times the slope's 3,669 shard-minutes and 0.78 of the
+two-part 5,717 (`docs/NIGHTLY.md`, "The measured complete run").
+
+`mutants_record.py` writes a one-run record (`write --widened <run> --previous
+<record>.json`, mutually exclusive with `--narrow`): the per-file delta against
+the previous record's widened figure, the survivors of every file, the shard
+table (each job's start, end and minutes from the run's jobs listing, which
+`fetch` now saves with the `mutation-record` and `mutation-plan` artifacts) and
+the survivor term; `measure` reads the plan's shards and leaves out the
+test-only files the plan does not list. The two-run form is unchanged
+(`test_the_survivor_term_sums_each_shards_outcomes_measured_and_by_its_rate`).
+No crate code moves.
+
 ### Fixed: the JSON lookup parse refuses what the reference's normalizer refuses (#768)
 
 From the rule and strength reads of PR #767 (#762, 2026-11-04 11:46Z), the
