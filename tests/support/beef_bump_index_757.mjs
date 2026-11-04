@@ -56,7 +56,9 @@ const BUMPS = {
   sibling_800002: () =>
     new MerklePath(800002, [[{ offset: 0, hash: SIBLING, txid: true }, { offset: 1, hash: P }]]),
   // The child alone at height 800003: the path a caller sets on it.
-  child_800003: () => new MerklePath(800003, [[{ offset: 0, hash: C, txid: true }]])
+  child_800003: () => new MerklePath(800003, [[{ offset: 0, hash: C, txid: true }]]),
+  // The grandchild alone at height 800004: a BUMP that does not hold the parent (#766).
+  grandchild_800004: () => new MerklePath(800004, [[{ offset: 0, hash: G, txid: true }]])
 }
 
 // Item 1: merge steps (`bump:<name>`, `raw:<tx>`, `txid:<tx>`), then the
@@ -100,7 +102,23 @@ const INDEX_CASES = [
     steps: ['bump:alone_800000', 'raw:parent', 'bump:left_800001', 'raw:child', 'txidonly:parent'],
     atomic: ['child']
   },
-  { name: 'raw_before_a_sibling_leaf', steps: ['raw:parent', 'bump:sibling_800002'], atomic: ['parent'] }
+  { name: 'raw_before_a_sibling_leaf', steps: ['raw:parent', 'bump:sibling_800002'], atomic: ['parent'] },
+  // #766: a txid-only entry that reaches the atomic writer without an index
+  // (`index:parent=none`, as one read from bytes carries none), and one whose
+  // index names a BUMP that does not hold its txid (`index:parent=1`): the
+  // reference's `#copySelectedTransactions` (`:448-470`) copies a BUMP only
+  // for an entry `#hasMatchingBump` (`:436-446`) proves, so neither atomic
+  // BEEF carries a BUMP and the copied entry's index is `undefined`.
+  {
+    name: 'txid_only_without_an_index_with_child',
+    steps: ['bump:alone_800000', 'bump:left_800001', 'txid:parent', 'raw:child', 'index:parent=none'],
+    atomic: ['child']
+  },
+  {
+    name: 'txid_only_naming_a_bump_without_its_txid_with_child',
+    steps: ['bump:alone_800000', 'bump:grandchild_800004', 'txid:parent', 'raw:child', 'index:parent=1'],
+    atomic: ['child']
+  }
 ]
 
 const build = steps => {
@@ -110,6 +128,10 @@ const build = steps => {
     if (kind === 'bump') beef.mergeBump(BUMPS[name]())
     else if (kind === 'raw') beef.mergeRawTx(TXS[name].toBinary())
     else if (kind === 'txidonly') beef.makeTxidOnly(TXS[name].id('hex'))
+    else if (kind === 'index') {
+      const [tx, index] = name.split('=')
+      beef.findTxid(TXS[tx].id('hex')).bumpIndex = index === 'none' ? undefined : Number(index)
+    }
     else beef.mergeTxidOnly(TXS[name].id('hex'))
   }
   return beef

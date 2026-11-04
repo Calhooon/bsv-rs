@@ -1084,16 +1084,12 @@ impl Beef {
             let mut copy = tx.clone();
             let txid = tx.txid();
             if tx.is_txid_only() {
-                // The BUMP its index names, as the reference's
-                // `#copySelectedTransactions` copies it (`Beef.ts:448-470`); else,
-                // this crate's own, the last carrying the txid (the earliest until
-                // #757's fold), where the reference copies none: a txid-only entry
-                // read from bytes has no index on either side.
-                let index = if self.proves(tx) {
-                    tx.bump_index()
-                } else {
-                    self.bumps.iter().rposition(|b| b.contains(&txid))
-                };
+                // The BUMP its index names when that BUMP holds the txid, else
+                // none and no index, as the reference's `#copySelectedTransactions`
+                // copies it (`Beef.ts:448-470`, `#hasMatchingBump` `:436-446`).
+                // Until #766 an entry without a matching index (one read from
+                // bytes carries none) took the last BUMP carrying the txid.
+                let index = tx.bump_index().filter(|_| self.proves(tx));
                 copy.set_bump_index(index.map(|i| keep(i, &mut beef)));
             } else if let Some(index) = tx.bump_index() {
                 if index >= self.bumps.len() {

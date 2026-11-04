@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the atomic writer copies no BUMP for a txid-only entry without a matching index, as the reference does (#766)
+
+From the scoped cold re-read of PR #763's fold (2026-11-04 11:25Z).
+`Beef::to_binary_atomic`'s closure (`atomic_closure`,
+`src/transaction/beef.rs`) gave a txid-only entry whose BUMP index names no
+BUMP holding its txid (an entry read from bytes carries no index; one set by
+hand may name another BUMP) the last BUMP of the BEEF holding the txid, this
+crate's own fallback. The reference copies a BUMP only for an included entry
+`#hasMatchingBump` proves, and copies the entry with the mapped index or
+`undefined` (`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:448-470`,
+the skip at `:453`; `#hasMatchingBump` `:436-446`: the index names a BUMP whose
+level 0 holds the txid). Now the txid-only branch copies the BUMP its index
+names when that BUMP holds the txid and no BUMP and no index otherwise; nothing
+else of the atomic rule moves (the subject's graph, the proven cut, a raw
+entry's BUMP, `from_atomic_beef`). The last-BUMP rule at the merge doors and
+`find_bump` (#757, #765) is the reference's and stays.
+
+Measured on `toBinaryAtomic(child)` of the vector's
+`txid_only_after_both_with_child` shape with the parent's index cleared: the
+reference writes `...0200beef00020262b0...` (no BUMP), this crate wrote
+`...0200beef01fe01350c...` (the last BUMP, at 800001) and now writes the
+reference's bytes; with the index naming a BUMP that does not hold the parent
+(the grandchild's, at 800004), the reference writes `...0200beef00...` and
+this crate wrote `...0200beef01fe00350c...` (the parent's BUMP at 800000).
+
+`tests/beef_bump_index_757.rs`'s
+`a_txid_only_entry_without_a_matching_index_carries_no_bump_into_the_atomic_beef_766`
+on two cases the #757 recorder now writes (`support/beef_bump_index_757.mjs`,
+`ts-stack@edf6e03` under Node v22.18.0: `txid_only_without_an_index_with_child`
+and `txid_only_naming_a_bump_without_its_txid_with_child`, a step `index:<tx>=`
+setting `bumpIndex` before the write, and one BUMP added,
+`grandchild_800004`); every earlier entry of `vectors/beef_bump_index_757.json`
+unchanged. Both RED on `e7f5d4f7` (the bytes above), green after.
+
+Semver: no public shape changes. The written form of such an entry's atomic
+BEEF loses a BUMP: a downstream comparing atomic bytes sees the change, and a
+reader that proved the txid-only entry by that BUMP now reads it as an
+unproven stub (`verify_structure` refuses it `StubNotProven`, `verify_valid`
+answers not valid; pinned in the test). Migration: give the entry the index
+of the BUMP holding its txid before writing (`set_bump_index(Some(i))`, or
+`merge_bump` of its proof on an entry with no index), or write the whole BEEF
+with `to_binary`.
+
+### Notes: cross-SDK parity (#766)
+
+The reference's bytes at the pin. The root `CLAUDE.md` row on the fallback is
+closed. The raw entry's shape, an index set by hand naming a BUMP that
+does not hold its txid, stays open as #798 (after-cut). go-sdk@2ca481c is not compared here.
+
 ### CI: the heavy-run cap by window, fourteen slots inside the run's own window and six outside, the fuzz stage to match, a dispatch input to override (#791)
 
 The owner's word of 2026-11-04 17:1xZ, through the keeper: "a heavy hosted run (a

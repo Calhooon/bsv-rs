@@ -78,6 +78,13 @@ fn build(v: &Value, case: &Value) -> Beef {
             "txidonly" => {
                 beef.make_txid_only(&tx(v, name).id());
             }
+            "index" => {
+                let (name, index) = name.split_once('=').unwrap();
+                let index = (index != "none").then(|| index.parse().unwrap());
+                beef.find_txid_mut(&tx(v, name).id())
+                    .unwrap()
+                    .set_bump_index(index);
+            }
             other => panic!("no step {other}"),
         }
     }
@@ -211,6 +218,40 @@ fn a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765() {
             .contains(&parent.to_string()));
         let mut read = Beef::from_binary(&beef.to_binary()).unwrap();
         assert!(read.verify_valid(false).valid, "{name}");
+    }
+}
+
+/// A txid-only entry that reaches the atomic writer without an index (one
+/// read from bytes carries none), or with an index naming a BUMP that does
+/// not hold its txid, is copied into the atomic BEEF with no BUMP, as the
+/// reference's `#copySelectedTransactions` (`Beef.ts:448-470`) copies a BUMP
+/// only for an entry `#hasMatchingBump` (`:436-446`) proves: `0200beef00`,
+/// no BUMP. Until #766 this crate copied the last BUMP holding the txid
+/// (`0200beef01fe01350c...`, `0200beef01fe00350c...`).
+#[test]
+fn a_txid_only_entry_without_a_matching_index_carries_no_bump_into_the_atomic_beef_766() {
+    let v = vector();
+    let child = v["txs"]["child"]["txid"].as_str().unwrap();
+    for name in [
+        "txid_only_without_an_index_with_child",
+        "txid_only_naming_a_bump_without_its_txid_with_child",
+    ] {
+        assert_written_as_recorded(&v, name);
+        let mut beef = build(&v, &index_case(&v, name));
+        let mut read = Beef::from_binary(&beef.to_binary_atomic(child).unwrap()).unwrap();
+        assert!(read.bumps.is_empty(), "{name}");
+        assert_eq!(read.txs.len(), 2, "{name}");
+        assert!(
+            read.txs.iter().all(|tx| tx.bump_index().is_none()),
+            "{name}"
+        );
+        // The stub is unproven in the bytes written.
+        assert_eq!(
+            read.verify_structure().err().map(|k| format!("{k:?}")),
+            Some("StubNotProven".to_string()),
+            "{name}"
+        );
+        assert!(!read.verify_valid(false).valid, "{name}");
     }
 }
 
