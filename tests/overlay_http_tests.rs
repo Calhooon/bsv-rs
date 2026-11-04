@@ -963,7 +963,8 @@ async fn test_lookup_output_list_with_context() {
     }
 }
 
-/// Test lookup with output-list where BEEF is provided as a hex string.
+/// Test lookup with output-list where BEEF is provided as a hex string: no
+/// byte array, so the reference's normalizer refuses the answer (#768).
 #[tokio::test]
 async fn test_lookup_output_list_beef_as_hex_string() {
     let mock_server = MockServer::start().await;
@@ -990,14 +991,12 @@ async fn test_lookup_output_list_beef_as_hex_string() {
         .lookup(&mock_server.uri(), &question, None)
         .await;
 
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].beef, vec![0x01, 0x02, 0x03, 0x04, 0x05]);
-    } else {
-        panic!("Expected OutputList, got: {:?}", answer);
-    }
+    let err = result.expect_err("a hex text beef is refused");
+    assert!(
+        err.to_string()
+            .contains("Malformed lookup response: output 0 beef"),
+        "{err}"
+    );
 }
 
 /// Test lookup with unknown answer type returns an error.
@@ -1036,12 +1035,13 @@ async fn test_lookup_unknown_answer_type() {
     );
 }
 
-/// Test lookup with no explicit type defaults to output-list.
+/// Test lookup with no explicit type: refused, as the reference's normalizer
+/// reads an output list only under the string `output-list` (#768).
 #[tokio::test]
-async fn test_lookup_default_type_is_output_list() {
+async fn test_lookup_missing_type_is_refused() {
     let mock_server = MockServer::start().await;
 
-    // Response has no "type" field - should default to output-list
+    // Response has no "type" field: malformed
     Mock::given(method("POST"))
         .and(path("/lookup"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -1063,12 +1063,10 @@ async fn test_lookup_default_type_is_output_list() {
         .lookup(&mock_server.uri(), &question, None)
         .await;
 
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
+    let err = result.expect_err("an answer without a type is refused");
     assert!(
-        matches!(answer, LookupAnswer::OutputList { .. }),
-        "Expected OutputList as default, got: {:?}",
-        answer
+        err.to_string().contains("Malformed lookup response"),
+        "{err}"
     );
 }
 
@@ -1314,9 +1312,10 @@ async fn test_lookup_facilitator_default_rejects_http() {
     );
 }
 
-/// Test lookup output-list with outputs missing required fields are skipped.
+/// Test lookup output-list with outputs missing required fields: the whole
+/// answer refused, as the reference's normalizer refuses it (#768).
 #[tokio::test]
-async fn test_lookup_output_list_skips_malformed_items() {
+async fn test_lookup_output_list_with_a_malformed_item_is_refused() {
     let mock_server = MockServer::start().await;
 
     // Some outputs are missing required fields (e.g., no outputIndex)
@@ -1330,11 +1329,11 @@ async fn test_lookup_output_list_skips_malformed_items() {
                     "outputIndex": 0
                 },
                 {
-                    // Missing outputIndex - should be skipped
+                    // Missing outputIndex: the answer is refused
                     "beef": [3, 4]
                 },
                 {
-                    // Missing beef - should be skipped
+                    // Missing beef
                     "outputIndex": 1
                 },
                 {
@@ -1354,19 +1353,15 @@ async fn test_lookup_output_list_skips_malformed_items() {
         .lookup(&mock_server.uri(), &question, None)
         .await;
 
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        // Only well-formed items should be included
-        assert_eq!(outputs.len(), 2);
-        assert_eq!(outputs[0].output_index, 0);
-        assert_eq!(outputs[1].output_index, 2);
-    } else {
-        panic!("Expected OutputList, got: {:?}", answer);
-    }
+    let err = result.expect_err("a malformed item refuses the answer");
+    assert!(
+        err.to_string()
+            .contains("Malformed lookup response: output 1 outputIndex"),
+        "{err}"
+    );
 }
 
-/// Test lookup with output-list where outputs field is missing (defaults to empty).
+/// Test lookup with output-list where outputs field is missing: refused (#768).
 #[tokio::test]
 async fn test_lookup_output_list_missing_outputs_field() {
     let mock_server = MockServer::start().await;
@@ -1388,16 +1383,12 @@ async fn test_lookup_output_list_missing_outputs_field() {
         .lookup(&mock_server.uri(), &question, None)
         .await;
 
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        assert!(
-            outputs.is_empty(),
-            "Expected empty outputs when field missing"
-        );
-    } else {
-        panic!("Expected OutputList, got: {:?}", answer);
-    }
+    let err = result.expect_err("an output list without outputs is refused");
+    assert!(
+        err.to_string()
+            .contains("Malformed lookup response: an output-list answer without an outputs array"),
+        "{err}"
+    );
 }
 
 /// Test lookup with freeform response containing null result: `"result":

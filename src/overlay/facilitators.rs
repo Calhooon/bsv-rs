@@ -309,65 +309,64 @@ impl OverlayBroadcastFacilitator for HttpsOverlayBroadcastFacilitator {
     }
 }
 
-/// Parse a JSON lookup answer into our enum type.
+/// The reference's bounds on an output-list item (`ts-stack@edf6e03`
+/// `packages/sdk/src/overlay-tools/LookupResolver.ts:252-256`): a BEEF at
+/// most the 32 MiB response bound, a context at most 1 MiB.
+#[cfg(feature = "http")]
+const MAX_LOOKUP_BEEF_BYTES: usize = 32 * 1024 * 1024;
+#[cfg(feature = "http")]
+const MAX_LOOKUP_CONTEXT_BYTES: usize = 1024 * 1024;
+
+/// The reference's facilitator's refusal of what its normalizer cannot read
+/// (`LookupResolver.ts:865-866`), the member named after the colon.
+#[cfg(feature = "http")]
+fn malformed(what: std::fmt::Arguments<'_>) -> Error {
+    Error::OverlayError(format!("Malformed lookup response: {what}"))
+}
+
+/// Parse a JSON lookup answer as the reference's normalizer reads it
+/// (`ts-stack@edf6e03` `LookupResolver.ts:389-448`, `normalizeLookupAnswer`,
+/// run by its HTTPS facilitator, which throws `Malformed lookup response` on
+/// what it refuses, `:865-866`; #768). Refused, each an `Err` the resolver
+/// records as the host's failure: a body that is not a JSON object (`[]`,
+/// `"x"`, `null`, `5`; `dataRecord`, `:305-307`), a missing or non-string
+/// `type`, an `output-list` answer whose `outputs` is missing or not an array
+/// (`:390-397`), and any item the normalizer refuses, the whole answer with
+/// it, where until #768 a missing `type` read as `output-list`, a missing
+/// `outputs` as empty and a malformed item was dropped. An item
+/// (`normalizeLookupOutput`, `:327-357`) is an object whose `beef` is an array
+/// of 1 to 32 MiB bytes, `outputIndex` an integer from 0 to 4294967295, an
+/// optional `context` an array of at most 1 MiB bytes and an optional `txid`
+/// 64 hex digits; `beef` and `context` may be the historical object form
+/// `{"0": 1, ..}` and `context` `{}`, as `normalizeBRC100ByteFields` repairs
+/// them first (`:858-863`), and a hex or base64 text is no byte array. A
+/// well-formed empty list is an answer. An unknown string `type` stays this
+/// crate's `Unknown answer type`.
 #[cfg(feature = "http")]
 fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
+    let json = json
+        .as_object()
+        .ok_or_else(|| malformed(format_args!("the answer is not a JSON object")))?;
     let answer_type = json
         .get("type")
         .and_then(|v| v.as_str())
-        .unwrap_or("output-list");
+        .ok_or_else(|| malformed(format_args!("the answer has no string type member")))?;
 
     match answer_type {
         "output-list" => {
-            let outputs = json
+            let items = json
                 .get("outputs")
                 .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|item| {
-                            let beef = item.get("beef").and_then(|v| {
-                                // Handle both array of numbers and base64/hex strings
-                                if let Some(arr) = v.as_array() {
-                                    Some(
-                                        arr.iter()
-                                            .filter_map(|n| n.as_u64().map(|n| n as u8))
-                                            .collect(),
-                                    )
-                                } else if let Some(s) = v.as_str() {
-                                    // Try hex first, then base64
-                                    hex::decode(s).ok().or_else(|| {
-                                        base64::Engine::decode(
-                                            &base64::engine::general_purpose::STANDARD,
-                                            s,
-                                        )
-                                        .ok()
-                                    })
-                                } else {
-                                    None
-                                }
-                            })?;
-
-                            let output_index =
-                                item.get("outputIndex").and_then(|v| v.as_u64())? as u32;
-
-                            let context = item.get("context").and_then(|v| {
-                                v.as_array().map(|arr| {
-                                    arr.iter()
-                                        .filter_map(|n| n.as_u64().map(|n| n as u8))
-                                        .collect()
-                                })
-                            });
-
-                            Some(OutputListItem {
-                                beef,
-                                output_index,
-                                context,
-                            })
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-
+                .ok_or_else(|| {
+                    malformed(format_args!(
+                        "an output-list answer without an outputs array"
+                    ))
+                })?;
+            let outputs = items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| parse_lookup_output(index, item))
+                .collect::<Result<_>>()?;
             Ok(LookupAnswer::OutputList { outputs })
         }
         // Presence, not non-null: `"result": null` is an answer, a missing
@@ -393,6 +392,85 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
             answer_type
         ))),
     }
+}
+
+/// One output-list item as `normalizeLookupOutput` reads it
+/// (`LookupResolver.ts:327-357`), after `normalizeBRC100ByteFields` repaired
+/// its `beef` and `context` (`:858-863`).
+#[cfg(feature = "http")]
+fn parse_lookup_output(index: usize, item: &serde_json::Value) -> Result<OutputListItem> {
+    let item = item
+        .as_object()
+        .ok_or_else(|| malformed(format_args!("output {index} is not a JSON object")))?;
+    let beef = item
+        .get("beef")
+        .and_then(lookup_byte_field)
+        .filter(|beef| !beef.is_empty() && beef.len() <= MAX_LOOKUP_BEEF_BYTES)
+        .ok_or_else(|| {
+            malformed(format_args!(
+                "output {index} beef is not an array of 1 to {MAX_LOOKUP_BEEF_BYTES} bytes"
+            ))
+        })?;
+    let output_index = item
+        .get("outputIndex")
+        .and_then(lookup_output_index)
+        .ok_or_else(|| {
+            malformed(format_args!(
+                "output {index} outputIndex is not an integer from 0 to 4294967295"
+            ))
+        })?;
+    let context = match item.get("context") {
+        None => None,
+        Some(value) => Some(
+            lookup_byte_field(value)
+                .filter(|context| context.len() <= MAX_LOOKUP_CONTEXT_BYTES)
+                .ok_or_else(|| {
+                    malformed(format_args!(
+                        "output {index} context is not an array of at most \
+                         {MAX_LOOKUP_CONTEXT_BYTES} bytes"
+                    ))
+                })?,
+        ),
+    };
+    let txid_ok = |t: &str| t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit());
+    if item
+        .get("txid")
+        .is_some_and(|v| !v.as_str().is_some_and(txid_ok))
+    {
+        return Err(malformed(format_args!(
+            "output {index} txid is not 64 hex digits"
+        )));
+    }
+    Ok(OutputListItem {
+        beef,
+        output_index,
+        context,
+    })
+}
+
+/// A schema-owned byte field (`normalizeBRC100ByteFields`,
+/// `BRC100ByteEncoding.ts:126-146`): `{}` the empty array, else
+/// `normalizeBRC100ByteArray`'s reading, an array of bytes or the historical
+/// object form.
+#[cfg(feature = "http")]
+fn lookup_byte_field(value: &serde_json::Value) -> Option<Vec<u8>> {
+    match value.as_object() {
+        Some(object) if object.is_empty() => Some(Vec::new()),
+        _ => crate::wallet::substrates::byte_fields::byte_array(value),
+    }
+}
+
+/// `Number.isInteger` from 0 to `0xffffffff` (`LookupResolver.ts:336-340`):
+/// an integral float such as `1.0` is an index, as `JSON.parse` reads it.
+#[cfg(feature = "http")]
+fn lookup_output_index(value: &serde_json::Value) -> Option<u32> {
+    if let Some(n) = value.as_u64() {
+        return u32::try_from(n).ok();
+    }
+    let n = value
+        .as_f64()
+        .filter(|n| (0.0..=f64::from(u32::MAX)).contains(n) && n.fract() == 0.0)?;
+    Some(n as u32)
 }
 
 /// Parse binary lookup response (compact outpoints + BEEF format).
@@ -535,13 +613,16 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[test]
-    fn test_parse_json_default_type() {
+    fn test_parse_json_missing_type_is_malformed() {
         let json = serde_json::json!({
             "outputs": []
         });
 
-        let answer = parse_json_lookup_answer(json).unwrap();
-        assert!(matches!(answer, LookupAnswer::OutputList { .. }));
+        let err = parse_json_lookup_answer(json).unwrap_err();
+        assert!(
+            err.to_string().contains("Malformed lookup response"),
+            "{err}"
+        );
     }
 
     #[cfg(feature = "http")]

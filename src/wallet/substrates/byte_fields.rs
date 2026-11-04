@@ -134,7 +134,7 @@ pub(super) fn refusal(call: &str, body: &Value) -> Option<Error> {
 /// `normalizeBRC100ByteArray` (`BRC100ByteEncoding.ts:81-86`), then
 /// `bytes(value, call, field)` (`WalletResultValidation.ts:868-906`): an
 /// array of integers 0 to 255, or the historical object form, at most 256 MiB.
-pub(super) fn byte_array(value: &Value) -> Option<Vec<u8>> {
+pub(crate) fn byte_array(value: &Value) -> Option<Vec<u8>> {
     let bytes: Vec<u8> = match value {
         Value::Array(items) if items.len() <= MAX_BYTES => {
             items.iter().map(byte).collect::<Option<_>>()?
