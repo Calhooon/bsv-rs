@@ -7,6 +7,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `resolve_by_identity_key` reads every output of the lookup answer before it answers, keeps only the asked subject's certificates and returns the first one's identity, as the reference's wallet does (#737)
+
+From the strength read of PR #733 (#730, 2026-11-04 02:2xZ), older than #730
+and widened by it: `IdentityClient::resolve_by_identity_key` parsed
+`outputs[0]` of the `ls_identity` answer alone, where the reference's wallet
+parses every output in order (`ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/Wallet.ts:950-1016`, `discoverOverlayCertificates`
+and `discoverByIdentityKey`, through `parseResults`,
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:671-707`): a
+skipped output (`IdentityEvidenceVerifier.parse` answering `null`, `:596-634`)
+is dropped and the next one read, a `limit` rethrown (`:630-634`). Since #730
+a first output the evidence check refuses, or one with no identity token,
+ended this crate's resolution with `None` where the reference reads the
+second. The function now walks every output through the same parser and
+returns the first admitted certificate's identity; the contacts override is
+unchanged, the signature too.
+
+The reads' fold (the rule and strength reads of PR #738) ports two more rules
+of the same path. The subject filter: the reference's discovery keeps only
+certificates whose subject is the key asked (`filterCertificatesByIdentityKey`,
+`identityUtils.ts:247-255`, `certificate.subject.toLowerCase() === identityKey.toLowerCase()`,
+called at `Wallet.ts:1012` inside `discoverByIdentityKey`), where this crate
+returned the first admitted certificate whatever its subject (the parser
+checks only that a token is signed by the subject it names); a certificate
+for another subject is now passed over, the subject's compressed hex compared
+with the asked key lower-cased. The whole walk: `parseResults` parses every
+output before the discovery answers (`identityUtils.ts:671-707`), so a
+`limit` anywhere in the answer refuses the call (`:630-634`, `Wallet.ts:950-955`),
+where this crate answered at the first admitted output; it now parses every
+output, a limit before or after an admitted one failing the call with
+`identity error: Transaction evidence: limit`, an `invalid-evidence` output
+anywhere a skip. The other doors are unchanged: `resolve_by_attributes` is
+the reference's `discoverByAttributes` path, which filters by attributes
+(`filterCertificatesByAttributes`, `identityUtils.ts:283-302`, called at
+`Wallet.ts:1078`), not by subject; `query`, `discover_certificates` and
+`discover_certificates_by_type` are this crate's own doors, with no
+counterpart in the reference's `IdentityClient` (`IdentityClient.ts`, whose
+lookups are `resolveByIdentityKey` and `resolveByAttributes` alone); all four
+already parse every output before they answer (a `?` on the parser inside
+the `for output in &outputs` loop, the result returned after it).
+
+`tests/vectors/identity_resolve_737.json` is written by
+`tests/support/identity_resolve_737.mjs` (#730's helpers, the reference's
+writer, #553's two revelation tokens) at `ts-stack@edf6e03` under Node
+v22.18.0 with bun 1.3.11's bundle, the wallet's path run whole:
+`parseResults` over both outputs, `filterCertificatesByIdentityKey`
+(`:247-255`), the trust step (`transformVerifiableCertificatesWithTrust`,
+`:313-382`, the certifier trusted at the threshold) and
+`IdentityClient.parseIdentities` (`packages/sdk/src/identity/IdentityClient.ts:994-1011`);
+two runs byte-identical. Seven answers of two outputs: an unproven subject
+without inputs then the token, and an `OP_TRUE` output then the token (one
+identity), the token then the refused output (one), two certificates (two),
+one certificate at two outpoints (one, the trust step keeping one per serial
+number, `:360-361`), one outpoint twice (one), 257 transactions then the token
+(`refused: Transaction evidence: limit`). The fold's five: another
+subject's certificate (the scalar 10's, issued and published by the
+reference's own `MasterCertificate` and `publiclyRevealAttributes`, recorded
+under `tokens`) alone (no identity), before the asked one's and after a
+skipped output then before the asked one's (the asked identity); the token
+then 257 transactions whose subject spends `88`x32 (another txid than the
+token's, so no resolver drops it as a repeat; refused); and the refused
+first output's shape re-recorded with a second token of the subject (carol,
+another serial number) after it, so a broken evidence skip answers alice
+there. The vector's `certificates`, `serial_numbers` and `output_index` are
+asserted since the fold: every shape's certificates read through this
+crate's `query` (the same parser, every output, no subject filter) equal
+`parseResults`' count and serial numbers, and each output served at its
+recorded index. `tests/identity_resolve_737.rs`
+rebuilds every output with this crate's writer to the recorded SHA-256 and
+serves the answer through `resolve_by_identity_key` on an injected `.invalid`
+resolver. On `b5d008d1` (the tip's test, vector and recorder over the base,
+measured by the fold's cold re-read) three of six tests are RED:
+`a_skipped_first_output_is_passed_over_for_the_token_after_it_737` on both
+shapes (`Ok(None)`, expected carol's identity after the refused output and
+`Ok(Some(("03acd484...", "alice@example.com")))` after the `OP_TRUE` one),
+`another_subjects_certificate_is_not_the_asked_identity_737` (`Ok(Some(bob))`
+on the two answers whose first output is bob's, `Ok(None)` on the skipped
+one's) and `a_limit_after_an_admitted_output_refuses_the_resolution_737`
+(`Ok(Some(alice))`); the token-first, the first-output limit and the
+stated-difference tests GREEN there. On `a3f5fd03` (the lane's commit, the fold's test, vector and recorder over
+it) `another_subjects_certificate_is_not_the_asked_identity_737` is RED on
+its three shapes (`Ok(Some(("03a0434d...", "bob@example.com"))), expected Ok(None)`,
+and `expected Ok(Some(("03acd484...", "alice@example.com")))` twice) and
+`a_limit_after_an_admitted_output_refuses_the_resolution_737` RED
+(`Ok(Some(("03acd484...", "alice@example.com"))), expected Err("identity error: Transaction evidence: limit")`);
+the other four GREEN there. On the tip all six GREEN.
+
+Semver: a behaviour change at a public door without a signature change:
+`resolve_by_identity_key` answers `Some` for an answer whose first output is
+skipped and a later one admitted, where it answered `None`; answers the
+asked identity, or `None`, where it answered another subject's identity; and
+fails with `Error::IdentityError("Transaction evidence: limit")` on a limit
+anywhere in the answer, where it answered `Some` when an admitted output came
+before the limit. Migration: none.
+
+### Notes: cross-SDK parity (#737)
+
+The reference's `resolveByIdentityKey` returns every identity the wallet's
+discovery admits (`IdentityClient.ts:559-591`, `Promise<DisplayableIdentity[]>`);
+this crate's `resolve_by_identity_key` returns `Option<DisplayableIdentity>`
+and so the first admitted, in the answer's order: on two certificates of the
+subject the reference returns two identities and this crate the first
+(`two_certificates_resolve_to_the_first_where_the_reference_returns_both_stated_737`).
+The return type is the owner's word; `resolve_by_attributes` already returns
+every identity (`Vec<DisplayableIdentity>`, `src/identity/client.rs`), the
+shape that word would give this function. The subject filter is ported
+(the fold); the wallet's trust settings and its trust sort
+(`identityUtils.ts:330,379`: a certificate whose certifier the wallet does
+not trust dropped, the rest sorted by trust) and its page (`discoveryPage`,
+`Wallet.ts:228-233`) are wallet configuration, not ported at this door: the
+first identity here is the answer's first admitted of the asked subject, the
+reference's first the most trusted. Two certifiers in reverse trust order
+are stated, not pinned, on the owner's brief with the list return; the
+vector's recorder trusts every certifier it finds at level 1 (the
+threshold), so its trust step drops nothing and reorders nothing, the
+vector's limit.
+
 ### Fixed: the identity parsers run the reference's evidence check and skip a refused token where they read it (#730)
 
 The keeper's word of 2026-11-04 01:2xZ on #728's shape 4: the toolbox's
