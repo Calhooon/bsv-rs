@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the JSON lookup parse refuses what the reference's normalizer refuses (#768)
+
+From the rule and strength reads of PR #767 (#762, 2026-11-04 11:46Z), the
+residues #762's parity note named. `parse_json_lookup_answer`
+(`src/overlay/facilitators.rs:314-370` at `81c312e2`) read a body that is not
+a JSON object, a missing or non-string `type` as `output-list`, a missing or
+non-array `outputs` as an empty list, and dropped any item without a byte
+`beef` (or a hex or base64 text of one) and an integer `outputIndex` by
+`filter_map`; since #760 every such answer was a host success. The reference's
+HTTPS facilitator runs `normalizeLookupAnswer` and throws when it reads
+nothing (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:865-866`: `if
+(normalizedAnswer == null) throw new Error('Malformed lookup response')`),
+and `normalizeOutputListAnswer` (`:389-406`) reads an output list only from a
+plain object (`dataRecord`, `:305-307`) whose `type` is the string
+`output-list` and whose `outputs` is an array every item of which
+`normalizeLookupOutput` admits (`:327-357`): an object whose `beef` is a byte
+array of 1 to 32 MiB (`isByteArray`, `:288-303`; `MAX_LOOKUP_BEEF_BYTES`,
+`:256`), `outputIndex` an integer from 0 to `0xffffffff`, an optional
+`context` a byte array of at most 1 MiB and an optional `txid` 64 hex digits;
+one refused item refuses the answer. `beef` and `context` are repaired first
+by `normalizeBRC100ByteFields` (`:858-863`, `BRC100ByteEncoding.ts:126-146`):
+the historical object form `{"0": 7, ..}` read as its bytes, `{}` as `[]`.
+`completeTrackedLookup` (`:2379-2406`) records the thrown error as the host's
+failure; `ts-sdk@9e3ede6`'s facilitator returned the body as parsed
+(`LookupResolver.ts:189`) and its `lookupHostWithTracking` (`:518-528`)
+recorded a failure for an answer without `type: 'output-list'` and an array
+`outputs`, so both references record `{}` a failure. The parse now refuses
+each shape as `Err(OverlayError("Malformed lookup response: <what>"))`, the
+member named after the colon as #762's text does (`the answer is not a JSON
+object`, `the answer has no string type member`, `an output-list answer
+without an outputs array`, `output N is not a JSON object`, `output N beef is
+not an array of 1 to 33554432 bytes`, `output N outputIndex is not an integer
+from 0 to 4294967295`, `output N context is not an array of at most 1048576
+bytes`, `output N txid is not 64 hex digits`), which the resolver records as a
+failure; the byte fields read through the wallet substrates' reading of the
+same normalizer (`byte_fields::byte_array`, now `pub(crate)`), an integral
+float index (`1.0`) read as `JSON.parse` reads it. A well-formed empty list
+stays a success; an unknown string `type` stays `Unknown answer type`.
+
+`tests/lookup_answer_normalizer_768.rs`, each shape on a `wiremock` host
+through the facilitator and the resolver (the host's counts read before and
+after: the tracker is global; each host a server of its own, outside
+`wiremock`'s pool, so no earlier test's failures back it off): `{}`,
+`[]`, `"x"`, `null`, `5`, `{"type":5}`, `{"type":"output-list"}`,
+`{"type":"output-list","outputs":"x"}`,
+`{"type":"output-list","outputs":[{"beef":[1]}]}`, a good item beside one
+without `beef`, a hex text `beef`, an empty `beef`, a `null` context and a
+two-digit txid each refused in the reference's text with one failure and no
+success recorded; RED on `81c312e2` (a scratch copy with the file overlaid),
+each `<body> was read: OutputList { outputs: [] }` (or the filtered list:
+`OutputList { outputs: [OutputListItem { beef: [1, 2], output_index: 0,
+context: None }] }` for the hex text and for the good item beside the bad;
+`beef: []` for the empty one); the historical object form, `{}` context, an
+index of `1.0` and a txid read (RED there too, the item dropped); and
+`{"type":"output-list","outputs":[]}` a success on both. 14 of 15 RED on the
+base. `tests/overlay_http_tests.rs`'s four pins of the old reading
+(`test_lookup_missing_type_is_refused`,
+`test_lookup_output_list_missing_outputs_field`,
+`test_lookup_output_list_with_a_malformed_item_is_refused`,
+`test_lookup_output_list_beef_as_hex_string`) now assert the refusal, and the
+unit test `test_parse_json_default_type` is
+`test_parse_json_missing_type_is_malformed`.
+
+Semver: a behaviour change in `HttpsOverlayLookupFacilitator`'s JSON answer
+parse, no signature change. Migration: a host answering a shape the
+normalizer refuses (no `type`, no `outputs`, a malformed item, a non-object
+body, a hex or base64 `beef`) now gets an error and a recorded failure where
+it got an empty or filtered success. The LOW overlay host serialises this
+crate's `LookupAnswer` (`~/bsv/bsv-overlay-cloudflare`
+`crates/overlay-cloudflare/src/routes.rs:2432,2459`, `json_ok(&answer)`), so it
+always writes `type`, an `outputs` array and byte-array `beef`.
+
+### Notes: cross-SDK parity (#768)
+
+#762's two residues are closed by this row: a JSON answer without `type` and
+an output list without `outputs` are refused as the normalizer refuses them.
+Left, stated: a `formula` answer is still read as `LookupAnswer::Formula`
+(#762's note; the normalizer refuses it, `:446-448`); the reference's 32 MiB
+response bound (`:252`) and `maxOutputs` bound (4096,
+`LookupResources.ts:24`, thrown as `LookupResourceLimitError` at `:859-860`,
+which the tracked call rethrows without recording a host failure, `:2415`,
+and the host's query keeps as a session limit, `:1764-1765`) are not ported,
+the item bounds alone checked here (the two bounds are #775's row); a valid
+`txid` member is checked and not carried (`OutputListItem` has no `txid`,
+#735). An unknown
+string `type` is refused here as `Unknown answer type` where the reference
+says `Malformed lookup response`: the verdict the same (one failure recorded),
+the words different. Go at `2ca481c` unmarshals the body into its typed answer
+(`overlay/lookup/facilitator.go:65`, `types.go:38-43`, `outputs` with
+`omitempty`), so `{}` is an answer of empty type there; its
+`OutputListItem.Beef` is a `[]byte` (`overlay/lookup/types.go:19-22`), which
+`encoding/json` reads from a base64 text and writes as base64, so a JSON
+answer Go writes is refused here and in the reference (`beef` no byte array);
+not filed.
+
 ### Fixed: a BEEF entry takes the last BUMP holding its txid as any level-0 leaf, flagged on the way, as the reference does; v0.3.5's strict match reversed (#765)
 
 `Beef::try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only`,
@@ -308,7 +404,8 @@ typed answer. Older and outside the row: the facilitator reads a JSON answer
 without `type` as an output list and an output list without `outputs` as
 empty, where the normalizer asks for `type: 'output-list'` and an array
 (`:389-397`) and the facilitator refuses both (`:865-866`); since #760 such an
-answer is a success for the host here and a failure there (#768). On the
+answer is a success for the host here and a failure there (#768, closed by
+that row: both refused). On the
 tracker path as on the host path (#760's residue), every error is a failure
 here, where `edf6e03` keeps a semantic rejection neutral (`:2416`). And with
 every tracker backed off, `find_competent_hosts` answers no hosts and `query`
