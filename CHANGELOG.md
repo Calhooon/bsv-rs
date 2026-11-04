@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a BEEF entry takes the last BUMP holding its txid as any level-0 leaf, flagged on the way, as the reference does; v0.3.5's strict match reversed (#765)
+
+`Beef::try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only`,
+`merge_transaction`, `make_txid_only`) and `update_bump_indices` (behind
+`merge_bump`) took a BUMP for an entry only where its level-0 leaf for the
+txid was flagged `txid` (the `flags` helper, v0.3.5, `ef98e246`). The
+reference's index holds every level-0 hash of every BUMP, the last winning
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:576-585`), and
+`#tryToValidateBumpIndex` takes it and flags the leaf (`:1329-1340`, the flag at
+`:1334-1338`); `#mergeBumpEntry` gives an entry without an index the merged
+BUMP through `#tryMarkTxProvenByBump`, which does the same (`:774-786`,
+`:813-822`). go-sdk@2ca481c takes any level-0 hash where it attaches a path (`bumpProves`,
+`transaction/beef.go:67-83`; `FindBumpByHash`, `:620-630`, the earliest;
+`MergeBump`, `:780-785`), but flags no leaf and writes no index for an entry
+merged without one (`MergeRawTx`, `:820-849`; `beefBytes`, `:1679-1694`), and
+its validator proves an entry without an index only by a leaf flagged `txid`
+(`ValidateTransactions`, `:1070-1083`, `:1105-1113`, `:1137-1140`): Go's own
+merges leave the p25 BEEF refused, as v0.3.5 left it here, while the bytes
+this crate now writes (the entry indexed, the leaf `02`) read valid there
+(`:1114-1128`). BRC-74's flag `00` is "data follows, not a client txid"
+(`transactions/0074.md:75`), not "unproven". Both sites now take the LAST BUMP
+whose level 0 holds the txid as any leaf and flag that leaf with
+`MerklePath::contains_and_mark`; #757's last-wins order is kept. The reason: a
+level-0 leaf of a BUMP is a txid of that block and its path computes the same
+root, so the any-hash match claims no proof that is not there. `ef98e246`
+argued the opposite ("a tx's txid can legitimately appear as a sibling hash in
+an unrelated bump") and read Go as strict from its `tryToValidateBumpIndex`
+(`:858-868`), which only checks a path already set; its production failure
+left no shape and no test, and #763's fold could not reproduce it in seven
+arrangements on v0.3.4.
+
+The keeper's word (2026-11-04 12:2xZ): the April incident is not in LOW's
+records, so v0.3.5's shape cannot be found; what LOW holds is the same rule's
+effect on the other side, its decision ledger of 2026-09-04 (p25). Two drain
+inputs were mined as siblings in block 964422; the toolbox's walk merged A's
+proof, whose BUMP carried B's hash as a plain leaf (flag false), took its "a
+BUMP already proves this" shortcut, merged B raw with no bump index and never
+walked B's parent (`2617c486...`); this crate's linker took flagged leaves only,
+the sorter demanded the parent, and the wallet's door refused the BEEF:
+`inputBEEF: BEEF structure is invalid: roots [04da74cc..., 7e9f364d...,
+1f2e5c0a..., 1076329a..., 3538181c...]; missing inputs [2617c486...];
+transactions with missing inputs [1f2e5c0a...]; 5 tx(s), 3 bump(s), 7,377
+bytes` (the CLI 0.2.24's drain through toolbox 0.3.61; the toolbox's 0.3.64,
+`ffd1b0f`, flags the leaf in its shortcut). The strict rule's one recorded
+production effect was the refusal of a BEEF the references link.
+
+`tests/beef_sibling_leaf_765.rs` rebuilds the p25 shape with this crate's
+writers (a block of four at 964422, its root computed from the leaves; A's
+BUMP flagging A at offset 2 with B plain at 3; A raw, then B raw with no
+index, then the drain spending both; B's parent not in the BEEF): on the tip
+B takes index 0, its leaf written `02`, and `verify_structure`, the bytes read
+back, `verify_stream_structure` and `Transaction::from_beef` (B's BUMP
+attached) accept it. RED on `81c312e2` (a scratch copy, its own target dir):
+`BEEF structure is invalid (InputNamesNoElement): roots ["de8ad6fc..."];
+missing inputs ["2626...26"]; transactions with missing inputs ["455a901c..."];
+3 tx(s), 1 bump(s), 348 bytes` (A, P, B; this crate's refusal in the door's
+shape). A txid no BUMP holds is still refused so (the control, green on
+both). #763's seven arrangements of `ef98e246`'s shape (a sibling spent by a
+chain of two unproven transactions: the BUMP before the entries and after
+them, `merge_beef` both ways, two BUMPs of the block combined, the entries
+newest to oldest, the sibling mid-chain over a parent proven a block below) link
+on the tip; on `81c312e2` six are refused for the missing parent and the
+mid-chain one is accepted with the sibling unindexed. The two #763 found
+refused on v0.3.4 answer for their own reasons: a txid-only sibling is valid
+under both `allow_txid_only` values (the flag decides nothing since 0.4.2;
+v0.3.4's refusal was the flag's), two roots at one height `RootNotCarried`.
+3 of 4 RED on `81c312e2`. The #757 sibling pin is an equality pin now
+(`a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765`):
+`raw_after_a_sibling_leaf` and `raw_before_a_sibling_leaf` written to the
+reference's recorded bytes, RED on `81c312e2` (the parent's leaf
+`...bb010062b05f...` for `...bb010262b05f...`, its entry `...0101000100...` for
+`...0101010100...`). The two unit tests that pinned the strict match,
+`test_try_to_validate_bump_index_strict_no_sibling_fallback` and
+`test_update_bump_indices_ignores_siblings`, pin the any-hash rule at their
+site now (`..._takes_a_sibling_leaf_and_flags_it_765`).
+
+Semver: a behaviour change in which BUMP an entry takes and in the written
+flag byte, no signature change; readers accept both forms. Migration: a BEEF
+whose txid sits only as an unflagged sibling leaf now links and verifies where
+it was refused, and its written bytes carry the flag (`02` for `00`) and the
+entry's index; a fixture pinning the old bytes re-records. For the hosts: a
+BEEF a reference wallet builds this way now links where it was refused; the
+toolbox's 0.3.64 shortcut flag stays harmless (a flagged leaf was taken before
+and is taken now).
+
 ### Notes: cross-SDK parity (the empty ASM text, ts-stack #1479)
 
 `Script::from_asm("")` and a double space inside a text read as go-sdk v1.7.1's
@@ -327,39 +412,10 @@ crate wrote before #757 (`raw_between`'s bytes, one hex digit from
 
 ### Notes: cross-SDK parity
 
-The match stays strict at both merge sites, older than #757 (v0.3.5,
-`ef98e246`): `try_to_validate_bump_index` and `update_bump_indices` take a BUMP
-only where its level-0 leaf for the txid is flagged `txid`, where the
-reference's `#tryToValidateBumpIndex` (`Beef.ts:1334-1338`) and
-`#tryMarkTxProvenByBump` (`:813-822`) take any level-0 hash and flag the leaf.
-go-sdk@2ca481c takes any level-0 hash too (`bumpProves`, `beef.go:67-83`;
-`FindBumpByHash`, `:620-630`; `MergeBump`, `:780-785`); its
-`tryToValidateBumpIndex` (`:858-868`) only checks a path already set, the
-reading v0.3.5's comment took for the whole of Go. BRC-74's flag `00` says
-"data follows, not a client txid" (`transactions/0074.md:75` at `5119a9b`), not
-that the leaf is unproven; this crate's own readers take any level-0 hash
-(`find_bump`, `verify_structure`). A BUMP carrying the txid only as an
-unflagged sibling is the entry's index in the reference and no proof here:
-merged after the txid's proof, index 1 there and 0 here
-(`raw_after_a_sibling_leaf`); merged before the BUMP, index 0 there and none
-here, so this crate's BEEF reads invalid (the parent's input names no entry)
-where the reference's reads valid (`raw_before_a_sibling_leaf`). In
-`raw_after_a_sibling_leaf` this crate's whole BEEF read back attaches the
-sibling's 800002 (`find_bump` takes any level-0 hash, the last), as the reference's does, but
-its atomic BEEF carries the 800000 its written index names where the
-reference's carries 800002: the written index and the attached path part
-here alone. Pinned by
-`a_bump_holding_the_txid_as_an_unflagged_sibling_is_no_proof_of_it_states_757`
-and stated in `CLAUDE.md`'s divergence list. The keeper's word (2026-11-04
-10:3xZ) is to conform, bound to a guard: v0.3.5's production shape rebuilt and
-shown valid under the any-hash rule. The fold could not rebuild it from what
-`ef98e246` left: the shape its message describes (a txid held as a sibling in
-a BUMP of a chain of unproven transactions), in seven arrangements (the BUMP
-before and after the entry, through `merge_beef` both ways, at another BUMP's
-height, newest first, the sibling mid-chain), is accepted by v0.3.4's `verify_valid` (`5ea9c52`, the
-any-hash fallback), save where a txid-only entry meets `allow_txid_only =
-false` or two roots share a height, which the rule does not decide. The
-rebuild is its own row; until it lands the strict match stands. Not filed.
+The strict sibling-leaf match this paragraph stated (v0.3.5, `ef98e246`) is
+reversed by #765: both merge sites take any level-0 leaf and flag it, as the
+reference does (go-sdk takes any level-0 hash where it attaches a path and
+proves an unindexed entry by a flagged leaf alone); see that entry.
 
 A txid-only entry without a BUMP index (one read from bytes: neither reader
 gives it one, `BeefTx.ts:294-295`) in an atomic closure: the reference's

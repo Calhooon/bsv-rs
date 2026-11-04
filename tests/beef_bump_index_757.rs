@@ -20,10 +20,11 @@
 //! names (`#copySelectedTransactions`, `:448-470`; the earliest carrying the
 //! txid until the fold), and `make_txid_only` sets the index again
 //! (`makeTxidOnly`, `:550-565`). A BUMP holding the txid only as an unflagged
-//! sibling leaf stays no proof at either merge site (`try_to_validate_bump_index`,
-//! `update_bump_indices`), where the reference's `#tryToValidateBumpIndex`
-//! (`:1334-1338`) and `#tryMarkTxProvenByBump` (`:813-822`) take it and flag
-//! the leaf: the stated difference, pinned byte for byte.
+//! sibling leaf is the entry's proof at both merge sites (`try_to_validate_bump_index`,
+//! `update_bump_indices`), the leaf flagged, as the reference's
+//! `#tryToValidateBumpIndex` (`:1334-1338`) and `#tryMarkTxProvenByBump`
+//! (`:813-822`) take it: the reference's bytes, since #765 (a stated
+//! difference until then).
 //!
 //! Every BEEF is rebuilt here by this crate's writer from the inputs the
 //! vector carries and compared with the bytes the reference's writer
@@ -185,56 +186,31 @@ fn an_entry_merged_before_or_between_the_bumps_keeps_the_bump_present_at_its_mer
     }
 }
 
-/// The stated difference, older than #757, at both merge sites: a BUMP that
-/// holds the txid as an unflagged sibling leaf is no proof of it here, where
-/// the reference takes any level-0 hash and flags the leaf. Merged after it
-/// (`try_to_validate_bump_index`; `#tryToValidateBumpIndex`, `:1334-1338`)
-/// the entry keeps the flagged BUMP's index; merged before it
-/// (`update_bump_indices`; `#tryMarkTxProvenByBump`, `:813-822`) the entry has
-/// none. This crate's bytes are the reference's with the sibling leaf's flag
-/// byte `00` for `02` and the entry's index byte `00` for `01`, or its format
-/// byte `00` (no BUMP) for `01 00`, and nothing else; the reference's bytes
-/// read valid here, this crate's where it holds a proof.
+/// A BUMP that holds the txid as an unflagged sibling leaf is its proof at
+/// both merge sites, the leaf flagged on the way, as the reference takes any
+/// level-0 hash. Merged after it (`try_to_validate_bump_index`;
+/// `#tryToValidateBumpIndex`, `:1334-1338`) the entry takes its index, the
+/// last; merged before it (`update_bump_indices`; `#tryMarkTxProvenByBump`,
+/// `:813-822`) it takes it on the BUMP's merge. The bytes are the reference's:
+/// the sibling leaf's flag byte `02` and the entry's index byte `01`, or its
+/// `01 00`. Until #765 this crate wrote `00` for each (v0.3.5's strict match)
+/// and its `raw_before_a_sibling_leaf` BEEF read invalid.
 #[test]
-fn a_bump_holding_the_txid_as_an_unflagged_sibling_is_no_proof_of_it_states_757() {
+fn a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765() {
     let v = vector();
     let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
-    let raw = v["txs"]["parent"]["raw"].as_str().unwrap();
-    let wire: String = (0..32).rev().map(|i| &parent[2 * i..2 * i + 2]).collect();
-    let flag = (format!("0102{wire}"), format!("0100{wire}"));
-    for (name, recorded, ours, entry) in [
-        ("raw_after_a_sibling_leaf", 1, Some(0), ("0101", "0100")),
-        ("raw_before_a_sibling_leaf", 0, None, ("0100", "00")),
+    for (name, index) in [
+        ("raw_after_a_sibling_leaf", 1),
+        ("raw_before_a_sibling_leaf", 0),
     ] {
-        let case = index_case(&v, name);
-        assert_eq!(case["parent_bump_index"], recorded, "{name}: the reference");
-        let mut beef = build(&v, &case);
-        assert_eq!(beef.find_txid(parent).unwrap().bump_index(), ours, "{name}");
-        let theirs = case["beef"].as_str().unwrap();
-        assert_eq!(
-            theirs.matches(&flag.0).count(),
-            1,
-            "{name}: the sibling leaf, flag 02"
-        );
-        let entry_at = (format!("{}{raw}", entry.0), format!("{}{raw}", entry.1));
-        assert_eq!(theirs.matches(&entry_at.0).count(), 1, "{name}: the entry");
-        let expected = theirs
-            .replace(&flag.0, &flag.1)
-            .replace(&entry_at.0, &entry_at.1);
-        assert_eq!(
-            beef.to_hex(),
-            expected,
-            "{name}: the flag and index bytes alone differ"
-        );
-        // Without the sibling's proof the parent here is unproven and its
-        // input names no entry; the reference's bytes read valid here.
+        assert_eq!(index_case(&v, name)["parent_bump_index"], index, "{name}");
+        assert_written_as_recorded(&v, name);
+        let mut beef = build(&v, &index_case(&v, name));
+        assert!(beef.bumps[index as usize]
+            .txids()
+            .contains(&parent.to_string()));
         let mut read = Beef::from_binary(&beef.to_binary()).unwrap();
-        assert_eq!(read.verify_valid(false).valid, ours.is_some(), "{name}");
-        let mut read = Beef::from_hex(theirs).unwrap();
-        assert!(
-            read.verify_valid(false).valid,
-            "{name}: the reference's bytes"
-        );
+        assert!(read.verify_valid(false).valid, "{name}");
     }
 }
 
