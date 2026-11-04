@@ -240,3 +240,7 @@ mod tests_736;
 #[cfg(test)]
 #[path = "evidence_741_tests.rs"]
 mod tests_741;
+
+#[cfg(test)]
+#[path = "evidence_748_tests.rs"]
+mod tests_748;
