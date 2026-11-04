@@ -578,8 +578,6 @@ Tests are organized by feature area:
 | **wallet** | `wallet_tests`, `wallet_client_instance_335`, `wallet_client_interface_404`, `wallet_client_shared_404`, `wire_method_roundtrip_tests`, `wallet_wire_cross_sdk_tests` |
 | **messages** | `messages_tests` |
 | **compat** | `compat_bip39_tests`, `compat_bip39_nfkd`, `compat_integration_tests`, `compat_ecies_envelope_109`, `compat_ecies_bounds_333`, `compat_ecies_short_envelope_463` |
-| **auth** | `auth_cross_sdk_tests`, `auth_identity_certificate_field_order_394`, `auth_integration_tests`, `auth_peer_e2e_tests`, `auth_peer_client_verifies_353`, `auth_peer_http_signing_server_353` |
-| **compat** | `compat_bip39_tests`, `compat_bip39_nfkd`, `compat_integration_tests`, `compat_ecies_envelope_109` |
 | **auth** | `auth_cross_sdk_tests`, `auth_peer_certificate_paths_445`, `auth_identity_certificate_field_order_394`, `auth_integration_tests`, `auth_peer_e2e_tests`, `auth_peer_client_verifies_353`, `auth_peer_http_signing_server_353` |
 | **overlay** | `overlay_cross_sdk_tests`, `overlay_integration_tests`, `overlay_mock_tests`, `overlay_admin_token_ts_parity_tests` |
 | **overlay HTTP** | `overlay_http_tests` |
