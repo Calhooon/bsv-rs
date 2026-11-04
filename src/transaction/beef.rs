@@ -41,6 +41,7 @@ use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V2};
 mod collect;
 mod in_memory;
 mod index;
+mod merge_graph;
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
 use collect::AfterFrame;
@@ -380,33 +381,26 @@ impl Beef {
         }
     }
 
-    /// Merges a transaction into this BEEF.
-    ///
-    /// If the transaction has a merkle path, it's also merged.
-    /// Replaces any existing transaction with the same txid.
-    pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx {
-        let txid = tx.id();
-        self.remove_existing_txid(&txid);
-
-        let bump_index = None; // Could be set if tx has merklePath
-
-        let idx = self.push_tx(
-            BeefTx::from_tx(tx, bump_index).with_txid(txid.clone()),
-            txid,
-        );
+    /// Stores `tx` under `txid` with `bump_index`, else the last BUMP flagging
+    /// it, in the place of an entry of the txid: one entry, no walk
+    /// (`merge_graph.rs`; `to_beef`'s collected ancestors).
+    pub(super) fn push_transaction(
+        &mut self,
+        txid: String,
+        tx: Transaction,
+        bump: Option<usize>,
+    ) -> usize {
+        let idx = self.replace_or_append(BeefTx::from_tx(tx, bump).with_txid(txid.clone()), txid);
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
-
-        &self.txs[idx]
+        idx
     }
 
     /// Merges raw transaction bytes into this BEEF.
     pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx {
         let new_tx = BeefTx::from_raw_tx(raw_tx, bump_index);
         let txid = new_tx.txid();
-        self.remove_existing_txid(&txid);
-
-        let idx = self.push_tx(new_tx.with_txid(txid.clone()), txid);
+        let idx = self.replace_or_append(new_tx.with_txid(txid.clone()), txid);
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
@@ -447,15 +441,6 @@ impl Beef {
         self.mark_mutated();
 
         Some(&self.txs[idx])
-    }
-
-    /// Removes an existing transaction by txid.
-    fn remove_existing_txid(&mut self, txid: &str) {
-        if let Some(idx) = self.index_of(txid) {
-            self.txs.remove(idx);
-            self.rebuild_index();
-            self.mark_mutated();
-        }
     }
 
     /// Gives a new entry without an index the LAST BUMP whose level 0 holds
@@ -502,7 +487,7 @@ impl Beef {
                 // the correct index by scanning self.bumps.
                 self.merge_raw_tx(raw.to_vec(), None);
             } else if let Some(t) = tx.tx() {
-                self.merge_transaction(t.clone());
+                self.push_transaction(t.id(), t.clone(), None);
             }
         }
     }
@@ -2838,7 +2823,8 @@ mod iterative_equivalence_tests {
             beef.merge_bump(bump);
         }
         for ancestor in ancestors {
-            beef.merge_transaction(ancestor);
+            // 0.3.34's merge: the entry alone, no path or source walk (#764).
+            beef.push_transaction(ancestor.id(), ancestor, None);
         }
         if atomic {
             beef.to_binary_atomic(&tx.id())

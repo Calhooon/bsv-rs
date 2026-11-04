@@ -7,6 +7,153 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `merge_transaction` merges the transaction's merkle path as a BUMP and walks its source transactions, as the reference does (#764)
+
+From the #757 lane's reading (2026-11-04 10:2xZ) and the rule read of PR #763.
+The reference's `mergeTransaction` (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Beef.ts:875-901`) runs `#mergeTransactionGraph`,
+which pops each transaction off a stack and runs `#mergeTransactionEntry`
+(`:849-856`): `current.merklePath` merged through `#mergeBumpEntry`
+(`:774-786`) and the returned index taken for the entry, else
+`#tryToValidateBumpIndex` (`:1329-1340`); an entry that ends with no index
+queues its inputs' `sourceTransaction`s (`#queueSourceTransactions`,
+`:858-863`, at `:897`), each txid once per call. go-sdk@2ca481c's
+`MergeTransaction` (`transaction/beef.go:875-912`) does the same save a held
+entry and a held BUMP: `MergeBump(tx.MerklePath)`, then `MergeTransaction` of
+each source when there is no index, but `mergeWouldNotChange` (`:920-950`)
+keeps a proven entry it holds instead of replacing it, and its
+`tryToValidateBumpIndex` (`:858-868`) never looks up a held BUMP, so for a
+transaction with no path that a held BUMP proves Go walks the sources where
+the reference and this crate stop (`subject_proven_by_a_held_bump`; read, not
+run). This crate's `merge_transaction` stored the transaction alone
+(`src/transaction/beef.rs:391-405` at `d14f560d`: `let bump_index = None; //
+Could be set if tx has merklePath`): its path was never written as a BUMP and
+no ancestor was merged, so `find_atomic_transaction` on such a BEEF descended
+past a parent the reference stops at.
+
+It now walks as the reference does (`src/transaction/beef/merge_graph.rs`, a
+stack, linear in the graph, no recursion): a transaction carrying a path has
+it merged through `merge_bump` and takes the returned index (a path whose
+BUMP the BEEF holds, the same height and root, is combined into it, no second
+BUMP); one without takes the last BUMP flagging its txid, as before; an entry
+that ends with an index stops the walk, one that ends with none has its
+inputs' sources merged and walked in turn, from the first input on. A source
+the BEEF already holds is replaced in its place, as the reference's
+`#replaceOrAppendTx` replaces it (`:531-540`), so an ancestor merged by hand
+is one entry still and a graph merged again moves no entry. The transaction given is stored as
+given; each ancestor is stored as a copy without its own source links (they
+are entries of the BEEF), so the walk clones each transaction once, where the
+reference holds the objects. `merge_beef` keeps its one-entry merge of an
+in-memory entry (no path or source walk), as the reference's `mergeBeef`
+reads a snapshot of the bytes, which carries neither (`:975`).
+
+Since #764's fold every door that replaces a held txid (`merge_raw_tx`,
+`merge_transaction` and its walk, the one-entry merge `merge_beef` and
+`to_beef` use) goes through one helper, the reference's `#replaceOrAppendTx`
+(`beef/index.rs`, `replace_or_append`): the entry is stored at the held one's
+position, where it was removed (`Vec::remove`, then the index rebuilt) and the
+new one appended. `merge_txid_only` keeps a held entry, as `mergeTxidOnly`
+does (`:919-929`). That made a re-merge over a held graph of G entries cost
+O(G·N) in a BEEF of N, where the reference's costs O(G), and it wrote another
+order: two unrelated transactions A and B held (raw, both proven or both
+unproven), A merged again, the reference writes A then B and this crate wrote
+B then A, as `sort_txs` keeps insertion order between entries no dependency
+orders. Older than #764 (the same on `d14f560d`, through `merge_raw_tx` too);
+found by the cold read of PR #770.
+
+Semver: a behaviour change without a signature change. The bytes `to_binary`
+writes after `merge_transaction` of a transaction carrying a `merkle_path` or
+input `source_transaction`s change: a BUMP and the ancestors appear, and the
+entry carries the BUMP's index. A re-merge of a held txid (`merge_raw_tx`,
+`merge_transaction`) leaves the entry in its place: the bytes after it change
+only where independent entries were written in the moved order (A then B
+above, B then A before). Readers are unchanged. `Transaction::to_beef`,
+`to_beef_v1` and `to_atomic_beef` write the bytes they wrote: since #764's fold
+they store their collected ancestors with the one-entry merge (their BUMPs are
+merged already, so a walk would merge each proven ancestor's path again), and
+the `iterative_equivalence_tests` byte comparison and `readme_examples` hold.
+Migration: a caller that merged a transaction's ancestors by hand as well
+merges them once (the replacement dedupes); a fixture pinning the old bytes of
+such a merge re-records; a site that re-merges an in-memory entry meant to
+stand alone (a root to prune or split from its ancestry, the toolbox's
+`create_action/beef_graph.rs:265` and `create_action/beef.rs:84`) keeps the
+one-entry merge with `beef.merge_raw_tx(tx.to_binary(), None)`. The dependents' sites (`grep -rn merge_transaction` in
+`bsv-overlay-cloudflare`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
+`rust-message-box`; 82 matching lines, each read at its window): four
+production sites, the rest tests. `overlay-engine`'s `gasp_overlay.rs:461`
+merges transactions parsed by `Transaction::from_binary` (no path, no links):
+unchanged. `overlay-cloudflare`'s `ef.rs:245` (`strip_subject_bump`'s
+fallback, the subject from `transaction_from_beef` with its path cleared but its sources linked) now
+writes the subject's ancestry and their BUMPs where its comment says "parents
+dropped", the guard (the subject raw, no proof claimed for it) still holding.
+The toolbox's `create_action/beef_graph.rs:265` and `create_action/beef.rs:84`
+re-merge an in-memory entry's transaction (`tx.tx()` with no raw bytes), which
+now walks the sources it carries. Thirteen test sites name a path or a
+source link within the forty lines before the call (`overlay-cloudflare`
+`submit_census.rs`, `low-app-layer` `compaction.rs`, the toolbox's
+`broadcast_memory_tests.rs`, `arcade_tests.rs`,
+`arcade_status_vector_tests.rs`, `rust-message-box` `payments.rs`; not run
+here): where the transaction merged carries them, its BEEF gains the BUMPs and
+ancestors the reference's would hold.
+
+`tests/beef_merge_transaction_764.rs` against
+`tests/vectors/beef_merge_transaction_764.json`
+(`tests/support/beef_merge_transaction_764.mjs`, the bun bundle of
+`packages/sdk` at `ts-stack@edf6e03` under Node v22.18.0; two runs
+byte-identical): nine graphs over #757's parent, child and grandchild, each
+rebuilt here (the transactions' bytes, the paths they carry, the sources their
+inputs carry, the case's prior merges) and compared with the reference's
+`mergeTransaction` then `toHex` bytes, its BUMP count and its entries'
+indices: a lone transaction carrying its path at 800000 (bumps `[alone]`,
+index 0) and a lone unproven one; a child carrying its proven parent on both
+inputs (one BUMP, the parent indexed, the child raw) and its unproven parent;
+a chain of three proven at the middle (the walk stops, the grandparent absent)
+and at the root (all three, one BUMP); a child whose parent the BEEF holds raw
+and with its BUMP (no duplicate entry, no second BUMP); a child a held BUMP
+proves (its sources not walked); and the stored forms (the transaction given
+keeps its links, an ancestor holds none). 6 of 10 RED on `d14f560d` (a scratch
+copy, its own target dir): `lone_proven: the bytes the reference's
+mergeTransaction then toHex writes`, `left: "0200beef0001000100000001aa..."`
+(no BUMP), `right: "0200beef01fe00350c000101000262b0..."`;
+`child_of_a_proven_parent` `left: "0200beef000100010000000262b0..."` (the
+child alone, the parent absent); the agreement cases (the lone unproven
+control, the two held-parent cases, the held-BUMP case) green on both.
+
+The fold's six cases, recorded by the same recorder (its runs byte-identical,
+the nine cases unchanged; a grandparent, two parents each spending one of its
+outputs, and a child spending both, with three lone-leaf BUMPs): two distinct
+unproven parents (the first input's merged first, the sort keeping it); the
+grandparent reached through both, without a path under the first and with one
+under the second (merged once, on the first branch: no BUMP); two unrelated
+transactions held, the first merged again unproven, proven, and through
+`merge_raw_tx` (A then B); a chain merged twice (one merge's bytes). Four of
+16 RED on `8db1878a` (a scratch copy, its own target dir): the three held
+cases (`left` writes the right parent's 3900-satoshi output first, `right` the
+left's 2900) and the re-merge's index pin (`the second merge moved an entry`,
+the order after the sort reversed); the distinct-parents and grandparent cases
+green on both, and RED on the tip with `.rev()` removed (both) or the
+once-per-call set removed (the grandparent case).
+
+### Notes: cross-SDK parity
+
+Ancestors are held without their links: the reference's `#mergeTransactionEntry`
+(`ts-stack@edf6e03` `Beef.ts:849-856`) stores each source object as given, its
+own `sourceTransaction` links kept; this crate stores `clone_for_beef` copies.
+The transaction given keeps its links on both sides, the bytes are the same,
+and `find_atomic_transaction` answers the same graph (its walk takes the
+root's own links, then this BEEF's entries, copies of those objects, and stops
+where both stop, `:649-680`). What differs: `find_txid(ancestor).tx()` has no
+`source_transaction` on its inputs where the reference's has the caller's, and
+`find_transaction_for_signing(ancestor)` links one level from the BEEF where
+the reference's returns the caller's whole chain. go-sdk@2ca481c differs from
+both: `mergeWouldNotChange` (`transaction/beef.go:920-950`) keeps a held proven
+entry rather than replacing it, and its `tryToValidateBumpIndex` (`:858-868`)
+only clears a path that lacks the txid, so a pathless transaction a held BUMP
+proves gets no index and its sources are walked (the recorded
+`subject_proven_by_a_held_bump`: the child alone here and in the reference,
+child and parent in Go; read, not run). Ours: linear storage by Rust
+ownership. Theirs: go-sdk, not filed.
+
 ### Fixed: the SLAP path's accounting and the freeform answer without a result follow the reference's host reputation (#762)
 
 From the rule read of PR #761 (#760, 2026-11-04 09:5xZ), two residues beside

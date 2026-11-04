@@ -38,6 +38,21 @@ impl Beef {
             .filter(|&i| self.txs.get(i).is_some_and(|tx| tx.has_txid(txid)))
     }
 
+    /// Stores `tx` under `txid` in the place of the entry held for the txid,
+    /// else appends it, as the reference's `#replaceOrAppendTx` does
+    /// (`ts-stack@edf6e03` `Beef.ts:531-540`): a held entry keeps its
+    /// position, so a re-merge moves no entry and costs no re-index. Until
+    /// #764's fold the held entry was removed and the new one appended.
+    pub(super) fn replace_or_append(&mut self, tx: BeefTx, txid: String) -> usize {
+        match self.index_of(&txid) {
+            Some(idx) => {
+                self.txs[idx] = tx;
+                idx
+            }
+            None => self.push_tx(tx, txid),
+        }
+    }
+
     /// Finds a BeefTx by txid.
     pub fn find_txid(&self, txid: &str) -> Option<&BeefTx> {
         self.index_of(txid).map(|i| &self.txs[i])

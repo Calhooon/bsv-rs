@@ -1,0 +1,595 @@
+{
+  "issue": 764,
+  "reference": "ts-stack@edf6e03 packages/sdk (Beef.ts:774-786, :849-863, :875-901, :1329-1340)",
+  "runtime": "node v22.18.0",
+  "txs": {
+    "parent": {
+      "txid": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062",
+      "raw": "0100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+    },
+    "child": {
+      "txid": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09",
+      "raw": "010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+    },
+    "grandchild": {
+      "txid": "392fb2c84726416f14a17996bff92077ede0b3609588ea4ebb40348dfa7a3ec5",
+      "raw": "0100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000"
+    },
+    "grand": {
+      "txid": "b3afb62ef9a5b177114a2e1b3c9cbff09f4476537d42c2806e8e12e9f1d80150",
+      "raw": "0100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff02b80b0000000000000151a00f000000000000015100000000"
+    },
+    "left": {
+      "txid": "20568af64b4320055ab89c0c8c3db6f956bc565a81d729eabcc3223763ed081c",
+      "raw": "01000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3000000000151ffffffff01540b000000000000015100000000"
+    },
+    "right": {
+      "txid": "8dbcc44350e050de0533978fd8aaf1be2431ebec0b5eb5678c3ec4dc38a8ced7",
+      "raw": "01000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3010000000151ffffffff013c0f000000000000015100000000"
+    },
+    "twin": {
+      "txid": "65150733c9f730327529116928c78b16d93ec86b2b4b142172ebcaf4a321bd08",
+      "raw": "01000000021c08ed633722c3bcea29d7815a56bc56f9b63d8c0c9cb85a0520434bf68a5620000000000151ffffffffd7cea838dcc43e8c67b55e0beceb3124bef1aad88f973305de50e05043c4bc8d000000000151ffffffff012c1a000000000000015100000000"
+    }
+  },
+  "bumps": {
+    "alone_800000": "fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
+    "child_800003": "fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3",
+    "grand_800010": "fe0a350c00010100025001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3",
+    "left_800011": "fe0b350c00010100021c08ed633722c3bcea29d7815a56bc56f9b63d8c0c9cb85a0520434bf68a5620",
+    "right_800012": "fe0c350c0001010002d7cea838dcc43e8c67b55e0beceb3124bef1aad88f973305de50e05043c4bc8d"
+  },
+  "cases": [
+    {
+      "name": "lone_proven",
+      "steps": [],
+      "merge": {
+        "tx": "parent",
+        "path": "alone_800000",
+        "sources": []
+      },
+      "returned": "parent",
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "lone_unproven",
+      "steps": [],
+      "merge": {
+        "tx": "parent",
+        "path": null,
+        "sources": []
+      },
+      "returned": "parent",
+      "beef": "0200beef0001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "child_of_a_proven_parent",
+      "steps": [],
+      "merge": {
+        "tx": "child",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "parent",
+            "path": "alone_800000",
+            "sources": []
+          },
+          {
+            "input": 1,
+            "tx": "parent",
+            "path": "alone_800000",
+            "sources": []
+          }
+        ]
+      },
+      "returned": "child",
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860201000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "child",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "child_of_an_unproven_parent",
+      "steps": [],
+      "merge": {
+        "tx": "child",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "parent",
+            "path": null,
+            "sources": []
+          },
+          {
+            "input": 1,
+            "tx": "parent",
+            "path": null,
+            "sources": []
+          }
+        ]
+      },
+      "returned": "child",
+      "beef": "0200beef0002000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "child",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "chain_stops_at_a_proven_middle",
+      "steps": [],
+      "merge": {
+        "tx": "grandchild",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "child",
+            "path": "child_800003",
+            "sources": [
+              {
+                "input": 0,
+                "tx": "parent",
+                "path": null,
+                "sources": []
+              },
+              {
+                "input": 1,
+                "tx": "parent",
+                "path": null,
+                "sources": []
+              }
+            ]
+          }
+        ]
+      },
+      "returned": "grandchild",
+      "beef": "0200beef01fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3020100010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "child",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "grandchild",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "chain_proven_at_the_root",
+      "steps": [],
+      "merge": {
+        "tx": "grandchild",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "child",
+            "path": null,
+            "sources": [
+              {
+                "input": 0,
+                "tx": "parent",
+                "path": "alone_800000",
+                "sources": []
+              },
+              {
+                "input": 1,
+                "tx": "parent",
+                "path": "alone_800000",
+                "sources": []
+              }
+            ]
+          }
+        ]
+      },
+      "returned": "grandchild",
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "child",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "grandchild",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "parent_already_raw",
+      "steps": [
+        "raw:parent"
+      ],
+      "merge": {
+        "tx": "child",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "parent",
+            "path": null,
+            "sources": []
+          },
+          {
+            "input": 1,
+            "tx": "parent",
+            "path": null,
+            "sources": []
+          }
+        ]
+      },
+      "returned": "child",
+      "beef": "0200beef0002000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "child",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "parent_already_proven",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent"
+      ],
+      "merge": {
+        "tx": "child",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "parent",
+            "path": "alone_800000",
+            "sources": []
+          },
+          {
+            "input": 1,
+            "tx": "parent",
+            "path": "alone_800000",
+            "sources": []
+          }
+        ]
+      },
+      "returned": "child",
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860201000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "child",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "subject_proven_by_a_held_bump",
+      "steps": [
+        "bump:child_800003"
+      ],
+      "merge": {
+        "tx": "child",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "parent",
+            "path": null,
+            "sources": []
+          },
+          {
+            "input": 1,
+            "tx": "parent",
+            "path": null,
+            "sources": []
+          }
+        ]
+      },
+      "returned": "child",
+      "beef": "0200beef01fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3010100010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "child",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "two_distinct_unproven_parents",
+      "steps": [],
+      "merge": {
+        "tx": "twin",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "left",
+            "path": null,
+            "sources": []
+          },
+          {
+            "input": 1,
+            "tx": "right",
+            "path": null,
+            "sources": []
+          }
+        ]
+      },
+      "returned": "twin",
+      "beef": "0200beef00030001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3000000000151ffffffff01540b0000000000000151000000000001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3010000000151ffffffff013c0f0000000000000151000000000001000000021c08ed633722c3bcea29d7815a56bc56f9b63d8c0c9cb85a0520434bf68a5620000000000151ffffffffd7cea838dcc43e8c67b55e0beceb3124bef1aad88f973305de50e05043c4bc8d000000000151ffffffff012c1a000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "left",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "right",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "twin",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "a_grandparent_reached_twice_is_merged_once",
+      "steps": [],
+      "merge": {
+        "tx": "twin",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "left",
+            "path": null,
+            "sources": [
+              {
+                "input": 0,
+                "tx": "grand",
+                "path": null,
+                "sources": []
+              }
+            ]
+          },
+          {
+            "input": 1,
+            "tx": "right",
+            "path": null,
+            "sources": [
+              {
+                "input": 0,
+                "tx": "grand",
+                "path": "grand_800010",
+                "sources": []
+              }
+            ]
+          }
+        ]
+      },
+      "returned": "twin",
+      "beef": "0200beef0004000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff02b80b0000000000000151a00f0000000000000151000000000001000000021c08ed633722c3bcea29d7815a56bc56f9b63d8c0c9cb85a0520434bf68a5620000000000151ffffffffd7cea838dcc43e8c67b55e0beceb3124bef1aad88f973305de50e05043c4bc8d000000000151ffffffff012c1a0000000000000151000000000001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3000000000151ffffffff01540b0000000000000151000000000001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3010000000151ffffffff013c0f000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "grand",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "twin",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "left",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "right",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "a_held_unproven_transaction_merged_again_keeps_its_place",
+      "steps": [
+        "raw:left",
+        "raw:right"
+      ],
+      "merge": {
+        "tx": "left",
+        "path": null,
+        "sources": []
+      },
+      "returned": "left",
+      "beef": "0200beef00020001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3000000000151ffffffff01540b0000000000000151000000000001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3010000000151ffffffff013c0f000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "left",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "right",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "a_held_proven_transaction_merged_again_keeps_its_place",
+      "steps": [
+        "bump:left_800011",
+        "bump:right_800012",
+        "raw:left",
+        "raw:right"
+      ],
+      "merge": {
+        "tx": "left",
+        "path": "left_800011",
+        "sources": []
+      },
+      "returned": "left",
+      "beef": "0200beef02fe0b350c00010100021c08ed633722c3bcea29d7815a56bc56f9b63d8c0c9cb85a0520434bf68a5620fe0c350c0001010002d7cea838dcc43e8c67b55e0beceb3124bef1aad88f973305de50e05043c4bc8d02010001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3000000000151ffffffff01540b000000000000015100000000010101000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3010000000151ffffffff013c0f000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "tx": "left",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "right",
+          "bump_index": 1,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "a_held_raw_transaction_merged_raw_again_keeps_its_place",
+      "steps": [
+        "raw:left",
+        "raw:right",
+        "raw:left"
+      ],
+      "merge": null,
+      "returned": null,
+      "beef": "0200beef00020001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3000000000151ffffffff01540b0000000000000151000000000001000000015001d8f1e9128e6e80c2427d5376449ff0bf9c3c1b2e4a1177b1a5f92eb6afb3010000000151ffffffff013c0f000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "left",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "right",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    },
+    {
+      "name": "chain_proven_at_the_root_merged_twice",
+      "steps": [],
+      "times": 2,
+      "merge": {
+        "tx": "grandchild",
+        "path": null,
+        "sources": [
+          {
+            "input": 0,
+            "tx": "child",
+            "path": null,
+            "sources": [
+              {
+                "input": 0,
+                "tx": "parent",
+                "path": "alone_800000",
+                "sources": []
+              },
+              {
+                "input": 1,
+                "tx": "parent",
+                "path": "alone_800000",
+                "sources": []
+              }
+            ]
+          }
+        ]
+      },
+      "returned": "grandchild",
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "parent",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "child",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "grandchild",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ]
+    }
+  ]
+}
