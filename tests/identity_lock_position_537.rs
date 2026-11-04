@@ -16,8 +16,22 @@ use bsv_rs::wallet::ProtoWallet;
 use indexmap::IndexMap;
 use serde_json::Value;
 
+/// The subject the token's certificate JSON names, if it carries one (a
+/// key-only token carries none, so no certificate is there to filter).
+fn subject_of(script: &[u8]) -> String {
+    let marker = b"\"subject\":\"";
+    match script.windows(marker.len()).position(|w| w == marker) {
+        Some(at) => {
+            let at = at + marker.len();
+            String::from_utf8(script[at..at + 66].to_vec()).unwrap()
+        }
+        None => "02aa".to_string(),
+    }
+}
+
 /// How many identities and certificates the two parsers return for `script`.
 async fn read(script: LockingScript) -> (usize, usize) {
+    let script_bytes = script.to_binary();
     let resolver = lock_position::answering("ls_identity", script);
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
@@ -26,7 +40,11 @@ async fn read(script: LockingScript) -> (usize, usize) {
         .resolve_by_attributes(attributes, false)
         .await
         .unwrap();
-    let certificates = client.discover_certificates("02aa").await.unwrap();
+    // The token's own subject, so the subject filter (#739) skips nothing
+    let certificates = client
+        .discover_certificates(&subject_of(&script_bytes))
+        .await
+        .unwrap();
     (identities.len(), certificates.len())
 }
 
