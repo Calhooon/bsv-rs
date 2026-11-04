@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the SLAP path's accounting and the freeform answer without a result follow the reference's host reputation (#762)
+
+From the rule read of PR #761 (#760, 2026-11-04 09:5xZ), two residues beside
+that row. `LookupResolver::find_competent_hosts` recorded a success for a
+tracker's output list and a failure for its error, and nothing for any other
+answer (`src/overlay/lookup_resolver.rs:379-381` at `6aee2bf9`). The reference
+sends a tracker's `ls_slap` question through the tracked call a host's
+question takes (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:1974`,
+`lookupSlapTrackerHosts` calling `lookupHostWithTracking`), so its answer is
+accounted by `completeTrackedLookup` (`:2379-2406`): an output list a success,
+a freeform answer neutral, anything its normalizer cannot read a failure
+(`Malformed lookup response`, `:2388-2392`, `:2403-2405`). The SLAP path now
+records a failure for a formula answer, with the host path's text (`Invalid
+lookup response`, #760), and nothing for a freeform one. And the HTTP
+facilitator read a `freeform` answer with no `result` member as
+`Freeform { result: Null }` (`src/overlay/facilitators.rs:373-378` at
+`6aee2bf9`), which #760 made neutral; the reference's normalizer reads a
+freeform answer only with an own `result` (`:430-433`, `Object.hasOwn`), so
+it is malformed there, a failure for the host. The facilitator now refuses it,
+`Malformed lookup response: a freeform answer without a result member`, and
+the resolver records the failure as for any facilitator error; `"result":
+null` stays an answer (presence, not non-null). The host reputation tracker's
+doc line on `record_failure` names both paths.
+
+`tests/lookup_tracker_accounting_762.rs`: three formula answers from a SLAP
+tracker on #760's scripted facilitator back it off (the fourth discovery does
+not ask it), RED on `6aee2bf9` (`a formula answer from a tracker is
+recorded`: no record); a `wiremock` host answering `{"type":"freeform"}` an
+`Err` and one recorded failure, RED on `6aee2bf9` (`a freeform answer without
+result was read: Freeform { result: Null }`); a freeform-only tracker leaves
+no record and `{"type":"freeform","result":null}` is `Freeform { result:
+Null }` with no record, green on both. `tests/overlay_http_tests.rs`'s
+`test_lookup_freeform_null_result` pinned the missing member as `Null`; it now
+answers `"result": null`.
+
+Semver: behaviour changes in the SLAP accounting and in one facilitator
+answer shape, no signature change. Migration: a tracker answering formula
+answers is backed off like a host; a host answering `freeform` without
+`result` is an error now.
+
+### Notes: cross-SDK parity (#762)
+
+The formula parse is left: `HttpsOverlayLookupFacilitator` still reads a
+`formula` answer as `LookupAnswer::Formula`, where `edf6e03`'s normalizer
+returns only an output list or a freeform answer (`:446-448`) and refuses it;
+its HTTPS facilitator runs that normalizer and throws `Malformed lookup
+response` itself (`:865-866`), so a direct caller there gets the error. The resolver records a `Formula` as a failure on both paths and aggregates
+nothing from it, the reference's accounting; the recorded text is
+`ts-sdk@9e3ede6`'s (`:527`), and a direct facilitator caller still gets the
+typed answer. Older and outside the row: the facilitator reads a JSON answer
+without `type` as an output list and an output list without `outputs` as
+empty, where the normalizer asks for `type: 'output-list'` and an array
+(`:389-397`) and the facilitator refuses both (`:865-866`); since #760 such an
+answer is a success for the host here and a failure there (#768). On the
+tracker path as on the host path (#760's residue), every error is a failure
+here, where `edf6e03` keeps a semantic rejection neutral (`:2416`). And with
+every tracker backed off, `find_competent_hosts` answers no hosts and `query`
+refuses in `No competent <network> hosts found by the SLAP trackers for lookup
+service: <service>`, where the reference's query refuses in
+`prepareHostsForQuery`'s words, `All SLAP trackers hosts are backing off for
+approximately <n>ms due to repeated failures.` (`:1956-1964`, `:2307-2313`,
+`:1671`); older than #762, reached now by a formula answer too (#769).
+
 ### Fixed: `merge_raw_tx` writes the last BUMP's index for a txid two BUMPs prove, as the reference does; a caller-set merkle path at `add_input_proof` replaced by the BEEF's proof and descended past where there is none (#757)
 
 From the #732 lane (2026-11-04 08:4xZ), two residues at `ts-stack@edf6e03`
