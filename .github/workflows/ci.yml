@@ -359,6 +359,13 @@ jobs:
       # from a configuration file, never the environment, so this step writes the cargo home's
       # from the job's CARGO_DEPENDENCIES_TEST_OPT_LEVEL, a name rust-cache hashes into its key:
       # another level misses, never an exact hit on dependencies built at the old one.
+      # The macos-26-arm64 image has no cargo home before cargo's first use (#789): the next step's
+      # append needs the directory, so make it here, the same on every runner.
+      - name: Make the cargo home
+        if: steps.plan.outputs.build == 'true'
+        shell: bash
+        run: mkdir -p "${CARGO_HOME:-$HOME/.cargo}"
+
       - name: Optimize the dependencies in the test profile
         if: steps.plan.outputs.build == 'true'
         shell: bash
