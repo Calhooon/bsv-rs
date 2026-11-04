@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{watch, RwLock};
 
+mod backoff; // the trackers' backoff and the cache's reuse rule (#769)
 mod query; // `query` and the ordered lookup (#394)
 
 /// Configuration for the lookup resolver.
@@ -75,8 +76,9 @@ struct TxMemoEntry {
 }
 
 /// Result type for in-flight host discovery requests.
-/// Uses String for error to enable cloning across waiters.
-type InFlightResult = Option<std::result::Result<Vec<String>, String>>;
+/// Carries the `Error` itself (`Clone`), so a waiter's refusal is the
+/// leader's (#769).
+type InFlightResult = Option<Result<Vec<String>>>;
 
 /// Resolver for SLAP lookup queries.
 ///
@@ -159,7 +161,12 @@ impl LookupResolver {
     /// Get competent hosts for a service with caching and request coalescing.
     ///
     /// Request coalescing ensures that concurrent requests for the same service
-    /// share a single SLAP tracker query, reducing network overhead.
+    /// share a single SLAP tracker query, reducing network overhead. A cached
+    /// list is reused only while some host in it is not backing off, so an
+    /// empty one never is (`ts-stack@edf6e03` `LookupResolver.ts:1898-1918`,
+    /// #769); a discovery's refusal is not cached, and with additional hosts
+    /// configured for the service it is an empty discovery they stand beside
+    /// (cached as an empty entry, which is never reused).
     async fn get_competent_hosts(&self, service: &str) -> Result<Vec<String>> {
         // Check for override
         if let Some(hosts) = self.host_overrides.get(service) {
@@ -185,7 +192,7 @@ impl LookupResolver {
         {
             let cache = self.hosts_cache.read().await;
             if let Some(entry) = cache.get(service) {
-                if entry.expires_at > now {
+                if entry.expires_at > now && self.has_available_host(&entry.hosts, now) {
                     return Ok(self.add_additional_hosts(service, entry.hosts.clone()));
                 }
             }
@@ -204,7 +211,7 @@ impl LookupResolver {
                 if let Some(res) = result {
                     return match res {
                         Ok(hosts) => Ok(self.add_additional_hosts(service, hosts)),
-                        Err(e) => Err(Error::OverlayError(e)),
+                        Err(e) => Err(e),
                     };
                 }
                 // Wait for next update
@@ -232,7 +239,7 @@ impl LookupResolver {
                     if let Some(res) = result {
                         return match res {
                             Ok(hosts) => Ok(self.add_additional_hosts(service, hosts)),
-                            Err(e) => Err(Error::OverlayError(e)),
+                            Err(e) => Err(e),
                         };
                     }
                     if receiver.changed().await.is_err() {
@@ -245,8 +252,9 @@ impl LookupResolver {
             }
         }
 
-        // Discover hosts via SLAP
-        let result = self.find_competent_hosts(service).await;
+        // Discover hosts via SLAP, the additional hosts admitted beside a refusal
+        let result =
+            self.beside_additional_hosts(service, self.find_competent_hosts(service).await);
 
         // Broadcast result to any waiters and clean up
         {
@@ -254,12 +262,8 @@ impl LookupResolver {
             in_flight.remove(service);
         }
 
-        // Convert result for broadcasting
-        let broadcast_result = match &result {
-            Ok(hosts) => Some(Ok(hosts.clone())),
-            Err(e) => Some(Err(e.to_string())),
-        };
-        let _ = tx.send(broadcast_result);
+        // Broadcast the result itself, so a waiter's error is the leader's (#769)
+        let _ = tx.send(Some(result.clone()));
 
         // Process result
         let hosts = result?;
@@ -305,7 +309,11 @@ impl LookupResolver {
     /// advertise the specified service. Each tracker response is parsed as a
     /// SLAP admin token to extract the host domain. Each tracker is accounted
     /// as a host is (#760, #762): an output list a success, a freeform answer
-    /// nothing, an error or a formula answer a failure.
+    /// nothing, an error or a formula answer a failure. A tracker backing off
+    /// is not asked; with every tracker backing off the discovery refuses in
+    /// the reference's words, `All SLAP trackers hosts are backing off for
+    /// approximately <N>ms due to repeated failures.`, N the soonest end of a
+    /// backoff (`LookupResolver.ts:2306-2314`, #769).
     ///
     /// This is the low-level discovery method. It does **not** use the hosts
     /// cache or request coalescing (those are handled by `get_competent_hosts`,
@@ -317,7 +325,8 @@ impl LookupResolver {
     ///
     /// # Returns
     ///
-    /// A list of host URLs that advertise the given service.
+    /// A list of host URLs that advertise the given service, empty when the
+    /// trackers asked named none (or no tracker is configured).
     ///
     /// # Example
     ///
@@ -331,15 +340,8 @@ impl LookupResolver {
     pub async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>> {
         let question = LookupQuestion::new("ls_slap", serde_json::json!({ "service": service }));
 
-        // Rank trackers and filter out those in backoff
-        let now = now_ms();
-        let ranked = self.reputation_tracker.rank_hosts(&self.slap_trackers);
-        let available: Vec<_> = ranked
-            .iter()
-            .filter(|h| h.entry.backoff_until <= now)
-            .map(|h| h.entry.host.clone())
-            .collect();
-
+        // The trackers not backing off; every one backing off refuses (#769)
+        let available = self.available_slap_trackers()?;
         if available.is_empty() {
             return Ok(Vec::new());
         }

@@ -89,9 +89,14 @@ async fn three_formula_answers_from_a_slap_tracker_back_it_off_762() {
     assert_eq!(entry.last_error.as_deref(), Some("Invalid lookup response"));
     // The third failure is past the two of grace: the tracker is backed off,
     // and the next discovery does not ask it (`find_competent_hosts` skips a
-    // tracker in backoff, answering no hosts).
-    let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
-    assert!(hosts.is_empty());
+    // tracker in backoff; every tracker backing off, it refuses, #769).
+    let refusal = resolver.find_competent_hosts(SERVICE).await.unwrap_err();
+    assert!(
+        refusal
+            .to_string()
+            .contains("All SLAP trackers hosts are backing off"),
+        "{refusal:?}"
+    );
     assert_eq!(
         asked.lock().unwrap().len(),
         3,
