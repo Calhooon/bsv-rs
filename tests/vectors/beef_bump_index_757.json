@@ -21,7 +21,8 @@
     "left_800001": "fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "right_800000": "fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
     "sibling_800002": "fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010062b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
-    "child_800003": "fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3"
+    "child_800003": "fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3",
+    "grandchild_800004": "fe04350c0001010002c53e7afa8d3440bb4eea889560b3e0ed7720f9bf9679a1146f412647c8b22f39"
   },
   "index_cases": [
     {
@@ -199,6 +200,41 @@
         {
           "subject": "parent",
           "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "txid_only_without_an_index_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "bump:left_800001",
+        "txid:parent",
+        "raw:child",
+        "index:parent=none"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "atomic": [
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef00020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "txid_only_naming_a_bump_without_its_txid_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "bump:grandchild_800004",
+        "txid:parent",
+        "raw:child",
+        "index:parent=1"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe04350c0001010002c53e7afa8d3440bb4eea889560b3e0ed7720f9bf9679a1146f412647c8b22f39020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef00020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
         }
       ]
     }
