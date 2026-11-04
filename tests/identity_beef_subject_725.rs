@@ -239,7 +239,12 @@ async fn an_atomic_header_naming_an_absent_txid_is_skipped_by_both_parsers_725()
 /// the subject's token: the one shape where the tip differs from the
 /// reference, newly exposed by #721 (the base skipped it by accident, its
 /// `beef.txs.first()` the txid-only entry, which holds no transaction). This
-/// pin asserts this crate's reading, the stated residue.
+/// pin asserts this crate's reading, the stated residue, documented by
+/// `CLAUDE.md`'s #553 row ("`assertUnconfirmedGraph` skips a lookup output
+/// whose unconfirmed graph has an input without its source transaction,
+/// `:143`, so a txid-only parent before a raw unproven subject is skipped
+/// there and read here"), and that the reference's refusing line names the
+/// subject, the txid both sides pick.
 #[tokio::test]
 async fn a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_there_553_725() {
     let v = vector();
@@ -258,6 +263,13 @@ async fn a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_
         assert!(
             refused_at.starts_with("TransactionEvidence.ts:143"),
             "{name}: {refused_at}"
+        );
+        assert!(
+            refused_at.contains(&format!(
+                "TransactionEvidence.ts:143: {} input",
+                t.subject.id()
+            )),
+            "{name}: the reference's pick is the subject: {refused_at}"
         );
         let selected = Transaction::from_beef(&beef, None).unwrap().id();
         assert_eq!(selected, t.subject.id(), "{name}");

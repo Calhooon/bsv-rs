@@ -313,3 +313,6 @@ mod to_binary_key_585;
 
 #[path = "client_beef_subject_725_tests.rs"]
 mod beef_subject_725;
+
+#[path = "client_beef_subject_728_tests.rs"]
+mod beef_subject_728;

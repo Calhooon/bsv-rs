@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: four more BEEF shapes of the identity subject pick pinned against the reference, and the #725 pins tightened (#728)
+
+No behaviour change. #727's strength read named four `ls_identity` BEEF shapes
+the #721 and #725 vectors leave. `tests/vectors/identity_beef_subject_728.json`
+is written by `tests/support/identity_beef_subject_728.mjs` (#725's helpers
+copied, #725's vector untouched), which uses the reference's own writers
+(`Beef.toBinary`, `toBinaryAtomic`; one Atomic BEEF prefix written by hand, as
+#725's was) at `ts-stack@edf6e03` under Node v22.18.0; two runs are
+byte-identical. For each of its five BEEFs it records the bytes, the output
+index, `parseEvidence`'s pick or refusal, which check refused and
+`parseResults`' outcome: the reference skips all five.
+`tests/identity_beef_subject_728.rs` rebuilds every BEEF with this crate's
+writer (`to_binary`, `to_binary_atomic`) to the recorded bytes and serves it
+through `resolve_by_attributes` and `discover_certificates`; the unit test
+`src/identity/client_beef_subject_728_tests.rs` hands the five to both parsers
+directly and asserts the vector's count.
+
+- **An `outputIndex` past the subject's outputs** (#725's chain at index 1):
+  skipped on both sides (`TransactionEvidence.ts:126`; here `outputs.get`).
+  GREEN on `0d8546c0` too, an agreement pinned; the test's index-0 control is
+  RED there (`beef.txs.first()`, the grandparent).
+- **A txid-only entry written last, no atomic header** (the reference's sort
+  keeps it last, so no hand bytes), and **an Atomic BEEF header naming a
+  txid-only entry**, by `toBinaryAtomic` and as a hand prefix over shape 2's
+  bytes (the token's transaction beside the subject): skipped on both sides (`findAtomicTransaction` is undefined,
+  `:120-121`; here `Transaction::from_beef` refuses, so the resolver drops the
+  output). The doors are GREEN on `0d8546c0`; the unit test is RED there on
+  the two shapes that hold the token's transaction ahead of the txid-only
+  entry (read).
+- **A raw parent whose BUMP names another txid**: read here and skipped by the
+  reference (the row below); RED on `0d8546c0`, whose `beef.txs.first()`, the
+  parent, skipped.
+
+The #725 pins: the txid-only parent test now asserts that the reference's
+refusing line names the subject (`TransactionEvidence.ts:143: <subject> input`),
+so the reference's pick is pinned and not only the line, and its doc comment
+quotes the documenting line of `CLAUDE.md`'s #553 row; the unit test asserts
+the vector's five BEEFs.
+
+### Notes: cross-SDK parity (#728)
+
+A raw parent merged with the index of a BUMP whose leaf names another txid,
+before a raw unproven subject, is skipped by the reference's discovery:
+`fromBinaryStrict` checks no BUMP index, `findBump` finds no BUMP carrying the
+parent's txid (`Beef.ts:570-574`), so the parent is unproven and
+`assertUnconfirmedGraph` refuses the subject's graph at the parent's input
+(`TransactionEvidence.ts:143` at `edf6e03`). This crate reads the bytes too
+(`TxidNotInBump` is `Beef::verify_structure`'s refusal, which no identity
+parser calls; the issue's "refused at the parse" is not this crate's reading),
+links the parent unproven the same way, and its parsers, which run no
+unconfirmed-graph check, read the subject's token. This is #553's stated
+evidence-layer residue, the class of #725's txid-only parent; it is pinned as
+this crate's reading in
+`a_parent_whose_bump_names_another_txid_is_read_here_and_skipped_there_553_728`,
+and the residue sentence of `CLAUDE.md`'s #553 row now names it.
+
 ### Tests: the three BEEF shapes of the identity subject pick pinned against the reference (#725)
 
 No behaviour change. #724's strength read named three BEEF shapes the #721
