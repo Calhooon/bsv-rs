@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `Transaction::from_beef` and `Beef::find_bump` take the last BUMP holding a txid, as the reference's index does (#732)
+
+From the strength read of PR #729 (#728, 2026-11-04 01:2xZ): the reference
+indexes the level-0 leaves of every BUMP with a `Map.set` loop over the BUMPs
+in order, so the LAST BUMP holding a txid is the one `findBump` answers and
+`#addInputProof` makes the transaction's `merklePath`
+(`ts-stack@edf6e03` `Beef.ts:570-585`, `:649-680`). This crate's
+`add_input_proof` built its index with `or_insert` and `find_bump` scanned
+from the front, so both kept the EARLIEST, and the comment on the index claimed
+the reference's answer. Both readers keep every BUMP they read and merge none
+(`Beef.ts:1257-1261`; `beef/collect.rs`), so two proofs of one txid at level 0
+(two blocks after a reorg, two roots at one height, a BUMP the writer did not
+merge) reach `from_beef` from the wire, and the attached path, and so the root
+a tracker is asked about, was another than the reference's. The index now
+keeps the last (`insert`), `find_bump` scans from the back, and the comment
+says so. `merge_bump` is unchanged: as the reference's `#findOrInsertBump`
+(`:791-810`) it combines only a BUMP of the same height and root.
+
+Semver: a behaviour change without a signature change: for a BEEF carrying
+two proofs of one txid, `Transaction::from_beef`, `from_atomic_beef`,
+`Beef::find_atomic_transaction` and `Beef::find_bump` answer the last proof
+where they answered the earliest. Migration: none for a BEEF with one proof per
+txid; a caller that relied on the earliest proof names it (`beef.bumps[i]`).
+
+`tests/beef_bump_lookup_732.rs` against `tests/vectors/beef_bump_lookup_732.json`
+(`tests/support/beef_bump_lookup_732.mjs`, the bun bundle of `packages/sdk` at
+`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical): four BEEFs,
+each built by this crate's writer (`merge_raw_tx`, `merge_bump`, `to_binary`)
+to the bytes the reference's writer recorded: a parent proven at 800000
+(root its txid) and at 800001 beside a sibling, in both orders; two roots at
+800000; and an unproven child spending both of that parent's outputs. The
+attached path, `find_bump`'s answer and both inputs' source paths (the full
+link and the stub) are the reference's, the last BUMP; the wire bump index
+(the earliest, on both sides) and both BUMPs read back unchanged. 3 of 4 RED on
+`9ae3ebcc` (`left: (800000, "86bd3ea1...")`, `right: (800001, "e476c603...")`),
+the wire-index agreement green on both.
+
+Residue, stated: `merge_raw_tx` after two BUMPs holding its txid sets the
+entry's bump index to the earliest holding it as a txid leaf
+(`try_to_validate_bump_index`), where the reference's `#tryToValidateBumpIndex` takes its index's, the
+last (`Beef.ts:1329-1340`; probed under Node 22: `bumpIndex 1`), so the two
+writers write another index byte for that merge order; no reader's verdict
+moves (both BUMPs hold the txid) and a reader's attached path follows the
+index, not the byte, but both atomic writers carry the BUMP the byte names
+(`atomic_closure`; the reference's `#copySelectedTransactions`,
+`Beef.ts:448-470`), so `to_binary_atomic` of that entry carries the earliest
+BUMP where `toBinaryAtomic` carries the last, and a reread attaches another
+path and asks a tracker about another root (#757).
+
 ### Fixed: the by-type questions send `certificateTypes` with `identityKey`, as the reference overlay reads them (#752)
 
 From the rule read of PR #750 (#746, 2026-11-04 07:0xZ), older than that PR:

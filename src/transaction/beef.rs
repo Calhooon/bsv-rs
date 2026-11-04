@@ -140,9 +140,12 @@ impl Beef {
         idx
     }
 
-    /// Finds a MerklePath that contains the given txid.
+    /// Finds a MerklePath that contains the given txid at level 0: the LAST
+    /// such BUMP when several hold it, as the reference's `findBump` answers
+    /// from its index (`Beef.ts:570-585` at `ts-stack@edf6e03`, a `Map.set`
+    /// over the BUMPs in order). Until #732 the earliest.
     pub fn find_bump(&self, txid: &str) -> Option<&MerklePath> {
-        self.bumps.iter().find(|b| b.contains(txid))
+        self.bumps.iter().rev().find(|b| b.contains(txid))
     }
 
     /// Finds a transaction and links each input that has no source
@@ -225,13 +228,15 @@ impl Beef {
             next_input: usize,
         }
 
-        // `find_bump`'s answer for every hash at level 0: the FIRST bump whose
-        // leaf level carries it, as `find_bump`'s scan returns.
+        // `find_bump`'s answer for every hash at level 0: the LAST bump whose
+        // leaf level carries it, as the reference's index keeps it
+        // (`Beef.ts:576-585` at `ts-stack@edf6e03`, `Map.set` over the bumps
+        // in order; the earliest until #732).
         let mut bump_by_txid: HashMap<&str, &MerklePath> = HashMap::new();
         for bump in &self.bumps {
             for leaf in bump.path.first().into_iter().flatten() {
                 if let Some(hash) = leaf.hash.as_deref() {
-                    bump_by_txid.entry(hash).or_insert(bump);
+                    bump_by_txid.insert(hash, bump);
                 }
             }
         }
