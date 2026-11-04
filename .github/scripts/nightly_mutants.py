@@ -215,6 +215,28 @@ def checkout_commit(pinned):
 MINIMUM_TEST_TIMEOUT = {"script": 120, "beef": 300, "merkle": 120, "wire": 120, "substrates": 120}
 TEST_TIMEOUT_MULTIPLIER = 3
 
+# #781 (the keeper's word of 2026-11-04 15:2xZ): a mutant that times out in the shard's
+# pass is re-run once, alone, its timeout derived again from a baseline timed on the
+# shard as it is then ("the base re-timed"); one that times out again is a timeout row,
+# outside the score's denominator, never a survivor and never a kill, as cargo-mutants'
+# own classes keep `Timeout` apart from `MissedMutant` and `CaughtMutant`. `run.json`
+# carries the mark; a shard without it (the evidence before #781) is judged as it was,
+# the timeout counted as not caught.
+TIMEOUT_RERUN = 1
+TIMEOUT_METHOD = ("re-run once alone (its exact name by --re, its line by --in-diff), "
+                  "the baseline re-timed, the shard's timeouts, --jobs 1 (#781)")
+# cargo-mutants 27.1.0 lists every `StructField` mutant of the files whatever `--re`
+# and `--exclude-re` say (`arithmetic_room.rs:179:13` on the script surface, nine in
+# all at 8264a95d); `--in-diff` of the mutant's line leaves them out, and the name
+# leaves out the line's other mutants. The judge still requires the one mutant alone.
+REGEX_META = set("\\.+*?()|[]{}^$#&-~")
+# libtest's warning for a test past 60 seconds; cargo's line for each test binary it
+# runs (verbose, as cargo-mutants runs it: "Running `<target>/debug/deps/<bin> ...`");
+# cargo-mutants' own line for the timeout it derived from the baseline (`debug.log`).
+HANGING_TEST = re.compile(r"^test (\S+) has been running for over \d+ seconds", re.MULTILINE)
+RUNNING_BINARY = re.compile(r"^\s*Running `[^`\s]*/deps/([^`\s/]+)", re.MULTILINE)
+AUTO_TIMEOUT = re.compile(r"Auto-set test timeout to (\d+(?:\.\d+)?)s")
+
 
 def run(args):
     root = args.output.resolve()
@@ -243,6 +265,7 @@ def run(args):
         "commit": checkout_commit(args.commit),
         "command": command,
         "cargo_incremental": "1",
+        "timeout_rerun": TIMEOUT_RERUN,
         "rustc_version": subprocess.check_output(["rustc", "--version"], text=True).strip(),
         "build_environment": {key: environment.get(key) for key in (
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CARGO_PROFILE_TEST_DEBUG",
@@ -259,14 +282,118 @@ def run(args):
         print(f"{args.surface} {args.shard}: no mutant in this shard of the night's files")
         return 0
     write_json(root / "run.json", metadata)
-    command += ["--minimum-test-timeout", str(MINIMUM_TEST_TIMEOUT[args.surface]),
-                "--timeout-multiplier", str(TEST_TIMEOUT_MULTIPLIER), "--build-timeout", "300",
-                "--jobs", "1", "--output", str(root)]
+    limits = timeout_args(args.surface)
+    command += [*limits, "--output", str(root)]
     print(shlex.join(command), flush=True)
     result = subprocess.run(command, check=False, env=environment)
     metadata["exit_code"] = result.returncode
     write_json(root / "run.json", metadata)
-    return result.returncode
+    if result.returncode not in (0, 2, 3):
+        return result.returncode
+    metadata["reruns"], status = lone_reruns(root, metadata["command"], limits, environment)
+    write_json(root / "run.json", metadata)
+    return status if status not in (0, 2, 3) else result.returncode
+
+
+def timeout_args(surface):
+    """The shard's limits, the same for its pass and each lone re-run."""
+    return ["--minimum-test-timeout", str(MINIMUM_TEST_TIMEOUT[surface]),
+            "--timeout-multiplier", str(TEST_TIMEOUT_MULTIPLIER), "--build-timeout", "300",
+            "--jobs", "1"]
+
+
+def exact_name(name):
+    """A regex matching `name` alone, by the escapes of Rust's `regex::escape`."""
+    return "^" + "".join("\\" + c if c in REGEX_META else c for c in name) + "$"
+
+
+# The options `lone_command` drops with their values: the sharding, the output, and the
+# shard's limits, which `run` appends to the stored command in place and `lone_reruns`
+# appends again; clap refuses an option given twice (`ArgAction::Set`, clap_builder
+# 4.5.27 `parser.rs:1201-1209`, cargo-mutants 27.1.0's lock), which cargo-mutants exits 1.
+LONE_DROPPED = ("--sharding", "--shard", "--output", "--minimum-test-timeout",
+                "--timeout-multiplier", "--build-timeout", "--jobs")
+
+
+def lone_command(command, mutant, diff):
+    """The shard's command for one mutant: no sharding, its name and its line (#781)."""
+    args, kept = iter(command), []
+    for arg in args:
+        if arg in LONE_DROPPED:
+            next(args, None)
+        else:
+            kept.append(arg)
+    return kept + ["--re", exact_name(mutant["name"]), "--in-diff", str(diff)]
+
+
+def line_diff(mutant):
+    """A diff touching the mutant's line alone, its text unchanged (cargo-mutants checks it)."""
+    file, line = mutant["file"], mutant["span"]["start"]["line"]
+    text = Path(file).read_text().split("\n")[line - 1]
+    return f"--- a/{file}\n+++ b/{file}\n@@ -{line},1 +{line},1 @@\n-{text}\n+{text}\n"
+
+
+def seconds(entry):
+    return round(sum(phase["duration"] for phase in entry.get("phase_results") or ()), 3)
+
+
+def test_timeout(out):
+    """The test timeout cargo-mutants set from its baseline, read from its `debug.log`."""
+    path = out / "debug.log"
+    found = AUTO_TIMEOUT.findall(path.read_text(errors="replace")) if path.is_file() else []
+    return float(found[-1]) if found else None
+
+
+def log_names(path):
+    """The test binary a log ran last (its file name, no host path) and the tests libtest
+    saw running past a minute."""
+    if not path.is_file():
+        return {"binary": None, "tests": []}
+    text = path.read_text(errors="replace")
+    binaries = RUNNING_BINARY.findall(text)
+    return {"binary": binaries[-1] if binaries else None,
+            "tests": sorted(set(HANGING_TEST.findall(text)))}
+
+
+def lone_reruns(root, command, limits, environment):
+    """Every mutant the shard's pass timed out, re-run once alone under `rerun/<n>/`."""
+    out = root / "mutants.out"
+    reruns, status = [], 0
+    if not (out / "outcomes.json").exists():
+        return reruns, status
+    timed_out = [entry for entry in json.loads((out / "outcomes.json").read_text())["outcomes"]
+                 if entry["scenario"] != "Baseline" and entry["summary"] == "Timeout"]
+    for index, entry in enumerate(timed_out):
+        mutant = entry["scenario"]["Mutant"]
+        where = root / "rerun" / str(index)
+        where.mkdir(parents=True)
+        (where / "line.diff").write_text(line_diff(mutant))
+        lone = lone_command(command, mutant, where / "line.diff") + limits + [
+            "--output", str(where)]
+        print(shlex.join(lone), flush=True)
+        result = subprocess.run(lone, check=False, env=environment)
+        if result.returncode not in (0, 2, 3):
+            status = status or result.returncode
+        again = None
+        if (where / "mutants.out" / "outcomes.json").exists():
+            again = [e for e in json.loads(
+                (where / "mutants.out" / "outcomes.json").read_text())["outcomes"]
+                if e["scenario"] != "Baseline" and e["scenario"]["Mutant"]["name"] == mutant["name"]]
+        second = again[0] if again and len(again) == 1 else None
+        kind = OUTCOMES.get(second["summary"]) if second else None
+        reruns.append({
+            "index": index, "file": mutant["file"], "mutant": mutant["name"],
+            "method": TIMEOUT_METHOD, "command": lone, "exit_code": result.returncode,
+            "pass": {"outcome": "timeout", "seconds": seconds(entry), "log": entry.get("log_path"),
+                     "test_timeout": test_timeout(out),
+                     "named": log_names(out / entry["log_path"]) if entry.get("log_path") else None},
+            "rerun": {"outcome": kind, "seconds": seconds(second) if second else None,
+                      "test_timeout": test_timeout(where / "mutants.out"),
+                      "log": second.get("log_path") if second else None,
+                      "named": (log_names(where / "mutants.out" / second["log_path"])
+                                if second and second.get("log_path") else None)},
+        })
+    return reruns, status
 
 
 def package(args):
@@ -282,6 +409,15 @@ def package(args):
     source = args.run / "mutants.out" / "diff"
     if source.exists():
         shutil.copytree(source, dest / "diff", dirs_exist_ok=True)
+    # #781: each lone re-run's outcomes and line, no log: a log carries host paths, the
+    # rustc line and the whole libtest output; what a second timeout's log names (the
+    # binary, the tests past a minute) is read into `run.json`'s `named` when it ends.
+    for rerun in json.loads((args.run / "run.json").read_text()).get("reruns", []):
+        where, kept = args.run / "rerun" / str(rerun["index"]), dest / "rerun" / str(rerun["index"])
+        kept.mkdir(parents=True, exist_ok=True)
+        for source in (where / "mutants.out" / "outcomes.json", where / "line.diff"):
+            if source.exists():
+                shutil.copyfile(source, kept / source.name)
     return 0
 
 
@@ -306,7 +442,7 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
     errors, rows, seen_runs, seen_mutants, commits = [], {}, set(), set(), set()
     file_surfaces, complete_surfaces = {}, set()
     invalid_surfaces = set()
-    commands = {}
+    commands, methods, timeouts = {}, set(), []
     runs = sorted(root.rglob("run.json"))
     for manifest in runs:
         run_error_count = len(errors)
@@ -320,6 +456,8 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
         if commands.setdefault(label[0], signature) != signature:
             errors.append(f"{label}: inconsistent mutation or test command across shards")
         commits.add(metadata["commit"])
+        methods.add(metadata.get("timeout_rerun"))
+        reruns = rerun_evidence(directory, metadata, label, errors)
         for file in metadata["files"]:
             rows.setdefault(file, Counter())
             file_surfaces.setdefault(file, set()).add(metadata["surface"])
@@ -367,10 +505,22 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
             if kind is None:
                 errors.append(f"{label}: unexpected outcome {entry['summary']}")
                 continue
-            rows.setdefault(mutant["file"], Counter())[kind] += 1
             totals[kind] += 1
+            final = kind
+            if reruns is not None and kind == "timeout":
+                # #781: the lone re-run's outcome is the mutant's; none, the method not run.
+                rerun = reruns.pop(key, None)
+                if rerun is None:
+                    errors.append(f"{label}: timeout without its lone re-run: {mutant['name']}")
+                    continue
+                final = rerun["outcome"]
+                if final == "timeout":
+                    timeouts.append(timeout_row(label, rerun))
+            rows.setdefault(mutant["file"], Counter())[final] += 1
         if baselines != 1:
             errors.append(f"{label}: expected one successful baseline, found {baselines}")
+        for _, name in sorted(reruns or ()):
+            errors.append(f"{label}: a lone re-run of a mutant its pass did not time out: {name}")
         if actual != expected:
             errors.append(f"{label}: candidate/result mismatch ({len(expected)} planned, {len(actual)} tested)")
         if outcome["total_mutants"] != len(actual):
@@ -399,15 +549,25 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
         errors.append("no mutation runs found")
     if len(commits) != 1:
         errors.append("results must describe exactly one source commit")
+    if len(methods) > 1:
+        errors.append("shards judged under different timeout rules (#781): "
+                      "some ran the lone re-run, some did not")
+    rerun_rule = methods == {TIMEOUT_RERUN}
     complete = not errors
+
+    def viable_of(counts):
+        # #781: a mutant that timed out twice is outside the denominator; evidence before
+        # the method (no mark) keeps its rule, the timeout counted as not caught.
+        return counts["caught"] + counts["missed"] + (0 if rerun_rule else counts["timeout"])
+
     surface_viable = Counter()
     for file, counts in rows.items():
         for surface in file_surfaces.get(file, ()):
-            surface_viable[surface] += counts["caught"] + counts["missed"] + counts["timeout"]
+            surface_viable[surface] += viable_of(counts)
     files = []
     for file, counts in sorted(rows.items()):
         scope_complete = file_surfaces.get(file, set()) <= complete_surfaces
-        viable = counts["caught"] + counts["missed"] + counts["timeout"]
+        viable = viable_of(counts)
         override = floors.get(file, {})
         floor = override.get("percent", GATE_FLOOR)
         if type(floor) is not int or not 0 <= floor <= 100:
@@ -421,7 +581,18 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
         # Every generated mutant unviable (a replacement the compiler refuses):
         # nothing a test can catch, so no score, unless the file's surface has
         # no viable mutant at all, which reads as a broken build and fails.
+        # #781 (the keeper's word of 2026-11-04 16:1xZ): every judged mutant timed out
+        # twice, the oracle unable to read the file: UNJUDGED, never NO VIABLE MUTANTS
+        # (the compiler's label), its mutants in the timeout table. The keeper's word of
+        # 16:2xZ: wherever the night enforces a number for a file, it fails closed. Here
+        # every measured file has one, its `mutation_floors` entry or else GATE_FLOOR
+        # (a gate path's, and every file elsewhere's default), so a timeout-only file
+        # fails; UNJUDGED and green is left to a carried row (`merge`), whose figure
+        # the night reds nowhere.
+        unjudged = (rerun_rule and counts["generated"] > 0 and viable == 0
+                    and counts["timeout"] > 0)
         vacuous = (counts["generated"] > 0 and viable == 0 and file not in floors
+                   and not unjudged
                    and all(surface_viable[s] > 0 for s in file_surfaces.get(file, ())))
         if vacuous:
             passed = None
@@ -430,18 +601,76 @@ def collect(root, expected_shards, floors, planned=None, floor_files=True):
         row = {"file": file, **{k: counts[k] for k in ("generated", *OUTCOMES.values())},
                "viable": viable, "score_percent": score, "floor_percent": floor,
                "issue": override.get("issue"), "passed": passed,
-               "scope_complete": scope_complete, "no_viable": vacuous}
+               "scope_complete": scope_complete, "no_viable": vacuous,
+               **({"unjudged": True} if unjudged else {})}
         files.append(row)
-        if passed is False:
+        if passed is False and unjudged:
+            errors.append(f"floor has no measured file: {file}")
+        elif passed is False:
             errors.append(f"{file}: below {floor}% or no viable mutants")
     for file in floors if floor_files else ():
-        if (file not in rows or rows[file]["generated"] == 0
-                or rows[file]["caught"] + rows[file]["missed"] + rows[file]["timeout"] == 0
+        if (file not in rows or rows[file]["generated"] == 0 or viable_of(rows[file]) == 0
                 or not file_surfaces.get(file, set()) <= complete_surfaces):
-            errors.append(f"floor has no measured file: {file}")
+            if f"floor has no measured file: {file}" not in errors:
+                errors.append(f"floor has no measured file: {file}")
     return {"schema_version": 1, "cargo_mutants_version": "27.1.0",
             "commits": sorted(commits), "complete": complete,
+            "timeout_rule": "rerun" if rerun_rule else "counted",
+            "timeouts": sorted(timeouts, key=lambda r: (r["file"], r["mutant"])),
             "files": files, "errors": errors, "passed": not errors}
+
+
+def rerun_evidence(directory, metadata, label, errors):
+    """#781: a marked shard's lone re-runs by mutant, each its own run checked; None for a
+    shard before the method, judged by the old rule."""
+    if metadata.get("timeout_rerun") is None:
+        return None
+    if metadata["timeout_rerun"] != TIMEOUT_RERUN:
+        errors.append(f"{label}: unknown timeout method {metadata['timeout_rerun']!r}")
+        return {}
+    found = {}
+    for rerun in metadata.get("reruns", []):
+        key, where = (rerun["file"], rerun["mutant"]), directory / "rerun" / str(rerun["index"])
+        if key in found:
+            errors.append(f"{label}: two lone re-runs of {rerun['mutant']}")
+        if rerun.get("exit_code") not in (0, 2, 3):
+            errors.append(f"{label}: lone re-run of {rerun['mutant']} failed "
+                          f"({rerun.get('exit_code')})")
+        path = where / "outcomes.json"
+        if not path.exists():
+            path = where / "mutants.out" / "outcomes.json"
+        if not path.exists():
+            errors.append(f"{label}: lone re-run of {rerun['mutant']} has no outcomes.json")
+            continue
+        outcome = json.loads(path.read_text())
+        if outcome.get("cargo_mutants_version") != "27.1.0" or not outcome.get("end_time"):
+            errors.append(f"{label}: lone re-run of {rerun['mutant']} unfinished or another tool")
+        baselines = [e for e in outcome["outcomes"] if e["scenario"] == "Baseline"]
+        if [e["summary"] for e in baselines] != ["Success"]:
+            errors.append(f"{label}: lone re-run of {rerun['mutant']} has no re-timed baseline")
+        mutants = [e for e in outcome["outcomes"] if e["scenario"] != "Baseline"]
+        if len(mutants) != 1 or identity(mutants[0]["scenario"]["Mutant"]) != key:
+            errors.append(f"{label}: lone re-run of {rerun['mutant']} did not run it alone")
+            continue
+        kind = OUTCOMES.get(mutants[0]["summary"])
+        if kind is None or kind == "unviable" or kind != rerun["rerun"]["outcome"]:
+            errors.append(f"{label}: lone re-run of {rerun['mutant']} reads "
+                          f"{mutants[0]['summary']}, its record {rerun['rerun']['outcome']}")
+            continue
+        found[key] = {**rerun, "outcome": kind, "surface": label[0], "shard": label[1]}
+    return found
+
+
+def timeout_row(label, rerun):
+    """A mutant that timed out twice: its own row, with both passes and the method."""
+    named = rerun["rerun"].get("named") or {}
+    return {"file": rerun["file"], "mutant": rerun["mutant"],
+            "shard": f"{label[0]} {label[1]}", "method": rerun["method"],
+            "pass_seconds": rerun["pass"]["seconds"],
+            "rerun_seconds": rerun["rerun"]["seconds"],
+            "pass_limit": rerun["pass"].get("test_timeout"),
+            "rerun_limit": rerun["rerun"].get("test_timeout"),
+            "binary": named.get("binary"), "tests": named.get("tests", [])}
 
 
 # Cut 7 (the keeper's speed line, the owner's word of 2026-11-02): a file's score
@@ -1002,7 +1231,8 @@ def callee_line(the_plan):
 
 
 def judge(counts, floor):
-    viable = counts["caught"] + counts["missed"] + counts["timeout"]
+    # The record's own denominator (#781: without the timeouts under the lone re-run).
+    viable = counts["viable"]
     return viable > 0 and 100 * counts["caught"] >= floor * viable
 
 
@@ -1030,12 +1260,15 @@ def merge(night, the_plan, base_record, floors, run_id):
             passed = judge(counts, floor) if counts["viable"] else None
             if carried.get("no_viable") or counts["generated"] == 0:
                 passed = None
+            if carried.get("unjudged"):
+                passed = False if file in floors else None
             row = {"file": file, **counts, "score_percent": carried["score_percent"],
                    "floor_percent": floor, "issue": issue, "passed": passed,
                    "scope_complete": True, "no_viable": carried.get("no_viable", False),
+                   **({"unjudged": True} if carried.get("unjudged") else {}),
                    "provenance": "carried", "run_id": carried["run_id"],
                    "commit": carried["commit"]}
-            if passed is False:
+            if passed is False and not carried.get("unjudged"):
                 findings.append(f"{file}: carried {carried['score_percent']:.2f}% below its "
                                 f"{floor}% floor, measured by run {carried['run_id']} at "
                                 f"{carried['commit']} (a finding, not a failure of the night)")
@@ -1046,7 +1279,8 @@ def merge(night, the_plan, base_record, floors, run_id):
         record_files[file] = {
             "surface": measured.get(file), **{k: row[k] for k in (
                 "generated", *OUTCOMES.values(), "viable", "score_percent", "no_viable",
-                "provenance", "run_id", "commit")}}
+                "provenance", "run_id", "commit")},
+            **({"unjudged": True} if row.get("unjudged") else {})}
     by_file = {row["file"]: row for row in rows}
     for file in floors:
         row = by_file.get(file)
@@ -1143,7 +1377,8 @@ def report(args):
                 base = json.loads((args.base_record / "record.json").read_text())
             run_id = getattr(args, "run_id", None) or os.environ.get("GITHUB_RUN_ID", "local")
             rows, findings, errors, record = merge(result, the_plan, base, floors, run_id)
-            result["errors"] += errors
+            # A floored UNJUDGED row names its floor in `collect` and again here: once.
+            result["errors"] += [e for e in errors if e not in result["errors"]]
             result.update(files=rows, findings=findings, mode=the_plan["mode"],
                           complete_run=record["complete_run"],
                           passed=not result["errors"])
@@ -1168,8 +1403,12 @@ def report(args):
             record["complete_run"]["lockfile_sha256"] = record.get("lockfile_sha256")
         write_json(Path(record_output), record)
     carried_from = result.get("complete_run")
+    rerun_rule = result.get("timeout_rule") == "rerun"
     lines = ["## Mutation scores (#81)", "",
-             "Score = caught / (caught + missed + timeout); unviable mutants are excluded.",
+             *(["Score = caught / (caught + missed); a mutant that timed out in its shard's "
+                "pass and again in its lone re-run (#781) is a timeout row below, neither a "
+                "survivor nor a kill; unviable mutants are excluded."] if rerun_rule else
+               ["Score = caught / (caught + missed + timeout); unviable mutants are excluded."]),
              f"Floors: {GATE_FLOOR}% on the gate paths; elsewhere `mutation_floors` "
              f"in `{args.floors}` (#602).", "",
              *([f"Source commit: `{commit}` (the dispatch's, #629).", ""] if commit else []),
@@ -1189,9 +1428,31 @@ def report(args):
             status = "NO MUTANTS" if row["scope_complete"] else "PARTIAL"
             if row["scope_complete"] and row.get("no_viable"):
                 status = "NO VIABLE MUTANTS"
+            if row["scope_complete"] and row.get("unjudged"):
+                status = "UNJUDGED"
         lines.append(f"| `{row['file']}` | {row['caught']} | {row['missed']} | "
                      f"{row['timeout']} | {row['unviable']} | {score} | {floor} | "
                      f"{status} | {provenance(row)} |")
+    if any(row.get("unjudged") for row in result["files"]):
+        lines += ["", "UNJUDGED: every judged mutant of the file timed out twice (#781), "
+                  "so the oracle read no score, its mutants in the table below; a file "
+                  "the night holds to a number (its floor, the gate's 80 or the default "
+                  "80) so read fails as a floor with no measured file, so UNJUDGED and "
+                  "green is a carried row's alone. NO VIABLE MUTANTS stays the label for a "
+                  "file whose every mutant the compiler refuses."]
+    if result.get("timeouts"):
+        lines += ["", "### Timed out twice (#781), outside the denominator", "",
+                  "| File | Mutant | Shard | Pass (s, limit) | Re-run (s, limit) | Method "
+                  "| Test named |",
+                  "| --- | --- | --- | ---: | ---: | --- | --- |"]
+        for row in result["timeouts"]:
+            named = ", ".join(f"`{test}`" for test in row["tests"]) or "none past a minute"
+            if row["binary"]:
+                named += f" (last binary `{row['binary']}`)"
+            lines.append(f"| `{row['file']}` | `{row['mutant']}` | {row['shard']} "
+                         f"| {row['pass_seconds']}, {row['pass_limit']} "
+                         f"| {row['rerun_seconds']}, {row['rerun_limit']} | {row['method']} "
+                         f"| {named} |")
     lines += ["", *(f"- {error}" for error in result["errors"])]
     if findings:
         lines += ["", "Carried below their floors (findings with their runs, not failures "

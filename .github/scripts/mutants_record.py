@@ -107,7 +107,11 @@ def measure(run_dir, floors=None, floor_files=True):
     result["scoreboard"] = {
         "PASS": sum(r["passed"] is True for r in summary["files"]),
         "FAIL": sum(r["passed"] is False for r in summary["files"]),
-        "NO MUTANTS": sum(r["passed"] is None for r in summary["files"]),
+        "NO MUTANTS": sum(r["passed"] is None and not r.get("unjudged")
+                          for r in summary["files"]),
+        **({"UNJUDGED": sum(r["passed"] is None and bool(r.get("unjudged"))
+                            for r in summary["files"])}
+           if result.get("timeout_rule") == "rerun" else {}),
         "files": len(summary["files"]),
     }
     return result
@@ -143,9 +147,15 @@ def floors(args):
 
 
 def survivors(run_dir):
-    """Every missed or timed-out mutant of the run, by name."""
+    """Every mutant of the run by name, its outcome the lone re-run's where it timed out
+    under #781's method (then its passes' figures beside it)."""
     found = {}
-    for path in sorted((run_dir / "shards").rglob("outcomes.json")):
+    for manifest in sorted((run_dir / "shards").rglob("run.json")):
+        data = json.loads(manifest.read_text())
+        path = manifest.parent / "outcomes.json"
+        if not path.exists():
+            continue
+        reruns = {r["mutant"]: r for r in data.get("reruns", [])}
         for entry in json.loads(path.read_text())["outcomes"]:
             if entry["scenario"] == "Baseline":
                 continue
@@ -158,7 +168,46 @@ def survivors(run_dir):
                 "function": function.get("function_name"), "genre": mutant["genre"],
                 "replacement": mutant["replacement"], "outcome": kind, "name": mutant["name"],
             }
+            rerun = reruns.get(mutant["name"]) if kind == "timeout" else None
+            if rerun is not None:
+                named = rerun["rerun"].get("named") or {}
+                found[mutant["name"]] |= {
+                    "outcome": rerun["rerun"]["outcome"], "pass_outcome": "timeout",
+                    "shard": f"{data['surface']} {data['shard']}",
+                    "pass_seconds": rerun["pass"]["seconds"],
+                    "rerun_seconds": rerun["rerun"]["seconds"],
+                    "pass_limit": rerun["pass"].get("test_timeout"),
+                    "rerun_limit": rerun["rerun"].get("test_timeout"),
+                    "binary": named.get("binary"), "tests": named.get("tests", [])}
     return found
+
+
+def survived(rule):
+    """The outcomes a record lists as survivors: since #781's method the missed alone."""
+    return ("missed",) if rule == "rerun" else ("missed", "timeout")
+
+
+def survivor_count(row, rule):
+    return row["missed"] + (0 if rule == "rerun" else row["timeout"])
+
+
+def previous_survivors(previous, before, gate=False):
+    """The previous record's survivors under its own rule (#781): a record before the
+    method (no `timeout_rule`) counted its timeouts as survivors, a marked one does not."""
+    rule = previous.get("timeout_rule", "counted")
+    return sum(survivor_count(r, rule) for f, r in before.items()
+               if not gate or nightly.is_gate_path(f))
+
+
+def statuses(rule):
+    """The tally's statuses; UNJUDGED (#781) under the lone re-run alone, so a record
+    before the method re-derives byte for byte."""
+    plain = ("PASS", "FAIL", "NO MUTANTS", "NO VIABLE MUTANTS")
+    return (*plain, "UNJUDGED") if rule == "rerun" else plain
+
+
+def unjudged_text(tally):
+    return f", {tally['UNJUDGED']} UNJUDGED" if "UNJUDGED" in tally else ""
 
 
 def score_text(score):
@@ -169,6 +218,8 @@ def status(row):
     if row["passed"] is None:
         if not row["scope_complete"]:
             return "PARTIAL"
+        if row.get("unjudged"):
+            return "UNJUDGED"  # #781: every judged mutant timed out twice, unenforced
         return "NO VIABLE MUTANTS" if row.get("no_viable") else "NO MUTANTS"
     return "PASS" if row["passed"] else "FAIL"
 
@@ -237,15 +288,17 @@ def write(args):
                       "result": status(row)})
     killed_before, killed_after = survivors(args.narrow), survivors(args.widened)
     narrow_left = {n: m for n, m in killed_before.items()
-                   if m["outcome"] in ("missed", "timeout") and nightly.is_gate_path(m["file"])}
+                   if m["outcome"] in survived(narrow["timeout_rule"])
+                   and nightly.is_gate_path(m["file"])}
     widened_left = {n: m for n, m in killed_after.items()
-                    if m["outcome"] in ("missed", "timeout") and nightly.is_gate_path(m["file"])}
+                    if m["outcome"] in survived(widened["timeout_rule"])
+                    and nightly.is_gate_path(m["file"])}
     groups = []
     gate_rows = [r for r in widened["files"] if nightly.is_gate_path(r["file"]) and r["viable"]]
     for row in file_order(gate_rows):
         mutants = sorted((m for m in widened_left.values() if m["file"] == row["file"]),
                          key=lambda m: (m["line"], m["column"], m["name"]))
-        if len(mutants) != row["missed"] + row["timeout"]:
+        if len(mutants) != survivor_count(row, widened["timeout_rule"]):
             raise SystemExit(f"{row['file']}: survivors differ from the scoreboard")
         if not mutants:
             continue
@@ -265,7 +318,7 @@ def write(args):
     def tally(result):
         return {"files": len(result["files"]),
                 **{k: sum(1 for r in result["files"] if status(r) == k)
-                   for k in ("PASS", "FAIL", "NO MUTANTS", "NO VIABLE MUTANTS")}}
+                   for k in statuses(result.get("timeout_rule"))}}
     totals = {
         "narrow_scoreboard": narrow["scoreboard"],
         "widened_scoreboard": widened["scoreboard"],
@@ -339,8 +392,8 @@ def markdown(doc):
         f"- Widened, the run's scoreboard (every file at 80): {before['PASS']} PASS, "
         f"{before['FAIL']} FAIL, {before['NO MUTANTS']} NO MUTANTS of {before['files']} files.",
         f"- Widened, under the record's floors: {widened['PASS']} PASS, {widened['FAIL']} FAIL, "
-        f"{widened['NO MUTANTS']} NO MUTANTS, {widened['NO VIABLE MUTANTS']} NO VIABLE MUTANTS "
-        f"of {widened['files']} files.",
+        f"{widened['NO MUTANTS']} NO MUTANTS, {widened['NO VIABLE MUTANTS']} NO VIABLE MUTANTS"
+        f"{unjudged_text(widened)} of {widened['files']} files.",
         f"- The gate paths under the widened oracle: {totals['gate_files_below_80']} files below 80, "
         f"{totals['gate_survivors']} survivors ({totals['gate_survivors_below_80']} on the files "
         f"below 80); the narrow run had {totals['narrow_gate_survivors']}; "
@@ -418,25 +471,52 @@ def shard_rows(run_dir):
         data = json.loads(manifest.read_text())
         outcome = json.loads((manifest.parent / "outcomes.json").read_text())
         job = jobs[f"Mutants ({data['surface']}, {data['shard']})"]
+        rule = "rerun" if data.get("timeout_rerun") == nightly.TIMEOUT_RERUN else "counted"
         spent = {"baseline": 0.0, "caught": 0.0, "survived": 0.0, "unviable": 0.0}
+        counted = {c: outcome[c] for c in ("total_mutants", "caught", "missed", "timeout",
+                                           "unviable")}
+        rerun_minutes = 0.0
+        if rule == "rerun":
+            # #781: every timed-out pass's minutes under their own heading, the shard's
+            # and the re-run's; a re-run's caught or missed minutes under its outcome.
+            spent |= {"timed_out": 0.0, "rerun_baseline": 0.0}
+            for rerun in data.get("reruns", []):
+                again = json.loads((manifest.parent / "rerun" / str(rerun["index"])
+                                    / "outcomes.json").read_text())
+                rerun_minutes += minutes(again["start_time"], again["end_time"])
+                for entry in again["outcomes"]:
+                    took = sum(phase["duration"] for phase in entry["phase_results"]) / 60
+                    if entry["scenario"] == "Baseline":
+                        spent["rerun_baseline"] += took
+                        continue
+                    kind = nightly.OUTCOMES[entry["summary"]]
+                    spent["timed_out" if kind == "timeout" else
+                          "survived" if kind == "missed" else kind] += took
+                    if kind != "timeout":
+                        counted["timeout"] -= 1
+                        counted[kind] += 1
         for entry in outcome["outcomes"]:
             took = sum(phase["duration"] for phase in entry["phase_results"]) / 60
             if entry["scenario"] == "Baseline":
                 spent["baseline"] += took
                 continue
             kind = nightly.OUTCOMES[entry["summary"]]
+            if rule == "rerun" and kind == "timeout":
+                spent["timed_out"] += took
+                continue
             spent["survived" if kind in ("missed", "timeout") else kind] += took
         k, n = map(int, data["shard"].split("/"))
         rows.append({
             "surface": data["surface"], "shard": data["shard"], "index": k, "of": n,
             "files": len(data["files"]),
             "targets": sum(a.startswith("--cargo-arg=--test=") for a in data["command"]),
-            **{c: outcome[c] for c in ("total_mutants", "caught", "missed", "timeout",
-                                       "unviable")},
+            **counted,
             "job_started": job["started_at"], "job_completed": job["completed_at"],
             "job_minutes": round(minutes(job["started_at"], job["completed_at"]), 1),
             "mutants_minutes": round(minutes(outcome["start_time"], outcome["end_time"]), 1),
             "minutes_by_outcome": {key: round(v, 1) for key, v in spent.items()},
+            **({"reruns": len(data.get("reruns", [])),
+                "rerun_minutes": round(rerun_minutes, 1)} if rule == "rerun" else {}),
         })
     return sorted(rows, key=lambda r: (list(nightly.SURFACES).index(r["surface"]), r["index"]))
 
@@ -446,13 +526,24 @@ def survivor_term(shards, whole=False):
     their minutes by the shard's rate (cargo-mutants' minutes over its mutants)."""
     term = {}
     for row in shards:
+        # #781: under the lone re-run a twice-timed-out mutant is no survivor; its count
+        # and minutes (both passes, the re-runs' baselines) stand under their own heading.
+        rule = "rerun" if "timed_out" in row["minutes_by_outcome"] else "counted"
         entry = term.setdefault("all" if whole else row["surface"], {
             "shards": 0, "mutants": 0, "caught": 0, "survived": 0, "unviable": 0,
             "job_minutes": 0.0, "mutants_minutes": 0.0, "measured_minutes": dict.fromkeys(
                 ("baseline", "caught", "survived", "unviable"), 0.0),
             "rate_minutes": {"caught": 0.0, "survived": 0.0, "unviable": 0.0}})
+        if rule == "rerun" and "timed_out" not in entry:
+            entry |= {"timed_out": 0, "rerun_minutes": 0.0}
+            entry["measured_minutes"] |= {"timed_out": 0.0, "rerun_baseline": 0.0}
+            entry["rate_minutes"]["timed_out"] = 0.0
         rate = row["mutants_minutes"] / row["total_mutants"]
-        survived = row["missed"] + row["timeout"]
+        survived = survivor_count(row, rule)
+        if rule == "rerun":
+            entry["timed_out"] += row["timeout"]
+            entry["rerun_minutes"] += row["rerun_minutes"]
+            entry["rate_minutes"]["timed_out"] += row["timeout"] * rate
         entry["shards"] += 1
         entry["mutants"] += row["total_mutants"]
         entry["caught"] += row["caught"]
@@ -466,8 +557,9 @@ def survivor_term(shards, whole=False):
                            ("unviable", row["unviable"])):
             entry["rate_minutes"][key] += count * rate
     for entry in term.values():
-        for key in ("job_minutes", "mutants_minutes"):
-            entry[key] = round(entry[key], 1)
+        for key in ("job_minutes", "mutants_minutes", "rerun_minutes"):
+            if key in entry:
+                entry[key] = round(entry[key], 1)
         for group in ("measured_minutes", "rate_minutes"):
             entry[group] = {k: round(v, 1) for k, v in entry[group].items()}
         measured = entry["measured_minutes"]
@@ -476,6 +568,9 @@ def survivor_term(shards, whole=False):
                                          if entry["survived"] else None)
         entry["minutes_per_kill"] = (round(measured["caught"] / entry["caught"], 2)
                                      if entry["caught"] else None)
+        if "timed_out" in entry:
+            entry["minutes_per_timeout"] = (round(measured["timed_out"] / entry["timed_out"], 2)
+                                            if entry["timed_out"] else None)
         entry["survivor_share_of_viable"] = round(
             entry["survived"] / (entry["caught"] + entry["survived"]), 4)
         spent = sum(measured.values())
@@ -505,6 +600,7 @@ def write_complete(args):
     if args.checkpoint:
         run["checkpoint"] = args.checkpoint
     found = survivors(args.widened)
+    rule = result["timeout_rule"]
     files, groups = [], []
     for row in result["files"]:
         old = before.get(row["file"])
@@ -522,19 +618,25 @@ def write_complete(args):
                    and r["viable"]), key=lambda r: (r["score_percent"], r["file"]))
     for row in file_order(gate) + rest:
         mutants = sorted((m for m in found.values() if m["file"] == row["file"]
-                          and m["outcome"] in ("missed", "timeout")),
+                          and m["outcome"] in survived(rule)),
                          key=lambda m: (m["line"], m["column"], m["name"]))
-        if len(mutants) != row["missed"] + row["timeout"]:
+        if len(mutants) != survivor_count(row, rule):
             raise SystemExit(f"{row['file']}: survivors differ from the scoreboard")
         if mutants:
             groups.append({"file": row["file"], "gate_path": nightly.is_gate_path(row["file"]),
                            "score_percent": row["score_percent"],
                            "floor_percent": row["floor_percent"],
-                           "missed": row["missed"], "timeout": row["timeout"],
+                           "missed": row["missed"],
+                           **({} if rule == "rerun" else {"timeout": row["timeout"]}),
                            "mutants": mutants})
+    # #781: a mutant that timed out in its pass and again alone, each its own row.
+    timeouts = sorted((m for m in found.values() if m["outcome"] == "timeout"),
+                      key=lambda m: (m["file"], m["line"], m["column"], m["name"]))
+    if rule == "rerun" and len(timeouts) != sum(r["timeout"] for r in result["files"]):
+        raise SystemExit("the timeout rows differ from the scoreboard")
     def tally(rows):
-        return {"files": len(rows), **{k: sum(1 for r in rows if status(r) == k) for k in (
-            "PASS", "FAIL", "NO MUTANTS", "NO VIABLE MUTANTS")}}
+        return {"files": len(rows),
+                **{k: sum(1 for r in rows if status(r) == k) for k in statuses(rule)}}
     # A previous row that generated nothing and is no measured file now is a test-only
     # file the plan leaves out (cut 7), not a file gone.
     absent = set(before) - {row["file"] for row in result["files"]}
@@ -545,9 +647,8 @@ def write_complete(args):
         "at_80_everywhere": tally(at_eighty["files"]),
         "survivors": sum(len(g["mutants"]) for g in groups),
         "gate_survivors": sum(len(g["mutants"]) for g in groups if g["gate_path"]),
-        "previous_survivors": sum(r["missed"] + r["timeout"] for r in before.values()),
-        "previous_gate_survivors": sum(r["missed"] + r["timeout"] for f, r in before.items()
-                                       if nightly.is_gate_path(f)),
+        "previous_survivors": previous_survivors(previous, before),
+        "previous_gate_survivors": previous_survivors(previous, before, gate=True),
         "files_new_since_previous": sum(f["previous"] is None for f in files),
         "files_gone_since_previous": gone,
         "previous_rows_test_only": len(absent) - len(gone),
@@ -555,12 +656,17 @@ def write_complete(args):
         "shard_minutes": round(sum(r["job_minutes"] for r in shards), 1),
         "mutants": sum(r["total_mutants"] for r in shards),
         "survivor_term": survivor_term(shards, whole=True)["all"],
+        **({"timeouts": len(timeouts),
+            "previous_timeout_rule": previous.get("timeout_rule", "counted")}
+           if rule == "rerun" else {}),
     }
     document = {"schema": 2, "kind": "complete", "issue": 602,
                 "gate_floor_percent": nightly.GATE_FLOOR, "floors_record": str(args.record),
                 "runs": {"complete": run}, "totals": totals, "files": files,
                 "survivors": groups, "shards": shards,
                 "survivor_term": survivor_term(shards)}
+    if rule == "rerun":
+        document |= {"timeout_rule": "rerun", "timeouts": timeouts}
     nightly.write_json(args.out.with_suffix(".json"), document)
     args.out.with_suffix(".md").write_text(markdown_complete(document))
     print(json.dumps(totals, indent=2))
@@ -573,6 +679,7 @@ def hours(value):
 
 def markdown_complete(doc):
     run, totals = doc["runs"]["complete"], doc["totals"]
+    rerun_rule = doc.get("timeout_rule") == "rerun"
     board, record, eighty = (totals["run_scoreboard"], totals["under_the_record"],
                              totals["at_80_everywhere"])
     wall = minutes(run["dispatched"], run["score_job_ended"])
@@ -629,15 +736,22 @@ def markdown_complete(doc):
         "## The counts",
         "",
         f"- The run's scoreboard (the floors at `{run['commit'][:8]}`): {board['PASS']} PASS, "
-        f"{board['FAIL']} FAIL, {board['NO MUTANTS']} NO MUTANTS of {board['files']} files.",
+        f"{board['FAIL']} FAIL, {board['NO MUTANTS']} NO MUTANTS{unjudged_text(board)} "
+        f"of {board['files']} files.",
         f"- Under this record's floors: {record['PASS']} PASS, {record['FAIL']} FAIL, "
-        f"{record['NO MUTANTS']} NO MUTANTS, {record['NO VIABLE MUTANTS']} NO VIABLE MUTANTS "
-        f"of {record['files']} files.",
+        f"{record['NO MUTANTS']} NO MUTANTS, {record['NO VIABLE MUTANTS']} NO VIABLE MUTANTS"
+        f"{unjudged_text(record)} of {record['files']} files.",
         f"- At 80 everywhere (no floor below it): {eighty['PASS']} PASS, {eighty['FAIL']} FAIL, "
-        f"{eighty['NO MUTANTS']} NO MUTANTS, {eighty['NO VIABLE MUTANTS']} NO VIABLE MUTANTS.",
-        f"- Survivors (missed or timed out): {totals['survivors']}, {totals['gate_survivors']} "
+        f"{eighty['NO MUTANTS']} NO MUTANTS, {eighty['NO VIABLE MUTANTS']} NO VIABLE MUTANTS"
+        f"{unjudged_text(eighty)}.",
+        (f"- Survivors (missed; #781's timeout rows apart, {totals.get('timeouts')} below): "
+         if rerun_rule else "- Survivors (missed or timed out): ")
+        + f"{totals['survivors']}, {totals['gate_survivors']} "
         f"on the gate paths; the previous record's widened run had "
-        f"{totals['previous_survivors']:,} and {totals['previous_gate_survivors']:,}. "
+        f"{totals['previous_survivors']:,} and {totals['previous_gate_survivors']:,}"
+        + ((" under its own rule, its timeouts counted as survivors (a record before #781)"
+            if totals.get("previous_timeout_rule") == "counted" else " under the same rule")
+           if rerun_rule else "") + ". "
         f"{totals['files_new_since_previous']} files are new since that record"
         + (f"; gone: {', '.join(f'`{f}`' for f in totals['files_gone_since_previous'])}"
            if totals["files_gone_since_previous"] else "; none is gone")
@@ -646,9 +760,18 @@ def markdown_complete(doc):
         "",
         "## Every measured file",
         "",
-        "Score = caught / (caught + missed + timeout). Delta in percentage points, this run "
+        ("Score = caught / (caught + missed): a mutant that timed out in its shard's pass "
+         "and again in its lone re-run (#781) is a timeout row, outside the denominator, "
+         "neither a survivor nor a kill; T counts those rows. " if rerun_rule else
+         "Score = caught / (caught + missed + timeout). ")
+        + "Delta in percentage points, this run "
         "minus the previous record's widened run (blank: a file new since, or no score). "
-        "Result: this run under this record's floors.",
+        "Result: this run under this record's floors"
+        + ("; UNJUDGED a file whose every judged mutant timed out twice where no number "
+           "is enforced, its mutants in the timeout rows (one held to a floor, the gate's "
+           "80 or the default 80 FAIL, its floor unread); "
+           "NO VIABLE MUTANTS a file whose every mutant the compiler refused."
+           if rerun_rule else "."),
         "",
         "| File | C/M/T/U | Viable | Score | Previous C/M/T/U | Previous score | Delta | Floor | Result |",
         "| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | --- |",
@@ -691,10 +814,15 @@ def markdown_complete(doc):
         "",
         "## The survivor term (#705)",
         "",
-        "Per surface: the survivors (missed and timed out) and the kills, the minutes their "
-        "mutants took as measured (each mutant's phases) and by the rate (count times its "
+        ("Per surface: the survivors (missed alone, #781) and the kills, the minutes their "
+         if rerun_rule else
+         "Per surface: the survivors (missed and timed out) and the kills, the minutes their ")
+        + "mutants took as measured (each mutant's phases) and by the rate (count times its "
         "shard's minutes a mutant), and the survivors' share of the viable mutants and of the "
-        "measured minutes.",
+        "measured minutes"
+        + (": under #781 that share's denominator also holds the timed-out passes and the "
+           "re-runs' baselines, which a record before #781 has not (its timeouts were "
+           "survivors), so the two shares are not one measure." if rerun_rule else "."),
         "",
         "| Surface | Shards | Mutants | Kills | Survivors | Unviable | Job min | Rate (min/mutant) "
         "| Kills min (measured / rate) | Survivors min (measured / rate) | Min a kill | Min a survivor "
@@ -713,6 +841,24 @@ def markdown_complete(doc):
             f"| {100 * t['survivor_share_of_viable']:.1f}% / "
             f"{100 * t['survivor_share_of_minutes']:.1f}% |")
     whole = doc["totals"]["survivor_term"]
+    timed_out_lines = []
+    if rerun_rule:
+        timed_out_lines = [
+            "",
+            "The timeout rows (#781), under their own heading and in no column above: per "
+            "surface, the mutants that timed out twice, the minutes every timed-out pass took "
+            "(the shard's and the lone re-run's) and the re-runs' baselines.",
+            "",
+            "| Surface | Timed out twice | Timed-out passes min | Re-run baselines min "
+            "| Re-runs min (cargo-mutants) |",
+            "| --- | ---: | ---: | ---: | ---: |",
+            *(f"| {s} | {t['timed_out']} | {t['measured_minutes']['timed_out']:,} "
+              f"| {t['measured_minutes']['rerun_baseline']:,} | {t['rerun_minutes']:,} |"
+              for s, t in sorted(doc["survivor_term"].items(),
+                                 key=lambda item: list(nightly.SURFACES).index(item[0]))),
+            f"| all | {whole['timed_out']} | {whole['measured_minutes']['timed_out']:,} "
+            f"| {whole['measured_minutes']['rerun_baseline']:,} | {whole['rerun_minutes']:,} |",
+        ]
     lines += [
         f"| all | {whole['shards']} | {whole['mutants']:,} | {whole['caught']:,} "
         f"| {whole['survived']:,} | {whole['unviable']:,} | {whole['job_minutes']:,} "
@@ -728,24 +874,56 @@ def markdown_complete(doc):
         f"{whole['measured_minutes']['caught']:,}: a survivor costs "
         f"{whole['minutes_per_survivor'] / whole['minutes_per_kill']:.1f} times a kill, and the "
         "kills, being most of the viable mutants, carry most of the run.",
+        *timed_out_lines,
         "",
         "## The survivors per file",
         "",
         "The gate paths in #603's order (the files below 80 first, the script surface by score "
         "ascending, then the readers; then the files at or above it), then the files elsewhere "
-        "by score ascending. Each line: `file:line:column` function: genre replacement; "
-        "*timeout* marks a mutant that timed out.",
+        "by score ascending. Each line: `file:line:column` function: genre replacement"
+        + ("; the mutants that timed out twice are the timeout rows below, no survivor."
+           if rerun_rule else "; *timeout* marks a mutant that timed out."),
         "",
     ]
     for group in doc["survivors"]:
         where = "gate path" if group["gate_path"] else f"floor {group['floor_percent']}%"
+        tally = (f"{group['missed']} missed" if rerun_rule else
+                 f"{group['missed']} missed, {group['timeout']} timed out")
         lines += [f"### `{group['file']}`: {score_text(group['score_percent'])}, {where}; "
-                  f"{group['missed']} missed, {group['timeout']} timed out", ""]
+                  f"{tally}", ""]
         for m in group["mutants"]:
             extra = " *timeout*" if m["outcome"] == "timeout" else ""
+            if m.get("pass_outcome") == "timeout":
+                extra = " *timed out in its pass, missed alone*"
             lines.append(f"- `{m['file']}:{m['line']}:{m['column']}` {m['function']}: "
                          f"{m['genre']} `{m['replacement']}`{extra}")
         lines.append("")
+    if rerun_rule:
+        lines += [
+            "## The timeout rows (#781)",
+            "",
+            "Each mutant that timed out in its shard's pass and again when re-run once alone "
+            "(its exact name by `--re`, its line by `--in-diff`, the baseline re-timed, the "
+            "shard's timeouts, `--jobs 1`): outside the score's denominator, neither a "
+            "survivor nor a kill, an environment artefact or a hang read from the test its "
+            "log names (the log kept in the shard's artifact).",
+            "",
+        ]
+        if not doc["timeouts"]:
+            lines += ["None: every mutant that timed out in its pass was caught or missed "
+                      "when re-run alone.", ""]
+        else:
+            lines += ["| Mutant | Shard | Pass (s, limit) | Re-run (s, limit) | Test named |",
+                      "| --- | --- | ---: | ---: | --- |"]
+            for m in doc["timeouts"]:
+                named = ", ".join(f"`{test}`" for test in m["tests"]) or "none past a minute"
+                if m["binary"]:
+                    named += f" (last binary `{m['binary']}`)"
+                lines.append(f"| `{m['file']}:{m['line']}:{m['column']}` {m['function']}: "
+                             f"{m['genre']} `{m['replacement']}` | {m['shard']} "
+                             f"| {m['pass_seconds']}, {m['pass_limit']} "
+                             f"| {m['rerun_seconds']}, {m['rerun_limit']} | {named} |")
+            lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
