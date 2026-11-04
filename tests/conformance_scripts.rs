@@ -1356,14 +1356,9 @@ const REGRESSION_KNOWN_FAILURES: &[(&str, &str)] = &[
     // (lshift-truncation.0001/.0003 FIXED 2026-07-08: OP_LSHIFT/OP_RSHIFT are
     // now width-preserving bitwise byte shifts — no BigNumber, no panic, no
     // 63-bit clamp. src/script/spend/bitwise.rs, `shifted`.)
-    // *** BUG (ASM parity): ScriptChunk::to_asm renders OP_0 as "0" (and
-    // OP_1NEGATE as "-1"), while ts-sdk renders "OP_0"/"OP_1NEGATE". Scripts
-    // round-tripped through ASM across the two SDKs disagree.
-    // src/script/chunk.rs::to_asm. ***
-    (
-        "regression.script.writebin-empty.0001",
-        "writeBin([]).toASM() must be 'OP_0'; bsv-rs renders '0' (ts-sdk ASM parity bug)",
-    ),
+    // (writebin-empty.0001 FIXED by #723: ScriptChunk::to_asm writes OP_0
+    // and OP_1NEGATE by the reference's names, OP.ts:6-7,11 at edf6e03,
+    // where it wrote "0" and "-1". src/script/chunk.rs::to_asm.)
 ];
 
 #[test]

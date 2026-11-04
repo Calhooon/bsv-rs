@@ -30,8 +30,10 @@ impl Script {
 
         while i < tokens.len() {
             let token = tokens[i];
-            // "0" and "-1" first, then the raw rest after an `OP_RETURN`, then
-            // hex data (no opcode of that name) or an opcode
+            // "0" and "-1" before all else (the reference's literals, `Script.ts:91-92`,
+            // and the text `to_asm` wrote before #723), then the raw rest
+            // after an `OP_RETURN`, then hex data (no opcode of that name) or
+            // an opcode (`OP_0`, `OP_FALSE`, `OP_1NEGATE` among them)
             match name_to_opcode(token) {
                 _ if token == "0" => {
                     chunks.push(ScriptChunk::new_opcode(OP_0));
@@ -104,6 +106,13 @@ impl Script {
     }
 
     /// Serializes the script to an ASM formatted string.
+    ///
+    /// A chunk without data is written by its opcode's name, `OP_0` for
+    /// `0x00` and `OP_1NEGATE` for `0x4f` as the reference's `toASM` names
+    /// them (`OP.ts:6-7,11` at `ts-stack@edf6e03`; go-sdk's `NewFromASM`
+    /// reads these names and not `0` or `-1`); until #723 they were written
+    /// `0` and `-1`, which `from_asm` still reads. A chunk with data is its
+    /// data's hex.
     ///
     /// An `OP_RETURN` chunk carrying the rest of the script is written as
     /// `OP_RETURN` and the rest's own ASM when that reads back to the same

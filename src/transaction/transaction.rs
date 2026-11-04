@@ -2362,7 +2362,7 @@ mod tests {
 
         // Verify the script structure: OP_FALSE OP_RETURN <data>
         let asm = tx.outputs[0].locking_script.to_asm();
-        assert!(asm.starts_with("0 OP_RETURN"));
+        assert!(asm.starts_with("OP_0 OP_RETURN"));
     }
 
     #[test]
@@ -2390,7 +2390,7 @@ mod tests {
 
         // Verify all parts are present in the script
         let asm = tx.outputs[0].locking_script.to_asm();
-        assert!(asm.starts_with("0 OP_RETURN"));
+        assert!(asm.starts_with("OP_0 OP_RETURN"));
     }
 
     #[test]
@@ -2535,7 +2535,7 @@ mod tests {
         assert!(tx.outputs[0].locking_script.as_script().is_data());
         // Should just be OP_FALSE OP_RETURN with no data
         let asm = tx.outputs[0].locking_script.to_asm();
-        assert_eq!(asm, "0 OP_RETURN");
+        assert_eq!(asm, "OP_0 OP_RETURN");
     }
 
     #[test]

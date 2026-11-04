@@ -12,9 +12,10 @@
 //! none of these shapes either, and this crate's answer is the reference's,
 //! not a stricter one: `from_chunks` refuses nothing, the bytes and the ASM
 //! are the reference's, save the rows stated in `CLAUDE.md` (#634's writer
-//! of an `OP_RETURN` with data, `0`/`-1` for `OP_0`/`OP_1NEGATE`, the name of
-//! a direct push without data) and the readings of `from_asm` #603 shard A
-//! states (the empty token, the short inline PUSHDATA).
+//! of an `OP_RETURN` with data, the name of a direct push without data;
+//! `OP_0` and `OP_1NEGATE` written by the reference's names since #723) and
+//! the readings of `from_asm` #603 shard A states (the empty token, the short
+//! inline PUSHDATA).
 //!
 //! go-sdk@2ca481c holds no such chunk in a script: `NewScriptFromScriptOps`
 //! (`script/script_chunk.go:119-163`) re-encodes every push opcode as the
@@ -34,8 +35,7 @@ use serde_json::Value;
 
 /// The ASM this crate writes where the reference writes other text, each a
 /// stated row: #634's `OP_RETURN` writer (the rest's ASM after `OP_RETURN`,
-/// the chunks after it as they are), `OP_0` and `OP_1NEGATE` as `0` and `-1`
-/// (the reference and go-sdk write the names), a direct push without data as
+/// the chunks after it as they are), a direct push without data as
 /// `OP_UNKNOWN<n>` (the reference's `OP[op]` is `undefined`); neither text
 /// reads back in either SDK.
 const ASM_STATED: &[(&str, &str, &str)] = &[
@@ -49,8 +49,6 @@ const ASM_STATED: &[(&str, &str, &str)] = &[
     ("op-return-empty-data", "OP_RETURN", "#634"),
     ("push1-no-data", "OP_UNKNOWN1", "#661"),
     ("push4b-no-data", "OP_UNKNOWN75", "#661"),
-    ("op0-no-data", "0", "#661"),
-    ("op1negate-no-data", "-1", "#661"),
 ];
 
 /// The reference's text read back by `from_asm` to other bytes, each #603

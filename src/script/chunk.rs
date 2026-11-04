@@ -61,20 +61,19 @@ impl ScriptChunk {
     }
 
     /// Converts this chunk to its ASM string representation.
+    ///
+    /// A chunk with data is its data's hex; one without is its opcode's
+    /// name, `OP_0` for `0x00` and `OP_1NEGATE` for `0x4f` as the reference
+    /// names them (`OP.ts:6-7,11` at `ts-stack@edf6e03`, the name listed
+    /// before `OP_FALSE` the one its `toASM` writes); `0` and `-1` until
+    /// #723, which `Script::from_asm` still reads. A direct push opcode
+    /// without data, which has no name, is `OP_UNKNOWN<n>`.
     pub fn to_asm(&self) -> String {
         match &self.data {
             Some(data) => to_hex(data),
-            None => {
-                if self.op == super::op::OP_0 {
-                    "0".to_string()
-                } else if self.op == super::op::OP_1NEGATE {
-                    "-1".to_string()
-                } else {
-                    opcode_to_name(self.op)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| format!("OP_UNKNOWN{}", self.op))
-                }
-            }
+            None => opcode_to_name(self.op)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("OP_UNKNOWN{}", self.op)),
         }
     }
 }
@@ -146,8 +145,8 @@ mod tests {
 
     #[test]
     fn test_to_asm_special() {
-        assert_eq!(ScriptChunk::new_opcode(OP_0).to_asm(), "0");
-        assert_eq!(ScriptChunk::new_opcode(OP_1NEGATE).to_asm(), "-1");
+        assert_eq!(ScriptChunk::new_opcode(OP_0).to_asm(), "OP_0");
+        assert_eq!(ScriptChunk::new_opcode(OP_1NEGATE).to_asm(), "OP_1NEGATE");
     }
 
     #[test]

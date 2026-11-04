@@ -289,7 +289,7 @@ fn the_asm_round_trips_on_every_shape_both_readings_of_op_return_included_634() 
     // A rest no ASM reads back (a truncated push), and a nested fold.
     for (hex, want) in [
         ("6a05aabb", "OP_RETURN 0x05aabb"),
-        ("006a0568656c6c6f", "0 OP_RETURN 68656c6c6f"),
+        ("006a0568656c6c6f", "OP_0 OP_RETURN 68656c6c6f"),
         ("6a6a6a51", "OP_RETURN OP_RETURN OP_RETURN OP_1"),
     ] {
         assert_eq!(asm(hex), want);
@@ -311,9 +311,9 @@ fn the_asm_round_trips_on_every_shape_both_readings_of_op_return_included_634() 
 fn an_empty_raw_token_after_op_return_round_trips_634() {
     for (asm, hex, written) in [
         ("OP_RETURN 0x", "6a", "OP_RETURN"),
-        ("0 OP_RETURN 0x", "006a", "0 OP_RETURN"),
+        ("0 OP_RETURN 0x", "006a", "OP_0 OP_RETURN"),
         ("OP_RETURN", "6a", "OP_RETURN"),
-        ("0 OP_RETURN", "006a", "0 OP_RETURN"),
+        ("0 OP_RETURN", "006a", "OP_0 OP_RETURN"),
     ] {
         let s = Script::from_asm(asm).unwrap();
         assert_eq!(s.to_hex(), hex, "{asm}");
@@ -328,7 +328,7 @@ fn an_empty_raw_token_after_op_return_round_trips_634() {
         ScriptChunk::new(0x00, None),
         ScriptChunk::new(0x6a, Some(vec![])),
     ]);
-    assert_eq!(held.to_asm(), "0 OP_RETURN");
+    assert_eq!(held.to_asm(), "OP_0 OP_RETURN");
     assert_eq!(Script::from_asm(&held.to_asm()).unwrap(), held);
 }
 
