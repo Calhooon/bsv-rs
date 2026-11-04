@@ -180,11 +180,10 @@ async fn a_contact_resolved_as_an_identity_answers_its_stored_badges_558() {
         // reference's loads it from the wallet, `getContacts(identityKey)`,
         // `IdentityClient.ts:386`): load it first, as a caller does.
         assert_eq!(client.get_contacts(true).await.unwrap().len(), 1, "{name}");
-        let resolved = client
-            .resolve_by_identity_key(key, true)
-            .await
-            .unwrap()
-            .unwrap_or_else(|| panic!("{name}: the contact is read"));
+        let resolved = client.resolve_by_identity_key(key, true).await.unwrap();
+        // The contact alone, as the reference returns its contacts' list (#737)
+        assert_eq!(resolved.len(), 1, "{name}: the contact is read");
+        let resolved = resolved.into_iter().next().unwrap();
         assert_eq!(reference_names(&resolved), case["resolved"], "{name}");
     }
 }
