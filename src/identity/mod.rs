@@ -42,8 +42,8 @@
 //! let config = IdentityClientConfig::with_originator("myapp.com");
 //! let client = IdentityClient::new(wallet, config);
 //!
-//! // Resolve an identity
-//! if let Some(identity) = client.resolve_by_identity_key("02abc123...").await? {
+//! // Resolve an identity: every admitted one, in the answer's order at the parser's one trust (#737)
+//! if let Some(identity) = client.resolve_by_identity_key("02abc123...", false).await?.first() {
 //!     println!("Found: {} ({})", identity.name, identity.abbreviated_key);
 //! }
 //!

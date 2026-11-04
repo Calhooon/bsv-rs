@@ -7,6 +7,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `resolve_by_identity_key` returns every admitted identity in the reference's order, the trust step ported as far as this crate holds it (#737, the list; the owner's word)
+
+The owner's word of 2026-11-04 13:5xZ on #737's held item: the door takes
+the reference's shape. `IdentityClient::resolve_by_identity_key` returned
+`Result<Option<DisplayableIdentity>>`, the earliest admitted identity of the
+asked subject (#737's first row); the reference's `resolveByIdentityKey`
+returns `Promise<DisplayableIdentity[]>`, every identity its wallet's
+discovery admits, in that discovery's order (`ts-stack@edf6e03`
+`packages/sdk/src/identity/IdentityClient.ts:559-591`: `parseIdentities` of
+the wallet's `certificates`, `:994-1011`, one identity per certificate, the
+order kept). The wallet's `discoverByIdentityKey`
+(`packages/wallet/wallet-toolbox/src/Wallet.ts:966-1016`) orders them by
+`transformVerifiableCertificatesWithTrust`
+(`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:313-382`) after
+the subject filter: the leading 256 certificates (`:22`, `:328`), a
+certificate whose certifier the trust settings do not name dropped
+(`:333-334`), one certificate per type, serial number and certifier within
+a subject (`:360-362`), a subject whose summed trust is under the threshold
+dropped (`:369-374`), then the stable sort by the certifier's trust,
+descending (`:378`), ties in the answer's order; then its page
+(`discoveryPage`, `Wallet.ts:228-233`, 10 by default).
+
+The door now returns `Result<Vec<DisplayableIdentity>>`: every output parsed
+as #737 landed (a skipped one passed over, a limit anywhere the call's
+refusal), the #739 subject filter, then the trust step as far as this crate
+holds it (`src/identity/client_trust.rs`): the cap of 256, one certificate
+per type, serial number and certifier, and the stable sort by each
+certificate's `certifier_info.trust`, descending. This crate holds no trust
+settings (#754's record), so the trust is the one figure its parser writes
+(5 for every certificate) and the order is the answer's; no certifier is
+dropped as untrusted and no threshold applies (the parity note). An answer
+with none admitted is the empty list, as the reference's `parseIdentities`
+of no certificate; it was `Ok(None)`. A stored contact of the key, when
+`override_with_contacts`, answers alone as a one-element list, as the
+reference returns its contacts' list (`:575-576`).
+
+`resolve_by_attributes` already returned a list; its order rule is not this
+one: it is the wallet's `discoverByAttributes` path (attributes filter, no
+subject filter, `Wallet.ts:1078`), every admitted certificate in the
+answer's order with a contact substituted per subject, unchanged here.
+
+Before, after, by signature:
+
+    pub async fn resolve_by_identity_key(&self, identity_key: &str, override_with_contacts: bool) -> Result<Option<DisplayableIdentity>>
+    pub async fn resolve_by_identity_key(&self, identity_key: &str, override_with_contacts: bool) -> Result<Vec<DisplayableIdentity>>
+
+Semver: a PUBLIC SHAPE change on the beta line (0.9), the return type of
+`IdentityClient::resolve_by_identity_key`, on the owner's word above; and
+the result moves for a multi-output answer: an answer admitting two or more
+certificates of the subject is two or more identities, where it was the
+earliest; one certificate at two outpoints stays one identity (the trust
+step's repeat rule). Migration, by caller shape:
+
+- `if let Some(id) = client.resolve_by_identity_key(k, b).await? { .. }`
+  becomes `if let Some(id) = client.resolve_by_identity_key(k, b).await?.into_iter().next() { .. }`
+  (element 0 where one was wanted: the answer's earliest admitted, as before);
+- `.is_none()` becomes `.is_empty()`, `.is_some()` `!.is_empty()`;
+- `.unwrap_or_else(..)` on the `Option` becomes a check of `len()` or `first()`.
+
+In this crate: the door's doc example, `IdentityClient`'s doc example and
+`src/identity/mod.rs`'s module example (`.first()`); four test files
+(`tests/identity_question_754.rs` `.is_empty()`;
+`tests/identity_contact_badges_558.rs` and
+`tests/identity_from_identity_abbreviated_key_568.rs` the contact as the one
+element; `tests/identity_resolve_737.rs` the list). `README.md`, `examples/`
+and `docs/` do not call the door. The dependents at
+`~/bsv/bsv-wallet-cli`, `~/bsv/bsv-wallet-toolbox-rs`,
+`~/bsv/rust-message-box` and `~/bsv/bsv-overlay-cloudflare` do not call it
+(a `grep` of each, `*.rs` and `*.md`, `target` excluded).
+
+`tests/identity_resolve_737.rs` compares every shape's identities (keys and
+names, in order) with the vector's list, where it compared the earliest;
+`tests/vectors/identity_resolve_737.json` is re-recorded by the recorder
+extended (`tests/support/identity_resolve_737.mjs`, Node v22.18.0, the
+bundle at `edf6e03`): a token of the asked subject (the scalar 9) by a
+second certifier (the scalar 8, `dave@example.com`), issued after the two
+earlier tokens so their bytes stay; four shapes added, the eleven earlier
+byte for byte (`cmp` of a re-run of the old recorder beforehand; the new one's
+two runs byte-identical): the subject's certificate by the certifier 7, a
+skipped output, its certificate by the certifier 8, both trusted at 1
+(`[alice, dave]`); the same answer with the certifier 8 trusted at 2
+(`[dave, alice]`, the stated difference); one output (`[alice]`); no output
+(`[]`). On `89acc4ff` (a scratch copy, its own target dir, the tip's test
+and vector copied in) 3 of 9 RED:
+`two_certificates_resolve_to_both_identities_in_order_737` (`Ok([("03acd484...",
+"alice@example.com")]), expected Ok([(.., "alice@example.com"), (..,
+"Unknown Identity")])`),
+`two_certifiers_around_a_skipped_output_resolve_in_the_answers_order_737`
+(`Ok([(.., "alice@example.com")]), expected Ok([(.., "alice@example.com"),
+(.., "dave@example.com")])`) and the stated test's `this crate` assertion
+(`left: Ok([(.., "alice@example.com")])`); the one-output and empty cases
+GREEN there through the `Option`'s iterator (`Ok(None)` read as no element),
+the other six GREEN. On the tip 9 of 9 GREEN. The sort and the repeat rule
+are pinned below the door by three unit tests in
+`src/identity/client_trust.rs` (certificates at trusts 1 and 3 from three
+certifiers; a repeat beside another certifier's same serial; 257
+certificates), since the door's trust is one constant: in a scratch copy of
+the tip with the repeat rule removed and the sort ascending,
+`the_token_first_and_one_certificate_twice_resolve_to_its_identity_737` and
+two of the three units RED.
+
+### Notes: cross-SDK parity (#737, the list)
+
+The list and its order follow the reference where this crate holds the
+inputs: the subject filter, the cap of 256, the repeat rule and the stable
+trust sort. The wallet's trust settings are not ported (this crate has none;
+#754's record): the reference drops a certificate of a certifier its
+settings do not name and a subject under its threshold, and orders by the
+settings' trust; here every certifier the overlay returns is kept at the
+parser's one trust, so the order is the answer's. On two certifiers at
+unequal trust the reference's most trusted comes ahead and this crate's
+answer order stands (`two_certifiers_at_unequal_trust_keep_the_answers_order_stated_737`,
+the vector's `two_certifiers_trust_ordered`, recorded under the settings
+`{ <certifier 8>: 2 }`). Not ported either, the wallet's page
+(`discoveryPage`, 10 by default, `Wallet.ts:228-233`): the list here is
+unpaged (the reference overlay's own default page of 10 bounds the answer,
+`IdentityLookupService.ts:83`), as `discover_certificates` is (#754).
+go-sdk@2ca481c's `ResolveByIdentityKey` returns a list too
+(`identity/client.go:239-255`, `[]DisplayableIdentity`, its wallet's
+certificates in order). The reference groups by the subject's exact text
+after a lower-cased filter (`:247-255`, `:354-358`), so an upper-case
+subject forms its own group with its own threshold and duplicate rule, and a
+certifier's case is matched against the settings' text; this crate holds keys
+and treats the cases as one (the #777 rule read; the cold read's probe of the
+reference at the pin on three hand-built certificates, A lower, B upper, C
+lower, returned `[A, C, B]` where this crate returns `[A, B, C]`, and kept the
+same certificate written in both cases twice where this crate keeps one: a
+reference artifact of text-keyed grouping, the key being one identity by first
+principles, the owner's word of 2026-11-04; upstream as ts-stack #1483, the
+keeper's filing at the pin: `identityGroups.get(subject)` keyed by the subject
+string as it arrives, `:355-359`, the certifier cache by identityKey,
+`:321-323`, the ask additive, grouping by the key's bytes; the row closes when
+it lands there). Ours: the unported trust settings and page, and the keys'
+one case pending ts-stack #1483. Theirs: none.
+
 ### CI: the hosted macOS leg of the Test Suite runs on the Intel image (`macos-15-intel`) while GitHub's arm64 capacity drops queued jobs; arm64 measured on the captains' Macs (#792)
 
 GitHub's wait, named as GitHub's: the two full-matrix witness runs on the #790

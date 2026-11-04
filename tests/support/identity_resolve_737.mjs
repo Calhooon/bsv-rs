@@ -76,14 +76,15 @@ const tracker = { isValidRootForHeight: async () => true, currentHeight: async (
 
 // A revelation token the reference's own `publiclyRevealAttributes` writes
 // (#553's `published`, its subject a parameter): a certificate of `fields`
-// issued by the scalar 7 to the scalar `scalar` under the serial number of
-// 32 bytes of `serial`, revealing `email`, locked and signed by the subject.
+// issued by the scalar `certifier` (7 unless named) to the scalar `scalar`
+// under the serial number of 32 bytes of `serial`, revealing `email`, locked
+// and signed by the subject.
 const ANYONE = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
-const published = async (scalar, fields, serial) => {
+const published = async (scalar, fields, serial, certifier = 7) => {
   const wallet = new ProtoWallet(new PrivateKey(scalar))
   const subject = new PrivateKey(scalar).toPublicKey().toString()
   const issued = await MasterCertificate.issueCertificateForSubject(
-    new ProtoWallet(new PrivateKey(7)), subject, fields,
+    new ProtoWallet(new PrivateKey(certifier)), subject, fields,
     Utils.toBase64(new Array(32).fill(1)), async () => '00'.repeat(32) + '.0',
     Utils.toBase64(new Array(32).fill(serial))
   )
@@ -108,7 +109,10 @@ const published = async (scalar, fields, serial) => {
 // asked subject under another serial number and name.
 const tokens = {
   other_subject: await published(10, { email: 'bob@example.com', name: 'Bob' }, 4),
-  second_name: await published(9, { email: 'carol@example.com', name: 'Carol' }, 5)
+  second_name: await published(9, { email: 'carol@example.com', name: 'Carol' }, 5),
+  // The list's fold (#737): the asked subject's certificate by another
+  // certifier, the scalar 8, issued after the two above so their bytes stay.
+  other_certifier: await published(9, { email: 'dave@example.com', name: 'Dave' }, 6, 8)
 }
 
 // One input spending `source` at 0 with `unlocking`, one 1-satoshi output
@@ -143,6 +147,9 @@ const builders = {
   other_subject_77: () => { const b = new Beef(); proven(b, spending('77'.repeat(32), '', tokens.other_subject), 900); return b.toBinary() },
   // A proven transaction spending `11`x32:0, its output 0 the asked subject's second token.
   second_name_11: () => { const b = new Beef(); proven(b, spending('11'.repeat(32), '', tokens.second_name), 900); return b.toBinary() },
+  // A proven transaction spending `33`x32:0, its output 0 the asked subject's
+  // certificate by the second certifier.
+  other_certifier_33: () => { const b = new Beef(); proven(b, spending('33'.repeat(32), '', tokens.other_certifier), 900); return b.toBinary() },
   // A proven transaction spending `66`x32:0 locked by OP_TRUE: no identity token.
   op_true_66: () => { const b = new Beef(); proven(b, spending('66'.repeat(32), '', '51'), 900); return b.toBinary() },
   // #730's `unproven_no_inputs`: invalid evidence (`TransactionEvidence.ts:174`).
@@ -168,14 +175,15 @@ const overBound = (byte, n) => {
 }
 const sizes = { transactions_over_bound: 256, transactions_over_bound_88: 256 }
 
-// The wallet's trust settings: the tokens' certifier trusted at the threshold.
-const trust = (certificates) => ({
+// The wallet's trust settings: every certifier found trusted at the
+// threshold, at 1, or at the level `levels` names for its key.
+const trust = (certificates, levels = {}) => ({
   trustLevel: 1,
   trustedCertifiers: [...new Set(certificates.map(c => c.certifier))].map(identityKey => ({
-    name: 'Certifier', description: 'The certifier of #553\'s tokens', identityKey, trust: 1
+    name: 'Certifier', description: 'The certifier of #553\'s tokens', identityKey, trust: levels[identityKey] ?? 1
   }))
 })
-const judged = async (outputs) => {
+const judged = async (outputs, levels) => {
   const lookup = { type: 'output-list', outputs: outputs.map(beef => ({ beef, outputIndex: 0 })) }
   let certificates
   try {
@@ -184,7 +192,7 @@ const judged = async (outputs) => {
     return { certificates: null, subjects: null, outcome: `refused: ${e.message}`, identities: null }
   }
   const bound = filterCertificatesByIdentityKey(certificates, subjectHex)
-  const trusted = transformVerifiableCertificatesWithTrust(trust(certificates), bound).certificates
+  const trusted = transformVerifiableCertificatesWithTrust(trust(certificates, levels), bound).certificates
   const identities = await IdentityClient.parseIdentities(trusted)
   return {
     certificates: certificates.length,
@@ -200,7 +208,7 @@ const judged = async (outputs) => {
 }
 
 const shapes = []
-const add = async (name, shape, check, names) => {
+const add = async (name, shape, check, names, levels) => {
   const outputs = names.map(n => builders[n](sizes[n]))
   shapes.push({
     name, shape, check,
@@ -212,7 +220,8 @@ const add = async (name, shape, check, names) => {
       if (outputs[i].length <= 4096) o.beef = Utils.toHex(outputs[i])
       return o
     }),
-    ...(await judged(outputs))
+    ...(levels ? { trust_levels: levels } : {}),
+    ...(await judged(outputs, levels))
   })
 }
 
@@ -254,11 +263,33 @@ await add('limit_first_then_token', 'iii',
   'the first output over limits.transactions (TransactionEvidence.ts:117): rethrown (identityUtils.ts:630-634), the discovery refused',
   ['transactions_over_bound', 'reference_11'])
 
+// The list's fold (#737): the asked subject's certificates by two
+// certifiers around a skipped output, both returned in the answer's order
+// at equal trust; the same answer with the second certifier trusted at 2,
+// the reference's trust sort putting its certificate ahead (the stated
+// difference: this crate holds no trust settings); one output, one identity;
+// no output, none.
+const certifierOf = (lock) => {
+  const field = LockingScript.fromHex(lock).chunks[2].data
+  return JSON.parse(Utils.toUTF8(field)).certifier
+}
+await add('two_certifiers_around_a_skipped_output', 'v',
+  'the asked subject\'s certificate by the certifier 7, invalid evidence (skipped), its certificate by the certifier 8: ' +
+  'both identities at equal trust, in the answer\'s order (the stable sort, identityUtils.ts:378)',
+  ['reference_11', 'unproven_no_inputs', 'other_certifier_33'])
+await add('two_certifiers_trust_ordered', 'v',
+  'the same answer with the certifier 8 trusted at 2: the reference returns its identity ahead (identityUtils.ts:378)',
+  ['reference_11', 'unproven_no_inputs', 'other_certifier_33'],
+  { [certifierOf(tokens.other_certifier)]: 2 })
+await add('token_alone', 'v', 'one output, the token: one identity', ['reference_11'])
+await add('no_outputs', 'v', 'an answer of no outputs: no identity, an empty list', [])
+
 process.stdout.write(JSON.stringify({
   description: '#737: the reference wallet\'s discovery over an ls_identity answer (a refused or ' +
     'non-identity output before the token, the token before a refused one, two certificates, one certificate at two ' +
     'outpoints, one outpoint twice, another subject\'s certificate before the asked one\'s, a limit ' +
-    'before and after the token): parseResults\' certificates and the identities resolveByIdentityKey returns',
+    'before and after the token; since the list\'s fold, two certifiers around a skipped output at equal and unequal ' +
+    'trust, one output, none): parseResults\' certificates and the identities resolveByIdentityKey returns, in its order',
   reference: 'ts-stack@edf6e03 packages/wallet/wallet-toolbox/src/Wallet.ts:950-1016; ' +
     'packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:247-255,313-382,596-634,671-707; ' +
     'packages/sdk/src/identity/IdentityClient.ts:559-591,994-1011',

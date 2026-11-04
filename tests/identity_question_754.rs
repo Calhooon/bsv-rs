@@ -147,7 +147,7 @@ async fn every_by_key_question_is_admitted_by_the_reference_allowlist_754() {
         .resolve_by_identity_key(KEY, false)
         .await
         .unwrap()
-        .is_none());
+        .is_empty());
     asked.extend(record.lock().unwrap().clone());
     let (door, record) = client("census-query");
     let mut query = IdentityQuery::by_identity_key(KEY);

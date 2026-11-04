@@ -5,17 +5,21 @@
 //! each output parsed in order, a skipped one dropped, a `limit` anywhere
 //! rethrown), keeps only the asked subject's certificates
 //! (`filterCertificatesByIdentityKey`, `identityUtils.ts:247-255`, called at
-//! `Wallet.ts:1012`), and returns the first one's identity, where it read
-//! `outputs[0]` alone. Against `tests/vectors/identity_resolve_737.json`
+//! `Wallet.ts:1012`), where it read `outputs[0]` alone; and, since the list
+//! (the owner's word of 2026-11-04 13:5xZ), returns every one's identity in
+//! the trust step's order (`transformVerifiableCertificatesWithTrust`,
+//! `identityUtils.ts:313-382`: one per type, serial number and certifier,
+//! the most trusted ahead, ties in the answer's order), where it returned
+//! the earliest. Against `tests/vectors/identity_resolve_737.json`
 //! (`tests/support/identity_resolve_737.mjs`, Node v22.18.0): each answer
 //! rebuilt by this crate's writer to the recorded SHA-256 and served on an
-//! in-process facilitator on an `.invalid` host, the identity answered as the
-//! reference's `resolveByIdentityKey` answers it
-//! (`packages/sdk/src/identity/IdentityClient.ts:559-591`), save the list:
-//! two certificates are two identities there and the first here, this
-//! crate's `Option` (the stated difference, the last test); and the
-//! certificates `parseResults` admits (their count and serial numbers) read
-//! by this crate's `query` over the same parser, every shape.
+//! in-process facilitator on an `.invalid` host, the identities answered as
+//! the reference's `resolveByIdentityKey` answers them
+//! (`packages/sdk/src/identity/IdentityClient.ts:559-591`), keys and names in
+//! order; and the certificates `parseResults` admits (their count and serial
+//! numbers) read by this crate's `query` over the same parser, every shape.
+//! One shape is stated: two certifiers at unequal trust, which the reference
+//! wallet's trust settings order and this crate, holding none, does not.
 #![cfg(feature = "identity")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -111,6 +115,7 @@ fn built(name: &str, size: Option<usize>) -> Vec<u8> {
         "second_certificate_55" => proven_spend("55", token_of("fields_at_bound")),
         "other_subject_77" => proven_spend("77", issued("other_subject")),
         "second_name_11" => proven_spend("11", issued("second_name")),
+        "other_certifier_33" => proven_spend("33", issued("other_certifier")),
         "op_true_66" => proven_spend("66", LockingScript::from_hex("51").unwrap()),
         "transactions_over_bound_88" => over_bound("88", size.unwrap()),
         "unproven_no_inputs" | "transactions_over_bound" => build::build(name, size).beef,
@@ -135,8 +140,8 @@ impl OverlayLookupFacilitator for Answering {
     }
 }
 
-/// An identity's key and name, or the words of the refusal.
-type Answer = Result<Option<(String, String)>, String>;
+/// The identities' keys and names in order, or the words of the refusal.
+type Answer = Result<Vec<(String, String)>, String>;
 
 /// The certificates admitted (their serial numbers in order), or the words
 /// of the refusal.
@@ -170,7 +175,12 @@ async fn resolve(outputs: Vec<(Vec<u8>, u32)>, key: &str) -> Answer {
     client(outputs)
         .resolve_by_identity_key(key, false)
         .await
-        .map(|found| found.map(|identity| (identity.identity_key, identity.name)))
+        .map(|found| {
+            found
+                .into_iter()
+                .map(|identity| (identity.identity_key, identity.name))
+                .collect()
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -194,8 +204,8 @@ async fn admitted(outputs: Vec<(Vec<u8>, u32)>) -> Admitted {
 }
 
 /// The shape `name`: its outputs rebuilt to the recorded bytes at their
-/// recorded indices, the reference's first identity (or its refusal) and
-/// the recorded case.
+/// recorded indices, the reference's identities in order (or its refusal)
+/// and the recorded case.
 fn shape(name: &str) -> (Vec<(Vec<u8>, u32)>, Answer, Value) {
     let v = vector();
     let case = v["shapes"]
@@ -225,13 +235,21 @@ fn shape(name: &str) -> (Vec<(Vec<u8>, u32)>, Answer, Value) {
     let outcome = case["outcome"].as_str().unwrap();
     let expected = if let Some(words) = outcome.strip_prefix("refused: ") {
         Err(format!("identity error: {words}"))
-    } else if case["identities"] == 0 {
-        Ok(None)
     } else {
-        Ok(Some((
-            case["first_subject"].as_str().unwrap().to_string(),
-            case["first_identity_name"].as_str().unwrap().to_string(),
-        )))
+        let texts = |member: &str| -> Vec<String> {
+            case[member]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| s.as_str().unwrap().to_string())
+                .collect()
+        };
+        let list: Vec<(String, String)> = texts("identity_subjects")
+            .into_iter()
+            .zip(texts("identity_names"))
+            .collect();
+        assert_eq!(case["identities"], list.len(), "{name}: the recorded count");
+        Ok(list)
     };
     (outputs, expected, case)
 }
@@ -257,8 +275,8 @@ fn recorded_admitted(case: &Value) -> Admitted {
     }
 }
 
-/// Each shape answered with the reference's first identity, and its
-/// admitted certificates the reference's, every disagreement named.
+/// Each shape answered with the reference's identities in its order, and
+/// its admitted certificates the reference's, every disagreement named.
 async fn agrees(names: &[&str]) {
     let key = vector()["subject"].as_str().unwrap().to_string();
     let mut differ = Vec::new();
@@ -290,7 +308,7 @@ async fn agrees(names: &[&str]) {
 async fn a_skipped_first_output_is_passed_over_for_the_token_after_it_737() {
     let (_, expected, _) = shape("refused_first_then_token");
     assert_eq!(
-        expected.unwrap().unwrap().1,
+        expected.unwrap()[0].1,
         "carol@example.com",
         "the second output's token, not the refused one's"
     );
@@ -313,9 +331,10 @@ async fn another_subjects_certificate_is_not_the_asked_identity_737() {
 }
 
 /// The token first (a skipped output after it), one certificate at two
-/// outpoints (one identity there, the trust step keeping one per serial
-/// number, `identityUtils.ts:360-361`) and one outpoint twice (read once,
-/// `:699-702`; the resolver's dedup here): the first identity on both sides.
+/// outpoints (one identity, the trust step keeping one per type, serial
+/// number and certifier, `identityUtils.ts:360-361`, ported) and one
+/// outpoint twice (read once, `:699-702`; the resolver's dedup here): one
+/// identity on both sides.
 #[tokio::test]
 async fn the_token_first_and_one_certificate_twice_resolve_to_its_identity_737() {
     agrees(&[
@@ -345,29 +364,56 @@ async fn a_limit_after_an_admitted_output_refuses_the_resolution_737() {
     agrees(&["token_then_limit"]).await;
 }
 
-/// Shape (ii), the stated difference: two admitted certificates of the
-/// subject. The reference's `resolveByIdentityKey` returns both identities
-/// (`IdentityClient.ts:568-571`, `DisplayableIdentity[]`); this crate's
-/// `resolve_by_identity_key` returns `Option<DisplayableIdentity>` and so
-/// the first, in the answer's order (the return type is the owner's word;
-/// `resolve_by_attributes` already returns every identity).
+/// Shape (ii): two admitted certificates of the subject, both identities
+/// in the answer's order (`IdentityClient.ts:568-571`, `DisplayableIdentity[]`),
+/// where this crate returned the earliest (`Option`, until the list).
 #[tokio::test]
-async fn two_certificates_resolve_to_the_first_where_the_reference_returns_both_stated_737() {
-    let (outputs, expected, case) = shape("two_certificates");
-    assert_eq!(case["identities"], 2, "the reference returns both");
-    assert_eq!(
-        case["identity_names"],
-        serde_json::json!(["alice@example.com", "Unknown Identity"])
-    );
+async fn two_certificates_resolve_to_both_identities_in_order_737() {
+    let (_, expected, _) = shape("two_certificates");
+    assert_eq!(expected.unwrap().len(), 2, "the reference returns both");
+    agrees(&["two_certificates"]).await;
+}
+
+/// Shape (v), the list's three outputs: the subject's certificate by the
+/// certifier 7, a skipped output, its certificate by the certifier 8, both
+/// trusted at one level: both identities, the answer's order (the trust
+/// step's stable sort, `identityUtils.ts:378`, at equal trust).
+#[tokio::test]
+async fn two_certifiers_around_a_skipped_output_resolve_in_the_answers_order_737() {
+    let (_, expected, case) = shape("two_certifiers_around_a_skipped_output");
+    assert_eq!(case["outputs"].as_array().unwrap().len(), 3);
+    let names: Vec<String> = expected.unwrap().into_iter().map(|(_, n)| n).collect();
+    assert_eq!(names, ["alice@example.com", "dave@example.com"]);
+    agrees(&["two_certifiers_around_a_skipped_output"]).await;
+}
+
+/// One output, one identity; no output, and another subject's certificate
+/// alone, the empty list, as the reference's `parseIdentities` of no
+/// certificate (`IdentityClient.ts:568-571`), where this crate answered
+/// `Ok(None)`.
+#[tokio::test]
+async fn one_output_is_a_one_element_list_and_none_the_empty_list_737() {
+    agrees(&["token_alone", "no_outputs", "other_subject_alone"]).await;
+}
+
+/// The stated difference: the same answer with the certifier 8 trusted at 2
+/// and the certifier 7 at 1. The reference wallet's trust sort puts the
+/// certifier 8's identity ahead (`identityUtils.ts:378`, its trust settings,
+/// `Wallet.ts:990,1010-1013`); this crate holds no trust settings (each
+/// certificate's `certifier_info.trust` one constant), so its order is the
+/// answer's, the reference's reversed.
+#[tokio::test]
+async fn two_certifiers_at_unequal_trust_keep_the_answers_order_stated_737() {
+    let (outputs, expected, case) = shape("two_certifiers_trust_ordered");
+    assert!(case["trust_levels"].is_object(), "the recorded settings");
     let key = vector()["subject"].as_str().unwrap().to_string();
+    let mut reversed = expected.unwrap();
+    let names: Vec<&str> = reversed.iter().map(|(_, n)| n.as_str()).collect();
     assert_eq!(
-        admitted(outputs.clone()).await,
-        recorded_admitted(&case),
-        "both certificates admitted on both sides"
+        names,
+        ["dave@example.com", "alice@example.com"],
+        "the reference"
     );
-    assert_eq!(
-        resolve(outputs, &key).await,
-        expected,
-        "this crate: the first"
-    );
+    reversed.reverse();
+    assert_eq!(resolve(outputs, &key).await, Ok(reversed), "this crate");
 }

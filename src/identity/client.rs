@@ -53,8 +53,8 @@ use std::sync::Arc;
 /// let wallet = ProtoWallet::new(None);
 /// let client = IdentityClient::new(wallet, IdentityClientConfig::default());
 ///
-/// // Resolve an identity by key
-/// let identity = client.resolve_by_identity_key("02abc123...", true).await?;
+/// // Resolve the identities of a key
+/// let identities = client.resolve_by_identity_key("02abc123...", true).await?;
 /// ```
 pub struct IdentityClient<W: WalletInterface> {
     wallet: W,
@@ -585,28 +585,27 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     // Resolution Methods
     // =========================================================================
 
-    /// Resolve an identity by identity key.
+    /// Resolve the identities of an identity key.
     ///
-    /// Queries the overlay network to find certificates associated with the key.
-    /// Reads every output of the lookup answer in order before it answers,
-    /// passing over one it skips, keeps only certificates whose subject is
-    /// `identity_key` (compared lower-cased, as the reference's
-    /// `filterCertificatesByIdentityKey`), and returns the first such
-    /// certificate's displayable identity, or None if none is admitted (#737).
-    /// The reference's `resolveByIdentityKey` returns every identity;
-    /// [`Self::resolve_by_attributes`] returns a list.
+    /// Reads every output of the `ls_identity` answer in order before it
+    /// answers, passing over one it skips (#737), keeps only certificates
+    /// whose subject is `identity_key` (compared lower-cased, the reference's
+    /// `filterCertificatesByIdentityKey`), and returns every one's
+    /// displayable identity in the reference wallet's trust order: one per
+    /// type, serial number and certifier, the most trusted certifier's ahead,
+    /// ties in the answer's order (`client_trust.rs`), as the reference's
+    /// `resolveByIdentityKey` returns its list (`IdentityClient.ts:559-591`).
+    /// An answer with none admitted is the empty list. The trust is each
+    /// certificate's `certifier_info.trust`; this crate holds no trust
+    /// settings, so no certifier is dropped as untrusted (#737, the list).
     ///
-    /// If `override_with_contacts` is true (default), personal contacts take priority
-    /// over discovered certificates.
-    ///
-    /// # Arguments
-    /// * `identity_key` - The hex-encoded public key to look up
-    /// * `override_with_contacts` - Whether to check contacts first (default: true)
+    /// If `override_with_contacts` is true, a stored contact of the key
+    /// answers alone, before any lookup.
     ///
     /// # Example
     /// ```rust,ignore
-    /// let identity = client.resolve_by_identity_key("02abc123...", true).await?;
-    /// if let Some(id) = identity {
+    /// let identities = client.resolve_by_identity_key("02abc123...", true).await?;
+    /// if let Some(id) = identities.first() {
     ///     println!("Found: {}", id.name);
     /// }
     /// ```
@@ -616,15 +615,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         identity_key: &str,
         override_with_contacts: bool,
-    ) -> Result<Option<DisplayableIdentity>> {
-        // First try contacts if override is enabled
+    ) -> Result<Vec<DisplayableIdentity>> {
         if override_with_contacts {
             if let Ok(Some(contact)) = self.contacts_manager.get_contact(identity_key).await {
-                return Ok(Some(contact.to_displayable_identity()));
+                return Ok(vec![contact.to_displayable_identity()]);
             }
         }
-
-        // Query the identity lookup service
         let question = LookupQuestion::new(
             "ls_identity",
             serde_json::json!({
@@ -632,31 +628,24 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                 "certifiers": [DEFAULT_SOCIALCERT_CERTIFIER]
             }),
         );
-
-        let answer = self.resolver.query(&question, None).await?;
-
-        // Every output parsed in order before the answer, a skipped one passed
-        // over and a limit anywhere refusing the call, as the reference's
-        // wallet walks them (identityUtils.ts:671-707, #737); then only the
-        // asked subject's certificates (filterCertificatesByIdentityKey,
-        // identityUtils.ts:247-255, Wallet.ts:1012); the first answers, where
-        // the reference returns every one (IdentityClient.ts:568-571)
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut first = None;
-                for output in &outputs {
-                    if let Some(cert) = self.parse_output_to_certificate(output).await? {
-                        if first.is_none()
-                            && is_asked_subject(cert.certificate.subject(), identity_key)
-                        {
-                            first = Some(Self::parse_identity(&cert));
-                        }
-                    }
+        // Every output parsed before the answer (identityUtils.ts:671-707),
+        // the asked subject's kept (:247-255), the trust step's order (:313-382)
+        let LookupAnswer::OutputList { outputs } = self.resolver.query(&question, None).await?
+        else {
+            return Ok(Vec::new());
+        };
+        let mut certificates = Vec::new();
+        for output in &outputs {
+            if let Some(cert) = self.parse_output_to_certificate(output).await? {
+                if is_asked_subject(cert.certificate.subject(), identity_key) {
+                    certificates.push(cert);
                 }
-                Ok(first)
             }
-            _ => Ok(None),
         }
+        Ok(trust::ordered_by_trust(certificates)
+            .iter()
+            .map(Self::parse_identity)
+            .collect())
     }
 
     /// Resolve identities by attribute values.
@@ -1761,3 +1750,6 @@ mod decode_token_744_tests;
 
 #[path = "client_record.rs"]
 mod record;
+
+#[path = "client_trust.rs"]
+mod trust;
