@@ -1,0 +1,340 @@
+{
+  "issue": 757,
+  "reference": "ts-stack@edf6e03 packages/sdk (Beef.ts:448-470, :550-565, :576-585, :649-668, :774-786, :813-822, :1329-1340)",
+  "runtime": "node v22.18.0",
+  "txs": {
+    "parent": {
+      "txid": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062",
+      "raw": "0100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+    },
+    "child": {
+      "txid": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09",
+      "raw": "010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+    },
+    "grandchild": {
+      "txid": "392fb2c84726416f14a17996bff92077ede0b3609588ea4ebb40348dfa7a3ec5",
+      "raw": "0100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000"
+    }
+  },
+  "bumps": {
+    "alone_800000": "fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
+    "left_800001": "fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "right_800000": "fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
+    "sibling_800002": "fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010062b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
+    "child_800003": "fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3"
+  },
+  "index_cases": [
+    {
+      "name": "raw_after_both",
+      "steps": [
+        "bump:alone_800000",
+        "bump:left_800001",
+        "raw:parent"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0101010100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_after_both_reversed",
+      "steps": [
+        "bump:left_800001",
+        "bump:alone_800000",
+        "raw:parent"
+      ],
+      "beef": "0200beef02fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbfe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101010100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_after_one_height_two_roots",
+      "steps": [
+        "bump:alone_800000",
+        "bump:right_800000",
+        "raw:parent"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101010100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_between",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "bump:left_800001"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_before_both",
+      "steps": [
+        "raw:parent",
+        "bump:alone_800000",
+        "bump:left_800001"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_after_both_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "bump:left_800001",
+        "raw:parent",
+        "raw:child"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0201010100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        },
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef01fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0201000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "txid_only_after_both",
+      "steps": [
+        "bump:alone_800000",
+        "bump:left_800001",
+        "txid:parent"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86",
+      "parent_bump_index": 1,
+      "atomic": []
+    },
+    {
+      "name": "raw_after_a_sibling_leaf",
+      "steps": [
+        "bump:alone_800000",
+        "bump:sibling_800002",
+        "raw:parent"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101010100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "txid_only_after_both_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "bump:left_800001",
+        "txid:parent",
+        "raw:child"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef01fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "made_txid_only_between_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "bump:left_800001",
+        "raw:child",
+        "txidonly:parent"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef01fe01350c000102000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_before_a_sibling_leaf",
+      "steps": [
+        "raw:parent",
+        "bump:sibling_800002"
+      ],
+      "beef": "0200beef01fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "parent",
+          "beef": "0101010162b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860200beef01fe02350c0001020002bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb010262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    }
+  ],
+  "path_cases": [
+    {
+      "name": "proven_parent_of_the_subject",
+      "steps": [
+        "raw:parent",
+        "raw:child",
+        "bump:alone_800000"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860201000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "set_on": "parent",
+      "set": "left_800001",
+      "subject": "child",
+      "walk": [
+        {
+          "txid": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09",
+          "merkle_path": null,
+          "inputs_linked": [
+            true,
+            true
+          ]
+        },
+        {
+          "txid": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062",
+          "merkle_path": {
+            "block_height": 800000,
+            "root": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062"
+          },
+          "inputs_linked": [
+            false
+          ]
+        }
+      ]
+    },
+    {
+      "name": "proven_subject",
+      "steps": [
+        "raw:parent",
+        "raw:child",
+        "bump:alone_800000"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860201000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "set_on": "parent",
+      "set": "left_800001",
+      "subject": "parent",
+      "walk": [
+        {
+          "txid": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062",
+          "merkle_path": {
+            "block_height": 800000,
+            "root": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062"
+          },
+          "inputs_linked": [
+            false
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unproven_parent_of_the_subject",
+      "steps": [
+        "raw:parent",
+        "raw:child",
+        "raw:grandchild",
+        "bump:alone_800000"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000",
+      "set_on": "child",
+      "set": "child_800003",
+      "subject": "grandchild",
+      "walk": [
+        {
+          "txid": "392fb2c84726416f14a17996bff92077ede0b3609588ea4ebb40348dfa7a3ec5",
+          "merkle_path": null,
+          "inputs_linked": [
+            true
+          ]
+        },
+        {
+          "txid": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09",
+          "merkle_path": {
+            "block_height": 800003,
+            "root": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09"
+          },
+          "inputs_linked": [
+            true,
+            true
+          ]
+        },
+        {
+          "txid": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062",
+          "merkle_path": {
+            "block_height": 800000,
+            "root": "86bd3ea19642568b29bbdc5e6d20fa871ff720cb3b97030c6eee8a8eec5fb062"
+          },
+          "inputs_linked": [
+            false
+          ]
+        }
+      ]
+    },
+    {
+      "name": "proven_parent_with_its_input_in_the_beef",
+      "steps": [
+        "raw:parent",
+        "raw:child",
+        "raw:grandchild",
+        "bump:child_800003"
+      ],
+      "beef": "0200beef01fe03350c0001010002094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa303000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d0070000000000000151000000000100010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000",
+      "set_on": "child",
+      "set": "alone_800000",
+      "subject": "grandchild",
+      "walk": [
+        {
+          "txid": "392fb2c84726416f14a17996bff92077ede0b3609588ea4ebb40348dfa7a3ec5",
+          "merkle_path": null,
+          "inputs_linked": [
+            true
+          ]
+        },
+        {
+          "txid": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09",
+          "merkle_path": {
+            "block_height": 800003,
+            "root": "a36fc2f967e36266e1cb2aa9dd8ec4dfc062803eb6c8fccac4c3e0a0f1744a09"
+          },
+          "inputs_linked": [
+            false,
+            false
+          ]
+        }
+      ]
+    }
+  ]
+}

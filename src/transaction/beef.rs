@@ -109,6 +109,12 @@ pub struct Beef {
     needs_sort: bool,
 }
 
+/// `bump`'s level 0 holds `txid` as a leaf flagged `txid` (the strict match).
+fn flags(bump: &MerklePath, txid: &str) -> bool {
+    let mut level0 = bump.path.first().into_iter().flatten();
+    level0.any(|l| l.txid && l.hash.as_deref() == Some(txid))
+}
+
 impl Beef {
     /// Creates a new empty BEEF with V2 format.
     pub fn new() -> Self {
@@ -242,18 +248,17 @@ impl Beef {
         }
         let find_bump = |txid: &str| bump_by_txid.get(txid).copied();
 
-        // Attach a transaction's own proof; a proven transaction is not
-        // descended (its frame starts with no input left to link).
+        // This BEEF's proof replaces any path the transaction carries, and a
+        // transaction it proves is not descended; one it does not prove is,
+        // a caller's path kept (`Beef.ts:658-666` at `ts-stack@edf6e03`;
+        // until #757 a caller's path was kept and ended the walk).
         let enter = |mut tx: Transaction| -> Frame {
-            if tx.merkle_path.is_none() {
-                if let Some(mp) = find_bump(&tx.id()) {
+            let next_input = match find_bump(&tx.id()) {
+                Some(mp) => {
                     tx.merkle_path = Some(mp.clone());
+                    tx.inputs.len()
                 }
-            }
-            let next_input = if tx.merkle_path.is_some() {
-                tx.inputs.len()
-            } else {
-                0
+                None => 0,
             };
             Frame { tx, next_input }
         };
@@ -309,8 +314,8 @@ impl Beef {
         }
     }
 
-    /// A bare copy of `tx`: the transaction with its BUMP when the BEEF proves
-    /// it, and with every input's `source_transaction` dropped, so no ancestry
+    /// A bare copy of `tx`: the transaction with this BEEF's BUMP in place of
+    /// its own path when the BEEF proves it (#757), and with every input's `source_transaction` dropped, so no ancestry
     /// is duplicated. The ancestry is lifted out before the clone and put back
     /// after, so building a stub never copies a subtree.
     fn bare_stub(tx: &mut Transaction, bump: Option<&MerklePath>) -> Transaction {
@@ -323,10 +328,8 @@ impl Beef {
         for (input, source) in tx.inputs.iter_mut().zip(ancestry) {
             input.source_transaction = source;
         }
-        if stub.merkle_path.is_none() {
-            if let Some(mp) = bump {
-                stub.merkle_path = Some(mp.clone());
-            }
+        if let Some(mp) = bump {
+            stub.merkle_path = Some(mp.clone());
         }
         stub
     }
@@ -362,27 +365,17 @@ impl Beef {
         index
     }
 
-    /// Updates bump indices for transactions proven by a bump.
-    /// Only assigns the bump if the txid appears as a flagged leaf (txid=true).
-    /// This prevents a tx from being claimed by a bump where it appears only
-    /// as a sibling hash. Matches TS SDK behavior where the txid flag is
-    /// checked/set during bump index assignment.
+    /// Gives each entry without an index the merged BUMP when its level 0
+    /// holds the txid as a leaf flagged `txid`, as the reference's
+    /// `#mergeBumpEntry` gives it (`ts-stack@edf6e03` `Beef.ts:774-786`). A
+    /// strict site beside `try_to_validate_bump_index`: the reference's
+    /// `#tryMarkTxProvenByBump` takes any level-0 hash and flags the leaf
+    /// (`:813-822`), a stated difference since v0.3.5 (`ef98e246`).
     fn update_bump_indices(&mut self, bump_index: usize) {
         let bump = &self.bumps[bump_index];
-        for tx in &mut self.txs {
-            if tx.bump_index().is_none() {
-                let txid = tx.txid();
-                // Only assign if the leaf has txid=true (a proper proven tx,
-                // not just a sibling hash used for proof computation)
-                let is_txid_leaf = bump
-                    .path
-                    .first()
-                    .into_iter()
-                    .flatten()
-                    .any(|l| l.txid && l.hash.as_deref() == Some(&txid));
-                if is_txid_leaf {
-                    tx.set_bump_index(Some(bump_index));
-                }
+        for tx in self.txs.iter_mut().filter(|tx| tx.bump_index().is_none()) {
+            if flags(bump, &tx.txid()) {
+                tx.set_bump_index(Some(bump_index));
             }
         }
     }
@@ -448,8 +441,9 @@ impl Beef {
         }
 
         // Replace with txid-only version
-        let new_tx = BeefTx::from_txid(txid.to_string());
-        self.txs[idx] = new_tx;
+        self.txs[idx] = BeefTx::from_txid(txid.to_string());
+        // The BUMP index again, as the reference's `makeTxidOnly` (`Beef.ts:550-565`).
+        self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
         Some(&self.txs[idx])
@@ -464,45 +458,26 @@ impl Beef {
         }
     }
 
-    /// Tries to validate a bump index for a new transaction.
-    ///
-    /// STRICT MATCHING ONLY: assigns `bump_index` if-and-only-if some bump's
-    /// level-0 leaf has `txid=true` AND `hash == tx.txid()`. If no such leaf
-    /// exists, `bump_index` remains `None`.
-    ///
-    /// A previous iteration of this function included a permissive second
-    /// pass that matched ANY leaf hash at level 0 (including sibling hashes
-    /// used only for merkle computation) and mutated the leaf's `txid` flag
-    /// to `true`. That was incorrect: a tx's txid can legitimately appear as
-    /// a sibling hash in an unrelated bump, and marking it as a txid-leaf
-    /// there would claim a proof that does not belong to it.
-    ///
-    /// The Go SDK (`go-sdk/transaction/beef.go:tryToValidateBumpIndex`) only
-    /// validates/discards already-assigned paths and does not auto-discover
-    /// from siblings. This matches that strict semantics. The TS SDK still
-    /// has the permissive variant; fixing it there is a separate effort.
+    /// Gives a new entry without an index the LAST BUMP whose level 0 holds
+    /// its txid as a leaf flagged `txid`, as the reference's
+    /// `#tryToValidateBumpIndex` reads its index (`ts-stack@edf6e03`
+    /// `Beef.ts:1329-1340`, the index a `Map.set` over the BUMPs, `:576-585`);
+    /// the earliest until #757. The match is strict here and at
+    /// `update_bump_indices`, a stated difference since v0.3.5 (`ef98e246`):
+    /// the reference takes any level-0 hash and flags the leaf (`:1334-1338`,
+    /// `:813-822`), as go-sdk@2ca481c's `bumpProves`, `FindBumpByHash` and
+    /// `MergeBump` do (`beef.go:67-83`, `:620-630`, `:780-785`; its
+    /// `tryToValidateBumpIndex`, `:858-868`, only checks a path already set),
+    /// and as this crate's `find_bump` and `verify_structure` read a BUMP.
+    /// BRC-74's flag `00` says a leaf is no client txid, not that it is
+    /// unproven (`transactions/0074.md:75-77` at `5119a9b`).
     fn try_to_validate_bump_index(&mut self, tx_idx: usize) {
         if self.txs[tx_idx].bump_index().is_some() {
             return;
         }
-
         let txid = self.txs[tx_idx].txid();
-
-        // Strict match: leaf has txid=true AND hash == tx.txid().
-        for (i, bump) in self.bumps.iter().enumerate() {
-            let is_txid_leaf = bump
-                .path
-                .first()
-                .map(|level0| {
-                    level0
-                        .iter()
-                        .any(|l| l.txid && l.hash.as_deref() == Some(&txid))
-                })
-                .unwrap_or(false);
-            if is_txid_leaf {
-                self.txs[tx_idx].set_bump_index(Some(i));
-                return;
-            }
+        if let Some(i) = self.bumps.iter().rposition(|b| flags(b, &txid)) {
+            self.txs[tx_idx].set_bump_index(Some(i));
         }
     }
 
@@ -1129,11 +1104,17 @@ impl Beef {
             let mut copy = tx.clone();
             let txid = tx.txid();
             if tx.is_txid_only() {
-                // A txid-only entry is valid when a BUMP of the BEEF proves
-                // it: keep the first that carries it.
-                if let Some(index) = self.bumps.iter().position(|b| b.contains(&txid)) {
-                    keep(index, &mut beef);
-                }
+                // The BUMP its index names, as the reference's
+                // `#copySelectedTransactions` copies it (`Beef.ts:448-470`); else,
+                // this crate's own, the last carrying the txid (the earliest until
+                // #757's fold), where the reference copies none: a txid-only entry
+                // read from bytes has no index on either side.
+                let index = if self.proves(tx) {
+                    tx.bump_index()
+                } else {
+                    self.bumps.iter().rposition(|b| b.contains(&txid))
+                };
+                copy.set_bump_index(index.map(|i| keep(i, &mut beef)));
             } else if let Some(index) = tx.bump_index() {
                 if index >= self.bumps.len() {
                     return Err(crate::Error::BeefError(format!(
@@ -2134,8 +2115,8 @@ mod tests {
         // Regression test for: consolidation failing with "BEEF structure is
         // invalid" because a tx's bump_index was being set to a bump that
         // contained its hash only as a sibling (used only for merkle
-        // computation of some OTHER tx's proof). Go SDK reference:
-        // `go-sdk/transaction/beef.go:tryToValidateBumpIndex` — strict only.
+        // computation of some OTHER tx's proof). The reference and go-sdk
+        // take the sibling (the stated difference at the function).
         let mut beef = Beef::new();
 
         // Build a bump that proves SOME OTHER tx (txid=true for it) and
