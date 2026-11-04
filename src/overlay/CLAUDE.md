@@ -16,11 +16,11 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | `mod.rs` | Module root; re-exports |
 | `types.rs` | Core types (Protocol, TaggedBEEF, Steak, LookupQuestion/Answer, etc.) and constants |
 | `host_reputation_tracker.rs` | Host performance tracking with exponential backoff and rank change events |
-| `facilitators.rs` | HTTP lookup/broadcast facilitators with binary/JSON response parsing |
+| `facilitators.rs` | HTTP lookup/broadcast facilitators with binary/JSON response parsing; #762: a `freeform` answer without a `result` member refused (`Malformed lookup response: ...`), `"result": null` an answer, as the reference's normalizer reads it (`ts-stack@edf6e03` `LookupResolver.ts:430-433`, `Object.hasOwn`); a `formula` answer still parsed (the resolver records it a failure) |
 | `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop; `decode_overlay_admin_token` decodes lock-before alone, as `OverlayAdminTokenTemplate.ts:164` does, a lock-after token refused in that site's `decodeCanonicalPushDrop` words (#537, `tests/overlay_admin_token_lock_position_537.rs`); since #544 it is the reference's static decode and `decode_and_verify_overlay_admin_token` the reference's author check, both through `admin_token_validation.rs` |
 | `admin_token_validation.rs` | #544: `decodeAdvertisement` (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:159-197`; the static decode `:237-239`): the canonical five-field envelope and bounds, SHIP or SLAP, a canonical identity key, an advertisement URI (the https family with path `/`, `wss`, `js8c+bsvauth+smf`; no localhost, no punycode label, no credentials or fragment), a `tm_`/`ls_` name, a canonical DER signature of 8 to 80 bytes; `decodeAndVerifyOverlayAdvertisement` (`:199-222`): the expected protocol, the identity's linked key's signature over the four data fields, the locking key; each refusal in the reference's words. The SLAP discovery (`lookup_resolver.rs`, `LookupResolver.ts:2206`) and the SHIP discovery (`topic_broadcaster.rs`, `SHIPBroadcaster.ts:775`) read through the verifying form. Pinned by `tests/overlay_admin_token_envelope_544.rs` |
 | `historian.rs` | Transaction ancestry traversal for building chronological history |
-| `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing |
+| `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing; #762: `find_competent_hosts` accounts a tracker as the host path accounts a host (`ts-stack@edf6e03` `LookupResolver.ts:1974`, `:2379-2406`): an output list a success, a freeform answer nothing, an error or a formula answer a failure (`Invalid lookup response`), a backed-off tracker skipped. Pinned by `tests/lookup_tracker_accounting_762.rs` |
 | `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order); #760: the host accounting is the reference's (`ts-stack@edf6e03` `LookupResolver.ts:2395-2405`, `ts-sdk@9e3ede6` `:518-528`): any output list, the empty one included, a success; a freeform answer recorded nothing (no backoff cleared); an error or a formula answer a failure (`Invalid lookup response`); a residue: every error a failure here, where `edf6e03` keeps a semantic 4xx rejection neutral (`:816-827`, `:2416`). Pinned by `tests/lookup_host_accounting_760.rs` |
 | `topic_broadcaster.rs` | SHIP topic broadcasting with acknowledgment requirements |
 | `retry.rs` | Public error-text retry for overlay broadcasts: three retries by default, no synchronization; unchanged by #340 |
@@ -140,11 +140,11 @@ impl LookupResolver {
 3. All available hosts are queried in parallel
 4. `OutputList` responses are deduplicated via TX memoization (`txId.outputIndex` as key)
 5. `Freeform` responses return the first successful one; `Formula` responses are not aggregated
-6. Success/failure is recorded in the reputation tracker for each host (any output list a success, a freeform answer nothing, an error or other answer a failure; #760)
+6. Success/failure is recorded in the reputation tracker for each host (any output list a success, a freeform answer nothing, an error or other answer a failure; #760), and for each SLAP tracker the same way (#762)
 
 ### Key Behaviors
 
-- **`find_competent_hosts(service)`**: Public low-level SLAP discovery method. Queries all SLAP trackers in parallel to find hosts advertising a service. Does **not** use the hosts cache or request coalescing (those are in the internal `get_competent_hosts` called by `query`)
+- **`find_competent_hosts(service)`**: Public low-level SLAP discovery method. Queries all SLAP trackers in parallel to find hosts advertising a service. Does **not** use the hosts cache or request coalescing (those are in the internal `get_competent_hosts` called by `query`). Each tracker is accounted as a host (#762): a formula answer or an error a failure, a freeform answer nothing, a tracker in backoff skipped
 - **TX Memoization**: Caches parsed transaction IDs from BEEF, deduplicating outputs using `txId.outputIndex` as the unique key (matches TS SDK behavior). Cache key is comma-separated byte values
 - **Request Coalescing**: Concurrent requests for the same service share a single SLAP tracker query via `tokio::sync::watch` channels
 - **Validation**: Host override service names must start with `ls_` or the constructor will panic

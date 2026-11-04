@@ -370,13 +370,17 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
 
             Ok(LookupAnswer::OutputList { outputs })
         }
-        "freeform" => {
-            let result = json
-                .get("result")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null);
-            Ok(LookupAnswer::Freeform { result })
-        }
+        // Presence, not non-null: `"result": null` is an answer, a missing
+        // member the reference's normalizer's refusal (`ts-stack@edf6e03`
+        // `LookupResolver.ts:430-433`, `Object.hasOwn`; #762).
+        "freeform" => match json.get("result") {
+            Some(result) => Ok(LookupAnswer::Freeform {
+                result: result.clone(),
+            }),
+            None => Err(Error::OverlayError(
+                "Malformed lookup response: a freeform answer without a result member".into(),
+            )),
+        },
         "formula" => {
             let formulas = json
                 .get("formulas")

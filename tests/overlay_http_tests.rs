@@ -1400,7 +1400,9 @@ async fn test_lookup_output_list_missing_outputs_field() {
     }
 }
 
-/// Test lookup with freeform response containing null result.
+/// Test lookup with freeform response containing null result: `"result":
+/// null` is present, an answer (a missing member is refused since #762,
+/// `tests/lookup_tracker_accounting_762.rs`).
 #[tokio::test]
 async fn test_lookup_freeform_null_result() {
     let mock_server = MockServer::start().await;
@@ -1408,8 +1410,8 @@ async fn test_lookup_freeform_null_result() {
     Mock::given(method("POST"))
         .and(path("/lookup"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "type": "freeform"
-            // No "result" field
+            "type": "freeform",
+            "result": null
         })))
         .expect(1)
         .mount(&mock_server)

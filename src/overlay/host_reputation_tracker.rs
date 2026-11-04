@@ -295,9 +295,9 @@ impl HostReputationTracker {
     }
 
     /// Record a failed request: counts it and backs the host off past the
-    /// grace failures, emitting a `RankChangeEvent` on a score change. The
-    /// resolver records one for an error or an answer neither an output list
-    /// nor freeform; any output list is a success, a freeform answer nothing
+    /// grace failures, emitting a `RankChangeEvent` on a score change. On the host and the
+    /// SLAP tracker paths (#762) the resolver records one for an error or an answer neither an
+    /// output list nor freeform; any output list is a success, a freeform answer nothing
     /// (`ts-stack@edf6e03` `LookupResolver.ts:2395-2405`, `ts-sdk@9e3ede6` `:518-528`; #760).
     pub fn record_failure(&self, host: &str, reason: Option<&str>) {
         let now = now_ms();

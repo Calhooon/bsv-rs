@@ -303,7 +303,9 @@ impl LookupResolver {
     ///
     /// Queries all available SLAP trackers in parallel to discover hosts that
     /// advertise the specified service. Each tracker response is parsed as a
-    /// SLAP admin token to extract the host domain.
+    /// SLAP admin token to extract the host domain. Each tracker is accounted
+    /// as a host is (#760, #762): an output list a success, a freeform answer
+    /// nothing, an error or a formula answer a failure.
     ///
     /// This is the low-level discovery method. It does **not** use the hosts
     /// cache or request coalescing (those are handled by `get_competent_hosts`,
@@ -376,9 +378,13 @@ impl LookupResolver {
                         }
                     }
                 }
-                Ok(_) => {
-                    // Non-output-list response from SLAP tracker
-                }
+                // A tracker's question is the reference's tracked call too
+                // (`ts-stack@edf6e03` `LookupResolver.ts:1974`, #762): a
+                // freeform answer neutral, a formula one a failure (`:2399-2405`).
+                Ok(LookupAnswer::Freeform { .. }) => {}
+                Ok(LookupAnswer::Formula { .. }) => self
+                    .reputation_tracker
+                    .record_failure(&tracker, Some("Invalid lookup response")),
                 Err(e) => {
                     self.reputation_tracker
                         .record_failure(&tracker, Some(&e.to_string()));
