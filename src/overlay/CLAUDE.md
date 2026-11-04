@@ -21,7 +21,7 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | `admin_token_validation.rs` | #544: `decodeAdvertisement` (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:159-197`; the static decode `:237-239`): the canonical five-field envelope and bounds, SHIP or SLAP, a canonical identity key, an advertisement URI (the https family with path `/`, `wss`, `js8c+bsvauth+smf`; no localhost, no punycode label, no credentials or fragment), a `tm_`/`ls_` name, a canonical DER signature of 8 to 80 bytes; `decodeAndVerifyOverlayAdvertisement` (`:199-222`): the expected protocol, the identity's linked key's signature over the four data fields, the locking key; each refusal in the reference's words. The SLAP discovery (`lookup_resolver.rs`, `LookupResolver.ts:2206`) and the SHIP discovery (`topic_broadcaster.rs`, `SHIPBroadcaster.ts:775`) read through the verifying form. Pinned by `tests/overlay_admin_token_envelope_544.rs` |
 | `historian.rs` | Transaction ancestry traversal for building chronological history |
 | `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing |
-| `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order) |
+| `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order); #760: the host accounting is the reference's (`ts-stack@edf6e03` `LookupResolver.ts:2395-2405`, `ts-sdk@9e3ede6` `:518-528`): any output list, the empty one included, a success; a freeform answer recorded nothing (no backoff cleared); an error or a formula answer a failure (`Invalid lookup response`); a residue: every error a failure here, where `edf6e03` keeps a semantic 4xx rejection neutral (`:816-827`, `:2416`). Pinned by `tests/lookup_host_accounting_760.rs` |
 | `topic_broadcaster.rs` | SHIP topic broadcasting with acknowledgment requirements |
 | `retry.rs` | Public error-text retry for overlay broadcasts: three retries by default, no synchronization; unchanged by #340 |
 | `wallet_retry.rs`, `wallet_retry_tests.rs` | #340: the reference wallet-evidence rule moved from identity, shared by revocation and the global store; five attempts, competing BEEF synchronization, original wallet error and caller error category preserved; five classification/boundary tests |
@@ -140,7 +140,7 @@ impl LookupResolver {
 3. All available hosts are queried in parallel
 4. `OutputList` responses are deduplicated via TX memoization (`txId.outputIndex` as key)
 5. `Freeform` responses return the first successful one; `Formula` responses are not aggregated
-6. Success/failure is recorded in the reputation tracker for each host
+6. Success/failure is recorded in the reputation tracker for each host (any output list a success, a freeform answer nothing, an error or other answer a failure; #760)
 
 ### Key Behaviors
 

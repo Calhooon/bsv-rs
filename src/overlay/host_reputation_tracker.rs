@@ -294,11 +294,11 @@ impl HostReputationTracker {
         }
     }
 
-    /// Record a failed request.
-    ///
-    /// Increments failure counters and applies exponential backoff
-    /// after the grace period is exceeded. Emits a `RankChangeEvent`
-    /// if the host's computed reputation score changes.
+    /// Record a failed request: counts it and backs the host off past the
+    /// grace failures, emitting a `RankChangeEvent` on a score change. The
+    /// resolver records one for an error or an answer neither an output list
+    /// nor freeform; any output list is a success, a freeform answer nothing
+    /// (`ts-stack@edf6e03` `LookupResolver.ts:2395-2405`, `ts-sdk@9e3ede6` `:518-528`; #760).
     pub fn record_failure(&self, host: &str, reason: Option<&str>) {
         let now = now_ms();
         let mut entries = self.entries.write().unwrap_or_else(PoisonError::into_inner);
