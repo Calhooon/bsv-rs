@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `discover_certificates` and `discover_certificates_by_type` keep only the asked subject's certificates, the rule `resolve_by_identity_key` carries from the reference (#739)
+
+From the scoped cold re-read of PR #738 (#737, 2026-11-04 03:4xZ), a residual
+outside that row: `IdentityClient::discover_certificates(identity_key)` and
+`discover_certificates_by_type(identity_key, cert_type)` returned every
+certificate the parser admitted, whatever its subject, so an overlay host
+answering a by-key discovery with another subject's certificate had it shown
+as the asked key's. Both now keep only certificates whose subject is the
+asked key, compared as `resolve_by_identity_key` compares since #737 (the
+subject's compressed hex against the asked key lower-cased, the reference's
+`filterCertificatesByIdentityKey`, `ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:247-255`, called
+at `Wallet.ts:1012`); one private helper, `is_asked_subject`, serves the
+three doors, and the two `discover_*` doors share one private walk. The walk
+and the error path are unchanged: every output parsed in order, a skipped
+one passed over, a `limit` anywhere failing the call (#730). `discover_certificates(identity_key)` is this crate's door for the BRC-100
+wallet's `discoverByIdentityKey` (`packages/sdk/src/wallet/Wallet.interfaces.ts:989-1001,1296-1299`;
+the toolbox's `Wallet.ts:966-1015`, the subject filter at `:1012`), the path
+whose parsers this crate ports (#553, #730, #737), so the filter is a parity
+rule (the rule read of PR #742); `discover_certificates_by_type` has no
+counterpart (`DiscoverByIdentityKeyArgs` carries no type), and the
+certificates' type is not checked here (#744).
+
+`tests/identity_discover_subject_739.rs` serves the #737 vector's shapes
+(`tests/vectors/identity_resolve_737.json`, unchanged, rebuilt by this
+crate's writer to the recorded SHA-256) through both doors on an injected
+`.invalid` resolver, the asked key lower- and upper-cased, the expected
+subjects the reference's identities on the same shapes: another subject's
+certificate alone (`other_subject_alone`, `[]`), then the asked one's
+(`other_subject_then_asked` and `skipped_then_other_subject_then_asked`, the
+asked one alone), and the control, the subject's two certificates, both
+returned. `tests/identity_lock_position_537.rs` asked `discover_certificates`
+for `02aa`, which the filter would answer `[]` whatever the parser did; it
+now asks the token's own subject (read from its certificate JSON; a key-only
+token carries none), so its skip stays a pin. On `13cd2c74` (the test
+overlaid) both door tests are RED:
+``assertion `left == right` failed: other_subject_alone, upper-cased false``,
+`left: ["03a0434d9e47f3c86235477c7b1ae6ae5d3442d49b1943c2b752a68e2a47e247c7"]`,
+`right: []`; the control GREEN there. On the tip all three GREEN.
+
+Semver: a behaviour change at two public doors without a signature change:
+`discover_certificates` and `discover_certificates_by_type` drop a
+certificate whose subject is not the asked key, where they returned it.
+Migration: none.
+
+### Notes: cross-SDK parity (#739)
+
+What the wallet's `discoverByIdentityKey` door does that `discover_certificates`
+does not (`ts-stack@edf6e03` `Wallet.ts:966-1015`): the overlay query is sent
+as `{identityKey, certifiers}` (`:1004`) where this crate sends
+`{identityKey, certificatesOnly: true}`; the certificates are filtered and
+sorted by the wallet's trust step with `certifierInfo` attached (`:1010-1011`),
+unported here (the #737 row); a page of offset and limit (default 10, at most
+10000) with `totalCertificates` (`:228-233`, `validationHelpers.ts:1540-1543`)
+where this crate returns every admitted certificate; the asked key is trimmed
+and lower-cased by `validateHexString` (`:522-533`), so a space-padded key is
+found there and answers `[]` here, and a malformed or uncompressed key is
+refused there and answers `Ok([])` here after a lookup; a contact-source
+shortcut (`:983-992`) and the `IdentityCertificate` result type. The by-type
+door's unchecked certificate type is #744.
+
 ### Tests: the evidence check's bounds pinned graph-wide across a proven ancestor, a parent raw and txid-only in both orders, and the limit error at every discovery door (#736)
 
 No behaviour change. #733's strength read named three gaps in #730's pins,

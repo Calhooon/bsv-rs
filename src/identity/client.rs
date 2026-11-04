@@ -643,11 +643,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         // the reference returns every one (IdentityClient.ts:568-571)
         match answer {
             LookupAnswer::OutputList { outputs } => {
-                let expected = identity_key.to_lowercase();
                 let mut first = None;
                 for output in &outputs {
                     if let Some(cert) = self.parse_output_to_certificate(output).await? {
-                        if first.is_none() && cert.subject_hex() == expected {
+                        if first.is_none()
+                            && is_asked_subject(cert.certificate.subject(), identity_key)
+                        {
                             first = Some(Self::parse_identity(&cert));
                         }
                     }
@@ -739,7 +740,13 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
     /// Discover all certificates for an identity.
     ///
-    /// Returns all certificates that the identity has revealed.
+    /// Returns the certificates the identity has revealed: every output of
+    /// the lookup answer parsed in order, a skipped one passed over, and only
+    /// certificates whose subject is `identity_key` kept (compared
+    /// lower-cased, the rule [`Self::resolve_by_identity_key`] carries from
+    /// the reference's `filterCertificatesByIdentityKey`; this door is the
+    /// BRC-100 wallet's `discoverByIdentityKey`, whose trust step, page and
+    /// argument check are not ported, #739).
     ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
@@ -749,33 +756,16 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         identity_key: &str,
     ) -> Result<Vec<VerifiableCertificate>> {
-        let question = LookupQuestion::new(
-            "ls_identity",
-            serde_json::json!({
-                "identityKey": identity_key,
-                "certificatesOnly": true
-            }),
-        );
-
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut certificates = Vec::new();
-
-                for output in &outputs {
-                    if let Some(cert) = self.parse_output_to_verifiable_certificate(output).await? {
-                        certificates.push(cert);
-                    }
-                }
-
-                Ok(certificates)
-            }
-            _ => Ok(Vec::new()),
-        }
+        let query = serde_json::json!({ "identityKey": identity_key, "certificatesOnly": true });
+        self.discover_of_subject(identity_key, query).await
     }
 
     /// Discover certificates of a specific type.
+    ///
+    /// Keeps only certificates whose subject is `identity_key`, as
+    /// [`Self::discover_certificates`] does (#739). This door has no reference
+    /// counterpart; `cert_type` goes to the overlay query and the returned
+    /// certificates' type is not checked here (#744).
     ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
@@ -787,30 +777,32 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         identity_key: &str,
         cert_type: &str,
     ) -> Result<Vec<VerifiableCertificate>> {
-        let question = LookupQuestion::new(
-            "ls_identity",
-            serde_json::json!({
-                "identityKey": identity_key,
-                "certificateType": cert_type
-            }),
-        );
+        let query =
+            serde_json::json!({ "identityKey": identity_key, "certificateType": cert_type });
+        self.discover_of_subject(identity_key, query).await
+    }
 
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut certificates = Vec::new();
-
-                for output in &outputs {
-                    if let Some(cert) = self.parse_output_to_verifiable_certificate(output).await? {
-                        certificates.push(cert);
-                    }
-                }
-
-                Ok(certificates)
+    /// The two `discover_*` doors' walk: every output parsed in order, a
+    /// limit anywhere the call's refusal (#730), then only the asked
+    /// subject's certificates (#739).
+    async fn discover_of_subject(
+        &self,
+        identity_key: &str,
+        query: serde_json::Value,
+    ) -> Result<Vec<VerifiableCertificate>> {
+        let question = LookupQuestion::new("ls_identity", query);
+        let LookupAnswer::OutputList { outputs } = self.resolver.query(&question, None).await?
+        else {
+            return Ok(Vec::new());
+        };
+        let mut certificates = Vec::new();
+        for output in &outputs {
+            if let Some(cert) = self.parse_output_to_verifiable_certificate(output).await? {
+                certificates.push(cert);
             }
-            _ => Ok(Vec::new()),
         }
+        certificates.retain(|cert| is_asked_subject(cert.subject(), identity_key));
+        Ok(certificates)
     }
 
     /// Query identities with complex filters.
@@ -1074,6 +1066,13 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             Ok(false) | Err(_) => Ok(None), // Signature verification failed
         }
     }
+}
+
+/// Whether `subject` is the asked key, both lower-cased as the reference's
+/// `filterCertificatesByIdentityKey` compares (`identityUtils.ts:247-255`,
+/// `Wallet.ts:1012`): the one rule of the three by-key doors (#737, #739).
+fn is_asked_subject(subject: &crate::primitives::PublicKey, identity_key: &str) -> bool {
+    subject.to_hex() == identity_key.to_lowercase()
 }
 
 #[cfg(test)]
