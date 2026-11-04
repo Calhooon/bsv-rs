@@ -232,3 +232,7 @@ fn enqueue_unconfirmed_parents<'a>(
 #[cfg(test)]
 #[path = "evidence_730_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "evidence_736_tests.rs"]
+mod tests_736;
