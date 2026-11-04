@@ -7,6 +7,7 @@ complete run and carries every other figure with its run (docs/NIGHTLY.md).
 
 import argparse
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -730,21 +731,177 @@ COMPLETE_RUN_MUTANTS = {"script": 2059, "beef": 748, "merkle": 101, "wire": 793,
 # A hosted job's limit (`timeout-minutes: 360` on the mutants job).
 JOB_MINUTES = 360
 NIGHT_SHARD_MINUTES = 45
-# The night shares the account with pull requests and the fleet's other nights
-# (the balance rule of 2026-10-26): six slots.
-NIGHT_PARALLEL = 6
-# The fleet's runner cap (the keeper's line of 10:0xZ 2026-11-03, on the opening
-# API read of the pool; 14 from 06:2xZ until then): the account's twenty hosted
-# runners are one pool across bsv-rs, the CLI, the toolbox and the stack, peaking
-# at twenty in 22 of 24 hours with a non-heavy p95 of 14, so a heavy run holds at
-# most six; the complete run's twenty-three shards go in four waves, 6, 6, 6 and 5. It
-# rises only when an occupancy read shows the p95 under 10.
-# The one place the number lives (GitHub reads no `env` in `strategy`; the
-# mutants job reads it from the plan's `max_parallel` output); its owner is loop
-# four's #675, which reads the account's occupancy from the API and moves it.
-# tests/arch_nightly_cap.rs refuses it above 6.
-HEAVY_MAX_PARALLEL = 6
+# The heavy-run cap by window (#791, the owner's word of 2026-11-04 17:1xZ through
+# the keeper, amending the balance rule of 2026-10-26 and the fleet's cap of 10:0xZ
+# 2026-11-03, six of the twenty in every hour until then): a heavy hosted run (a
+# complete mutation run, a nightly) takes up to WINDOW_PARALLEL of the account's
+# twenty slots inside its own window when no other heavy run of the account is
+# scheduled in that window, SHARED_PARALLEL otherwise. The word names a nightly a
+# heavy run, so the incremental night takes the same rule (its six of the balance
+# rule, NIGHT_PARALLEL until #791, is gone). The one place the figure lives (GitHub
+# reads no `env` in `strategy`; the mutants and fuzz matrices read the plan's
+# `max_parallel` output); its owner is loop four's #675, which reads the account's
+# occupancy from the API and moves it. tests/arch_nightly_cap.rs refuses the window's
+# figure above 14, the shared one above 6 and the input's bound above 20.
+WINDOW_PARALLEL = 14
+SHARED_PARALLEL = 6
+# The dispatch's `heavy_max_parallel` input overrides the window for one run, inside
+# the account's twenty slots.
+PARALLEL_BOUNDS = (1, 20)
+# The keeper's windows table (#791): one row per window, its UTC hours [start, end),
+# its owner, whether it is this crate's, and the keeper's source. A later word edits a
+# row, not the code. A window past midnight wraps (start > end). A row without hours
+# matches no dispatch.
+HEAVY_WINDOWS = (
+    {"start": 1, "end": 9, "ours": True,
+     "owner": "bsv-rs: the complete run's 01:00Z slot, the incremental night's 07:00Z and the pin-chain dispatches",
+     "source": "#791, the owner's word of 2026-11-04 17:1xZ through the keeper"},
+    {"start": 17, "end": 20, "ours": False,
+     "owner": "bsv-wallet-cli: its night",
+     "source": "#791, the keeper's table of 2026-11-04 18:0xZ (it supersedes the one-hour entries of 2026-11-03)"},
+    {"start": 20, "end": 1, "ours": False,
+     "owner": "wallet-toolbox: its night",
+     "source": "#791, the keeper's table of 2026-11-04 18:0xZ (it supersedes the one-hour entries of 2026-11-03)"},
+)
+# The day, 09:00Z to 17:00Z, is every repository's PR CI at six: outside every window.
+
+
+def window_text(row):
+    return f"{row['owner']}, {row['start']:02d}:00Z to {row['end']:02d}:00Z"
+
+
+def windows_at(at):
+    """The rows of HEAVY_WINDOWS holding `at`'s hour: [start, end), a window past
+    midnight wrapping, a row without hours holding none."""
+    hour = at.hour
+    def holds(row):
+        if row["start"] is None:
+            return False
+        if row["start"] < row["end"]:
+            return row["start"] <= hour < row["end"]
+        return hour >= row["start"] or hour < row["end"]
+    return [row for row in HEAVY_WINDOWS if holds(row)]
+
+
+def own_window(at):
+    """This crate's window row when `at` is inside it and inside no other run's, else None."""
+    here = windows_at(at)
+    if any(not row["ours"] for row in here):
+        return None
+    return next((row for row in here if row["ours"]), None)
+
+
+def heavy_max_parallel(at, override=None):
+    """The heavy run's slots at `at` (a UTC datetime) and why (#791).
+
+    The dispatch's input, when given, over the window, bounded to PARALLEL_BOUNDS;
+    else WINDOW_PARALLEL inside this crate's window with no other heavy run's
+    window at the hour, SHARED_PARALLEL otherwise. The figure of the run's opening
+    waves: `split_tail` moves the waves projected past the window's end to six.
+    """
+    if override is not None and str(override).strip() != "":
+        text = str(override).strip()
+        low, high = PARALLEL_BOUNDS
+        if not re.fullmatch(r"[0-9]+", text) or not low <= int(text) <= high:
+            raise SystemExit(f"heavy_max_parallel: `{text}` is not an integer from "
+                             f"{low} to {high} (the account's slots)")
+        return int(text), f"the dispatch input heavy_max_parallel={int(text)}"
+    clock = at.strftime("%H:%MZ")
+    here = windows_at(at)
+    others = [row for row in here if not row["ours"]]
+    if others:
+        return SHARED_PARALLEL, (f"at {clock}, inside another heavy run's window ("
+                                 f"{'; '.join(window_text(r) for r in others)})")
+    if here:
+        return WINDOW_PARALLEL, f"at {clock}, inside this crate's window ({window_text(here[0])})"
+    return SHARED_PARALLEL, f"at {clock}, outside every window"
 RECORD_ARTIFACT = "mutation-record"
+
+
+# The tail (#791, the keeper's word of 2026-11-04 18:0xZ): "a run overrunning its
+# window drops to six for the waves after the window's end: the plan's shard estimates
+# project each wave's end at dispatch, the waves projected inside 01:00Z to 09:00Z run
+# at fourteen and those past it at six [...] never fourteen into the CLI's window."
+# The waves are the matrix's order cut into runs of the window's figure, each starting
+# when the previous one's longest shard ends; a shard's minutes are the last complete
+# record's `job_minutes` in the tree (a shard's minutes do not move with the figure,
+# only the waves do), a shard the record does not name its surface's longest there.
+# An incremental night's shards are not the complete run's (other files, other
+# counts): their minutes are the plan's own estimates, the keeper's "the plan's shard
+# estimates" (NIGHT_SHARD_MINUTES a shard at most, by the night's sizing).
+RECORDS_GLOB = "docs/census/mutants-*.json"
+
+
+def recorded_shard_minutes(repo=Path(".")):
+    """The newest record in the tree with shards: its path and {(surface, shard): minutes}."""
+    for path in sorted((Path(repo) / "docs/census").glob("mutants-*.json"), reverse=True):
+        shards = json.loads(path.read_text()).get("shards") or []
+        if shards:
+            return (path.relative_to(repo).as_posix(),
+                    {(row["surface"], row["shard"]): row["job_minutes"] for row in shards})
+    return None, {}
+
+
+def shard_estimate(row, minutes):
+    """A matrix row's minutes: the record's, else its surface's longest there, else the
+    record's longest, else the plan's own estimate (no record in the tree)."""
+    if (row["surface"], row["shard"]) in minutes:
+        return minutes[(row["surface"], row["shard"])]
+    surface = [m for (s, _), m in minutes.items() if s == row["surface"]]
+    if surface or minutes:
+        return max(surface or minutes.values())
+    return row.get("estimated_minutes", 0)
+
+
+def window_end(row, at):
+    """The end of the window `row` holding `at`, a datetime."""
+    end = at.replace(hour=row["end"], minute=0, second=0, microsecond=0)
+    return end if end > at else end + timedelta(days=1)
+
+
+def project_waves(matrix, minutes, at, figure):
+    """Each wave of `figure` shards in matrix order and its projected end."""
+    waves, clock = [], at
+    for start in range(0, len(matrix), figure):
+        wave = matrix[start:start + figure]
+        clock = clock + timedelta(minutes=max(shard_estimate(r, minutes) for r in wave))
+        waves.append((wave, clock))
+    return waves
+
+
+def split_tail(matrix, at, figure, reason, override=None, recorded=(None, {})):
+    """The window's shards at `figure`, the tail at SHARED_PARALLEL, and the reason (#791).
+
+    Outside this crate's window, or the matrix empty: no tail, the figure as given.
+    Inside it, the waves projected to end at or before the window's end run at the
+    figure (the window's, or the dispatch input's) and the rest are the tail at six; a
+    run whose opening wave already ends past the window runs whole at six.
+    """
+    row = own_window(at)
+    if row is None or not matrix:
+        return list(matrix), [], figure, reason
+    source, minutes = recorded
+    end = window_end(row, at)
+    waves = project_waves(matrix, minutes, at, figure)
+    def clock(when):
+        return when.strftime("%H:%MZ") + ("" if when.date() == at.date() else " the next day")
+    window = [r for wave, ends in waves if ends <= end for r in wave]
+    tail = [r for wave, ends in waves if ends > end for r in wave]
+    ends = ", ".join(clock(e) for _, e in waves)
+    by = f"by {end.strftime('%H:%MZ')}"
+    told = (f"{reason}; the waves of {figure} projected from "
+            f"{source or 'the plan estimates'} end at {ends}")
+    if override is not None and str(override).strip() != "":
+        told += " (the input sets the window's waves; the tail stays six)"
+    if not window:
+        return list(matrix), [], SHARED_PARALLEL, (
+            f"{told}: the opening wave ends past the window, every one of the "
+            f"{len(matrix)} shards at {SHARED_PARALLEL}")
+    if not tail:
+        return window, [], figure, f"{told}: every wave ends {by}, all {len(window)} shards at {figure}"
+    return window, tail, figure, (
+        f"{told}: the {len(window)} shards of the waves ending {by} at {figure}, "
+        f"the {len(tail)} after them the tail at {SHARED_PARALLEL}")
 # A change to these reaches every measured file, whatever it touches.
 EVERYTHING = {
     "Cargo.toml": "the manifest: a dependency, a feature or a profile reaches every file that uses it",
@@ -1187,11 +1344,25 @@ def plan(args):
                                     base_record["files"] if base_record else None,
                                     {s: len(t) for s, t in result["surface_tests"].items()})
     result["shards"] = len(result["matrix"])
-    result["max_parallel"] = HEAVY_MAX_PARALLEL if result["mode"] == "complete" else NIGHT_PARALLEL
+    at = getattr(args, "at", None) or datetime.now(timezone.utc)
+    result["max_parallel"], result["max_parallel_reason"] = heavy_max_parallel(
+        at, getattr(args, "max_parallel", None))
+    # #791's tail: the waves projected past this crate's window run at six after it.
+    window, tail, result["max_parallel"], result["max_parallel_reason"] = split_tail(
+        result["matrix"], at, result["max_parallel"], result["max_parallel_reason"],
+        getattr(args, "max_parallel", None),
+        recorded_shard_minutes(repo) if result["mode"] == "complete" else (None, {}))
+    result["matrix_window"], result["matrix_tail"] = window, tail
+    result["shards_tail"], result["max_parallel_tail"] = len(tail), SHARED_PARALLEL
+    # The fuzz stage starts after the last shard: the tail's figure when there is one.
+    result["max_parallel_fuzz"] = SHARED_PARALLEL if tail else result["max_parallel"]
     result["carried"] = sorted(set(measured) - files)
     write_json(args.output, result)
     print(json.dumps({k: result[k] for k in ("mode", "why_complete", "base", "files", "matrix",
-                                              "shards", "max_parallel")}, indent=2))
+                                              "shards", "max_parallel",
+                                              "max_parallel_reason", "shards_tail",
+                                              "max_parallel_tail", "max_parallel_fuzz")},
+                     indent=2))
     print(f"{sum(map(len, by_surface.values()))} files measured tonight, "
           f"{len(result['carried'])} carried")
     print(selection_line(result))
@@ -1201,8 +1372,15 @@ def plan(args):
             output.write(f"mode={result['mode']}\n")
             output.write(f"shards={result['shards']}\n")
             output.write(f"max_parallel={result['max_parallel']}\n")
+            output.write(f"max_parallel_reason={result['max_parallel_reason']}\n")
+            output.write(f"shards_tail={result['shards_tail']}\n")
+            output.write(f"max_parallel_tail={result['max_parallel_tail']}\n")
+            output.write(f"max_parallel_fuzz={result['max_parallel_fuzz']}\n")
             output.write(f"lockfile={result['lockfile']}\n")
-            output.write(f"matrix={json.dumps(result['matrix'], separators=(',', ':'))}\n")
+            # The mutants job's matrix is the window's waves, the tail job's the rest;
+            # plan.json's `matrix` stays every shard, the score's planned set.
+            output.write(f"matrix={json.dumps(result['matrix_window'], separators=(',', ':'))}\n")
+            output.write(f"matrix_tail={json.dumps(result['matrix_tail'], separators=(',', ':'))}\n")
     return 0
 
 
@@ -1288,6 +1466,13 @@ def merge(night, the_plan, base_record, floors, run_id):
             errors.append(f"floor has no measured file: {file}")
     run = {"run_id": run_id, "commit": commit, "mode": the_plan["mode"],
            "files": len(tonight), "callee_added": len(the_plan.get("callee_added", []))}
+    # #791: the slots the run held and why, so the record says "at fourteen".
+    if "max_parallel" in the_plan:
+        run["max_parallel"] = the_plan["max_parallel"]
+        run["max_parallel_reason"] = the_plan.get("max_parallel_reason")
+    if the_plan.get("shards_tail"):
+        run["shards_tail"] = the_plan["shards_tail"]
+        run["max_parallel_tail"] = the_plan["max_parallel_tail"]
     if the_plan["mode"] == "complete":
         complete_run, runs = {"run_id": run_id, "commit": commit}, [run]
     else:
@@ -1502,6 +1687,10 @@ def main():
                          help="the directory of the record to carry from (absent: complete)")
     planner.add_argument("--repo", type=Path, default=Path("."))
     planner.add_argument("--output", type=Path, required=True)
+    planner.add_argument("--max-parallel", default=None,
+                         help="the dispatch's heavy_max_parallel input, 1 to 20 (empty: the window, #791)")
+    planner.add_argument("--at", type=lambda text: datetime.fromisoformat(text).astimezone(timezone.utc),
+                         default=None, help="the time to read the windows at, ISO 8601 (default: now, UTC, the plan step's clock; the workflow passes none)")
     planner.set_defaults(func=plan)
     finder = subs.add_parser("latest-record", help="download the record the night carries from")
     finder.add_argument("--line", required=True)

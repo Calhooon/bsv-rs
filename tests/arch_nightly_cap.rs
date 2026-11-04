@@ -1,21 +1,23 @@
-//! Every heavy run on the runners holds at most six of the account's twenty.
+//! Every heavy run on the runners holds the slots of its window: fourteen of the account's
+//! twenty inside its own, six outside.
 //!
-//! The fleet's runner cap (the keeper's line of 10:0xZ 2026-11-03, on the opening API read of
-//! the pool, after 14 from 06:2xZ; `docs/lanes/ci-speed-7.md`, "The fleet's runner cap"): the
-//! account's twenty hosted runners are one pool across bsv-rs, the CLI, the toolbox and the
-//! stack, at twenty in 22 of 24 hours with a non-heavy p95 of 14 slots, and a complete
-//! nightly that put its twenty shards on them in one wave (run 41579707627) held PR #679's
-//! twelve-minute job 52 minutes in the queue. The cap rises when a read shows that p95
-//! under 10. Every matrix that is a heavy run (a job that runs mutants or
-//! fuzzes) carries `max-parallel` at most [`HEAVY_MAX_PARALLEL`]. GitHub reads no `env`
-//! in `strategy`, so a matrix writes the literal or reads the mutation plan's output,
-//! whose number is `HEAVY_MAX_PARALLEL` in `.github/scripts/nightly_mutants.py` (its
-//! owner loop four's #675). This guard reads every `.github/workflows/*.yml` and that
-//! script (nothing else; no network, no environment) at the string level and refuses,
-//! naming it: a heavy matrix without `max-parallel`, a literal above the cap, a reading
-//! of anything but the plan's output, a plan whose constants pass the cap or whose
-//! complete run does not take `HEAVY_MAX_PARALLEL`, and the two heavy jobs gone from the
-//! nightly (so the guard cannot pass by finding nothing). `ci.yml`'s two matrices (the Test
+//! The heavy-run cap by window (#791, the owner's word of 2026-11-04 17:1xZ through the
+//! keeper, amending the fleet's runner cap of six of 10:0xZ 2026-11-03, `docs/lanes/ci-speed-7.md`,
+//! "The fleet's runner cap"): the account's twenty hosted runners are one pool across bsv-rs,
+//! the CLI, the toolbox and the stack; a heavy hosted run (a complete mutation run, a nightly)
+//! takes up to [`WINDOW_MAX_PARALLEL`] inside its own window when no other heavy run of the
+//! account is scheduled there, [`SHARED_MAX_PARALLEL`] otherwise, and a dispatch input
+//! overrides it for one run inside [`INPUT_MAX_PARALLEL`]. GitHub reads no `env` in
+//! `strategy`, so the nightly's two heavy matrices (the mutant shards, the fuzz targets) read
+//! the mutation plan's output, whose figure is `heavy_max_parallel` over `HEAVY_WINDOWS` in
+//! `.github/scripts/nightly_mutants.py` (its owner loop four's #675); a heavy matrix of any
+//! other workflow writes a literal at most six. This guard reads every
+//! `.github/workflows/*.yml` and that script (nothing else; no network, no environment) at the
+//! string level and refuses, naming it: a heavy matrix without `max-parallel`, a literal on
+//! the nightly's two matrices or above six elsewhere, a reading of anything but the plan's
+//! output, a plan whose figures pass fourteen, six or twenty or that does not hand out
+//! `heavy_max_parallel`, and the two heavy jobs gone from the nightly (so the guard cannot pass
+//! by finding nothing). `ci.yml`'s two matrices (the Test
 //! Suite cells, the dependents) are not heavy on a pull request, but the nightly dispatches the
 //! whole file on each line: they carry `max-parallel` at most 6 too, and the nightly dispatches
 //! beta's run, waits for it, then main's (#682's second fold, the keeper's word (a)); the run
@@ -29,14 +31,43 @@
 use std::fs;
 use std::path::PathBuf;
 
-/// The cap: a heavy run holds at most six of the twenty runners.
-const HEAVY_MAX_PARALLEL: u32 = 6;
+/// Inside its own window a heavy run holds at most fourteen of the twenty runners (#791).
+const WINDOW_MAX_PARALLEL: u32 = 14;
 
-/// The one reading of the plan the mutants matrix may make.
+/// Outside it, and on every matrix that does not read the plan, at most six.
+const SHARED_MAX_PARALLEL: u32 = 6;
+
+/// The dispatch input's bound: the account's twenty slots.
+const INPUT_MAX_PARALLEL: u32 = 20;
+
+/// The heavy matrices that must read the plan, never a literal, each with the one reading of
+/// the plan it may make (#791): the window's waves, the tail after them at six (#791's fold,
+/// the keeper's word of 2026-11-04 18:0xZ) and the fuzz stage after the last shard.
+const PLAN_MATRICES: [(&str, &str); 3] = [
+    ("nightly.yml mutants", PLAN_READING),
+    ("nightly.yml mutants-tail", TAIL_READING),
+    ("nightly.yml fuzz", FUZZ_READING),
+];
+
+/// The reading of the window's figure.
 const PLAN_READING: &str = "${{ fromJSON(needs.source.outputs.max_parallel) }}";
 
-/// The plan's line that gives the complete run the cap and a night its six.
-const PLAN_LINE: &str = "result[\"max_parallel\"] = HEAVY_MAX_PARALLEL if result[\"mode\"] == \"complete\" else NIGHT_PARALLEL";
+/// The reading of the tail's figure (#791's fold).
+const TAIL_READING: &str = "${{ fromJSON(needs.source.outputs.max_parallel_tail) }}";
+
+/// The reading of the fuzz stage's figure: the window's, six after a tail (#791's fold).
+const FUZZ_READING: &str = "${{ fromJSON(needs.source.outputs.max_parallel_fuzz) }}";
+
+/// The plan's line that hands out the window's figure and its reason (#791).
+const PLAN_LINE: &str =
+    "result[\"max_parallel\"], result[\"max_parallel_reason\"] = heavy_max_parallel(";
+
+/// The plan's lines that split the waves past the window into the tail, and set the tail's
+/// figure to the shared six (#791's fold).
+const TAIL_LINES: [&str; 2] = [
+    "window, tail, result[\"max_parallel\"], result[\"max_parallel_reason\"] = split_tail(",
+    "result[\"shards_tail\"], result[\"max_parallel_tail\"] = len(tail), SHARED_PARALLEL",
+];
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -108,22 +139,52 @@ fn constant(plan: &str, name: &str) -> Option<u32> {
         .and_then(|value| value.trim().parse().ok())
 }
 
-/// What is wrong with the plan's cap: its constants and the line that hands it out.
+/// The plan's `PARALLEL_BOUNDS = (low, high)`.
+fn bounds(plan: &str) -> Option<(u32, u32)> {
+    let value = plan
+        .lines()
+        .find_map(|line| line.strip_prefix("PARALLEL_BOUNDS = "))?;
+    let (low, high) = value
+        .trim()
+        .strip_prefix('(')?
+        .strip_suffix(')')?
+        .split_once(',')?;
+    Some((low.trim().parse().ok()?, high.trim().parse().ok()?))
+}
+
+/// What is wrong with the plan's cap: its figures and the line that hands it out.
 fn plan_errors(plan: &str) -> Vec<String> {
     let mut errors = Vec::new();
-    for name in ["HEAVY_MAX_PARALLEL", "NIGHT_PARALLEL"] {
+    for (name, cap) in [
+        ("WINDOW_PARALLEL", WINDOW_MAX_PARALLEL),
+        ("SHARED_PARALLEL", SHARED_MAX_PARALLEL),
+    ] {
         match constant(plan, name) {
-            Some(n) if (1..=HEAVY_MAX_PARALLEL).contains(&n) => {}
+            Some(n) if (1..=cap).contains(&n) => {}
             Some(n) => errors.push(format!(
-                "nightly_mutants.py: {name} = {n}, above the fleet's cap of {HEAVY_MAX_PARALLEL}"
+                "nightly_mutants.py: {name} = {n}, above the window rule's {cap} (#791)"
             )),
             None => errors.push(format!("nightly_mutants.py: no `{name} = <integer>`")),
         }
+    }
+    match bounds(plan) {
+        Some((1, high)) if (1..=INPUT_MAX_PARALLEL).contains(&high) => {}
+        Some((low, high)) => errors.push(format!(
+            "nightly_mutants.py: PARALLEL_BOUNDS = ({low}, {high}), outside 1 to the account's {INPUT_MAX_PARALLEL}"
+        )),
+        None => errors.push("nightly_mutants.py: no `PARALLEL_BOUNDS = (<low>, <high>)`".to_owned()),
     }
     if !plan.lines().any(|line| line.trim() == PLAN_LINE) {
         errors.push(format!(
             "nightly_mutants.py: the plan does not hand out the cap: no `{PLAN_LINE}`"
         ));
+    }
+    for line in TAIL_LINES {
+        if !plan.lines().any(|have| have.trim() == line) {
+            errors.push(format!(
+                "nightly_mutants.py: the plan does not split the tail at six: no `{line}`"
+            ));
+        }
     }
     errors
 }
@@ -150,13 +211,22 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
                 .filter_map(|line| line.strip_prefix("max-parallel:"))
                 .map(str::trim)
                 .collect();
+            let name = format!("{file} {job}");
+            let reads = PLAN_MATRICES
+                .iter()
+                .find(|(matrix, _)| *matrix == name)
+                .map(|(_, reading)| *reading);
             match values.as_slice() {
                 [] => errors.push(format!("{file} {job}: a heavy matrix without `max-parallel`")),
-                [value] if *value == PLAN_READING => reads_plan = true,
+                [value] if Some(*value) == reads => reads_plan = true,
+                [value] if reads.is_some() => errors.push(format!(
+                    "{file} {job}: max-parallel `{value}`, not the plan's window figure `{}` (#791)",
+                    reads.unwrap_or_default()
+                )),
                 [value] => match value.parse::<u32>() {
-                    Ok(n) if (1..=HEAVY_MAX_PARALLEL).contains(&n) => {},
+                    Ok(n) if (1..=SHARED_MAX_PARALLEL).contains(&n) => {},
                     Ok(n) => errors.push(format!(
-                        "{file} {job}: max-parallel {n}, above the fleet's cap of {HEAVY_MAX_PARALLEL}"
+                        "{file} {job}: max-parallel {n}, above the shared cap of {SHARED_MAX_PARALLEL}"
                     )),
                     Err(_) => errors.push(format!(
                         "{file} {job}: max-parallel `{value}` is neither a literal nor `{PLAN_READING}`"
@@ -166,7 +236,7 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
             }
         }
     }
-    for job in ["nightly.yml mutants", "nightly.yml fuzz"] {
+    for (job, _) in PLAN_MATRICES {
         if !heavy.iter().any(|found| found == job) {
             errors.push(format!(
                 "{job}: not found as a heavy matrix (found {heavy:?})"
@@ -180,7 +250,7 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
 }
 
 /// The nightly's edges that keep its heavy work in sequence, `(job, the job it needs)`:
-/// fuzz after the shards (6 + 6 would be twelve), the score job after them (6 + 1), beta's
+/// fuzz after the shards (14 + 14 inside the window would be twenty-eight), the score job after them, beta's
 /// dispatch of `ci.yml` after both, the weekly bench after beta's run (#683), and main's after
 /// beta's and the bench's (#682's second fold, the keeper's word (a)). The two dispatched runs ask for up to 9 jobs at once (beta's: six test cells,
 /// `lint`, `checks`, the plan) and up to 22 (main's, on main's `ci.yml`: six cells, nine gates
@@ -190,9 +260,12 @@ fn cap_errors(workflows: &[(String, String)], plan: &str) -> Vec<String> {
 /// about a minute and a half, and a run on beta's file holds up to 14 (six cells, six
 /// dependents, `lint`, `checks`) under matrix caps of 6 (`docs/lanes/ci-speed-7.md`, "The
 /// fleet's runner cap", the residual).
-const HEAVY_EDGES: [(&str, &str); 9] = [
+const HEAVY_EDGES: [(&str, &str); 12] = [
     ("fuzz", "mutants"),
+    ("mutants-tail", "mutants"),
+    ("fuzz", "mutants-tail"),
     ("mutation-score", "mutants"),
+    ("mutation-score", "mutants-tail"),
     ("ci-full-beta", "mutants"),
     ("ci-full-beta", "fuzz"),
     ("bench", "mutants"),
@@ -308,65 +381,184 @@ fn with_nightly(edit: impl Fn(&str) -> String) -> Vec<(String, String)> {
 }
 
 #[test]
-fn every_heavy_matrix_carries_max_parallel_at_most_six() {
+fn every_heavy_matrix_reads_the_plans_window_figure_791() {
     let plan = read(".github/scripts/nightly_mutants.py");
     assert_eq!(cap_errors(&workflows(), &plan), Vec::<String>::new());
     assert_eq!(
-        constant(&plan, "HEAVY_MAX_PARALLEL"),
-        Some(HEAVY_MAX_PARALLEL)
+        constant(&plan, "WINDOW_PARALLEL"),
+        Some(WINDOW_MAX_PARALLEL)
     );
+    assert_eq!(
+        constant(&plan, "SHARED_PARALLEL"),
+        Some(SHARED_MAX_PARALLEL)
+    );
+    assert_eq!(bounds(&plan), Some((1, INPUT_MAX_PARALLEL)));
+    let nightly = read(".github/workflows/nightly.yml");
+    for (_, reading) in PLAN_MATRICES {
+        let line = format!("      max-parallel: {reading}\n");
+        assert_eq!(nightly.matches(&line).count(), 1, "{reading}");
+    }
+    // The dispatch input reaches the plan (#791).
+    assert!(nightly.contains("      heavy_max_parallel:\n"));
+    assert!(nightly.contains("HEAVY_MAX_PARALLEL: ${{ inputs.heavy_max_parallel }}"));
+    assert!(nightly.contains("--max-parallel \"$HEAVY_MAX_PARALLEL\""));
 }
 
 #[test]
-fn the_cap_removed_or_raised_is_refused() {
+fn a_literal_cap_or_the_line_removed_is_refused_791() {
     let plan = read(".github/scripts/nightly_mutants.py");
-    let fuzz_six = "      max-parallel: 6\n";
-    let mutants_line = format!("      max-parallel: {PLAN_READING}\n");
-    let gone = with_nightly(|text| {
-        assert!(text.contains(&mutants_line));
-        text.replacen(&mutants_line, "", 1)
-    });
-    assert_eq!(
-        cap_errors(&gone, &plan).len(),
-        1,
-        "{:?}",
-        cap_errors(&gone, &plan)
-    );
-    let fuzz_raised = with_nightly(|text| {
-        assert!(text.contains(fuzz_six));
-        text.replacen(fuzz_six, "      max-parallel: 7\n", 1)
-    });
-    assert_eq!(cap_errors(&fuzz_raised, &plan).len(), 1);
-    let literal_twenty =
-        with_nightly(|text| text.replacen(&mutants_line, "      max-parallel: 20\n", 1));
-    assert_eq!(cap_errors(&literal_twenty, &plan).len(), 1);
-    let raised = plan.replacen("HEAVY_MAX_PARALLEL = 6\n", "HEAVY_MAX_PARALLEL = 14\n", 1);
-    assert_ne!(raised, plan);
-    assert_eq!(cap_errors(&workflows(), &raised).len(), 1);
-    let slots = plan.replacen(PLAN_LINE, "result[\"max_parallel\"] = SLOT_LIMIT", 1);
+    // The three matrices (the window's waves, the tail, the fuzz stage) refuse the line
+    // removed, a literal (the old six included) and another matrix's reading.
+    for (job, reading) in PLAN_MATRICES {
+        let line = format!("      max-parallel: {reading}\n");
+        let gone = with_nightly(|text| {
+            assert!(text.contains(&line));
+            text.replacen(&line, "", 1)
+        });
+        let errors = cap_errors(&gone, &plan);
+        assert_eq!(errors.len(), 1, "{job}: {errors:?}");
+        let others = PLAN_MATRICES
+            .iter()
+            .filter(|(_, other)| *other != reading)
+            .map(|(_, other)| other.to_string());
+        for literal in ["6", "14", "20"]
+            .map(str::to_owned)
+            .into_iter()
+            .chain(others)
+        {
+            let edited = with_nightly(|text| {
+                text.replacen(&line, &format!("      max-parallel: {literal}\n"), 1)
+            });
+            let errors = cap_errors(&edited, &plan);
+            assert_eq!(errors.len(), 1, "{job} {literal}: {errors:?}");
+            assert!(
+                errors[0].contains("not the plan's window figure"),
+                "{errors:?}"
+            );
+        }
+    }
+    for (from, to) in [
+        ("WINDOW_PARALLEL = 14\n", "WINDOW_PARALLEL = 15\n"),
+        ("SHARED_PARALLEL = 6\n", "SHARED_PARALLEL = 7\n"),
+        ("PARALLEL_BOUNDS = (1, 20)\n", "PARALLEL_BOUNDS = (1, 21)\n"),
+    ] {
+        let raised = plan.replacen(from, to, 1);
+        assert_ne!(raised, plan, "{from}");
+        assert_eq!(cap_errors(&workflows(), &raised).len(), 1, "{to}");
+    }
+    let slots = plan.replacen(PLAN_LINE, "result[\"max_parallel\"] = SLOT_LIMIT  # ", 1);
     assert_ne!(slots, plan);
     assert_eq!(cap_errors(&workflows(), &slots).len(), 1);
+    // The tail's figure at the window's, or the split gone (#791's fold).
+    for (from, to) in [
+        (
+            TAIL_LINES[1],
+            "result[\"shards_tail\"], result[\"max_parallel_tail\"] = len(tail), WINDOW_PARALLEL",
+        ),
+        (TAIL_LINES[0], "window, tail = result[\"matrix\"], []  # "),
+    ] {
+        let edited = plan.replacen(from, to, 1);
+        assert_ne!(edited, plan, "{from}");
+        let errors = cap_errors(&workflows(), &edited);
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("does not split the tail at six"),
+            "{errors:?}"
+        );
+    }
+}
+
+/// A job's lines from its `env:` to its end: the steps the tail must share with the window's.
+fn from_env<'a>(jobs: &'a [(String, Vec<&'a str>)], job: &str) -> Option<&'a [&'a str]> {
+    let (_, lines) = jobs.iter().find(|(name, _)| name == job)?;
+    let at = lines.iter().position(|line| *line == "    env:")?;
+    // The comment above the next job is read into this one's lines: not a step.
+    let end = lines.len()
+        - lines
+            .iter()
+            .rev()
+            .take_while(|line| line.trim().is_empty() || line.starts_with("  #"))
+            .count();
+    lines.get(at..end)
+}
+
+/// What is wrong with the tail job (#791's fold): gone, or its env and steps not the
+/// window's job's byte for byte (so a step fixed in one is fixed in both).
+fn tail_errors(nightly: &str) -> Vec<String> {
+    let parsed = jobs(nightly);
+    match (
+        from_env(&parsed, "mutants"),
+        from_env(&parsed, "mutants-tail"),
+    ) {
+        (Some(window), Some(tail)) if window == tail => Vec::new(),
+        (Some(_), Some(_)) => {
+            vec!["nightly.yml mutants-tail: its env and steps are not the mutants job's".to_owned()]
+        }
+        _ => vec!["nightly.yml: no mutants and mutants-tail jobs with an `env:`".to_owned()],
+    }
+}
+
+#[test]
+fn the_waves_past_the_window_run_in_a_tail_matrix_at_six_791() {
+    let nightly = read(".github/workflows/nightly.yml");
+    assert_eq!(tail_errors(&nightly), Vec::<String>::new());
+    assert!(nightly.contains("    needs: [source, mutants]\n    if: ${{ !cancelled() && needs.source.result == 'success' && needs.source.outputs.shards_tail != '0' }}\n"));
+    assert!(
+        nightly.contains("        include: ${{ fromJSON(needs.source.outputs.matrix_tail) }}\n")
+    );
+    let step = "          python3 .github/scripts/nightly_mutants.py run \\\n";
+    assert_eq!(nightly.matches(step).count(), 2);
+    let drifted = nightly.replacen(
+        step,
+        "          python3 .github/scripts/nightly_mutants.py  run \\\n",
+        1,
+    );
+    assert_eq!(
+        tail_errors(&drifted),
+        ["nightly.yml mutants-tail: its env and steps are not the mutants job's"]
+    );
+    let gone = nightly.replacen("  mutants-tail:\n", "  mutants-later:\n", 1);
+    assert_eq!(
+        tail_errors(&gone),
+        ["nightly.yml: no mutants and mutants-tail jobs with an `env:`"]
+    );
 }
 
 #[test]
 fn no_two_heavy_jobs_of_the_nightly_hold_the_runners_at_once() {
     let nightly = read(".github/workflows/nightly.yml");
     assert_eq!(edge_errors(&nightly), Vec::<String>::new());
-    let fuzz_edge = "    needs: [source, mutants]\n    if: ${{ !cancelled() && needs.source.result";
+    let fuzz_edge =
+        "    needs: [source, mutants, mutants-tail]\n    if: ${{ !cancelled() && needs.source.result";
     assert!(nightly.contains(fuzz_edge));
-    let fuzz_free = nightly.replacen(fuzz_edge, &fuzz_edge.replacen(", mutants", "", 1), 1);
+    let fuzz_free = nightly.replacen(
+        fuzz_edge,
+        &fuzz_edge.replacen(", mutants, mutants-tail", "", 1),
+        1,
+    );
     assert_eq!(
         edge_errors(&fuzz_free),
         [
             "nightly.yml fuzz and mutants can overlap: no `needs: mutants` edge on fuzz (its needs: [\"source\"])",
+            "nightly.yml fuzz and mutants-tail can overlap: no `needs: mutants-tail` edge on fuzz (its needs: [\"source\"])",
+            // The dispatches reach the tail only through the fuzz stage.
+            "nightly.yml ci-full-beta and mutants-tail can overlap: no `needs:` path between them",
+            "nightly.yml ci-full-main and mutants-tail can overlap: no `needs:` path between them",
+            "nightly.yml bench and mutants-tail can overlap: no `needs:` path between them",
             "nightly.yml mutants and fuzz can overlap: no `needs:` path between them",
+            "nightly.yml mutants-tail and fuzz can overlap: no `needs:` path between them",
         ]
     );
     let ci_edge = "    needs: [mutants, fuzz]\n";
     assert!(nightly.contains(ci_edge));
     let ci_free = nightly.replacen(ci_edge, "", 1);
     let errors = edge_errors(&ci_free);
-    assert_eq!(errors.len(), 4, "{errors:?}");
+    // The two edges, then the shards, the tail and the fuzz stage beside it (#791's fold).
+    assert_eq!(errors.len(), 5, "{errors:?}");
+    assert!(errors.contains(
+        &"nightly.yml ci-full-beta and mutants-tail can overlap: no `needs:` path between them"
+            .to_owned()
+    ));
     assert!(errors.contains(&"nightly.yml ci-full-beta and fuzz can overlap: no `needs: fuzz` edge on ci-full-beta (its needs: [])".to_owned()));
     let main_edge = "    needs: [ci-full-beta, bench]\n";
     assert!(nightly.contains(main_edge));
@@ -473,9 +665,9 @@ fn ci_matrix_errors(ci: &str) -> Vec<String> {
         });
         match dispatch.map(str::parse::<u32>) {
             None => errors.push(format!("ci.yml {job}: a matrix without `max-parallel`")),
-            Some(Ok(n)) if (1..=HEAVY_MAX_PARALLEL).contains(&n) => {}
+            Some(Ok(n)) if (1..=SHARED_MAX_PARALLEL).contains(&n) => {}
             Some(Ok(n)) => errors.push(format!(
-                "ci.yml {job}: max-parallel {n} on a dispatch, above the fleet's cap of {HEAVY_MAX_PARALLEL}"
+                "ci.yml {job}: max-parallel {n} on a dispatch, above the shared cap of {SHARED_MAX_PARALLEL}"
             )),
             Some(Err(_)) => errors.push(format!("ci.yml {job}: max-parallel `{}` unread", value.unwrap_or(""))),
         }
@@ -742,11 +934,12 @@ fn the_weekly_bench_runs_after_the_shards_fuzz_and_beta_and_waits_for_its_run_68
         "nightly.yml bench and ci-full-beta can overlap: no `needs: ci-full-beta` edge on bench (its needs: [])",
         "nightly.yml ci-full-beta and bench can overlap: no `needs:` path between them",
         "nightly.yml bench and mutants can overlap: no `needs:` path between them",
+        "nightly.yml bench and mutants-tail can overlap: no `needs:` path between them",
         "nightly.yml bench and fuzz can overlap: no `needs:` path between them",
     ] {
         assert!(errors.contains(&expected.to_owned()), "{expected} not in {errors:?}");
     }
-    assert_eq!(errors.len(), 6, "{errors:?}");
+    assert_eq!(errors.len(), 7, "{errors:?}");
 
     // Main's dispatch no longer after the bench: the bench's run and main's 22 at once.
     let main_edge = "    needs: [ci-full-beta, bench]\n";

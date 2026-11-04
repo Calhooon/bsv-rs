@@ -140,7 +140,16 @@ fn every_heavy_job_after_the_shards_keeps_not_cancelled_709() {
         .filter(|(n, l)| heavy(l) && after(&graph, n, "mutants"))
         .map(|(n, _)| n)
         .collect();
-    assert_eq!(judged, ["ci-full-beta", "ci-full-main", "bench", "fuzz"]);
+    assert_eq!(
+        judged,
+        [
+            "ci-full-beta",
+            "ci-full-main",
+            "bench",
+            "mutants-tail",
+            "fuzz"
+        ]
+    );
 
     let bench = in_job(
         &nightly,

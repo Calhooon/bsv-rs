@@ -124,12 +124,92 @@ beside it, following `ci.yml`. The mutation jobs' token has only `contents: read
 
 The shards are the plan's (cut 7, below): a complete run is twenty-three, eight
 script, three BEEF, one Merkle, three wire and eight substrates since #703's
-second fold (twenty before it: eleven, three, one, two and three until #685), at six at a
-time (the fleet's runner cap, `HEAVY_MAX_PARALLEL`: 6 since the keeper's
-line of 10:0xZ 2026-11-03 on the opening occupancy read, 14 from 06:2xZ; four
-waves, 6, 6, 6 and 5; the twenty of the fixed lists replayed at about 3h07m from run 41579707627's shard
-times, `docs/lanes/ci-speed-7.md`); a night is as many as its files' estimated minutes need, at six
-at a time.
+second fold (twenty before it: eleven, three, one, two and three until #685), at
+the plan's figure by window (below; at six, the fleet's cap of the keeper's line
+of 10:0xZ 2026-11-03 until #791, four waves, 6, 6, 6 and 5; the twenty of the
+fixed lists replayed at about 3h07m from run 41579707627's shard times,
+`docs/lanes/ci-speed-7.md`; at fourteen, two waves, 14 and 9, the second the
+tail at six when it is projected past 09:00Z, below); a night is as many as its
+files' estimated minutes need, at the same figure.
+
+**The heavy-run cap by window (#791).** The owner's word of 2026-11-04
+17:1xZ, through the keeper, amending the balance rule of 2026-10-26 and the
+fleet's cap of six: a heavy hosted run (a complete mutation run, a nightly)
+takes up to fourteen of the account's twenty slots inside its own window
+when no other heavy run of the account is scheduled in that window, six
+otherwise. The plan (`nightly_mutants.py plan`, `heavy_max_parallel`) reads
+the plan step's UTC clock (minutes after the dispatch) against the keeper's
+windows table, kept as data in
+the script (`HEAVY_WINDOWS`, one row per window with its owner and source, so
+a later word edits a row):
+
+| Window (UTC) | Owner | Figure here |
+| --- | --- | ---: |
+| 01:00Z to 09:00Z | bsv-rs: the complete run's 01:00Z slot, the incremental night's 07:00Z and the pin-chain dispatches | 14 |
+| 17:00Z to 20:00Z (the keeper's table of 2026-11-04 18:0xZ, superseding the one-hour entries of 2026-11-03) | bsv-wallet-cli's night | 6 |
+| 20:00Z to 01:00Z (the same table; a window past midnight wraps) | the toolbox's night | 6 |
+| 09:00Z to 17:00Z (the same table: outside every window) | the day, every repository's PR CI | 6 |
+| any other hour | none | 6 |
+
+None runs at fourteen while another heavy run's window holds the hour. The
+dispatch input `heavy_max_parallel` (an integer from 1 to 20; empty by
+default) overrides the window for one run. The plan writes the figure as
+`max_parallel` and why as `max_parallel_reason` (the window matched, "outside
+every window", or the dispatch input) into `plan.json` and the step's
+outputs.
+
+**The tail (#791's fold).** The keeper's word of 2026-11-04 18:0xZ: "a run
+overrunning its window drops to six for the waves after the window's end: the
+plan's shard estimates project each wave's end at dispatch, the waves projected
+inside 01:00Z to 09:00Z run at fourteen and those past it at six, so a complete
+run dispatched by about 04:00Z runs whole at fourteen and a late one tails at six
+into the day's PR CI; never fourteen into the CLI's window." Inside this crate's
+window the plan (`split_tail`) cuts the matrix, in the order it runs, into waves
+of the window's figure, each starting when the previous one's longest shard
+ends, and projects each wave's end from the plan's clock. A complete run's shard
+minutes are the last complete record's in the tree (`shards[].job_minutes` of the
+newest `docs/census/mutants-*.json` with shards; a shard's minutes do not move
+with the figure, only the waves do; a shard the record does not name reads as
+its surface's longest there); an incremental night's are the plan's own
+estimates (its shards are not the complete run's). The shards whose wave ends at
+or before 09:00Z are the `mutants` job's matrix at the window's figure; the rest
+are the tail, the `mutants-tail` job (the same steps and artifact names, pinned
+byte for byte; `needs: [source, mutants]`, `!cancelled()`, skipped on an empty
+tail) at `max_parallel_tail`, six. A run whose opening wave already ends past
+09:00Z runs whole at six with no tail; outside the window there is no tail. The
+dispatch input sets the window's waves only; the tail stays six (outside the
+window it is the whole run's figure, as before the fold). `plan.json` keeps
+`matrix` (every shard, the score's planned set) and adds `matrix_window`,
+`matrix_tail`, `shards_tail`, `max_parallel_tail` and `max_parallel_fuzz`; the
+step's `matrix` output is the window's waves and `matrix_tail` the tail;
+`max_parallel_reason` names the waves' projected ends and the split. On the
+2026-11-04 record (the two waves' longest shards 212.8 and 244.8 minutes, script
+0/8 and wire 2/3) a complete run runs whole at fourteen when dispatched by
+01:22Z; at 03:00Z its waves end at 06:32Z and 10:37Z, so 14 shards run at
+fourteen and the 9 after them (wire 2/3 and the eight substrates shards) are the
+tail; at 07:00Z the opening wave ends at 10:32Z and the whole run is at six. The
+word's "by about 04:00Z" reads a shorter run than the record measures. The waves
+are a bound: GitHub starts a queued shard as soon as any slot frees, so the
+window's job ends no later than its projection. The mutant shards read
+`max_parallel` and `max_parallel_tail`, the fuzz targets `max_parallel_fuzz` (the
+window's figure, six after a tail, which ends past the window; a literal 6 until
+#791); the fuzz stage and the score job need both shard jobs. The
+night's record names both in its run entry and a complete run's record in its
+producing-run section ("23 shards at 14 at a time, at 07:00Z, inside this
+crate's window"). The figure's owner is loop four's #675.
+`tests/arch_nightly_cap.rs` refuses a literal or another matrix's reading on
+any of the three matrices, the line removed, the window's figure above 14, the
+shared one above 6, the input's bound above 20, the tail's figure other than the
+shared six, the split gone, and the tail's steps other than the window's job's.
+GitHub's own waits are named as GitHub's in the record, never
+absorbed as this crate's (`mutants_record.py write --github-wait <text>`, a
+line each): an image change, an incident, a hosted-runner queue; on
+2026-11-04 the move of `macos-latest` to the macos-26-arm64 image (run
+41861794622; the step that assumed the cargo home was this crate's, fixed by
+#789) and the hosted macOS arm64 queue of 16:49Z to 17:2xZ ("The job was not
+acquired by Runner of type hosted even after multiple attempts"; GitHub's
+notice: "Due to capacity constraints, jobs targeting macOS arm64 runners may
+experience longer queue times") were GitHub's.
 Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a test timeout
 of three times its baseline's test time, never under 120 seconds (300 for BEEF;
 `MINIMUM_TEST_TIMEOUT`'s floors, the fixed timeouts until #685), and a 300-second
@@ -665,7 +745,7 @@ table, never a new failure of the night.
 ```sh
 # The night (by hand in the fleet's one daily slot, 07:00Z; 00:00Z retired 2026-11-03): the reach rule's files, the rest carried.
 gh workflow run nightly.yml --ref beta
-# The complete run (the day's one dispatch in the 07:00Z slot, in place of the night, alone): at each prerelease pin (RELEASING.md step 3), after a measured cap change, before a minor tag, by hand.
+# The complete run (the day's one dispatch in the 01:00Z slot from the chain of 2026-11-05 on, the window's start, so the whole run fits at fourteen by the record's minutes; the keeper's word of 2026-11-04 18:2xZ; 07:00Z until the beta.7 cut; the incremental night keeps 07:00Z): at each prerelease pin (RELEASING.md step 3), after a measured cap change, before a minor tag, by hand.
 gh workflow run nightly.yml --ref beta -f mode=complete
 # The captain's Sunday night: the night, then the bench after beta's run, then main's (#683).
 gh workflow run nightly.yml --ref beta -f weekly=true
@@ -675,7 +755,7 @@ A complete run was twenty shards (the keeper's cut 5; twenty-three since
 #703's second fold, below), at most six at a
 time since the fleet's runner cap of 10:0xZ 2026-11-03 (fourteen from
 06:2xZ, one wave of twenty before; `docs/lanes/ci-speed-7.md`, "The fleet's
-runner cap"), dispatched in the 07:00Z slot, alone (the CLI's 17:00Z,
+runner cap"), dispatched in the 01:00Z slot from 2026-11-05 on (07:00Z until the beta.7 cut), alone (the CLI's 17:00Z,
 the toolbox's 18:00Z): the
 measured minutes of run 41347058507 (script 130 per 515 mutants, BEEF 37 per
 187, Merkle 3 per 25, wire 19.5 per 198, substrates 36.5 per 286; 901
@@ -800,7 +880,7 @@ the runner hook (above): the ceiling is per test binary, so a narrower shard
 changes nothing about it. A night's shards are sized by its files' mutants in
 the record at those rates (since #685 at the minutes of the night's sets,
 `surface_minutes`; each matrix entry carries its `estimated_minutes`), 45 minutes a shard, at most the complete run's
-count per surface, six at a time (the balance rule of 2026-10-26). An empty
+count per surface, at the plan's figure by window (#791; six, the balance rule of 2026-10-26, until then). An empty
 plan runs no shard; the score job carries every figure. The bench is the
 `weekly` input: the workflow has no schedule, so "weekly" is the dispatcher's
 word, and the job dispatches `bench.yml` at the line's tip, after beta's
@@ -863,7 +943,7 @@ The fuzz job files its own crashes (below).
 
 ## Fuzz (#82)
 
-**What runs.** One job per target of `fuzz/Cargo.toml` (19 today, pinned to the matrix by `tests/arch_fuzz_targets_dispatched.rs`; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (AddressSanitizer, but `-s none` for `fuzz_script_spend_default`, whose 128 MiB budget ASan's resident set takes past the 2,048 MB RSS limit, #398) (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for a fixed budget from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=$((FUZZ_MINUTES * 60))`): a crash is recorded and the run goes on. The budget is `FUZZ_MINUTES`, 10 minutes per target by default, set by the repository variable `NIGHTLY_FUZZ_MINUTES` (at most 30, under the job's 45-minute timeout); until cut 7 it was an hour (run 41347058507: 19 targets of 60 to 63 minutes each, six at a time, 4h07m of the night). Every target runs every night within the budget.
+**What runs.** One job per target of `fuzz/Cargo.toml` (19 today, pinned to the matrix by `tests/arch_fuzz_targets_dispatched.rs`; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (AddressSanitizer, but `-s none` for `fuzz_script_spend_default`, whose 128 MiB budget ASan's resident set takes past the 2,048 MB RSS limit, #398) (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for a fixed budget from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=$((FUZZ_MINUTES * 60))`): a crash is recorded and the run goes on. The budget is `FUZZ_MINUTES`, 10 minutes per target by default, set by the repository variable `NIGHTLY_FUZZ_MINUTES` (at most 30, under the job's 45-minute timeout); until cut 7 it was an hour (run 41347058507: 19 targets of 60 to 63 minutes each, six at a time, 4h07m of the night). The targets run at the plan's `max_parallel_fuzz`: the shards' figure by window (#791: 14 inside 01:00Z to 09:00Z, 6 outside, the dispatch input over both; a literal 6 until then), six after a tail (#791's fold). Every target runs every night within the budget.
 
 **Where the results land.**
 
