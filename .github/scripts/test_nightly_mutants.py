@@ -1,9 +1,13 @@
 """Exercise score math and rejection of incomplete or inconsistent evidence."""
 
 import argparse
+from collections import Counter
+import io
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -243,6 +247,515 @@ class ScoreTests(unittest.TestCase):
     def test_existing_output_cannot_reuse_stale_evidence(self):
         with self.assertRaises(FileExistsError):
             nightly.run(argparse.Namespace(output=self.root))
+
+
+class TimeoutReRun781(unittest.TestCase):
+    """#781 (the keeper's word of 2026-11-04 15:2xZ): a mutant that times out is re-run
+    once alone; a second timeout is a row outside the denominator, never a survivor nor a
+    kill. The witness: a file floored at 100 with one injected timeout."""
+
+    FILE = "src/wallet/wire/encoding.rs"
+    NAME = "src/wallet/wire/encoding.rs:9:5: replace f -> usize with 1"
+    # Literals, not the module's names, so the evidence reads on a tree before #781.
+    MARK, METHOD = 1, "re-run once alone (#781)"
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / "shards"
+        self.floors = Path(self.temp.name) / "ratchets.json"
+        nightly.write_json(self.floors, {"mutation_floors": {self.FILE: {"percent": 100}}})
+
+    @staticmethod
+    def mutant(name, file=FILE):
+        line = int(name.split(":")[1])
+        return {"file": file, "name": name, "span": {"start": {"line": line, "column": 5}},
+                "genre": "FnValue", "replacement": "1", "function": {"function_name": "f"}}
+
+    @staticmethod
+    def outcomes(entries, seconds=60.0):
+        def phases(took):
+            return [{"phase": "Build", "duration": 10.0}, {"phase": "Test", "duration": took}]
+        counts = Counter(nightly.OUTCOMES[summary] for _, summary in entries)
+        return {"cargo_mutants_version": "27.1.0", "start_time": "2026-11-04T01:00:00Z",
+                "end_time": "2026-11-04T02:00:00Z", "total_mutants": len(entries),
+                **{kind: counts[kind] for kind in nightly.OUTCOMES.values()},
+                "outcomes": [{"scenario": "Baseline", "summary": "Success",
+                              "phase_results": phases(30.0)}] + [
+                    {"scenario": {"Mutant": mutant}, "summary": summary,
+                     "log_path": f"log/{i}.log", "phase_results": phases(seconds)}
+                    for i, (mutant, summary) in enumerate(entries)]}
+
+    def shard(self, rerun="Timeout", method=True, label="wire-0-1", shard="0/1"):
+        """Three kills and one timeout in the pass; `rerun` the lone re-run's outcome
+        (None: the method's mark without its re-run)."""
+        path = self.root / label
+        path.mkdir(parents=True)
+        kills = [self.mutant(f"{self.FILE}:{i}:5: replace g with {i}") for i in (1, 2, 3)]
+        hung = self.mutant(self.NAME)
+        nightly.write_json(path / "candidates.json", kills + [hung])
+        nightly.write_json(path / "outcomes.json", self.outcomes(
+            [(m, "CaughtMutant") for m in kills] + [(hung, "Timeout")], seconds=360.0))
+        metadata = {"surface": "wire", "shard": shard, "commit": "c" * 40, "exit_code": 3,
+                    "files": [self.FILE], "command": ["cargo", "mutants", "--shard", shard]}
+        if method:
+            metadata["timeout_rerun"] = self.MARK
+            metadata["reruns"] = []
+        if method and rerun is not None:
+            again = path / "rerun" / "0"
+            again.mkdir(parents=True)
+            nightly.write_json(again / "outcomes.json",
+                               self.outcomes([(hung, rerun)], seconds=380.0))
+            kind = nightly.OUTCOMES[rerun]
+            metadata["reruns"] = [{
+                "index": 0, "file": self.FILE, "mutant": self.NAME,
+                "method": self.METHOD, "exit_code": 3 if kind == "timeout" else 0,
+                "command": [], "pass": {"outcome": "timeout", "seconds": 370.0,
+                                        "log": "log/3.log", "test_timeout": 360.0,
+                                        "named": None},
+                "rerun": {"outcome": kind, "seconds": 390.0, "log": "log/0.log",
+                          "test_timeout": 380.0,
+                          "named": {"binary": "wire_codec-1a2b",
+                                    "tests": ["a_frame_that_never_ends"]}}}]
+        nightly.write_json(path / "run.json", metadata)
+        return path
+
+    def report(self):
+        output = Path(self.temp.name) / "score.json"
+        with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}), \
+                patch("sys.stdout", new=io.StringIO()):
+            status = nightly.report(argparse.Namespace(
+                input=self.root, output=output, expected_shards=None, floors=self.floors))
+        return status, json.loads(output.read_text()), output.with_suffix(".md").read_text()
+
+    def test_781_a_floor_at_100_with_a_second_timeout_passes_and_writes_the_row(self):
+        self.shard("Timeout")
+        status, result, markdown = self.report()
+        row = result["files"][0]
+        self.assertEqual(status, 0, result["errors"])
+        self.assertTrue(result["passed"])
+        self.assertEqual((row["caught"], row["missed"], row["timeout"], row["viable"]),
+                         (3, 0, 1, 3))
+        self.assertEqual((row["score_percent"], row["passed"]), (100, True))
+        self.assertEqual(result["timeouts"], [{
+            "file": self.FILE, "mutant": self.NAME, "shard": "wire 0/1",
+            "method": self.METHOD, "pass_seconds": 370.0, "rerun_seconds": 390.0,
+            "pass_limit": 360.0, "rerun_limit": 380.0,
+            "binary": "wire_codec-1a2b", "tests": ["a_frame_that_never_ends"]}])
+        self.assertIn("Score = caught / (caught + missed)", markdown)
+        self.assertIn(f"| `{self.FILE}` | `{self.NAME}` | wire 0/1 | 370.0, 360.0 "
+                      f"| 390.0, 380.0 |", markdown)
+
+    def test_781_a_timeout_caught_alone_reads_caught(self):
+        self.shard("CaughtMutant")
+        status, result, _ = self.report()
+        row = result["files"][0]
+        self.assertEqual(status, 0, result["errors"])
+        self.assertEqual((row["caught"], row["timeout"], row["viable"]), (4, 0, 4))
+        self.assertEqual(result["timeouts"], [])
+
+    def test_781_a_timeout_missed_alone_reads_missed(self):
+        self.shard("MissedMutant")
+        status, result, _ = self.report()
+        row = result["files"][0]
+        self.assertEqual(status, 1)
+        self.assertEqual((row["caught"], row["missed"], row["timeout"], row["viable"]),
+                         (3, 1, 0, 4))
+        self.assertEqual((row["score_percent"], row["passed"]), (75, False))
+
+    def test_781_a_timeout_without_its_lone_re_run_fails_closed(self):
+        self.shard(None)
+        status, result, _ = self.report()
+        self.assertEqual(status, 1)
+        self.assertFalse(result["complete"])
+        self.assertIn(f"('wire', '0/1'): timeout without its lone re-run: {self.NAME}",
+                      result["errors"])
+
+    def test_781_evidence_before_the_method_keeps_the_old_rule(self):
+        self.shard(method=False)
+        status, result, markdown = self.report()
+        row = result["files"][0]
+        self.assertEqual(status, 1)
+        self.assertTrue(result["complete"])
+        self.assertEqual((row["timeout"], row["viable"], row["score_percent"]), (1, 4, 75))
+        self.assertIn("Score = caught / (caught + missed + timeout)", markdown)
+
+    def test_781_shards_under_two_rules_fail_closed(self):
+        self.shard("Timeout")
+        self.shard(method=False, label="wire-1-2", shard="1/2")
+        result = nightly.collect(self.root, None, {})
+        self.assertIn("shards judged under different timeout rules (#781): "
+                      "some ran the lone re-run, some did not", result["errors"])
+
+    def test_781_a_re_run_that_ran_more_than_its_mutant_fails_closed(self):
+        path = self.shard("Timeout")
+        data = json.loads((path / "rerun" / "0" / "outcomes.json").read_text())
+        extra = self.mutant(f"{self.FILE}:20:5: delete field x")
+        data["outcomes"].append({"scenario": {"Mutant": extra}, "summary": "CaughtMutant"})
+        nightly.write_json(path / "rerun" / "0" / "outcomes.json", data)
+        result = nightly.collect(self.root, None, {})
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} did not run it alone",
+                      result["errors"])
+
+    def test_781_the_lone_command_drops_the_sharding_and_names_the_mutant_and_its_line(self):
+        command = ["cargo", "mutants", "--no-shuffle", "--sharding", "round-robin",
+                   "--shard", "3/8", "--file", "src/script/**/*.rs", "--cargo-arg=--lib"]
+        name = "src/script/script.rs:708:13: replace += with *= in Snapshot<'a>::read"
+        lone = nightly.lone_command(command, {"name": name}, Path("/r/line.diff"))
+        self.assertEqual(lone, [
+            "cargo", "mutants", "--no-shuffle", "--file", "src/script/**/*.rs",
+            "--cargo-arg=--lib", "--re",
+            r"^src/script/script\.rs:708:13: replace \+= with \*= in Snapshot<'a>::read$",
+            "--in-diff", "/r/line.diff"])
+
+    def test_781_the_shard_re_runs_each_timeout_alone_and_packages_its_evidence(self):
+        root = Path(self.temp.name) / "run"
+        (root / "mutants.out" / "log").mkdir(parents=True)
+        source = Path(self.temp.name) / "src.rs"
+        source.write_text("fn f() -> usize {\n    0\n}\n")
+        hung = self.mutant(f"{source}:2:5: replace f -> usize with 1", file=str(source))
+        kill = self.mutant(f"{source}:1:1: replace f with 2", file=str(source))
+        nightly.write_json(root / "mutants.out" / "outcomes.json", self.outcomes(
+            [(kill, "CaughtMutant"), (hung, "Timeout")]))
+        (root / "mutants.out" / "log" / "1.log").write_text("the pass's log\n")
+        calls = []
+
+        def cargo_mutants(command, **_):
+            calls.append(command)
+            out = Path(command[command.index("--output") + 1]) / "mutants.out"
+            (out / "log").mkdir(parents=True)
+            nightly.write_json(out / "outcomes.json", self.outcomes([(hung, "Timeout")]))
+            (out / "log" / "0.log").write_text(
+                "     Running `/home/runner/target/debug/build/x-1/build-script-build`\n"
+                "     Running `/home/runner/target/debug/deps/wire_codec-1a2b '--skip=x'`\n"
+                "test a_frame_that_never_ends has been running for over 60 seconds\n")
+            (out / "debug.log").write_text("INFO timeouts.rs:68: Auto-set test timeout to 380s\n")
+            (out / "lock.json").write_text("host metadata")
+            return subprocess.CompletedProcess(command, 3)
+
+        with patch("subprocess.run", side_effect=cargo_mutants), \
+                patch("sys.stdout", new=io.StringIO()):
+            reruns, status = nightly.lone_reruns(
+                root, ["cargo", "mutants", "--shard", "1/2"], nightly.timeout_args("wire"), {})
+        self.assertEqual(status, 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][calls[0].index("--re") + 1], nightly.exact_name(hung["name"]))
+        self.assertNotIn("--shard", calls[0])
+        self.assertEqual((root / "rerun" / "0" / "line.diff").read_text(),
+                         f"--- a/{source}\n+++ b/{source}\n@@ -2,1 +2,1 @@\n-    0\n+    0\n")
+        self.assertEqual(reruns[0]["rerun"]["outcome"], "timeout")
+        self.assertEqual(reruns[0]["rerun"]["named"],
+                         {"binary": "wire_codec-1a2b", "tests": ["a_frame_that_never_ends"]})
+        self.assertEqual(reruns[0]["rerun"]["test_timeout"], 380.0)
+        nightly.write_json(root / "run.json", {"reruns": reruns})
+        nightly.write_json(root / "candidates.json", [])
+        nightly.package(argparse.Namespace(run=root, output=Path(self.temp.name) / "artifact"))
+        kept = Path(self.temp.name) / "artifact" / "run" / "rerun" / "0"
+        # No log (host paths, the rustc line, libtest's output): its reading is `named`.
+        self.assertEqual(sorted(str(p.relative_to(kept)) for p in kept.rglob("*") if p.is_file()),
+                         ["line.diff", "outcomes.json"])
+
+    def test_781_the_record_lists_a_second_timeout_as_a_row_not_a_survivor(self):
+        import mutants_record as record
+        run_dir = Path(self.temp.name)
+        self.shard("Timeout")
+        nightly.write_json(run_dir / "jobs.json", [{
+            "name": "Mutants (wire, 0/1)", "status": "completed", "conclusion": "success",
+            "started_at": "2026-11-04T00:58:00Z", "completed_at": "2026-11-04T03:10:00Z"}])
+        found = record.survivors(run_dir)
+        self.assertEqual(found[self.NAME]["outcome"], "timeout")
+        self.assertEqual(found[self.NAME]["pass_outcome"], "timeout")
+        self.assertEqual([m for m in found.values() if m["outcome"] in record.survived("rerun")],
+                         [])
+        shards = record.shard_rows(run_dir)
+        self.assertEqual((shards[0]["caught"], shards[0]["missed"], shards[0]["timeout"]),
+                         (3, 0, 1))
+        # The pass's 370 s and the re-run's 390 s under their own heading, not survived.
+        self.assertEqual(shards[0]["minutes_by_outcome"],
+                         {"baseline": 0.7, "caught": 18.5, "survived": 0.0, "unviable": 0.0,
+                          "timed_out": 12.7, "rerun_baseline": 0.7})
+        term = record.survivor_term(shards)["wire"]
+        self.assertEqual((term["survived"], term["timed_out"], term["minutes_per_timeout"]),
+                         (0, 1, 12.7))
+        self.assertEqual(term["survivor_share_of_viable"], 0.0)
+
+    # The strength read of c32facb9 (2026-11-04): a witness for each fail-closed line
+    # that a one-line mutation of the judge left green.
+
+    def errors_with(self, edit=None, rerun="Timeout", record=None):
+        """The witness's errors after `edit(metadata, outcomes)` on its lone re-run."""
+        path = self.shard(rerun)
+        metadata = json.loads((path / "run.json").read_text())
+        again = json.loads((path / "rerun" / "0" / "outcomes.json").read_text())
+        if record is not None:
+            metadata["reruns"][0]["rerun"]["outcome"] = record
+        if edit:
+            edit(metadata, again)
+        nightly.write_json(path / "run.json", metadata)
+        nightly.write_json(path / "rerun" / "0" / "outcomes.json", again)
+        return nightly.collect(self.root, None, {})["errors"]
+
+    def test_781_strength_a_red_re_timed_baseline_is_refused(self):
+        def red(_, again):
+            again["outcomes"][0]["summary"] = "Failure"
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} has no re-timed baseline",
+                      self.errors_with(red))
+
+    def test_781_strength_an_unviable_re_run_is_refused(self):
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} reads Unviable, "
+                      f"its record unviable", self.errors_with(rerun="Unviable"))
+
+    def test_781_strength_the_re_run_s_outcome_must_be_its_record_s(self):
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} reads CaughtMutant, "
+                      f"its record timeout", self.errors_with(rerun="CaughtMutant",
+                                                              record="timeout"))
+
+    def test_781_strength_a_record_naming_another_file_or_mutant_is_refused(self):
+        def elsewhere(metadata, _):
+            metadata["reruns"][0]["file"] = "src/wallet/wire/framing.rs"
+        errors = self.errors_with(elsewhere)
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} did not run it alone", errors)
+        self.assertIn(f"('wire', '0/1'): timeout without its lone re-run: {self.NAME}", errors)
+
+    def test_781_strength_a_re_run_of_a_mutant_its_pass_did_not_time_out_is_refused(self):
+        kill = f"{self.FILE}:1:5: replace g with 1"
+        def of_a_kill(metadata, again):
+            metadata["reruns"][0]["mutant"] = kill
+            again["outcomes"][1]["scenario"]["Mutant"] = self.mutant(kill)
+        self.assertIn(f"('wire', '0/1'): a lone re-run of a mutant its pass did not time out: "
+                      f"{kill}", self.errors_with(of_a_kill))
+
+    def test_781_strength_the_re_run_s_exit_code_is_read(self):
+        def failed(metadata, _):
+            metadata["reruns"][0]["exit_code"] = 101
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} failed (101)",
+                      self.errors_with(failed))
+
+    def test_781_strength_an_unfinished_re_run_is_refused(self):
+        def unfinished(_, again):
+            again["end_time"] = None
+        self.assertIn(f"('wire', '0/1'): lone re-run of {self.NAME} unfinished or another tool",
+                      self.errors_with(unfinished))
+
+    def test_781_strength_two_re_runs_of_one_mutant_are_refused(self):
+        def twice(metadata, _):
+            metadata["reruns"].append(dict(metadata["reruns"][0]))
+        self.assertIn(f"('wire', '0/1'): two lone re-runs of {self.NAME}", self.errors_with(twice))
+
+    def test_781_strength_an_unknown_mark_is_refused(self):
+        def other(metadata, _):
+            metadata["timeout_rerun"] = 2
+        self.assertIn("('wire', '0/1'): unknown timeout method 2", self.errors_with(other))
+
+    def run_shard(self, pass_code=3, rerun_code=3):
+        """`run` on one shard whose pass times one mutant out, cargo and git faked: the
+        mark read from `run.json` when the pass starts, every command, the status."""
+        self.addCleanup(os.chdir, os.getcwd())
+        os.chdir(self.temp.name)
+        source = Path("src.rs")
+        source.write_text("fn f() -> usize {\n    0\n}\n")
+        hung = self.mutant(f"{source}:2:5: replace f -> usize with 1", file=str(source))
+        output, seen, calls = Path(self.temp.name) / "run", {}, []
+
+        def cargo(command, stdout=None, **_):
+            calls.append(command)
+            if "--list" in command:
+                stdout.write(json.dumps([hung]))
+                return subprocess.CompletedProcess(command, 0)
+            out = Path(command[command.index("--output") + 1]) / "mutants.out"
+            out.mkdir(parents=True)
+            if "--shard" in command:
+                seen["mark"] = json.loads((output / "run.json").read_text()).get("timeout_rerun")
+            nightly.write_json(out / "outcomes.json", self.outcomes([(hung, "Timeout")]))
+            return subprocess.CompletedProcess(command, pass_code if "--shard" in command
+                                               else rerun_code)
+
+        shard = ["cargo", "mutants", "--sharding", "round-robin", "--shard", "0/1"]
+        with patch("subprocess.run", side_effect=cargo), \
+                patch("subprocess.check_output", return_value="c" * 40), \
+                patch.object(nightly, "mutation_args", return_value=shard), \
+                patch("sys.stdout", new=io.StringIO()):
+            status = nightly.run(argparse.Namespace(
+                output=output, file=[str(source)], plan=None, surface="wire", shard="0/1",
+                commit=None))
+        return status, seen, calls, json.loads((output / "run.json").read_text())
+
+    def test_781_strength_run_writes_the_mark_before_the_pass(self):
+        status, seen, calls, metadata = self.run_shard()
+        self.assertEqual(seen["mark"], 1)
+        self.assertEqual(metadata["timeout_rerun"], 1)
+        self.assertEqual((status, metadata["exit_code"], len(metadata["reruns"])), (3, 3, 1))
+
+    def test_781_strength_the_lone_command_carries_the_shard_s_limits(self):
+        _, _, calls, _ = self.run_shard()
+        lone = calls[-1]
+        self.assertNotIn("--shard", lone)
+        # Each once: `run` stores the pass's command with its limits, and clap refuses an
+        # option given twice (the lone command composed through `run`, not by hand).
+        self.assertEqual([lone.count(flag) for flag in (
+            "--minimum-test-timeout", "--timeout-multiplier", "--build-timeout", "--jobs",
+            "--output")], [1, 1, 1, 1, 1])
+        pairs = {lone[i]: lone[i + 1] for i in range(len(lone) - 1)}
+        self.assertEqual({flag: pairs.get(flag) for flag in (
+            "--minimum-test-timeout", "--timeout-multiplier", "--build-timeout", "--jobs")},
+            {"--minimum-test-timeout": str(nightly.MINIMUM_TEST_TIMEOUT["wire"]),
+             "--timeout-multiplier": str(nightly.TEST_TIMEOUT_MULTIPLIER),
+             "--build-timeout": "300", "--jobs": "1"})
+        # The pass's limits are the same words.
+        self.assertEqual(calls[1][calls[1].index("--minimum-test-timeout"):
+                                  calls[1].index("--output")], nightly.timeout_args("wire"))
+
+    def test_781_strength_a_failed_re_run_is_the_run_s_status(self):
+        status, _, _, metadata = self.run_shard(rerun_code=101)
+        self.assertEqual((status, metadata["exit_code"]), (101, 3))
+        self.assertEqual(metadata["reruns"][0]["exit_code"], 101)
+
+    def test_781_strength_a_failed_pass_runs_no_re_run(self):
+        status, _, calls, metadata = self.run_shard(pass_code=1)
+        self.assertEqual((status, len(calls)), (1, 2))
+        self.assertNotIn("reruns", metadata)
+
+    def test_781_strength_no_mutant_log_is_packaged(self):
+        for outcome in ("Timeout", "CaughtMutant"):
+            with self.subTest(outcome=outcome):
+                run = Path(self.temp.name) / f"run-{outcome}"
+                where = run / "rerun" / "0"
+                (where / "mutants.out" / "log").mkdir(parents=True)
+                (where / "line.diff").write_text("--- a/x\n")
+                nightly.write_json(where / "mutants.out" / "outcomes.json", {})
+                (where / "mutants.out" / "log" / "0.log").write_text(
+                    "Running `/home/runner/target/debug/deps/wire_codec-1a2b`\n")
+                (where / "mutants.out" / "debug.log").write_text("host\n")
+                nightly.write_json(run / "run.json", {"reruns": [{
+                    "index": 0, "rerun": {"outcome": nightly.OUTCOMES[outcome],
+                                          "log": "log/0.log"}}]})
+                nightly.write_json(run / "candidates.json", [])
+                artifact = Path(self.temp.name) / f"artifact-{outcome}"
+                nightly.package(argparse.Namespace(run=run, output=artifact))
+                kept = sorted(str(p.relative_to(artifact / run.name))
+                              for p in (artifact / run.name).rglob("*") if p.is_file())
+                self.assertEqual(kept, ["candidates.json", "rerun/0/line.diff",
+                                        "rerun/0/outcomes.json", "run.json"])
+
+    def test_781_strength_the_previous_record_s_survivors_read_under_its_own_rule(self):
+        import mutants_record as record
+        before = {"src/script/a.rs": {"missed": 1, "timeout": 2},
+                  "src/wallet/b.rs": {"missed": 3, "timeout": 4}}
+        self.assertEqual(record.previous_survivors({}, before), 10)
+        self.assertEqual(record.previous_survivors({}, before, gate=True), 3)
+        self.assertEqual(record.previous_survivors({"timeout_rule": "rerun"}, before), 4)
+        self.assertEqual(record.previous_survivors({"timeout_rule": "rerun"}, before, True), 1)
+
+    def test_781_strength_every_metacharacter_a_name_carries_is_escaped(self):
+        import re
+        name = r"src/a.rs:1:2: replace f(x) <T> + * | [i] . ? ^ $ {n} \ with -~#&"
+        self.assertEqual(nightly.exact_name(name),
+                         r"^src/a\.rs:1:2: replace f\(x\) <T> \+ \* \| \[i\] \. \? \^ \$ "
+                         r"\{n\} \\ with \-\~\#\&$")
+        # `<` and `>` stay as they are: Rust's `regex::escape` leaves them, and `\<`, `\>`
+        # are word boundaries since regex 1.10.
+        self.assertTrue(re.fullmatch(nightly.exact_name(name), name))
+
+    # The keeper's word of 2026-11-04 16:1xZ, refined: a timeout-only file is UNJUDGED.
+    OTHER = "src/wallet/wire/framing.rs"
+    OTHER_NAME = "src/wallet/wire/framing.rs:4:5: replace h -> usize with 0"
+
+    # The keeper's word of 16:2xZ: a gate path is floored (GATE_FLOOR), never unclaimed.
+    GATE = "src/script/spend/key_point.rs"
+    GATE_NAME = "src/script/spend/key_point.rs:4:5: replace h -> usize with 0"
+
+    def split_shard(self, rerun="Timeout", gate=False):
+        """The witness's shard with its hung mutant moved to OTHER (`gate`: to GATE): its
+        one mutant timed out in the pass and, under `rerun`, again alone (Unviable: the
+        compiler's)."""
+        if gate:
+            self.OTHER, self.OTHER_NAME = self.GATE, self.GATE_NAME
+        path = self.shard("Timeout")
+        hung = self.mutant(self.OTHER_NAME, file=self.OTHER)
+        candidates = json.loads((path / "candidates.json").read_text())
+        nightly.write_json(path / "candidates.json", candidates[:3] + [hung])
+        outcomes = json.loads((path / "outcomes.json").read_text())
+        outcomes["outcomes"][4]["scenario"]["Mutant"] = hung
+        if rerun == "Unviable":
+            outcomes["outcomes"][4]["summary"] = "Unviable"
+            outcomes["timeout"], outcomes["unviable"] = 0, 1
+        nightly.write_json(path / "outcomes.json", outcomes)
+        metadata = json.loads((path / "run.json").read_text())
+        metadata["files"].append(self.OTHER)
+        if rerun == "Unviable":
+            metadata["reruns"] = []
+            shutil.rmtree(path / "rerun")
+        else:
+            metadata["reruns"][0].update(file=self.OTHER, mutant=self.OTHER_NAME)
+            again = json.loads((path / "rerun" / "0" / "outcomes.json").read_text())
+            again["outcomes"][1]["scenario"]["Mutant"] = hung
+            nightly.write_json(path / "rerun" / "0" / "outcomes.json", again)
+        nightly.write_json(path / "run.json", metadata)
+
+    def other_row(self, result):
+        return {row["file"]: row for row in result["files"]}[self.OTHER]
+
+    def test_781_an_unfloored_timeout_only_file_fails_on_the_default_floor(self):
+        # The keeper's word of 16:2xZ: the default the judge reds a file elsewhere below
+        # (GATE_FLOOR, no `mutation_floors` entry) is a number the night enforces.
+        import mutants_record as record
+        self.split_shard("Timeout")
+        status, result, markdown = self.report()
+        row = self.other_row(result)
+        self.assertEqual(status, 1)
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["errors"], [f"floor has no measured file: {self.OTHER}"])
+        self.assertEqual((row["generated"], row["timeout"], row["viable"]), (1, 1, 0))
+        self.assertTrue(row.get("unjudged"))
+        self.assertIs(row["passed"], False)
+        self.assertFalse(row["no_viable"])
+        self.assertIn(f"| `{self.OTHER}` | 0 | 0 | 1 | 0 | n/a | 80% | FAIL |", markdown)
+        self.assertNotIn("NO VIABLE MUTANTS |", markdown)
+        self.assertEqual([r["mutant"] for r in result["timeouts"]], [self.OTHER_NAME])
+        self.assertEqual(record.status(row), "FAIL")
+        # UNJUDGED and green is a carried row's alone (`merge`: the night reds no carried
+        # figure), counted apart under the re-run rule.
+        self.assertEqual(record.status(dict(row, passed=None)), "UNJUDGED")
+        self.assertIn("UNJUDGED", record.statuses("rerun"))
+        self.assertNotIn("UNJUDGED", record.statuses("counted"))
+
+    def test_781_a_timeout_only_gate_path_is_floored_and_fails(self):
+        import mutants_record as record
+        self.split_shard("Timeout", gate=True)
+        self.assertTrue(nightly.is_gate_path(self.OTHER))
+        status, result, markdown = self.report()
+        row = self.other_row(result)
+        self.assertEqual(status, 1)
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["errors"], [f"floor has no measured file: {self.OTHER}"])
+        self.assertTrue(row.get("unjudged"))
+        self.assertIs(row["passed"], False)
+        self.assertEqual(row["floor_percent"], nightly.GATE_FLOOR)
+        self.assertIn(f"| `{self.OTHER}` | 0 | 0 | 1 | 0 | n/a | 80% | FAIL |", markdown)
+        self.assertEqual(record.status(row), "FAIL")
+
+    def test_781_a_floored_timeout_only_file_fails_on_its_floor_alone(self):
+        nightly.write_json(self.floors, {"mutation_floors": {
+            self.FILE: {"percent": 100}, self.OTHER: {"percent": 100}}})
+        self.split_shard("Timeout")
+        status, result, markdown = self.report()
+        row = self.other_row(result)
+        self.assertEqual(status, 1)
+        self.assertTrue(result["complete"])
+        self.assertIs(row["passed"], False)
+        self.assertEqual(result["errors"], [f"floor has no measured file: {self.OTHER}"])
+        self.assertIn(f"| `{self.OTHER}` | 0 | 0 | 1 | 0 | n/a | 100% | FAIL |", markdown)
+
+    def test_781_a_file_the_compiler_refuses_whole_stays_no_viable_under_the_re_run(self):
+        self.split_shard("Unviable")
+        status, result, markdown = self.report()
+        row = self.other_row(result)
+        self.assertEqual(status, 0, result["errors"])
+        self.assertEqual(result["timeout_rule"], "rerun")
+        self.assertTrue(row["no_viable"])
+        self.assertFalse(row.get("unjudged", False))
+        self.assertIn(f"| `{self.OTHER}` | 0 | 0 | 0 | 1 | n/a | 80% | NO VIABLE MUTANTS |",
+                      markdown)
 
 
 class PinIsTheDispatchCommit(unittest.TestCase):

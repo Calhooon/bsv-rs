@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the oracle's timeout judge: a timed-out mutant re-run once alone; a second timeout a row outside the score's denominator, never a survivor nor a kill (#781)
+
+The keeper's word of 2026-11-04 15:2xZ: "a mutant that times out is re-run once,
+alone, under the stated method (the base re-timed, the TMPDIR artefact read);
+one that times out again is excluded from the score's denominator and recorded
+as a timeout row ..., never a survivor and never a kill." Until now a timeout
+counted as not caught (`viable = caught + missed + timeout`), so one hang under
+a floor of 100 turned the night red, and the 2026-11-04 complete run's 16 timeouts
+(eight on the script surface, three in BEEF, five in `raw_tree.rs`) were listed
+among its 332 survivors. `nightly_mutants.py run` now re-runs each mutant the
+shard's pass timed out, alone, inside the shard's step: the shard's command
+without its sharding, an anchored `--re` of the exact name and a one-line
+`--in-diff` of its start line (cargo-mutants 27.1.0 lists every `StructField`
+mutant whatever `--re` says), the baseline run again, the same limits, `--jobs
+1`, its own `rerun/<n>/`; `run.json` carries the mark (`timeout_rerun: 1`) and
+both passes per mutant, and `package` keeps each re-run's outcomes and its
+one-line diff. `report` judges `viable = caught + missed`, the re-run's
+outcome the mutant's, a second timeout in a table of its own (the file, the
+mutant, the shard, both durations, the method, the test the log names), and
+fails closed on a timeout without its lone re-run, on a re-run that ran more
+than its mutant or lacks a green re-timed baseline, and on shards under two
+rules. Evidence without the mark keeps its rule: `mutants_record.py write`
+re-derives `docs/census/mutants-2026-11-04.md` and `.json` byte for byte from
+run 41753882105's artifacts. The record lists a twice-timed-out mutant as a
+timeout row (its own `.md` section and `.json` member, `timeouts`), and the
+survivor term counts the timed-out passes' minutes and the re-runs' baselines
+under their own heading. The floors are unchanged: the score rounded down,
+never lowered, no margin. Pinned by
+`test_781_a_floor_at_100_with_a_second_timeout_passes_and_writes_the_row` and
+its siblings in `.github/scripts/test_nightly_mutants.py` (`TimeoutReRun781`:
+the re-run caught reads caught, missed reads missed, a missing re-run fails
+closed, evidence before the method keeps the old rule), each of the four RED on
+the base. `docs/NIGHTLY.md` ("What runs", "Score and evidence") and
+`docs/lanes/fix-781.md` carry the method. A file whose every judged mutant
+timed out twice reads `UNJUDGED` (the keeper's word of 2026-11-04 16:1xZ):
+listed by name in the record and, wherever the night enforces a number for the
+file (a `mutation_floors` entry, a gate path's 80, the 80 a file elsewhere is
+held to by default; the keeper's word of 16:2xZ), failing closed with `floor has
+no measured file`, green only on a carried row, whose figure the night reds
+nowhere; `NO VIABLE MUTANTS` stays the label for a file the compiler refuses
+whole (`test_781_a_floored_timeout_only_file_fails_on_its_floor_alone`,
+`test_781_an_unfloored_timeout_only_file_fails_on_the_default_floor`,
+`test_781_a_timeout_only_gate_path_is_floored_and_fails`). The packaged
+evidence keeps no mutant log (a second timeout's log carried host paths, the
+rustc line and the whole libtest output; what it names stays in `run.json`'s
+`named`), and the lone command carries the shard's four limits once, where `run`'s
+in-place command gave them twice and cargo-mutants' clap would refuse every
+re-run (exit 1, the night failing closed); the `test_781_strength_*` tests
+witness each fail-closed line, all 41 one-line reversions of the judge red, and
+the record reads the previous record's survivors under its own rule.
+
+### Notes: cross-SDK parity
+
+No SDK behaviour moves. The outcome classes are cargo-mutants' own (27.1.0's
+`CaughtMutant`, `MissedMutant`, `Timeout`, `Unviable`): a timeout stays its own
+class through the judge and the record, as the tool reports it.
+
 ### Changed: `resolve_by_identity_key` returns every admitted identity in the reference's order, the trust step ported as far as this crate holds it (#737, the list; the owner's word)
 
 The owner's word of 2026-11-04 13:5xZ on #737's held item: the door takes

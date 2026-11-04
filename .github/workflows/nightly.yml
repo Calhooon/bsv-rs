@@ -496,11 +496,15 @@ jobs:
             --plan "$RUNNER_TEMP/plan/plan.json" \
             --output "$RUNNER_TEMP/mutations/$LABEL" || status=$?
           # Misses (2) and timeouts (3) are judged by the per-file floor below.
+          # Inside `run`, each mutant the pass timed out is re-run once alone
+          # (#781: the baseline re-timed, under this job's timeout-minutes);
+          # a second timeout is a row outside the score's denominator.
           # Baseline, setup and runner failures remain failures of this job.
           if [[ "$status" != 0 && "$status" != 2 && "$status" != 3 ]]; then
             exit "$status"
           fi
 
+      # The re-runs' outcomes and one-line diffs are kept, no mutant log (#781).
       - name: Package the outcomes and mutant diffs
         if: always()
         run: |

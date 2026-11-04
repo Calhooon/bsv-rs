@@ -133,7 +133,19 @@ at a time.
 Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a test timeout
 of three times its baseline's test time, never under 120 seconds (300 for BEEF;
 `MINIMUM_TEST_TIMEOUT`'s floors, the fixed timeouts until #685), and a 300-second
-build timeout per mutant. A job is limited to
+build timeout per mutant. A mutant that times out in the shard's pass is re-run
+once, alone, inside the same `run` (#781, the keeper's word of 2026-11-04
+15:2xZ): the shard's command without its sharding, the mutant's exact name as an
+anchored `--re` (escaped as Rust's `regex::escape` escapes) and a one-line
+`--in-diff` of its start line, the text unchanged (cargo-mutants 27.1.0 lists
+every `StructField` mutant of the files whatever `--re` and `--exclude-re` say,
+nine at `8264a95d`; the line leaves them out and the name leaves out the line's
+other mutants), the baseline run again so its timeout is derived from the shard
+as it is then (the base re-timed), the same limits, `--jobs 1`, and its own
+`--output`, `rerun/<n>/`. The re-run's outcome is the mutant's: caught or missed
+replaces the pass's timeout; a second timeout stays one. `run.json` carries the
+mark (`timeout_rerun: 1`) and each re-run (the mutant, both passes' outcomes,
+seconds and logs, the test each log names, the command, the method). A job is limited to
 six hours. A failed baseline, interrupted job or missing shard fails the score
 check. These limits bound work; they never turn an unfinished run into a score.
 
@@ -361,27 +373,78 @@ The `mutation-summary` artifact holds the same table as Markdown and
 `mutation-summary.json`. The `mutants-SURFACE-SHARD` artifacts hold the generated
 candidate list, source commit, exact command, outcomes and diffs. Retention is
 30 days. They omit `lock.json`, debug logs and arbitrary test output, which can
-carry host metadata or test values. Download evidence before retention expires;
+carry host metadata or test values; since #781 they keep each lone re-run's
+`rerun/<n>/outcomes.json` and `line.diff` and no log of any mutant: what a
+second timeout's log names (the last test binary's file name, the tests libtest
+saw running past a minute) is read into `run.json`'s `named` when the re-run
+ends, and the timeout table reads it there (the strength read of #784: the
+kept log carried host paths, the full rustc line and the whole libtest output).
+Download evidence before retention expires;
 on a lane host, keep it under `/Volumes/Lanes/out/bsv-rs/oracle-nightly/`.
 
 For each file:
 
 ```text
-viable = caught + missed + timeout
+viable = caught + missed
 score = 100 * caught / viable
 pass = 100 * caught >= floor * viable
 ```
 
-Unviable mutants are reported but excluded from the denominator. A timeout is
-not a caught mutant. A file with generated mutants but no viable result fails.
+Unviable mutants are reported but excluded from the denominator. A mutant that
+timed out in its shard's pass is judged by its lone re-run (above, "What
+runs"): caught or missed as it reads there; one that times out again is excluded
+from the denominator and listed in the report's timeout table (the file, the
+mutant, the shard, both passes' seconds, the method, the test the log names),
+each its own row, an environment artefact or a hang read from that test: never
+a survivor and never a kill, as cargo-mutants keeps `Timeout` a class apart
+(#781, the keeper's word of 2026-11-04 15:2xZ: no margin on a floor; the judge,
+not the floor, carries a timeout). A file with generated mutants whose every
+judged mutant timed out twice (`viable = 0`, at least one timeout row) reads
+`UNJUDGED`, never `NO VIABLE MUTANTS` (the compiler's label, below), its
+mutants in the timeout table and the file listed by name in the record's census,
+so nothing drops in silence (#781, the keeper's word of 2026-11-04 16:1xZ). The
+rule in one line (the keeper's word of 16:2xZ): wherever the night enforces a
+number for a file (an explicit `mutation_floors` entry, the 80 of a gate path,
+or the 80 a file elsewhere without an entry is held to), a timeout-only file
+fails closed, with the one error `floor has no measured file: <file>` and the
+Result `FAIL`; `UNJUDGED` and green only where the night claims nothing for the
+file and measures it for the record alone. Every file a night judges has such a
+number, so a timeout-only file it judges fails; `UNJUDGED` and green is a carried
+row's (the night reds no carried figure; a carried row with an explicit entry
+still fails on that floor). `TimeoutReRun781` pins the floored, the default and
+the gate cases.
 Files generating no mutants are listed as `NO MUTANTS`, without a numeric score.
+The report's Result column, whole: `PASS`, `FAIL`, `NO MUTANTS`, `NO VIABLE
+MUTANTS` (every mutant unviable), `UNJUDGED` (every judged mutant timed out
+twice, on a carried row; #781) and `PARTIAL` (a surface of the file incomplete).
 The check requires every candidate to have exactly one recognized outcome,
-successful baselines, matching tool versions, matching source commits and
+every timeout its lone re-run (the re-run finished, its re-timed baseline
+green, the one mutant alone in it, its outcome the one `run.json` records),
+one timeout rule across the shards, successful baselines, matching tool versions, matching source commits and
 every shard of the plan (`report --plan`; a local replay's `--expected-shards`). Duplicate, missing, corrupt or unfinished evidence fails closed.
 The integer comparison avoids accepting a displayed percentage rounded upward.
 
+Evidence from before #781 (the 2026-11-01 and 2026-11-04 runs' artifacts, whose
+`run.json` carries no `timeout_rerun` mark and no `rerun/`) is judged under its
+own rule, `viable = caught + missed + timeout`, the timeout counted as not
+caught: `mutants_record.py write` re-derives `docs/census/mutants-2026-11-04.md`
+and `.json` byte for byte from run 41753882105's artifacts, and a carried
+record row keeps the denominator it was measured with (`judge` reads the row's
+`viable`).
+
+A complete run's record compares a run with the record before it, and the two
+may be under different rules. Under the re-run the record says which: the
+previous record's survivors are read under its own rule (`previous_survivors`:
+a record without `timeout_rule` counted its timeouts as survivors, a marked one
+did not; `totals.previous_timeout_rule` names it), and the survivor term's
+share of minutes has the timed-out passes and the re-runs' baselines in its
+denominator, which a record before #781 has not, so the two shares are not one
+measure (the record's legend says so). A record under the old rule is written
+as it was.
+
 A file whose generated mutants are all unviable (each replacement refused by
-the compiler, so nothing a test can catch) is listed as `NO VIABLE MUTANTS`,
+the compiler, so nothing a test can catch; no timeout row) is listed as
+`NO VIABLE MUTANTS`,
 without a score, when its surface has viable mutants elsewhere; if a surface
 has no viable mutant at all, the build is read as broken and every such file
 fails (#81's fail-closed intent, kept). `src/wallet/substrates/http_json/answer.rs`
