@@ -748,6 +748,17 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// BRC-100 wallet's `discoverByIdentityKey`, whose trust step, page and
     /// argument check are not ported, #739).
     ///
+    /// The question is `{ identityKey }`, the key the reference overlay's
+    /// `ls_identity` allowlist admits (`IdentityLookupService.ts:74-82` at
+    /// `ts-stack@edf6e03`); until #754 it carried `certificatesOnly: true`,
+    /// a key that allowlist refuses for the whole question. The reference
+    /// wallet adds `certifiers`, its trust settings' keys (`Wallet.ts:992,1004`);
+    /// with no trust settings here, no certifier is named: the certifier
+    /// narrowing is the wallet door's, by its trust settings, above this one,
+    /// and the overlay answers the subject's certificates of every certifier,
+    /// at most its default page of 10 (`IdentityLookupService.ts:83`),
+    /// unpaged here.
+    ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
     ///
@@ -756,7 +767,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         identity_key: &str,
     ) -> Result<Vec<VerifiableCertificate>> {
-        let query = serde_json::json!({ "identityKey": identity_key, "certificatesOnly": true });
+        // The key alone, as the reference overlay admits it (#754)
+        let query = serde_json::json!({ "identityKey": identity_key });
         self.discover_of_subject(identity_key, query).await
     }
 
