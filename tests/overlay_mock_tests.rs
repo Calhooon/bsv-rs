@@ -639,9 +639,9 @@ async fn test_lookup_resolver_records_reputation() {
     // global reputation tracker.
     let mock = Arc::new(MockLookupFacilitator::new());
 
-    let answer = LookupAnswer::Freeform {
-        result: serde_json::json!({"ok": true}),
-    };
+    // An empty output list is a success, as the reference records it; a
+    // freeform answer records nothing (#760).
+    let answer = LookupAnswer::OutputList { outputs: vec![] };
     mock.add_response("http://rep-host:8080", answer).await;
 
     let mut host_overrides = HashMap::new();
@@ -670,13 +670,9 @@ async fn test_lookup_resolver_records_reputation() {
     // Check the global reputation tracker recorded the interaction
     let tracker = get_overlay_host_reputation_tracker();
     let snapshot = tracker.snapshot("http://rep-host:8080");
-    // The host should have been recorded (either success or it might
-    // not match since the Freeform answer validation is nuanced)
-    // We verify the tracker is accessible and functional
-    assert!(
-        snapshot.is_some(),
-        "Reputation tracker should have a record for the host"
-    );
+    let snapshot = snapshot.expect("Reputation tracker should have a record for the host");
+    assert_eq!(snapshot.total_successes, 1);
+    assert_eq!(snapshot.consecutive_failures, 0);
 }
 
 // =============================================================================

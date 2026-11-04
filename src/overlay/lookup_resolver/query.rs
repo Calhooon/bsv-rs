@@ -14,7 +14,10 @@ impl LookupResolver {
     /// Execute a lookup query.
     ///
     /// Discovers competent hosts and queries them in parallel,
-    /// aggregating results.
+    /// aggregating results. Each host's answer feeds the global host
+    /// reputation as the reference's does (#760): an output list, empty or
+    /// not, a success; a freeform answer nothing, a backoff kept; an error or
+    /// any other answer a failure.
     ///
     /// # Arguments
     ///
@@ -120,15 +123,19 @@ impl LookupResolver {
         for (host, result, elapsed) in results {
             match result {
                 Ok(answer) => {
-                    // Validate the response
-                    let is_valid = matches!(&answer, LookupAnswer::OutputList { outputs } if !outputs.is_empty())
-                        || matches!(&answer, LookupAnswer::Freeform { .. });
-
-                    if is_valid {
-                        self.reputation_tracker.record_success(&host, elapsed);
-                    } else {
-                        self.reputation_tracker
-                            .record_failure(&host, Some("Invalid lookup response"));
+                    // The reference's accounting (#760): any output list a
+                    // success, the empty one included (`ts-stack@edf6e03`
+                    // `LookupResolver.ts:2395-2398`, `ts-sdk@9e3ede6`
+                    // `:518-528`); a freeform answer neutral, nothing
+                    // recorded (`edf6e03` `:2399-2402`); any other a failure.
+                    match &answer {
+                        LookupAnswer::OutputList { .. } => {
+                            self.reputation_tracker.record_success(&host, elapsed)
+                        }
+                        LookupAnswer::Freeform { .. } => {}
+                        LookupAnswer::Formula { .. } => self
+                            .reputation_tracker
+                            .record_failure(&host, Some("Invalid lookup response")),
                     }
 
                     match answer {

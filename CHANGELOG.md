@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the lookup resolver records success for any output list and keeps a freeform answer neutral, as the reference's host reputation does (#760)
+
+From the strength read of PR #759 (#754, 2026-11-04 09:1xZ), outside that
+row: `LookupResolver` read a host's answer as valid only when it was an
+output list with at least one output or a freeform answer, and recorded
+`Invalid lookup response` as a host failure for an empty output list
+(`src/overlay/lookup_resolver/query.rs:122-132` at `8601c66b`). Both
+references record a success for any output list, the empty one included:
+`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/LookupResolver.ts:2395-2398`
+(`isOutputListAnswer`, then `recordSuccess`) and `ts-sdk@9e3ede6`
+`src/overlay-tools/LookupResolver.ts:518-528` (`answer.type === 'output-list'
+&& Array.isArray((answer).outputs)`, then `recordSuccess`). The host
+reputation tracker is one global keyed by host URL with two failures of grace
+and a backoff of 1 s doubling to 60 s, so three lookups answered empty (a
+subject with no certificates, a key with no record) backed that host off for
+every resolver in the process, and the next identity, kvstore or registry
+lookup against it failed with `All competent hosts for <service> are backing
+off`. The site now records a success for every output list. A freeform answer
+recorded a success here, which cleared any backoff; `edf6e03` treats it as
+neutral (`:2399-2402`: "A valid freeform response is neutral: it proves this
+request reached the service, but it must not erase an availability backoff",
+then `if (isFreeformAnswer(normalizedAnswer)) return normalizedAnswer`, no
+call on the tracker), and so does this crate now: nothing is recorded, neither
+success nor latency nor failure. A `formula` answer stays a failure with
+`Invalid lookup response`, the text `ts-sdk@9e3ede6` records for it too
+(`:527`; `edf6e03`'s normalizer refuses it as `Malformed lookup response`,
+`:2388-2392`, `:2403-2405`); the text is the tracker's recorded reason, matched
+by no reader in the crate.
+
+`tests/lookup_host_accounting_760.rs`, a recording facilitator in #752's shape
+answering from a script, each test on its own `.invalid` host: four lookups
+answered with an empty output list are all answered, and two failures, a
+freeform answer, a failure, then a fifth lookup refused as backing off; a third
+test (the #761 strength read's line) has a host that only ever answered
+freeform leave no tracker record at all, RED on `b285d621` (the freeform
+success of the old rule made a record). The two RED on `8601c66b` (a scratch copy, its own target dir, the test file copied
+in): `lookup 4: Err(OverlayError("All competent hosts for
+ls_host_accounting_760 are backing off for approximately 1000ms"))` and
+``called `Result::unwrap_err()` on an `Ok` value: OutputList { outputs: [] }``
+(the freeform success had reset the count, so the third failure fell inside
+the grace). `tests/identity_question_752.rs` is unchanged: its three empty
+answers on one host sat at the edge of the backoff and are now successes.
+`tests/overlay_mock_tests.rs`'s `test_lookup_resolver_records_reputation`
+answered a freeform result and asserted only that the host had a record (the
+old freeform success); it now answers an empty output list and asserts the
+one success.
+
+Semver: a behaviour change in the host reputation accounting with no
+signature change. Migration: none for a caller; an empty answer no longer
+backs a host off, and a freeform answer no longer clears a backoff.
+
+### Notes: cross-SDK parity (#760)
+
+The non-empty rule was this crate's own: neither reference had it. The
+freeform reading follows `ts-stack@edf6e03`; the older `ts-sdk@9e3ede6`
+records a failure for a freeform answer (`:518-528`, its `isValid` reading
+the output list alone), a reading this crate did not have before and does not
+take now. One error class stays a failure here, older than #760 and outside
+it: `edf6e03` keeps a semantic HTTP rejection neutral (a 4xx other than 408,
+425 and 429, `:816-827`; `throwTrackedLookupFailure` throws it before
+`recordFailure`, `:2416`, as it does a resource limit, `:2415`), where this
+crate's facilitator answers every non-2xx as an error
+(`src/overlay/facilitators.rs:174-178`) and the resolver records it as a
+failure (found by #760's cold read).
+
 ### Fixed: `discover_certificates` asks `ls_identity` as the reference wallet does, without the `certificatesOnly` key the overlay's allowlist refuses (#754)
 
 From the #752 lane's reading of the reference overlay (2026-11-04 08:0xZ):
