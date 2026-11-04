@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the evidence walk's visited set pinned (a grandparent shared by two unproven paths; a proven grandparent reached twice), witnessed under Node 22 (#748)
+
+No behaviour change. From #747's strength read, which held that no pin of
+#730, #736 or #741 reaches a node of the unconfirmed graph twice, so the
+visited set of `assert_unconfirmed_graph` (`TransactionEvidence.ts:162-166`
+at `ts-stack@edf6e03`) could go with every pin green. That was not so: #736's
+subject reaches its unproven parent 2048 times and #741's parents reach the
+proven G 4094 times, and with the set's skip removed both go RED (the inputs
+sum and the script-bytes sum). The two shapes here pin the set directly.
+`tests/vectors/identity_evidence_748.json` is written by
+`tests/support/identity_evidence_748.mjs` (#741's helpers copied, its vector
+untouched) with the reference's own writers under Node v22.18.0, its replay
+also run with the set's skip removed; two runs are byte-identical.
+
+- **A grandparent shared by two unproven paths**: the subject spends P1:0
+  and P2:0, both unproven; P1 spends G:0 and P2 G:1; G is unproven and spends
+  GG:0; GG is proven with no inputs. Read on both sides, G walked once.
+  Without the set GG:0 is spent twice, `invalid-evidence` at `:149`, and the
+  output is skipped.
+- **A proven grandparent reached twice**: the same parents over a proven G
+  with 4092 inputs whose sources are absent: 4096 over the graph, read on both
+  sides. Without the set the sum is 8188, `limit` at `:170-171`.
+
+`tests/identity_evidence_748.rs` rebuilds both BEEFs with this crate's
+writer to the recorded SHA-256 and serves them through
+`resolve_by_attributes` and `discover_certificates`; the unit module
+`src/identity/evidence_748_tests.rs` judges them with `parse_evidence`. In a
+scratch copy both are RED with the set's skip removed; with the skip kept for
+proven nodes alone, the shared unproven G is RED here (so is #736's inputs
+pin, and #741's stays green).
+
 ### Fixed: `IdentityClient::query` keeps only the certificates its question asked for (#746)
 
 From the strength read of PR #745 (#744, 2026-11-04 05:5xZ): `query` sent the
