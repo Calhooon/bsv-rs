@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the three BEEF shapes of the identity subject pick pinned against the reference (#725)
+
+No behaviour change. #724's strength read named three BEEF shapes the #721
+vector leaves. `tests/vectors/identity_beef_subject_725.json` is written by
+`tests/support/identity_beef_subject_725.mjs`, which uses the reference's own
+writers (`Beef.toBinary`, `toBinaryAtomic`; the order held for the absent
+subject, which `toBinaryAtomic` refuses), at `ts-stack@edf6e03` under Node
+v22.18.0; two runs are byte-identical. For each shape it records the bytes,
+`parseEvidence`'s pick or refusal, which check refused (replayed through
+`Beef`'s public methods) and `parseResults`' outcome.
+`tests/identity_beef_subject_725.rs` rebuilds all five BEEFs with this
+crate's writer (`to_writer`, `to_binary`, `to_binary_atomic`) to the recorded
+bytes: on these shapes the two writers' sorts agree, txid-only entry before the
+raw one and grandparent, parent, subject.
+
+- **An Atomic BEEF header naming an absent txid**: the reference skips it
+  (`findAtomicTransaction` is undefined, `TransactionEvidence.ts:118-121`).
+  At the public doors this crate never hands it to a parser:
+  `LookupResolver`'s dedup drops any output that `Transaction::from_beef`
+  refuses, as the reference's resolver does (`LookupResolver.ts:2232-2237`).
+  So the integration pin is GREEN on `0d8546c0` too. The parsers' own skip is
+  the unit test `src/identity/client_beef_subject_725_tests.rs`, RED on
+  `0d8546c0`, where `beef.txs.first()` read the token's transaction.
+- **A three-transaction chain** (a proven grandparent, an unproven parent
+  and subject), plain and atomic: read from its subject on both sides; RED on
+  `0d8546c0`, where the grandparent was read and skipped.
+- **A txid-only parent before a raw unproven subject**, plain and atomic:
+  read here and skipped by the reference (the row below); RED on `0d8546c0`,
+  where the txid-only entry, which holds no transaction, was read and skipped.
+
+### Notes: cross-SDK parity
+
+A txid-only parent before a raw unproven subject is skipped by the reference's
+discovery: `parseEvidence` selects the subject and `assertUnconfirmedGraph`
+refuses it, because the subject's input has no source transaction
+(`TransactionEvidence.ts:143`, `:155-177` at `edf6e03`). This crate's
+parsers run no unconfirmed-graph check, so they read it. This is #553's stated
+evidence-layer residue. #721's subject pick exposed it (the base skipped the
+shape by accident). It is pinned as this crate's reading in
+`a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_there_553_725`,
+and the residue sentence of `CLAUDE.md`'s #553 row now names it.
+
 ### Changed: `to_asm` writes `OP_0` and `OP_1NEGATE`, the reference's names, where it wrote `0` and `-1` (#723)
 
 `ScriptChunk::to_asm`, and through it `Script::to_asm`, `LockingScript::to_asm`
