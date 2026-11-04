@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Notes: cross-SDK parity (the empty ASM text, ts-stack #1479)
+
+`Script::from_asm("")` and a double space inside a text read as go-sdk v1.7.1's
+`NewFromASM` reads them (the empty script; `script/script.go:46-50`), where
+`ts-stack@edf6e03`'s `Script.fromASM('')` splits `''` into `['']` and reads the
+empty token as an unknown hex token, one chunk `{ data: [], op: 0 }`, an empty
+push (`Script.ts:73-82`, the token path `:92-125`), while its `toASM` of the
+empty script is `''` (`:222-229`); a double space inserts a silent empty push the
+same way. Filed upstream by the keeper as ts-stack #1479 (2026-11-04, the ask
+additive at the default). `CLAUDE.md`'s #603 shard A row and the #723 parity
+note now cite it: the divergence is from ts-sdk alone, the port's reading held
+as go-sdk's pending the filing; the owner's word on the empty ASM stays open on
+its brief with that recommendation. Records only; no code or test moved.
+
 ### Fixed: `merge_transaction` merges the transaction's merkle path as a BUMP and walks its source transactions, as the reference does (#764)
 
 From the #757 lane's reading (2026-11-04 10:2xZ) and the rule read of PR #763.
@@ -1220,7 +1234,12 @@ reference's text for both opcodes. go-sdk@2ca481c writes `0x00` as `OP_FALSE`
 (`script/opcodes.go:546`), which this crate and the reference read; its
 `NewFromASM` refuses the old `0` and `-1` (`ErrInvalidOpCode`). The row's
 `OP_UNKNOWN<n>` and `OP_RETURN` clauses stand, and so does #603 shard A's
-reading of `from_asm("")` and a double space, held pending the owner's word.
+reading of `from_asm("")` and a double space: go-sdk's reading (`NewFromASM("")`
+the empty script, `script/script.go:46-50` at v1.7.1), the divergence from
+ts-sdk alone (`fromASM('')` one empty push `{ data: [], op: 0 }` where
+`toASM` of the empty script is `''`, `Script.ts:73-82,92-125,222-229`), filed
+upstream as ts-stack #1479 (2026-11-04) and held pending it; the
+recommendation on the owner's brief is now to hold the port's reading.
 
 ### Fixed: the `ls_identity` parsers read the output from the BEEF's subject, as the reference's discovery does (#721)
 
