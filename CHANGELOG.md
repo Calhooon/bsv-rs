@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the hosted macOS leg of the Test Suite runs on the Intel image (`macos-15-intel`) while GitHub's arm64 capacity drops queued jobs; arm64 measured on the captains' Macs (#792)
+
+GitHub's wait, named as GitHub's: the two full-matrix witness runs on the #790
+fix (run 41870549678 at 16:44Z on `lane/fix-789`, run 41874342387 at 17:06Z on
+`witness-beta7` at `5d7acc7f`) had both macOS jobs dropped after fifteen minutes
+in the queue, each job annotated "The job was not acquired by Runner of type
+hosted even after multiple attempts" under GitHub's notice "Due to capacity
+constraints, jobs targeting macOS arm64 runners may experience longer queue
+times"; the ubuntu and windows jobs were green both times. The release run on a
+tag calls `ci.yml` with the same macOS jobs, so the publish gate of
+v0.9.0-beta.7 would have waited on the same dropped jobs. On the keeper's word
+(2026-11-04 17:3xZ): the hosted macOS arm64 job is a duplicate witness of what
+every lane of ours measures on the captains' arm64 Macs (the fix lane, the
+record lane and every read ran the suite on the Studio or the box that day), so
+`ci.yml`'s Test Suite matrix carries `macos-15-intel` (x86_64, outside the
+arm64 notice) in place of `macos-latest`, the macOS build and suite still proven
+in the publish's own run; `tests/arch_ci_pr_runs_the_required_set.rs` names the
+Intel entry in its matrix fixture. The witness is a `workflow_dispatch` of
+`ci.yml` on the fix branch over the full matrix, the Intel jobs green; the tag
+goes on this fix's merge commit. #792 stays open to return the arm64 entry when
+GitHub's capacity does, or to add it beside the Intel one as a non-gating leg.
+
 ### Tests: the four discovery tests ask a scripted tracker and assert exactly, hermetic with and without `http` (#779)
 
 From #769's lane and the reads of PR #778. The four unit tests

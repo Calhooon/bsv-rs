@@ -1039,14 +1039,14 @@ fn a_stale_full_set_exception_is_refused_naming_the_entry() {
 fn the_whole_test_matrix_on_a_pull_request_is_refused_cell_by_cell() {
     let ci = edited(
         &read(".github/workflows/ci.yml"),
-        "os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '[\"ubuntu-latest\", \"macos-latest\", \"windows-latest\"]' || '[\"ubuntu-latest\"]') }}",
-        "os: [ubuntu-latest, macos-latest, windows-latest]",
+        "os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '[\"ubuntu-latest\", \"macos-15-intel\", \"windows-latest\"]' || '[\"ubuntu-latest\"]') }}",
+        "os: [ubuntu-latest, macos-15-intel, windows-latest]",
     );
     let errors = pr_refusals(&ci, "main", REQUIRED_ON_MAIN);
     assert_eq!(
         errors,
         [
-            "job `test` runs `Test Suite (macos-latest, stable)` on a pull request into main, not a required context there",
+            "job `test` runs `Test Suite (macos-15-intel, stable)` on a pull request into main, not a required context there",
             "job `test` runs `Test Suite (windows-latest, stable)` on a pull request into main, not a required context there",
         ]
     );
@@ -1054,7 +1054,7 @@ fn the_whole_test_matrix_on_a_pull_request_is_refused_cell_by_cell() {
     assert_eq!(
         errors,
         [
-            "job `test` runs `Test Suite (macos-latest, stable)` on a push to beta, not a required context there",
+            "job `test` runs `Test Suite (macos-15-intel, stable)` on a push to beta, not a required context there",
             "job `test` runs `Test Suite (windows-latest, stable)` on a push to beta, not a required context there",
         ]
     );
