@@ -7,3438 +7,1300 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added: the complete run's record of 2026-11-04 (run 41753882105 at `2ff81a44`): the scores, the floors raised, the survivors per file, the survivor term for #705 (#602, #705)
-
-The complete run 41753882105 (`nightly.yml -f mode=complete` on beta, pinned
-`2ff81a44`, dispatched 2026-11-04 01:24:50Z, the corpus at ts-stack `edf6e03`,
-cargo-mutants 27.1.0, rustc 1.99.1, 23 shards at six at a time under the
-4,000,000 KB ceiling) is recorded in `docs/census/mutants-2026-11-04.md` and
-`.json`. Its mutation part ran 13h35m (the last shard ended 14:59:33Z, the
-score job 14:59:46Z; the fuzz jobs after it are not the record's), 4,438
-job-minutes over 4,902 mutants. The 12:00Z checkpoint ran under the keeper's
-bound rule of 2026-11-04 in place of the twelve-hour cancel (the end projected
-by the mean before 15:00Z, the bound the longest measured end plus thirty
-minutes, no cancel), and the record's producing run says so (`write
---checkpoint`). Every one of the 85 measured files passes: 80
-PASS, 0 FAIL and 5 NO MUTANTS under the floors at `2ff81a44`; 80 PASS, 4 NO
-MUTANTS and 1 NO VIABLE MUTANTS under the raised floors; 72 PASS and 8 FAIL at
-80 everywhere (the eight floored files below 80). 332 survivors, 152 on the gate
-paths, where the 2026-11-01 widened run left 1,583 and 548.
-
-The floors: `mutants_record.py floors --write` raised 27 of `docs/ratchets.json`'s
-29 `mutation_floors` entries to the run's scores rounded down (the substrates'
-`http_json.rs` 50 to 92, `http_wire.rs` 15 to 93, `result_values/raw_tree.rs` 19
-to 57; the wire's `bounds.rs` 68 to 97, `mod.rs` 60 to 97, `transceiver.rs` 40
-to 100, among them) and held `wire/diagnostics.rs` at 0 and `wire/processor.rs`
-at 60, their figures; no entry added. None of the 29 files' source moved
-between `2ff81a44` and `4ed58d05`, and the tip's selections hold every target
-the run's did, so the raised floors stand at the tip (`tools/ratchet/run
---check --against 4ed58d05`: pass).
-
-The survivor term for #705, measured by each mutant's build and test phases:
-the 332 survivors took 779 minutes and the 4,136 kills 3,496, 17.8 percent of
-the 4,369 minutes for the survivors (2.35 minutes a survivor, 0.85 a kill):
-script 252 of 1,513 minutes (16.7 percent), BEEF 20 (4.8), Merkle 1.4 (4.1),
-wire 60 (9.7), substrates 445 of 1,787 (24.9). The kills carry the run, where
-#705's row read the survivors as its cost. The measured rates a mutant (script
-0.71, BEEF 0.56, Merkle 0.37, wire 0.79, substrates 1.57 minutes) set the
-complete run at 1.21 times the slope's 3,669 shard-minutes and 0.78 of the
-two-part 5,717 (`docs/NIGHTLY.md`, "The measured complete run").
-
-`mutants_record.py` writes a one-run record (`write --widened <run> --previous
-<record>.json`, mutually exclusive with `--narrow`): the per-file delta against
-the previous record's widened figure, the survivors of every file, the shard
-table (each job's start, end and minutes from the run's jobs listing, which
-`fetch` now saves with the `mutation-record` and `mutation-plan` artifacts) and
-the survivor term; `measure` reads the plan's shards and leaves out the
-test-only files the plan does not list. The two-run form is unchanged
-(`test_the_survivor_term_sums_each_shards_outcomes_measured_and_by_its_rate`).
-No crate code moves.
-
-### Fixed: the JSON lookup parse refuses what the reference's normalizer refuses (#768)
-
-From the rule and strength reads of PR #767 (#762, 2026-11-04 11:46Z), the
-residues #762's parity note named. `parse_json_lookup_answer`
-(`src/overlay/facilitators.rs:314-370` at `81c312e2`) read a body that is not
-a JSON object, a missing or non-string `type` as `output-list`, a missing or
-non-array `outputs` as an empty list, and dropped any item without a byte
-`beef` (or a hex or base64 text of one) and an integer `outputIndex` by
-`filter_map`; since #760 every such answer was a host success. The reference's
-HTTPS facilitator runs `normalizeLookupAnswer` and throws when it reads
-nothing (`ts-stack@edf6e03`
-`packages/sdk/src/overlay-tools/LookupResolver.ts:865-866`: `if
-(normalizedAnswer == null) throw new Error('Malformed lookup response')`),
-and `normalizeOutputListAnswer` (`:389-406`) reads an output list only from a
-plain object (`dataRecord`, `:305-307`) whose `type` is the string
-`output-list` and whose `outputs` is an array every item of which
-`normalizeLookupOutput` admits (`:327-357`): an object whose `beef` is a byte
-array of 1 to 32 MiB (`isByteArray`, `:288-303`; `MAX_LOOKUP_BEEF_BYTES`,
-`:256`), `outputIndex` an integer from 0 to `0xffffffff`, an optional
-`context` a byte array of at most 1 MiB and an optional `txid` 64 hex digits;
-one refused item refuses the answer. `beef` and `context` are repaired first
-by `normalizeBRC100ByteFields` (`:858-863`, `BRC100ByteEncoding.ts:126-146`):
-the historical object form `{"0": 7, ..}` read as its bytes, `{}` as `[]`.
-`completeTrackedLookup` (`:2379-2406`) records the thrown error as the host's
-failure; `ts-sdk@9e3ede6`'s facilitator returned the body as parsed
-(`LookupResolver.ts:189`) and its `lookupHostWithTracking` (`:518-528`)
-recorded a failure for an answer without `type: 'output-list'` and an array
-`outputs`, so both references record `{}` a failure. The parse now refuses
-each shape as `Err(OverlayError("Malformed lookup response: <what>"))`, the
-member named after the colon as #762's text does (`the answer is not a JSON
-object`, `the answer has no string type member`, `an output-list answer
-without an outputs array`, `output N is not a JSON object`, `output N beef is
-not an array of 1 to 33554432 bytes`, `output N outputIndex is not an integer
-from 0 to 4294967295`, `output N context is not an array of at most 1048576
-bytes`, `output N txid is not 64 hex digits`), which the resolver records as a
-failure; the byte fields read through the wallet substrates' reading of the
-same normalizer (`byte_fields::byte_array`, now `pub(crate)`), an integral
-float index (`1.0`) read as `JSON.parse` reads it. A well-formed empty list
-stays a success; an unknown string `type` stays `Unknown answer type`.
-
-`tests/lookup_answer_normalizer_768.rs`, each shape on a `wiremock` host
-through the facilitator and the resolver (the host's counts read before and
-after: the tracker is global; each host a server of its own, outside
-`wiremock`'s pool, so no earlier test's failures back it off): `{}`,
-`[]`, `"x"`, `null`, `5`, `{"type":5}`, `{"type":"output-list"}`,
-`{"type":"output-list","outputs":"x"}`,
-`{"type":"output-list","outputs":[{"beef":[1]}]}`, a good item beside one
-without `beef`, a hex text `beef`, an empty `beef`, a `null` context and a
-two-digit txid each refused in the reference's text with one failure and no
-success recorded; RED on `81c312e2` (a scratch copy with the file overlaid),
-each `<body> was read: OutputList { outputs: [] }` (or the filtered list:
-`OutputList { outputs: [OutputListItem { beef: [1, 2], output_index: 0,
-context: None }] }` for the hex text and for the good item beside the bad;
-`beef: []` for the empty one); the historical object form, `{}` context, an
-index of `1.0` and a txid read (RED there too, the item dropped); and
-`{"type":"output-list","outputs":[]}` a success on both. 14 of 15 RED on the
-base. `tests/overlay_http_tests.rs`'s four pins of the old reading
-(`test_lookup_missing_type_is_refused`,
-`test_lookup_output_list_missing_outputs_field`,
-`test_lookup_output_list_with_a_malformed_item_is_refused`,
-`test_lookup_output_list_beef_as_hex_string`) now assert the refusal, and the
-unit test `test_parse_json_default_type` is
-`test_parse_json_missing_type_is_malformed`.
-
-Semver: a behaviour change in `HttpsOverlayLookupFacilitator`'s JSON answer
-parse, no signature change. Migration: a host answering a shape the
-normalizer refuses (no `type`, no `outputs`, a malformed item, a non-object
-body, a hex or base64 `beef`) now gets an error and a recorded failure where
-it got an empty or filtered success. The LOW overlay host serialises this
-crate's `LookupAnswer` (`~/bsv/bsv-overlay-cloudflare`
-`crates/overlay-cloudflare/src/routes.rs:2432,2459`, `json_ok(&answer)`), so it
-always writes `type`, an `outputs` array and byte-array `beef`.
-
-### Notes: cross-SDK parity (#768)
-
-#762's two residues are closed by this row: a JSON answer without `type` and
-an output list without `outputs` are refused as the normalizer refuses them.
-Left, stated: a `formula` answer is still read as `LookupAnswer::Formula`
-(#762's note; the normalizer refuses it, `:446-448`); the reference's 32 MiB
-response bound (`:252`) and `maxOutputs` bound (4096,
-`LookupResources.ts:24`, thrown as `LookupResourceLimitError` at `:859-860`,
-which the tracked call rethrows without recording a host failure, `:2415`,
-and the host's query keeps as a session limit, `:1764-1765`) are not ported,
-the item bounds alone checked here (the two bounds are #775's row); a valid
-`txid` member is checked and not carried (`OutputListItem` has no `txid`,
-#735). An unknown
-string `type` is refused here as `Unknown answer type` where the reference
-says `Malformed lookup response`: the verdict the same (one failure recorded),
-the words different. Go at `2ca481c` unmarshals the body into its typed answer
-(`overlay/lookup/facilitator.go:65`, `types.go:38-43`, `outputs` with
-`omitempty`), so `{}` is an answer of empty type there; its
-`OutputListItem.Beef` is a `[]byte` (`overlay/lookup/types.go:19-22`), which
-`encoding/json` reads from a base64 text and writes as base64, so a JSON
-answer Go writes is refused here and in the reference (`beef` no byte array);
-not filed.
-
-### Fixed: a BEEF entry takes the last BUMP holding its txid as any level-0 leaf, flagged on the way, as the reference does; v0.3.5's strict match reversed (#765)
-
-`Beef::try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only`,
-`merge_transaction`, `make_txid_only`) and `update_bump_indices` (behind
-`merge_bump`) took a BUMP for an entry only where its level-0 leaf for the
-txid was flagged `txid` (the `flags` helper, v0.3.5, `ef98e246`). The
-reference's index holds every level-0 hash of every BUMP, the last winning
-(`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:576-585`), and
-`#tryToValidateBumpIndex` takes it and flags the leaf (`:1329-1340`, the flag at
-`:1334-1338`); `#mergeBumpEntry` gives an entry without an index the merged
-BUMP through `#tryMarkTxProvenByBump`, which does the same (`:774-786`,
-`:813-822`). go-sdk@2ca481c takes any level-0 hash where it attaches a path (`bumpProves`,
-`transaction/beef.go:67-83`; `FindBumpByHash`, `:620-630`, the earliest;
-`MergeBump`, `:780-785`), but flags no leaf and writes no index for an entry
-merged without one (`MergeRawTx`, `:820-849`; `beefBytes`, `:1679-1694`), and
-its validator proves an entry without an index only by a leaf flagged `txid`
-(`ValidateTransactions`, `:1070-1083`, `:1105-1113`, `:1137-1140`): Go's own
-merges leave the p25 BEEF refused, as v0.3.5 left it here, while the bytes
-this crate now writes (the entry indexed, the leaf `02`) read valid there
-(`:1114-1128`). BRC-74's flag `00` is "data follows, not a client txid"
-(`transactions/0074.md:75`), not "unproven". Both sites now take the LAST BUMP
-whose level 0 holds the txid as any leaf and flag that leaf with
-`MerklePath::contains_and_mark`; #757's last-wins order is kept. The reason: a
-level-0 leaf of a BUMP is a txid of that block and its path computes the same
-root, so the any-hash match claims no proof that is not there. `ef98e246`
-argued the opposite ("a tx's txid can legitimately appear as a sibling hash in
-an unrelated bump") and read Go as strict from its `tryToValidateBumpIndex`
-(`:858-868`), which only checks a path already set; its production failure
-left no shape and no test, and #763's fold could not reproduce it in seven
-arrangements on v0.3.4.
-
-The keeper's word (2026-11-04 12:2xZ): the April incident is not in LOW's
-records, so v0.3.5's shape cannot be found; what LOW holds is the same rule's
-effect on the other side, its decision ledger of 2026-09-04 (p25). Two drain
-inputs were mined as siblings in block 964422; the toolbox's walk merged A's
-proof, whose BUMP carried B's hash as a plain leaf (flag false), took its "a
-BUMP already proves this" shortcut, merged B raw with no bump index and never
-walked B's parent (`2617c486...`); this crate's linker took flagged leaves only,
-the sorter demanded the parent, and the wallet's door refused the BEEF:
-`inputBEEF: BEEF structure is invalid: roots [04da74cc..., 7e9f364d...,
-1f2e5c0a..., 1076329a..., 3538181c...]; missing inputs [2617c486...];
-transactions with missing inputs [1f2e5c0a...]; 5 tx(s), 3 bump(s), 7,377
-bytes` (the CLI 0.2.24's drain through toolbox 0.3.61; the toolbox's 0.3.64,
-`ffd1b0f`, flags the leaf in its shortcut). The strict rule's one recorded
-production effect was the refusal of a BEEF the references link.
-
-`tests/beef_sibling_leaf_765.rs` rebuilds the p25 shape with this crate's
-writers (a block of four at 964422, its root computed from the leaves; A's
-BUMP flagging A at offset 2 with B plain at 3; A raw, then B raw with no
-index, then the drain spending both; B's parent not in the BEEF): on the tip
-B takes index 0, its leaf written `02`, and `verify_structure`, the bytes read
-back, `verify_stream_structure` and `Transaction::from_beef` (B's BUMP
-attached) accept it. RED on `81c312e2` (a scratch copy, its own target dir):
-`BEEF structure is invalid (InputNamesNoElement): roots ["de8ad6fc..."];
-missing inputs ["2626...26"]; transactions with missing inputs ["455a901c..."];
-3 tx(s), 1 bump(s), 348 bytes` (A, P, B; this crate's refusal in the door's
-shape). A txid no BUMP holds is still refused so (the control, green on
-both). #763's seven arrangements of `ef98e246`'s shape (a sibling spent by a
-chain of two unproven transactions: the BUMP before the entries and after
-them, `merge_beef` both ways, two BUMPs of the block combined, the entries
-newest to oldest, the sibling mid-chain over a parent proven a block below) link
-on the tip; on `81c312e2` six are refused for the missing parent and the
-mid-chain one is accepted with the sibling unindexed. The two #763 found
-refused on v0.3.4 answer for their own reasons: a txid-only sibling is valid
-under both `allow_txid_only` values (the flag decides nothing since 0.4.2;
-v0.3.4's refusal was the flag's), two roots at one height `RootNotCarried`.
-3 of 4 RED on `81c312e2`. The #757 sibling pin is an equality pin now
-(`a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765`):
-`raw_after_a_sibling_leaf` and `raw_before_a_sibling_leaf` written to the
-reference's recorded bytes, RED on `81c312e2` (the parent's leaf
-`...bb010062b05f...` for `...bb010262b05f...`, its entry `...0101000100...` for
-`...0101010100...`). The two unit tests that pinned the strict match,
-`test_try_to_validate_bump_index_strict_no_sibling_fallback` and
-`test_update_bump_indices_ignores_siblings`, pin the any-hash rule at their
-site now (`..._takes_a_sibling_leaf_and_flags_it_765`).
-
-Semver: a behaviour change in which BUMP an entry takes and in the written
-flag byte, no signature change; readers accept both forms. Migration: a BEEF
-whose txid sits only as an unflagged sibling leaf now links and verifies where
-it was refused, and its written bytes carry the flag (`02` for `00`) and the
-entry's index; a fixture pinning the old bytes re-records. For the hosts: a
-BEEF a reference wallet builds this way now links where it was refused; the
-toolbox's 0.3.64 shortcut flag stays harmless (a flagged leaf was taken before
-and is taken now).
-
-### Notes: cross-SDK parity (the empty ASM text, ts-stack #1479)
-
-`Script::from_asm("")` and a double space inside a text read as go-sdk v1.7.1's
-`NewFromASM` reads them (the empty script; `script/script.go:46-50`), where
-`ts-stack@edf6e03`'s `Script.fromASM('')` splits `''` into `['']` and reads the
-empty token as an unknown hex token, one chunk `{ data: [], op: 0 }`, an empty
-push (`Script.ts:73-82`, the token path `:92-125`), while its `toASM` of the
-empty script is `''` (`:222-229`); a double space inserts a silent empty push the
-same way. Filed upstream by the keeper as ts-stack #1479 (2026-11-04, the ask
-additive at the default). `CLAUDE.md`'s #603 shard A row and the #723 parity
-note now cite it: the divergence is from ts-sdk alone, the port's reading held
-as go-sdk's; the owner's word (2026-11-04 13:5xZ, through the keeper) holds it
-so: the empty script, with go-sdk, ts-stack #1479 the upstream row, the item
-closed. Records only; no code or test moved.
-
-### Fixed: `merge_transaction` merges the transaction's merkle path as a BUMP and walks its source transactions, as the reference does (#764)
-
-From the #757 lane's reading (2026-11-04 10:2xZ) and the rule read of PR #763.
-The reference's `mergeTransaction` (`ts-stack@edf6e03`
-`packages/sdk/src/transaction/Beef.ts:875-901`) runs `#mergeTransactionGraph`,
-which pops each transaction off a stack and runs `#mergeTransactionEntry`
-(`:849-856`): `current.merklePath` merged through `#mergeBumpEntry`
-(`:774-786`) and the returned index taken for the entry, else
-`#tryToValidateBumpIndex` (`:1329-1340`); an entry that ends with no index
-queues its inputs' `sourceTransaction`s (`#queueSourceTransactions`,
-`:858-863`, at `:897`), each txid once per call. go-sdk@2ca481c's
-`MergeTransaction` (`transaction/beef.go:875-912`) does the same save a held
-entry and a held BUMP: `MergeBump(tx.MerklePath)`, then `MergeTransaction` of
-each source when there is no index, but `mergeWouldNotChange` (`:920-950`)
-keeps a proven entry it holds instead of replacing it, and its
-`tryToValidateBumpIndex` (`:858-868`) never looks up a held BUMP, so for a
-transaction with no path that a held BUMP proves Go walks the sources where
-the reference and this crate stop (`subject_proven_by_a_held_bump`; read, not
-run). This crate's `merge_transaction` stored the transaction alone
-(`src/transaction/beef.rs:391-405` at `d14f560d`: `let bump_index = None; //
-Could be set if tx has merklePath`): its path was never written as a BUMP and
-no ancestor was merged, so `find_atomic_transaction` on such a BEEF descended
-past a parent the reference stops at.
-
-It now walks as the reference does (`src/transaction/beef/merge_graph.rs`, a
-stack, linear in the graph, no recursion): a transaction carrying a path has
-it merged through `merge_bump` and takes the returned index (a path whose
-BUMP the BEEF holds, the same height and root, is combined into it, no second
-BUMP); one without takes the last BUMP flagging its txid, as before; an entry
-that ends with an index stops the walk, one that ends with none has its
-inputs' sources merged and walked in turn, from the first input on. A source
-the BEEF already holds is replaced in its place, as the reference's
-`#replaceOrAppendTx` replaces it (`:531-540`), so an ancestor merged by hand
-is one entry still and a graph merged again moves no entry. The transaction given is stored as
-given; each ancestor is stored as a copy without its own source links (they
-are entries of the BEEF), so the walk clones each transaction once, where the
-reference holds the objects. `merge_beef` keeps its one-entry merge of an
-in-memory entry (no path or source walk), as the reference's `mergeBeef`
-reads a snapshot of the bytes, which carries neither (`:975`).
-
-Since #764's fold every door that replaces a held txid (`merge_raw_tx`,
-`merge_transaction` and its walk, the one-entry merge `merge_beef` and
-`to_beef` use) goes through one helper, the reference's `#replaceOrAppendTx`
-(`beef/index.rs`, `replace_or_append`): the entry is stored at the held one's
-position, where it was removed (`Vec::remove`, then the index rebuilt) and the
-new one appended. `merge_txid_only` keeps a held entry, as `mergeTxidOnly`
-does (`:919-929`). That made a re-merge over a held graph of G entries cost
-O(G·N) in a BEEF of N, where the reference's costs O(G), and it wrote another
-order: two unrelated transactions A and B held (raw, both proven or both
-unproven), A merged again, the reference writes A then B and this crate wrote
-B then A, as `sort_txs` keeps insertion order between entries no dependency
-orders. Older than #764 (the same on `d14f560d`, through `merge_raw_tx` too);
-found by the cold read of PR #770.
-
-Semver: a behaviour change without a signature change. The bytes `to_binary`
-writes after `merge_transaction` of a transaction carrying a `merkle_path` or
-input `source_transaction`s change: a BUMP and the ancestors appear, and the
-entry carries the BUMP's index. A re-merge of a held txid (`merge_raw_tx`,
-`merge_transaction`) leaves the entry in its place: the bytes after it change
-only where independent entries were written in the moved order (A then B
-above, B then A before). Readers are unchanged. `Transaction::to_beef`,
-`to_beef_v1` and `to_atomic_beef` write the bytes they wrote: since #764's fold
-they store their collected ancestors with the one-entry merge (their BUMPs are
-merged already, so a walk would merge each proven ancestor's path again), and
-the `iterative_equivalence_tests` byte comparison and `readme_examples` hold.
-Migration: a caller that merged a transaction's ancestors by hand as well
-merges them once (the replacement dedupes); a fixture pinning the old bytes of
-such a merge re-records; a site that re-merges an in-memory entry meant to
-stand alone (a root to prune or split from its ancestry, the toolbox's
-`create_action/beef_graph.rs:265` and `create_action/beef.rs:84`) keeps the
-one-entry merge with `beef.merge_raw_tx(tx.to_binary(), None)`. The dependents' sites (`grep -rn merge_transaction` in
-`bsv-overlay-cloudflare`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
-`rust-message-box`; 82 matching lines, each read at its window): four
-production sites, the rest tests. `overlay-engine`'s `gasp_overlay.rs:461`
-merges transactions parsed by `Transaction::from_binary` (no path, no links):
-unchanged. `overlay-cloudflare`'s `ef.rs:245` (`strip_subject_bump`'s
-fallback, the subject from `transaction_from_beef` with its path cleared but its sources linked) now
-writes the subject's ancestry and their BUMPs where its comment says "parents
-dropped", the guard (the subject raw, no proof claimed for it) still holding.
-The toolbox's `create_action/beef_graph.rs:265` and `create_action/beef.rs:84`
-re-merge an in-memory entry's transaction (`tx.tx()` with no raw bytes), which
-now walks the sources it carries. Thirteen test sites name a path or a
-source link within the forty lines before the call (`overlay-cloudflare`
-`submit_census.rs`, `low-app-layer` `compaction.rs`, the toolbox's
-`broadcast_memory_tests.rs`, `arcade_tests.rs`,
-`arcade_status_vector_tests.rs`, `rust-message-box` `payments.rs`; not run
-here): where the transaction merged carries them, its BEEF gains the BUMPs and
-ancestors the reference's would hold.
-
-`tests/beef_merge_transaction_764.rs` against
-`tests/vectors/beef_merge_transaction_764.json`
-(`tests/support/beef_merge_transaction_764.mjs`, the bun bundle of
-`packages/sdk` at `ts-stack@edf6e03` under Node v22.18.0; two runs
-byte-identical): nine graphs over #757's parent, child and grandchild, each
-rebuilt here (the transactions' bytes, the paths they carry, the sources their
-inputs carry, the case's prior merges) and compared with the reference's
-`mergeTransaction` then `toHex` bytes, its BUMP count and its entries'
-indices: a lone transaction carrying its path at 800000 (bumps `[alone]`,
-index 0) and a lone unproven one; a child carrying its proven parent on both
-inputs (one BUMP, the parent indexed, the child raw) and its unproven parent;
-a chain of three proven at the middle (the walk stops, the grandparent absent)
-and at the root (all three, one BUMP); a child whose parent the BEEF holds raw
-and with its BUMP (no duplicate entry, no second BUMP); a child a held BUMP
-proves (its sources not walked); and the stored forms (the transaction given
-keeps its links, an ancestor holds none). 6 of 10 RED on `d14f560d` (a scratch
-copy, its own target dir): `lone_proven: the bytes the reference's
-mergeTransaction then toHex writes`, `left: "0200beef0001000100000001aa..."`
-(no BUMP), `right: "0200beef01fe00350c000101000262b0..."`;
-`child_of_a_proven_parent` `left: "0200beef000100010000000262b0..."` (the
-child alone, the parent absent); the agreement cases (the lone unproven
-control, the two held-parent cases, the held-BUMP case) green on both.
-
-The fold's six cases, recorded by the same recorder (its runs byte-identical,
-the nine cases unchanged; a grandparent, two parents each spending one of its
-outputs, and a child spending both, with three lone-leaf BUMPs): two distinct
-unproven parents (the first input's merged first, the sort keeping it); the
-grandparent reached through both, without a path under the first and with one
-under the second (merged once, on the first branch: no BUMP); two unrelated
-transactions held, the first merged again unproven, proven, and through
-`merge_raw_tx` (A then B); a chain merged twice (one merge's bytes). Four of
-16 RED on `8db1878a` (a scratch copy, its own target dir): the three held
-cases (`left` writes the right parent's 3900-satoshi output first, `right` the
-left's 2900) and the re-merge's index pin (`the second merge moved an entry`,
-the order after the sort reversed); the distinct-parents and grandparent cases
-green on both, and RED on the tip with `.rev()` removed (both) or the
-once-per-call set removed (the grandparent case).
-
-### Notes: cross-SDK parity
-
-Ancestors are held without their links: the reference's `#mergeTransactionEntry`
-(`ts-stack@edf6e03` `Beef.ts:849-856`) stores each source object as given, its
-own `sourceTransaction` links kept; this crate stores `clone_for_beef` copies.
-The transaction given keeps its links on both sides, the bytes are the same,
-and `find_atomic_transaction` answers the same graph (its walk takes the
-root's own links, then this BEEF's entries, copies of those objects, and stops
-where both stop, `:649-680`). What differs: `find_txid(ancestor).tx()` has no
-`source_transaction` on its inputs where the reference's has the caller's, and
-`find_transaction_for_signing(ancestor)` links one level from the BEEF where
-the reference's returns the caller's whole chain. go-sdk@2ca481c differs from
-both: `mergeWouldNotChange` (`transaction/beef.go:920-950`) keeps a held proven
-entry rather than replacing it, and its `tryToValidateBumpIndex` (`:858-868`)
-only clears a path that lacks the txid, so a pathless transaction a held BUMP
-proves gets no index and its sources are walked (the recorded
-`subject_proven_by_a_held_bump`: the child alone here and in the reference,
-child and parent in Go; read, not run). Ours: linear storage by Rust
-ownership. Theirs: go-sdk, not filed.
-
-### Fixed: the SLAP path's accounting and the freeform answer without a result follow the reference's host reputation (#762)
-
-From the rule read of PR #761 (#760, 2026-11-04 09:5xZ), two residues beside
-that row. `LookupResolver::find_competent_hosts` recorded a success for a
-tracker's output list and a failure for its error, and nothing for any other
-answer (`src/overlay/lookup_resolver.rs:379-381` at `6aee2bf9`). The reference
-sends a tracker's `ls_slap` question through the tracked call a host's
-question takes (`ts-stack@edf6e03`
-`packages/sdk/src/overlay-tools/LookupResolver.ts:1974`,
-`lookupSlapTrackerHosts` calling `lookupHostWithTracking`), so its answer is
-accounted by `completeTrackedLookup` (`:2379-2406`): an output list a success,
-a freeform answer neutral, anything its normalizer cannot read a failure
-(`Malformed lookup response`, `:2388-2392`, `:2403-2405`). The SLAP path now
-records a failure for a formula answer, with the host path's text (`Invalid
-lookup response`, #760), and nothing for a freeform one. And the HTTP
-facilitator read a `freeform` answer with no `result` member as
-`Freeform { result: Null }` (`src/overlay/facilitators.rs:373-378` at
-`6aee2bf9`), which #760 made neutral; the reference's normalizer reads a
-freeform answer only with an own `result` (`:430-433`, `Object.hasOwn`), so
-it is malformed there, a failure for the host. The facilitator now refuses it,
-`Malformed lookup response: a freeform answer without a result member`, and
-the resolver records the failure as for any facilitator error; `"result":
-null` stays an answer (presence, not non-null). The host reputation tracker's
-doc line on `record_failure` names both paths.
-
-`tests/lookup_tracker_accounting_762.rs`: three formula answers from a SLAP
-tracker on #760's scripted facilitator back it off (the fourth discovery does
-not ask it), RED on `6aee2bf9` (`a formula answer from a tracker is
-recorded`: no record); a `wiremock` host answering `{"type":"freeform"}` an
-`Err` and one recorded failure, RED on `6aee2bf9` (`a freeform answer without
-result was read: Freeform { result: Null }`); a freeform-only tracker leaves
-no record and `{"type":"freeform","result":null}` is `Freeform { result:
-Null }` with no record, green on both. `tests/overlay_http_tests.rs`'s
-`test_lookup_freeform_null_result` pinned the missing member as `Null`; it now
-answers `"result": null`.
-
-Semver: behaviour changes in the SLAP accounting and in one facilitator
-answer shape, no signature change. Migration: a tracker answering formula
-answers is backed off like a host; a host answering `freeform` without
-`result` is an error now.
-
-### Notes: cross-SDK parity (#762)
-
-The formula parse is left: `HttpsOverlayLookupFacilitator` still reads a
-`formula` answer as `LookupAnswer::Formula`, where `edf6e03`'s normalizer
-returns only an output list or a freeform answer (`:446-448`) and refuses it;
-its HTTPS facilitator runs that normalizer and throws `Malformed lookup
-response` itself (`:865-866`), so a direct caller there gets the error. The resolver records a `Formula` as a failure on both paths and aggregates
-nothing from it, the reference's accounting; the recorded text is
-`ts-sdk@9e3ede6`'s (`:527`), and a direct facilitator caller still gets the
-typed answer. Older and outside the row: the facilitator reads a JSON answer
-without `type` as an output list and an output list without `outputs` as
-empty, where the normalizer asks for `type: 'output-list'` and an array
-(`:389-397`) and the facilitator refuses both (`:865-866`); since #760 such an
-answer is a success for the host here and a failure there (#768, closed by
-that row: both refused). On the
-tracker path as on the host path (#760's residue), every error is a failure
-here, where `edf6e03` keeps a semantic rejection neutral (`:2416`). And with
-every tracker backed off, `find_competent_hosts` answers no hosts and `query`
-refuses in `No competent <network> hosts found by the SLAP trackers for lookup
-service: <service>`, where the reference's query refuses in
-`prepareHostsForQuery`'s words, `All SLAP trackers hosts are backing off for
-approximately <n>ms due to repeated failures.` (`:1956-1964`, `:2307-2313`,
-`:1671`); older than #762, reached now by a formula answer too (#769).
-
-### Fixed: `merge_raw_tx` writes the last BUMP's index for a txid two BUMPs prove, as the reference does; a caller-set merkle path at `add_input_proof` replaced by the BEEF's proof and descended past where there is none (#757)
-
-From the #732 lane (2026-11-04 08:4xZ), two residues at `ts-stack@edf6e03`
-(`packages/sdk/src/transaction/Beef.ts`).
-
-The written index. The reference's `#tryToValidateBumpIndex` asks its
-level-0 index (`:1329-1340`: `const i = this.#ensureBumpTxidIndex().get(txid)`,
-then `newTx.bumpIndex = i`), the index a `Map.set` over the BUMPs in order
-(`:576-585`), so an entry merged after two BUMPs that hold its txid takes the
-LAST one's index; `BeefTx.toWriter` writes it and the atomic writer carries
-that BUMP (`#copySelectedTransactions`, `:448-470`). This crate's
-`try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only` and
-`merge_transaction`) scanned from the front and took the EARLIEST, so
-`to_binary` wrote another index byte and `to_binary_atomic` carried another
-BUMP than the reference's, and an atomic BEEF read back attached another path.
-It now scans from the back. An entry merged before a BUMP is unchanged and
-agrees: the BUMP present at its merge, as `#mergeBumpEntry` sets only an entry
-without an index (`:774-786`). The readers are unchanged: `add_input_proof`
-attaches the last BUMP holding a txid whatever the written byte (#732), and
-both forms prove the txid.
-
-The caller's path. `#addInputProof` (`:649-668`) sets
-`current.merklePath = mp` whenever `findBump(txid)` answers, over a
-`merklePath` the transaction already carries, and goes on to the inputs only
-when it does not answer, the carried path kept. `add_input_proof` kept a
-carried path (`enter` and `bare_stub` attached a BUMP only to a transaction
-without one) and treated any carried path as the end of the walk. Both now
-follow the reference: this BEEF's BUMP replaces a carried path and ends the
-walk; a transaction this BEEF does not prove is descended, its own path kept.
-A carried path reaches the walk only through the in-memory API (`BeefTx::tx_mut`,
-`merge_transaction` of a transaction with a path, an input's own
-`source_transaction`); the readers set none, so `Transaction::from_beef` on
-bytes is unchanged. `Transaction::verify` reads a transaction with a path as
-proven and does not descend it, so the extra links are not judged.
-
-Semver: a behaviour change without a signature change: for a BEEF holding two
-BUMPs that prove one txid, the entry merged after both carries the last
-BUMP's index, so the bytes `to_binary` writes change in that entry's index
-byte and `to_binary_atomic` carries the last BUMP; readers accept both forms.
-`find_atomic_transaction` replaces a path a held transaction carries with the
-BEEF's BUMP for its txid, and links the inputs of a transaction that carries a
-path the BEEF does not hold. Migration: a fixture pinning the old bytes
-re-records; a caller that set a path on a held transaction to override the
-BEEF's merges that path as a BUMP instead. The four dependents' fixtures were
-scanned (every BEEF found in a test, vector, fixture, bench or example file of
-`bsv-overlay-cloudflare`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli` and
-`rust-message-box`: 66 parsed) and none holds two BUMPs sharing a level-0 hash.
-
-`tests/beef_bump_index_757.rs` against `tests/vectors/beef_bump_index_757.json`
-(`tests/support/beef_bump_index_757.mjs`, the bun bundle of `packages/sdk` at
-`ts-stack@edf6e03` under Node v22.18.0; the fold's three runs byte-identical,
-the eleven earlier cases unchanged): eight BEEFs (eleven since the fold)
-rebuilt by this crate's writer from the merge steps the vector carries and
-compared with the reference's `toHex` and `toBinaryAtomic` bytes (a raw or
-txid-only parent merged after BUMPs at 800000 and 800001 in both orders, after
-two roots at 800000, with a child beside it; merged before and between them),
-and three path cases (a BEEF read back, a caller's 800001 path set on the
-proven parent or subject, a caller's 800003 path on the unproven child), each
-walk `findAtomicTransaction` leaves. 4 of 6 RED on `b285d621` (a scratch copy,
-its own target dir): `raw_after_both: the bytes the reference's toBinary
-writes`, `left: "...0101000100000001aa..."`, `right: "...0101010100000001aa..."`
-(the entry's index byte `00` for `01`); the atomic BEEF carrying
-`fe00350c...` (800000) where the reference carries `fe01350c...` (800001); the
-caller's `800001` kept where the reference attaches `800000`; the walk stopped
-at the child's own path where the reference links both of its inputs. The
-before-or-between agreement and the stated sibling case green on both.
-
-The fold (the three reads of PR #763). The atomic writer's txid-only branch
-took the EARLIEST BUMP carrying the txid, whatever the entry's index; the
-reference copies `bumps[tx.bumpIndex]` for a txid-only entry as for a raw one
-(`#copySelectedTransactions`, `:448-470`): `atomic_closure` now carries the
-BUMP the index names, else the last carrying the txid. `make_txid_only` set no
-index; the reference's `makeTxidOnly` asks `#tryToValidateBumpIndex` again
-(`:550-565`), and so does this crate's now. Three cases recorded:
-`txid_only_after_both_with_child` (the atomic BEEF of the child carrying
-800001), `made_txid_only_between_with_child` (an entry merged between the
-BUMPs, index 0, made txid-only: index 1 on both sides) and
-`raw_before_a_sibling_leaf`, and one path case, a proven child whose inputs the
-BEEF carries raw (`proven_parent_with_its_input_in_the_beef`: the walk stops
-at the proof on both sides). RED on `f23fb60c` (a scratch copy, the fold's test
-file and vector overlaid, its own target dir): `txid_only_after_both_with_child:
-the bytes the reference's toBinaryAtomic("child") writes`, `left: "...0200beef01fe00350c..."`,
-`right: "...0200beef01fe01350c..."`; with that case passing,
-`made_txid_only_between_with_child: the parent's bump index`, `left: None`,
-`right: Some(1)`. The path case is an agreement, green on `f23fb60c` and RED
-with `enter` descending a proven transaction (`inputs_linked` `[true, true]`
-for `[false, false]`), which the older proven-parent case does not catch. The
-stated sibling pin asserts the two bytes it differs by (the leaf's flag and the
-entry's index or format byte) where it asserted any difference. A BEEF this
-crate wrote before #757 (`raw_between`'s bytes, one hex digit from
-`raw_after_both`'s, at offset 247) reads valid on `Beef::from_binary` with
-`verify_valid` and on `verify_stream_structure`.
-
-### Notes: cross-SDK parity
-
-The strict sibling-leaf match this paragraph stated (v0.3.5, `ef98e246`) is
-reversed by #765: both merge sites take any level-0 leaf and flag it, as the
-reference does (go-sdk takes any level-0 hash where it attaches a path and
-proves an unindexed entry by a flagged leaf alone); see that entry.
-
-A txid-only entry without a BUMP index (one read from bytes: neither reader
-gives it one, `BeefTx.ts:294-295`) in an atomic closure: the reference's
-`#copySelectedTransactions` copies no BUMP for it (`Beef.ts:453`), so its
-`toBinaryAtomic` writes the txid-only entry unproven; this crate's
-`atomic_closure` carries the last BUMP holding the txid (the earliest until
-#757's fold). Measured at the fold's re-read on `txid_only_after_both_with_child`'s
-bytes read back: the child's atomic BEEF `...0200beef00...` (no BUMP) there,
-`...0200beef01fe01350c...` here. Older than #757; this crate keeps the proof
-its own `verify_valid` asks of a txid-only entry. Unpinned; filed as #766.
-
-### Fixed: the lookup resolver records success for any output list and keeps a freeform answer neutral, as the reference's host reputation does (#760)
-
-From the strength read of PR #759 (#754, 2026-11-04 09:1xZ), outside that
-row: `LookupResolver` read a host's answer as valid only when it was an
-output list with at least one output or a freeform answer, and recorded
-`Invalid lookup response` as a host failure for an empty output list
-(`src/overlay/lookup_resolver/query.rs:122-132` at `8601c66b`). Both
-references record a success for any output list, the empty one included:
-`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/LookupResolver.ts:2395-2398`
-(`isOutputListAnswer`, then `recordSuccess`) and `ts-sdk@9e3ede6`
-`src/overlay-tools/LookupResolver.ts:518-528` (`answer.type === 'output-list'
-&& Array.isArray((answer).outputs)`, then `recordSuccess`). The host
-reputation tracker is one global keyed by host URL with two failures of grace
-and a backoff of 1 s doubling to 60 s, so three lookups answered empty (a
-subject with no certificates, a key with no record) backed that host off for
-every resolver in the process, and the next identity, kvstore or registry
-lookup against it failed with `All competent hosts for <service> are backing
-off`. The site now records a success for every output list. A freeform answer
-recorded a success here, which cleared any backoff; `edf6e03` treats it as
-neutral (`:2399-2402`: "A valid freeform response is neutral: it proves this
-request reached the service, but it must not erase an availability backoff",
-then `if (isFreeformAnswer(normalizedAnswer)) return normalizedAnswer`, no
-call on the tracker), and so does this crate now: nothing is recorded, neither
-success nor latency nor failure. A `formula` answer stays a failure with
-`Invalid lookup response`, the text `ts-sdk@9e3ede6` records for it too
-(`:527`; `edf6e03`'s normalizer refuses it as `Malformed lookup response`,
-`:2388-2392`, `:2403-2405`); the text is the tracker's recorded reason, matched
-by no reader in the crate.
-
-`tests/lookup_host_accounting_760.rs`, a recording facilitator in #752's shape
-answering from a script, each test on its own `.invalid` host: four lookups
-answered with an empty output list are all answered, and two failures, a
-freeform answer, a failure, then a fifth lookup refused as backing off; a third
-test (the #761 strength read's line) has a host that only ever answered
-freeform leave no tracker record at all, RED on `b285d621` (the freeform
-success of the old rule made a record). The two RED on `8601c66b` (a scratch copy, its own target dir, the test file copied
-in): `lookup 4: Err(OverlayError("All competent hosts for
-ls_host_accounting_760 are backing off for approximately 1000ms"))` and
-``called `Result::unwrap_err()` on an `Ok` value: OutputList { outputs: [] }``
-(the freeform success had reset the count, so the third failure fell inside
-the grace). `tests/identity_question_752.rs` is unchanged: its three empty
-answers on one host sat at the edge of the backoff and are now successes.
-`tests/overlay_mock_tests.rs`'s `test_lookup_resolver_records_reputation`
-answered a freeform result and asserted only that the host had a record (the
-old freeform success); it now answers an empty output list and asserts the
-one success.
-
-Semver: a behaviour change in the host reputation accounting with no
-signature change. Migration: none for a caller; an empty answer no longer
-backs a host off, and a freeform answer no longer clears a backoff.
-
-### Notes: cross-SDK parity (#760)
-
-The non-empty rule was this crate's own: neither reference had it. The
-freeform reading follows `ts-stack@edf6e03`; the older `ts-sdk@9e3ede6`
-records a failure for a freeform answer (`:518-528`, its `isValid` reading
-the output list alone), a reading this crate did not have before and does not
-take now. One error class stays a failure here, older than #760 and outside
-it: `edf6e03` keeps a semantic HTTP rejection neutral (a 4xx other than 408,
-425 and 429, `:816-827`; `throwTrackedLookupFailure` throws it before
-`recordFailure`, `:2416`, as it does a resource limit, `:2415`), where this
-crate's facilitator answers every non-2xx as an error
-(`src/overlay/facilitators.rs:174-178`) and the resolver records it as a
-failure (found by #760's cold read).
-
-### Fixed: `discover_certificates` asks `ls_identity` as the reference wallet does, without the `certificatesOnly` key the overlay's allowlist refuses (#754)
-
-From the #752 lane's reading of the reference overlay (2026-11-04 08:0xZ):
-`IdentityClient::discover_certificates(identity_key)` sent
-`{ identityKey, certificatesOnly: true }` to `ls_identity`. The reference
-overlay's identity lookup service admits seven keys and refuses any other
-for the whole question (`ts-stack@edf6e03`
-`packages/overlays/topics/src/identity/IdentityLookupService.ts:74-82`:
-`attributes`, `certifiers`, `identityKey`, `certificateTypes`,
-`serialNumber`, `limit`, `offset`; `shared/queryValidation.ts:35-38`,
-`Invalid lookup query: unexpected field <key>`), so a reference host refused
-the by-key discovery outright, the class of #752's `certificateType`. The
-door now asks `{ identityKey }`. The reference wallet's
-`discoverByIdentityKey`, the door this one stands for, asks
-`{ identityKey, certifiers }` (`wallet-toolbox` `Wallet.ts:1004`), its
-certifiers its trust settings' keys (`:992`; Metanet Trust Services and
-SocialCert by default, `WalletSettingsManager.ts:160-178`). This crate has
-no trust settings (the trust step unported, #739's parity note), so it names
-no certifier: the key alone reaches `findByIdentityKey` with no certifier
-filter (`IdentityLookupService.ts:144-145`,
-`IdentityStorageManager.ts:285-301`), where naming the SocialCert certifier
-alone, as `resolve_by_identity_key` and `query` do, would drop the
-certificates of the reference's other default certifier. #739's subject
-filter on the answer is unchanged. The refusal is witnessed by reading the
-allowlist, no live overlay.
-
-What `certificatesOnly` was: a key written with the door by the commit that
-added the identity module (`5e4b9503`), sent by neither go-sdk@2ca481c nor
-ts-sdk@9e3ede6b (a `grep` of each finds no such key), read by no reference host and
-documented nowhere in this repository (no rustdoc, README, `docs/` or
-changelog line describes it as a contract; the #739 parity note and #752's
-finding name it only as the difference from the reference).
-
-Semver: the question's shape is a wire contract toward overlay hosts, not a
-signature: a behaviour change at one public door without a signature change.
-Migration: a non-reference host that read `certificatesOnly` no longer
-receives it; nothing in this crate documented the key, and a reference host
-answered nothing before.
-
-`tests/identity_question_754.rs`: #752's recording facilitator on an
-injected `.invalid` resolver; `discover_certificates`' question equal to
-`{ identityKey }` and admitted by the allowlist, and the questions of the
-four by-key doors (`discover_certificates`, `discover_certificates_by_type`,
-`resolve_by_identity_key`, `query` with a type, limit and offset) each
-admitted by it. 2 of 2 RED on `c92ab842` (a scratch copy, its own target
-dir, the test file copied in): `left: [Object {"certificatesOnly": Bool(true),
-"identityKey": ...}]`, `right: [Object {"identityKey": ...}]`, and the census's
-`left: ["certificatesOnly"]`, `right: []`.
-
-### Fixed: `Transaction::from_beef` and `Beef::find_bump` take the last BUMP holding a txid, as the reference's index does (#732)
-
-From the strength read of PR #729 (#728, 2026-11-04 01:2xZ): the reference
-indexes the level-0 leaves of every BUMP with a `Map.set` loop over the BUMPs
-in order, so the LAST BUMP holding a txid is the one `findBump` answers and
-`#addInputProof` makes the transaction's `merklePath`
-(`ts-stack@edf6e03` `Beef.ts:570-585`, `:649-680`). This crate's
-`add_input_proof` built its index with `or_insert` and `find_bump` scanned
-from the front, so both kept the EARLIEST, and the comment on the index claimed
-the reference's answer. Both readers keep every BUMP they read and merge none
-(`Beef.ts:1257-1261`; `beef/collect.rs`), so two proofs of one txid at level 0
-(two blocks after a reorg, two roots at one height, a BUMP the writer did not
-merge) reach `from_beef` from the wire, and the attached path, and so the root
-a tracker is asked about, was another than the reference's. The index now
-keeps the last (`insert`), `find_bump` scans from the back, and the comment
-says so. `merge_bump` is unchanged: as the reference's `#findOrInsertBump`
-(`:791-810`) it combines only a BUMP of the same height and root.
-
-Semver: a behaviour change without a signature change: for a BEEF carrying
-two proofs of one txid, `Transaction::from_beef`, `from_atomic_beef`,
-`Beef::find_atomic_transaction` and `Beef::find_bump` answer the last proof
-where they answered the earliest. Migration: none for a BEEF with one proof per
-txid; a caller that relied on the earliest proof names it (`beef.bumps[i]`).
-
-`tests/beef_bump_lookup_732.rs` against `tests/vectors/beef_bump_lookup_732.json`
-(`tests/support/beef_bump_lookup_732.mjs`, the bun bundle of `packages/sdk` at
-`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical): four BEEFs,
-each built by this crate's writer (`merge_raw_tx`, `merge_bump`, `to_binary`)
-to the bytes the reference's writer recorded: a parent proven at 800000
-(root its txid) and at 800001 beside a sibling, in both orders; two roots at
-800000; and an unproven child spending both of that parent's outputs. The
-attached path, `find_bump`'s answer and both inputs' source paths (the full
-link and the stub) are the reference's, the last BUMP; the wire bump index
-(the earliest, on both sides) and both BUMPs read back unchanged. 3 of 4 RED on
-`9ae3ebcc` (`left: (800000, "86bd3ea1...")`, `right: (800001, "e476c603...")`),
-the wire-index agreement green on both.
-
-Residue, stated: `merge_raw_tx` after two BUMPs holding its txid sets the
-entry's bump index to the earliest holding it as a txid leaf
-(`try_to_validate_bump_index`), where the reference's `#tryToValidateBumpIndex` takes its index's, the
-last (`Beef.ts:1329-1340`; probed under Node 22: `bumpIndex 1`), so the two
-writers write another index byte for that merge order; no reader's verdict
-moves (both BUMPs hold the txid) and a reader's attached path follows the
-index, not the byte, but both atomic writers carry the BUMP the byte names
-(`atomic_closure`; the reference's `#copySelectedTransactions`,
-`Beef.ts:448-470`), so `to_binary_atomic` of that entry carries the earliest
-BUMP where `toBinaryAtomic` carries the last, and a reread attaches another
-path and asks a tracker about another root (#757; closed there).
-
-### Fixed: the by-type questions send `certificateTypes` with `identityKey`, as the reference overlay reads them (#752)
-
-From the rule read of PR #750 (#746, 2026-11-04 07:0xZ), older than that PR:
-`IdentityClient::discover_certificates_by_type` and `IdentityClient::query`
-(with `certificate_type` set) sent the type to `ls_identity` as
-`certificateType`, a string. The reference overlay's identity lookup service
-admits seven keys and refuses any other for the whole question
-(`ts-stack@edf6e03` `packages/overlays/topics/src/identity/IdentityLookupService.ts:74-82`:
-`attributes`, `certifiers`, `identityKey`, `certificateTypes`,
-`serialNumber`, `limit`, `offset`; `shared/queryValidation.ts:35-38`,
-`Invalid lookup query: unexpected field <key>`), reads `certificateTypes` as
-an array of at most 32 base64 texts of 32 decoded bytes (`:97-100`; the
-check trims and tests the alphabet, the padding and the length, with no
-trailing-bit check, `validationHelpers.ts:488-498`), and
-answers by type only beside `identityKey` (`:136-143`, then
-`IdentityStorageManager.ts:315-339`, `findByCertificateType`; the overlay's
-own `IdentityQuery` type, `types.ts:28-36`). A reference host therefore
-refused every by-type question, so #744's and #746's type filters took effect
-only against a non-reference host. Both doors now send
-`certificateTypes: [cert_type]`; `discover_certificates_by_type`'s question is
-`{ identityKey, certificateTypes }`, `query`'s carries the same key beside
-its others, every other key as before. The reference wallet asks no by-type
-question (`wallet-toolbox` `Wallet.ts:1004`, `discoverByIdentityKey`, sends
-`{ identityKey, certifiers }`), so the overlay's allowlist is the reference
-for the shape. The refusal is witnessed by reading the allowlist, no live
-overlay.
-
-Semver: the question's shape is a wire contract toward overlay hosts, not a
-signature: a behaviour change at two public doors without a signature change.
-Migration: a non-reference host that read `certificateType` now receives
-`certificateTypes`, an array of one; such a host reads the new key or loses
-the type (a reference host answered nothing before). `IdentityQuery`'s own
-serde JSON keeps its `certificateType` member: it is the struct's
-serialization, not the lookup question.
-
-Not changed, a finding for a follow-up: `discover_certificates` sends
-`certificatesOnly: true`, a key the same allowlist refuses
-(`IdentityLookupService.ts:74-82`), so a reference host refuses that door's
-question too; outside #752's two doors.
-
-`tests/identity_question_752.rs`: a recording facilitator on an injected
-`.invalid` resolver keeps each question it receives; the by-type door's
-question `{ identityKey, certificateTypes: [type] }` and `query`'s with a type,
-limit and offset each equal to the expected JSON and admitted by the
-allowlist, `query` without a type carrying no type key. 2 of 3 RED on
-`56caa15d` (a scratch copy, its own target dir, the test file copied in):
-`left: [Object {"certificateType": String("AQEB...AQE="), "identityKey": ...}]`,
-`right: [Object {"certificateTypes": Array [String("AQEB...AQE=")], ...}]`;
-the no-type control green on both.
-
-### Tests: the evidence walk's visited set pinned (a grandparent shared by two unproven paths; a proven grandparent reached twice), witnessed under Node 22 (#748)
-
-No behaviour change. From #747's strength read, which held that no pin of
-#730, #736 or #741 reaches a node of the unconfirmed graph twice, so the
-visited set of `assert_unconfirmed_graph` (`TransactionEvidence.ts:162-166`
-at `ts-stack@edf6e03`) could go with every pin green. That was not so: #736's
-subject reaches its unproven parent 2048 times and #741's parents reach the
-proven G 4094 times, and with the set's skip removed both go RED (the inputs
-sum and the script-bytes sum). The two shapes here pin the set directly.
-`tests/vectors/identity_evidence_748.json` is written by
-`tests/support/identity_evidence_748.mjs` (#741's helpers copied, its vector
-untouched) with the reference's own writers under Node v22.18.0, its replay
-also run with the set's skip removed; two runs are byte-identical.
-
-- **A grandparent shared by two unproven paths**: the subject spends P1:0
-  and P2:0, both unproven; P1 spends G:0 and P2 G:1; G is unproven and spends
-  GG:0; GG is proven with no inputs. Read on both sides, G walked once.
-  Without the set GG:0 is spent twice, `invalid-evidence` at `:149`, and the
-  output is skipped.
-- **A proven grandparent reached twice**: the same parents over a proven G
-  with 4092 inputs whose sources are absent: 4096 over the graph, read on both
-  sides. Without the set the sum is 8188, `limit` at `:170-171`.
-
-`tests/identity_evidence_748.rs` rebuilds both BEEFs with this crate's
-writer to the recorded SHA-256 and serves them through
-`resolve_by_attributes` and `discover_certificates`; the unit module
-`src/identity/evidence_748_tests.rs` judges them with `parse_evidence`. In a
-scratch copy both are RED with the set's skip removed; with the skip kept for
-proven nodes alone, the shared unproven G is RED here (so is #736's inputs
-pin, and #741's stays green).
-
-### Fixed: `IdentityClient::query` keeps only the certificates its question asked for (#746)
-
-From the strength read of PR #745 (#744, 2026-11-04 05:5xZ): `query` sent the
-question's `identityKey`, `certificateType` and `certifiers` to `ls_identity`
-and kept every certificate the parser admitted, so an overlay host could
-answer with another subject's, type's or certifier's certificate, as the two
-`discover_*` doors could before #739 and #744. After the walk (every output
-parsed in order, a `limit` anywhere failing the call, unchanged) `query` now
-keeps a certificate only when it matches every field the question carries:
-`identity_key` through `is_asked_subject` (both sides lower-cased, the rule of
-the by-key doors, #737, #739); `certificate_type` as the canonical base64
-text, `type_base64()` compared exactly with the asked text (#744);
-`certifier` (an `Option<String>`, one key, sent as a one-entry `certifiers`
-list) as the certificate's certifier key in lower-case hex against the asked
-text lower-cased. A field the question does not carry filters nothing: with
-`certifier` unset the lookup still asks the default SocialCert certifier, and
-a certificate of another certifier is kept; `attributes` is sent and not
-checked on the answer.
-
-Hardening, not parity: the reference has no such door (`IdentityClient.ts`'s
-lookups at `ts-stack@edf6e03` are `resolveByIdentityKey` and
-`resolveByAttributes`), so this crate's own rule answers the question its own
-door asks.
-
-Semver: a behaviour change at one public door without a signature change:
-`query` drops a certificate its question did not ask for where it returned
-it. Migration: none.
-
-`tests/identity_query_filters_746.rs`: #737's harness and tokens on an
-injected `.invalid` resolver, one RED per filter on `8a2cc173` (a scratch copy,
-its own target dir, the test file copied in): #737's `other_subject_then_asked`
-answered to `by_identity_key` (`left` both subjects, `right` the asked one);
-#744's re-typed record answered to the asked type; the reference record
-re-certified and re-signed by the scalar 8, revealed by the subject 9 (this
-crate's writer), answered to the certifier 7; the three together on four
-certificates. A question with no filter keeps all four in the answer's order,
-GREEN on both. `tests/identity_resolve_737.rs`'s `admitted` helper read the
-parser's admissions through `query(IdentityQuery::by_identity_key(key))`,
-which kept every subject; it now reads through `query(IdentityQuery::default())`,
-a question that carries no filter (its six tests green on `8a2cc173` and on the
-tip).
-
-### Tests: the revocation's lock position pinned at its decode site, past the token check (#746)
-
-The revocation (`revoke.rs`, the reference's `IdentityClient.ts:773` site,
-lock-before) called `PushDrop::decode_before` inline, its position masked by
-the same token check that masked the parsers' until #744
-(`is_canonical_signed_pushdrop` refuses every lock-after layout). It now
-decodes through one crate-private function, `decode_revocation_token`
-(unchanged behaviour), and the unit module
-`src/identity/revoke_decode_746_tests.rs` pins it on #553's `reference`
-token relocked after its fields: `PushDrop::decode` reads it with the same
-key and fields, the token check refuses it, `decode_revocation_token` refuses
-it. RED with the function reading through `PushDrop::decode` (`the
-revocation's decode site reads lock-before alone`).
-
-### Tests: the evidence check's inputs bound pinned over two unproven branches, witnessed under Node 22; the 2049-input BEEF built once per test binary (#741)
-
-No behaviour change. From #740's strength read: #736's single-chain pin of
-the inputs bound (2048 at the subject, 2049 at its parent) passes a walk that
-sums each path alone, so a recursive refactor of `assert_unconfirmed_graph`
-carrying the sums per branch would land green.
-`tests/vectors/identity_evidence_741.json` is written by
-`tests/support/identity_evidence_741.mjs` (#736's helpers copied, #736's
-vector untouched) with the reference's own writers at `ts-stack@edf6e03`
-under Node v22.18.0; two runs are byte-identical.
-
-- **Two unproven branches**: a subject of 2 inputs spends two unproven
-  parents, P1 of 2047 inputs and P2 of 2048, each spending its own outputs of
-  one proven grandparent with no inputs: 4097 over the graph, `limit` at
-  `TransactionEvidence.ts:170-171` on both sides (the stack pops P2 first, so
-  the refusal is at P1); 2047 and 2047, 4096, read. Along either path alone
-  the sum is at most 2050. `tests/identity_evidence_741.rs` rebuilds both
-  BEEFs with this crate's writer to the recorded SHA-256 and serves them
-  through `resolve_by_attributes` and `discover_certificates`; the unit module
-  `src/identity/evidence_741_tests.rs` judges them with `parse_evidence` to
-  the recorded code and line. In a scratch copy, the sums carried per path
-  turn both RED while every #736 and #730 pin stays green.
-- **Built once per binary**: `tests/support/identity_evidence_736.rs`'s
-  `build` keeps each shape in a `OnceLock`, so the door file builds the
-  2049-input BEEF once where it built it six times. No pin changes. The
-  saving is small (the file's single-threaded run 24.46 s to 23.78 s in
-  debug): the time is the parse and linking of the large BEEF at each door,
-  not its build (`docs/lanes/fix-741.md`).
-
-### Fixed: `discover_certificates_by_type` keeps only the asked type's certificates (#744)
-
-From the strength read of PR #742 (#739, 2026-11-04 04:5xZ): the by-type door
-sent its `cert_type` in the `ls_identity` query and never checked it on the
-certificates it read, so an overlay host answering with another type's
-certificate was believed. The door now keeps a certificate only when its type
-is the asked one, applied on #742's shared walk (`discover_of_subject`: every
-output parsed in order, a `limit` anywhere failing the call, #730, #737) after
-its subject filter (`is_asked_subject`, #739), so a certificate is returned
-only when both its subject and its type are the asked ones. The comparison is the certificate's canonical base64 text
-(`type_base64()`) against the asked text, exactly: a token's `type` is
-canonical base64 of 32 bytes or the token is skipped (#553), so its
-re-encoding is the token's own text and the text comparison is the bytes'
-comparison for every canonical asked text; an asked text no token can carry
-(unpadded, spaced) matches nothing. `discover_certificates` and the other
-doors are unchanged.
-
-Hardening, not parity: the reference has no by-type door
-(`DiscoverByIdentityKeyArgs` carries no type at `ts-stack@edf6e03`), so this
-crate's own rule answers the question its own door asks.
-
-Semver: a behaviour change at one public door without a signature change:
-`discover_certificates_by_type` drops a certificate whose type is not the
-asked one where it returned it. Migration: none.
-
-`tests/identity_discover_type_744.rs`: #737's token (#553's `reference` case,
-type `AQEB...AQE=`) and the same record re-typed to `AwMD...AwM=`, re-signed by
-its certifier and revealed by its subject (this crate's writer), served on an
-injected `.invalid` resolver: `discover_certificates` returns both, the by-type
-door the asked type's alone either way round, nothing for another type alone
-or for the asked text unpadded; and the asked type under another subject's
-certificate (the same record re-typed and revealed by the subject 5) beside
-them: the asked key's and type's certificate alone, the foreign subject's
-dropped by the subject filter, the foreign type's by the type filter. Built
-on `cbf27827` before PR #742 landed and folded onto it (`b2760031`): RED there
-with the tip's file overlaid, 3 of 3 (`left: ["AQEB...AQE=", "AwMD...AwM="]`,
-`right: ["AQEB...AQE="]`; at the three-output assertion
-``the foreign subject's and the foreign type's certificates``, the asked
-key's foreign-type certificate returned), the foreign-subject assertions
-before it passing there (the subject filter is #742's). On the tip 3 of 3.
-
-### Tests: the two `ls_identity` parsers' lock position pinned at their decode site, past the token check (#744)
-
-From #742's cold read (2026-11-04 05:0xZ): since #544 the token check
-(`is_authenticated_token`) refuses every lock-after layout on its own:
-`is_canonical_signed_pushdrop` requires a 33-byte key push then `OP_CHECKSIG`
-as the script's leading two chunks. No lock-after token can pass it, so with
-both parsers reverted to `PushDrop::decode` (the lock position either way)
-`tests/identity_lock_position_537.rs` stayed green (measured: 2 of 2 under the
-mutation). Both parsers now decode through one crate-private function,
-`decode_token` (`PushDrop::decode_before`, unchanged behaviour), and the unit
-module `src/identity/client_decode_token_744_tests.rs` pins it on the
-reference's own revelation token relocked after its fields (the same key, the
-same two fields, the same signature): `PushDrop::decode` reads it with the
-same fields, the token check refuses it, and `decode_token` refuses it by the
-position alone. RED with `decode_token` reading through `PushDrop::decode`
-(`the parsers' decode site reads lock-before alone`). The 537 file's relocked
-control is unchanged; its helper `subject_of` (#742), which asked `02aa` when
-the token carried no `"subject":"` marker, now refuses that case naming the
-token, and the #618 key-only case asks `02aa` explicitly (`KEY_ONLY_ASKED`),
-so no certificate-carrying case can fall to an ask the subject filter answers
-`[]`.
-
-### Fixed: `discover_certificates` and `discover_certificates_by_type` keep only the asked subject's certificates, the rule `resolve_by_identity_key` carries from the reference (#739)
-
-From the scoped cold re-read of PR #738 (#737, 2026-11-04 03:4xZ), a residual
-outside that row: `IdentityClient::discover_certificates(identity_key)` and
-`discover_certificates_by_type(identity_key, cert_type)` returned every
-certificate the parser admitted, whatever its subject, so an overlay host
-answering a by-key discovery with another subject's certificate had it shown
-as the asked key's. Both now keep only certificates whose subject is the
-asked key, compared as `resolve_by_identity_key` compares since #737 (the
-subject's compressed hex against the asked key lower-cased, the reference's
-`filterCertificatesByIdentityKey`, `ts-stack@edf6e03`
-`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:247-255`, called
-at `Wallet.ts:1012`); one private helper, `is_asked_subject`, serves the
-three doors, and the two `discover_*` doors share one private walk. The walk
-and the error path are unchanged: every output parsed in order, a skipped
-one passed over, a `limit` anywhere failing the call (#730). `discover_certificates(identity_key)` is this crate's door for the BRC-100
-wallet's `discoverByIdentityKey` (`packages/sdk/src/wallet/Wallet.interfaces.ts:989-1001,1296-1299`;
-the toolbox's `Wallet.ts:966-1015`, the subject filter at `:1012`), the path
-whose parsers this crate ports (#553, #730, #737), so the filter is a parity
-rule (the rule read of PR #742); `discover_certificates_by_type` has no
-counterpart (`DiscoverByIdentityKeyArgs` carries no type), and the
-certificates' type is not checked here (#744).
-
-`tests/identity_discover_subject_739.rs` serves the #737 vector's shapes
-(`tests/vectors/identity_resolve_737.json`, unchanged, rebuilt by this
-crate's writer to the recorded SHA-256) through both doors on an injected
-`.invalid` resolver, the asked key lower- and upper-cased, the expected
-subjects the reference's identities on the same shapes: another subject's
-certificate alone (`other_subject_alone`, `[]`), then the asked one's
-(`other_subject_then_asked` and `skipped_then_other_subject_then_asked`, the
-asked one alone), and the control, the subject's two certificates, both
-returned. `tests/identity_lock_position_537.rs` asked `discover_certificates`
-for `02aa`, which the filter would answer `[]` whatever the parser did; it
-now asks the token's own subject (read from its certificate JSON; a key-only
-token carries none), so its skip stays a pin. On `13cd2c74` (the test
-overlaid) both door tests are RED:
-``assertion `left == right` failed: other_subject_alone, upper-cased false``,
-`left: ["03a0434d9e47f3c86235477c7b1ae6ae5d3442d49b1943c2b752a68e2a47e247c7"]`,
-`right: []`; the control GREEN there. On the tip all three GREEN.
-
-Semver: a behaviour change at two public doors without a signature change:
-`discover_certificates` and `discover_certificates_by_type` drop a
-certificate whose subject is not the asked key, where they returned it.
-Migration: none.
-
-### Notes: cross-SDK parity (#739)
-
-What the wallet's `discoverByIdentityKey` door does that `discover_certificates`
-does not (`ts-stack@edf6e03` `Wallet.ts:966-1015`): the overlay query is sent
-as `{identityKey, certifiers}` (`:1004`) where this crate sends
-`{identityKey, certificatesOnly: true}`; the certificates are filtered and
-sorted by the wallet's trust step with `certifierInfo` attached (`:1010-1011`),
-unported here (the #737 row); a page of offset and limit (default 10, at most
-10000) with `totalCertificates` (`:228-233`, `validationHelpers.ts:1540-1543`)
-where this crate returns every admitted certificate; the asked key is trimmed
-and lower-cased by `validateHexString` (`:522-533`), so a space-padded key is
-found there and answers `[]` here, and a malformed or uncompressed key is
-refused there and answers `Ok([])` here after a lookup; a contact-source
-shortcut (`:983-992`) and the `IdentityCertificate` result type. The by-type
-door's unchecked certificate type is #744.
-
-### Tests: the evidence check's bounds pinned graph-wide across a proven ancestor, a parent raw and txid-only in both orders, and the limit error at every discovery door (#736)
-
-No behaviour change. #733's strength read named three gaps in #730's pins,
-each a refactor the current pins would let through.
-`tests/vectors/identity_evidence_736.json` is written by
-`tests/support/identity_evidence_736.mjs` (#730's helpers copied, #730's
-vector untouched), which builds every BEEF with the reference's own writers
-at `ts-stack@edf6e03` under Node v22.18.0 and records the bytes,
-`parseEvidence`'s pick or refusal with its code and line, and
-`parseResults`' outcome; two runs are byte-identical.
-`tests/identity_evidence_736.rs` rebuilds each BEEF with this crate's writer
-to the recorded SHA-256 and serves it through `resolve_by_attributes` and
-`discover_certificates`; the unit module `src/identity/evidence_736_tests.rs`
-judges each with `parse_evidence` to the recorded code and line and asserts
-the vector's six shapes.
-
-- **The inputs bound over the graph**: 2048 inputs at an unproven subject and
-  2049 at its unproven parent, which spends a proven grandparent with no
-  inputs, refuse the discovery at the parent (`TransactionEvidence.ts:170-171`,
-  `limit`); 2048 and 2048 read. Neither transaction crosses 4096 alone.
-- **A proven parent's scripts count**: the subject's scripts 131072 bytes and
-  its PROVEN parent's 131073 refuse (`graphScriptBytes` over every visited
-  transaction, `:168`, before the proof ends the branch at `:173`); 131072 and
-  131072 read.
-- **One parent written raw and txid-only**: the later entry is the index's on
-  both sides (`Beef.#rebuildTxIndexes`, `Beef.ts:516-524`; `rebuild_index`
-  here), so raw then txid-only is skipped (`:143`) and txid-only then raw is
-  read. No merge writes both entries, so both sides write these two BEEFs by
-  hand over `txs` (`Beef.toWriter` there, `Beef::to_writer` here), unsorted.
-- **The limit at every door**: `resolve_by_identity_key`,
-  `resolve_by_attributes`, `discover_certificates`,
-  `discover_certificates_by_type` and `query` each refuse #730's
-  `transactions_over_bound` and this vector's `graph_inputs_over_bound` with
-  `identity error: Transaction evidence: limit`. #730's door helper stopped at
-  `resolve_by_attributes`'s `?`, so on a limit shape it ran that door alone.
-
-Every pin is GREEN on `b5d008d1` (the behaviour landed with #730). In a scratch
-copy, sums counted per transaction make 3 of the 4 unit pins and 7 of the 8
-door pins RED while #730's ten stay green; an index that keeps the earlier
-entry makes the two-entry pins RED (2 unit, 1 door).
-
-### Fixed: `resolve_by_identity_key` reads every output of the lookup answer before it answers, keeps only the asked subject's certificates and returns the first one's identity, as the reference's wallet does (#737)
-
-From the strength read of PR #733 (#730, 2026-11-04 02:2xZ), older than #730
-and widened by it: `IdentityClient::resolve_by_identity_key` parsed
-`outputs[0]` of the `ls_identity` answer alone, where the reference's wallet
-parses every output in order (`ts-stack@edf6e03`
-`packages/wallet/wallet-toolbox/src/Wallet.ts:950-1016`, `discoverOverlayCertificates`
-and `discoverByIdentityKey`, through `parseResults`,
-`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:671-707`): a
-skipped output (`IdentityEvidenceVerifier.parse` answering `null`, `:596-634`)
-is dropped and the next one read, a `limit` rethrown (`:630-634`). Since #730
-a first output the evidence check refuses, or one with no identity token,
-ended this crate's resolution with `None` where the reference reads the
-second. The function now walks every output through the same parser and
-returns the first admitted certificate's identity; the contacts override is
-unchanged, the signature too.
-
-The reads' fold (the rule and strength reads of PR #738) ports two more rules
-of the same path. The subject filter: the reference's discovery keeps only
-certificates whose subject is the key asked (`filterCertificatesByIdentityKey`,
-`identityUtils.ts:247-255`, `certificate.subject.toLowerCase() === identityKey.toLowerCase()`,
-called at `Wallet.ts:1012` inside `discoverByIdentityKey`), where this crate
-returned the first admitted certificate whatever its subject (the parser
-checks only that a token is signed by the subject it names); a certificate
-for another subject is now passed over, the subject's compressed hex compared
-with the asked key lower-cased. The whole walk: `parseResults` parses every
-output before the discovery answers (`identityUtils.ts:671-707`), so a
-`limit` anywhere in the answer refuses the call (`:630-634`, `Wallet.ts:950-955`),
-where this crate answered at the first admitted output; it now parses every
-output, a limit before or after an admitted one failing the call with
-`identity error: Transaction evidence: limit`, an `invalid-evidence` output
-anywhere a skip. The other doors are unchanged: `resolve_by_attributes` is
-the reference's `discoverByAttributes` path, which filters by attributes
-(`filterCertificatesByAttributes`, `identityUtils.ts:283-302`, called at
-`Wallet.ts:1078`), not by subject; `query`, `discover_certificates` and
-`discover_certificates_by_type` are this crate's own doors, with no
-counterpart in the reference's `IdentityClient` (`IdentityClient.ts`, whose
-lookups are `resolveByIdentityKey` and `resolveByAttributes` alone); all four
-already parse every output before they answer (a `?` on the parser inside
-the `for output in &outputs` loop, the result returned after it).
-
-`tests/vectors/identity_resolve_737.json` is written by
-`tests/support/identity_resolve_737.mjs` (#730's helpers, the reference's
-writer, #553's two revelation tokens) at `ts-stack@edf6e03` under Node
-v22.18.0 with bun 1.3.11's bundle, the wallet's path run whole:
-`parseResults` over both outputs, `filterCertificatesByIdentityKey`
-(`:247-255`), the trust step (`transformVerifiableCertificatesWithTrust`,
-`:313-382`, the certifier trusted at the threshold) and
-`IdentityClient.parseIdentities` (`packages/sdk/src/identity/IdentityClient.ts:994-1011`);
-two runs byte-identical. Seven answers of two outputs: an unproven subject
-without inputs then the token, and an `OP_TRUE` output then the token (one
-identity), the token then the refused output (one), two certificates (two),
-one certificate at two outpoints (one, the trust step keeping one per serial
-number, `:360-361`), one outpoint twice (one), 257 transactions then the token
-(`refused: Transaction evidence: limit`). The fold's five: another
-subject's certificate (the scalar 10's, issued and published by the
-reference's own `MasterCertificate` and `publiclyRevealAttributes`, recorded
-under `tokens`) alone (no identity), before the asked one's and after a
-skipped output then before the asked one's (the asked identity); the token
-then 257 transactions whose subject spends `88`x32 (another txid than the
-token's, so no resolver drops it as a repeat; refused); and the refused
-first output's shape re-recorded with a second token of the subject (carol,
-another serial number) after it, so a broken evidence skip answers alice
-there. The vector's `certificates`, `serial_numbers` and `output_index` are
-asserted since the fold: every shape's certificates read through this
-crate's `query` (the same parser, every output, no subject filter) equal
-`parseResults`' count and serial numbers, and each output served at its
-recorded index. `tests/identity_resolve_737.rs`
-rebuilds every output with this crate's writer to the recorded SHA-256 and
-serves the answer through `resolve_by_identity_key` on an injected `.invalid`
-resolver. On `b5d008d1` (the tip's test, vector and recorder over the base,
-measured by the fold's cold re-read) three of six tests are RED:
-`a_skipped_first_output_is_passed_over_for_the_token_after_it_737` on both
-shapes (`Ok(None)`, expected carol's identity after the refused output and
-`Ok(Some(("03acd484...", "alice@example.com")))` after the `OP_TRUE` one),
-`another_subjects_certificate_is_not_the_asked_identity_737` (`Ok(Some(bob))`
-on the two answers whose first output is bob's, `Ok(None)` on the skipped
-one's) and `a_limit_after_an_admitted_output_refuses_the_resolution_737`
-(`Ok(Some(alice))`); the token-first, the first-output limit and the
-stated-difference tests GREEN there. On `a3f5fd03` (the lane's commit, the fold's test, vector and recorder over
-it) `another_subjects_certificate_is_not_the_asked_identity_737` is RED on
-its three shapes (`Ok(Some(("03a0434d...", "bob@example.com"))), expected Ok(None)`,
-and `expected Ok(Some(("03acd484...", "alice@example.com")))` twice) and
-`a_limit_after_an_admitted_output_refuses_the_resolution_737` RED
-(`Ok(Some(("03acd484...", "alice@example.com"))), expected Err("identity error: Transaction evidence: limit")`);
-the other four GREEN there. On the tip all six GREEN.
-
-Semver: a behaviour change at a public door without a signature change:
-`resolve_by_identity_key` answers `Some` for an answer whose first output is
-skipped and a later one admitted, where it answered `None`; answers the
-asked identity, or `None`, where it answered another subject's identity; and
-fails with `Error::IdentityError("Transaction evidence: limit")` on a limit
-anywhere in the answer, where it answered `Some` when an admitted output came
-before the limit. Migration: none.
-
-### Notes: cross-SDK parity (#737)
-
-The reference's `resolveByIdentityKey` returns every identity the wallet's
-discovery admits (`IdentityClient.ts:559-591`, `Promise<DisplayableIdentity[]>`);
-this crate's `resolve_by_identity_key` returns `Option<DisplayableIdentity>`
-and so the first admitted, in the answer's order: on two certificates of the
-subject the reference returns two identities and this crate the first
-(`two_certificates_resolve_to_the_first_where_the_reference_returns_both_stated_737`).
-The return type is the owner's word; `resolve_by_attributes` already returns
-every identity (`Vec<DisplayableIdentity>`, `src/identity/client.rs`), the
-shape that word would give this function. The subject filter is ported
-(the fold); the wallet's trust settings and its trust sort
-(`identityUtils.ts:330,379`: a certificate whose certifier the wallet does
-not trust dropped, the rest sorted by trust) and its page (`discoveryPage`,
-`Wallet.ts:228-233`) are wallet configuration, not ported at this door: the
-first identity here is the answer's first admitted of the asked subject, the
-reference's first the most trusted. Two certifiers in reverse trust order
-are stated, not pinned, on the owner's brief with the list return; the
-vector's recorder trusts every certifier it finds at level 1 (the
-threshold), so its trust step drops nothing and reorders nothing, the
-vector's limit.
-
-### Fixed: the identity parsers run the reference's evidence check and skip a refused token where they read it (#730)
-
-The keeper's word of 2026-11-04 01:2xZ on #728's shape 4: the toolbox's
-discovery reads an `ls_identity` output only after its verifier admits the
-evidence (`ts-stack@edf6e03`
-`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:600-634`, the
-coordinator calling `parseEvidence` under `defaultTransactionEvidenceLimits`,
-`packages/sdk/src/transaction/TransactionEvidenceCoordinator.ts:184`), and
-this crate's two parsers read the token of any BEEF `Transaction::from_beef`
-parsed: a leniency at an identity door, not a stated residue.
-`src/identity/evidence.rs` is `parseEvidence` (`TransactionEvidence.ts:93-201`):
-the 1 MiB bytes bound, the strict parse (`Beef::from_binary` refuses a byte
-after the frame, as `fromBinaryStrict` does), at most 256 transactions, the
-target (the atomic txid, else the last entry), the output index, then
-`assertUnconfirmedGraph`'s walk of the whole unconfirmed graph from the
-subject (`:137-177`): each input's source the entry the BEEF holds under its
-txid, a transaction proven when a BUMP of the BEEF carries its txid (`findBump`,
-`Beef.ts:570-574`, whatever index its entry names), a proven one ending its
-branch, an unproven one without inputs refused, an input without its source
-refused, a second spend of one outpoint refused, 4096 inputs and 256 KiB of
-script across the graph. The walk reads the BEEF, not the
-`source_transaction` links, because the linear linking hands a repeated
-parent to a later input as a stub. It asks no BUMP index of its leaf, as
-`parseEvidence` does not (`#verifyBumpIndexLeaves` is `verifyValid`'s,
-`Beef.ts:1129-1138`): `TxidNotInBump`, which `Beef::verify_structure` and the
-streaming reader's `check_bump_index` raise, is not this door's refusal.
-Both parsers call it in place of their `Transaction::from_beef` line: an
-`invalid-evidence` refusal skips the output, as the verifier's catch does
-(`identityUtils.ts:630-634`); a `limit` refuses the discovery in the
-reference's words, `identity error: Transaction evidence: limit`
-(`Error::IdentityError`), as that catch rethrows it and `Wallet.ts:950-955`
-rethrows it again. No new error variant.
-
-`tests/vectors/identity_evidence_730.json` is written by
-`tests/support/identity_evidence_730.mjs`, which calls the reference's
-`parseEvidence` directly on BEEFs its own writer builds and records
-`parseResults`' outcome, at `ts-stack@edf6e03` under Node v22.18.0; two runs
-are byte-identical. Twelve BEEFs: a second spend of one outpoint in the graph
-(`:149`), an unproven subject without inputs (`:174`), 4096 and 4097 inputs and
-262144 and 262145 script bytes (`:170-171`), 256 and 257 transactions (`:117`)
-and 1048576 and 1048577 bytes (`:101`), a proven parent whose own parent is
-absent (read on both), and #728's shape 4 with the grandparent present raw and
-proven by its own BUMP (read on both: the guard that the check is the walk and
-not `verify_structure`). The `sourceTXID` check (`:145-146`) is recorded as
-unreached from bytes: both SDKs find a source under the txid its bytes hash
-to. `tests/identity_evidence_730.rs` rebuilds each BEEF with this crate's
-writer to the recorded SHA-256 and serves it through `resolve_by_attributes`
-and `discover_certificates`; `src/identity/evidence_730_tests.rs` compares the
-check's code and line with the reference's on the twelve and on the #725 and
-#728 shapes.
-
-On `11bb04ce` (the scratch copy with the tip's tests), RED:
-`a_txid_only_parent_before_an_unproven_subject_is_skipped_as_the_reference_skips_it_725`
-(`left: (1, 1)`, `right: (0, 0)`),
-`a_parent_whose_bump_names_another_txid_is_skipped_as_the_reference_skips_it_728`
-(the same), the two unit modules (`bump_names_another_txid: (true, true),
-expected false`; both txid-only parent BEEFs), the #553 pin
-(`certificate_at_bound`: `left: Ok((1, 1))`, `right: Err("identity error:
-Transaction evidence: limit")`), and four of the six #730 door tests (six
-shapes `Ok((1, 1))` where the reference skips or refuses); the proven-parent
-agreement and the guard GREEN on both. #728's shapes 1 to 3 and #725's (a) and
-(c) GREEN on both. The #725 and #728 pins now assert each shape's
-`selected_txid` and shapes 1 to 3 their `refused_at` by equality, shape 4 the
-whole line (`TransactionEvidence.ts:143: <parent> input <grandparent>.0 has
-no source transaction`). The test fixtures that published an unproven
-transaction spending a made-up parent (`tests/support/pushdrop_lock_position_537.rs`'s
-`output_of`, `src/identity/client_field_value_261_tests.rs`,
-`tests/auth_identity_certificate_field_order_394.rs`) now prove it by a block
-of its own, as complete evidence.
-
-Semver: a behaviour change at a public door, no signature change. The five
-discovery functions (`resolve_by_identity_key`, `resolve_by_attributes`,
-`discover_certificates`, `discover_certificates_by_type`, `query`) drop a
-lookup output whose evidence the check refuses, where they read it, and fail
-with `Transaction evidence: limit` on an answer past the reference's limits.
-Migration: none for a caller whose overlay answers with complete evidence; a
-caller whose overlay answers with a parent not carried sees the output
-dropped.
-
-### Notes: cross-SDK parity (#730)
-
-The check is `parseEvidence`'s; the coordinator's verification after it is
-not ported: `tx.verify` on the admitted subject against the wallet's chain
-tracker (`TransactionEvidenceCoordinator.ts:317-345`), so an unproven
-ancestor's failing script, a BUMP root the tracker refuses or a coinbase proof
-under 100 blocks deep (`MerklePath.ts:488-496`) is skipped there and read
-here (`CLAUDE.md`'s #553 row, the residue it keeps). Its concurrency limits
-(`pendingTransactions`, `consumers`) are not ported either: one discovery
-parses its outputs in turn. Where `Beef::from_binary` refuses bytes
-`fromBinaryStrict` reads (#86's reserved forms), the output is skipped here.
-The reference checks the lookup output's `txid` hint against the subject it
-picked (`TransactionEvidence.ts:123-124`); `OutputListItem` carries no `txid`,
-so a JSON answer whose `txid` disagrees with its BEEF's subject is skipped
-there and read here (#735: the port is a public field, the owner's word).
-The reference's `timeout` code comes from the coordinator's tracker verify,
-unported, so this check has no timeout path.
-
-### Tests: four more BEEF shapes of the identity subject pick pinned against the reference, and the #725 pins tightened (#728)
-
-No behaviour change. #727's strength read named four `ls_identity` BEEF shapes
-the #721 and #725 vectors leave. `tests/vectors/identity_beef_subject_728.json`
-is written by `tests/support/identity_beef_subject_728.mjs` (#725's helpers
-copied, #725's vector untouched), which uses the reference's own writers
-(`Beef.toBinary`, `toBinaryAtomic`; one Atomic BEEF prefix written by hand, as
-#725's was) at `ts-stack@edf6e03` under Node v22.18.0; two runs are
-byte-identical. For each of its five BEEFs it records the bytes, the output
-index, `parseEvidence`'s pick or refusal, which check refused and
-`parseResults`' outcome: the reference skips all five.
-`tests/identity_beef_subject_728.rs` rebuilds every BEEF with this crate's
-writer (`to_binary`, `to_binary_atomic`) to the recorded bytes and serves it
-through `resolve_by_attributes` and `discover_certificates`; the unit test
-`src/identity/client_beef_subject_728_tests.rs` hands the five to both parsers
-directly and asserts the vector's count.
-
-- **An `outputIndex` past the subject's outputs** (#725's chain at index 1):
-  skipped on both sides (`TransactionEvidence.ts:126`; here `outputs.get`).
-  GREEN on `0d8546c0` too, an agreement pinned; the test's index-0 control is
-  RED there (`beef.txs.first()`, the grandparent).
-- **A txid-only entry written last, no atomic header** (the reference's sort
-  keeps it last, so no hand bytes), and **an Atomic BEEF header naming a
-  txid-only entry**, by `toBinaryAtomic` and as a hand prefix over shape 2's
-  bytes (the token's transaction beside the subject): skipped on both sides (`findAtomicTransaction` is undefined,
-  `:120-121`; here `Transaction::from_beef` refuses, so the resolver drops the
-  output). The doors are GREEN on `0d8546c0`; the unit test is RED there on
-  the two shapes that hold the token's transaction ahead of the txid-only
-  entry (read).
-- **A raw parent whose BUMP names another txid**: read here and skipped by the
-  reference (the row below); RED on `0d8546c0`, whose `beef.txs.first()`, the
-  parent, skipped.
-
-The #725 pins: the txid-only parent test now asserts that the reference's
-refusing line names the subject (`TransactionEvidence.ts:143: <subject> input`),
-so the reference's pick is pinned and not only the line, and its doc comment
-quotes the documenting line of `CLAUDE.md`'s #553 row; the unit test asserts
-the vector's five BEEFs.
-
-### Notes: cross-SDK parity (#728)
-
-A raw parent merged with the index of a BUMP whose leaf names another txid,
-before a raw unproven subject, is skipped by the reference's discovery:
-`fromBinaryStrict` checks no BUMP index, `findBump` finds no BUMP carrying the
-parent's txid (`Beef.ts:570-574`), so the parent is unproven and
-`assertUnconfirmedGraph` refuses the subject's graph at the parent's input
-(`TransactionEvidence.ts:143` at `edf6e03`). This crate reads the bytes too
-(`TxidNotInBump` is `Beef::verify_structure`'s refusal, which no identity
-parser calls; the issue's "refused at the parse" is not this crate's reading),
-links the parent unproven the same way, and its parsers, which run no
-unconfirmed-graph check, read the subject's token. This is #553's stated
-evidence-layer residue, the class of #725's txid-only parent; it is pinned as
-this crate's reading in
-`a_parent_whose_bump_names_another_txid_is_read_here_and_skipped_there_553_728`,
-and the residue sentence of `CLAUDE.md`'s #553 row now names it.
-
-### Tests: the three BEEF shapes of the identity subject pick pinned against the reference (#725)
-
-No behaviour change. #724's strength read named three BEEF shapes the #721
-vector leaves. `tests/vectors/identity_beef_subject_725.json` is written by
-`tests/support/identity_beef_subject_725.mjs`, which uses the reference's own
-writers (`Beef.toBinary`, `toBinaryAtomic`; the order held for the absent
-subject, which `toBinaryAtomic` refuses), at `ts-stack@edf6e03` under Node
-v22.18.0; two runs are byte-identical. For each shape it records the bytes,
-`parseEvidence`'s pick or refusal, which check refused (replayed through
-`Beef`'s public methods) and `parseResults`' outcome.
-`tests/identity_beef_subject_725.rs` rebuilds all five BEEFs with this
-crate's writer (`to_writer`, `to_binary`, `to_binary_atomic`) to the recorded
-bytes: on these shapes the two writers' sorts agree, txid-only entry before the
-raw one and grandparent, parent, subject.
-
-- **An Atomic BEEF header naming an absent txid**: the reference skips it
-  (`findAtomicTransaction` is undefined, `TransactionEvidence.ts:118-121`).
-  At the public doors this crate never hands it to a parser:
-  `LookupResolver`'s dedup drops any output that `Transaction::from_beef`
-  refuses, as the reference's resolver does (`LookupResolver.ts:2232-2237`).
-  So the integration pin is GREEN on `0d8546c0` too. The parsers' own skip is
-  the unit test `src/identity/client_beef_subject_725_tests.rs`, RED on
-  `0d8546c0`, where `beef.txs.first()` read the token's transaction.
-- **A three-transaction chain** (a proven grandparent, an unproven parent
-  and subject), plain and atomic: read from its subject on both sides; RED on
-  `0d8546c0`, where the grandparent was read and skipped.
-- **A txid-only parent before a raw unproven subject**, plain and atomic:
-  read here and skipped by the reference (the row below); RED on `0d8546c0`,
-  where the txid-only entry, which holds no transaction, was read and skipped.
-
-### Notes: cross-SDK parity
-
-A txid-only parent before a raw unproven subject is skipped by the reference's
-discovery: `parseEvidence` selects the subject and `assertUnconfirmedGraph`
-refuses it, because the subject's input has no source transaction
-(`TransactionEvidence.ts:143`, `:155-177` at `edf6e03`). This crate's
-parsers run no unconfirmed-graph check, so they read it. This is #553's stated
-evidence-layer residue. #721's subject pick exposed it (the base skipped the
-shape by accident). It is pinned as this crate's reading in
-`a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_there_553_725`,
-and the residue sentence of `CLAUDE.md`'s #553 row now names it.
-
-### Changed: `to_asm` writes `OP_0` and `OP_1NEGATE`, the reference's names, where it wrote `0` and `-1` (#723)
-
-`ScriptChunk::to_asm`, and through it `Script::to_asm`, `LockingScript::to_asm`
-and `UnlockingScript::to_asm`, wrote `0x00` as `0` and `0x4f` as `-1`. The
-reference names them `OP_0` and `OP_1NEGATE` (`ts-stack@edf6e03`
-`packages/sdk/src/script/OP.ts:6-7,11`: `OP_0` listed before `OP_FALSE`, "the
-top one will be used in standard ASM output"; `toASM` writes `OP[op]` through
-`#_chunkToString`, `Script.ts:668-677`), go-sdk@2ca481c's `NewFromASM` reads
-those names and cannot read `0` or `-1` (`script/script.go:46-63`: neither is a
-name, and neither is hex), and no BRC defines an ASM text, so the reference's
-text is this crate's (the keeper's word of 2026-11-03 23:1xZ on #661's open
-text). `to_asm` now writes the names; every other opcode's name is unchanged.
-`from_asm` keeps reading both forms, as the reference's `fromASM` reads the
-literals `0` and `-1` before any name (`#parseASMToken`, `Script.ts:91-92`), so
-a text the old writer wrote reads back to the same bytes.
-
-`tests/script_asm_names_723.rs` (five tests) against
-`vectors/script_asm_names_723.json` (recorded by `support/script_asm_names_723.mjs`
-under Node v22.18.0, two runs byte-identical): eight scripts written as the
-reference writes them through the three script types and read back to their
-bytes (`OP_0` and `OP_1NEGATE` alone and together, `OP_0` before a push,
-`OP_1NEGATE OP_1ADD OP_0 OP_EQUAL`, `OP_DUP OP_0 OP_DROP`, pushes of `00` and
-`81` written as their hex); ten texts read to the reference's bytes and written
-back in its text (`0`, `-1`, `0 -1` and `OP_DUP 0 OP_DROP`, the reference
-reading a bare `0` as the byte `00` and `-1` as `4f`; `OP_0`, `OP_FALSE`,
-`OP_1NEGATE`; `00` a push of one zero byte); go-sdk's reader (transcribed, not
-run) reading every text written. 5 of 5 RED on `0d8546c0` (`left: "0"`,
-`right: "OP_0"`; `left: "OP_DUP 0 OP_DROP"`), the reader halves green there.
-
-The tests that asserted the old text now assert the writer's: the chunk unit
-test, three `OP_0 OP_RETURN` outputs in `src/transaction/transaction.rs`, four
-in `tests/script_if_depth_634.rs`, one in `tests/script_script_603_b.rs`; in
-`tests/script_chunk_asm_661.rs` the two `0`/`-1` rows leave `ASM_STATED` (the
-reference's ASM on 18 of its 24 shapes, 16 before). No vector carried the old
-text as an output (`script_asm_603_a.json`'s `0` and `-1` are `fromASM`'s
-input). The ts-stack census's one ASM regression, `writebin-empty.0001`
-(`writeBin([]).toASM()` is `OP_0`), passes, its known failure removed from
-`tests/conformance_scripts.rs`: the script regressions 11 run, 11 passed, 0
-known (10 and 1 before); the evaluation census, judged by hex, unchanged at
-5,116 total, 4,120 run, 4,109 passed, 959 unsupported, 37 skipped, 11 known
-failures, against both `~/bsv/ts-stack/conformance` and `edf6e03`'s.
-
-Semver: no type or signature changed; the text of a public output changed.
-Every script holding `OP_0` (a data carrier's `OP_0 OP_RETURN <data>`, a
-CHECKMULTISIG unlocking script's leading `OP_0`) or `OP_1NEGATE` reads
-differently in ASM. Migration: a caller that matched `0` or `-1` in `to_asm`'s
-text matches `OP_0` or `OP_1NEGATE`; a caller that stored the old text reads it
-back with `from_asm` unchanged. No dependent named in `CLAUDE.md` calls
-`to_asm` or `from_asm`.
-
-### Notes: cross-SDK parity (#723)
-
-`CLAUDE.md`'s #661 row loses its `0`/`-1` clause: this crate writes the
-reference's text for both opcodes. go-sdk@2ca481c writes `0x00` as `OP_FALSE`
-(`script/opcodes.go:546`), which this crate and the reference read; its
-`NewFromASM` refuses the old `0` and `-1` (`ErrInvalidOpCode`). The row's
-`OP_UNKNOWN<n>` and `OP_RETURN` clauses stand, and so does #603 shard A's
-reading of `from_asm("")` and a double space: go-sdk's reading (`NewFromASM("")`
-the empty script, `script/script.go:46-50` at v1.7.1), the divergence from
-ts-sdk alone (`fromASM('')` one empty push `{ data: [], op: 0 }` where
-`toASM` of the empty script is `''`, `Script.ts:73-82,92-125,222-229`), filed
-upstream as ts-stack #1479 (2026-11-04); the owner's word (2026-11-04
-13:5xZ, through the keeper): HELD as the empty script, with go-sdk, the
-upstream row the filing, the item closed.
-
-### Fixed: the `ls_identity` parsers read the output from the BEEF's subject, as the reference's discovery does (#721)
-
-- #720's rule read found both `ls_identity` parsers
-  (`parse_output_to_certificate`, `parse_output_to_verifiable_certificate`)
-  taking the transaction of a lookup output's BEEF by `beef.txs.first()`. The
-  reference's discovery (the toolbox's `IdentityEvidenceVerifier.parse`,
-  `identityUtils.ts:600-612` at `ts-stack@edf6e03`) loads
-  `beef.atomicTxid ?? beef.txs.at(-1)?.txid` through `findAtomicTransaction`
-  and reads `outputIndex` on it (`TransactionEvidence.ts:110-127`), the rule of
-  `Transaction.fromBEEF` and of this crate's `Transaction::from_beef(_, None)`,
-  which the revocation already used. Every writer (TS 2, TS 3, this crate)
-  lists parents first, so for a revelation whose own transaction is unproven
-  (its BEEF carries a parent, proven or not) the parsers read the parent and
-  skipped the token; and a
-  BEEF listing the subject before its parent with no atomic header was read
-  where the reference reads the parent and skips. Both parsers now read
-  through `Transaction::from_beef(&output.beef, None)`; a BEEF it refuses is a
-  skip. The table of shapes is `docs/lanes/fix-721.md`.
-- The witness is `tests/vectors/identity_beef_subject_721.json`, written by
-  `tests/support/identity_beef_subject_721.mjs` against #553's bundle (the SDK
-  and the toolbox's `identityUtils.ts` at `edf6e03`, `parseEvidence`
-  exported) under Node v22.18.0; two runs are byte-identical. Five shapes of
-  one proven parent and one subject carrying the reference's revelation token
-  (#553's), each with the bytes, the selected txid and `parseResults`' outcome.
-  `tests/identity_beef_subject_721.rs` rebuilds each with this crate's BEEF
-  writer to the recorded bytes and serves it through `resolve_by_attributes`
-  and `discover_certificates`: RED on `0d8546c0` on 3 of 5 shapes (parent
-  first, atomic parent first: skipped where the reference reads; subject first
-  without a header: read where it skips), GREEN after; the lone subject and the
-  atomic subject first agree on both.
-- No public API change. The results of `resolve_by_identity_key`,
-  `resolve_by_attributes`, `query`, `discover_certificates` and
-  `discover_certificates_by_type` move for a multi-transaction BEEF: a
-  revelation whose own transaction is unproven is now returned, and one listed
-  before its parent in a non-atomic BEEF is now skipped. No error text changes.
-
-### Tests: a script built by hand from chunks with empty or misplaced data is the reference's, its ASM pinned (#661)
-
-No behaviour change. #652's re-read found `Script::from_chunks` with
-`ScriptChunk::new` holding chunks no parser produces (`Some(vec![])` on `OP_1`,
-`OP_0`, `0x01` or `OP_PUSHDATA1`, which writes `""`; data on `OP_DUP`, which
-writes `0102`; an `OP_RETURN` with data followed by more chunks, which the
-serializer drops and `to_asm` writes) and asked for a rule: refuse at
-construction, or write what the serializer writes. The reference does
-neither: `new Script(chunks)` holds any `{ op, data? }` (`ts-stack@edf6e03`
-`ScriptChunk.ts`), its bytes are `#writeChunkData`'s
-(`Script.ts:474-490,539-562`: the data after an opcode below `OP_PUSHDATA1`,
-after a PUSHDATA opcode with its length, after an `OP_RETURN` with nothing
-after it, after any other opcode none) and its ASM `#_chunkToString`'s
-(`:668-677`: a chunk with data its data's hex alone, whatever the opcode), so it
-round-trips none of these shapes either. This crate already writes the
-reference's bytes on every one of them and its ASM save the eight texts the
-parity note names, and its answer stays the reference's, not a stricter one:
-`from_chunks` refuses nothing, `to_binary` writes the reference's bytes and
-`to_asm` its text but for those eight.
-
-`tests/script_chunk_asm_661.rs` (five tests) against
-`vectors/script_chunk_asm_661.json` (twenty-four shapes recorded by
-`support/script_chunk_asm_661.mjs` under Node v22.18.0, two runs
-byte-identical: the reference's `toHex`, `toASM`, `fromASM` of that text and
-`fromHex` of those bytes): the bytes on all 24; the ASM on 16, the other 8
-enumerated (`ASM_STATED`); `from_asm` of the reference's text the reference's
-bytes on 13, refused by both on 2 (`undefined`), the other 9 #603 shard A's
-stated readings (`READ_BACK_STATED`);
-the round trip holding here on 7 shapes and in the reference on 5, each
-listed; the issue's four empty-data shapes and `OP_DUP` with `[1, 2]` by
-name. Green on `c6781b4a` (nothing to fix). RED under the issue's two other
-rules, planted in a scratch copy: `to_asm` writing the ASM of the serialized
-bytes, 3 of 5; `from_chunks` normalizing as go-sdk's writer does, 5 of 5.
-
-### Notes: cross-SDK parity (#661)
-
-Three texts this crate writes differ from the reference's, all older than #661
-and unchanged by it (the `0`/`-1` and `OP_UNKNOWN<n>` texts stated against the
-reference by this note and its row alone): `OP_0` and `OP_1NEGATE` are `0` and
-`-1` here and `OP_0` and `OP_1NEGATE` there (go-sdk@2ca481c writes `OP_FALSE`
-and `OP_1NEGATE`, `script/opcodes.go:545-546,625`, and its `NewFromASM` cannot
-read `0` or `-1`, `script/script.go:46-63`), a public output of every script
-holding them, open for the keeper's word; a direct push opcode without data is
-`OP_UNKNOWN<n>` here and `undefined` there (`OP[op]`), neither reading back;
-and #634's `OP_RETURN` writer, stated there (with empty data, #603 shard B's
-bare `OP_RETURN` row). go-sdk holds no such chunk in a script:
-`NewScriptFromScriptOps` (`script/script_chunk.go:119-163`) re-encodes a push
-opcode's data as its minimal push (`01` with empty data is `00`, `03` with one
-byte `01aa`, `OP_PUSHDATA1` with one byte `01aa`) and drops data on every other
-opcode but `OP_RETURN`, whose data it appends before it stops, so its bytes
-differ from the reference's and this crate's on 11 of the 24 shapes
-(transcribed in the recorder, not run). The row is in `CLAUDE.md`'s divergence
-list.
-
-### Fixed: the contacts manager reads a listed token as the reference's `PushDrop.decode` does, so its count, bounds and envelope refuse in the reference's order and words (#718)
-
-- #717's rule read checked the shared canonical refusal against
-  `decodeCanonicalPushDrop` (`ts-stack@edf6e03` `PushDropValidation.ts:54-79`) at
-  its five callers, but not the identity and contacts sites. None of those calls
-  it; each reference counterpart reads with `PushDrop.decode` at its default
-  position (`PushDrop.ts:63-121`, the second chunk never read) and runs its own
-  checks. The four sites are read in `docs/lanes/fix-718.md`, with a table:
-  the contacts manager's `authenticate_contact`
-  (`#authenticateContactScript`, `ContactsManager.ts:431-466`), the identity
-  revocation's lookup loop (`IdentityClient.ts:768-829`), and the two
-  `ls_identity` parsers (the toolbox's `decodeIdentityOutput`,
-  `identityUtils.ts:497-559`). Each site's limits equal its counterpart's: two
-  fields; a contact ciphertext of 1 to 66,560 bytes and a signature of 8 to 80;
-  an identity certificate of 1 to 262,144 bytes and a signature of 8 to 80.
-- The contacts site differed. Its read was the canonical lock-before decode
-  (`PushDrop::decode_before`), which refuses four kinds of token in its own
-  words before the count, the bounds and the envelope: an empty script, a key
-  alone, a `05` key, and a token without `OP_CHECKSIG` second. That is the
-  issue's envelope-before-bounds class, in the decode's form.
-  `authenticate_contact` now reads as the reference does, using the reference
-  decode's own words for the read's refusals and `decode_reference_before`
-  (#618's reading, crate-visible now) for the fields. A token without
-  `OP_CHECKSIG` second with an oversized ciphertext is now refused as
-  `contact ciphertext must contain 1-66560 bytes`; before, it was
-  `Expected OP_CHECKSIG after pubkey`. The words reach no caller: the listing
-  drops the output, and the update and removal replace the error with the
-  reference's outer words, as before.
-- The identity sites agree with the reference. Every refusal is a skip on both
-  sides, and the revocation's run words are the reference's
-  (`No authenticated revelation output matches the requested certificate.`).
-  The parsers check the record before the envelope, where the toolbox checks
-  the envelope first; no caller can see that order.
-- The witness is `tests/vectors/identity_contacts_canonical_718.json`, written
-  by `tests/support/identity_contacts_canonical_718.mjs` against the whole SDK
-  at `edf6e03` under Node v22.18.0; two runs are byte-identical. It holds ten
-  shapes, each with the reference's `getContacts` drop words and its
-  revocation's run words. The tokens are built by this crate's PushDrop writer
-  and pinned to the recorded SHA-256.
-- The unit test `src/identity/contacts_auth_718_tests.rs` is RED on 8 of the 10
-  shapes with the read put back to `decode_before`, and GREEN after.
-  `tests/identity_contacts_canonical_718.rs` pins the agreement at the
-  revocation, both parsers and the contacts listing; it is GREEN on both.
-- No public API change.
-
-### Notes: cross-SDK parity (#718)
-
-Two residues at the contacts site, both older than #718. A compressed key with
-x at or above p is reduced by the reference and read on; this crate's
-`from_bytes` refuses it in native words (the #498 and #183 rows). The
-reference's update and removal refusals carry the inner words as `cause`; this
-crate's `Error` has no cause chain, so the outer words alone reach the caller.
-go-sdk@2ca481c has no contacts manager or identity revocation.
-
-### CI: a `CHANGELOG.md` change reaches no binary through an assertion's literal, and a module's `CLAUDE.md` reaches nothing (#689's two remaining rows)
-
-- The Test Suite's plan (`.github/scripts/affected_tests.py`) read every
-  string literal of a test source as a read of the path it names, so
-  `tests/arch_ci_lines.rs`'s needle of `ci.yml`'s text (`case "$file" in
-  Cargo.toml | CHANGELOG.md) ;; ...`) put that binary in the plan of every
-  pull request touching the changelog. A literal holding whitespace is now a
-  sentence, a message or a command, never a path read: no tracked path holds
-  a space. On the tip a `CHANGELOG.md`-only change plans `integration
-  binaries reached: 0 of 288`, `build: False` (1 before). No test reads
-  `CHANGELOG.md` (four name it in comments, `arch_ci_lines` in a needle).
-  Across the 3,934 tracked paths the rule drops 98 (binary, path) pairs over
-  20 paths' reach, each a word in a message or a needle (`docs/FIXTURES.md` in
-  a stub's label, a recorder's `.mjs` named in its test's message, the fuzz
-  corpora's `hex` and `base64`, `tools/ratchet/run`'s `run`); none of those
-  binaries opens or runs the file.
-- A module's Markdown under `src/` (`src/<m>/CLAUDE.md`, 28 files) reached
-  the seven binaries that walk `src/`, every one of which reads the `.rs`
-  files alone (`tests/arch_support/mod.rs`) or the module directories
-  (`arch_tests_claude_rows_name_modules_706`). It reaches no walker now:
-  `src/script/CLAUDE.md` alone plans 0 of 288, `build: False` (7 before). A
-  source under `src/` reaches the same set as before (`src/script/spend/mod.rs`:
-  229 binaries, unit, doc, memory and tracing, before and after).
-
-Pinned by `.github/scripts/test_affected_tests.py`:
-`test_a_path_only_in_an_assertions_literal_is_not_read_689` (a fixture with
-the path only in an assertion's needle, its message and a `format!` reaches
-nothing; `include_str!` and `Path::new` of it reach) and
-`test_a_module_claude_md_reaches_no_walker_of_src_689` (a module's `CLAUDE.md`
-and another Markdown under `src/` reach nothing, a Rust source beside them and
-Markdown under a walked `tests/` tree still do), each RED on the base's script;
-`test_a_docs_only_change_reaches_nothing` now asserts no binary and no build.
-No Rust file changes.
-
-### Fixed: PushDrop's canonical refusal checks the field bounds before the envelope (#616)
-
-- A token this crate's lock-before read refuses (no `OP_CHECKSIG` second) is refused
-  in `decodeCanonicalPushDrop`'s words (`ts-stack@edf6e03`
-  `PushDropValidation.ts:54-79`) by `canonical_refusal`
-  (`src/script/templates/pushdrop_position.rs`). It read the first chunk, the key and
-  the field count, then answered the envelope's words whatever the fields held; the
-  reference checks each field against `maximumFieldBytes` and the running payload
-  against `maximumPayloadBytes` before the envelope (`:63-73`). A no-CHECKSIG token
-  with the right field count and one field past its bound now refuses with
-  `PushDrop token contains an oversized field`, one whose payload passes its bound
-  with `PushDrop token payload is too large`, and the envelope's words stay for a token
-  whose fields are in bounds. The fields' lengths are `PushDrop.decode`'s
-  (`PushDrop.ts:96-115`: a push's data, one byte for `OP_0`, `OP_1NEGATE` and the
-  opcodes 80 to 96). Each of the five sites passes its own limits, the reference's
-  at its counterpart: the local store (2 MiB, 2 MiB + 1 KiB), the kvstore interpreter
-  (1 MiB, 1 MiB + 64 KiB), the registry (16 KiB, 64 KiB), the overlay admin token
-  (4 KiB, 8 KiB) and the storage downloader (2 KiB, 2 KiB + 256 bytes).
-- `tests/script_pushdrop_canonical_bounds_616.rs` (4 tests) reads four registry basket
-  tokens built by this crate's PushDrop writer through
-  `decode_and_verify_registry_token`, their bytes pinned by the SHA-256 the reference
-  recorded for the same shape (`tests/vectors/pushdrop_canonical_bounds_616.json`,
-  written by `tests/support/pushdrop_canonical_bounds_616.mjs` from a bundle of
-  `packages/sdk` at `edf6e03` under Node v22.18.0, two runs byte-identical; each case
-  the words of `decodeCanonicalPushDrop` with the registry's limits and of
-  `decodeAndVerifyRegistryToken('basket', ..)`, equal). The oversized-field and
-  payload tests RED on `9cf60844` (`left: RegistryError("PushDrop token must use the
-  canonical PushDrop envelope")`); the in-bounds no-CHECKSIG token keeps the
-  envelope's words and the CHECKSIG control keeps the bounds' words, green on both.
-- The strength fold adds five tests (9 in the file), the vector's seven new shapes
-  recorded by the same script (the earlier four byte-identical): six fields with an
-  oversized one keep the count's words, a payload exactly at 65,536 bytes keeps the
-  envelope's, an oversized field that also crosses the payload is the field's, an
-  `OP_1` field counts one byte toward the payload, and the overlay admin token's
-  static decode (`decode_overlay_admin_token`, 4096 and 8192 bytes,
-  `OverlayAdminTokenTemplate.ts:29-30,159-167`) refuses at its own bounds, a second
-  site wired to the shared check. Each is RED on a scratch copy of the tip with the
-  order or limit it pins changed (the bounds before the count, the payload's `>=`, the
-  payload before the field, an opcode field as no byte, the site's limits swapped).
-- No public type or signature changes: `canonical_refusal` is crate-visible, and an
-  error's text is not a type. A caller matching the envelope's words on a token with
-  an oversized field or payload and no `OP_CHECKSIG` second now reads the bounds'
-  words. No difference with the reference remains on this input class; the
-  `CLAUDE.md` row 93 residue is closed (`docs/lanes/fix-616.md`).
-
-### Tests: one row per file in `tests/CLAUDE.md` (#712)
-
-- Three files had two rows each in the `## Files` table:
-  `script_int64_operand_witness.rs`, `script_shift_count_witness.rs` and
-  `transport_fault_wallet.rs`. Every reader (the #706 guard, `rows_from_sources.py`,
-  the plan's and the night's `test_rows`) keys the table by the file's stem and keeps the
-  last copy; the shift row read was the stale one (the default mode "shifts by any
-  count", before #383). Each pair is merged to the copy its file's tests pin
-  (`docs/lanes/fix-712.md`); the Modules cells were equal, so no plan selection moves.
-- `tests/arch_tests_claude_rows_name_modules_706.rs` and
-  `rows_from_sources.py --check` refuse a stem named in two rows, naming its files and
-  each row's line (`a_file_named_in_two_rows_is_refused_with_both_lines_712`, its Python
-  twin in `test_affected_tests.py`); RED on `472c2fd8` with three refusals, green after.
-  The check keys by the stem, as the readers do, through the readers' own table reading
-  (`table_rows` in the guard, `nightly_mutants.table_rows` in Python), so a
-  `support/a.rs` row beside an `a.rs` row, one row to every reader, is refused as two
-  (`a_support_file_beside_a_top_level_file_of_its_stem_is_two_rows_712` in both; RED
-  on the name-keyed check of the review's `67ad7d28`, which returned no refusal).
-
-### CI: the cap guard reads every workflow for a heavy dispatch or `uses:`, pins `!cancelled()` after the shards, the give-up bound and the wait's `--workflow` (#709)
-
-- The rule read of #683's landing found five ways a later edit could put two
-  heavy runs on the twenty runners with `tests/arch_nightly_cap.rs` green: a
-  dispatch from a workflow other than `nightly.yml`, a reusable call
-  (`uses: ./.github/workflows/<file>`) in place of a `gh workflow run` line,
-  `!cancelled()` dropped from a job after the shards, the wait's give-up
-  raised past its job's timeout, and the wait's `--workflow` naming another
-  file. No workflow changes; the guard reads each from the YAML by a rule.
-  The rule's reading of today's files: `release.yml`'s six calls start on a
-  push of tags alone, the owner's release ritual, and pass by their trigger;
-  `sync-main-into-beta.yml`'s dispatch of `ci.yml` on a push to main is named
-  in the guard's record with its reason, not sequenced with the nightly (a
-  stated residual for the keeper); an `echo`'s text and a comment are no
-  dispatch.
-
-Pinned by `tests/arch_nightly_cap_rules_709.rs` (5 tests): each rule RED on a
-mutation of the tip's YAML with the old guard green on it (a `gh workflow
-run bench.yml` step and a `uses:` job in `ci.yml`, `!cancelled()` dropped
-from the bench's `if:`, the bench's budget at 58 minutes, its `--workflow`
-at `ci.yml`, a `uses:` job in the nightly with no `needs`). The record is
-`docs/lanes/fix-709.md`.
-
-The fold on PR #713 (the strength read's holes): a dispatch job of the nightly
-with a job after it must carry a `gh run watch` per dispatch, each watch under
-`timeout "$budget"` with `budget` the one `$((N * 60 - SECONDS))` the give-up
-rule reads (a watch dropped, its `timeout` dropped, a literal `timeout 7200` or
-a budget doubled inside `$((...))` refused; a `sleep 2m` refused as unreadable,
-a decoy `sleep` before the loop no reading); the wait's list equals the set its
-job dispatched in both directions (two dispatches with one listed refused, `-w`
-and `--workflow=` read, a `WF=bench.yml` variable read through its one literal
-assignment, else refused as unreadable); the absent-`if:` and the give-up
-refusals reworded (``with no `if:` ``, and ``the wait can run N minutes (the
-larger of the budget's B and the poll's P × I s, M)``, the larger term named). Pinned by
-`tests/arch_nightly_cap_watch_713.rs` (4 tests), each new rule RED on a mutation
-of the real YAML (the bench's watch deleted, its `timeout` dropped,
-`ci-full-beta`'s budget doubled, a second dispatch in the bench, its list on
-`-w ci.yml`), the last four green on the old guard; the bench's watch deleted
-was refused by the old guard already, in its conclusion-after-the-watch words.
-The readers move to `tests/support/nightly_cap_rules.rs`. The lane record's
-sync line corrected: the sync's dispatched `ci.yml` run is on the sync branch
-built from beta (both matrices at six, at most nine jobs at once, not main's
-22), fired zero times on record.
-
-The second fold (the scoped check of the fold): rule 5's reusable-call
-exemption read any `uses:` line, so a step's `uses: actions/checkout` in a
-dispatch job exempted it; it reads the job-level `uses` field now, pinned by
-`a_steps_uses_does_not_make_a_dispatch_job_a_reusable_call_713` (RED before).
-A `(( budget *= 2 ))` after the budget's assignment is read by no rule, a
-stated residue in the record.
-
-### Docs: one merged integration binary measured against its parts (speed loop three, #693)
-
-- `docs/lanes/ci-merged-binary.md`: the ten `tests/script_*witness*.rs` binaries
-  (one gate, one Modules cell) built and run as one scratch binary on the Studio:
-  about 0.25 s of rustc per binary removed (0.15 s of it the link), the same 100
-  tests, no reach loss on a library change, a test-only change running the
-  group; projected 39 to 53 s of a CI build over the 35 equal-cell groups. A
-  measurement row: no test, source or manifest changes.
-
-### Tests: every `tests/CLAUDE.md` row names the modules its file reaches, pinned by a guard; the rows completed from the sources (#706)
-
-- The nightly's run selection (#685, PR #703) reads a measured file's targets
-  from the binaries' `bsv_rs::` paths and their `tests/CLAUDE.md` rows, and
-  no guard pinned what a row names: on `ba0952c9` 235 of the 258 rows of a
-  binary named no module and 28 binaries had no row. The `## Files` table
-  gains a Modules cell (the fourth), and every top-level `tests/*.rs` has a
-  row naming at least the modules its source names (a `bsv_rs::<m>` path or
-  a crate-root re-export named through the crate, over the binary and the
-  module files it declares). `.github/scripts/rows_from_sources.py` wrote
-  the cells (`--check` refuses as the guard does, and runs in the Test
-  Suite's plan step beside the plan's own tests, so the Python and Rust
-  readings cannot drift unnoticed); six rows whose binary reaches a module
-  only through a caller, and whose description says it exercises it, name
-  that module too. That caller clause is a judgment, the one part of the
-  convention that moves a selection: its six pairs are frozen in
-  `tests/caller_modules_706.txt`, which the guard and `--check` read, and a
-  row that drops one is refused. 28 rows added, each from its file's header;
-  no existing row's description changed.
-- A row shared by several files (the #537 and #544 rows, six files each)
-  names each file's modules apart (`` `a.rs`: `m`; `b.rs`: none ``), and a
-  file's part is its reading in the guard, the writer and `row_modules`: the
-  row's union put all twelve binaries in the `identity`, `kvstore`,
-  `registry` and `storage` sets (five in `primitives`) their sources never
-  name, so a pull request touching one of those modules ran up to ten more
-  binaries. A union cell over a shared row is refused.
-- The fourteen lowercase crate-root re-exports (`bsv_rs::sha256`,
-  `bsv_rs::sign`, `get_url_for_file`, `run_dispatch`, ...) count as their
-  module's in both readings, as the convention's "a crate-root re-export"
-  says; a glob import reads them as bare calls. No test names one today: no
-  row moved.
-- Two readings of `affected_tests.py` tightened, each with a test showing what
-  it over-matched: `row_modules` reads the Modules cell alone (a description
-  pointing at another file's witnesses, `src/identity/...` in an auth
-  binary's row, put that binary in identity's set; a row of four cells, the
-  table before #706, keeps the old reading), and `used_modules` reads a
-  re-exported name only through the crate's path (the word reading took
-  `WalletFaultFamily::Transport` for `auth`, a comment's "Address" for
-  `script`, overlay's `Protocol` for `wallet`; an alias of the crate is
-  read).
-- The figures on #685's direct reading: the targets a measured file runs go
-  from 104 to 136 to 107 to 138 (script 138, BEEF and Merkle 107, wire and
-  substrates 131); the binaries reaching a module only through a caller, the
-  reading's stated limit, from 80 script, 102 transaction and 32 wallet to
-  76, 97 and 33 (`docs/NIGHTLY.md`, "What the direct reading leaves
-  uncounted").
-
-Pinned by `tests/arch_tests_claude_rows_name_modules_706.rs`: RED on
-`ba0952c9` with 274 refusals (29 binaries without a row, the guard's own
-among them; 245 rows naming fewer), green after; its unit tests pin the two
-over-matches, the shared row's parts, the lowercase re-exports and the frozen
-pairs, each RED before (a scratch drop of `beef_order_held`'s `script`, the
-#537 row's union restored and the lowercase names left uncounted: 7 refusals
-and the unit test). `tests/arch_ci_runs_every_test.rs` refuses a `ci.yml`
-without the `--check` step. The record: `docs/lanes/fix-706.md`.
-
-### CI: the nightly's weekly bench runs after the shards, the fuzz targets and beta's run, under the cap guard's rule (#683)
-
-- The nightly's `bench` job (`-f weekly=true`, the captain's Sunday night)
-  dispatched `bench.yml` with no `needs`, so its run (`Benchmarks Build` and
-  the regression check at once, then the scoreboard) started beside the
-  opening wave of shards, and `tests/arch_nightly_cap.rs` counted only a heavy
-  matrix or a dispatch of `ci.yml` as heavy. The job now needs `mutants`,
-  `fuzz` and `ci-full-beta` under `if: ${{ !cancelled() && inputs.weekly }}`,
-  waits for the run it dispatched as `ci-full-beta` waits for beta's (the
-  runs listed before the dispatch, the bot's alone, the give-up at 55
-  minutes, the conclusion read, a `failure` failing the job, under
-  `set -euo pipefail`), and `ci-full-main` needs it too, so main's 22 never
-  start beside it; on another night the job is skipped and main's dispatch
-  follows beta's as before. The cost on a Sunday: main's dispatch waits for
-  the bench's run, and this job holds one runner while it does.
-
-Pinned by `tests/arch_nightly_cap.rs` (7 tests, 6 before): a job that
-dispatches any workflow is a heavy job of the nightly, ordered by `needs:`
-with every other, and a dispatch job another job runs after is held to
-`ci-full-beta`'s wait rules; RED on `ba0952c9`'s nightly (`nightly.yml bench
-and mutants can overlap: no `needs: mutants` edge on bench (its needs: [])`
-and seven more), each refusal shown on a mutated text (the bench's edge
-removed, main's edge on it removed, a new dispatch job named by no list,
-the bench's watch and actor filter removed). The record is
-`docs/lanes/fix-683.md`.
-
-### CI: a measured file's test surface is every target the reach rule names for it, not a fixed list per surface (the oracle, #685)
-
-The keeper's row of 2026-11-03: #681's opening lane (PR #684) found the #660
-tests (`tests/pubkey_encoding_660.rs`, `tests/pubkey_point_shapes_660_adv.rs`)
-asserting what two of `src/script/spend/key_point.rs`'s survivors break, and
-`tests/p2pk_hybrid_625.rs` the same for `src/script/templates/multisig.rs`,
-while the script surface's fixed list (`tests/script_*.rs` and five targets,
-45) never ran them, so the measured scores left out kills the suite had.
-
-- A measured file's targets are the integration binaries naming its module,
-  the direct reading (`Tree.direct` in `affected_tests.py`, the run's alone: a
-  `bsv_rs::<m>` path, a crate-root re-export, a `tests/CLAUDE.md` row naming
-  the module or a file of it; the keeper's word of 2026-11-03 16:1xZ), less
-  a binary that only reads source text (the six `arch_*` walks of `src/`), the two run apart and the cost checks (the five stress and
-  wall-clock suites the loop always left out, and `wallet_http_json_linear_432`);
-  `--lib` alone where none (`lib_only` in the plan; none at `55424846`). The
-  plan writes each file's set (`selection`), each surface's union over the
-  night's files (`surface_tests`, the shard's `--test` list) and prints the
-  sizes: 136 targets for the 43 script files, 104 for the four BEEF and Merkle
-  files, 134 for the 38 wire and substrates files.
-- The callers' level (one level of the modules naming `crate::<m>`,
-  `Tree.users`) stays a pull request's plan (`reach`), where a build and not a
-  run per mutant is the cost; the branch's reading before the fold took it in
-  the run, 216, 206 and 166 targets and about 5,237 to 8,090 estimated
-  shard-minutes against 903. Two readings, two
-  rules: the callee rule (11-03 00:1xZ, #666) decides which files a night
-  re-measures (the PLAN), the direct rule which targets a mutant's tests are
-  (the RUN); no reader takes the one for the other. Both findings' tests are
-  in the direct sets by their `bsv_rs::script` paths; their `tests/CLAUDE.md`
-  rows name no module (the rule read of `59eeedcc`).
-- Left uncounted by construction: a binary reaching a module only through a
-  caller, 80 script, 102 transaction and 32 wallet binaries by the rule read of
-  `59eeedcc` (reproduced by the docs fold from `Tree`); 233 of the 256 rows of
-  the tree's binaries name no module (the rule read gave 223), and no guard
-  pins the row convention (`docs/NIGHTLY.md`, "What the direct reading leaves
-  uncounted").
-- A test's change re-measures the files whose selection runs it, at the head
-  or at the complete run's sha; a `tests/CLAUDE.md` row whose modules change
-  re-measures the files whose selection that moves; `affected_tests.py` now
-  reaches everything.
-- A mutant's test timeout is three times its shard's baseline test time, the
-  old fixed 120 s (300 for BEEF) its floor: a survivor running 216 targets
-  outlasts 120 s and was read as a timeout (`multisig.rs:108:19` on one host;
-  under the direct reading at a 200 s timeout, a Missed at 168 s of tests).
-- The cost: about 0.005 minutes a target a mutant (the record's own slope, a
-  line through two points, script and wire, that the other three surfaces
-  miss; one host's `multisig.rs` run measured 0.845 minutes a mutant where it
-  gives 0.77), 3,669 estimated shard-minutes under the direct reading against
-  903 (5,237 with the callers' level); read in two parts (0.28 s a target
-  rebuilt by every mutant, 0.64 s a target run by each survivor; the
-  substrates' share is 84 percent), about 5,717. Each matrix entry carries
-  its `estimated_minutes`.
-- The complete run's shards (`complete_split`, #703's second fold): the
-  record's own method (the twenty shared out by the slope's estimate: floors,
-  one shard at least, the largest remainders) over the direct reading's sets
-  at `f7ea87ae` gives eight, three, one, three and five, and a ceiling raises
-  a surface until no shard's two-part estimate passes 300 minutes (the job's
-  360 with a margin): eight, three, one, three and eight, twenty-three shards,
-  about 198, 173, 63, 200 and 113 minutes a shard by the slope and 235, 231,
-  90, 284 and 275 in two parts. Replayed at six slots, about 11h24m by the
-  slope and 17h05m in two parts, against the fixed lists' 187 minutes (run
-  41579707627's shards at six): the 07:00Z complete run is expected to take
-  that, and measures it, checkpointed at 12:00Z under the keeper's word of
-  2026-11-03 17:1xZ (a projection past twelve hours of six slots cancels the run
-  and keeps the measured per-mutant rate per surface as the figure; the retry at
-  the weekend slot after the survivor-term row #705). The fold before kept the callers' level's nine,
-  three, one, three and four, which the method does not give; its substrates
-  shards were 551 minutes in two parts, past the job's 360. The conformance
-  corpus is about 1 percent of a baseline (`conformance_scripts` 0.60 s and
-  `conformance_beef` 0.01 s on runner job 125937464890).
-
-Pinned by `.github/scripts/test_nightly_mutants.py` (`SelectionWitnesses685`:
-the two findings, RED on the fixed lists; the complete shards under
-`JOB_MINUTES`; the split recomputed by the method and every surface's
-two-part shard under 300 minutes, RED on nine, three, one, three, four; `transaction`'s binaries out of a script file's set unless they
-name `script`, RED on the callers' level; the fixture's `test_685_*`, a
-caller's binaries out of its callee's selection and still in a pull request's
-reach, RED on the callers' level). The record
-is `docs/lanes/fix-685.md`; `docs/NIGHTLY.md`, "The selection" and "The cost
-of #685's selection".
-
-### CI: the `checks` job's cache keyed by the cargo-mutants version it installs, the tool built once per key and restored after (speed loop three, #699)
-
-- `Swatinem/rust-cache` saves on a miss alone, and `checks`' entry on `beta`
-  was saved at 03:39Z 2026-11-03, before the mutants-entries gate (#663)
-  installed cargo-mutants; every run restored it by a full match and built
-  cargo-mutants 27.1.0 again: 64 s, 68 s and 71 s of a 74 s to 80 s step
-  (runs 41672716963, 41648342758, 41646365090). `CARGO_MUTANTS_VERSION`
-  moves from the step's `env:` to the job's, a `CARGO*` name the action
-  hashes into its key, so the key moves with the version: one miss on the
-  line's push builds the tool and saves `~/.cargo/bin` with the entry, every
-  run after restores it. A `key:` input would not do it: the action ignores
-  `key` beside `shared-key` (rust-cache v2.9.3 `src/config.ts:75-82`).
-
-Pinned by `tests/arch_ci_tool_cache_key.rs`: every `cargo install` after a
-rust-cache step names a version its cache key carries (a hashed job or
-workflow variable, or the version in `prefix-key`/`shared-key`), with
-`cache-bin` and the environment hash on; RED on the base's `ci.yml`
-(`sets CARGO_MUTANTS_VERSION at step level, outside the cache key`). The
-before, the budget and the after: `docs/lanes/ci-speed-3.md`.
-
-### CI: the semver tool's cache seeded from a push to a line, every pull request's opening `semver` run a restore (speed loop three, #696)
-
-- `semver` runs on pull requests alone, and a pull request's cache is read by
-  that pull request's re-runs only, so every pull request's opening `semver`
-  run built cargo-semver-checks 0.51.0: 241 s, 285 s and 294 s of a 299 s to
-  358 s job (runs 41634821365, 41624795016, 41621814166), against 65 s on a
-  hit. A job of its own, `semver-tool-seed` (`semver tool cache`), runs on a
-  push to `beta` or `main`, looks up `semver`'s key (`lookup-only`, nothing
-  downloaded on a hit) and on a miss installs the tool as `semver` does,
-  saving it in the line's scope, which every pull request into the line
-  reads. No required context added: five on `beta`, six on `main`.
-
-Pinned by `tests/arch_ci_semver_tool_seed.rs` (the seed's action, path, key,
-toolchain and install equal to `semver`'s) and `PUSH_SEEDS` in
-`tests/arch_ci_pr_runs_the_required_set.rs`. cargo-deny is a release binary
-and the ratchet's build is seeded by `lint`'s push saves; the `checks` cache
-on `beta` predates #663 and carries no cargo-mutants, so its 68 s build
-recurs on every run until the key moves: `docs/lanes/ci-speed-3.md`.
-
-### CI: the compile time by evidence: the lib's unit tests run once, the tracing step shares the library build, the dependencies at opt-level 1 in the test profile (speed loop three, #672)
-
-- The integration step names `--test '*'` (cargo's glob over the integration
-  binaries) where `--tests` also ran the lib's 1,725 unit tests a second time
-  after the unit step's: 16 percent of the step's test-seconds in three beta
-  runs (24 s to 37 s of its run) and a 20-second build beside the binaries.
-  On one host after a one-line change: build 97.1 s to 92.8, run 98.0 s to
-  80.3.
-- The tracing step builds on `--all-features` (which carries `tracing`), the
-  library the memory step built, where `full,http,tracing` built one of its
-  own: 17.5 s to 3.2 on one host, 18 s of CI's step.
-- The dependencies build at opt-level 1 in the Test Suite's test profile,
-  the crate at 0: a step writes `[profile.test.package."*"]` into the cargo
-  home's configuration from the job's `CARGO_DEPENDENCIES_TEST_OPT_LEVEL`
-  (cargo reads a package's profile from no environment variable; rust-cache
-  hashes the `CARGO` name into its key, so another level misses). On one
-  host: integration run 81.0 s to 50.3, unit 20.2 to 14.4, memory 61.7 to
-  47.0, the warm build 93.7 to 90.1; a cache miss builds the dependencies in
-  208 s for 137. The crate at 1 as well cost 214 s of build for 47 of run:
-  not taken. The PR's own run carries the miss, and so does the landing's
-  `beta` push (a pull request's cache is its ref's alone): the hit is the
-  second `beta` run after the landing.
-
-Pinned by `tests/arch_ci_runs_every_test.rs` (`shared_build_refusals`,
-`dependency_profile_refusals`). Clippy's feature set, the ratchet's build,
-`CARGO_INCREMENTAL`, unused dependencies (machete finds none) and merging
-binaries measured and left: `docs/lanes/ci-speed-3.md`.
-
-### CI: every heavy run capped at six on the opening occupancy read, the complete dispatch at 07:00Z (the fleet's runner cap, 2026-11-03)
-
-The keeper's line of 10:0xZ, on the opening API read of the pool (12,251 jobs
-over three days): the twenty runners sit at twenty in 22 of 24 hours, the
-non-heavy p95 is 14 slots, and a job queued beside a heavy run waits a median
-of 0:38 (worst 88:53) against 0:02 (worst 3:16) beside none. The cap of 14
-below becomes 6: the plan's `HEAVY_MAX_PARALLEL` for a complete run (a night
-stays at `NIGHT_PARALLEL` 6), the `fuzz` matrix's 6, and `ci.yml`'s Test
-Suite and dependents literals, so the seven dependents run six, then one,
-on a dispatch, a tag, a push to main and a pull request into main (the
-seventh's 1m37s after bsv-tracker's 1m13s, inside the toolbox's 7m08s in
-run 41579745459: no longer by the replay). The cost: a complete run's twenty
-shards in four waves, about 3h07m replayed from run 41579707627's shard
-times against 1h40m on 14. The complete dispatch moves from 00:00Z to
-07:00Z, alone (the toolbox's 16:00Z, the CLI's 17:30Z); the cap rises only
-when a read shows the p95 under 10. Pinned by `tests/arch_nightly_cap.rs`
-(a cap above 6 refused, RED with the plan's constant and a matrix literal
-restored to 14). The record is `docs/lanes/ci-speed-7.md`, "The fleet's
-runner cap".
-
-### CI: a docs-only pull request's `semver` job checks nothing (speed loop two, #689)
-
-#690, the earliest docs-only pull request under #668's exit, ran 4m43s
-(run 41617426467) against #669's 10m05s: the Test Suite 8 s, `lint` 9 s,
-`checks` 30 s, `main-in-beta` 5 s, and `semver` 4m39s, the one job the exit
-left alone. `semver` now runs lint's plan step after its own checkout and
-every step after it carries `docs_only != 'true'` (the tool's install with
-its cache miss), a last step printing `docs-only: no API to check` so the
-required context reports green; on every other pull request it runs as
-before, against the same baseline tag. Read from its own plan rather than
-the Test Suite's through `needs`, which would hold `semver` behind the
-suite on every code change. Pinned by `tests/arch_ci_docs_only_exit.rs`
-(`semver_refusals`, RED with the check's condition removed and on the base's
-`ci.yml`) and `test_affected_tests.py`'s plan-key tests. The record is
-`docs/lanes/ci-speed-loop2-docs-only.md`, "The semver exit".
-
-### CI: a docs-only pull request's Test Suite, lint and checks build nothing (speed loop two, #668)
-
-#669, a pull request of `CHANGELOG.md` and a lane record, ran the whole set
-for 10m05s (run 41574976294); after cut 4 the Test Suite's plan already ran
-no test for such a change, but every job still restored its cache, installed
-its tools and built. Now the Test Suite's plan writes `build` (some unit, doc
-or integration target reached) and every step after it carries `build` or a
-flag that implies it, a last step printing `docs-only: nothing to build` so
-the required context reports green; `lint` and `checks` plan too and read
-`docs_only` (every changed path a `*.md` other than `README.md`, which the
-ratchet measures, and outside `tools/ratchet/`, the ratchet's code; a file
-under `docs/` that is not Markdown, `docs/ratchets.json` the ratchet's record
-above all, is never docs only; no unit or doc test; none of the binaries
-`ci.yml` runs by `--test` reached): their toolchain, cache and
-lockfile steps skip, their gates skip with them, and the verdict step reads a
-skipped gate as `SKIP` on a docs-only change alone. `secrets` still scans the
-pull request's commits. A change to `CHANGELOG.md` still reaches
-`arch_ci_lines` (its needle names the file), so the Test Suite builds and runs
-that one binary there; `semver` (about 50 s on a cache hit) and
-`main-in-beta` (seconds) run as before. Pinned by
-`tests/arch_ci_docs_only_exit.rs` (each step after a plan carries its
-condition, read whole, never by substring; only a checkout before a plan;
-each refusal shown on a mutated `ci.yml`; `arch_ci_lines`' bundle
-rule reads the plan step as no gate and admits `secrets`' docs-only arm) and
-the plan's unit tests
-in `.github/scripts/test_affected_tests.py` (the ratchet's record and code
-never docs only; every `steps.plan.outputs` key `ci.yml` reads one the plan
-writes, on a pull request and on a push). The record is
-`docs/lanes/ci-speed-loop2-docs-only.md`; the after figure is the next
-docs-only pull request's run.
-
-### Tests
-
-- The HTTP wallet's typed reading measured apart from the transport, the array-form pin deterministic (#697):
-  `test_http_json_success_tx_in_the_array_form_costs_the_typed_reading` measured the four-times bound through a
-  wiremock server, so its peak counted the transport's buffers, and on a loaded runner one more body's worth was
-  alive at it (2,218,461 B for 468,692 B of text, 4.73 times, on PR #691's run and #694's re-run, green on the
-  same code otherwise). The bound now sits on the typed reading alone,
-  `the_typed_reading_of_a_create_action_answer_costs_under_four_times_its_text_apart_from_the_transport_697`:
-  `serde_json::from_slice::<CreateActionResult>` on the body in memory, the reading
-  `src/wallet/substrates/http_json/answer.rs:89` does (its function `pub(super)`), 262,240 B on every run, RED at
-  8,519,898 B with the `tx` read through a `Value`; a crate-contract pin labeled with
-  `src/wallet/substrates/CLAUDE.md:15`, which now states the cost. The wiremock figure stays printed and is held
-  under five times the text, a stated bound naming the extra copy (9,345,126 B on the RED). The fixture moved to
-  `tests/support/http_json_answer_697.rs`. Record: `docs/lanes/fix-697.md`.
-- `src/script/spend/script_code.rs`'s survivors of the complete run killed (#681): ten library tests in
-  `src/script/spend/script_code_tests.rs` pin the scriptCode's writer and walker against bitcoin-sv `879fc8b`
-  `src/script/script.h` (`operator<<` at 102-130, `GetOp2` at 163-198, `FindAndDelete` at 200-222): `push_of`'s
-  header byte for byte at 0, 1, 75, 76, 255, 256, 65535 and 65536 bytes; `find_and_delete`'s walk stepping over
-  a direct, PUSHDATA1, PUSHDATA2 and PUSHDATA4 push whose data holds the pattern (minimal at each boundary size and
-  non-minimal) and deleting the copy after it; a PUSHDATA2 of `0x0100` read as 256 bytes; a one-byte push cut
-  short at the last byte kept. The six timeouts of the issue's run (eight on this host's baseline) are answered by
-  a bound, not a longer timeout: `find_and_delete`'s two loops now run over ranges of the script's length (a walk
-  that advances ends inside them, `the_bound_never_cuts_short_a_walk_of_one_byte_steps_681`), so a walker that
-  returns its own position or one behind it ends and answers another script
-  (`a_copy_after_two_instructions_is_deleted_by_a_walk_that_advances_681`, which hangs on seven of the eight
-  without the bound). The bound adds no mutant (51 before and after). 15 of the 16 survivors and all 8 timeouts
-  killed, each RED on its mutant; `104:26` (`<` to `<=` in `next_op`'s cut-push check) is named an equivalence
-  candidate (it differs only at the script's last instruction, where breaking and stepping keep the same bytes).
-  The file: 27 caught, 16 missed, 8 timeouts (52.94%) on this host's baseline (the issue's run: 29, 16, 6,
-  56.86%); 50 caught, 1 missed (98.04%) after. Record: `docs/lanes/kill-script-code.md`.
-- `src/script/templates/multisig.rs`'s survivors of the complete run killed (#681): six tests in the file's own
-  module pin the m-of-n edges against the node's `GetScriptForMultisig` form (bitcoin-sv `879fc8b`
-  `src/script/standard.cpp:315-324`): the bytes of a 1-of-1 and a 2-of-3 on both lock paths, m = n written and
-  m = n + 1 refused, 16-of-16 as `OP_16` twice with 17 keys refused, 257 keys refused (a count cast to `u8` would
-  read 1), and the #625 reachability rule at its edge (`n - 1 - j < m` refused, `= m` written). 12 of the 13
-  survivors killed, each RED on its mutant: two on the node's rule (`241:38`, m <= n, `standard.cpp:135`) and
-  ten crate-contract pins counted apart (the keeper's ruling), each test labeled with its documenting line
-  (`multisig.rs:103`'s 16-key bound for `114:19` and `238:14`; `multisig.rs:224-229`'s #625 refusal for the seven
-  of `266`-`267`). The one survivor, `108:19` (`||` to `&&` on the threshold), is named an equivalence
-  candidate for the captain's reads (every threshold it lets past is refused later as `CryptoError`, the error
-  message the only difference). The
-  file: 33 caught, 13 missed (71.74%) before; 45 caught, 1 missed, 1 unviable (97.83%) after. Record:
-  `docs/lanes/kill-multisig.md`.
-
-### CI: every heavy run on the runners carries max-parallel 14 (the fleet's runner cap, 2026-11-03)
-
-The account's twenty hosted runners are one pool across bsv-rs, the CLI,
-the toolbox and the stack: the complete nightly 41579707627 asked for its
-twenty shards in one wave and PR #679's run, created 05:05:32Z, finished 52
-minutes later. The nightly's `mutants` matrix now holds at most 14 (the
-plan's `HEAVY_MAX_PARALLEL` for a complete run, read through the pin job's
-`max_parallel` output; a night stays at 6), and the `fuzz` matrix keeps its
-6, so six runners stay for the fleet's pull request and queue runs. The cost:
-a complete run's shards go 14 then 6, about 35 minutes longer (41579707627's
-shard times replayed on 14 slots: about 100 minutes against 65). Pinned by
-`tests/arch_nightly_cap.rs` (a heavy matrix without `max-parallel` or above
-14, in any workflow, refused; two heavy jobs of the nightly with no `needs:`
-path between them refused). The dispatch of the two whole `ci.yml` runs now
-runs after the shards and the fuzz targets, and one run after the other
-(the keeper's word (a)): beta's run holds up to 9 jobs at once and main's,
-on main's `ci.yml`, up to 22 (16 before its seven dependents start), up to
-31 together where the shards had held them to about 12. `ci-full` is split
-into `ci-full-beta`, which dispatches beta's run and waits for it (the run
-it dispatched, found among the bot's runs not listed before the dispatch,
-so a hand dispatch on beta is never the run watched; a `failure`
-conclusion fails the job, the give-up at 55 minutes a warning with no verdict
-and any other failed watch an error, the step under `set -euo pipefail`; one runner for its 23 minutes; a concurrency group in `ci.yml` would not hold
-main's run, which reads main's own file), and `ci-full-main`, which needs
-it; `ci.yml`'s Test Suite and dependents matrices carry `max-parallel: 14`
-(at most seven wide, so nothing moves today). The residual: a matrix cap
-does not bound singleton jobs, so main's run holds up to 22 for about a
-minute and a half. The CI phase in sequence is about 39 minutes replayed
-from the measured jobs (beta's 22m42s, then main's 16m32s alone), an hour
-and 23 minutes at the hour main's run took beside the shards (04:43Z to
-05:43Z in 41579707627); the next complete run measures it. The record and the stagger slots are
-`docs/lanes/ci-speed-7.md`, "The fleet's runner cap". The number's owner is
-loop four's #675.
-
-### Tests: src/script/spend/key_point.rs's survivors of the complete run killed (#681)
-
-- The complete nightly (run 41579707627 on `e3fef6dc`) measured `key_point.rs` at 25.00%
-  (1 caught, 3 missed, 1 unviable): the #660 pins live in `tests/pubkey_encoding_660.rs` and
-  `tests/pubkey_point_shapes_660_adv.rs`, outside the script surface's selection (`--lib`
-  and `tests/script_*.rs`), so no test the oracle runs read the switch. Three library tests,
-  `src/script/spend/key_point_tests.rs`: `a_key_that_is_no_point_passes_the_encoding_check_and_checks_false_in_every_mode_681`
-  (seven non-points, `<key> OP_CHECKSIG OP_NOT` and the CHECKMULTISIG form valid under an
-  empty signature in the default mode and the block and standard words at both eras, the
-  node's `IsCompressedOrUncompressedPubKey` and `CPubKey::Verify` at `879fc8b`) kills
-  `&&` to `||` in `check_public_key_point` and `reads_the_reference_point` to `true`;
-  `an_x_past_the_field_prime_is_no_signature_key_in_every_mode_681` (`03||p+1`, a point
-  to a reducing reader) kills `true` at `signature_key` alone;
-  `a_wrong_length_or_prefix_is_refused_as_the_scripts_error_in_every_mode_681` pins the
-  error class of a 33-byte `04`, a 65-byte `02` and a 32-byte key and kills nothing here.
-  After: 3 caught, 1 missed, 1 unviable, 75.00%. The one survivor,
-  `check_public_key_point` to `Ok(())` (`key_point.rs:39:9`), is declared equivalent in
-  `.cargo/mutants.toml` on three reads of 2026-11-03 (DECLARE 0.96, EQUIVALENT 0.97,
-  DECLARE 0.85): the switch is the literal `false`, so the body is `Ok(())` on every input;
-  the entry is removed when the switch reads a flag or a feature. With it the file reads
-  3 of 3 viable, 100% (`docs/lanes/kill-key-point.md`).
-
-### CI: a pull request's Test Suite runs the test targets its changed files reach; the whole suite once per landing by the `full-suite` label (speed loop one, cut 4, #667)
-
-Before this cut a pull request's run and the sequencer's landing run each ran the whole
-Test Suite (12m05s to 15m15s on #664's, #666's and #669's runs, #669 a docs-only change;
-integration and memory 80 to 85 percent of it), so every landing cost two.
-
-- **On a pull request** the job plans before its test steps
-  (`.github/scripts/affected_tests.py`, the #666 reach rule read the other way, reusing
-  `nightly_mutants.py`'s readings) from the merge ref's diff against its base: a library source reaches the unit and doc tests and
-  every integration binary using its module or, one level out, a module naming
-  `crate::<module>` (by `bsv_rs::` paths, crate-root re-exports and the
-  `tests/CLAUDE.md` rows); a test file itself; a changed row its binary; a support file,
-  vector or fixture the binaries that declare it, name it in a string literal or walk its
-  directory; `Cargo.toml`, `Cargo.lock`, `build.rs`, `src/lib.rs`, `src/error.rs`,
-  `.cargo/config*`, the toolchain, `ci.yml` and the plan's script everything. The
-  integration step runs the reached binaries as `--test` names (cargo builds those
-  alone), the unit, memory, tracing and doc steps run when the plan reaches them, and a
-  step checks the reached set against `cargo metadata`'s integration targets. On the
-  last fifty landings: 25 reach 0 to 12 binaries and no unit, doc or memory step, 20
-  library landings reach 103 to 275 (one more, a vector a library source includes, 5),
-  4 plan everything (`docs/lanes/ci-speed-4.md`). A walked literal is tested with
-  `os.path.isdir`, since `Path.is_dir` raises on a name too long on Python 3.11 to 3.13,
-  the runner's 3.12 among them; a path is matched to `\Z`, so a `README.md` change
-  reaches `readme_examples` (#680 fold).
-- **Once per landing** the whole suite: the sequencer labels the PR `full-suite` before
-  it pushes the rebased head, and the job reads the label live through the API at its
-  start (`pull-requests: read`, granted on `release.yml`'s call too), never by a
-  `labeled` trigger. A push to `beta` or `main`, a dispatch and a tag's call run the
-  whole suite as before.
-- A pull request saves the dependency cache only when its plan is the whole suite (an
-  empty or partial target under the shared key, a subset's build without the memory or
-  tracing features, would be every later run's exact hit); the landing run carries
-  `full-suite`, so a complete cache is saved once per landing.
-- **The guard**: `tests/arch_ci_runs_every_test.rs` (#146) reads each step's `if:` and
-  pins the shape (`reached_refusals`): the whole-suite step under the plan's `whole`
-  flag, the reached step beside the subset check, every flag set on a run that is not a
-  pull request, the live label read and no `labeled` trigger;
-  `.github/scripts/test_affected_tests.py` (19 cases on a fixture tree) pins the plan
-  and runs before it on every pull request.
-
-### CI: the ten slowest tests made fast, each with the kill it guards kept (speed loop two, #670)
-
-What was slow: by nextest's per-test timings in the Test Suite job of runs
-41558273855, 41560881228 and 41563214016, ten tests took 804 s (their
-medians), 45% of each run's 1,396 to 1,793 test-seconds: the memory step's
-`test_http_json_success_tx_in_the_array_form_costs_the_typed_reading` alone
-339 s of a 363 s step, the rest in the integration step (70 s to 30 s each).
-What changed, tests only (no source behaviour, no workflow line; the one
-source line of the fold names the transport's timeout, below): each test
-asks the same thing of a smaller input, the bound unchanged where it is a
-ratio; every one of the ten took that cut, made fast, none made
-nightly-only and none fixed (an `#[ignore]` would leave a test no job runs).
-The array-form answer's `tx` is 128 KiB, not 1 MiB (`TX_PUSH`; the
-peak under four times the text at both sizes, 13.2 MB against 1.9 MB with
-the typed reading skipped). The streaming BEEF heap test reads 1,000, 4,000
-and 16,000 links, not to 100,000: the index's table doubles, so its peak is
-a step of the depth, and at 1,000 times a power of two each depth sits at
-the same point of the step (351 B per element at all three, where 10,000
-read 281 and 100,000 read 225). The same per-element bounds, and a new check
-that the marginal cost per element from 4,000 to 16,000 is within 1.25 of
-that from 1,000 to 4,000 (the #676 fold; a kept spent output RED at 1,000; a
-planted per-link allocation growing with the index, about 0.008 B times n
-squared, RED at 16,000, 470 B per element, where 1,000, 3,000 and 10,000
-passed it). The two readers' sweeps (`beef_two_readers_agree`,
-`merkle_path_two_readers_agree`) cut and change every byte but bytes 2 to 30
-of each 32-byte hash of a well-formed seed, which neither reader reads apart
-from the hash (`tests/support/hash_interiors.rs`; RED on a `>=` to `>` in
-`verify_structure`'s BUMP index check and on a truncation offset moved in
-`MerklePath::from_reader`). The three `linear_root_equivalence_tests` draw
-compound blocks of at most 32 leaves in two of their three block arms, not
-80 and 64; the third keeps 80, so partial blocks of 33 to 80 leaves are
-still drawn (the #676 fold); the rounds unchanged
-(cargo-mutants on `find_or_compute_once` and `root_from`, 23 mutants:
-18 caught, 4 missed, 1 unviable before and after). `merkle_path_cost`'s compound BUMP
-asks the root of nine txids spread over the block, the last included, not of
-every 97th. The deep chain's `to_beef` round trip runs 25,000 links on a
-256 KiB stack, the links per byte of 100,000 on 1 MiB (a recursion per link
-planted in `to_beef` overflows it). The auth transport's timeout test uses a
-client of a one-second timeout through `with_client`, the class the error's
-(the transport's own 30 s client is no longer waited on). Its 30 s is
-pinned without the wait instead (the #676 fold): `REQUEST_TIMEOUT` in
-`src/auth/transports/http/client.rs`, which `default_client` builds with
-through the `default_client_with(timeout)` seam, a unit test asserting the
-constant, the default's construction through the seam at it, and the seam's
-timeout ending a request the far side never answers (1 s against 5 s). On
-this host the ten went from 612 s to 92 s, and to about 108 s with the
-fold's 80-leaf arm and 16,000-link depth; the record, `docs/lanes/ci-speed-loop2-slowest.md`, has
-each test's seconds, the cut, the RED, the runner ratio and the five figures.
-
-### CI: every `.cargo/mutants.toml` equivalence entry checked against the mutant list in `checks` and the nightly's pin job (#663)
-
-An `exclude_re` entry names one mutant by file, line, column and text. A line
-shift leaves it naming a line that holds no such mutant: it excludes nothing,
-the equivalent mutant runs at its new line and survives, and the file reads
-below its true figure. Beta carried fifteen stale `script.rs` entries after
-#639 (found by #652's rebase lane), three stale `merkle_path.rs` entries
-(#677) and one stale `beef.rs` entry since #651 (#678), each found by hand.
-
-- `.github/scripts/mutants_entries.py` lists the mutants of every file the
-  entries name (`cargo mutants --list --file <file> --no-config`: a listing
-  from the source, nothing built; seven files, 1,302 mutants, about six
-  seconds locally) and fails when an entry matches no listed mutant
-  (`STALE entry`, then `re-point to <line>:<col>` when one free listed mutant
-  of the same text, at the same column, else any, is the only candidate, or
-  every candidate) or more than one (`DOUBLE match`, every line). Stale
-  entries of one text pair with as many free candidates in line order, the
-  order a shift keeps. `--fix` rewrites each uniquely re-pointed entry and the
-  `<line>:<col>` its comment names, for the captain's hand use. A script of
-  its own, not a subcommand of `nightly_mutants.py` (whose change reaches
-  every measured file and makes the next night complete) and not a ratchet
-  counter (the ratchet compares counters with a recorded baseline; this is
-  an absolute check against a listing).
-- Two gates: `mutants-entries`, a step of CI's `checks` job on every pull
-  request and push (`PASS mutants-entries`/`FAIL mutants-entries`, named by
-  the last step on failure), and `Refuse a stale equivalence entry` in the
-  nightly's `source` job before its plan, so a stale entry refuses the run
-  before any shard. Both run cargo-mutants 27.1.0, the nightly's
-  `CARGO_MUTANTS_VERSION`, installed by `cargo install --locked` as the
-  nightly's shards install it (in `checks` into the cargo home; rust-cache
-  keeps `~/.cargo/bin` but saves only on a beta push whose key missed, so the
-  build, 1m 15s on PR #679's run, recurs until the key next moves); the
-  script refuses another version. The listing runs under `NO_COLOR=1` and
-  `--colors=never`: ci.yml's `CARGO_TERM_COLOR=always` styles cargo-mutants'
-  `--list` lines, and PR #679's own `checks` run read all 27 entries as
-  STALE before it. The pin job's timeout moves
-  from 10 to 20 minutes for the build, and its Rust install is unconditional.
-- The `beef.rs` `Beef::sort_txs` entry re-pointed from 912:33 to 915:33, the
-  script's `--fix` output byte for byte as PR #678's change, so beta passes
-  the new gate whichever lands second.
-
-Pinned by `.github/scripts/test_mutants_entries.py` (13 tests: a colored
-listing environment listing plain lines, a match, a
-miss with a unique re-point, a miss with two candidates, a double match, a
-triple-quoted entry with a lifetime, a shift under entries of one text, a
-held line, `--fix` on the entries and their comment, a one-line shift under
-adjacent entries, a repeated entry, an unreadable entry, the repository's
-entries readable) and by `tests/arch_ci_lines.rs` (`BUNDLES` names the new
-gate; `every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663`
-refuses a `checks` job without the check, a pin job without it before its
-plan, a workflow passing `--fix`, and two cargo-mutants versions).
-
-### CI: the nightly incremental by the reach rule, the figures carried with their run's sha, the complete run per prerelease, a fixed fuzz budget, the bench weekly (speed round 1, cut 7)
-
-The last nightly, run 41347058507 (dispatched 2026-11-01 20:28Z at
-`9640eaa7`, measured `42a74f1b`), took 10h43m from creation: 3h23m queued
-behind the concurrency group, 3h12m of twenty mutation shards at six at a
-time (script 128 to 136 minutes a shard, BEEF 36 to 43, Merkle 5 to 6, wire 20
-to 24, substrates 36 to 44; 4,843 mutants over 93 files), then 4h07m of
-nineteen fuzz targets at an hour each. Its twenty baselines succeeded; the
-score job failed on eleven gate-path files below 80 (#603's standing list).
-On the owner's word of 2026-11-02 ("even the nightly... is all that
-necessary? or maybe a fraction"):
-
-- **The reach rule** (`nightly_mutants.py plan`): a night mutates only the
-  measured files the changes since the last complete run reach (a measured
-  file; a selection test's `tests/CLAUDE.md` row or its surfaces; a vector or
-  support file through the sources that name it; a module's other sources;
-  an exclusion's file), and carries every other figure. `Cargo.toml`,
-  `Cargo.lock`, `build.rs`, `.cargo/*`, `src/lib.rs`, `src/error.rs`, the
-  nightly's workflow, script and memory-ceiling runner reach everything and
-  make the night complete; documentation reaches nothing. On beta's last ten
-  commits, with the two folds below: two plan nothing, one plans three
-  files, three plan nine (the four BEEF and Merkle files and the five
-  substrates files that call `crate::transaction`), one forty (its row naming
-  a test-only file; the measured script files it changes reaching their
-  module's callers), one 43 (the script surface's 40, its row naming none,
-  and the three BEEF files naming `crate::script`), two (the nightly's own
-  script) plan the complete run
-  (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
-- **The reach rule's five holes, closed (PR #666's fold)**, each pinned by a
-  `test_fold_*` case in `test_nightly_mutants.py` that failed on the cut's
-  script: a deleted selection test is judged by the base's selection and row
-  (`git rm tests/script_script_603_a.rs` planned nothing, now the script
-  surface's 40); a data file is named by its whole name or a directory two
-  deep (`tests/fixtures/wire/createAction.json`, read through a
-  `format!`-built path, planned nothing, now the wire surface's 15) and a
-  support `.rs` by the `#[path]` or `mod` line that compiles it in (a change
-  to `tests/support/fixtures/*` or `tests/vectors/sighash.json` was a
-  complete run through the bare word `fixtures`, now 15 and 55 files); a
-  changed source of an unmeasured module re-measures, one level, the measured
-  files that name it by `crate::<m>` (`CALLEE_RULE`: an edit to
-  `src/primitives/hash.rs` planned nothing, now 39 files in 16 shards); a row
-  naming a test-only file reaches the files it tests; the thirteen
-  `#[cfg(test)]` modules under the globs are tests of their surface, never
-  measured (82 measured files, not 95). Beta's last ten commits: 29 shards
-  over the eight incremental ones before, 34 after.
-- **The callee rule's letter and its count per night (PR #666's second
-  fold)**, on the keeper's word ("the record names per night how many files
-  the cure added"; a changed module re-measures every measured file that
-  names it). The rule now reaches from every changed source under
-  `src/<m>/`, measured or not (a test-only one excepted), where the fold
-  applied it to an unmeasured source alone: an edit to the measured
-  `src/transaction/beef.rs` planned 1 file and plans 7 (it, `beef_tx.rs` and
-  the five substrates files that `use crate::transaction`), one to
-  `src/script/spend/flow.rs` 1 and 29. Of beta's last ten, `script-a` moves
-  from 40 files in 11 shards to 43 in 14 and `script-c` from 15 in 5 to 40 in
-  14, the eight incremental nights from 34 shards to 46; the cold read's
-  three probes are unchanged (40, 15, 39). The plan's JSON carries
-  `callee_rule` and `callee_added` (the files the rule reached that no other
-  rule did, by the reach run again with the rule off), the record's `runs[]`
-  entry the count under its run id and sha, and the scoreboard's header "The
-  callee rule added N files tonight (<mode>)" with their names; a complete
-  run prints 0. On the sample: 5 for `ffff16d0..84a01d2a`, 3 for `script-a`,
-  25 for `script-c`, 39 for the `primitives/hash.rs` probe, 0 for a
-  documentation night. Pinned by three `test_fold2_*` cases that failed on
-  the fold's script (the count absent; a measured file reaching no caller).
-- **The record**: the `mutation-record` artifact (90 days), found by the
-  source job through the artifacts API, never a commit (no write permission
-  on beta, no race with the sequencer): per file the figure, the counts,
-  `night` or `carried`, and the run id and sha it came from, beside the
-  complete run's `Cargo.lock`, which every night builds. The scoreboard gains
-  a Figure column and names the complete run it carries from; a carried
-  figure below its floor is listed as a finding with its run, never a
-  failure of the night.
-- **The complete run** (`-f mode=complete`, at each prerelease pin and before
-  a minor tag, `RELEASING.md` step 3): twenty shards in one wave (eleven
-  script, three BEEF, one Merkle, two wire, three substrates, about 50
-  minutes each by run 41347058507's rates) in place of the surfaces by four.
-- **The fuzz budget**: `FUZZ_MINUTES`, 10 minutes per target by default
-  (the repository variable `NIGHTLY_FUZZ_MINUTES`), every target every night;
-  it was an hour.
-- **The bench weekly**: the `weekly` input dispatches `bench.yml` on the line
-  (`gh workflow run nightly.yml --ref beta -f weekly=true`, the captain's
-  Sunday line); the workflow still has no schedule.
-
-Pinned by `.github/scripts/test_nightly_mutants.py` (23 new tests: each reach
-rule on a fixture tree and its diffs, the plan's modes and sizes, the merge of
-a night onto a complete run, the provenance column, the carried-below-floor
-finding, an empty plan, an empty shard, the record's lookup). The record of
-the cut is `docs/lanes/ci-speed-7.md`.
-
-### Changed: CI's small gates are steps of two jobs, `lint` and `checks`, one setup each; the required contexts re-pointed (CI speed round 1, cuts 2 and 3)
-
-What was wasteful: a pull request into `beta` ran twelve jobs, ten of them small
-gates each on a runner of its own, with its own checkout, toolchain and cache
-restore. On run 41537280176 (2026-11-02, 30 minutes, the `Test Suite` 26 of
-them) those ten took 632 s of runner time, 261 s of it setup steps against
-283 s of gate steps (`deny` 139 s of setup, building cargo-deny from source,
-for 3 s of checks), and queued 4 to 9.5 minutes for a slot of the account's
-twenty, shared by three captains. What changed (`ci.yml`): `lint` carries
-Rustfmt, Clippy (`--all-targets --all-features`, then each published slice
-alone), deny and ratchet; `checks` carries vectors, fixtures, secrets,
-Documentation and wasm32 (combined), its one-cell matrix now a step. Each job
-has one checkout, one toolchain setup and one `Swatinem/rust-cache` restore
-(v2.9.3, `d1527c8f67ef9af357290475d4af4b0fab8f12e0`), saved by a push to a
-line alone, so a pull request restores its line's build; cargo-deny 0.20.2 is
-the release binary through `taiki-e/install-action` (v2.89.1,
-`682ce6c3c696a4cd5168a05f98e51aa02b877941`). What did not change: every gate
-still runs, with the same commands, on the same events; each is its own step
-that runs when an earlier gate failed, prints its own `PASS <gate>` or
-`FAIL <gate>` line, and the job's last step fails naming every gate that did
-not pass. `semver`, `main-in-beta`, `beta-born` and the dependents jobs stay
-jobs of their own (their own events, `main-in-beta` beta's alone). The test
-job is unchanged here.
-
-The required contexts move: `beta` from twelve to five (`Test Suite
-(ubuntu-latest, stable)`, `lint`, `checks`, `main-in-beta`, `semver`); `main`
-keeps its thirteen until the pull request that promotes this commit to it
-(that pull request runs its merge ref's `ci.yml` and reports `lint` and
-`checks`), then six (`Test Suite (ubuntu-latest, stable)`, `lint`, `checks`,
-`dependents`, `semver`, `beta-born`), the PATCH at that pull request after its
-run is green and before its merge. The verdict step skips no line: an empty
-outcome, an empty gate name or a blank line is a `FAIL` naming its position. The branch protection and the sequencer's names move at the
-landing (`docs/lanes/ci-speed-2.md` lists each). Cut 3, the twin runs: none
-were found to end. `ci.yml` already runs `push` on `main` and `beta` alone
-(every run of the last thirty on a lane branch is a `pull_request` run), so the
-`on:` block is unchanged, as is the concurrency group, which cancels a
-superseded run of the same pull request.
-
-The tests: `tests/arch_ci_lines.rs`'s
-`the_bundled_gates_each_run_and_report_and_the_last_step_names_every_failure`
-(RED on `ffff16d0`'s `ci.yml`: no `lint`, no `checks`) and
-`a_bundle_with_a_gate_stopped_unreported_or_unjudged_is_refused` (a gate
-without `!cancelled()`, without its line, unjudged, gone, a second cache, a
-lenient last step, each refused naming it);
-`tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` and
-`REQUIRED_ON_MAIN` (12 of its 16 tests RED on `ffff16d0`'s `ci.yml` with the
-new constants). `docs/ARCH-RULES.md` section 7, `tests/CLAUDE.md`'s rows,
-`RELEASING.md` step 2 and `CLAUDE.md` rule 7 name the new contexts.
-
-### Added: src/transaction/beef_stream.rs's surviving mutants, shard S1 (the stream's cursor and element reading), killed from the sibling's rules and vectors (#603)
+## [0.9.0-beta.7] - 2026-11-04
+
+The 0.9.0 line's seventh prerelease (RELEASING.md point 14), cut from `beta` under the owner's standing green light through the keeper (the chain set on the complete run at 2026-11-04 01:2xZ, his word a stop and never a go; the keeper's word of 15:5xZ: the content is `beta` at #780's landing, the tag on the version PR's green, #777 and #778 to beta.8 with #735's field) at the tip after #780 landed (`8ac66446`): warranted by the complete mutation run's record (#780: run 41753882105 at `2ff81a44`, 80 PASS / 0 FAIL / 5 NO MUTANTS, 27 of 29 floors raised, 332 survivors against 1,583, the survivor term 17.8%) and the landings since beta.6: the identity client's lookups made the reference's (the evidence check #730, the subject and type filters #737 #739 #744 #746, the by-type question #752, the `ls_identity` question #754, the BEEF subject #721, the listed token #718, with their pins #725 #728 #736 #741 #748), the BEEF readers' BUMP index and merge walk (#732, #757, #764, #765) and the MerklePath doors (#631, #641, #649), the lookup resolver's reputation, accounting and JSON parse (#760, #762, #768), the script layer's node readings (the IF depth #634, the key encoding #660 and #625, CHECKMULTISIG's words #657, the scriptCode #654, `to_asm`'s names #723, the hand-built script's ASM #661), PushDrop's decode and bounds (#616, #618), the wallet wire's public validators and the certificate key helper (#609, #610), the nightly oracle made whole (the corpus and the floors #602, the pin #629, the equivalence check #663, the reach rule #685, the record #780) with the kill lanes (#603's nineteen entries, #681) and the speed loops (#664, #667, #668, #670, #672, #683, #689, #693, #696, #699, #706, #709, #712, the fleet's caps): 83 entries. No api-break since beta.6 by the entries' own words; the additions are #609's seven validators and #610's helper, and the behaviour changes carry their migration lines (#634, #657, #723, #730, #737, #739, #744, #746, #752, #732, #754, #757, #760, #762, #764, #765, #768) on the dependents' intakes (bsv-wallet-cli#386, bsv-wallet-toolbox-rs#533).
+
+### Changed: the nightly's Mutants oracle runs the conformance corpus, so the mutation scores are measured against the sibling's vectors (#602, #31)
+
+On the owner's word of 2026-11-01 14:3xZ through the keeper (the stack's brief,
+23.9): the first complete scoreboard (run 41294262955 at `ab155018`) was
+measured without the ts-stack corpus. `conformance_scripts` and
+`conformance_beef` sit in the script, BEEF and Merkle selections, but skip when
+`BSV_CONFORMANCE_DIR` is unset, and the `mutants` job never checked the corpus
+out, so the 517 gate-path survivors (#603) and #602's floors table are the
+narrow figure. `nightly.yml`'s `mutants` job now checks the corpus out exactly
+as `ci.yml`'s `vectors` job does (`bsv-blockchain/ts-stack` at
+`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`, sparse `conformance`, no
+credentials, `path: ts-stack`), sets `BSV_CONFORMANCE_DIR` in the job's
+environment and asserts `META.json` before the baseline. The floors are set
+from the widened figure (the first dispatch after this landing), never the
+narrow one; `docs/NIGHTLY.md` carries both. No crate code moves.
+
+The witness, `src/script/not_judged.rs` under the script surface's selection
+(cargo-mutants 27.1.0, local): unset, the baseline's `conformance_scripts`
+passes its three tests in 0.00 s (the suites return at the missing
+`META.json`), 2 caught and 1 missed; set, in 1.44 s, in the baseline and in the
+surviving mutant's run alike, 2 caught and 1 missed (the `Display::fmt`
+replacement at `not_judged.rs:90:9`, which no conformance verdict observes);
+set to a copy of the corpus without `evaluation.json`, the unmutated baseline
+fails at `conformance_scripts_evaluation`. libtest captures a passing test's
+output, so the suite's `SKIP` and `total=5116 ...` lines are not in
+`mutants.out/log/`; the time and the red baseline are the reading. The
+environment reaches cargo-mutants' test runs; the other files' movement is the
+widened dispatch's to measure.
+
+### Changed: the mutation gate's floors live in the ratchet's record, 80 on the interpreter and the BEEF and Merkle readers and the measured widened value elsewhere, never lowered (#602)
+
+On the owner's word of 2026-11-01 14:1xZ through the keeper (23.5 (c)): the
+nightly's mutation gate is 80 percent caught on `src/script/**`,
+`src/transaction/beef*.rs` and `src/transaction/merkle_path.rs`, and the
+ratchet elsewhere (`src/wallet/wire/**`, `src/wallet/substrates/**`): the
+measured value is the floor, never lowered, raised by a landing that raises the
+score; on the 14:3xZ word and the keeper's 14:4xZ reading, the floors come from
+the widened figure (the oracle with the conformance corpus), never the narrow
+one. The floors move from `nightly.yml`'s `MUTATION_FLOORS` string (removed) to
+`docs/ratchets.json`'s new `mutation_floors` member, 29 files at their widened
+score rounded down with #602 as their issue, read by `nightly_mutants.py report
+--floors` (default `docs/ratchets.json`) from the measured commit; a gate-path
+entry is refused. `tools/ratchet/run --check --against <base>` refuses a floor
+lowered or removed from the base's record, a raise or a new entry passing, and
+`--record` carries the member over unchanged
+(`a_lowered_or_removed_mutation_floor_is_refused_602`, RED on a copy with the
+refusal's body removed). A file whose generated mutants are all unviable is
+`NO VIABLE MUTANTS`, unscored, when its surface has viable mutants, and still
+fails when the surface has none (`src/wallet/substrates/http_json/answer.rs`:
+two `Default::default()` replacements of a type without `Default`;
+`test_a_file_whose_mutants_are_all_unviable_has_no_score`).
+
+The two figures: the narrow run 41294262955 at `ab155018` (no corpus) scored
+31 PASS, 46 FAIL and 15 NO MUTANTS at 80 everywhere; the widened run
+41327640129 at `b8d0a008` (corpus at ts-stack `edf6e03`) 33 PASS, 44 FAIL and
+15 NO MUTANTS at 80 everywhere, and 62 PASS, 14 FAIL, 15 NO MUTANTS and 1 NO
+VIABLE MUTANTS under the record's floors: the fourteen failures are the
+gate-path files below 80, red until #603's lanes land. The survivors' record,
+both runs side by side with the gate paths' 548 widened survivors by
+`file:line:column` and the 97 the corpus killed, is
+`docs/census/mutants-2026-11-01.md` and `.json`, written from the artifacts by
+`.github/scripts/mutants_record.py` (`fetch`, `floors`, `write`). No crate code
+moves.
+
+### Added: the key bytes Certificate.toBinary writes for a subject or certifier key, as a public helper named for the operation (#610)
+
+On the keeper's word of 2026-11-01 20:1xZ on the toolbox's ask (shape (2)):
+`auth::certificates::certificate_key_bytes(text, field) -> Result<[u8; 33]>`
+(`src/auth/certificates/to_binary_key.rs`, under `auth`) is the reference's
+`Certificate.toBinary` on a `subject` or `certifier` text (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts:240-254`): the text taken as
+given, never trimmed, `/^(02|03)[0-9a-fA-F]{64}$/` in either case, else
+`Invalid certificate <field>: expected compressed public key hex`; the decoded
+bytes a key to `PublicKey.fromDER` (`assertCompressedPublicKey`, `:136-143`),
+else `Invalid certificate <field>: expected a compressed secp256k1 public key`;
+both `Error::CertificateValidationError`. It returns the 33 bytes `toBinary`
+writes, so a compressed x at or above p that `fromDER` reduces to a point is
+returned unreduced, as the reference writes it; a caller that needs the key
+reads the bytes with `PublicKey::from_bytes`, which refuses that x (#183).
+`read_to_binary_key` (#585) keeps its name and visibility, crate-private under
+`identity`, and is the helper followed by `from_bytes` in the second sentence:
+one definition, the identity parsers' reading and words unchanged.
+
+Pinned against `tests/vectors/certificate_key_bytes_610.json`, written by
+`tests/support/certificate_key_bytes_610.mjs` (a bun bundle of `mod.ts` at
+`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical): for each of
+the subject (an `03` key) and the certifier (an `02` key) 23 texts, #585's eight
+and the shapes around them (the other prefix, mixed case, a leading space, a
+trailing line break, empty, 64 and 68 digits, `0x`, the prefixes `04`, `05` and
+`00` at compressed length, a non-hex and a non-ASCII character, x at p and the
+largest x), each with the 33 bytes `toBinary(false)` writes or the words it
+throws. `tests/auth_certificate_key_bytes_610.rs`: the helper's bytes equal the
+reference's for the 12 accepted texts and its error the reference's for the 34
+refused, and the same for the 16 `to_binary` outcomes of #585's vector, none
+enumerated apart; an x above p and the largest x written unreduced and refused
+by `from_bytes`. Compile-RED on `9640eaa7` (`E0432`, the helper absent); on a
+scratch copy, 1 of 3 RED with the text rule cut to the length, 3 of 3 with the
+point read by `from_bytes`; #585's three pins green unchanged.
+
+Migration (bsv-wallet-toolbox-rs): drop `internalize_args::compressed_key` and
+call `bsv_rs::auth::certificates::certificate_key_bytes(text, "subject")` (or
+`"certifier"`) at the key sites, `PublicKey::from_bytes` on its bytes where a
+key is held; the texts are unchanged. One input to read at those sites: a
+compressed x at or above p whose reduction is a point is written, as `toBinary`
+writes it, and `from_bytes` refuses its bytes.
+
+### Added: src/script/templates/rpuzzle.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The template sits outside the sibling's Lean definition, so its rule source
+is the reference's `RPuzzle.ts` at `ts-stack@edf6e03`
+(`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`) and its `__tests`. The widened
+run 41327640129 left 10 survivors (50.00%). 9 are killed by tests and none is
+declared equivalent, so 1 remains. The tests are two in `tests/template_tests.rs`
+(`rpuzzle_reference_603`) against `tests/vectors/rpuzzle_lock_and_spend_603.json`,
+which `tests/support/rpuzzle_lock_and_spend_603.mjs` records under Node v22.18.0.
+`the_lock_pushes_the_value_minimally_rpuzzle_lock_and_spend_603_lock` pins `lock`'s
+push at ten lengths and kills the `<` replacements at `rpuzzle.rs:350:34`
+(`==`, `>`) and `rpuzzle.rs:352:32` (`<=`, `==`, `>`).
+`the_unlock_signs_with_the_given_k_rpuzzle_lock_and_spend_603_spend` checks 36
+spends (six puzzle types by six scopes, k = 12345678, the private key 1, as
+`__tests/RPuzzle.test.ts:19-51` builds them): each signed transaction matches the
+reference byte for byte and each spend is valid. It kills the four
+replacements in `sign_with_k`'s `s = k⁻¹ (z + r d)` at `rpuzzle.rs:403`. The one that
+remains is `rpuzzle.rs:350:34` `<` → `<=`. It changes the opcode only for a
+76-byte value, where the length and `OP_PUSHDATA1` are the same byte, so the
+chunk and its serialization do not change. The reference's own `{ op:
+value.length }` (`RPuzzle.ts:65`, `Script.ts:544-547`) writes those same bytes. It is
+not declared in `exclude_re` until three independent reads accept it.
+Re-measured with the script surface's selection and the corpus:
+19 caught, 1 missed, 0 timeouts, 8 unviable: 95.00% of viable.
+
+### Notes: cross-SDK parity (#603)
+
+The reference's `RPuzzle.lock` writes the value as `{ op: value.length, data:
+value }` (`RPuzzle.ts:65`). Up to 76 bytes that is a minimal push, and this
+crate's bytes are the same. From 77 bytes it is not the minimal push: at 77
+the reference writes the value under an `OP_PUSHDATA2` whose length is 77 and at
+78 under an `OP_PUSHDATA4` (non-minimal pushes of the value; 78 is read from
+`Script.ts:553-560` and is not among the vector's lengths), and from 79 no push
+at all, the opcode byte alone with the data dropped (`Script.ts:539-562`; at 256
+the single byte `00`). This crate keeps the minimal push at every length,
+`OP_PUSHDATA1` from 76 to 255 and `OP_PUSHDATA2` from 256, as the reference's
+`Script.writeBin` does (`Script.ts:340-352`). The recorded vector pins both
+answers at 0, 20, 32, 33, 75, 76, 77, 100, 255 and 256. An R value or its hash
+is 20 to 33 bytes, so no puzzle that either SDK can spend crosses the gap.
+The line is in CLAUDE.md's divergence list.
+
+### Added: src/script/templates/pushdrop_position.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 25 of the file's 26 viable mutants missed
+(3.85%): the helpers' witnesses lived in the kvstore, registry, storage and
+overlay tests, outside the script surface's selection. The file is a template,
+outside the sibling's Lean definition (`bsv-script-lean@5dc337e1`; the corpus
+step does not apply), so its rule source is the reference, `PushDrop.ts` and
+`PushDropValidation.ts` at `ts-stack@edf6e03`. Six unit tests in
+`src/script/templates/pushdrop_position_603_tests.rs`, each expectation a Node
+v22.18.0 recording already in the tree: `public_key_forms_498.json` (39 key
+texts through `PublicKey.fromString`: `key_text_refusal`, and the 34 hex ones
+as bytes through `Point.fromDER`: `point_message`), `sec1_tag_05_550.json`'s
+`PublicKey.fromDER` case, and `kvstore_local_454.json`'s `parser_words_489`
+(16 tokens: `PushDrop.decode`'s verdict for `decode_before`, and
+`decodeCanonicalPushDrop`'s words with `fieldCount: 2` for
+`canonical_refusal`); the one token no recording carries, a key and a
+CHECKSIG with no field, is this crate's writer in `PushDrop.lock`'s shape
+(`PushDrop.ts:164-171,185-193`), which `PushDrop.decode` reads as zero fields
+(`:73-77,97`). Killed by tests 25, declared equivalent 0, remaining 0;
+re-measured with the script surface's selection and the corpus set: 26
+caught, 0 missed, 0 timeout, 1 unviable, 100% of viable. No `src/` behaviour
+changed and no vector moved; the recording the tests read states one
+difference, below.
+
+### Notes: cross-SDK parity (#603)
+
+`parser_words_489` records two tokens the reference's `PushDrop.decode` reads
+at its default position (no `parser_error`) and this crate's `PushDrop::decode`
+and `decode_before` refuse: `token_key_only`, the key push alone, which the
+reference reads as the key and no field (`ts-stack@edf6e03`
+`PushDrop.ts:73-78,97`) and `pushdrop.rs:229` refuses as `Script too short for
+PushDrop`; and `token_no_checksig`, `OP_1` in the CHECKSIG's place, whose
+second chunk the reference never reads (its two fields returned) and
+`pushdrop.rs:261` refuses as `Expected OP_CHECKSIG after pubkey`. The public
+verdict that differs is the template's `PushDrop::decode`. At every caller of
+`decode_before` the reference refuses both as well: `decodeCanonicalPushDrop`
+on the field count or the envelope (`PushDropValidation.ts:54-79`; the local
+store, the kvstore interpreter, the registry, the overlay admin token and the
+storage downloader, in the recorded words through `canonical_refusal`), and
+the identity client and the contacts manager on their field count and
+canonical script (`IdentityClient.ts:130-147,773-776`,
+`ContactsManager.ts:225-242,431-441`; a skip or a wrapped refusal on both
+sides). Go at `2ca481c` refuses both, as this crate does
+(`transaction/template/pushdrop/pushdrop.go:20-53`: two chunks at least,
+`OpCHECKSIG` second). A residue the cold read found, derived from the
+reference's code and not recorded: a no-CHECKSIG token with the site's field
+count and a field over the site's bound is refused here in the envelope's
+words, where `decodeCanonicalPushDrop` checks the bounds before the envelope
+(`PushDropValidation.ts:63-73`) and says `PushDrop token contains an oversized
+field` or `PushDrop token payload is too large`; the verdict is the same.
+
+Census (#375; current reading):
+
+- Row 93: Ours: since #618 the public `PushDrop::decode` reads a key-only script and a token without CHECKSIG second as `PushDrop.decode` at its default position reads them (PushDrop.ts:63-121 at edf6e03; tests/vectors/pushdrop_decode_618.json, tests/script_pushdrop_decode_618.rs); the refusal stands on the canonical path alone (`decode_before` and the canonical-script checks), where every site refuses both as its counterpart does (PushDropValidation.ts:54-79 at the local store, the kvstore interpreter, the registry, the overlay admin token and the storage downloader; IdentityClient.ts:130-147; ContactsManager.ts:225-242; one `_618` witness per site), as go-sdk at 2ca481c refuses them at its public `Decode` (pushdrop.go:20-53); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73), and the key parse's and the refused shapes' words where the reference throws its own. Theirs: go-sdk, its public `Decode` refusing what the reference reads, no filing made (the #618 entry).
+
+### Added: src/script/templates/pushdrop.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 13 of the file's 53 viable mutants missed
+(75.47%). Two of them, `-` to `+` and to `/` in `decode_lock_after`'s
+`take(last_idx - 1)` (`pushdrop.rs:308:50` at `b8d0a008`), are gone: #618's
+fold at `4b0678fa` removed that loop for `reference_fields`. They are not
+counted as killed. The file is a template, outside the sibling's Lean
+definition: `bsv-script-lean@5dc337e1` has no PushDrop rule in `corpus/`,
+`lean/` or `spec/`. A full-corpus run of each of the eleven that stand
+(`harness/run --impl bsv-rs --corpus all --spec recorded`, nine corpora, all
+GREEN) moved no verdict, so the rule source is the reference, `PushDrop.ts`
+at `ts-stack@edf6e03`. `tests/support/pushdrop_decode_618.mjs` is extended
+rather than duplicated. It now writes two more sections of
+`tests/vectors/pushdrop_decode_618.json` under Node v22.18.0, and its earlier
+sections are byte-identical:
+
+- `locks_603`: the reference's own `lock` of nine fields at both positions,
+  under a second key, with other fields, and with the key pushed uncompressed.
+- `two_chunks_603`: three two-chunk scripts with no key first, read at
+  `'after'`.
+
+`tests/script_pushdrop_mutants_603.rs` holds the tests:
+
+- `a_zero_byte_field_is_op_0_and_a_longer_one_a_push_pushdrop_ts_20_41_locks_603`
+  kills `create_minimally_encoded_chunk`'s `||` to `&&` and `==` to `!=`
+  (`:165:28`, `:165:43`). The reference writes `00` as `OP_0` and `0001` as a
+  push (`PushDrop.ts:21-41`). The node's `CheckMinimalPush` would write the
+  one-byte zero as `01 00` (`lean/BsvScript/Machine.lean:69-75`). The
+  reference reads its `OP_0` back as `00` (`:104-105`), and this crate writes
+  as the reference does.
+- `a_two_chunk_lock_after_is_refused_for_its_checksig_or_key_pushdrop_ts_79_94_two_chunks_603`
+  kills `decode_lock_after`'s `<` to `<=` and to `==` (`:290:25`). The
+  reference refuses each of these scripts for its last chunk or its key
+  (`:81-92`), never for its length.
+- Three `PartialEq` tests kill `eq`'s seven mutants (`:463:9` twice,
+  `:463:49`, `:464:13`, `:464:28`, `:465:13`, `:465:35`). They are
+  `tokens_the_reference_reads_alike_are_equal_pushdrop_ts_63_121_locks_603`,
+  `tokens_differing_in_position_alone_are_unequal_pushdrop_ts_197_201_locks_603`
+  and `tokens_differing_in_key_or_fields_alone_are_unequal_pushdrop_ts_63_121_locks_603`.
+  Tokens the reference reads alike at the same position are equal, the
+  uncompressed key included, because `PublicKey.toString` gives the same
+  text for both. Tokens that differ in the key alone, the fields alone or
+  the position alone are unequal. The reference has no equality of its own,
+  and its reading carries no position: two tokens that differ in position
+  alone read alike (`locks_603`). The position rule is this crate's
+  `PartialEq` contract (`src/script/templates/CLAUDE.md`: the compressed
+  key, the fields and the position), and the reference's `lock` writes the
+  two positions as different scripts (`PushDrop.ts:197-201`).
+
+Each test was RED on its mutants in a scratch copy and GREEN on the tree.
+Killed by tests 11, declared equivalent 0, remaining 0, removed by #618 2.
+Re-measured with the script surface's selection and the corpus set: 41
+caught, 0 missed, 1 timeout, 5 unviable, 97.62% caught of viable. The
+timeout is `add_drop_operations`' `-=` to `+=` (`:196:23`), an unbounded
+push. It was caught under the nightly's memory ceiling (0 timeouts in the
+census), and macOS has no `ulimit -v` to apply that ceiling here. No `src/`
+behaviour changed and no vector revealed a divergence from the reference,
+so there is no parity note.
+
+### Added: the seven key calls' argument validators as public helpers, each named for its reference site (#609)
+
+#609, the CLI's ask filed from bsv-wallet-toolbox-rs's #186/#142 lane
+(the owner's word of 2026-11-01 14:1xZ: the seven key calls route a
+privileged request to the wallet's privileged key manager, as the
+reference's `Wallet.ts:455-570` does): the toolbox must judge the arguments
+before it routes, so a refusal keeps its words and its place (`The
+privilegedReason parameter must be a value when 'privileged' is true`, pinned
+by the toolbox's `tests/proto_validator_pin.rs`), and the validators were
+crate-private, so it called `ProtoWallet` once only to validate. The
+keeper's word of 2026-11-01 20:1xZ: shape (2) of the 01:1xZ word on #579,
+one public helper per reference validator, named for its site; never an
+internal reader as public API.
+
+The reference has seven validators, one per call, over shared rules (one
+view for all seven would hide getPublicKey's identity branch and the
+signature calls' exclusivity), so there are seven helpers, re-exported at
+`wallet::`, each `fn(&<Call>Args) -> Result<()>`:
+
+| Helper | Reference (`ts-stack@edf6e03`, `packages/sdk/src/wallet/validationHelpers.ts`) | Rules after the shared ones |
+|---|---|---|
+| `validate_get_public_key_args(&GetPublicKeyArgs)` | `validateGetPublicKeyArgs`, `:1717-1732` | without `identity_key` the protocol and key ID required (`The protocolID parameter must be a [securityLevel, protocolName] tuple`, `The keyID parameter must be a string`); with it, each supplied field judged and the privilege always |
+| `validate_wallet_encrypt_args(&EncryptArgs)` | `validateWalletEncryptArgs`, `:1752-1756` | `plaintext` at most 268,435,456 bytes |
+| `validate_wallet_decrypt_args(&DecryptArgs)` | `validateWalletDecryptArgs`, `:1758-1762` | `ciphertext` at most 268,435,456 bytes |
+| `validate_create_hmac_args(&CreateHmacArgs)` | `validateCreateHmacArgs`, `:1764-1768` | `data` at most 268,435,456 bytes |
+| `validate_verify_hmac_args(&VerifyHmacArgs)` | `validateVerifyHmacArgs`, `:1770-1775` | `data` at most 268,435,456 bytes (the HMAC's 32 bytes are its type's) |
+| `validate_create_signature_args(&CreateSignatureArgs)` | `validateCreateSignatureArgs`, `:1789-1793` | exactly one of `data` and `hash_to_directly_sign` (`validateExclusiveDataAndHash`, `:1777-1787`), `data` bounded |
+| `validate_verify_signature_args(&VerifySignatureArgs)` | `validateVerifySignatureArgs`, `:1795-1804` | exactly one of `data` and `hash_to_directly_verify`, then the signature at most 72 bytes, then canonical DER (`isCanonicalDERSignature`, `Secp256k1Validation.ts:33-53`) |
+
+The shared rules, in the reference's order (`validateEncryptionArgs`,
+`:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
+`:198-205`), `keyID` 1 to 800, then `validatePrivilege` (`:207-222`): a
+present `privilegedReason` 5 to 50 UTF-8 bytes whether or not `privileged`,
+and `privileged: Some(true)` without one refused in the words above. Every
+refusal is `Error::WalletRefusal` of class `InvalidParameter`, code 6, `The
+<name> parameter must be <rule>`. The names are the reference's
+(`validateWalletEncryptArgs` gives `validate_wallet_encrypt_args`, where the
+Rust type is `EncryptArgs`). The helpers are the #415/#420 validators made
+public under those names, the definitions `ProtoWallet`'s seven calls and
+the wire processor already ran; `ProtoWallet` and the processor call them
+(getPublicKey through the crate-private reader the helper wraps, which also
+hands back the protocol and key ID), so no refusal text or verdict moves:
+nothing refused is accepted, nothing accepted refused.
+The counterparty is not judged by the helpers: `Counterparty` is typed, and a
+text is judged where it is read, by `Counterparty::from_hex` through #579's
+`validate_public_key`, so a host reading a counterparty text refuses a bad one
+before the call exists, ahead of a bad protocol the reference would name first
+(the order `src/wallet/CLAUDE.md` has stated since #420).
+
+Pinned by `tests/wallet_key_args_validators_609.rs` against
+`tests/vectors/key_args_validators_609.json` (222 cases, 26 shared rules on
+each of the seven calls and 40 call-specific, recorded from the seven
+exported reference validators at `ts-stack@edf6e03` under Node v22.18.0 by
+`tests/support/key_args_validators_609.mjs`, two runs byte-identical; 102
+accepted, 120 refused): every case through its helper, and every refusal
+through `ProtoWallet` to the same `Error`; one test per rule. RED on
+`9640eaa7` as a compile failure (`E0432`, the seven helpers absent), and each
+of the nine rules (the privilege required, the reason's bounds, the
+protocol name's, the key ID's, getPublicKey's required fields, the byte
+bound, the exclusivity, the signature's length, its DER) red on a scratch
+copy of the tip with that rule removed. `tests/wallet_proto_args_415.rs`
+and `tests/wallet_proto_args_420.rs` green unchanged.
+
+The reference's own order, for the hosts: its `Wallet` routes on
+`args.privileged` before any validator
+(`packages/wallet/wallet-toolbox/src/Wallet.ts:455-570` at the pin), and
+its `PrivilegedKeyManager` asks `getPrivilegedKey(args.privilegedReason)`
+before the inner `ProtoWallet` validates (`PrivilegedKeyManager.ts:343-383`),
+so there a privileged request without a reason reaches the key manager's
+fetch first and is refused by the validator after it; a host that calls the
+helper before routing refuses before the fetch, with the same words.
+
+Migration: bsv-wallet-toolbox-rs (#186) and bsv-wallet-cli replace the
+validating `ProtoWallet` call ahead of a privileged route with
+`bsv_rs::wallet::validate_<site>_args(&args)?` at the pin that carries this,
+then route; the texts are unchanged. Semver: seven public functions added, a
+minor addition on the beta line; no shape or behaviour moves.
+
+### Notes: cross-SDK parity (#609)
+
+Go at `2ca481c` has no argument-validation layer for the seven calls: its
+`ProtoWallet` judges no protocol name, key ID, byte length, signature or
+privilege (`wallet/proto_wallet.go:63-135` and the five calls after it), and
+`PrivilegedReason` is a plain `string` (`wallet/interfaces.go:449`), so an
+absent reason and an empty one are one value there; its one check is
+getPublicKey's, in its own words (`protocolID and keyID are required if
+identityKey is false`, `:72-74`). This crate follows the reference, so no new
+divergence is stated; the two typed-representation residues (`identity_key:
+false` for the absent flag, a counterparty text judged at
+`Counterparty::from_hex` before the protocol) are #420's, unchanged and
+stated in `src/wallet/CLAUDE.md`.
+
+### Added: src/script/transaction.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left seven survivors in `src/script/transaction.rs`
+(3 caught of 10 viable, 30 percent): `TransactionContext`'s four default
+methods (`input` and `output` as `None`, `input_count` and `output_count` as 0
+and 1) and `SpendValidation::validate_all_inputs` as `Ok(())`. No implementor of
+the traits exists in the crate or in the sibling's harness, so under each
+survivor no entry of the sibling's nine corpora (`bsv-script-lean` at
+`387dab35`: seed, flow, arith, stack, crypto, bytes, eras, gen, tx) moves its
+verdict; each is killed by a hand test over this crate's own transactions,
+`tests/script_transaction_context_603.rs`, every rule cited from the sibling's
+Lean definition: `input` by `Sighash.lean:127-128` (`inputAt`) on
+`TX_VALID_2`'s second input, `output` by `Sighash.lean:164-170`
+(`bip143Outputs`' `tx.outputs[nIn]?`) on its two outputs, the counts by
+`Sighash.lean:134-137,259-263` and `Tx.lean:88-98`, and `validate_all_inputs`
+by `BsvChain/Utxo.lean:149-165` (`checkInputScripts`: every input judged in
+order, the first refusal the transaction's) on a two-input P2PKH spend built and
+signed by this crate's writer, refused at input 1 with its second unlocking
+script replaced. Killed by tests 7, declared equivalent 0, remaining 0;
+re-measured under the script surface's selection with the conformance corpus at
+`ts-stack@edf6e03`: 10 caught, 0 missed, 0 timed out, 2 unviable, 100 percent.
+No behaviour changes; no parity note (no vector revealed a divergence).
+
+### Added: src/transaction/beef_tx.rs's surviving mutants killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
-left 44 survivors in this shard's sixteen functions of
-`src/transaction/beef_stream.rs` (the decoder's and the stream's accessors,
-`finish`, `on_varint`, `on_run_done`, `next_element`, the cursor's
-`to_binary`, `from_binary` and `input_reached`, the verifier's `cursor` and
-`step_until`); two of them timed out. Of the 44: killed 41 (30 from the
-sibling's rules and the reference's recordings, 11 on crate-contract pins
-stated apart, below); declared equivalent 1 (`788:9`, on three reads); two
-timeouts the oracle counts as such, never as caught (`1263:9`, `3214:32`);
-remaining 0 (`2828:26` decided by reachability, below).
-
-The sibling's wire corpus (bsv-script-lean@387dab35 `corpus/wire`, 150
-rows, through a scratch copy of its `run_wire` linked to this tree) reaches
-only the whole-BEEF path: under six of the survivors no row moved, and under
-`on_run_done` replaced by `()` the run stops at beef-001, the earliest row
-with a script. Seventeen tests in `tests/beef_stream_603_s1.rs` take the rows by id
-(beef-001, -023 to -026, -031, atomic-beef-023, bump-003) and expect the
-reference's reading of them. The shared recorder
-`tests/support/beef_reference_603.mjs` gains three cases (`stream`:
-`Beef.fromReader`'s position after the header and after each element, the
-version, the atomic subject, the element kinds and `verifyValid` on seven
-rows; `stream_txids`; `bump_offset_outside_its_level`, bump-003 with a
-level-1 leaf moved to its level's width, which the reference refuses) and
-three rows (beef-024, beef-025, bump-003), merged after S2's and S4's cases;
-`tests/vectors/beef_reference_603.json` regenerated at `ts-stack@edf6e03`
-under Node v22.18.0, two runs byte-identical, every entry of beta's vector
-(14 rows, 30 cases) and of the lane's (13 rows, 20 cases) byte-identical,
-17 rows and 33 cases in all. Each test cites the sibling's wire views
-(`lean/BsvChain/Views/Wire/BEEF.lean:89-128`, `AtomicBEEF.lean:36-41`,
-`BUMP.lean:108-115`). The cursor tests resume every cursor between the
-rows' elements (BSC3, BSC4 for beef-026's held child, BSC5 under a work
-budget) to the one-pass verdict, the reference's `verifyValid`; the pause
-and the held-and-charged cursor are fixtures this crate's writer builds in
-the rows' shapes. `input_reached` is held to the input that the resumed
-reading's verdict names (a third input refused by CLEANSTACK at version 1),
-not to a constant. Each kill is RED on its test in a scratch copy.
-
-The crate-contract pins (the keeper's ruling of 2026-11-02 14:1xZ: no
-`BSC*` layout is the sibling's or the reference's, so each test names the
-public line it pins and says "crate-contract pin, no sibling rule, stated"),
-11 kills:
-
-- `a_cursor_in_no_layout_is_refused_by_its_word_wire_beef_023`, `2769:22`:
-  `Cursor::to_binary`'s rustdoc, "BSC1 is refused: restart its reading".
-- `a_bsc2_cursor_carrying_the_spent_bit_reads_and_resumes_wire_beef_023`,
-  `2828:22` (`>` to `==` and to `>=`) and `2861:32`: `Cursor::to_binary`'s
-  rustdoc, "reads a BSC2 cursor as BSC3 with no edge for a transaction read
-  before it", with 0.8.0's "the transactions by txid with a spent flag".
-- `a_cursor_edge_of_a_transaction_not_held_raw_is_refused_wire_atomic_beef_023`,
-  `2886:36`, `2886:46` and `2828:44` (`&` to `^` and to `|`, which refuse
-  the entry's flags 0 for its flags, not its edge): `src/transaction/CLAUDE.md`,
-  "edges of a txid the index does not hold raw, is refused", and 0.8.1's
-  entry below.
-- `a_pause_before_its_frame_is_refused`, `2941:23` (`<` to `>`) and
-  `2941:38`: `Cursor::input_reached`'s rustdoc, "the transaction starts at
-  `offset`", with `src/transaction/CLAUDE.md`'s exception for a released
-  held transaction, "the cursor naming it before the frame".
-- `a_bsc3_cursor_with_flags_its_writer_never_writes_is_refused_wire_beef_023`,
-  `2828:26` (`||` to `&&`): `Cursor::from_binary`'s rustdoc, promoted for
-  it, "A BSC3 (and BSC4, BSC5) transaction's flags byte is 0 or 2, the raw
-  bit; any other value is refused", cross-referenced from `to_binary`'s.
-
-Two tests changed under the ruling. The lane's spent-bit test also asserted
-that BSC3 refuses the spent bit and that every flags byte above 3 is
-refused. No public line stated either, so those assertions went and
-`2828:26` (`||` to `&&` in the flags check) was left a stated candidate.
-The keeper's word (2026-11-03 01:1xZ) put it to reachability, and the
-second fold decided it: the parser is public and takes stored bytes, while
-the writer never produces the state, so the refusal is a contract a
-persisting caller relies on. The line went into `Cursor::from_binary`'s
-rustdoc and `src/transaction/CLAUDE.md`, and the deciding test asserts the
-valid cursor's round trip byte for byte and `Err` for flags 1, 3, 4, 6, 5,
-7 and 255, never a message; cargo-mutants catches `2828:26` under it and
-misses it without it (`780:13` caught either way). The two rustdoc lines
-move the check to line 2830; the mutants here keep the run's numbers. The
-lane's edge test
-refused an empty edge list, which no public line states either. It now
-refuses the stated case, an edge of an entry not held raw.
-
-The two timeouts are RED on tests with their own bound. `step_until`'s `&&`
-to `||` (`3214:32`) is bounded by a step count: twice the row's elements.
-`on_run_done` replaced by `()` (`1263:9`) is bounded by a 60 s wall-clock
-timer, because under that mutant the decoder loops inside one
-`BeefDecoder::next` call without consuming a byte, so no count the public
-surface offers reaches it. The oracle still counts both as timeouts, since
-every unbounded reading in the selection hangs under them. The tests are
-kill witnesses, not the oracle's verdict.
-
-Declared equivalent on three reads (`.cargo/mutants.toml`): `take_deferred`
-replaced by `None` (`788:9`). Only the collecting decoder fills `deferred`
-and only `Beef::collect` reads it; under the mutant the fold reaches the
-pure `check_transaction` with the same arguments, so the refusal, its name
-and its offset are the same, the earliest kept either way
-(`beef_stream.rs:787-799, 1323, 2019`; `beef/collect.rs:67-86, 118, 131`;
-bsv-script-lean@387dab35 `lean/BsvScript/TxRules.lean:82-95`;
-bsv-stack-lean@5df1e0a3 `lean/BeefOfAnySize.lean:797-825, 951-965`; BRC-62
-`0062.md:183`; `Beef.ts:1054-1090` at `ts-stack@edf6e03`). The cold read
-(MERGE, 0.95), the adversarial read (EQUIVALENT, 0.96, 325,122 inputs) and
-the rule read (EQUIVALENT, 0.96). Its witness is
-`the_earliest_refusal_is_a_transactions_before_a_trailing_byte_lean_no_input_anchor`:
-bsv-stack-lean's `no_input_anchor` row with a trailing byte, refused
-`NoInputs` at 49 by the stream and by `Beef::from_binary`.
-
-The beef surface's mutation selection takes `tests/beef_stream_603_*.rs`
-(beta's glob since #643); `test_the_beef_selection_runs_the_streams_603_files`
-now names `beef_stream_603_s1` too. Re-measured on this shard's sixteen
-functions at the rebased tree (`--re` over the sixteen, the surface's
-selection, the corpus at `edf6e03`, `--jobs 1`, ten pieces of 14 mutants in
-the foreground): 141 mutants, `788:9`'s `None` absent, 131 caught, 1 missed
-(`2828:26`, the stated candidate then, killed by the second fold), 2 timeouts (`1263:9`, `3214:32`), 7
-unviable; 97.76 percent caught of 134 viable. One of the caught is outside
-the sixteen: `BeefDecoder::collecting`'s field deletion (`780:13`), which
-cargo-mutants 27.1.0 lists whatever the `--re` (see `.cargo/mutants.toml` on
-`592:13`). The whole file's figure is the witness's after the four shards
-land.
-
-### Fixed: OP_CHECKMULTISIG refuses a badly encoded public key or signature in the encoding check's own words, as OP_CHECKSIG does (#657)
-
-Under STRICTENC (every default-mode spend and every supported word),
-`OP_CHECKMULTISIG` and `OP_CHECKMULTISIGVERIFY` swallowed the refusal of
-`check_signature_encoding` and `check_public_key_encoding` and wrote their own
-sentence in its place (`src/script/spend/crypto.rs`, `op_checkmultisig`):
-
-- before: `OP_CHECKMULTISIG requires correct encoding for the public key and signature.`
-  (`OP_CHECKMULTISIGVERIFY ...` for the other opcode), whatever the fault;
-- after: the check's own words, the ones `OP_CHECKSIG` already returned:
-  `The public key is in an unknown format.` (a hybrid `06`/`07` key, a `05`
-  tag, a key off the curve), `The non-compressed public key must be 65 bytes.`
-  (a 33-byte `04` key, a 66-byte one), `The compressed public key must be 33
-  bytes.`, `The public key is too short, it must be at least 33 bytes.`,
-  `Public key is empty.`, `The signature format is invalid.` (a signature
-  that is no DER), `The public key must be compressed.` under
-  COMPRESSED_PUBKEYTYPE, and every other sentence of the signature check
-  (low S, hash type, FORKID under a word).
-
-The reference throws from its helpers (`ts-stack@edf6e03` `Spend.ts:606-629`,
-`#checkSignatureEncoding`; `:687-718`, `#checkPublicKeyEncoding`), so its
-wrapper sentence at the CHECKMULTISIG site (`:1809-1815`) and the CHECKSIG one
-(`:1669-1673`) is never reached (its own comment: "Fallback, should be
-unreachable"). The node returns the helper's error at both sites too
-(`bitcoin-sv` v1.2.3 `interpreter.cpp:1459-1469`, `:1605-1615`;
-`CheckPubKeyEncoding` `:312-327` over `IsCompressedOrUncompressedPubKey`
-`:132-152`), `SCRIPT_ERR_PUBKEYTYPE`, an error code and no contract sentence
-(`script_error.cpp:90-91`'s text is a debug string); this crate's
-`ScriptEvaluationError` carries no code, so its words are the contract and they
-are now the reference's at both sites. The signature is judged before the key,
-the order both references keep. No verdict moved.
-
-Pinned by `tests/pubkey_words_657.rs` against
-`tests/vectors/pubkey_words_657.json` (348 cases recorded from the unmodified
-reference under Node v22.18.0 by `tests/support/pubkey_words_657.mjs`, two runs
-byte-identical; every lock and unlock rebuilt by this crate's writer): thirteen
-key shapes (two controls, hybrid `06` and `07`, a 33-byte `04` and `05`, a
-34-byte compressed, a 66-byte uncompressed, a 32-byte key, empty, a compressed
-and an uncompressed key off the curve, `02` with x = p + 1) by a DER signature
-and an empty one, three keys by a truncated DER signature, at the four
-signature opcodes, in the default mode at versions 1 and 2 and under an
-explicit word with STRICTENC. On `e49cf55d` 3 of the 4 tests RED (the
-CHECKMULTISIG key and signature tests and the census: `left:
-Err("OP_CHECKMULTISIG requires correct encoding for the public key and
-signature.")`, `right: Err("The public key is in an unknown format.")`); the
-CHECKSIG test green on both, the statement that CHECKSIG matched already.
-
-The ripple: `tests/support/conformance_forkid_gate_429.rs` no longer special-cases
-`node.tx-valid.shared.0097` (this crate now says the recorded `The signature
-format is invalid.`), `tests/support/conformance_signature_words_417.rs`
-matches that sentence alone, and `tests/conformance_scripts.rs`'s BUG 1 comment
-quotes the new words. The census with `BSV_CONFORMANCE_DIR` at `edf6e03`'s
-`conformance/` is unchanged base against tip: 5,116 total, 4,120 run, 4,109
-passed, 959 unsupported, 37 skipped, 11 known failures, every class count the
-same. No dependent matched the old words (bsv-overlay-cloudflare,
-rust-message-box, bsv-wallet-toolbox-rs, rust-chaintracks,
-bsv-middleware-cloudflare-public).
-
-Migration: a caller matching `requires correct encoding for the public key and
-signature.` matches the encoding check's sentences above instead (the
-`OP_CHECKSIG` ones, unchanged).
-
-### Notes: cross-SDK parity (#657)
-
-The census row `node.tx-valid.shared.0097` (#429, #434) is closed: its words
-are now the reference's. One key shape keeps other words at both sites, older
-than #657: `02` with x = p + 1. The reference reduces x modulo p
-(`Point.ts:365-367`), passes the encoding check and fails the signature
-(`The top stack element must be truthy after script evaluation.` and the
-VERIFY opcodes' sentences); this crate's `PublicKey::from_bytes` refuses the key
-at the encoding check, `The public key is in an unknown format.` (#183's
-residue; enumerated as `READ_OTHERWISE` in the test, 24 cases).
-
-### Changed: the chunker reads the IF depth as the reference does, three chunks on `686a51`; the ASM round trip fixed on both shapes (#634)
-
-A public behaviour change, semver minor: `Script::chunks`, `Script::to_asm`,
-`Script::from_asm`, `PushDrop::decode` and the registry's token reader answer
-differently on a script with a stray `OP_ENDIF` (one with no `OP_IF` open)
-before an `OP_RETURN`, and `to_asm` writes every folded `OP_RETURN` otherwise.
-
-`Script::parse_chunks` counts an IF depth and folds the rest of the script into
-an `OP_RETURN` read at depth 0. It clamped the depth at 0, so after a stray
-`OP_ENDIF` an `OP_RETURN` was read as top level: `686a51` (`OP_ENDIF OP_RETURN
-OP_1`) was two chunks, `[OP_ENDIF, OP_RETURN <51>]`. The reference lets the
-depth go negative and folds only at `=== 0` (`ts-stack@edf6e03`
-`Script.ts:599-631`, the test at `:608`, the decrement at `:616`): three
-chunks. The keeper's word of 2026-11-02 22:1xZ: the verdict is the node's and
-no reading moves it, but the chunker is an application-layer reader this
-crate's public readers consume while claiming the reference's parity, so it
-follows the reference's reading. `parse_chunks` and `truncated_push_index` are
-now ported from `:599-631` line for line, no floor.
-
-`to_asm` wrote a folded `OP_RETURN` as its data's hex alone (the reference's
-`_chunkToString`, `Script.ts:668-677`), which `from_asm` reads back as a push:
-`686a51` under the clamp gave `OP_ENDIF 51`, read back as `680151`, and
-`68636a5168` (where the reference's own reading folds) gives the same loss on
-either rule. A script that re-reads as a different script is a reader bug
-whatever the door: `to_asm` now writes a folded `OP_RETURN` as `OP_RETURN` and
-the rest's own ASM read with no fold (`0 OP_RETURN 68656c6c6f` for
-`006a0568656c6c6f`, was `0 0568656c6c6f`), or as `OP_RETURN 0x<hex>` when that
-would not read back to the same bytes (a truncated push, a non-minimal one),
-and an empty rest as `OP_RETURN` alone (the reference writes `""` for `6a`,
-which reads back as `00`); `from_asm` reads a `0x<hex>` token as the raw rest
-when it is the last token and follows an `OP_RETURN` (`OP_RETURN 0x` is the
-bare `OP_RETURN`), and refuses it anywhere else (it was refused everywhere;
-the reference's `fromASM` refuses `0x` as invalid hex). The rest is written
-with no fold and no recursion, linear in its length, and reads back byte for
-byte whatever it holds; a chunk before it that
-`to_asm` cannot write back (a non-minimal push, `4c01aa` reading back as
-`01aa`; an undefined opcode) is as before. `ScriptChunk::to_asm` is unchanged.
-
-`tests/script_if_depth_634.rs` (fifteen shapes, `vectors/script_if_depth_634.json`):
-
-- `a_stray_endif_before_op_return_parses_as_three_chunks_the_if_depth_negative_634`
-  (was `..._two_chunks_the_if_depth_clamped_at_0_634`): `686a51` the reference's
-  three chunks and ASM, go-sdk's two; the issue's other forms.
-- `the_chunks_are_the_references_and_part_from_go_sdk_after_a_stray_endif_634`
-  (was `the_readers_differ_only_after_a_stray_endif_634`): this crate's chunks the
-  reference's on all fifteen; go-sdk's but on the six whose `OP_RETURN` follows a
-  stray `OP_ENDIF` at a negative depth.
-- `the_asm_round_trips_on_every_shape_both_readings_of_op_return_included_634`
-  (new): `from_asm(to_asm(s)) == s` on the fifteen, `686a51` and `68636a5168`
-  named, the reference's text for `68636a5168` reading back as `6863025168`, a
-  truncated rest as `0x`, a nested fold, `0x` refused elsewhere.
-- the three verdict tests unchanged and green on both rules.
-
-`tests/script_if_depth_consequences_634.rs` (the adversarial read's four, now
-the reference's recorded answers, `vectors/script_if_depth_consequences_634.json`):
-`pushdrop_decode_reads_the_references_four_fields_after_a_stray_endif_634`
-(`[abcd, "", "", hello]`, was `[abcd, "", 0568656c6c6f6d]`);
-`the_registry_reader_refuses_the_envelope_in_the_references_words_634`
-(`PushDrop token must use the canonical PushDrop envelope`, was `Unexpected
-PushDrop token field count`); `the_asm_after_a_stray_endif_is_the_references_and_reads_back_634`;
-`a_work_budget_reaches_the_unbalanced_verdict_the_nodes_scriptcode_gives_634`
-(the 200 signature pushes after the stray `OP_ENDIF` deleted from the scriptCode
-as the node's `FindAndDelete` deletes them, `script.h:202-224`, so a work budget
-of 1,000 reaches `OP_ENDIF requires a preceeding OP_IF.`; under the clamp it
-declined, `ScriptResourceLimit`).
-
-RED: on the code before the fold (a scratch copy, its own target), 7 of the 10
-(3 of 6 and 4 of 4; the verdict tests green); with the clamp removed and `to_asm`
-unfixed, the round-trip test alone (5 of 6 and 4 of 4 green).
-
-Migration: a caller that relied on two chunks after a stray `OP_ENDIF` (the
-rest of the script one `OP_RETURN` chunk's data) reads them as opcodes now, as
-the reference and the node's `GetOp` do; a caller that parsed `to_asm`'s text
-of a data carrier read from bytes finds `OP_RETURN` and the pushes where the
-hex of the rest stood. No dependent named in `CLAUDE.md` calls `to_asm` or
-`from_asm`. One counts the chunks itself: `bsv-overlay-cloudflare`'s
-`overlay-engine` (`chunk_count`, `crates/overlay-engine/src/script_door.rs:147-169`,
-the depth floored by `saturating_sub` as this crate's was), pinned to this
-crate's parse by `e585f2_m1_the_chunk_count_is_the_sdks`, whose edge
-`OP_ENDIF OP_ENDIF OP_RETURN 0x01` counts 3 there and 4 here: that pin goes
-RED at its bump from `=0.7.2` until its counter drops the floor; its sig-op
-count over `Script::chunks` (`engine.rs:851`) reads the opcodes after a stray
-`OP_ENDIF` too.
-
-### Notes: cross-SDK parity (#634)
-
-The node reads no chunks: `CScript::GetOp2` (bitcoin-sv v1.2.3 `6504a3a`
-`src/script/script.h:165-198`) reads one opcode and its push with no depth, and
-the interpreter refuses an `OP_ENDIF` on an empty conditional stack
-(`interpreter.cpp:835-840`) before any `OP_RETURN` the readers fold
-differently, so no verdict depends on the chunking (fifteen shapes, eight
-modes, on every SDK's chunks). go-sdk at `2ca481c` has four readers:
-`Script.Chunks()` (`DecodeScript`, no floor, `OP_RETURN` an opcode only at
-`> 0`, `script_chunk.go:255-260`: two chunks on `686a51`, the reference's three
-on `68636a5168`), the interpreter's legacy parser (clamped at 0,
-`interpreter/opcodeparser.go:389-401`), `ToASM` and the engine's parser (no
-fold). This crate parts from `DecodeScript` on six of the fifteen shapes; the
-draft `docs/lanes/375-filings/script-chunker-if-depth-clamp-go-sdk.md` is
-queue row 28, unfiled. The reference's own reading the keeper names wrong is
-`68636a5168` (`OP_ENDIF OP_IF OP_RETURN OP_1 OP_ENDIF`): the `OP_RETURN` sits
-inside an open `OP_IF` and is folded as top level, the depth -1 + 1 = 0,
-against the parser's own rule that only an `OP_RETURN` outside every
-conditional folds the rest (the interpreter's data reading, top level alone);
-this crate follows the reference there too, and queue row 26
-(`docs/lanes/375-filings/script-if-depth-negative-ts-stack.md`) is narrowed to
-it. The reference's ASM round trip fails on every folded `OP_RETURN` carrying
-data: its `toASM` writes the rest's hex alone, its `fromASM` reads it as a
-push (`Script.ts:108-117`); recorded under Node v22.18.0 on the fifteen shapes
-(`6a0568656c6c6f`, `5163686a51`, `6a6851`, `5163516368686a51`, `68636a5168`,
-`5163686851636a5168` fail; `68636a5168` reads back as `6863025168`) and on
-`006a0568656c6c6f` (read back as `00060568656c6c6f`). It fails on a bare
-`OP_RETURN` too: its parser gives one an empty data array (`Script.ts:609`),
-which `_chunkToString` writes as nothing (`:668-677`), so `toASM` gives `""`
-for `6a` and `"OP_0 "` for `006a`, read back as `00` and `0000`, and its
-`fromASM` refuses `OP_RETURN 0x` (`toArray`'s invalid hex, `:111-117`);
-recorded under Node v22.18.0 at `edf6e03`. This crate's `to_asm` parts from
-`toASM` on every such script, the rest reading back whole and a bare
-`OP_RETURN` written as `OP_RETURN`.
-
-### CI: the Test Suite job builds from a dependency cache keyed by rustc, `Cargo.toml` and a lockfile generated in the job and runs under nextest, without debuginfo (speed round 1, cut 1)
-
-What was slow: `Test Suite (ubuntu-latest, stable)` took 26 of a run's 29
-minutes (run 41537280176) and is every landing's critical path. 2:45 went to
-restoring a 7,350 MB `actions/cache` archive that an exact hit never
-refreshed, 4:15 to compiles, 18:49 to tests run one binary at a time (the
-memory step's 13 on one thread). What changed, in the `test` job alone:
-`Swatinem/rust-cache` v2.9.3 (sha-pinned) caches the dependencies' build,
-keyed by rustc's version, host and hash, the `CARGO*`/`RUST*` environment,
-`Cargo.toml` and the lockfile `cargo generate-lockfile` writes in the job just
-before it (no lockfile is tracked, so without that step a dependency's
-compatible release would be rebuilt on every exact hit; with it the key
-moves, one miss, a rebuild and a save), saved on a pull request and on a push
-to a line;
-`CARGO_PROFILE_DEV_DEBUG`, `CARGO_PROFILE_TEST_DEBUG` and `CARGO_INCREMENTAL`
-are 0 in the job's env (a developer's `cargo test` keeps its debuginfo);
-`cargo-nextest` 0.9.150 (by `taiki-e/install-action` v2.89.1, sha-pinned)
-runs the lib, integration, memory and tracing steps with `--no-fail-fast`;
-the linker stays rustc's default rust-lld on Linux. What did not change:
-every test runs once per step as before, on the same features, target
-selectors and steps, hermetic as before; doc tests stay `cargo test --doc`.
-The memory tests' isolation is now nextest's process per test, not
-`--test-threads=1`, with `RUST_TEST_THREADS=1` on that step so libtest
-inside each process keeps its synchronous path and no 60-second warning
-allocates in the profile (#372). `tests/arch_ci_runs_every_test.rs` (#146) reads a
-`cargo nextest run` line as a step as it reads `cargo test`
-(`a_nextest_run_is_a_step_as_cargo_test_is`; the base guard refuses all 272
-files against the new workflow). The record, with the split per step and the
-sharding rule (the memory step's one 5:36 test and the doc tests already put
-the job past 8 minutes, so the next round splits it by step), is
-`docs/lanes/ci-speed-1.md`.
-Measured after: the Test Suite went from 26m01s to 15m26s on a cache hit (beta's
-push run 41563214016) and 16m06s cold (run 41558273855), and a landing's run from
-29m11s to 20m05s (run 41558273855); a fast runner's miss took 12m45s (run
-41560881228), so the job is test-bound and the cache saves about 40 seconds.
-
-### Fixed: the CHECKSIG scriptCode built from the bytes as the node builds it, so an unlocking-script check after a codeseparator keeps the locking script whatever chunk follows (#654)
-
-The scriptCode of `OP_CHECKSIG`, `OP_CHECKSIGVERIFY`, `OP_CHECKMULTISIG` and
-`OP_CHECKMULTISIGVERIFY` was built from the executing script's chunks after the
-last `OP_CODESEPARATOR`, the locking script's chunks appended inside the
-unlocking script, then written through `Script::to_binary`'s chunk serializer
-(`build_subscript` and the CHECKMULTISIG site, `src/script/spend/crypto.rs`).
-That serializer stops at an `OP_RETURN` chunk holding data, and the parser
-folds every byte after a top-level `OP_RETURN` into one such chunk, so for an
-unlocking script `<sig> <P> OP_CODESEPARATOR OP_CHECKSIG OP_RETURN 01 00` over
-the locking script `OP_VERIFY OP_1` (U2) the scriptCode here was `ac6a0100`,
-the locking script dropped. bitcoin-sv v1.2.3 builds it from the bytes
-(`interpreter.cpp:1470-1484`, `1566-1579`; `script.h:201-224`):
-
-```cpp
-CScript scriptCode {pbegincodehash, pend};
-if(checksigData && IsChronicle(flags))
-{
-    scriptCode += *checksigData;
-}
-CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
-```
-
-the unlocking script's bytes from the last executed codeseparator to its end,
-then the locking script's bytes, `ac6a01006951`; `CleanupScriptCode`
-(`:255-263`) deletes a signature's push only without `SIGHASH_FORKID`, by
-`FindAndDelete`'s walk of `GetOp` instructions, which reads through an
-`OP_RETURN`. Under the post-Chronicle `block` and `standard` words (a version-2
-spend is malleable there, `:2321-2334`, so the unlocking script need not be
-push-only) the spend the node signs was refused here (`OP_VERIFY requires the
-top stack value to be truthy.`) and a spend signed over this crate's digest was
-accepted here and refused by the node: a consensus difference on the block
-word, through `Spend`, `Transaction::verify` and the streaming reader alike.
-
-Two more readings went with it. The locking script was appended inside the
-unlocking script under every word, where the node appends it only under
-`SCRIPT_CHRONICLE` (`IsChronicle(flags)`): under a pre-Chronicle word that does
-not require a push-only unlocking script (`ScriptFlags::block(ProtocolEra::PostGenesis)`
-without `SIGPUSHONLY`, or `set_require_push_only(false)` after it) the node
-signs the unlocking script's bytes alone. And a non-FORKID signature's push
-behind a top-level `OP_RETURN` was not deleted (the folded chunk never equals
-the push), where the node's walk deletes it: no word reaches this (a word
-carries `SIGHASH_FORKID`, which forces STRICTENC, `:2315-2318`, and refuses the
-signature at its encoding), the default mode does (#429 verifies a `0x01` signature over
-the original digest there).
-
-The fix: `src/script/spend/script_code.rs` builds the scriptCode at both sites
-as the node does: the executing script's bytes from the last executed
-`OP_CODESEPARATOR` (the chunk index's byte offset) to its end; inside the
-unlocking script the locking script's bytes, under a word carrying `CHRONICLE`
-and in the default mode at every version (the reference's `Spend` appends at
-every version, `Spend.ts:1688-1690`); then, for each signature without the
-FORKID bit, `FindAndDelete` of its minimal push ported byte for byte
-(`find_and_delete`, `GetOp2`'s read, consecutive copies, the bytes after a
-read that fails kept). No public API changes. `crypto.rs` frees the lines it
-held (439 from 499); `spend/mod.rs` stays at 800.
-
-The modes, U2 at version 2 (the full table in the vector):
-
-| Mode | Before | After | Node (Lean) | TypeScript default |
-|---|---|---|---|---|
-| `block` / `standard`, post-Chronicle, node-signed | refused (`OP_VERIFY`) | valid | valid | (no word) |
-| `block` / `standard`, post-Chronicle, signed over `ac6a0100` | valid | refused | invalid | (no word) |
-| default, `set_require_push_only(false)`, node-signed | refused | valid | | refused |
-| default, `set_require_push_only(false)`, signed over `ac6a0100` | valid | refused | | valid |
-
-The serializer's stop itself stays: it is the reference's writer
-(`Script.ts:450-484` at `ts-stack@edf6e03`), a script read from bytes writes
-its bytes back (the folded chunk is always its last), no template places a
-chunk behind such a chunk, and since #654 no scriptCode is built through it;
-only chunks a caller puts behind a data-carrying `OP_RETURN` are not written,
-as in the reference (pinned).
-
-A downstream on the live chain-parameter word (#440: the wallet toolbox's
-`verify_beef_spends`, `bsv-wallet-toolbox-rs` at `=0.9.0-beta.6`, on its next
-pin) refused a node-valid post-Chronicle spend whose unlocking script carries a
-codeseparator, a CHECKSIG and a data-carrying `OP_RETURN`, and accepted one the
-node refuses; after the update it accepts the node-valid spend and refuses the
-other. A default-mode caller (the overlay engine's submit door,
-`bsv-overlay-cloudflare` `script_door.rs`, `Spend` with no word, at `=0.7.2` on
-its `main`) refuses the unlocking-script shapes (U1, U2, U3, M2, P1) at
-push-only before and after, and on the update sees L1 alone (a `0x01` signature in the locking script behind its own
-`OP_RETURN`, a push-only unlocking script) accepted, where it was refused. The
-relay (`rust-message-box`, `=0.4.5`) sees nothing until it moves.
-
-The witnesses are `tests/sighash_scriptcode_654.rs`:
-`an_unlocking_checksig_signs_the_locking_script_past_a_top_level_op_return_654`
-(U2 under both post-Chronicle words, `ALL|FORKID` over BIP143 and
-`ALL|FORKID|CHRONICLE` over the original digest accepted, the old digest
-refused), `an_unlocking_checkmultisig_signs_the_locking_script_past_a_top_level_op_return_654`
-(M2, the same through `OP_CHECKMULTISIG`, run),
-`a_bare_op_return_ending_the_unlocking_script_keeps_the_locking_script_654`
-(U3, `ac6a6951` before, after and at the node),
-`an_unlocking_checksig_under_a_pre_chronicle_word_signs_the_unlocking_script_alone_654`
-(P1 and U2 under the post-Genesis block word without `SIGPUSHONLY`: the spend
-signed over the unlocking script's bytes alone valid, the one over the bytes
-with the locking script refused by NULLFAIL, `OP_CHECKSIG requires failing
-signatures to be empty.`),
-`a_non_forkid_signature_is_refused_by_the_words_before_its_script_code_654`
-(L1 and U1 under the five words, the words' refusal; L1 in the default mode
-valid), `the_chunk_serializer_keeps_the_references_stop_and_a_read_script_its_bytes_654`
-and `the_vector_holds_the_cases_this_crate_writes_and_their_verdicts_654`,
-against `tests/vectors/sighash_scriptcode_654.json`: twenty cases (ten shapes at
-versions 1 and 2, signatures by this crate's signer), each with its three
-scriptCodes (post-Chronicle, pre-Chronicle, this crate's before #654), the
-sibling's Lean evaluator's digest of each (`bsv-script-lean@387dab35` `eval/bsvs
-sighash`; U2's `6fd93a20...92f18370` the node's, `79a755dd...5b661b9900`
-this crate's before), this crate's verdict in seven modes, the evaluator's
-verdict under each of the five words (`eval --flags`; the node's rules,
-`Ops/Crypto.lean` `scriptCodeOf`, `Sighash.lean` `findAndDelete`; its
-self-test green on its flow and seed corpora), equal to this crate's on all
-100 cells, and the reference's default `Spend` verdict, recorded by
-`tests/support/sighash_scriptcode_654.mjs` under Node v22.18.0 from a bundle of
-`ts-stack@edf6e03`, two runs byte-identical. The `FindAndDelete` port answers
-the node's own unit cases (`src/script/spend/script_code_tests.rs`, as the
-Lean states them, `Sighash.lean:323-341`). RED on `3fd977be` (a scratch copy
-with the test and the vector alone): 5 of 6, U3 green there (the same
-scriptCode before and after).
-
-### Notes: cross-SDK parity (#654)
-
-The reference's `Spend` builds the scriptCode from chunks and writes it through
-the same stopping serializer (`ts-stack@edf6e03` `Spend.ts:1676-1702`,
-`Script.ts:450-484`), its parser folding the bytes after a top-level
-`OP_RETURN` into one chunk, a bare one as `data: []` (`Script.ts:608-610`), on
-which the serializer stops too. So in the default mode, where this crate now
-reads the node's bytes, the two differ: U2 at version 2 (the unlocking script
-need not be push-only there: the reference's default runs it; here with
-`set_require_push_only(false)`) is valid here and refused there when signed
-over the node's scriptCode, the converse when signed over `ac6a0100`; U3 at
-version 2 (a bare `OP_RETURN` ends the unlocking script) is valid here and at
-the node, refused there; M2 as U2; L1 at both versions (a push-only unlocking
-script, reachable with no switch) valid here, refused there, its signature's
-push behind the `OP_RETURN` kept in the reference's scriptCode. Under the words
-the reference has no parity mode to compare (its explicit flags append the
-locking script at every era, where the node appends it under `CHRONICLE`
-alone, P1). Go at `2ca481c` was not run here. Ours: the node's bytes
-(bitcoin-sv v1.2.3 `interpreter.cpp:1470-1484`, `script.h:201-224`), in every
-mode, as 0.3.27 made the scriptCode's cleanup the node's (bsv-rs#12). Theirs:
-a draft on the queue ([sighash-scriptcode-op-return-stop-ts-stack](./docs/lanes/375-filings/sighash-scriptcode-op-return-stop-ts-stack.md), row 27; unfiled).
-
-### Fixed: the P2PK lock refuses a hybrid public key, and the Multisig lock a key not tagged 02/03 where every spend reaches it, locks whose spend no word lets pass (#625)
-
-`P2PK::lock` accepted a 65-byte hybrid key (`06`/`07` + x + y) and wrote
-`<key> OP_CHECKSIG`; `Multisig::lock` (the `ScriptTemplate` door, raw 33-byte
-keys) accepted any tag. Under STRICTENC the node refuses either key at the
-CHECKSIG or CHECKMULTISIG that reads it (bitcoin-sv v1.2.3 `6504a3a`
-`src/script/interpreter.cpp:132-152` `IsCompressedOrUncompressedPubKey`,
-`:312-316` `CheckPubKeyEncoding`, called at `:1465` and `:1611`;
-`SCRIPT_ERR_PUBKEYTYPE`), and every word this crate builds carries STRICTENC
-(the block and standard words name it; `SIGHASH_FORKID`, which
-`ScriptFlags::check` requires, forces it, `:2315-2318`), as every column of
-the sibling's corpus refuses `crypto-00014` (`bsv-script-lean@5dc337e1`
-`corpus/crypto/cases.jsonl`, the hybrid `07` lock). The P2PK template wrote a
-lock nothing can spend. It refuses it now, `Error::InvalidPublicKey` naming
-the tag and the rule (`a hybrid public key (tag 0x07) is neither compressed
-nor uncompressed: its spend fails under STRICTENC
-(IsCompressedOrUncompressedPubKey)`); a 33-byte `06`/`07` key at P2PK keeps
-the existing `Invalid public key prefix`.
-
-CHECKMULTISIG checks only the keys it reaches. The node's loop
-(`interpreter.cpp:1538-1633`) starts `ikey` at the stack's second item, the
-key pushed last (index n - 1 of the lock), and walks down to index 0, taking
-the signatures from the last pushed down the same way; it checks each key's
-encoding as it reaches it (`:1611`) and stops at the threshold's last match,
-so a key below that point is never read. The reference's `Spend` walks the
-same way (`ts-stack@edf6e03` `Spend.ts:1752-1838`), and this crate's
-`op_checkmultisig` pops the keys in that order (`pubkeys[0]` the last
-pushed). Index n - 1 is reached first. A spend can avoid every bad key
-exactly when, with `j` the highest index of a bad key, the `n - 1 - j` keys
-after it meet the threshold: `Multisig::lock` refuses the lock only when
-`n - 1 - j < m` (a dead lock: every spend reaches a bad key), naming `j`,
-its tag, the count after it and the threshold (`public key 1 has tag 0x07,
-not a compressed key's 0x02 or 0x03, and the 1 key(s) after it cannot meet
-the threshold 2: every spend reaches it and fails under STRICTENC
-(IsCompressedOrUncompressedPubKey)`); a lock whose bad keys a spend can
-avoid is written, as the node and the reference spend it. The bad set is
-every tag but `02`/`03` at 33 bytes: a 33-byte `04` key fails the same check
-in both (the reference's `The non-compressed public key must be 65 bytes.`).
-`Multisig::lock_from_keys` writes compressed keys and was never open to it.
-
-The reference has no P2PK or Multisig template (`ts-stack@edf6e03`
-`packages/sdk/src/script/templates/index.ts`: P2PKH, RPuzzle, PushDrop;
-go-sdk at `2ca481c` neither). Recorded under Node v22.18.0 from a bun build
-of `edf6e03` (`tests/support/p2pk_hybrid_625.mjs`,
-`tests/vectors/p2pk_hybrid_625.json`) on the corpus's `key("a")`, whose y is
-odd: `PublicKey.fromString` and `fromDER` read `07` + x + y to the compressed
-key and refuse `06` for it (`Point string value is wrong length`,
-`src/primitives/Point.ts:303-330`); its
-`Script` writer pushes either as given; its `Spend` refuses both spends, at
-versions 1 and 2, under its default flags and under an explicit
-`SIGHASH_FORKID` word, `The public key is in an unknown format.`
-(`Spend.ts:687-716`, at the CHECKSIG `:1669`), and accepts the uncompressed
-control under both. This crate's interpreter gives the same verdicts and words
-in its default mode and under `ScriptFlags::block` and `ScriptFlags::standard`
-of the post-Genesis and post-Chronicle eras; the version-2 `07` spend this
-crate signs is `crypto-00014`'s transaction byte for byte. The vector's
-`multisig` sweep: m-of-n for n from 1 to 4 and every m, a key retagged `04`,
-`06` or `07` at each index and `07` at each pair of indices (125 shapes),
-each spent at versions 1 and 2 by the m highest-indexed good keys (a bad
-index's own key filling the count): the reference's `Spend`, under its
-default flags and the explicit `SIGHASH_FORKID` word, accepts the 35 shapes
-the rule calls avoidable and refuses the 90 it calls dead (500 of 500
-records agree), in its key check's words.
-
-The witnesses are `tests/p2pk_hybrid_625.rs`:
-`a_hybrid_key_is_refused_at_the_p2pk_lock_625`, RED on `b9f78224` (`left:
-Ok("41065935…ac")` for `hybrid_06`), green after;
-`an_unreached_bad_key_lock_is_written_and_spent_under_every_word_625` (a
-one-of-two lock with key 0 retagged `04`, `06`, `07`, written to the
-reference's bytes and spent by key 1, valid in the default mode at versions 1
-and 2 and under the block and standard words of both eras) and
-`the_multisig_sweep_follows_the_reachability_rule_and_the_reference_625` (the
-125 shapes: the lock written to the reference's bytes exactly where the rule
-says avoidable, refused naming the highest bad index elsewhere; the spend
-signed to the reference's unlock byte for byte and judged in the five modes
-as the rule says), RED on #625's first cut `82afa758` (the first refused at
-`lock`, `unwrap()` on an `Err`; the second at `1-of-1 bad [0] tag 04`, the
-old words), and `a_multisig_lock_a_bad_key_makes_dead_is_refused_at_the_lock_625`
-(1-of-1, 2-of-2 with either key bad, 1-of-2 with the last bad, 2-of-3 with
-the middle bad, 2-of-4 with keys 0 and 3 bad, tags `00`, `04`, `05`, `06`,
-`07`), RED on `b9f78224` (every lock written) and on `82afa758` in its words
-alone, green after; `the_spend_of_a_hybrid_lock_is_refused_under_every_word_625`
-(the lock written by `Script`'s writer to the reference's bytes, the spend
-signed by `P2PK::sign_with_sighash` to the reference's transaction, every
-verdict above), `the_spend_of_a_retagged_multisig_lock_is_refused_under_every_word_625`
-and `the_reference_parser_reads_the_hybrid_tag_y_names_and_no_template_carries_it_625`
-(`PublicKey::from_hex` reads both tags as the reference does, `from_bytes`
-refuses both), green before and after: the parser and the interpreter are not
-the doors that moved.
-
-### Notes: cross-SDK parity (#625)
-
-The reference's doors for a hybrid key are its parser, which accepts the tag
-y names, and its interpreter, which refuses both tags; it has no template
-door, and its `Script` writer locks the key as given. This crate refuses the
-key at its own templates, a door the reference does not have: a stated
-divergence (a row in `CLAUDE.md`'s list), not a verdict that differs. Every
-column refuses the spend of a P2PK lock of a hybrid key and of a dead
-Multisig lock; a Multisig lock whose bad keys a spend can avoid is written
-here and spent by every column, so its verdict does not differ either.
-Multisig's spend reaching a retagged key was refused here in this crate's
-CHECKMULTISIG words (`OP_CHECKMULTISIG requires correct encoding for the
-public key and signature.`); the reference's visible words are its key
-check's (`The public key is in an unknown format.`, or for a 33-byte `04`
-key `The non-compressed public key must be 65 bytes.`, thrown inside
-`#checkPublicKeyEncoding` before its wrapper at `Spend.ts:1808-1814`; the
-sweep records them): a pre-existing difference of words, closed by #657,
-whose site returns the key check's words.
-
-Semver: no type changed. A caller that locked a hybrid key with `P2PK::lock`,
-or with `Multisig::lock` a set of keys every spend of which reaches one
-tagged other than `02`/`03`, gets `Err` where it got a lock no node would let
-spend. No downstream on this host (`bsv-overlay-cloudflare`,
-`rust-message-box`, `bsv-wallet-toolbox-rs`) calls either template.
-
-### Changed: ci: the `vectors` job's corpus pin is one named constant, and CLAUDE.md no longer says CI skips the conformance corpus (#31)
-
-#31 found that `ci.yml` checked out no corpus and set no `BSV_CONFORMANCE_DIR`,
-so every CI run of `conformance_scripts` and `conformance_beef` was the skip,
-and 0.3.29 reached `main` with the evaluation gate red. The `vectors` job
-(1e4cfc2b, required on both lines) already closes that: it sparse-checks out
-`bsv-blockchain/ts-stack` at `edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`
-(`conformance` alone, no credentials), sets `BSV_CONFORMANCE_DIR`, asserts
-`META.json` and runs both files with `--nocapture` (beta's run 41518921952:
-`total=5116 run=4120 passed=4109 unsupported=959 skipped=37
-known_failures=11 failures=0 panics=0`). The pin is now the job's
-`TS_STACK_PIN`, so a pin move is one line (`nightly.yml`'s `mutants` job
-carries the same commit); `CLAUDE.md`'s "Where the numbers come from" said
-"CI does not" run the files and now names the job. No separate `conformance`
-job: a job outside the required set that runs on a push or a pull request is
-refused by `tests/arch_ci_pr_runs_the_required_set.rs`, and it would repeat
-the `vectors` job. No crate code moves.
-
-### Added: src/transaction/beef_stream.rs's surviving mutants, shard S4 (the judge and the remainder), killed from the sibling's rules and vectors (#603)
-
-The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left
-21 of the judge's and the remainder's mutants alive (`Judge::start_of` 6,
-`Judge::check_named_subject` 2, `BeefIndex::note_raw` 2,
-`BeefIndex::model_work` 2, `BeefIndex::entries`, `Referenced::is_empty`,
-`Verdict::is_valid`, `atomic_unreached`, `HeadersFn::carries`, the two
-`Display` impls, `AsyncStreamVerifier::run`, the constant `CHUNK`). Killed by
-tests: 19 of 21, in `tests/beef_stream_603_s4.rs` (12 tests, each RED on its
-mutants in a scratch copy, the log beside the lane's evidence; the 12th, for
-`3026:33`, added by the review of #645): 17 rest on the sibling's rules and
-the reference's recordings, 2 on crate-contract pins stated apart
-(`note_raw`'s `2234:9` and `2234:50`, the offset a missing subject is named
-at without a prefix: crate-contract pin, no sibling rule, stated; the Lean
-names offset 4 only and the reference reports no offset). The line they pin
-is now public, on `Reason::SubjectMissing`'s rustdoc and
-`src/transaction/CLAUDE.md:21`: "a missing subject is named at the prefix's
-32 bytes; without a prefix, at the last raw transaction instead, or at the
-stream's end when there is none" (the line promoted from `Judge::conclude`'s
-0.8.1 comment, not invented), and their test names it, so the keeper's
-condition (1) holds; re-cited the day a sibling rule or a reference recording
-covers it. Declared equivalent: 1, `2348:66` on three reads (below, in
-`.cargo/mutants.toml`; at `2348:55` since the seed fold, below). Remaining: 1, stated: `1378:25` (`replace * with +`,
-the 16 KiB read size `CHUNK`), an internal parameter a pin would freeze,
-neither a kill nor an equivalence (its test, `source.largest == 16 * 1024`,
-asserted a read size no document states and went under the keeper's ruling
-of 2026-11-02; no verdict or element depends on it, the Lean's resume at
-every `k`); it enters nothing.
-
-The vectors: the rows of `bsv-script-lean@5dc337e1` `corpus/wire`
-(`beef-001`, `beef-023`, `beef-031`, `atomic-beef-023`, `atomic-beef-025`)
-with the reference's answers on them, recorded by #632's recorder
-(`tests/support/beef_reference_603.mjs`, extended with five `s4_*` cases:
-`Transaction.fromAtomicBEEF` and `fromBEEF` on the subject, `Beef.verify`
-with every root carried and none, the unproven spends, the truncated read; at
-`ts-stack@edf6e03` under Node v22.18.0; every earlier case and row
-byte-identical on the re-run); the recording's `two_bumps_one_root`; and the
-rows of `bsv-stack-lean@5df1e0a3` `lean/BeefOfAnySize/Scenarios.lean` (the
-atomic chain of 10,000 links: 740,145 units of work, an index of 20,005; the
-root not carried at offset 5). A named subject the prefix also names is
-found, a missing one is refused at offset 4, or without a prefix at the last
-raw transaction (`note_raw`); a root the headers function does not carry is
-refused; the first pass names the unproven spends; a txid two BUMPs carry is
-one entry per BUMP (`entries`' `proven_again`); a resumed reading runs from
-the input reached, and a resumed source carrying another transaction at that
-offset has every input run (`start_of`, against `tests/beef_stream_pause.rs`'s
-shape at two inputs); a BEEF of proven transactions never asks the tracker
-for the tip (`run`'s `&&`); the two error texts; a bad version word after the atomic prefix is refused at 36 by the
-asynchronous reader in chunks of 36 bytes as by the stream whole (the Lean's
-`cutFrame`, `bsv-stack-lean@5df1e0a3` `lean/BeefOfAnySize.lean:1108-1124`,
-cuts the frame before `finish` asks the subject).
-
-Declared equivalent on three reads (the keeper's word of 2026-11-02), with
-no entry of the sibling's wire corpus moving
-(`run_wire` on its five files, 150 rows, the scratch harness's `bsv-rs` the
-lane's tree and the mutant's), the ts-stack corpus's BEEF suites
-(`conformance_beef` at `edf6e03`) and this crate's BEEF witnesses
-(`beef_stream`, `beef_atomic_graph`, `beef_stream_pause`, `beef_order_held`)
-green under it:
-
-- `atomic_unreached` `2348:66`, `<` to `<=`: the comparison picks the
-  earliest unreached entry by the trie order over a `HashMap` keyed by txid;
-  `u` is an earlier key, so the two orders are equal only for the same txid
-  (`reverse_bits` is a bijection), which a map never holds twice. The Lean's
-  `failing` walks a trie of one value per key (`bsv-stack-lean@5df1e0a3`
-  `lean/BeefOfAnySize.lean:363-376`, `key` at `:381-384`, `finish` at
-  `:993-998`). Both callers' tables hold one entry per txid (the stream's
-  `HashMap`, `beef_stream.rs:1746`, `:2053`, `:2205-2223`; the whole path's
-  `beef/in_memory.rs:264-280`), as do TS's (`Beef.ts:517-522, 529-538,
-  919-929` at `edf6e03`) and go-sdk v1.7.2's (`beef.go:23, 416`). The cold
-  read (accepts, 0.97), the adversarial read (EQUIVALENT, 0.98: a transaction
-  carried twice raw and txid-only, in two BUMPs, merged from two BEEFs, a
-  subject repeated, every feed split of a streamed BEEF, none moved), the rule
-  read (EQUIVALENT, 0.98).
-
-`Judge::check_named_subject` `3026:33`, `||` to `&&`, was the lane's second
-candidate; it is not equivalent. The prefix's subject is set when its 32
-bytes are read, before the version word ends the header, and the
-asynchronous reader asks the check after every decoder step: the mutant
-compares the subjects there and refuses `SubjectMissing` at 4 an atomic BEEF
-whose chunk ends after the prefix and whose version word is bad, where the
-tree refuses `BadVersion` at 36
-(`a_bad_version_after_the_prefix_is_refused_whatever_the_chunks_wire_atomic_beef_023`).
-
-Re-measured on this shard's functions (`--re` of the brief, the beef
-surface's selection from `nightly_mutants.py`'s `mutation_args` with this
-file added, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, ten
-round-robin shards): 48 mutants of S4's functions, 47 viable, 45 caught, 2
-missed (`2348:66`, `3026:33`), 0 timed out, 1 unviable (`3443:9`): 95.7
-percent caught of viable, re-measured the same mutant for mutant by the
-review of #645 in fourteen shards; with the review's test `3026:33` is
-caught: 46 caught, 1 missed, 97.9 percent; with the chunk test gone under the
-keeper's ruling (re-measured by the ruling's read on `f04eb090`, fourteen
-round-robin shards of four, the same 56 mutants as the lane's list): 45
-caught, 2 missed (`1378:25` `*` to `+`, `2348:66`, the two candidates), 1
-unviable, 95.7 percent; the whole regex 53 caught of 56. The regex matched 8
-more of other shards' functions (`Refusal`'s and `SpendRefusal`'s `fmt`, the five of the
-other two `carries`, `BeefDecoder::collecting`'s `780:13`), all caught. After
-the declaration (the fold, on `d1826625` with the entry, fourteen round-robin
-shards, `--jobs 1`, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`): the regex
-lists 55, `2348:66`'s `<=` absent; 53 caught, 1 missed (`1378:25`, stated), 1
-unviable (`3443:9`), 0 timed out; the shard's 47 at 45 caught of 46 viable,
-97.8 percent.
-
-The seed fold (the declaration's re-read): the other mutant at the
-declared site, `2348:66` `<` to `==`, was counted as caught by the run but
-its kill hung on the `HashMap`'s random seed. Under `==` the comparison never
-replaces, so the walk named the unreached entry the map yielded first, and
-the tests of the named entry (`beef_atomic_graph`'s X/Y pair) passed when
-the seed put the expected entry there: 16 of 200 runs through. The last pass
-of `atomic_unreached` now takes the unreached txids in a `BTreeSet`, by their
-bytes, and keeps the least by the trie order: the tree's answer is the same
-(the least of a set by a one-to-one key does not depend on the order it is
-taken in; no allocation when the walk reaches every entry), and under `==`
-the mutant names the least by the bytes on every seed. The 13th test,
-`the_entry_named_is_the_trie_earliest_not_the_byte_or_wire_earliest_on_every_seed`,
-puts two txid-only entries beside a proven subject, `01 00..` on the wire
-before `02 00..`, so the byte-earliest and wire-earliest is not the
-trie-earliest: RED on the mutant in 20 of 20 runs in a scratch copy (it
-names `01` at 151, not `02` at 184), RED on the pre-fix code with the mutant
-in 25 of 40 (the seed's share), GREEN on the tree. The site moved within the
-line, so the mutants are now `2348:55` (`<=` declared, its entry's regex
-moved, the reason unchanged: the set holds one txid per map key), and the
-`&&` to `||` at `2348:21` is gone with the `&&`. The function's line count is
-unchanged (its doc rewrapped), so every other mutant of the file keeps its
-line and column. Re-measured (`cargo mutants`, the beef surface's selection,
-`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`): `2348:55` `==`
-alone 20 runs, 20 caught (by `beef_atomic_graph`'s X/Y pair, now
-deterministic, ahead of this file in the run); the regex in five round-robin
-shards lists 54, 52 caught, 1 missed (`1378:25`, stated), 1 unviable
-(`3443:9`), 0 timed out; the shard's functions 46 listed, 44 caught of 45
-viable, 97.8 percent. Of the shard's 21 survivors: killed 19, declared 1,
-remaining 1, stated (`1378:25`); the `==` mutant, never one of the 21, is
-now killed on every seed.
-
-`tests/beef_stream_603_s4.rs` is in the beef surface's selection through
-shard S2's `tests/beef_stream_603_*.rs` glob (`.github/scripts/nightly_mutants.py`,
-`docs/NIGHTLY.md`): the existing pins of these behaviours (`beef_stream_deep`,
-`beef_stream_pause`) are outside the selection, which is why the mutants
-survived it.
-
-### Fixed: the nightly's pin job pins the dispatch's commit, never beta's tip at dequeue; the consumers check it out and the report names it (#629)
-
-The nightly's `source` job checked out the dispatched branch and pinned
-`git rev-parse HEAD`, the line's tip when the job dequeued, not the commit
-the run was dispatched on. Run 41347058507 (2026-11-01), dispatched at
-`9640eaa7` as the witness for #611's floors, queued until #613 landed and
-pinned `42a74f1b`: every shard measured that tree while the run's `head_sha`
-and the record named `9640eaa7`. The `source` job now pins the dispatch's
-commit, `inputs.commit` when the dispatch names one (a new optional input,
-`gh workflow run nightly.yml --ref beta -f commit=<full sha>`), else
-`github.sha`, fixed by GitHub at the run's creation, through
-`nightly_mutants.py pin`, which takes the sha as an argument, never resolves
-a ref, and refuses a sha that is not a full 40-hex sha or not on the
-dispatched line. The Mutants shards pass it to `run --commit`, which refuses
-a checkout at another commit, and the score job to `report --commit`, which
-refuses evidence of another commit and names the pin in the scoreboard
-(`Source commit: <sha>`); the fuzz jobs already checked out the pin. The
-shards' selection, the ceiling, the floors, the fuzz targets and the
-record's shape are unchanged. `docs/NIGHTLY.md` states the rule. The test:
-`PinIsTheDispatchCommit` in `.github/scripts/test_nightly_mutants.py` (a
-repository whose `origin/beta` moved from A to B after the dispatch pins A;
-a sha off the line, a ref name and a short sha are refused; a shard and the
-report refuse another commit), red on the pre-fix script (no `pin`, no
-`checkout_commit`, a report that names no commit), green after.
-
-### Fixed: the public key encoding check reads a key's length and prefix as the node reads it; the curve and the range are the signature check's (#660)
-
-`check_public_key_encoding` (`src/script/spend/crypto.rs`), at both signature
-sites (`OP_CHECKSIG`/`OP_CHECKSIGVERIFY` and `OP_CHECKMULTISIG`/`VERIFY`),
-parsed the key's point after its length and prefix checks and refused a 33-
-or 65-byte key whose point is off the curve or whose x (or y) is at or past
-the field prime: `The public key is in an unknown format.` at CHECKSIG,
-`OP_CHECKMULTISIG requires correct encoding for the public key and
-signature.` at CHECKMULTISIG, in every mode. The node reads the length and
-the prefix alone. Its STRICTENC check (bitcoin-sv v1.2.3
-`interpreter.cpp:312-327`, `CheckPubKeyEncoding`) is
-`IsCompressedOrUncompressedPubKey` (`:132-152`): at least 33 bytes; `04` at
-65; `02`/`03` at 33; any other prefix refused. Such a key passes, and the
-signature check answers false: `CheckSig` (`:2133-2163`) returns false where
-`CPubKey::Verify` cannot parse the point (`pubkey.cpp:183-194`,
-`secp256k1_ec_pubkey_parse`). With an empty signature no NULLFAIL applies
-(`interpreter.cpp:1491-1497,1641-1646`), so `<key> OP_CHECKSIG OP_NOT` and
-its 1-of-1 CHECKMULTISIG form are valid at the node. Under `ScriptFlags::block`
-and `standard`, in both eras, at versions 1 and 2, this crate refused 120 such
-spends (the #660 probe, 2026-11-02 22:4xZ). A consensus parity defect under
-the block word; the interpreter follows the node in every mode (0.3.27).
-
-The fix: the encoding check keeps its length, prefix and
-COMPRESSED_PUBKEYTYPE refusals in their words, unchanged, and reads nothing of
-the point; `verify_signature` reads it, and a key that is no point is the
-check's false (`Ok(false)`, never a refusal or a panic, rule 5). The reading
-of the point is one place, `src/script/spend/key_point.rs`: the switch
-`reads_the_reference_point` (`false`, the node's reading in every mode),
-`check_public_key_point` (the encoding check's share, nothing under the
-node's reading) and `signature_key` (the key the signature check verifies
-against). A fold to the reference's reading in the default mode alone
-returns `self.flags.is_none()` from the switch: the encoding check then
-refuses a point the reference's `PublicKey.fromDER` cannot read in its
-words, and the signature check verifies against the reduced point
-(`PublicKey::from_reference_der`, #498's reader); measured in a scratch copy,
-the default mode then matches the reference's verdict on every recorded
-cell, the CHECKMULTISIG cells in this crate's wrapper words. A key that
-parses is judged as before: a valid signature verifies and a wrong one
-fails, NULLFAIL under a word unchanged.
-
-Verdicts, before and after (the six points: `02`/`03` with x = 5, off the
-curve; `02` with x = p; `02` with x = p + 1; `03` with x = 2^256 - 1; `04`
-with G.x and G.y + 1, off the curve; the four shapes: `<key> OP_CHECKSIG
-OP_NOT` and `1 <key> 1 OP_CHECKMULTISIG OP_NOT`, each with an empty
-signature and with a strict-DER `r = 1, s = 1` ALL|FORKID one):
-
-- Under a word (both words, both eras, versions 1 and 2; 192 cells): every
-  cell refused before at the encoding check. Now the empty-signature cells
-  and the DER cells at post-Chronicle version 2 (Chronicle relaxes NULLFAIL,
-  `interpreter.cpp:40-44`) are valid, 120 cells; the other 72 are refused in
-  NULLFAIL's words (`OP_CHECKSIG requires failing signatures to be empty.`,
-  `OP_CHECKMULTISIG ...`), the node's `SCRIPT_ERR_SIG_NULLFAIL`. The
-  sibling's Lean evaluator (`bsv-script-lean@387dab35`, `spec@387dab35`,
-  `eval/bsvs eval`) answers the same on all 224 word cells with the control
-  key, 140 valid and 84 `SCRIPT_ERR_SIG_NULLFAIL`.
-- In the default mode (48 cells): every cell refused before; all valid now
-  (no NULLFAIL without a word). The reference's default at `ts-stack@edf6e03`
-  answers valid on the x = p + 1 and x = 2^256 - 1 cells (it reduces x modulo
-  p) and refuses the four off-curve and x = p points' 32 cells at its
-  encoding check, `The public key is in an unknown format.` (the parity
-  paragraph below).
-
-The witnesses are `tests/pubkey_encoding_660.rs`:
-`an_off_curve_or_over_range_key_fails_the_signature_check_not_the_encoding_check_660`
-(the probe's evidence test, the 192 word cells swept: 120 valid, 72 in
-NULLFAIL's words), `the_default_mode_reads_the_point_as_the_node_reads_it_660`
-(its verdict one function, `default_valid`, a fold's to switch),
-`the_vector_carries_this_crates_cells_and_the_lean_agrees_with_the_node_660`,
-`the_reference_default_refuses_an_off_curve_point_a_stated_divergence_660`,
-`a_wrong_length_or_prefix_is_still_refused_at_the_encoding_check_660` and
-`a_key_on_the_curve_verifies_its_signature_and_refuses_a_wrong_one_660`,
-against `tests/vectors/pubkey_encoding_660.json`: 280 cells (the control and
-the six points, four shapes, five modes, two versions), their bytes this
-crate's writer's (the ignored `record_the_cells_660`), the node's verdict
-derived from its code, the Lean's under each word and the reference's under
-its default (Node v22.18.0, the bun bundle of `packages/sdk`), recorded by
-`tests/support/pubkey_encoding_660.mjs`; two runs byte-identical. RED on
-`e49cf55d` (the test file and the vector on the unchanged tree): 4 of 6, the
-sweep and the default (`Err("The public key is in an unknown format.")`
-where `Ok(true)`), the vector's Lean comparison and the divergence census
-(the x = p + 1 cells refused here, valid in the reference); the two controls
-green on both.
-
-The census: `conformance_scripts` with `BSV_CONFORMANCE_DIR` at
-`ts-stack@edf6e03`'s `conformance` holds 5,116 total, 4,120 run, 4,109
-passed, 959 unsupported, 37 skipped, 11 known failures, every class pin
-unmoved; no evaluation row of the corpus pushes a 33- or 65-byte `02`/`03`/`04`
-key that is no point (a scan of every direct push), so no row could move.
-The hybrid-key rows (`node.script.bitcoin-sv.1426`, `.1430`, teranode's
-`1377`, `1381`) stay refused at the prefix.
-
-Downstreams: a host running scripts (the overlay engine's submit door,
-`Transaction::verify`, and the streaming reader under a live word) refused
-before a spend whose script checks an off-curve or out-of-range key against
-an empty signature and inverts the answer, which the node accepts; it
-accepts it now. No consumer on this host matches either refusal's words
-(`bsv-overlay-cloudflare`, `rust-message-box` searched). A spend with a valid
-key judges as before.
-
-### Notes: cross-SDK parity (#660)
-
-Under a word the crate now reads the key as bitcoin-sv v1.2.3 does, and the
-sibling's Lean agrees cell for cell. In the default mode the crate reads it
-as the node does too, where the reference's default reads the point at its
-encoding check (`ts-stack@edf6e03` `Spend.ts:687-718`,
-`#checkPublicKeyEncoding`, `PublicKey.fromDER` under its `try`): an off-curve
-point, or x = p (x = 0 has no point), is refused there in `The public key is
-in an unknown format.`, and an x past p is reduced modulo p
-(`Point.ts:365-367`) and read as the point it names, the reduction the
-filed quirk of the divergence list's key-forms row (queue row 18, ts-stack
-#1467). On the recorded cells the verdicts agree for x past p (the signature
-fails either way) and differ for the four refused points (32 cells, valid
-here). A signature made for the reduced point verifies there and fails here.
-The #657 vector is the divergence's recorded witness: its
-`compressed-off-curve` and `uncompressed-off-curve` cases (48 of 348, both
-signatures, the four opcodes, the three modes) keep the reference's `unknown
-format` and are judged here as the control key with the same signature is
-(`NODE_READ_660` in `tests/pubkey_words_657.rs`), and its 24 x = p + 1
-cases, enumerated apart until now, take the reference's verdict and words.
-Ours: the node's reading in every mode, the default included, by the
-keeper's word of 2026-11-02 23:2xZ (`CLAUDE.md`'s line that the interpreter
-follows the node); the reference's reading stays one switch away
-(`reads_the_reference_point`). Go (`go-sdk@2ca481c`)
-not measured.
-
-Semver: no public type or signature changed. The refusal words for a wrong
-length or prefix are unchanged; the `unknown format` and CHECKMULTISIG
-encoding refusals no longer fire for a key of the right length and prefix
-that is no point.
-
-### Fixed: a MerklePath with no levels at all is refused at every door and panics no walk (#649)
-
-A `MerklePath` whose `path` is empty (no levels), held through the public
-fields, panicked in every walk that read level 0: `compute_root` (with no
-txid at `self.path[0]`, with one in `index_of`), `combine` (through
-`compute_root`), `trim`, `contains`, `contains_and_mark`, `txids`, and so
-`Transaction::verify` on a transaction carrying one as its proof and
-`Beef::merge_bump` beside a transaction no bump proves (`update_bump_indices`,
-`src/transaction/beef.rs`). `CLAUDE.md` rule 5: nothing panics on input. The
-#648 cold read found it in `compute_root`.
-
-The reference refuses the shape at its constructor (`ts-stack@edf6e03`
-`MerklePath.ts:198-200`):
+left 17 of the file's 54 viable mutants alive (68.52 percent): the surface's
+selection (`nightly_mutants.py`'s `beef`: the library's `transaction::` tests,
+`transaction_tests`, `beef_stream`, `beef_limits`, `beef_atomic_graph`,
+`conformance_beef` with the corpus) never named `tx_mut`, `refresh`,
+`has_txid`, `raw_tx_or_compute`, `has_no_inputs`, `has_no_outputs` or the
+input list's dedup directly. Seven tests in the file's own module now do, each
+named for its rule: the node's first two transaction checks from
+bsv-script-lean@387dab3 `lean/BsvScript/TxRules.lean:88-89`
+(`checkTransactionCommon_vinEmpty`, `_voutEmpty`, `:220-231`) on the vectors
+`regular-empty-inputs` and `regular-empty-outputs` of its
+`corpus/chain/mempool/mempool.jsonl` (recorded `bad-txns-vin-empty`,
+`bad-txns-vout-empty`), each read from its bytes and from its parse; and the
+reference's `BeefTx.ts` at `ts-stack@edf6e03` (`txid` `:105-116`,
+`getRawTxBytes` `:144-151`, `syncRawTxFromTransaction` `:160-177`,
+`updateInputTxids`' set `:218-233`) on block 170's spend and an entry the
+crate's writer builds. Killed by tests: 17; declared equivalent: 0;
+remaining: 0. Re-measured with the surface's selection and
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`: 54 caught, 0 missed, 0 timed
+out, 7 unviable, 100 percent of viable. No vector revealed a divergence from
+the reference.
+
+### Added: src/script/unlocking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 8 of the file's 26 viable mutants
+alive (69.23 percent): `into_script`, `to_asm` (twice), `len` (twice),
+`is_empty` (twice) and `From<Script>::from`. Killed by tests: 8. Declared
+equivalent: 0. Remaining: 0. Re-measured with the script surface's selection
+(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03`): 26 caught, 0 missed, 0 timed out, 0 unviable, 100 percent.
+
+The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
+of the eight: the harness builds its scriptSig with `from_binary` and the
+interpreter reads it through `chunks`, `as_script` and `is_push_only`. Each
+mutant is observable, so each is a hand vector, not an equivalent:
+`tests/script_unlocking_script_603.rs` takes three public corpus entries by id
+with their recorded verdicts (flow-01013, scriptSig `000000`, valid;
+flow-01059, `5150`, `SCRIPT_ERR_BAD_OPCODE`; seed-000013, empty,
+`SCRIPT_ERR_INVALID_STACK_OPERATION`), run under the post-Chronicle block word:
+`len` and `is_empty` count `getOpTail`'s instructions
+(`lean/BsvScript/Machine.lean:29-50`, the empty script `:55`; four mutants);
+`into_script` and `From<Script>` hand `verifyScript` the scriptSig's own bytes
+(`:499-509`), flow-01059 round-tripped through `Script` still refused as
+recorded (two); `to_asm` is `Script`'s, as the reference's `UnlockingScript`
+overrides no serializer (`ts-stack@edf6e03`
+`packages/sdk/src/script/UnlockingScript.ts:12-30`), and reads back to
+flow-01059's refused bytes (two). Each test RED on its mutants in a scratch
+copy, all three green on the tree. No vector revealed a divergence.
+
+### Added: src/script/not_judged.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 1 of the file's 3 viable mutants missed
+(66.67%): `<impl fmt::Display for NotJudgedCause>::fmt` replaced with
+`Ok(Default::default())` (`src/script/not_judged.rs:90:9`), the empty
+sentence. The cause's sentences were pinned only through the verifiers
+(`tests/beef_not_judged_452.rs`, `tests/transaction_work_budget_519.rs`,
+`src/transaction/beef_stream/not_judged_tests.rs`), outside the script
+surface's selection. The file is off the interpreter's verdict path: the
+sibling's spec verdict is `valid | invalid reason`
+(`bsv-script-lean@5dc337e1` `lean/BsvScript/Machine.lean:418-425`) and its
+harness reads an input an engine does not judge as `undecided`, apart from
+both (`docs/DESIGN.md:140-150`); the harness calls `Spend::validate`, which
+never builds a `NotJudgedCause`, so the corpus step does not apply.
+`tests/script_not_judged_text_603.rs`,
+`every_not_judged_cause_renders_its_own_sentence_603`, pins every cause's
+sentence at the cause itself, the four height causes produced by
+`ChainParams::word_for_input` on mainnet's heights, the others at their
+witnesses' values; RED on the mutant (`left: ""`), GREEN on the tree.
+Killed by tests 1, declared equivalent 0, remaining 0; re-measured with the
+script surface's selection and the corpus set: 3 caught, 0 missed, 0
+timeout, 0 unviable, 100% of viable. No `src/` behaviour changed; no parity
+note.
+
+### Fixed: the public PushDrop::decode reads a key-only and a no-CHECKSIG token as the reference does; the refusal stands on the canonical path (#618)
+
+On the keeper's word of 2026-11-01 22:1xZ on census row 93 (#614's read):
+`PushDrop::decode` refused a script that is a key alone (`Script too short for
+PushDrop`) and a key whose second chunk is not `OP_CHECKSIG` (`Expected
+OP_CHECKSIG after pubkey`), where the reference's `PushDrop.decode` at its
+default position reads both (`ts-stack@edf6e03` `PushDrop.ts:63-121`): the key
+the first chunk, the second chunk never read, the fields from the third, each
+pushed before the read ends at a *next* chunk that is a DROP. A first chunk of
+33 or 65 bytes followed by anything but `OP_CHECKSIG`, or by nothing, is now
+read that way (`src/script/templates/pushdrop_reference_read.rs`), the lock
+position `Before`, the key's compressed bytes the reference's
+`lockingPublicKey`; a lock-after token whose first field is a point is such a
+token and is read as the reference's default reads it. Nothing else of the
+door moves: the writer's lock-before token reads as it did, a first chunk that
+is no 33- or 65-byte push is read lock-after (the reference's `'after'`), the
+empty script and one chunk that is no key are `Script too short for PushDrop`,
+and a key the parse refuses is refused in its words (`Point not on curve` for
+an x off the curve, where the reference says `Invalid point`). The vector
+`tests/vectors/pushdrop_decode_618.json` is the reference's reading of
+fourteen shapes at both positions and of the two shapes at each of the six
+#537 sites, written by `tests/support/pushdrop_decode_618.mjs` under Node
+v22.18.0, two runs byte-identical; `tests/script_pushdrop_decode_618.rs`
+pins the door (3 of 5 RED on the tree before the fix: the key alone, the
+token without CHECKSIG, and the off-curve key alone's words). The fold
+(the read's FIX 1): every path of the door, lock-before, lock-after and the
+reference read, reads its fields through one loop, `reference_fields`
+(`PushDrop.ts:96-115`), so `<key> OP_CHECKSIG OP_DROP` and `<key>
+OP_CHECKSIG OP_2DROP` read one empty field where they read none, an
+`OP_RESERVED` field reads `00` where it read empty, and a lock-after token
+reads to the next DROP as the reference's `'after'` does (the key and
+`OP_CHECKSIG` fields when no DROP comes), ten more recorded shapes, the three
+RED on `646209a3` at both positions, `decode_before`'s refusals unchanged.
+
+The canonical path is unchanged and refuses both shapes as each site's
+reference counterpart does: `PushDrop::decode_before` (`Script too short for
+PushDrop`, `Expected OP_CHECKSIG after pubkey`) and `canonical_refusal`'s
+words at the five `decodeCanonicalPushDrop` sites (`PushDropValidation.ts:54-79`),
+the identity and contacts managers' field-count and canonical-script checks
+(`IdentityClient.ts:130-147`, `ContactsManager.ts:225-242`). The two sites
+that read through the public door, the local store's decode
+(`src/kvstore/local_parser_words.rs`) and the revocation
+(`src/identity/revoke.rs`), now call `decode_before`, the same verdict on
+every token those sites gate. A witness per site, each the recorded
+reference outcome on the site's own #537 token in the two shapes (this
+crate's writer, its bytes the recording's): the identity parsers and the
+revocation skip them in the reference's words (`No authenticated revelation
+output matches the requested certificate.`), the contacts manager drops
+them, the registry's reader refuses them in `decodeCanonicalPushDrop`'s words
+and its resolvers skip them, the kvstore interpreter reads no value, the
+admin token is refused in the recorded words, the downloader names no host,
+and the local store refuses `token_key_only` and `token_no_checksig` of
+`kvstore_local_454.json`'s `parser_words_489` in the recorded words
+(`_618` tests in the six `*_lock_position_537.rs` files and
+`kvstore_local_parser_words_489.rs`).
+
+Semver: a behaviour change on a public function. A caller of
+`PushDrop::decode` that relied on its refusal of a key alone or of a key
+without CHECKSIG second now gets the reference's reading; a caller that needs
+the refusal checks the token's shape itself (the crate's own sites read
+through the canonical path, `decode_before` and the canonical-script checks).
+One such caller is downstream: `bsv-overlay-cloudflare`'s topic managers
+(`overlay-discovery` SHIP, SLAP, UHRP, agent, DM delegation and LOW, and
+`overlay-engine`'s `engine.rs`, at `9dff935b`) gate admission on
+`PushDrop::decode` and a field count, so on a bump past their `=0.7.2` pin a
+token with no `OP_CHECKSIG` second decodes there; one that must keep refusing
+it checks that the second chunk is `OP_CHECKSIG`.
+
+### Notes: cross-SDK parity (#618)
+
+The public door follows the reference from this landing; the stated
+difference stands on the canonical path alone, where every site refuses both
+shapes as its reference counterpart refuses them. go-sdk at `2ca481c` refuses
+both, as this crate did (`transaction/template/pushdrop/pushdrop.go:20-53`:
+`nil` for fewer than two chunks, and the lock-before branch taken only with
+`OpCHECKSIG` second): stated, no filing. Residues: a key the reference reads
+and this crate's parse refuses (hybrid, x above p; #489, #498) keeps the
+parse's words on both shapes, as on the writer's token; the refused shapes'
+words are this crate's where the reference throws a JavaScript `TypeError` or
+its key parse's words (`Cannot read properties of undefined (reading
+'data')`, `script.chunks[0].data must have value`, `Unknown point format`,
+`Invalid point`), recorded in the vector beside them.
+
+Census (#375; current reading):
+
+- Row 93: Ours: since #618 the public `PushDrop::decode` reads a key-only script and a token without CHECKSIG second as `PushDrop.decode` at its default position reads them (PushDrop.ts:63-121 at edf6e03; tests/vectors/pushdrop_decode_618.json, tests/script_pushdrop_decode_618.rs); the refusal stands on the canonical path alone (`decode_before` and the canonical-script checks), where every site refuses both as its counterpart does (PushDropValidation.ts:54-79 at the local store, the kvstore interpreter, the registry, the overlay admin token and the storage downloader; IdentityClient.ts:130-147; ContactsManager.ts:225-242; one `_618` witness per site), as go-sdk at 2ca481c refuses them at its public `Decode` (pushdrop.go:20-53); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73), and the key parse's and the refused shapes' words where the reference throws its own. Theirs: go-sdk, its public `Decode` refusing what the reference reads, no filing made (the #618 entry).
+
+### Added: src/script/templates/p2pk.rs and src/script/template.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The P2PK lock is `<pubkey> OP_CHECKSIG`, so the rule source is the sibling
+`bsv-script-lean` at `5dc337e1`: `decodePubKey`
+(`lean/BsvScript/Crypto/Secp256k1.lean:151-175`, the tags `02`/`03` with 32
+bytes, `04`/`06`/`07` with 64) and, under STRICTENC,
+`isCompressedOrUncompressedPubKey` in `checkSigOp`
+(`lean/BsvScript/Ops/Crypto.lean:77-84`, `:133-156`). The reference has no P2PK
+template at `ts-stack@edf6e03`, nor go-sdk at `2ca481c`. The widened run
+41327640129 left 5 survivors in `p2pk.rs` (54.55%) and 4 in `template.rs`
+(75.00%). 8 are killed by tests, 1 is declared equivalent, and 0 remain.
+
+`tests/script_p2pk_template_603.rs` copies four entries of the sibling's
+`corpus/crypto/cases.jsonl` by id, each with its recorded verdict (every column
+`valid`). The signer is the corpus's `key("a")`, the sha256 of its label, and
+its signatures are RFC 6979, so the templates must write the recorded bytes:
+
+- `the_lock_writes_both_key_forms_as_the_corpus_crypto_p2pk_crypto_00001_00002`
+  locks the compressed and uncompressed keys to the corpus's scripts. It kills
+  `p2pk.rs:116:47` (`!=` to `==`), `p2pk.rs:126:35` (the guard `false`) and
+  `p2pk.rs:126:48` (`==` to `!=`).
+- `the_unlock_signs_the_corpus_spend_and_it_verifies_crypto_p2pk_crypto_00001_00002`
+  signs with `P2PK::unlock`, writes the recorded unlocking script and spends
+  valid under the post-Chronicle block word. It kills `template.rs:286:9`
+  (`sign` answering an empty script; in the sibling's `corpus/signer`, run
+  through its bsv-rs signer adapter against this tree, the mutant moved 97
+  template rows) and the three lock mutants above.
+- `the_lock_refuses_a_tag_its_length_does_not_carry_crypto_p2pk_crypto_00001_00002`
+  retags the corpus keys (`02`/`03` at 65 bytes, `04`/`06`/`07` at 33), as the
+  corpus builds its hybrid key. The lock refuses each, and the same key as a raw
+  lock is refused under the block word, as `crypto-00014` records
+  (`SCRIPT_ERR_PUBKEYTYPE`). It kills `p2pk.rs:125:28` and `p2pk.rs:126:35`
+  (each guard `true`).
+- `the_p2pkh_helper_writes_the_corpus_unlock_crypto_p2pkh_crypto_00015` covers
+  `build_p2pkh_unlocking_script`, which writes `crypto-00015`'s unlock, and the
+  spend is valid. It kills `template.rs:325:5`.
+
+`the_unlock_debug_is_nonempty_and_names_its_estimate_c_debug_nonempty_603` (in
+`template.rs`'s unit tests) pins the Rust API Guidelines' C-DEBUG and
+C-DEBUG-NONEMPTY (<https://rust-lang.github.io/api-guidelines/debuggability.html>:
+every public type implements `Debug`, and its representation is never empty):
+the unlock's text is non-empty, names `ScriptTemplateUnlock`, shows the
+estimate's value and elides the two opaque functions. It kills
+`template.rs:299:9` (`fmt` answering `Ok(())` and writing nothing).
+
+The ninth, `template.rs:210:36` (`|` to `^` in `compute_sighash_scope`), is
+declared equivalent in `.cargo/mutants.toml`'s `exclude_re`. The base types 1
+to 3 and FORKID `0x40` occupy disjoint bits, so the two operators give the
+same word for every `SignOutputs` (bitcoin-sv v1.2.3
+`sighashtype.h:16-21,43,73-74,87`; `TransactionSignature.ts:240-245` and
+`SignatureUtils.ts:44-62` at `ts-stack@edf6e03`;
+`lean/BsvScript/Sighash.lean:52-58`, `:73`, `:79`, `:478`). Three independent
+reads accept it: the cold read; the adversarial read (EQUIVALENT, 0.97: every
+`SignOutputs` value under both `anyone_can_pay` values and twelve signed and
+verified transactions byte-identical on both sides; `SignOutputs` is closed and
+no conversion puts `0x40` into its flag); the rule read (EQUIVALENT, 0.97: the
+six scopes `0x41`, `0xc1`, `0x42`, `0xc2`, `0x43`, `0xc3` equal on the tree and
+the mutant). No entry of the sibling's `--corpus all` run or of its
+`corpus/signer` moved under it either. For the other eight mutants, the
+`--corpus all` run (9 corpora, GREEN) moved no verdict: the harness judges
+script bytes and never calls a template.
+
+Re-measured with the script surface's selection and the corpus:
+
+| File | Caught | Missed | Timeouts | Unviable | Caught of viable |
+|---|---:|---:|---:|---:|---:|
+| `p2pk.rs` | 11 | 0 | 0 | 1 | 100.00% |
+| `template.rs` | 15 | 0 | 0 | 2 | 100.00% |
+
+`template.rs` re-measured with the declaration in place (`cargo mutants --file
+src/script/template.rs --jobs 1`): 17 mutants, 15 caught, 0 missed, 2 unviable,
+the declared one not listed.
+
+Stated, not changed: the template locks a hybrid key (`06`/`07` at 65 bytes),
+which `decodePubKey` reads. But every column of the sibling's corpus refuses
+that output's spend under STRICTENC (`crypto-00014`, `SCRIPT_ERR_PUBKEYTYPE`),
+so such an output cannot be spent under the node's words.
+
+### Added: src/script/locking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 8 of the file's 27 viable mutants
+alive (70.37 percent): `into_script`, `len` (twice), `is_empty` (twice),
+`is_push_only` (twice) and `From<Script>::from`. Killed by tests: 8. Declared
+equivalent: 0. Remaining: 0. Re-measured with the script surface's selection
+(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03`): 27 caught, 0 missed, 0 timed out, 1 unviable, 100 percent.
+
+The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
+of the eight: the harness builds its locking script with `from_binary` and the
+interpreter reads it through `as_script` and `chunks`. Each mutant is
+observable, so each is a hand vector, not an equivalent:
+`tests/script_locking_script_603.rs` takes six public corpus entries by id
+with their recorded verdicts (flow-01005, lock `5151`, valid; flow-01009, the
+empty lock, valid; flow-01011, the empty lock under an empty scriptSig, refused;
+seed-000013, lock `8f5187`, `SCRIPT_ERR_INVALID_STACK_OPERATION`; flow-01061,
+scriptSig `60`, valid; flow-01092, scriptSig `5161` at version 1,
+`SCRIPT_ERR_SIG_PUSHONLY`), run under the post-Chronicle block word: `len` and
+`is_empty` count `getOpTail`'s instructions (`lean/BsvScript/Machine.lean:29-50`;
+four mutants); `is_push_only` is `isPushOnly` over the script's bytes
+(`:52-59`), the predicate `verifyScript`'s SIGPUSHONLY gate applies
+(`:500-503`), true on flow-01061's accepted `60` and the empty lock, false on
+flow-01092's refused `5161` and on `8f5187` (two); `into_script` and
+`From<Script>` hand `verifyScript` the scriptPubKey's own bytes (`:495-509`),
+flow-01005's `5151` round-tripped through `Script` still valid, where the
+mutants' empty lock is flow-01011's recorded refusal (two). Each test RED on
+its mutants in a scratch copy, all three green on the tree. No vector revealed
+a divergence.
+
+### Added: src/transaction/beef.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 25 of the file's 117 viable mutants missed and 1 timed out (77.78
+percent). The sibling's wire corpus (bsv-script-lean@387dab35
+`corpus/wire/beef.jsonl` and `atomic-beef.jsonl`, 63 rows, run through a
+scratch copy of its `harness/src/bin/run_wire.rs` linked to this tree) moved
+under one survivor alone (`is_atomic` to `true`: 28 plain rows read as
+atomic). Eighteen tests in `src/transaction/beef/reference_603_tests.rs`
+(inside the surface's `--lib` selection, outside the `beef*.rs` glob) take
+the rows by id (beef-001, -002, -004, -023, -029, -030, atomic-beef-001) and
+expect the reference's answer on them: `tests/vectors/beef_reference_603.json`,
+17 cases recorded from `Beef.ts` at `ts-stack@edf6e03` under Node v22.18.0 by
+`tests/support/beef_reference_603.mjs` (two runs byte-identical), with the
+sibling's BEEF view cited per test (`lean/BsvChain/Views/Wire/BEEF.lean`
+`:121-128`, `:344-364`, `:398-416`; `AtomicBEEF.lean:102-112`). The rules:
+`mergeBump`'s combine, `#mergeBumpEntry`, `#markMutated` and the sort before
+serializing, `findBump`, `findTransactionForSigning`, `findAtomicTransaction`,
+`fromReader`, `isAtomic`, `clone`, `toLogString`, `#collectBumpTxids`'s one
+root per height (both directions), `#verifyBumpIndexLeaves` (beef-029 also in
+the streaming reader's kind, `BumpIndexNamesNoBump`), `partitionTxs` on a raw
+transaction with no input, `verifyValid` on a ring held in the input cache,
+`#reindexBumps`' guard; `trim_known_proven`'s cut at a proof from the mined
+object (BRC-62 `0062.md:183-187`). Each mutant RED on its test in a scratch
+copy, 24 of 25 (the conformed log string removed the 26th's `!`).
+
+Killed by tests: 23 of the 25 missed (one more, the inputs list's `!` at
+`1174:16`, left with the code its conformed log no longer has); declared
+equivalent: 1; remaining: 0. The timeout, `add_input_proof`'s `+=` to `*=`
+(`beef.rs:278:28`), fails its test now (the frame's parent index underflows)
+but stays a timeout, not counted as caught: other tests of the selection,
+whose inputs name no entry of the BEEF, loop under it until the 300 s bound.
+The declared, `sort_txs`' `i < j` to `i <= j` (`beef.rs:912:33`): `i == j` is
+reached only if a transaction waits on its own txid at its own acceptance,
+and a waiter is released before it is ready (`dependents` is removed at the
+release, a repeat returns early), so the branch is not reached even with a
+hand-written input cache; no row of either corpus moves under it. Declared equivalent in
+`.cargo/mutants.toml`'s `exclude_re` with that reason, the sibling's
+`BeefEntry.txid` and `parents` (`BEEF.lean:338-342,370-373`: no txid among
+its own parents) and the reference's `sortTxs` (`Beef.ts` at
+`ts-stack@edf6e03`), on three reads that accept it: the cold read (MERGE at
+0.9), the adversarial read (EQUIVALENT at 0.95: a raw transaction naming its
+own txid as a source, one transaction merged twice as raw and txid-only in
+each order, an entry whose input cache lists itself, a ring of two, a
+txid-only entry whose txid a raw entry carries, the subject first, last and
+in the middle, each written, read, sorted, verified and serialized
+byte-identical under both) and the rule read (EQUIVALENT at 0.96: BRC-62's
+sources-precede order and the sort's invariant leave `i != j` at the line).
+Re-measured with the surface's selection and `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03` (the corpus read, its pinned totals unchanged), the
+declared one excluded: 114 caught, 0 missed, 1 timed out (`278:28`), 6
+unviable of 121, 99.13 percent of viable (114 of 115).
+
+Two readings conformed to the reference (rule 1; reference-shaped public
+changes on the 0.9.0 line): `Beef::find_transaction_for_signing` now links
+each input without a source transaction to the one the BEEF holds
+(`Beef.ts:615-631`; until #603 the inputs were left unlinked, "simplified for
+now"), and `Beef::to_log_string` writes `Beef.toLogString`'s text
+(`Beef.ts:1698-1733`: `BUMPS`, the lists joined with `,\n`, a BUMP's txids
+list written when empty). Both RED on the base through their tests.
+The semver reading: both are public behaviour, reference-shaped on the 0.9.0
+line (the owner's word of 2026-10-26); a caller matching the old log text
+(`BUMPs`, no separators) reads the reference's, and a caller of
+`find_transaction_for_signing` finds its inputs' held sources linked where
+they were `None`. None of the named downstreams calls either (grepped at the
+cold read, 2026-11-01).
+
+### Notes: cross-SDK parity (#603)
+
+The two conformed readings close differences no list carried; none remains
+at the cases recorded. The log's `isValid` stays `is_valid(false)`, where the
+reference calls `isValid()` (`allow_txid_only` decides nothing here, the
+stated 0.4.2 row), and a txid-flagged leaf with no hash is left out of the
+txids list where the reference writes `''`. The reference's
+`findTransactionForSigning` links the BEEF's own transaction objects in
+place, so a later call sees the links; this crate returns a clone with each
+held source cloned in, the BEEF unchanged, one level deep on a BEEF read from
+bytes as the reference's; an input with no source txid is left unlinked here
+where the reference throws `sourceTXID must be valid` (`Beef.ts:621`).
+
+### Added: src/script/script.rs's surviving mutants, shard B (the chunk parser), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129) left 28 mutants alive in
+`Script::parse_chunks`. Killed by tests: 24. Declared equivalent: 4.
+Remaining: 0. Re-measured on the function alone (`cargo mutants --file
+src/script/script.rs --re parse_chunks --jobs 1`, the script surface's
+selection, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`): 91 caught, 0 missed,
+3 timed out (`210:17` `*=`, `245:28` `-`, `258:28` `-`, each a parse that no
+longer advances; none of this shard's survivors), 0 unviable, 96.81 percent
+of viable.
+
+The rule is the node's `GetOp` as the sibling states it
+(`bsv-script-lean@5dc337e1` `lean/BsvScript/Machine.lean:29-50`, bitcoin-sv
+`script.h:165-200`). The sibling's harness (`harness/run --impl bsv-rs
+--corpus all --spec recorded`, then `road`, `million`, `xsig-144`) moved the
+recorded verdicts of 18 mutants, each a panic on a short size word (flow-00751
+to 00754, seed-000397, 001993, 003106, 006614, 009101, 009276); the others
+moved no verdict. `tests/script_script_603_b.rs` takes those entries by id
+with their recorded verdicts, the node's own decoder vectors from the
+sibling's `corpus/cpp` (`cscript_tests.cpp` `GetOp2`,
+`instruction_iterator_tests.cpp`, cpp-sighash-00018's scriptCode
+`656a6a00ab` with its recorded original digest), seed-009157 (a size word's
+third byte set), bytes-00107 (a bare `OP_RETURN`, valid), and the ts-stack
+vectors `script-001` and `node.script.bitcoin-sv.0074`; the 2^24-byte push
+of `280:62` is built by this crate's writer (no corpus entry carries a size
+word with its fourth byte set and anything after it). Each test RED on its
+mutants in a scratch copy, all ten green on the tree. The four `|` to `^`
+mutants of the size reads (`257:30`, `280:31`, `280:43`, `280:56`) are
+declared in `.cargo/mutants.toml`: the size bytes occupy disjoint 8-bit
+lanes (`Machine.lean:39,43`), where `|` and `^` agree. No `src/` behaviour
+changed.
+
+### Notes: cross-SDK parity (#603, shard B)
+
+The kill of `215:35` pins a reading the reference does not share: a bare
+`OP_RETURN` (no byte after it) is a chunk without data that prints
+`OP_RETURN` here, as the node reads and prints it (`GetOp`, bitcoin-sv v1.2.3
+`script.h:173-198`; `ScriptToAsmStr`, `core_write.cpp:115-173`, the opcode's
+name). `ts-stack@edf6e03` `Script.ts:608-610` gives it `data: []`, and its
+`toASM` prints the empty string, which `fromASM` reads back as `OP_0` (`00`),
+a different script (run under Node 22.23.3 from the source at the pin:
+`fromHex('6a')` gives `[{op:106,data:[]}]` and `''`; `fromASM('')` gives
+`00`; `fromASM('OP_RETURN')` gives `6a`, whose `fromHex` is the empty-data
+chunk again). go-sdk at `2ca481c` gives it an empty `Data` too
+(`script/script_chunk.go:258-270`). The mutant is the reference's reading;
+the node's is kept, the reference's round trip losing the opcode. Stated, not
+filed.
+
+### Added: src/transaction/merkle_path.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 left 25 survivors in `src/transaction/merkle_path.rs`
+(64 caught of 89 viable, 71.91 percent): the constructor's tree-height bound and
+legal-offset rule (`new_internal`, lines 160 to 194), `combine`'s extension to the
+other's levels (415), `trim` (455 to 494) and the shared root walk (`RootWalker`,
+592, 628, 660). The readers build a path through the stream, never through `new`,
+so under each survivor no entry of the sibling's corpora moves (`bsv-script-lean`
+at `387dab35`: the nine corpora of `harness/run --corpus all`, every one GREEN, and
+the 150 rows of `corpus/wire` through `run_wire`, both identical to the base
+column; a caught mutant at `merkle_path.rs:648` moves 192 lines of the wire
+column, the loop's control). The tests are seven in
+`src/transaction/merkle_path_603_tests.rs` against `tests/vectors/merkle_path_603.json`,
+which `tests/support/merkle_path_603.mjs` records under Node v22.18.0 from the
+reference's `MerklePath.ts` at `ts-stack@edf6e03` over BUMPs copied by their ids
+from the sibling's `corpus/wire/bump.jsonl` and the conformance corpus's
+`merkle-path.json` (`mp-parse-001`, `mp-combine-001`). The bound falls to
+`the_tree_height_bound_is_64_levels_bump_lean_66_wire_bump_001_029` (BRC-74's 64,
+the sibling's `bumpMaxTreeHeight`, `lean/BsvChain/Views/Wire/BUMP.lean:66`); the
+legal offsets (`MerklePath.ts:220-235`) to
+`legal_offsets_admit_every_path_the_reference_admits_wire_bump_rows_and_mp_parse_combine_001`,
+`a_level_0_duplicate_takes_no_part_in_the_offset_rule_wire_bump_007` and
+`an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631` (#603's `…_by_legal_offsets_alone_wire_bump_008_014_018`, renamed by #631),
+which also kill `RootWalker::root_from`'s meeting check (628); `combine` and
+`trim` (`MerklePath.ts:508-594`) to
+`combine_of_two_paths_of_one_block_is_the_references_compound_wire_bump_pairs`
+(every ordered pair of two mainnet rows of one block),
+`combine_extends_a_shorter_path_to_the_others_levels_wire_bump_005` and
+`trim_drops_a_level_0_pair_with_no_client_txid_wire_bump_023_to_026` (the four
+compound rows, each also with one client txid's flag cleared). Killed by tests 21, declared equivalent 4,
+remaining 0: `merkle_path.rs:592:13` (the `shared` field deleted) and the three
+replacements of the guard at `660:27`/`660:33`. Each changes only which nodes a
+later walk reuses: a node's hash at a level and offset is a function of its
+inputs, not of the walk that reaches it (BRC-74's root derivation), and every
+walk still returns its root, which the constructor compares with the first
+(`MerklePath.ts:242-261`, the sibling's `Bump.root`, `BUMP.lean:382-393`), so a
+differing root is refused before any mark is read and no verdict, root or byte
+moves. Declared on three reads: the cold read (0.92), the adversarial read
+(equivalent ×4, 0.93: paths sharing every internal node and none, duplicates on
+both sides of a shared node, a lone leaf at offset 0 and off it, `combine` and
+`trim` after walks) and the rule read (equivalent ×4, 0.95). The three guard
+mutants are `exclude_re` entries in `.cargo/mutants.toml`; `592:13` has no
+entry there, because cargo-mutants 27.1.0 adds a struct-field deletion without
+its name filter (`src/visit.rs:703-747`), so it still lists and still survives,
+the oracle's one standing miss on this file until the tool filters it. The Merkle surface's selection
+(`test_skips('merkle')`, `.github/scripts/nightly_mutants.py`) skipped every
+`transaction::` module but `merkle_path`, so under the oracle the seven tests
+never ran (64 caught, 25 missed, 0 timed out, 12 unviable on this tip, the cold
+read's re-measure); it now keeps every `transaction::` module whose name starts
+with `merkle_path`, pinned by
+`test_the_merkle_surface_runs_merkle_path_603_tests` in
+`.github/scripts/test_nightly_mutants.py` (`transaction::beef::` still skipped).
+Re-measured on the tip under the fixed selection's `mutation_args` with the
+conformance corpus at `ts-stack@edf6e03`: 85 caught, 4 missed, 0 timed out,
+12 unviable, 95.51 percent of viable; with the three guard mutants declared
+(98 listed): 85 caught, 1 missed (`592:13`), 0 timed out, 12 unviable, 98.84
+percent of viable. No behaviour changes.
+
+### Notes: cross-SDK parity (#603)
+
+The recorded vector shows three differences from the reference's `MerklePath`
+at `ts-stack@edf6e03`. Each is older than #603. None is a change. Two are the
+reference's bugs, filed as ts-stack #1469 and #1470 on 2026-11-02 from the #375
+queue's twenty-third and twenty-fourth drafts; answer pending. First, the reference refuses a
+path of more than 54 levels (`MerklePath.ts:198-199`, `Merkle Path must contain
+between 1 and 54 levels`), in its constructor and so in `fromBinary`, narrower
+than BRC-74's 64 (`transactions/0074.md:51`, the sibling's `BUMP.lean:66`), which
+this crate holds; the vector records the reference's refusal of the 64-level path
+beside this crate's root for it, the root the reference's own walk climbs to one
+level at a time. Second, `combine` of a receiver with fewer levels than the
+other: the reference merges over the receiver's levels alone (`:520`), so
+`bump-005` combined into its own level 1 gives one level and a root other than
+the one its combine checked; this crate extends the receiver to the other's
+levels and gives `bump-005` back byte for byte, its root unchanged. Go at
+`2ca481c` indexes past the receiver's levels there
+(`transaction/merklepath.go:453-467`) and has no level bound or offset rule in
+`NewMerklePath` (`:149`). Third, a crate-side difference conformed by #631 and
+no longer a difference: a leaf off every path is refused in the reference's
+words with its `, with legal offsets: …` list (`:230-235`); the lone leaf at an
+offset other than 0 stays this crate's refusal (0.4.2). No block holds 2^54
+transactions, and a path's verdict on the BEEF and BUMP readers is the stream's
+(bsv-rs#167).
+The line is in CLAUDE.md's divergence list.
+
+### Fixed: MerklePath's off-path offset refusal names the legal offsets as the reference's text does (#631)
+
+`MerklePath::new` refused a leaf above level 0 at an offset no level-0 hash
+climbs through as `Invalid offset: N, at height: H`; the reference goes on to
+list the legal offsets (`ts-stack@edf6e03` `MerklePath.ts:220-235`):
 
 ```ts
-if (!Array.isArray(path) || path.length === 0 || path.length > 54) {
-  throw new Error('Merkle Path must contain between 1 and 54 levels')
-}
+legalOffsets[h].add(siblingOf(offsetAtHeight(leaf.offset, h)))
+...
+`Invalid offset: ${leaf.offset}, at height: ${height}, with legal offsets: ${Array.from(legalOffsets[height], offset => offset.toString()).join(', ')}`
 ```
 
-and `fromHex` of its bytes the same, its reader building the path a tree
-height of 0 gives and handing it to that constructor (`:104-168`). Its walks
-on one held through the public field read `path[0]` unasked (`computeRoot`
-`:375-382`, `indexOf` `:327-333`, `combine` `:508-537`, `trim` `:544-600`)
-and throw the runtime's `TypeError` (`Cannot read properties of undefined
-(reading 'find')`, `(reading 'length')` for `trim`), words of no rule.
+The refusal is now the reference's text byte for byte, the list in the order
+level 0's leaves (duplicates apart) first name each offset, as its `Set`
+iterates, not sorted: `mp-parse-001` with a leaf added at level 1, offset 1526,
+is `Invalid offset: 1526, at height: 1, with legal offsets: 1525, 1524`;
+`mp-combine-001` at level 1, offset 7, `…, with legal offsets: 0, 3, 5`, and
+`5, 3, 0` with its level 0 reversed (`src/transaction/merkle_path_legal.rs`).
+The legal set is unchanged, so no verdict moves; the lone leaf at an offset
+other than 0 keeps this crate's refusal (`MissingSibling`, 0.4.2), a stated
+difference. The witness is
+`an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631`
+(`src/transaction/merkle_path_603_tests.rs`, renamed from #603's
+`…_by_legal_offsets_alone_wire_bump_008_014_018`) against six shapes of
+`tests/vectors/merkle_path_603.json`, three added to
+`tests/support/merkle_path_603.mjs` and re-recorded under Node v22.18.0 (the
+existing entries byte for byte unchanged); RED before the change (`left:
+"Invalid offset: 3, at height: 1"`). The 0.3.34 root-check equivalence keeps
+its legacy copy verbatim and maps its offset words through the #631 rule.
+`new_unchecked` and the BUMP readers do not judge legal offsets and are
+unchanged.
 
-Doors, before and after:
+Semver: an error text changed, no type. A caller matching the whole
+`MerklePathError` text of an off-path refusal sees `, with legal offsets: …`
+appended; a prefix match on `Invalid offset: N, at height: H` still holds. No
+`.rs` file of `bsv-overlay-cloudflare`, `rust-message-box`,
+`bsv-middleware-cloudflare-public` or `rust-chaintracks` names the text (the
+`bsv-low` workers were not read by this lane).
 
-- `new`, `new_unchecked`: refused before, `Path cannot be empty`; refused now
-  in the reference's sentence with this crate's bound, `Merkle Path must
-  contain between 1 and 64 levels` (BRC-74's 64 where the reference holds 54,
-  #603's stated divergence; `merkle_path_legal::no_levels`).
-- `from_binary`, `from_hex`, `from_reader`, the streaming reader,
-  `Beef::from_binary`: refused before and after in the stream's words,
-  `TreeHeightZero` at the tree-height byte (#167); unchanged, now pinned.
-- `compute_root`: panicked; now refuses as the reference's `computeRoot`
-  refuses a level 0 with no leaf to climb from, `No valid leaf found in the
-  Merkle Path` (`:378-379`), and, given a txid, as its `indexOf` refuses a
-  txid level 0 does not carry, `Transaction ID <txid> not found in the Merkle
-  Path` (`:330`). `combine` refuses either way through it, both paths
-  unchanged; `Transaction::verify` carries the `indexOf` words.
-- `trim`: panicked; now leaves the path as it is. `contains` and
-  `contains_and_mark` answer `false`, `txids` none, `Beef::merge_bump` adds
-  the bump and proves no transaction by it.
+### Added: src/script/script.rs's surviving mutants, shard D (the truncated-push index), killed from the sibling's rules and vectors (#603)
 
-Every walk now reads level 0 through one accessor, `MerklePath::level0`
-(`src/transaction/merkle_path_legal.rs`), never `path[0]`; `contains` is
-`index_of(..).is_ok()`, the same scan.
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 27 mutants of `truncated_push_index` alive (the index `Spend` refuses a
+truncated push at, read through `Script::truncated_push`), three of them
+timeouts. Killed by tests: 22 (19 the oracle reads caught; the three
+walk-stalling ones fail this file's deadline test but the oracle still reads
+TIMEOUT, below, never caught). Declared equivalent: 5 (on three reads, below,
+in `.cargo/mutants.toml`). Remaining: 0. Re-measured on this function alone
+(`cargo mutants --file src/script/script.rs --re truncated_push_index` with
+the script surface's selection from `nightly_mutants.py`'s `mutation_args`,
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--in-place` on a scratch copy,
+20 shards): 75 caught, 5 missed (the five candidates), 3 timed out, 0
+unviable, 90.36 percent of 83 viable. With the five declared, the same run
+(`--jobs 1`, 20 shards): 78 mutants, 75 caught, 0 missed, the same 3 timed
+out (784:13, 800:17, 826:17), 0 unviable, 96.15 percent of 78 viable.
 
-The witnesses are `tests/merkle_path_649.rs`: `an_empty_path_is_refused_at_new`,
+The rules, from the sibling `bsv-script-lean@5dc337e1`: `getOpTail`
+(`lean/BsvScript/Machine.lean:29-50`), a push's size the opcode below
+`OP_PUSHDATA1`, else 1, 2 or 4 little-endian length bytes, a cut length or a
+body short of the size a parse failure that the loop reports as `badOpcode`
+where the walk reaches it (`:384-386`; bitcoin-sv v1.2.3 `script.h:165-200`,
+`GetOp2` returning false, `interpreter.cpp:450-451`; this crate's rule since
+0.3.27, bsv-rs#12); a top-level `OP_RETURN` ending the script (`:342-344`;
+`interpreter.cpp:856-861`), top level by the static scope of
+`GetSigOpCount` (`lean/BsvScript/SigOps.lean:62-69,85`; `script.cpp:45-58`).
+The vectors: the sibling's harness (`harness/run --impl bsv-rs --spec
+recorded`, a scratch copy linked to a scratch tree) over `all`, `road`,
+`xsig-144`, `million` and the `cpp/replay` corpora, base and each mutant, and
+every script of the whole `corpus/` through `truncated_push` on each mutant.
+`tests/script_script_603_d.rs` copies the moved entries by corpus and id with
+their recorded verdicts (`spec@cb7e46e`, `sv-node@v1.2.3`, or
+`sv-node-unit@v1.2.2` for the node's own `GetOp2` table): flow-01085
+(`516a4c`, valid: 788:15, 788:30, 788:48, 788:66), the subscript at
+`sighash/bsv-rs-0.7.0.jsonl:495` (`ffd7646f6a13…`, a cut push after a nested
+`OP_RETURN`: 788:42, 790:22), flow-01031 (800:17 `*=`), cpp-cscript-00009 and
+flow-01045 (806:41 `&`, 806:70), cpp-cscript-00013 and flow-00753 (810:20),
+flow-01049, road-seed-009157 and cpp-cscript-00014 (814:46, 815:17 `&`,
+815:46, 816:17 `&`, 816:46). Four moved no entry of the whole corpus
+(788:60, `OP_VERIF` and `OP_VERNOTIF` opening no scope; 789:34; 791:58 `+`
+and `/`) and fall to scripts of the scope rule (`65 6a 01`, `66 6a 01`,
+`63 63 68 6a 01`, `63 68 6a 01`, and a spend of `63 63 68 6a 68 02 aa`
+refused at the cut push): built by hand from the rule, no recorder's. The
+three walk-stalling mutants (784:13 `*=`, 800:17 `-=`, 826:17 `-=`) fail the
+file's tests within a ten-second deadline thread on arith-00001, arith-00003
+and cpp-bn_op-00003; `cargo mutants` still reads them TIMEOUT, because the
+library's own `script::spend` unit tests run first and hang on them. Each
+test RED on its mutants in a scratch copy, all eight green on the tree.
+
+The five declared equivalent in `.cargo/mutants.toml`'s `exclude_re`, on the
+ensemble's three reads (the cold read, MERGE at 0.93; the adversarial read,
+EQUIVALENT ×5 at 0.97, 1,068,663 observations byte-identical on the tree and
+each mutant where a control mutant moved them all; the rule read, EQUIVALENT
+×5 at 0.97, bitcoin-sv v1.2.3 `script.h:177-189`): `793:45`, `op > 0` to `op
+>= 0`: `OP_0` is a push of size 0 (`Machine.lean:32`, `op < OP_PUSHDATA1`),
+never short of its body (`:49`), and the index's `pos + 0 > length` cannot
+hold, so the push and the non-push branch both advance by nothing; `806:41`,
+`814:17`, `815:17`, `816:17`, `|` to `^`: the operands are one byte and bytes
+shifted by 8, 16 and 24, disjoint in their bits, so `^` equals `|` (and the
+sum of `Machine.lean:39,43`) at every association. No corpus entry and no
+script of the corpus moved under any of the five. No vector revealed a
+divergence.
+
+### Added: src/script/script.rs's surviving mutants, shard C (the writers), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left
+28 of the writers' mutants alive (`compute_serialized_length` 17,
+`serialize_chunks_to_bytes` 3, `write_bin` 3, `write_number` 4,
+`encode_script_number` 1). Killed by tests: 21. Declared equivalent: 6,
+named below, in `.cargo/mutants.toml`'s `exclude_re` on three reads that
+accept all six (judged at `b5e3f7d1`: the cold read; the adversarial read,
+EQUIVALENT ×6 at 0.97; the rule read, EQUIVALENT ×6 at 0.97). Remaining: 1, `write_bin`'s `451:32` (`<` to `<=` on the
+4 GiB bound): only an input of 2^32 bytes or more reaches it, and the
+oracle's shards run every test under `ulimit -v 4000000` (4,096,000,000
+bytes, `.github/scripts/test-runner-memory-ceiling.sh`, #574), where that
+allocation fails and aborts the shard's baseline; a test the oracle can
+never run is not a kill, so there is none (the reference's bound stays
+recorded in the vector's `bound`). Re-measured on this shard's functions
+(`--re 'compute_serialized_length|serialize_chunks_to_bytes|write_bin|write_number|encode_script_number'`,
+the script surface's selection from `nightly_mutants.py`'s `mutation_args`,
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, run as ten
+round-robin shards): 98 viable, 90 caught, 7 missed (`451:32` and the six
+candidates), 1 timed out (`511:23` `>` to `>=`, an endless loop, not a
+survivor of the census), 0 unviable: 91.8 percent caught
+of viable. With the six declared, the same run (ten round-robin shards,
+`--jobs 1`) lists 92: 92 viable, 90 caught, 1 missed (`451:32`), 1 timed out
+(`511:23`), 0 unviable, the six absent: 97.8 percent caught of viable.
+
+The sibling's whole corpus (`bsv-script-lean@5dc337e1`, `harness/run --impl
+bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
+of the 28: the harness reads every script with `from_binary`, whose bytes
+`to_binary` returns unwritten. The vectors reach the writers instead: the
+corpus's push, number and script shapes at the encoding edges, copied by id,
+and the reference's `Script.writeBin`, `writeBn` and `toBinary` at
+`ts-stack@edf6e03` under Node v22.18.0 for the shapes the corpus lacks
+(`tests/vectors/script_writers_603_c.json`, written by
+`tests/support/script_writers_603_c.mjs`, two runs byte-identical). The rules:
+`pushData` (`lean/BsvScript/Sighash.lean:275-282`, `CScript::operator<<`,
+`script.h:104-133`) with its `le32` length (`:66`); `encode`
+(`lean/BsvScript/Numbers.lean:134-147`, `CScriptNum::serialize`).
+
+- `src/script/script_length_603_tests.rs` (a unit module: the sum,
+  now `pub(crate)`, sizes the writer's buffer alone), the two-path rule with no
+  allocator assumption: `compute_serialized_length` of the chunks equals the
+  length of the bytes `to_binary` writes for them, which are the reference's,
+  and the length the reference's `toBinary` writes (`#computeSerializedLength`,
+  `Script.ts:450-476`). On the recording's eleven corpus scripts
+  (`bytes-00076` to `-00079`: a 75-byte direct push, `OP_PUSHDATA1`, `2`, `4`
+  of one byte; `arith-00011`, `-00013`, `-00687`; `seed-000647` and
+  `gen-00999`, data after a top-level `OP_RETURN`; `seed-000785`'s 65535-byte
+  push and `tx-00040`'s 10,000,036-byte output rebuilt by the writers) and
+  the writer's pushes at its twelve lengths, 1 to 2^24: all 17 of
+  `compute_serialized_length` (`328:9` `0` and `1`, `330:19`, `333:29`,
+  `334:27` `*=` and `-=`, `337:29` three, `339:36`, `340:27`, `340:32`,
+  `341:36`, `342:32`, `343:36`, `344:27`, `344:32`), and RED on each of the
+  function's 27 mutants in a scratch copy.
+- `tests/script_script_603_c.rs`: the push writer at each edge against the
+  reference's bytes and the corpus's (`seed-000785`'s 65535-byte push), 65536
+  bytes `OP_PUSHDATA4` `00 00 01 00` and 2^24 `00 00 00 01` (`448:23`, `380:38`,
+  `381:38`); `tx-00040`'s `OP_0 OP_RETURN` output rebuilt by the writers to the
+  corpus's 10,000,036 bytes, `4e 9d 96 98 00` (`379:38`, `380:38`); the number
+  writer on 22 corpus pushes by id (`seed-000040` -2 to `seed-000133`
+  -(2^63 - 1)) and `i64::MIN` by the reference; nine corpus scripts written
+  back from their chunks to their bytes and spent to their recorded verdicts
+  under the post-Chronicle block word.
+
+Each kill RED on its mutant in a scratch copy, every test green on the tree,
+and green under a simulated 4,096,000,000-byte ceiling (an allocator refusing
+past it; macOS refuses `ulimit -v`). The six declared equivalent, each with
+no corpus entry moving and no test of either file failing, on three reads:
+the cold read (accepts the six), the adversarial read (push lengths 0 to
+65537 at every edge and the `i64` edge set through the writers, `from_asm` and
+`OP_NUM2BIN`, all six diffs empty, two control mutants moving 81,966 and 1,220
+lines; EQUIVALENT ×6, 0.97), the rule read (`script.h:104-133`,
+`int_serialization.h:23-59` at bitcoin-sv v1.2.3; EQUIVALENT ×6, 0.97):
+
+- `write_bin` `442:23` (`<` to `<=`): at the one length where the branches
+  differ, 76, the direct branch's opcode is `76`, which is `OP_PUSHDATA1`, the
+  chunk the same and its bytes `pushData`'s (`Sighash.lean:279-280`; the
+  reference's recording at 76; the RPuzzle precedent, `rpuzzle.rs:350:34`).
+- `write_number` `486:29` (`<` to `<=`) and `488:27` (`<=`, `==`, `>`):
+  `encode` of an `i64` is at most nine bytes (`encode_length_le_iff`,
+  `Numbers.lean:1019`, bounds the length by the magnitude; 2^63 is eight bytes
+  and a sign byte), so the comparison with 76 is always true at
+  `486` and the `OP_PUSHDATA1`/`OP_PUSHDATA2` branch at `488` is never reached.
+- `encode_script_number` `507:28` (`<` to `<=`): zero returns before the sign
+  is read (`encode`'s `if v = 0 then []`, `Numbers.lean:147`), so `num <= 0`
+  and `num < 0` agree on every value that reaches it.
+
+No vector revealed a divergence from the reference.
+
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S2 (the index's folds), killed from the sibling's rules and vectors (#603)
+
+The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
+left 35 mutants of `BeefIndex::fold_bump`, `fold_txid_only` and `fold_tx`
+alive. Killed by tests: 35. Declared equivalent: 0. Remaining: 0. Re-measured
+on the three functions (`cargo mutants --file src/transaction/beef_stream.rs
+--re 'BeefIndex::fold_bump|BeefIndex::fold_tx|BeefIndex::fold_txid_only'`
+with the BEEF surface's selection from `nightly_mutants.py`'s
+`mutation_args`, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, ten
+shards; the regex matches 76, the three functions' 75 and one stray,
+`780:13` in `BeefDecoder::collecting`, shard S1's, caught and not counted
+here): 75 mutants, 73 caught, 0 missed, 0 timed out, 2 unviable (`2049:9`,
+`2097:9`, `Ok(Default::default())` of a type without one), 100 percent of 73
+viable. The BEEF surface's selection now takes every
+`tests/beef_stream_603_*.rs` (the script surface's `script_*.rs` form), so the
+four shards' files run under the oracle; before it none did.
+
+`tests/beef_stream_603_s2.rs` (8 tests) reads, through the stream's public
+readers, the BEEFs of `tests/vectors/beef_reference_603.json`'s eight
+`stream_s2_*` cases: the rows of bsv-script-lean `corpus/wire/beef.jsonl` by id
+(beef-001, -003, -004, -014, -015, -023, -026; byte-identical at `5dc337e1`
+and `387dab35`) written into the shapes of the reference's `mergeBump`,
+`makeTxidOnly`, `mergeRawTx` and `mergeBeef` by #632's recorder
+(`tests/support/beef_reference_603.mjs`, extended; its 17 earlier cases
+unchanged), each with the reference's `verifyValid(true)` (`Beef.ts:1054-1090`
+at `ts-stack@edf6e03`, Node v22.18.0); and the Lean's reading of the same
+bytes (`tests/vectors/beef_stream_603_s2_lean.json`, written by
+`tests/support/beef_stream_603_s2.lean`): bsv-stack-lean@88c37ac8's
+`readBytes` (`lean/BeefOfAnySize.lean:1151-1155`, the definition this reader
+states) under SHA-256 (the sibling's `BsvScript.Hash.sha256d`, bsvscript
+v1.1.1) with headers carrying the reference's roots, and bsv-script-lean's
+`isFinalTx` (`lean/BsvChain/Finality.lean:116-120`). The Lean's three modules
+compiled from `git show 88c37ac8:` into the lane's folder: the sibling's
+checkout's own build predates its 2026-10-22 and 10-25 `BeefOfAnySize`
+commits and counts the index without the edges.
+
+- The counts (`fold_bump` 1942:20, 1954:22 ×2, 1954:31, 1954:35 ×2, 1954:62
+  ×2, 1956:19, 1956:36, 1956:43 ×2, 1956:47 ×2, 1956:51 ×2; `fold_txid_only`
+  2062:20 ×2, 2063:19 ×2, 2063:25 ×2; `fold_tx` 2228:38 ×2, 2228:42 ×2,
+  2228:46 ×2): beef-014's and beef-015's BUMPs at block 500000, one root,
+  combined by `mergeBump` into one proving two txids, beef-023's lone BUMP
+  proving one, beef-014's transaction a txid-only entry, beef-015's of three
+  inputs. The Lean accepts with steps 6, work 1611 and index size 21
+  (`Parsed.cost`, `BeefOfAnySize.lean:920-926`; `Index.size`, :860-861; its
+  `summary`, `Scenarios.lean:91-95`), and `steps()`, `model_work()` and
+  `spec_size()` answer them (`the_folds_count_the_leans_cost_…_beef_014_015_023`).
+  These counters reach no verdict: the Lean's summary is the only place they
+  are stated, so the test reads them through the public counts.
+- The BUMP index rule (1947:35 `false`, 1947:45 `==`): beef-003's transaction
+  carried by its own BUMP and by a later one, naming the later; valid for the
+  reference (`#verifyBumpIndexLeaves`, `Beef.ts:1129-1139`) and the Lean
+  (`checkBump`, `BeefOfAnySize.lean:888-892`), `TxidNotInBump { index: 1 }`
+  on the mutants (`a_txid_two_bumps_carry_is_proven_by_the_later_it_names_beef_003_004`).
+- A BUMP carrying one txid twice (1947:35 `true`): the Lean keeps a BUMP's
+  txids as a set (`setOf`, `:475`), size 5; the mutant counts 6
+  (`a_bump_carrying_one_txid_twice_holds_it_once_beef_003`).
+- A new entry releases its held children (2052:19, 2200:19): beef-026 (the
+  child ahead of its parent) as the sibling wrote it and with the parent a
+  txid-only entry; valid for the reference (`sortTxs`, `Beef.ts:1065`) and
+  this reader (#240), the held child never released on the mutants. The Lean
+  is order-bound and refuses both at the child's input, its row (b)
+  (`BeefOfAnySize.lean:3381-3392`, "a divergence row, no filing"), recorded
+  beside them (`a_child_ahead_of_its_parent_is_released_by_it_beef_026`,
+  `a_child_ahead_of_its_txid_only_parent_is_released_by_it_beef_026`).
+- A repeat keeps the transaction's outputs (2203:20): a parent read as a
+  txid-only entry then raw, and read raw twice, then a child spending it
+  (P2PKH, the reference's scripts verdict true); the Lean takes the repeat
+  (`enter`, `enterRaw`, `:900-910`) and accepts; the mutants refuse the
+  child's spend (`a_txid_only_entry_then_its_transaction_keeps_its_outputs_for_the_child`,
+  `a_transaction_read_twice_keeps_its_outputs_for_the_child`).
+- The finality threshold (2143:46 `<=`): `finality/threshold-500000000`
+  (bsv-script-lean `corpus/chain/finality/finality.jsonl`; node
+  `validation.cpp:227-247` at `6504a3af`): its lock time 500000000 and
+  sequence 0 on a child spending the parent; at the row's own height and
+  cutoff (500000000, 500000000) both `isFinalTx` and the stream answer not
+  final, which no `<=` changes, so the row is read again at candidate 800001
+  with a cutoff of 500000001, where the Lean's `isFinalTx` answers final and
+  the mutant, reading the lock as a height, `NonFinal`
+  (`a_lock_time_at_the_threshold_is_a_time_finality_threshold_500000000`).
+
+Each test RED on its mutants in the re-measure's logs, all eight green on the
+tree.
+
+### Notes: cross-SDK parity (#603, shard S2)
+
+A BEEF that carries one txid twice (a txid-only entry then the raw
+transaction, or the raw transaction twice) is refused by the reference's
+`verifyValid` (`#hasDuplicateTxids`, `Beef.ts:1066,1092-1099` at
+`ts-stack@edf6e03`) and accepted by both of this crate's readers, the stream
+and `Beef::from_binary` with `verify_valid` (three entries, valid), as the Lean
+this reader states accepts it (`enter` keeps the earliest entry, `enterRaw`
+upgrades it, `BeefOfAnySize.lean:900-910`). The reference reads the same bytes
+as one entry when merged (`mergeBeef`, `:971`, valid). Older than #603; no
+change: the stream's rule is its Lean's. The vectors are the
+`stream_s2_txid_only_entry_then_its_transaction` and
+`stream_s2_transaction_twice` cases.
+
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S3 (the index's sizes, roots and finish), killed from the sibling's rules and vectors (#603)
+
+The widened run 41327640129 (`docs/census/mutants-2026-11-01.md`) left 32
+survivors in this shard's functions of `src/transaction/beef_stream.rs`:
+`BeefIndex::spec_size` (12), `BeefIndex::finish`'s work line (8),
+`BeefIndex::deferred` (4), `BeefIndex::roots` (3) and `bump_root` (5). The
+accessors are read by no harness and no in-crate caller, and the BEEF
+surface's selection never ran the files that assert them
+(`tests/beef_stream_deep.rs`, `tests/beef_order_held.rs`,
+`tests/merkle_path_even_offset_duplicate.rs`). Under each `bump_root`
+survivor no entry of the sibling's corpora moves (`bsv-script-lean` at
+`5dc337e1`: the nine corpora of `harness/run --corpus all`, every one GREEN,
+and the 150 rows of `corpus/wire` through `run_wire`, each identical to the
+base column; a root-order edit at line 497, the loop's control, moves 92 wire
+lines). Six tests in `tests/beef_stream_603_s3.rs` kill 29:
+`index_size_counts_a_txid_two_bumps_carry_twice_beef_of_any_size_two_bumps_one_txid`
+(the 12 of `spec_size`) and
+`finish_adds_one_pass_and_three_times_the_walks_fuel_beef_of_any_size_two_bumps_one_txid_atomic`
+(the 8 of `finish`, and `spec_size`'s 12) against
+`tests/vectors/beef_stream_603_s3.json`, a row of two BUMPs carrying one txid
+recorded from the stack's definition (`bsv-stack-lean@9a69056`
+`lean/BeefOfAnySize.lean`, `Index.size` :860-861, `finish` :990-1002,
+`budget` :982; `readBytes` 14 entries, work 405 plain and 428 atomic) by
+`tests/support/beef_stream_603_s3.lean`, its bytes this crate's writers' at
+the Lean's length; `the_leans_atomic_chain_of_10000_has_the_leans_counts_beef_of_any_size_chain_10000_atomic`
+(the sibling's own `#guard_msgs` summary, `Scenarios.lean:148-150`: 10,002
+steps, work 740,145, 20,005 entries; all of `finish`'s and 10 of
+`spec_size`'s); `the_roots_are_each_bumps_height_and_root_in_wire_order_beef_of_any_size_two_bumps_one_txid`
+(the 3 of `roots`, the Lean index's `bumps`, :838-850);
+`every_unproven_link_is_held_until_the_funding_arrives_beef_order_240_reversed_chain_40`
+(the 4 of `deferred`: 39 held at the peak, none at the verdict, the
+reference's `verifyValid` valid, `tests/vectors/beef_order_240.json`); and
+`a_node_computed_from_a_left_duplicate_is_no_node_bump_nodeat_even_offset_duplicate_167`
+(`bump_root`'s `476:27` `|=` and `476:32` `/`: the sibling's `Bump.nodeAt`
+computes a node only from a word on the left,
+`lean/BsvChain/Views/Wire/BUMP.lean:295-306`, on #167's recorded shapes, the
+duplicate at offset 2 the one that separates `/`). Each RED on its mutant in a
+scratch copy, green on the tip. Killed by tests 29, declared equivalent 3,
+remaining 0: `bump_root`'s `502:28` (the guard `*p == parent` to `true`) and
+`507:42` (`level + 1` to `level * 1` and `level - 1`, the level that arm's
+refusal names), candidates at `6b566305`, now in `.cargo/mutants.toml`'s
+`exclude_re` on three accepting reads (the ensemble rule): the cold read
+(MERGE, 0.9, the three accepted at 0.9 each), the adversarial read
+(EQUIVALENT x3, 0.96: `bump_root` is `pub(crate)`, its only callers the
+decoder and `beef/in_memory.rs`, each refusing the repeated offset first; with
+the arm a panic, 9.65 million exhaustive height-2 BUMPs, 2 million random to
+height 5 and the ts-stack corpus never reached it, the callers' pre-checks
+removed too) and the rule read (EQUIVALENT x3, 0.95: one value per offset,
+`beef_stream.rs:444-447`; the agreement check before the parent comparison,
+`:458-470`; one node per parent offset, `:513-519`; the stack's Lean in the
+same order; `MerklePath.ts:42, 56-62, 221` at `edf6e03` and bitcoin-sv v1.2.3
+`merkleblock.cpp:146-192` state no order that reaches the arm). The arm is
+unreachable: both callers refuse a second
+leaf at an offset before the walk (`DuplicateOffset`; the stack's `levelMap`,
+`BeefOfAnySize.lean:503-507`), so the path nodes of a level hold distinct
+offsets, and each node's agreement check against what the level carries
+(`climb`'s `agree`, :522-526) runs before its parent is compared (:547-550),
+so the two children of one parent pair the same two hashes in either order of
+the walk. No entry moves (the corpora above, the ts-stack conformance BEEF
+families at `edf6e03`), and with the arm replaced by a panic none of
+`merkle_path_two_readers_agree` (every byte of every BUMP the tree holds
+changed), `beef_two_readers_agree`, `beef_stream`, `beef_atomic_graph`,
+`transaction_tests`, `conformance_beef` or 300,000 random BUMPs from
+consistent trees with duplicates and corruptions (the equal arm reached
+315,548 times) reaches it; the random probe ran in the lane, outside the
+tree, a statement and not a pin (the cold read's exhaustive probe, every
+BUMP of tree height 1 to 3 over absent, duplicate, true and wrong leaves,
+2,127,069 shapes, reached the equal arm 702,099 times and the refusal
+never, also outside the tree). The BEEF surface's selection runs every
+`tests/beef_stream_603_*.rs` since #643 (`mutation_args`, `.github/scripts/nightly_mutants.py`);
+this entry pins it by `test_the_beef_selection_runs_the_streams_603_files`. Re-measured with
+that selection, `--re 'BeefIndex::deferred|BeefIndex::finish|BeefIndex::roots|BeefIndex::spec_size|bump_root'`
+and the conformance corpus at `ts-stack@edf6e03`, in twelve shards: before
+the declaration (`6b566305`) 53 listed (the shard's 52 and `780:13`, a
+struct-field deletion in `BeefDecoder::collecting` cargo-mutants 27.1.0 lists
+without its name filter, caught), 50 caught, 3 missed, 0 timed out, 0
+unviable; after it 50 listed (the three absent), 50 caught, 0 missed, 0 timed
+out, 0 unviable; the shard's functions 49 of 49 tested, 100 percent. No
+behaviour changes.
+
+### Fixed: MerklePath's constructors refuse a level 0 of duplicate flags alone, as the reference's constructor does (#641)
+
+`MerklePath::new` and `MerklePath::new_unchecked` accepted a path whose level
+0 carries only duplicate-flagged leaves (no txid leaf, no hash leaf): the
+root check walks from each hashed leaf of level 0, there was none, and the
+path came back `Ok`. The reference's constructor refuses it
+(`ts-stack@edf6e03` `MerklePath.ts:241-263`): after the offset checks
+(`:213-236`) it asks `computeRootCached` for a root from each level-0 leaf,
+which looks for a leaf with a hash and throws (`:342-343`):
+
+```ts
+if (typeof txid !== 'string') txid = this.path[0].find(leaf => Boolean(leaf.hash))?.hash
+if (typeof txid !== 'string') throw new TypeError('Transaction ID is undefined')
+```
+
+with `legalOffsetsOnly` true or false, so both constructors refuse it now, in
+those words (`MerklePathError("Transaction ID is undefined")`, after the offset
+checks as there: `[[dup 0], [hash at 1]]` is still `Invalid offset: 1, at
+height: 1, with legal offsets: ` from `new`; `src/transaction/merkle_path_legal.rs`,
+`rooted`). The issue took `new` for a door that already refused; it did not
+(RED below). `new_unchecked` is the reference's constructor with
+`legalOffsetsOnly` false (`merkle_path_603.json`'s `unchecked` verdicts are
+recorded so), its contract the checks of `new` but the legal offsets above
+level 0, so it refuses too rather than being stated as a wider door; its
+rustdoc says so. Its one `src/` caller, the wallet's BEEF result reader
+(`src/wallet/substrates/result_values/beef.rs`), already refused such a level
+ahead of it. `from_binary`, `from_hex`, `from_reader`, the streaming reader,
+`Beef::from_binary` and `verify_structure` already refused it, in the
+stream's words (`NoTxidAtLevelZero` at the BUMP, #167), where the reference's
+`fromHex` throws from the same constructor; they are unchanged and now pinned.
+`compute_root` on such a path held through the public fields refuses it in the
+reference's `computeRoot()` words (`No valid leaf found in the Merkle Path`,
+`:375-381`), no panic and no walk.
+
+The witnesses are `tests/merkle_path_641.rs`:
+`a_level_zero_of_duplicates_alone_is_refused_at_new`,
 `…_at_new_unchecked`, `…_at_from_binary`, `…_at_the_stream`,
-`…_at_compute_root`, `…_at_combine`, `…_at_transaction_verify`,
-`an_empty_path_does_not_panic_at_trim_or_the_leaf_queries`,
-`an_empty_path_does_not_panic_in_a_beef` and
-`the_shapes_bytes_are_this_crates_writers`, against two shapes in
-`tests/vectors/merkle_path_649.json` (no levels at block heights 1 and
-813706), recorded by `tests/support/merkle_path_649.mjs` from `@bsv/sdk` at
-`ts-stack@edf6e03` bundled with bun under Node v22.18.0: the constructor with
-its defaults and with `legalOffsetsOnly` false, `fromHex` of the bytes,
-`computeRoot()` and `computeRoot(txid)`, `trim()` and `combine` either way,
-the words and the error class; each shape's bytes (`0100`, `fe8a6a0c0000`) are
-this crate's writer's. RED on `b9f78224` (the test file on the unchanged
-tree): 7 of 10, the two constructor tests on the words (`Path cannot be
-empty`), the five walk tests as panics (`index out of bounds` at
-`merkle_path.rs:365` in `compute_root`, `:456` in `trim`, `:339` in
-`index_of`); the `beef.rs` hunk RED alone in a scratch copy with only it
-removed (`beef.rs:372:45`); the `from_binary` and stream tests and the bytes
-test green on both.
+`a_level_zero_of_duplicates_alone_held_unchecked_is_refused_by_compute_root`
+and `the_shapes_bytes_are_this_crates_writers`, against five shapes in
+`tests/vectors/merkle_path_641.json` (a duplicate at 0, at 1, at 0 and 1,
+under an empty level, under a hash at level 1), recorded by
+`tests/support/merkle_path_641.mjs` from `@bsv/sdk` at `ts-stack@edf6e03`
+bundled with bun under Node v22.18.0: the constructor with its defaults and
+with `legalOffsetsOnly` false, `fromHex` of the bytes and `computeRoot()`, the
+words and the error class; each shape's bytes are this crate's writer's. RED
+on `7b44110e` (a scratch copy with the `src/` change removed): the `new` and
+`new_unchecked` tests, `left: None, right: Some(MerklePathError("Transaction
+ID is undefined"))`; the other four green there and after. The 0.3.34
+root-check equivalence keeps its legacy copy verbatim and maps its answer
+through the #641 rule (`with_a_hashed_leaf`), as it maps #631's words.
 
-### Notes: cross-SDK parity
+Go (`go-sdk@2ca481c`, v1.7.2) checks nothing at construction
+(`NewMerklePath`, `transaction/merklepath.go:149-154`;
+`NewMerklePathFromReader`, `:197-276`) and refuses such a path only at
+`ComputeRoot` (`no valid leaf found in the Merkle Path`, `:350-353`); this
+crate follows the reference.
 
-The constructors' sentence is the reference's with this crate's bound, `64`
-where the reference's says `54` (`MerklePath.ts:198-200`), the row of the
-height bound the divergence list already carries (BRC-74's 64, ts-stack
-#1469). Where the reference throws a `TypeError` of its runtime (a defect,
-no verdict), no reference words exist for that shape, and each door here
-answers on its own terms: `compute_root` with no txid refuses in
-`computeRoot`'s words for a level 0 with no leaf (`:378-379`), with a txid in
-`indexOf`'s (`:330`), `combine` and `Transaction::verify` through it (the
-reference's `combine`, `:508-537`, throws at its `computeRoot`); `trim`
-returns with the path unchanged where the reference's throws `(reading
-'length')` (`:544-600`), as Go's returns; `contains`, `contains_and_mark`,
-`txids` and `Beef::merge_bump` find no leaf. The readers (`from_binary`,
-`from_hex`, `from_reader`) keep the stream's `TreeHeightZero` where the
-reference's `fromHex` throws its constructor's sentence, as #641 left the
-readers in the stream's words; the verdict is the same. Go (`go-sdk@2ca481c`,
-v1.7.2) checks nothing at `NewMerklePath` (`transaction/merklepath.go:149`),
-reads a tree height of 0 into a path with no levels
-(`NewMerklePathFromReader`, `:209-218`), refuses it at `ComputeRoot` (`merkle
-path has no leaves`, `:340-341`) and returns from `trim` (`:688-690`).
-
-Semver: no type changed. The constructors' text for an empty path changed
-from `Path cannot be empty` (the words stay in one place, the 0.3.34
-constructor kept verbatim in `merkle_path.rs`'s `linear_root_equivalence_tests`
-as the equivalence oracle, whose generator builds no empty path); no
-downstream on this host matches it
-(`bsv-overlay-cloudflare`, `rust-message-box` searched; `rust-chaintracks`
-and `bsv-middleware-cloudflare-public` are not on this host). A walk that
-panicked now answers.
+Semver: no type changed. A caller that built a level 0 of duplicates alone
+through `new` or `new_unchecked` gets `Err` where it got a path no root could
+be computed from. The `MerklePath::new` calls of `bsv-overlay-cloudflare`
+(`overlay-integration-tests`) and `rust-message-box` (`src/payments.rs`) build
+a txid leaf; `bsv-middleware-cloudflare-public` and `rust-chaintracks` are not
+on this host, and the `bsv-low` workers were not read by this lane.
 
 ### Added: src/script/script.rs's surviving mutants, shard A (the ASM parser and the predicates), killed from the sibling's rules and vectors (#603)
 
@@ -3593,1296 +1455,3438 @@ relied on the no-op; no caller in `bsv-overlay-cloudflare`,
 `set_chunk_opcode_at_the_chunk_count_appends_as_the_reference_does_ts_297_301`,
 RED with the append removed.
 
-### Fixed: MerklePath's constructors refuse a level 0 of duplicate flags alone, as the reference's constructor does (#641)
+### Fixed: a MerklePath with no levels at all is refused at every door and panics no walk (#649)
 
-`MerklePath::new` and `MerklePath::new_unchecked` accepted a path whose level
-0 carries only duplicate-flagged leaves (no txid leaf, no hash leaf): the
-root check walks from each hashed leaf of level 0, there was none, and the
-path came back `Ok`. The reference's constructor refuses it
-(`ts-stack@edf6e03` `MerklePath.ts:241-263`): after the offset checks
-(`:213-236`) it asks `computeRootCached` for a root from each level-0 leaf,
-which looks for a leaf with a hash and throws (`:342-343`):
+A `MerklePath` whose `path` is empty (no levels), held through the public
+fields, panicked in every walk that read level 0: `compute_root` (with no
+txid at `self.path[0]`, with one in `index_of`), `combine` (through
+`compute_root`), `trim`, `contains`, `contains_and_mark`, `txids`, and so
+`Transaction::verify` on a transaction carrying one as its proof and
+`Beef::merge_bump` beside a transaction no bump proves (`update_bump_indices`,
+`src/transaction/beef.rs`). `CLAUDE.md` rule 5: nothing panics on input. The
+#648 cold read found it in `compute_root`.
+
+The reference refuses the shape at its constructor (`ts-stack@edf6e03`
+`MerklePath.ts:198-200`):
 
 ```ts
-if (typeof txid !== 'string') txid = this.path[0].find(leaf => Boolean(leaf.hash))?.hash
-if (typeof txid !== 'string') throw new TypeError('Transaction ID is undefined')
+if (!Array.isArray(path) || path.length === 0 || path.length > 54) {
+  throw new Error('Merkle Path must contain between 1 and 54 levels')
+}
 ```
 
-with `legalOffsetsOnly` true or false, so both constructors refuse it now, in
-those words (`MerklePathError("Transaction ID is undefined")`, after the offset
-checks as there: `[[dup 0], [hash at 1]]` is still `Invalid offset: 1, at
-height: 1, with legal offsets: ` from `new`; `src/transaction/merkle_path_legal.rs`,
-`rooted`). The issue took `new` for a door that already refused; it did not
-(RED below). `new_unchecked` is the reference's constructor with
-`legalOffsetsOnly` false (`merkle_path_603.json`'s `unchecked` verdicts are
-recorded so), its contract the checks of `new` but the legal offsets above
-level 0, so it refuses too rather than being stated as a wider door; its
-rustdoc says so. Its one `src/` caller, the wallet's BEEF result reader
-(`src/wallet/substrates/result_values/beef.rs`), already refused such a level
-ahead of it. `from_binary`, `from_hex`, `from_reader`, the streaming reader,
-`Beef::from_binary` and `verify_structure` already refused it, in the
-stream's words (`NoTxidAtLevelZero` at the BUMP, #167), where the reference's
-`fromHex` throws from the same constructor; they are unchanged and now pinned.
-`compute_root` on such a path held through the public fields refuses it in the
-reference's `computeRoot()` words (`No valid leaf found in the Merkle Path`,
-`:375-381`), no panic and no walk.
+and `fromHex` of its bytes the same, its reader building the path a tree
+height of 0 gives and handing it to that constructor (`:104-168`). Its walks
+on one held through the public field read `path[0]` unasked (`computeRoot`
+`:375-382`, `indexOf` `:327-333`, `combine` `:508-537`, `trim` `:544-600`)
+and throw the runtime's `TypeError` (`Cannot read properties of undefined
+(reading 'find')`, `(reading 'length')` for `trim`), words of no rule.
 
-The witnesses are `tests/merkle_path_641.rs`:
-`a_level_zero_of_duplicates_alone_is_refused_at_new`,
+Doors, before and after:
+
+- `new`, `new_unchecked`: refused before, `Path cannot be empty`; refused now
+  in the reference's sentence with this crate's bound, `Merkle Path must
+  contain between 1 and 64 levels` (BRC-74's 64 where the reference holds 54,
+  #603's stated divergence; `merkle_path_legal::no_levels`).
+- `from_binary`, `from_hex`, `from_reader`, the streaming reader,
+  `Beef::from_binary`: refused before and after in the stream's words,
+  `TreeHeightZero` at the tree-height byte (#167); unchanged, now pinned.
+- `compute_root`: panicked; now refuses as the reference's `computeRoot`
+  refuses a level 0 with no leaf to climb from, `No valid leaf found in the
+  Merkle Path` (`:378-379`), and, given a txid, as its `indexOf` refuses a
+  txid level 0 does not carry, `Transaction ID <txid> not found in the Merkle
+  Path` (`:330`). `combine` refuses either way through it, both paths
+  unchanged; `Transaction::verify` carries the `indexOf` words.
+- `trim`: panicked; now leaves the path as it is. `contains` and
+  `contains_and_mark` answer `false`, `txids` none, `Beef::merge_bump` adds
+  the bump and proves no transaction by it.
+
+Every walk now reads level 0 through one accessor, `MerklePath::level0`
+(`src/transaction/merkle_path_legal.rs`), never `path[0]`; `contains` is
+`index_of(..).is_ok()`, the same scan.
+
+The witnesses are `tests/merkle_path_649.rs`: `an_empty_path_is_refused_at_new`,
 `…_at_new_unchecked`, `…_at_from_binary`, `…_at_the_stream`,
-`a_level_zero_of_duplicates_alone_held_unchecked_is_refused_by_compute_root`
-and `the_shapes_bytes_are_this_crates_writers`, against five shapes in
-`tests/vectors/merkle_path_641.json` (a duplicate at 0, at 1, at 0 and 1,
-under an empty level, under a hash at level 1), recorded by
-`tests/support/merkle_path_641.mjs` from `@bsv/sdk` at `ts-stack@edf6e03`
-bundled with bun under Node v22.18.0: the constructor with its defaults and
-with `legalOffsetsOnly` false, `fromHex` of the bytes and `computeRoot()`, the
-words and the error class; each shape's bytes are this crate's writer's. RED
-on `7b44110e` (a scratch copy with the `src/` change removed): the `new` and
-`new_unchecked` tests, `left: None, right: Some(MerklePathError("Transaction
-ID is undefined"))`; the other four green there and after. The 0.3.34
-root-check equivalence keeps its legacy copy verbatim and maps its answer
-through the #641 rule (`with_a_hashed_leaf`), as it maps #631's words.
+`…_at_compute_root`, `…_at_combine`, `…_at_transaction_verify`,
+`an_empty_path_does_not_panic_at_trim_or_the_leaf_queries`,
+`an_empty_path_does_not_panic_in_a_beef` and
+`the_shapes_bytes_are_this_crates_writers`, against two shapes in
+`tests/vectors/merkle_path_649.json` (no levels at block heights 1 and
+813706), recorded by `tests/support/merkle_path_649.mjs` from `@bsv/sdk` at
+`ts-stack@edf6e03` bundled with bun under Node v22.18.0: the constructor with
+its defaults and with `legalOffsetsOnly` false, `fromHex` of the bytes,
+`computeRoot()` and `computeRoot(txid)`, `trim()` and `combine` either way,
+the words and the error class; each shape's bytes (`0100`, `fe8a6a0c0000`) are
+this crate's writer's. RED on `b9f78224` (the test file on the unchanged
+tree): 7 of 10, the two constructor tests on the words (`Path cannot be
+empty`), the five walk tests as panics (`index out of bounds` at
+`merkle_path.rs:365` in `compute_root`, `:456` in `trim`, `:339` in
+`index_of`); the `beef.rs` hunk RED alone in a scratch copy with only it
+removed (`beef.rs:372:45`); the `from_binary` and stream tests and the bytes
+test green on both.
 
-Go (`go-sdk@2ca481c`, v1.7.2) checks nothing at construction
-(`NewMerklePath`, `transaction/merklepath.go:149-154`;
-`NewMerklePathFromReader`, `:197-276`) and refuses such a path only at
-`ComputeRoot` (`no valid leaf found in the Merkle Path`, `:350-353`); this
-crate follows the reference.
+### Notes: cross-SDK parity
 
-Semver: no type changed. A caller that built a level 0 of duplicates alone
-through `new` or `new_unchecked` gets `Err` where it got a path no root could
-be computed from. The `MerklePath::new` calls of `bsv-overlay-cloudflare`
-(`overlay-integration-tests`) and `rust-message-box` (`src/payments.rs`) build
-a txid leaf; `bsv-middleware-cloudflare-public` and `rust-chaintracks` are not
-on this host, and the `bsv-low` workers were not read by this lane.
+The constructors' sentence is the reference's with this crate's bound, `64`
+where the reference's says `54` (`MerklePath.ts:198-200`), the row of the
+height bound the divergence list already carries (BRC-74's 64, ts-stack
+#1469). Where the reference throws a `TypeError` of its runtime (a defect,
+no verdict), no reference words exist for that shape, and each door here
+answers on its own terms: `compute_root` with no txid refuses in
+`computeRoot`'s words for a level 0 with no leaf (`:378-379`), with a txid in
+`indexOf`'s (`:330`), `combine` and `Transaction::verify` through it (the
+reference's `combine`, `:508-537`, throws at its `computeRoot`); `trim`
+returns with the path unchanged where the reference's throws `(reading
+'length')` (`:544-600`), as Go's returns; `contains`, `contains_and_mark`,
+`txids` and `Beef::merge_bump` find no leaf. The readers (`from_binary`,
+`from_hex`, `from_reader`) keep the stream's `TreeHeightZero` where the
+reference's `fromHex` throws its constructor's sentence, as #641 left the
+readers in the stream's words; the verdict is the same. Go (`go-sdk@2ca481c`,
+v1.7.2) checks nothing at `NewMerklePath` (`transaction/merklepath.go:149`),
+reads a tree height of 0 into a path with no levels
+(`NewMerklePathFromReader`, `:209-218`), refuses it at `ComputeRoot` (`merkle
+path has no leaves`, `:340-341`) and returns from `trim` (`:688-690`).
 
-### Added: src/transaction/beef_stream.rs's surviving mutants, shard S3 (the index's sizes, roots and finish), killed from the sibling's rules and vectors (#603)
+Semver: no type changed. The constructors' text for an empty path changed
+from `Path cannot be empty` (the words stay in one place, the 0.3.34
+constructor kept verbatim in `merkle_path.rs`'s `linear_root_equivalence_tests`
+as the equivalence oracle, whose generator builds no empty path); no
+downstream on this host matches it
+(`bsv-overlay-cloudflare`, `rust-message-box` searched; `rust-chaintracks`
+and `bsv-middleware-cloudflare-public` are not on this host). A walk that
+panicked now answers.
 
-The widened run 41327640129 (`docs/census/mutants-2026-11-01.md`) left 32
-survivors in this shard's functions of `src/transaction/beef_stream.rs`:
-`BeefIndex::spec_size` (12), `BeefIndex::finish`'s work line (8),
-`BeefIndex::deferred` (4), `BeefIndex::roots` (3) and `bump_root` (5). The
-accessors are read by no harness and no in-crate caller, and the BEEF
-surface's selection never ran the files that assert them
-(`tests/beef_stream_deep.rs`, `tests/beef_order_held.rs`,
-`tests/merkle_path_even_offset_duplicate.rs`). Under each `bump_root`
-survivor no entry of the sibling's corpora moves (`bsv-script-lean` at
-`5dc337e1`: the nine corpora of `harness/run --corpus all`, every one GREEN,
-and the 150 rows of `corpus/wire` through `run_wire`, each identical to the
-base column; a root-order edit at line 497, the loop's control, moves 92 wire
-lines). Six tests in `tests/beef_stream_603_s3.rs` kill 29:
-`index_size_counts_a_txid_two_bumps_carry_twice_beef_of_any_size_two_bumps_one_txid`
-(the 12 of `spec_size`) and
-`finish_adds_one_pass_and_three_times_the_walks_fuel_beef_of_any_size_two_bumps_one_txid_atomic`
-(the 8 of `finish`, and `spec_size`'s 12) against
-`tests/vectors/beef_stream_603_s3.json`, a row of two BUMPs carrying one txid
-recorded from the stack's definition (`bsv-stack-lean@9a69056`
-`lean/BeefOfAnySize.lean`, `Index.size` :860-861, `finish` :990-1002,
-`budget` :982; `readBytes` 14 entries, work 405 plain and 428 atomic) by
-`tests/support/beef_stream_603_s3.lean`, its bytes this crate's writers' at
-the Lean's length; `the_leans_atomic_chain_of_10000_has_the_leans_counts_beef_of_any_size_chain_10000_atomic`
-(the sibling's own `#guard_msgs` summary, `Scenarios.lean:148-150`: 10,002
-steps, work 740,145, 20,005 entries; all of `finish`'s and 10 of
-`spec_size`'s); `the_roots_are_each_bumps_height_and_root_in_wire_order_beef_of_any_size_two_bumps_one_txid`
-(the 3 of `roots`, the Lean index's `bumps`, :838-850);
-`every_unproven_link_is_held_until_the_funding_arrives_beef_order_240_reversed_chain_40`
-(the 4 of `deferred`: 39 held at the peak, none at the verdict, the
-reference's `verifyValid` valid, `tests/vectors/beef_order_240.json`); and
-`a_node_computed_from_a_left_duplicate_is_no_node_bump_nodeat_even_offset_duplicate_167`
-(`bump_root`'s `476:27` `|=` and `476:32` `/`: the sibling's `Bump.nodeAt`
-computes a node only from a word on the left,
-`lean/BsvChain/Views/Wire/BUMP.lean:295-306`, on #167's recorded shapes, the
-duplicate at offset 2 the one that separates `/`). Each RED on its mutant in a
-scratch copy, green on the tip. Killed by tests 29, declared equivalent 3,
-remaining 0: `bump_root`'s `502:28` (the guard `*p == parent` to `true`) and
-`507:42` (`level + 1` to `level * 1` and `level - 1`, the level that arm's
-refusal names), candidates at `6b566305`, now in `.cargo/mutants.toml`'s
-`exclude_re` on three accepting reads (the ensemble rule): the cold read
-(MERGE, 0.9, the three accepted at 0.9 each), the adversarial read
-(EQUIVALENT x3, 0.96: `bump_root` is `pub(crate)`, its only callers the
-decoder and `beef/in_memory.rs`, each refusing the repeated offset first; with
-the arm a panic, 9.65 million exhaustive height-2 BUMPs, 2 million random to
-height 5 and the ts-stack corpus never reached it, the callers' pre-checks
-removed too) and the rule read (EQUIVALENT x3, 0.95: one value per offset,
-`beef_stream.rs:444-447`; the agreement check before the parent comparison,
-`:458-470`; one node per parent offset, `:513-519`; the stack's Lean in the
-same order; `MerklePath.ts:42, 56-62, 221` at `edf6e03` and bitcoin-sv v1.2.3
-`merkleblock.cpp:146-192` state no order that reaches the arm). The arm is
-unreachable: both callers refuse a second
-leaf at an offset before the walk (`DuplicateOffset`; the stack's `levelMap`,
-`BeefOfAnySize.lean:503-507`), so the path nodes of a level hold distinct
-offsets, and each node's agreement check against what the level carries
-(`climb`'s `agree`, :522-526) runs before its parent is compared (:547-550),
-so the two children of one parent pair the same two hashes in either order of
-the walk. No entry moves (the corpora above, the ts-stack conformance BEEF
-families at `edf6e03`), and with the arm replaced by a panic none of
-`merkle_path_two_readers_agree` (every byte of every BUMP the tree holds
-changed), `beef_two_readers_agree`, `beef_stream`, `beef_atomic_graph`,
-`transaction_tests`, `conformance_beef` or 300,000 random BUMPs from
-consistent trees with duplicates and corruptions (the equal arm reached
-315,548 times) reaches it; the random probe ran in the lane, outside the
-tree, a statement and not a pin (the cold read's exhaustive probe, every
-BUMP of tree height 1 to 3 over absent, duplicate, true and wrong leaves,
-2,127,069 shapes, reached the equal arm 702,099 times and the refusal
-never, also outside the tree). The BEEF surface's selection runs every
-`tests/beef_stream_603_*.rs` since #643 (`mutation_args`, `.github/scripts/nightly_mutants.py`);
-this entry pins it by `test_the_beef_selection_runs_the_streams_603_files`. Re-measured with
-that selection, `--re 'BeefIndex::deferred|BeefIndex::finish|BeefIndex::roots|BeefIndex::spec_size|bump_root'`
-and the conformance corpus at `ts-stack@edf6e03`, in twelve shards: before
-the declaration (`6b566305`) 53 listed (the shard's 52 and `780:13`, a
-struct-field deletion in `BeefDecoder::collecting` cargo-mutants 27.1.0 lists
-without its name filter, caught), 50 caught, 3 missed, 0 timed out, 0
-unviable; after it 50 listed (the three absent), 50 caught, 0 missed, 0 timed
-out, 0 unviable; the shard's functions 49 of 49 tested, 100 percent. No
-behaviour changes.
+### Fixed: the public key encoding check reads a key's length and prefix as the node reads it; the curve and the range are the signature check's (#660)
 
-### Added: src/transaction/beef_stream.rs's surviving mutants, shard S2 (the index's folds), killed from the sibling's rules and vectors (#603)
+`check_public_key_encoding` (`src/script/spend/crypto.rs`), at both signature
+sites (`OP_CHECKSIG`/`OP_CHECKSIGVERIFY` and `OP_CHECKMULTISIG`/`VERIFY`),
+parsed the key's point after its length and prefix checks and refused a 33-
+or 65-byte key whose point is off the curve or whose x (or y) is at or past
+the field prime: `The public key is in an unknown format.` at CHECKSIG,
+`OP_CHECKMULTISIG requires correct encoding for the public key and
+signature.` at CHECKMULTISIG, in every mode. The node reads the length and
+the prefix alone. Its STRICTENC check (bitcoin-sv v1.2.3
+`interpreter.cpp:312-327`, `CheckPubKeyEncoding`) is
+`IsCompressedOrUncompressedPubKey` (`:132-152`): at least 33 bytes; `04` at
+65; `02`/`03` at 33; any other prefix refused. Such a key passes, and the
+signature check answers false: `CheckSig` (`:2133-2163`) returns false where
+`CPubKey::Verify` cannot parse the point (`pubkey.cpp:183-194`,
+`secp256k1_ec_pubkey_parse`). With an empty signature no NULLFAIL applies
+(`interpreter.cpp:1491-1497,1641-1646`), so `<key> OP_CHECKSIG OP_NOT` and
+its 1-of-1 CHECKMULTISIG form are valid at the node. Under `ScriptFlags::block`
+and `standard`, in both eras, at versions 1 and 2, this crate refused 120 such
+spends (the #660 probe, 2026-11-02 22:4xZ). A consensus parity defect under
+the block word; the interpreter follows the node in every mode (0.3.27).
 
-The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
-left 35 mutants of `BeefIndex::fold_bump`, `fold_txid_only` and `fold_tx`
-alive. Killed by tests: 35. Declared equivalent: 0. Remaining: 0. Re-measured
-on the three functions (`cargo mutants --file src/transaction/beef_stream.rs
---re 'BeefIndex::fold_bump|BeefIndex::fold_tx|BeefIndex::fold_txid_only'`
-with the BEEF surface's selection from `nightly_mutants.py`'s
-`mutation_args`, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, ten
-shards; the regex matches 76, the three functions' 75 and one stray,
-`780:13` in `BeefDecoder::collecting`, shard S1's, caught and not counted
-here): 75 mutants, 73 caught, 0 missed, 0 timed out, 2 unviable (`2049:9`,
-`2097:9`, `Ok(Default::default())` of a type without one), 100 percent of 73
-viable. The BEEF surface's selection now takes every
-`tests/beef_stream_603_*.rs` (the script surface's `script_*.rs` form), so the
-four shards' files run under the oracle; before it none did.
+The fix: the encoding check keeps its length, prefix and
+COMPRESSED_PUBKEYTYPE refusals in their words, unchanged, and reads nothing of
+the point; `verify_signature` reads it, and a key that is no point is the
+check's false (`Ok(false)`, never a refusal or a panic, rule 5). The reading
+of the point is one place, `src/script/spend/key_point.rs`: the switch
+`reads_the_reference_point` (`false`, the node's reading in every mode),
+`check_public_key_point` (the encoding check's share, nothing under the
+node's reading) and `signature_key` (the key the signature check verifies
+against). A fold to the reference's reading in the default mode alone
+returns `self.flags.is_none()` from the switch: the encoding check then
+refuses a point the reference's `PublicKey.fromDER` cannot read in its
+words, and the signature check verifies against the reduced point
+(`PublicKey::from_reference_der`, #498's reader); measured in a scratch copy,
+the default mode then matches the reference's verdict on every recorded
+cell, the CHECKMULTISIG cells in this crate's wrapper words. A key that
+parses is judged as before: a valid signature verifies and a wrong one
+fails, NULLFAIL under a word unchanged.
 
-`tests/beef_stream_603_s2.rs` (8 tests) reads, through the stream's public
-readers, the BEEFs of `tests/vectors/beef_reference_603.json`'s eight
-`stream_s2_*` cases: the rows of bsv-script-lean `corpus/wire/beef.jsonl` by id
-(beef-001, -003, -004, -014, -015, -023, -026; byte-identical at `5dc337e1`
-and `387dab35`) written into the shapes of the reference's `mergeBump`,
-`makeTxidOnly`, `mergeRawTx` and `mergeBeef` by #632's recorder
-(`tests/support/beef_reference_603.mjs`, extended; its 17 earlier cases
-unchanged), each with the reference's `verifyValid(true)` (`Beef.ts:1054-1090`
-at `ts-stack@edf6e03`, Node v22.18.0); and the Lean's reading of the same
-bytes (`tests/vectors/beef_stream_603_s2_lean.json`, written by
-`tests/support/beef_stream_603_s2.lean`): bsv-stack-lean@88c37ac8's
-`readBytes` (`lean/BeefOfAnySize.lean:1151-1155`, the definition this reader
-states) under SHA-256 (the sibling's `BsvScript.Hash.sha256d`, bsvscript
-v1.1.1) with headers carrying the reference's roots, and bsv-script-lean's
-`isFinalTx` (`lean/BsvChain/Finality.lean:116-120`). The Lean's three modules
-compiled from `git show 88c37ac8:` into the lane's folder: the sibling's
-checkout's own build predates its 2026-10-22 and 10-25 `BeefOfAnySize`
-commits and counts the index without the edges.
+Verdicts, before and after (the six points: `02`/`03` with x = 5, off the
+curve; `02` with x = p; `02` with x = p + 1; `03` with x = 2^256 - 1; `04`
+with G.x and G.y + 1, off the curve; the four shapes: `<key> OP_CHECKSIG
+OP_NOT` and `1 <key> 1 OP_CHECKMULTISIG OP_NOT`, each with an empty
+signature and with a strict-DER `r = 1, s = 1` ALL|FORKID one):
 
-- The counts (`fold_bump` 1942:20, 1954:22 ×2, 1954:31, 1954:35 ×2, 1954:62
-  ×2, 1956:19, 1956:36, 1956:43 ×2, 1956:47 ×2, 1956:51 ×2; `fold_txid_only`
-  2062:20 ×2, 2063:19 ×2, 2063:25 ×2; `fold_tx` 2228:38 ×2, 2228:42 ×2,
-  2228:46 ×2): beef-014's and beef-015's BUMPs at block 500000, one root,
-  combined by `mergeBump` into one proving two txids, beef-023's lone BUMP
-  proving one, beef-014's transaction a txid-only entry, beef-015's of three
-  inputs. The Lean accepts with steps 6, work 1611 and index size 21
-  (`Parsed.cost`, `BeefOfAnySize.lean:920-926`; `Index.size`, :860-861; its
-  `summary`, `Scenarios.lean:91-95`), and `steps()`, `model_work()` and
-  `spec_size()` answer them (`the_folds_count_the_leans_cost_…_beef_014_015_023`).
-  These counters reach no verdict: the Lean's summary is the only place they
-  are stated, so the test reads them through the public counts.
-- The BUMP index rule (1947:35 `false`, 1947:45 `==`): beef-003's transaction
-  carried by its own BUMP and by a later one, naming the later; valid for the
-  reference (`#verifyBumpIndexLeaves`, `Beef.ts:1129-1139`) and the Lean
-  (`checkBump`, `BeefOfAnySize.lean:888-892`), `TxidNotInBump { index: 1 }`
-  on the mutants (`a_txid_two_bumps_carry_is_proven_by_the_later_it_names_beef_003_004`).
-- A BUMP carrying one txid twice (1947:35 `true`): the Lean keeps a BUMP's
-  txids as a set (`setOf`, `:475`), size 5; the mutant counts 6
-  (`a_bump_carrying_one_txid_twice_holds_it_once_beef_003`).
-- A new entry releases its held children (2052:19, 2200:19): beef-026 (the
-  child ahead of its parent) as the sibling wrote it and with the parent a
-  txid-only entry; valid for the reference (`sortTxs`, `Beef.ts:1065`) and
-  this reader (#240), the held child never released on the mutants. The Lean
-  is order-bound and refuses both at the child's input, its row (b)
-  (`BeefOfAnySize.lean:3381-3392`, "a divergence row, no filing"), recorded
-  beside them (`a_child_ahead_of_its_parent_is_released_by_it_beef_026`,
-  `a_child_ahead_of_its_txid_only_parent_is_released_by_it_beef_026`).
-- A repeat keeps the transaction's outputs (2203:20): a parent read as a
-  txid-only entry then raw, and read raw twice, then a child spending it
-  (P2PKH, the reference's scripts verdict true); the Lean takes the repeat
-  (`enter`, `enterRaw`, `:900-910`) and accepts; the mutants refuse the
-  child's spend (`a_txid_only_entry_then_its_transaction_keeps_its_outputs_for_the_child`,
-  `a_transaction_read_twice_keeps_its_outputs_for_the_child`).
-- The finality threshold (2143:46 `<=`): `finality/threshold-500000000`
-  (bsv-script-lean `corpus/chain/finality/finality.jsonl`; node
-  `validation.cpp:227-247` at `6504a3af`): its lock time 500000000 and
-  sequence 0 on a child spending the parent; at the row's own height and
-  cutoff (500000000, 500000000) both `isFinalTx` and the stream answer not
-  final, which no `<=` changes, so the row is read again at candidate 800001
-  with a cutoff of 500000001, where the Lean's `isFinalTx` answers final and
-  the mutant, reading the lock as a height, `NonFinal`
-  (`a_lock_time_at_the_threshold_is_a_time_finality_threshold_500000000`).
+- Under a word (both words, both eras, versions 1 and 2; 192 cells): every
+  cell refused before at the encoding check. Now the empty-signature cells
+  and the DER cells at post-Chronicle version 2 (Chronicle relaxes NULLFAIL,
+  `interpreter.cpp:40-44`) are valid, 120 cells; the other 72 are refused in
+  NULLFAIL's words (`OP_CHECKSIG requires failing signatures to be empty.`,
+  `OP_CHECKMULTISIG ...`), the node's `SCRIPT_ERR_SIG_NULLFAIL`. The
+  sibling's Lean evaluator (`bsv-script-lean@387dab35`, `spec@387dab35`,
+  `eval/bsvs eval`) answers the same on all 224 word cells with the control
+  key, 140 valid and 84 `SCRIPT_ERR_SIG_NULLFAIL`.
+- In the default mode (48 cells): every cell refused before; all valid now
+  (no NULLFAIL without a word). The reference's default at `ts-stack@edf6e03`
+  answers valid on the x = p + 1 and x = 2^256 - 1 cells (it reduces x modulo
+  p) and refuses the four off-curve and x = p points' 32 cells at its
+  encoding check, `The public key is in an unknown format.` (the parity
+  paragraph below).
 
-Each test RED on its mutants in the re-measure's logs, all eight green on the
-tree.
+The witnesses are `tests/pubkey_encoding_660.rs`:
+`an_off_curve_or_over_range_key_fails_the_signature_check_not_the_encoding_check_660`
+(the probe's evidence test, the 192 word cells swept: 120 valid, 72 in
+NULLFAIL's words), `the_default_mode_reads_the_point_as_the_node_reads_it_660`
+(its verdict one function, `default_valid`, a fold's to switch),
+`the_vector_carries_this_crates_cells_and_the_lean_agrees_with_the_node_660`,
+`the_reference_default_refuses_an_off_curve_point_a_stated_divergence_660`,
+`a_wrong_length_or_prefix_is_still_refused_at_the_encoding_check_660` and
+`a_key_on_the_curve_verifies_its_signature_and_refuses_a_wrong_one_660`,
+against `tests/vectors/pubkey_encoding_660.json`: 280 cells (the control and
+the six points, four shapes, five modes, two versions), their bytes this
+crate's writer's (the ignored `record_the_cells_660`), the node's verdict
+derived from its code, the Lean's under each word and the reference's under
+its default (Node v22.18.0, the bun bundle of `packages/sdk`), recorded by
+`tests/support/pubkey_encoding_660.mjs`; two runs byte-identical. RED on
+`e49cf55d` (the test file and the vector on the unchanged tree): 4 of 6, the
+sweep and the default (`Err("The public key is in an unknown format.")`
+where `Ok(true)`), the vector's Lean comparison and the divergence census
+(the x = p + 1 cells refused here, valid in the reference); the two controls
+green on both.
 
-### Notes: cross-SDK parity (#603, shard S2)
+The census: `conformance_scripts` with `BSV_CONFORMANCE_DIR` at
+`ts-stack@edf6e03`'s `conformance` holds 5,116 total, 4,120 run, 4,109
+passed, 959 unsupported, 37 skipped, 11 known failures, every class pin
+unmoved; no evaluation row of the corpus pushes a 33- or 65-byte `02`/`03`/`04`
+key that is no point (a scan of every direct push), so no row could move.
+The hybrid-key rows (`node.script.bitcoin-sv.1426`, `.1430`, teranode's
+`1377`, `1381`) stay refused at the prefix.
 
-A BEEF that carries one txid twice (a txid-only entry then the raw
-transaction, or the raw transaction twice) is refused by the reference's
-`verifyValid` (`#hasDuplicateTxids`, `Beef.ts:1066,1092-1099` at
-`ts-stack@edf6e03`) and accepted by both of this crate's readers, the stream
-and `Beef::from_binary` with `verify_valid` (three entries, valid), as the Lean
-this reader states accepts it (`enter` keeps the earliest entry, `enterRaw`
-upgrades it, `BeefOfAnySize.lean:900-910`). The reference reads the same bytes
-as one entry when merged (`mergeBeef`, `:971`, valid). Older than #603; no
-change: the stream's rule is its Lean's. The vectors are the
-`stream_s2_txid_only_entry_then_its_transaction` and
-`stream_s2_transaction_twice` cases.
+Downstreams: a host running scripts (the overlay engine's submit door,
+`Transaction::verify`, and the streaming reader under a live word) refused
+before a spend whose script checks an off-curve or out-of-range key against
+an empty signature and inverts the answer, which the node accepts; it
+accepts it now. No consumer on this host matches either refusal's words
+(`bsv-overlay-cloudflare`, `rust-message-box` searched). A spend with a valid
+key judges as before.
 
-### Added: src/script/script.rs's surviving mutants, shard C (the writers), killed from the sibling's rules and vectors (#603)
+### Notes: cross-SDK parity (#660)
+
+Under a word the crate now reads the key as bitcoin-sv v1.2.3 does, and the
+sibling's Lean agrees cell for cell. In the default mode the crate reads it
+as the node does too, where the reference's default reads the point at its
+encoding check (`ts-stack@edf6e03` `Spend.ts:687-718`,
+`#checkPublicKeyEncoding`, `PublicKey.fromDER` under its `try`): an off-curve
+point, or x = p (x = 0 has no point), is refused there in `The public key is
+in an unknown format.`, and an x past p is reduced modulo p
+(`Point.ts:365-367`) and read as the point it names, the reduction the
+filed quirk of the divergence list's key-forms row (queue row 18, ts-stack
+#1467). On the recorded cells the verdicts agree for x past p (the signature
+fails either way) and differ for the four refused points (32 cells, valid
+here). A signature made for the reduced point verifies there and fails here.
+The #657 vector is the divergence's recorded witness: its
+`compressed-off-curve` and `uncompressed-off-curve` cases (48 of 348, both
+signatures, the four opcodes, the three modes) keep the reference's `unknown
+format` and are judged here as the control key with the same signature is
+(`NODE_READ_660` in `tests/pubkey_words_657.rs`), and its 24 x = p + 1
+cases, enumerated apart until now, take the reference's verdict and words.
+Ours: the node's reading in every mode, the default included, by the
+keeper's word of 2026-11-02 23:2xZ (`CLAUDE.md`'s line that the interpreter
+follows the node); the reference's reading stays one switch away
+(`reads_the_reference_point`). Go (`go-sdk@2ca481c`)
+not measured.
+
+Semver: no public type or signature changed. The refusal words for a wrong
+length or prefix are unchanged; the `unknown format` and CHECKMULTISIG
+encoding refusals no longer fire for a key of the right length and prefix
+that is no point.
+
+### Fixed: the nightly's pin job pins the dispatch's commit, never beta's tip at dequeue; the consumers check it out and the report names it (#629)
+
+The nightly's `source` job checked out the dispatched branch and pinned
+`git rev-parse HEAD`, the line's tip when the job dequeued, not the commit
+the run was dispatched on. Run 41347058507 (2026-11-01), dispatched at
+`9640eaa7` as the witness for #611's floors, queued until #613 landed and
+pinned `42a74f1b`: every shard measured that tree while the run's `head_sha`
+and the record named `9640eaa7`. The `source` job now pins the dispatch's
+commit, `inputs.commit` when the dispatch names one (a new optional input,
+`gh workflow run nightly.yml --ref beta -f commit=<full sha>`), else
+`github.sha`, fixed by GitHub at the run's creation, through
+`nightly_mutants.py pin`, which takes the sha as an argument, never resolves
+a ref, and refuses a sha that is not a full 40-hex sha or not on the
+dispatched line. The Mutants shards pass it to `run --commit`, which refuses
+a checkout at another commit, and the score job to `report --commit`, which
+refuses evidence of another commit and names the pin in the scoreboard
+(`Source commit: <sha>`); the fuzz jobs already checked out the pin. The
+shards' selection, the ceiling, the floors, the fuzz targets and the
+record's shape are unchanged. `docs/NIGHTLY.md` states the rule. The test:
+`PinIsTheDispatchCommit` in `.github/scripts/test_nightly_mutants.py` (a
+repository whose `origin/beta` moved from A to B after the dispatch pins A;
+a sha off the line, a ref name and a short sha are refused; a shard and the
+report refuse another commit), red on the pre-fix script (no `pin`, no
+`checkout_commit`, a report that names no commit), green after.
+
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S4 (the judge and the remainder), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`) left
-28 of the writers' mutants alive (`compute_serialized_length` 17,
-`serialize_chunks_to_bytes` 3, `write_bin` 3, `write_number` 4,
-`encode_script_number` 1). Killed by tests: 21. Declared equivalent: 6,
-named below, in `.cargo/mutants.toml`'s `exclude_re` on three reads that
-accept all six (judged at `b5e3f7d1`: the cold read; the adversarial read,
-EQUIVALENT ×6 at 0.97; the rule read, EQUIVALENT ×6 at 0.97). Remaining: 1, `write_bin`'s `451:32` (`<` to `<=` on the
-4 GiB bound): only an input of 2^32 bytes or more reaches it, and the
-oracle's shards run every test under `ulimit -v 4000000` (4,096,000,000
-bytes, `.github/scripts/test-runner-memory-ceiling.sh`, #574), where that
-allocation fails and aborts the shard's baseline; a test the oracle can
-never run is not a kill, so there is none (the reference's bound stays
-recorded in the vector's `bound`). Re-measured on this shard's functions
-(`--re 'compute_serialized_length|serialize_chunks_to_bytes|write_bin|write_number|encode_script_number'`,
-the script surface's selection from `nightly_mutants.py`'s `mutation_args`,
-`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, run as ten
-round-robin shards): 98 viable, 90 caught, 7 missed (`451:32` and the six
-candidates), 1 timed out (`511:23` `>` to `>=`, an endless loop, not a
-survivor of the census), 0 unviable: 91.8 percent caught
-of viable. With the six declared, the same run (ten round-robin shards,
-`--jobs 1`) lists 92: 92 viable, 90 caught, 1 missed (`451:32`), 1 timed out
-(`511:23`), 0 unviable, the six absent: 97.8 percent caught of viable.
+21 of the judge's and the remainder's mutants alive (`Judge::start_of` 6,
+`Judge::check_named_subject` 2, `BeefIndex::note_raw` 2,
+`BeefIndex::model_work` 2, `BeefIndex::entries`, `Referenced::is_empty`,
+`Verdict::is_valid`, `atomic_unreached`, `HeadersFn::carries`, the two
+`Display` impls, `AsyncStreamVerifier::run`, the constant `CHUNK`). Killed by
+tests: 19 of 21, in `tests/beef_stream_603_s4.rs` (12 tests, each RED on its
+mutants in a scratch copy, the log beside the lane's evidence; the 12th, for
+`3026:33`, added by the review of #645): 17 rest on the sibling's rules and
+the reference's recordings, 2 on crate-contract pins stated apart
+(`note_raw`'s `2234:9` and `2234:50`, the offset a missing subject is named
+at without a prefix: crate-contract pin, no sibling rule, stated; the Lean
+names offset 4 only and the reference reports no offset). The line they pin
+is now public, on `Reason::SubjectMissing`'s rustdoc and
+`src/transaction/CLAUDE.md:21`: "a missing subject is named at the prefix's
+32 bytes; without a prefix, at the last raw transaction instead, or at the
+stream's end when there is none" (the line promoted from `Judge::conclude`'s
+0.8.1 comment, not invented), and their test names it, so the keeper's
+condition (1) holds; re-cited the day a sibling rule or a reference recording
+covers it. Declared equivalent: 1, `2348:66` on three reads (below, in
+`.cargo/mutants.toml`; at `2348:55` since the seed fold, below). Remaining: 1, stated: `1378:25` (`replace * with +`,
+the 16 KiB read size `CHUNK`), an internal parameter a pin would freeze,
+neither a kill nor an equivalence (its test, `source.largest == 16 * 1024`,
+asserted a read size no document states and went under the keeper's ruling
+of 2026-11-02; no verdict or element depends on it, the Lean's resume at
+every `k`); it enters nothing.
 
-The sibling's whole corpus (`bsv-script-lean@5dc337e1`, `harness/run --impl
-bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
-of the 28: the harness reads every script with `from_binary`, whose bytes
-`to_binary` returns unwritten. The vectors reach the writers instead: the
-corpus's push, number and script shapes at the encoding edges, copied by id,
-and the reference's `Script.writeBin`, `writeBn` and `toBinary` at
-`ts-stack@edf6e03` under Node v22.18.0 for the shapes the corpus lacks
-(`tests/vectors/script_writers_603_c.json`, written by
-`tests/support/script_writers_603_c.mjs`, two runs byte-identical). The rules:
-`pushData` (`lean/BsvScript/Sighash.lean:275-282`, `CScript::operator<<`,
-`script.h:104-133`) with its `le32` length (`:66`); `encode`
-(`lean/BsvScript/Numbers.lean:134-147`, `CScriptNum::serialize`).
+The vectors: the rows of `bsv-script-lean@5dc337e1` `corpus/wire`
+(`beef-001`, `beef-023`, `beef-031`, `atomic-beef-023`, `atomic-beef-025`)
+with the reference's answers on them, recorded by #632's recorder
+(`tests/support/beef_reference_603.mjs`, extended with five `s4_*` cases:
+`Transaction.fromAtomicBEEF` and `fromBEEF` on the subject, `Beef.verify`
+with every root carried and none, the unproven spends, the truncated read; at
+`ts-stack@edf6e03` under Node v22.18.0; every earlier case and row
+byte-identical on the re-run); the recording's `two_bumps_one_root`; and the
+rows of `bsv-stack-lean@5df1e0a3` `lean/BeefOfAnySize/Scenarios.lean` (the
+atomic chain of 10,000 links: 740,145 units of work, an index of 20,005; the
+root not carried at offset 5). A named subject the prefix also names is
+found, a missing one is refused at offset 4, or without a prefix at the last
+raw transaction (`note_raw`); a root the headers function does not carry is
+refused; the first pass names the unproven spends; a txid two BUMPs carry is
+one entry per BUMP (`entries`' `proven_again`); a resumed reading runs from
+the input reached, and a resumed source carrying another transaction at that
+offset has every input run (`start_of`, against `tests/beef_stream_pause.rs`'s
+shape at two inputs); a BEEF of proven transactions never asks the tracker
+for the tip (`run`'s `&&`); the two error texts; a bad version word after the atomic prefix is refused at 36 by the
+asynchronous reader in chunks of 36 bytes as by the stream whole (the Lean's
+`cutFrame`, `bsv-stack-lean@5df1e0a3` `lean/BeefOfAnySize.lean:1108-1124`,
+cuts the frame before `finish` asks the subject).
 
-- `src/script/script_length_603_tests.rs` (a unit module: the sum,
-  now `pub(crate)`, sizes the writer's buffer alone), the two-path rule with no
-  allocator assumption: `compute_serialized_length` of the chunks equals the
-  length of the bytes `to_binary` writes for them, which are the reference's,
-  and the length the reference's `toBinary` writes (`#computeSerializedLength`,
-  `Script.ts:450-476`). On the recording's eleven corpus scripts
-  (`bytes-00076` to `-00079`: a 75-byte direct push, `OP_PUSHDATA1`, `2`, `4`
-  of one byte; `arith-00011`, `-00013`, `-00687`; `seed-000647` and
-  `gen-00999`, data after a top-level `OP_RETURN`; `seed-000785`'s 65535-byte
-  push and `tx-00040`'s 10,000,036-byte output rebuilt by the writers) and
-  the writer's pushes at its twelve lengths, 1 to 2^24: all 17 of
-  `compute_serialized_length` (`328:9` `0` and `1`, `330:19`, `333:29`,
-  `334:27` `*=` and `-=`, `337:29` three, `339:36`, `340:27`, `340:32`,
-  `341:36`, `342:32`, `343:36`, `344:27`, `344:32`), and RED on each of the
-  function's 27 mutants in a scratch copy.
-- `tests/script_script_603_c.rs`: the push writer at each edge against the
-  reference's bytes and the corpus's (`seed-000785`'s 65535-byte push), 65536
-  bytes `OP_PUSHDATA4` `00 00 01 00` and 2^24 `00 00 00 01` (`448:23`, `380:38`,
-  `381:38`); `tx-00040`'s `OP_0 OP_RETURN` output rebuilt by the writers to the
-  corpus's 10,000,036 bytes, `4e 9d 96 98 00` (`379:38`, `380:38`); the number
-  writer on 22 corpus pushes by id (`seed-000040` -2 to `seed-000133`
-  -(2^63 - 1)) and `i64::MIN` by the reference; nine corpus scripts written
-  back from their chunks to their bytes and spent to their recorded verdicts
-  under the post-Chronicle block word.
+Declared equivalent on three reads (the keeper's word of 2026-11-02), with
+no entry of the sibling's wire corpus moving
+(`run_wire` on its five files, 150 rows, the scratch harness's `bsv-rs` the
+lane's tree and the mutant's), the ts-stack corpus's BEEF suites
+(`conformance_beef` at `edf6e03`) and this crate's BEEF witnesses
+(`beef_stream`, `beef_atomic_graph`, `beef_stream_pause`, `beef_order_held`)
+green under it:
 
-Each kill RED on its mutant in a scratch copy, every test green on the tree,
-and green under a simulated 4,096,000,000-byte ceiling (an allocator refusing
-past it; macOS refuses `ulimit -v`). The six declared equivalent, each with
-no corpus entry moving and no test of either file failing, on three reads:
-the cold read (accepts the six), the adversarial read (push lengths 0 to
-65537 at every edge and the `i64` edge set through the writers, `from_asm` and
-`OP_NUM2BIN`, all six diffs empty, two control mutants moving 81,966 and 1,220
-lines; EQUIVALENT ×6, 0.97), the rule read (`script.h:104-133`,
-`int_serialization.h:23-59` at bitcoin-sv v1.2.3; EQUIVALENT ×6, 0.97):
+- `atomic_unreached` `2348:66`, `<` to `<=`: the comparison picks the
+  earliest unreached entry by the trie order over a `HashMap` keyed by txid;
+  `u` is an earlier key, so the two orders are equal only for the same txid
+  (`reverse_bits` is a bijection), which a map never holds twice. The Lean's
+  `failing` walks a trie of one value per key (`bsv-stack-lean@5df1e0a3`
+  `lean/BeefOfAnySize.lean:363-376`, `key` at `:381-384`, `finish` at
+  `:993-998`). Both callers' tables hold one entry per txid (the stream's
+  `HashMap`, `beef_stream.rs:1746`, `:2053`, `:2205-2223`; the whole path's
+  `beef/in_memory.rs:264-280`), as do TS's (`Beef.ts:517-522, 529-538,
+  919-929` at `edf6e03`) and go-sdk v1.7.2's (`beef.go:23, 416`). The cold
+  read (accepts, 0.97), the adversarial read (EQUIVALENT, 0.98: a transaction
+  carried twice raw and txid-only, in two BUMPs, merged from two BEEFs, a
+  subject repeated, every feed split of a streamed BEEF, none moved), the rule
+  read (EQUIVALENT, 0.98).
 
-- `write_bin` `442:23` (`<` to `<=`): at the one length where the branches
-  differ, 76, the direct branch's opcode is `76`, which is `OP_PUSHDATA1`, the
-  chunk the same and its bytes `pushData`'s (`Sighash.lean:279-280`; the
-  reference's recording at 76; the RPuzzle precedent, `rpuzzle.rs:350:34`).
-- `write_number` `486:29` (`<` to `<=`) and `488:27` (`<=`, `==`, `>`):
-  `encode` of an `i64` is at most nine bytes (`encode_length_le_iff`,
-  `Numbers.lean:1019`, bounds the length by the magnitude; 2^63 is eight bytes
-  and a sign byte), so the comparison with 76 is always true at
-  `486` and the `OP_PUSHDATA1`/`OP_PUSHDATA2` branch at `488` is never reached.
-- `encode_script_number` `507:28` (`<` to `<=`): zero returns before the sign
-  is read (`encode`'s `if v = 0 then []`, `Numbers.lean:147`), so `num <= 0`
-  and `num < 0` agree on every value that reaches it.
+`Judge::check_named_subject` `3026:33`, `||` to `&&`, was the lane's second
+candidate; it is not equivalent. The prefix's subject is set when its 32
+bytes are read, before the version word ends the header, and the
+asynchronous reader asks the check after every decoder step: the mutant
+compares the subjects there and refuses `SubjectMissing` at 4 an atomic BEEF
+whose chunk ends after the prefix and whose version word is bad, where the
+tree refuses `BadVersion` at 36
+(`a_bad_version_after_the_prefix_is_refused_whatever_the_chunks_wire_atomic_beef_023`).
 
-No vector revealed a divergence from the reference.
+Re-measured on this shard's functions (`--re` of the brief, the beef
+surface's selection from `nightly_mutants.py`'s `mutation_args` with this
+file added, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`, ten
+round-robin shards): 48 mutants of S4's functions, 47 viable, 45 caught, 2
+missed (`2348:66`, `3026:33`), 0 timed out, 1 unviable (`3443:9`): 95.7
+percent caught of viable, re-measured the same mutant for mutant by the
+review of #645 in fourteen shards; with the review's test `3026:33` is
+caught: 46 caught, 1 missed, 97.9 percent; with the chunk test gone under the
+keeper's ruling (re-measured by the ruling's read on `f04eb090`, fourteen
+round-robin shards of four, the same 56 mutants as the lane's list): 45
+caught, 2 missed (`1378:25` `*` to `+`, `2348:66`, the two candidates), 1
+unviable, 95.7 percent; the whole regex 53 caught of 56. The regex matched 8
+more of other shards' functions (`Refusal`'s and `SpendRefusal`'s `fmt`, the five of the
+other two `carries`, `BeefDecoder::collecting`'s `780:13`), all caught. After
+the declaration (the fold, on `d1826625` with the entry, fourteen round-robin
+shards, `--jobs 1`, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`): the regex
+lists 55, `2348:66`'s `<=` absent; 53 caught, 1 missed (`1378:25`, stated), 1
+unviable (`3443:9`), 0 timed out; the shard's 47 at 45 caught of 46 viable,
+97.8 percent.
 
-### Added: src/script/script.rs's surviving mutants, shard D (the truncated-push index), killed from the sibling's rules and vectors (#603)
+The seed fold (the declaration's re-read): the other mutant at the
+declared site, `2348:66` `<` to `==`, was counted as caught by the run but
+its kill hung on the `HashMap`'s random seed. Under `==` the comparison never
+replaces, so the walk named the unreached entry the map yielded first, and
+the tests of the named entry (`beef_atomic_graph`'s X/Y pair) passed when
+the seed put the expected entry there: 16 of 200 runs through. The last pass
+of `atomic_unreached` now takes the unreached txids in a `BTreeSet`, by their
+bytes, and keeps the least by the trie order: the tree's answer is the same
+(the least of a set by a one-to-one key does not depend on the order it is
+taken in; no allocation when the walk reaches every entry), and under `==`
+the mutant names the least by the bytes on every seed. The 13th test,
+`the_entry_named_is_the_trie_earliest_not_the_byte_or_wire_earliest_on_every_seed`,
+puts two txid-only entries beside a proven subject, `01 00..` on the wire
+before `02 00..`, so the byte-earliest and wire-earliest is not the
+trie-earliest: RED on the mutant in 20 of 20 runs in a scratch copy (it
+names `01` at 151, not `02` at 184), RED on the pre-fix code with the mutant
+in 25 of 40 (the seed's share), GREEN on the tree. The site moved within the
+line, so the mutants are now `2348:55` (`<=` declared, its entry's regex
+moved, the reason unchanged: the set holds one txid per map key), and the
+`&&` to `||` at `2348:21` is gone with the `&&`. The function's line count is
+unchanged (its doc rewrapped), so every other mutant of the file keeps its
+line and column. Re-measured (`cargo mutants`, the beef surface's selection,
+`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--jobs 1`): `2348:55` `==`
+alone 20 runs, 20 caught (by `beef_atomic_graph`'s X/Y pair, now
+deterministic, ahead of this file in the run); the regex in five round-robin
+shards lists 54, 52 caught, 1 missed (`1378:25`, stated), 1 unviable
+(`3443:9`), 0 timed out; the shard's functions 46 listed, 44 caught of 45
+viable, 97.8 percent. Of the shard's 21 survivors: killed 19, declared 1,
+remaining 1, stated (`1378:25`); the `==` mutant, never one of the 21, is
+now killed on every seed.
 
-The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
-left 27 mutants of `truncated_push_index` alive (the index `Spend` refuses a
-truncated push at, read through `Script::truncated_push`), three of them
-timeouts. Killed by tests: 22 (19 the oracle reads caught; the three
-walk-stalling ones fail this file's deadline test but the oracle still reads
-TIMEOUT, below, never caught). Declared equivalent: 5 (on three reads, below,
-in `.cargo/mutants.toml`). Remaining: 0. Re-measured on this function alone
-(`cargo mutants --file src/script/script.rs --re truncated_push_index` with
-the script surface's selection from `nightly_mutants.py`'s `mutation_args`,
-`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`, `--in-place` on a scratch copy,
-20 shards): 75 caught, 5 missed (the five candidates), 3 timed out, 0
-unviable, 90.36 percent of 83 viable. With the five declared, the same run
-(`--jobs 1`, 20 shards): 78 mutants, 75 caught, 0 missed, the same 3 timed
-out (784:13, 800:17, 826:17), 0 unviable, 96.15 percent of 78 viable.
+`tests/beef_stream_603_s4.rs` is in the beef surface's selection through
+shard S2's `tests/beef_stream_603_*.rs` glob (`.github/scripts/nightly_mutants.py`,
+`docs/NIGHTLY.md`): the existing pins of these behaviours (`beef_stream_deep`,
+`beef_stream_pause`) are outside the selection, which is why the mutants
+survived it.
 
-The rules, from the sibling `bsv-script-lean@5dc337e1`: `getOpTail`
-(`lean/BsvScript/Machine.lean:29-50`), a push's size the opcode below
-`OP_PUSHDATA1`, else 1, 2 or 4 little-endian length bytes, a cut length or a
-body short of the size a parse failure that the loop reports as `badOpcode`
-where the walk reaches it (`:384-386`; bitcoin-sv v1.2.3 `script.h:165-200`,
-`GetOp2` returning false, `interpreter.cpp:450-451`; this crate's rule since
-0.3.27, bsv-rs#12); a top-level `OP_RETURN` ending the script (`:342-344`;
-`interpreter.cpp:856-861`), top level by the static scope of
-`GetSigOpCount` (`lean/BsvScript/SigOps.lean:62-69,85`; `script.cpp:45-58`).
-The vectors: the sibling's harness (`harness/run --impl bsv-rs --spec
-recorded`, a scratch copy linked to a scratch tree) over `all`, `road`,
-`xsig-144`, `million` and the `cpp/replay` corpora, base and each mutant, and
-every script of the whole `corpus/` through `truncated_push` on each mutant.
-`tests/script_script_603_d.rs` copies the moved entries by corpus and id with
-their recorded verdicts (`spec@cb7e46e`, `sv-node@v1.2.3`, or
-`sv-node-unit@v1.2.2` for the node's own `GetOp2` table): flow-01085
-(`516a4c`, valid: 788:15, 788:30, 788:48, 788:66), the subscript at
-`sighash/bsv-rs-0.7.0.jsonl:495` (`ffd7646f6a13…`, a cut push after a nested
-`OP_RETURN`: 788:42, 790:22), flow-01031 (800:17 `*=`), cpp-cscript-00009 and
-flow-01045 (806:41 `&`, 806:70), cpp-cscript-00013 and flow-00753 (810:20),
-flow-01049, road-seed-009157 and cpp-cscript-00014 (814:46, 815:17 `&`,
-815:46, 816:17 `&`, 816:46). Four moved no entry of the whole corpus
-(788:60, `OP_VERIF` and `OP_VERNOTIF` opening no scope; 789:34; 791:58 `+`
-and `/`) and fall to scripts of the scope rule (`65 6a 01`, `66 6a 01`,
-`63 63 68 6a 01`, `63 68 6a 01`, and a spend of `63 63 68 6a 68 02 aa`
-refused at the cut push): built by hand from the rule, no recorder's. The
-three walk-stalling mutants (784:13 `*=`, 800:17 `-=`, 826:17 `-=`) fail the
-file's tests within a ten-second deadline thread on arith-00001, arith-00003
-and cpp-bn_op-00003; `cargo mutants` still reads them TIMEOUT, because the
-library's own `script::spend` unit tests run first and hang on them. Each
-test RED on its mutants in a scratch copy, all eight green on the tree.
+### Changed: ci: the `vectors` job's corpus pin is one named constant, and CLAUDE.md no longer says CI skips the conformance corpus (#31)
 
-The five declared equivalent in `.cargo/mutants.toml`'s `exclude_re`, on the
-ensemble's three reads (the cold read, MERGE at 0.93; the adversarial read,
-EQUIVALENT ×5 at 0.97, 1,068,663 observations byte-identical on the tree and
-each mutant where a control mutant moved them all; the rule read, EQUIVALENT
-×5 at 0.97, bitcoin-sv v1.2.3 `script.h:177-189`): `793:45`, `op > 0` to `op
->= 0`: `OP_0` is a push of size 0 (`Machine.lean:32`, `op < OP_PUSHDATA1`),
-never short of its body (`:49`), and the index's `pos + 0 > length` cannot
-hold, so the push and the non-push branch both advance by nothing; `806:41`,
-`814:17`, `815:17`, `816:17`, `|` to `^`: the operands are one byte and bytes
-shifted by 8, 16 and 24, disjoint in their bits, so `^` equals `|` (and the
-sum of `Machine.lean:39,43`) at every association. No corpus entry and no
-script of the corpus moved under any of the five. No vector revealed a
-divergence.
+#31 found that `ci.yml` checked out no corpus and set no `BSV_CONFORMANCE_DIR`,
+so every CI run of `conformance_scripts` and `conformance_beef` was the skip,
+and 0.3.29 reached `main` with the evaluation gate red. The `vectors` job
+(1e4cfc2b, required on both lines) already closes that: it sparse-checks out
+`bsv-blockchain/ts-stack` at `edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`
+(`conformance` alone, no credentials), sets `BSV_CONFORMANCE_DIR`, asserts
+`META.json` and runs both files with `--nocapture` (beta's run 41518921952:
+`total=5116 run=4120 passed=4109 unsupported=959 skipped=37
+known_failures=11 failures=0 panics=0`). The pin is now the job's
+`TS_STACK_PIN`, so a pin move is one line (`nightly.yml`'s `mutants` job
+carries the same commit); `CLAUDE.md`'s "Where the numbers come from" said
+"CI does not" run the files and now names the job. No separate `conformance`
+job: a job outside the required set that runs on a push or a pull request is
+refused by `tests/arch_ci_pr_runs_the_required_set.rs`, and it would repeat
+the `vectors` job. No crate code moves.
 
-### Fixed: MerklePath's off-path offset refusal names the legal offsets as the reference's text does (#631)
+### Fixed: the P2PK lock refuses a hybrid public key, and the Multisig lock a key not tagged 02/03 where every spend reaches it, locks whose spend no word lets pass (#625)
 
-`MerklePath::new` refused a leaf above level 0 at an offset no level-0 hash
-climbs through as `Invalid offset: N, at height: H`; the reference goes on to
-list the legal offsets (`ts-stack@edf6e03` `MerklePath.ts:220-235`):
+`P2PK::lock` accepted a 65-byte hybrid key (`06`/`07` + x + y) and wrote
+`<key> OP_CHECKSIG`; `Multisig::lock` (the `ScriptTemplate` door, raw 33-byte
+keys) accepted any tag. Under STRICTENC the node refuses either key at the
+CHECKSIG or CHECKMULTISIG that reads it (bitcoin-sv v1.2.3 `6504a3a`
+`src/script/interpreter.cpp:132-152` `IsCompressedOrUncompressedPubKey`,
+`:312-316` `CheckPubKeyEncoding`, called at `:1465` and `:1611`;
+`SCRIPT_ERR_PUBKEYTYPE`), and every word this crate builds carries STRICTENC
+(the block and standard words name it; `SIGHASH_FORKID`, which
+`ScriptFlags::check` requires, forces it, `:2315-2318`), as every column of
+the sibling's corpus refuses `crypto-00014` (`bsv-script-lean@5dc337e1`
+`corpus/crypto/cases.jsonl`, the hybrid `07` lock). The P2PK template wrote a
+lock nothing can spend. It refuses it now, `Error::InvalidPublicKey` naming
+the tag and the rule (`a hybrid public key (tag 0x07) is neither compressed
+nor uncompressed: its spend fails under STRICTENC
+(IsCompressedOrUncompressedPubKey)`); a 33-byte `06`/`07` key at P2PK keeps
+the existing `Invalid public key prefix`.
 
-```ts
-legalOffsets[h].add(siblingOf(offsetAtHeight(leaf.offset, h)))
-...
-`Invalid offset: ${leaf.offset}, at height: ${height}, with legal offsets: ${Array.from(legalOffsets[height], offset => offset.toString()).join(', ')}`
+CHECKMULTISIG checks only the keys it reaches. The node's loop
+(`interpreter.cpp:1538-1633`) starts `ikey` at the stack's second item, the
+key pushed last (index n - 1 of the lock), and walks down to index 0, taking
+the signatures from the last pushed down the same way; it checks each key's
+encoding as it reaches it (`:1611`) and stops at the threshold's last match,
+so a key below that point is never read. The reference's `Spend` walks the
+same way (`ts-stack@edf6e03` `Spend.ts:1752-1838`), and this crate's
+`op_checkmultisig` pops the keys in that order (`pubkeys[0]` the last
+pushed). Index n - 1 is reached first. A spend can avoid every bad key
+exactly when, with `j` the highest index of a bad key, the `n - 1 - j` keys
+after it meet the threshold: `Multisig::lock` refuses the lock only when
+`n - 1 - j < m` (a dead lock: every spend reaches a bad key), naming `j`,
+its tag, the count after it and the threshold (`public key 1 has tag 0x07,
+not a compressed key's 0x02 or 0x03, and the 1 key(s) after it cannot meet
+the threshold 2: every spend reaches it and fails under STRICTENC
+(IsCompressedOrUncompressedPubKey)`); a lock whose bad keys a spend can
+avoid is written, as the node and the reference spend it. The bad set is
+every tag but `02`/`03` at 33 bytes: a 33-byte `04` key fails the same check
+in both (the reference's `The non-compressed public key must be 65 bytes.`).
+`Multisig::lock_from_keys` writes compressed keys and was never open to it.
+
+The reference has no P2PK or Multisig template (`ts-stack@edf6e03`
+`packages/sdk/src/script/templates/index.ts`: P2PKH, RPuzzle, PushDrop;
+go-sdk at `2ca481c` neither). Recorded under Node v22.18.0 from a bun build
+of `edf6e03` (`tests/support/p2pk_hybrid_625.mjs`,
+`tests/vectors/p2pk_hybrid_625.json`) on the corpus's `key("a")`, whose y is
+odd: `PublicKey.fromString` and `fromDER` read `07` + x + y to the compressed
+key and refuse `06` for it (`Point string value is wrong length`,
+`src/primitives/Point.ts:303-330`); its
+`Script` writer pushes either as given; its `Spend` refuses both spends, at
+versions 1 and 2, under its default flags and under an explicit
+`SIGHASH_FORKID` word, `The public key is in an unknown format.`
+(`Spend.ts:687-716`, at the CHECKSIG `:1669`), and accepts the uncompressed
+control under both. This crate's interpreter gives the same verdicts and words
+in its default mode and under `ScriptFlags::block` and `ScriptFlags::standard`
+of the post-Genesis and post-Chronicle eras; the version-2 `07` spend this
+crate signs is `crypto-00014`'s transaction byte for byte. The vector's
+`multisig` sweep: m-of-n for n from 1 to 4 and every m, a key retagged `04`,
+`06` or `07` at each index and `07` at each pair of indices (125 shapes),
+each spent at versions 1 and 2 by the m highest-indexed good keys (a bad
+index's own key filling the count): the reference's `Spend`, under its
+default flags and the explicit `SIGHASH_FORKID` word, accepts the 35 shapes
+the rule calls avoidable and refuses the 90 it calls dead (500 of 500
+records agree), in its key check's words.
+
+The witnesses are `tests/p2pk_hybrid_625.rs`:
+`a_hybrid_key_is_refused_at_the_p2pk_lock_625`, RED on `b9f78224` (`left:
+Ok("41065935…ac")` for `hybrid_06`), green after;
+`an_unreached_bad_key_lock_is_written_and_spent_under_every_word_625` (a
+one-of-two lock with key 0 retagged `04`, `06`, `07`, written to the
+reference's bytes and spent by key 1, valid in the default mode at versions 1
+and 2 and under the block and standard words of both eras) and
+`the_multisig_sweep_follows_the_reachability_rule_and_the_reference_625` (the
+125 shapes: the lock written to the reference's bytes exactly where the rule
+says avoidable, refused naming the highest bad index elsewhere; the spend
+signed to the reference's unlock byte for byte and judged in the five modes
+as the rule says), RED on #625's first cut `82afa758` (the first refused at
+`lock`, `unwrap()` on an `Err`; the second at `1-of-1 bad [0] tag 04`, the
+old words), and `a_multisig_lock_a_bad_key_makes_dead_is_refused_at_the_lock_625`
+(1-of-1, 2-of-2 with either key bad, 1-of-2 with the last bad, 2-of-3 with
+the middle bad, 2-of-4 with keys 0 and 3 bad, tags `00`, `04`, `05`, `06`,
+`07`), RED on `b9f78224` (every lock written) and on `82afa758` in its words
+alone, green after; `the_spend_of_a_hybrid_lock_is_refused_under_every_word_625`
+(the lock written by `Script`'s writer to the reference's bytes, the spend
+signed by `P2PK::sign_with_sighash` to the reference's transaction, every
+verdict above), `the_spend_of_a_retagged_multisig_lock_is_refused_under_every_word_625`
+and `the_reference_parser_reads_the_hybrid_tag_y_names_and_no_template_carries_it_625`
+(`PublicKey::from_hex` reads both tags as the reference does, `from_bytes`
+refuses both), green before and after: the parser and the interpreter are not
+the doors that moved.
+
+### Notes: cross-SDK parity (#625)
+
+The reference's doors for a hybrid key are its parser, which accepts the tag
+y names, and its interpreter, which refuses both tags; it has no template
+door, and its `Script` writer locks the key as given. This crate refuses the
+key at its own templates, a door the reference does not have: a stated
+divergence (a row in `CLAUDE.md`'s list), not a verdict that differs. Every
+column refuses the spend of a P2PK lock of a hybrid key and of a dead
+Multisig lock; a Multisig lock whose bad keys a spend can avoid is written
+here and spent by every column, so its verdict does not differ either.
+Multisig's spend reaching a retagged key was refused here in this crate's
+CHECKMULTISIG words (`OP_CHECKMULTISIG requires correct encoding for the
+public key and signature.`); the reference's visible words are its key
+check's (`The public key is in an unknown format.`, or for a 33-byte `04`
+key `The non-compressed public key must be 65 bytes.`, thrown inside
+`#checkPublicKeyEncoding` before its wrapper at `Spend.ts:1808-1814`; the
+sweep records them): a pre-existing difference of words, closed by #657,
+whose site returns the key check's words.
+
+Semver: no type changed. A caller that locked a hybrid key with `P2PK::lock`,
+or with `Multisig::lock` a set of keys every spend of which reaches one
+tagged other than `02`/`03`, gets `Err` where it got a lock no node would let
+spend. No downstream on this host (`bsv-overlay-cloudflare`,
+`rust-message-box`, `bsv-wallet-toolbox-rs`) calls either template.
+
+### Fixed: the CHECKSIG scriptCode built from the bytes as the node builds it, so an unlocking-script check after a codeseparator keeps the locking script whatever chunk follows (#654)
+
+The scriptCode of `OP_CHECKSIG`, `OP_CHECKSIGVERIFY`, `OP_CHECKMULTISIG` and
+`OP_CHECKMULTISIGVERIFY` was built from the executing script's chunks after the
+last `OP_CODESEPARATOR`, the locking script's chunks appended inside the
+unlocking script, then written through `Script::to_binary`'s chunk serializer
+(`build_subscript` and the CHECKMULTISIG site, `src/script/spend/crypto.rs`).
+That serializer stops at an `OP_RETURN` chunk holding data, and the parser
+folds every byte after a top-level `OP_RETURN` into one such chunk, so for an
+unlocking script `<sig> <P> OP_CODESEPARATOR OP_CHECKSIG OP_RETURN 01 00` over
+the locking script `OP_VERIFY OP_1` (U2) the scriptCode here was `ac6a0100`,
+the locking script dropped. bitcoin-sv v1.2.3 builds it from the bytes
+(`interpreter.cpp:1470-1484`, `1566-1579`; `script.h:201-224`):
+
+```cpp
+CScript scriptCode {pbegincodehash, pend};
+if(checksigData && IsChronicle(flags))
+{
+    scriptCode += *checksigData;
+}
+CleanupScriptCode(scriptCode, vchSig.GetElement(), flags);
 ```
 
-The refusal is now the reference's text byte for byte, the list in the order
-level 0's leaves (duplicates apart) first name each offset, as its `Set`
-iterates, not sorted: `mp-parse-001` with a leaf added at level 1, offset 1526,
-is `Invalid offset: 1526, at height: 1, with legal offsets: 1525, 1524`;
-`mp-combine-001` at level 1, offset 7, `…, with legal offsets: 0, 3, 5`, and
-`5, 3, 0` with its level 0 reversed (`src/transaction/merkle_path_legal.rs`).
-The legal set is unchanged, so no verdict moves; the lone leaf at an offset
-other than 0 keeps this crate's refusal (`MissingSibling`, 0.4.2), a stated
-difference. The witness is
-`an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631`
-(`src/transaction/merkle_path_603_tests.rs`, renamed from #603's
-`…_by_legal_offsets_alone_wire_bump_008_014_018`) against six shapes of
-`tests/vectors/merkle_path_603.json`, three added to
-`tests/support/merkle_path_603.mjs` and re-recorded under Node v22.18.0 (the
-existing entries byte for byte unchanged); RED before the change (`left:
-"Invalid offset: 3, at height: 1"`). The 0.3.34 root-check equivalence keeps
-its legacy copy verbatim and maps its offset words through the #631 rule.
-`new_unchecked` and the BUMP readers do not judge legal offsets and are
-unchanged.
+the unlocking script's bytes from the last executed codeseparator to its end,
+then the locking script's bytes, `ac6a01006951`; `CleanupScriptCode`
+(`:255-263`) deletes a signature's push only without `SIGHASH_FORKID`, by
+`FindAndDelete`'s walk of `GetOp` instructions, which reads through an
+`OP_RETURN`. Under the post-Chronicle `block` and `standard` words (a version-2
+spend is malleable there, `:2321-2334`, so the unlocking script need not be
+push-only) the spend the node signs was refused here (`OP_VERIFY requires the
+top stack value to be truthy.`) and a spend signed over this crate's digest was
+accepted here and refused by the node: a consensus difference on the block
+word, through `Spend`, `Transaction::verify` and the streaming reader alike.
 
-Semver: an error text changed, no type. A caller matching the whole
-`MerklePathError` text of an off-path refusal sees `, with legal offsets: …`
-appended; a prefix match on `Invalid offset: N, at height: H` still holds. No
-`.rs` file of `bsv-overlay-cloudflare`, `rust-message-box`,
-`bsv-middleware-cloudflare-public` or `rust-chaintracks` names the text (the
-`bsv-low` workers were not read by this lane).
+Two more readings went with it. The locking script was appended inside the
+unlocking script under every word, where the node appends it only under
+`SCRIPT_CHRONICLE` (`IsChronicle(flags)`): under a pre-Chronicle word that does
+not require a push-only unlocking script (`ScriptFlags::block(ProtocolEra::PostGenesis)`
+without `SIGPUSHONLY`, or `set_require_push_only(false)` after it) the node
+signs the unlocking script's bytes alone. And a non-FORKID signature's push
+behind a top-level `OP_RETURN` was not deleted (the folded chunk never equals
+the push), where the node's walk deletes it: no word reaches this (a word
+carries `SIGHASH_FORKID`, which forces STRICTENC, `:2315-2318`, and refuses the
+signature at its encoding), the default mode does (#429 verifies a `0x01` signature over
+the original digest there).
 
-### Added: src/transaction/merkle_path.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+The fix: `src/script/spend/script_code.rs` builds the scriptCode at both sites
+as the node does: the executing script's bytes from the last executed
+`OP_CODESEPARATOR` (the chunk index's byte offset) to its end; inside the
+unlocking script the locking script's bytes, under a word carrying `CHRONICLE`
+and in the default mode at every version (the reference's `Spend` appends at
+every version, `Spend.ts:1688-1690`); then, for each signature without the
+FORKID bit, `FindAndDelete` of its minimal push ported byte for byte
+(`find_and_delete`, `GetOp2`'s read, consecutive copies, the bytes after a
+read that fails kept). No public API changes. `crypto.rs` frees the lines it
+held (439 from 499); `spend/mod.rs` stays at 800.
 
-The widened run 41327640129 left 25 survivors in `src/transaction/merkle_path.rs`
-(64 caught of 89 viable, 71.91 percent): the constructor's tree-height bound and
-legal-offset rule (`new_internal`, lines 160 to 194), `combine`'s extension to the
-other's levels (415), `trim` (455 to 494) and the shared root walk (`RootWalker`,
-592, 628, 660). The readers build a path through the stream, never through `new`,
-so under each survivor no entry of the sibling's corpora moves (`bsv-script-lean`
-at `387dab35`: the nine corpora of `harness/run --corpus all`, every one GREEN, and
-the 150 rows of `corpus/wire` through `run_wire`, both identical to the base
-column; a caught mutant at `merkle_path.rs:648` moves 192 lines of the wire
-column, the loop's control). The tests are seven in
-`src/transaction/merkle_path_603_tests.rs` against `tests/vectors/merkle_path_603.json`,
-which `tests/support/merkle_path_603.mjs` records under Node v22.18.0 from the
-reference's `MerklePath.ts` at `ts-stack@edf6e03` over BUMPs copied by their ids
-from the sibling's `corpus/wire/bump.jsonl` and the conformance corpus's
-`merkle-path.json` (`mp-parse-001`, `mp-combine-001`). The bound falls to
-`the_tree_height_bound_is_64_levels_bump_lean_66_wire_bump_001_029` (BRC-74's 64,
-the sibling's `bumpMaxTreeHeight`, `lean/BsvChain/Views/Wire/BUMP.lean:66`); the
-legal offsets (`MerklePath.ts:220-235`) to
-`legal_offsets_admit_every_path_the_reference_admits_wire_bump_rows_and_mp_parse_combine_001`,
-`a_level_0_duplicate_takes_no_part_in_the_offset_rule_wire_bump_007` and
-`an_offset_off_every_path_is_refused_in_the_reference_words_with_its_legal_offsets_631` (#603's `…_by_legal_offsets_alone_wire_bump_008_014_018`, renamed by #631),
-which also kill `RootWalker::root_from`'s meeting check (628); `combine` and
-`trim` (`MerklePath.ts:508-594`) to
-`combine_of_two_paths_of_one_block_is_the_references_compound_wire_bump_pairs`
-(every ordered pair of two mainnet rows of one block),
-`combine_extends_a_shorter_path_to_the_others_levels_wire_bump_005` and
-`trim_drops_a_level_0_pair_with_no_client_txid_wire_bump_023_to_026` (the four
-compound rows, each also with one client txid's flag cleared). Killed by tests 21, declared equivalent 4,
-remaining 0: `merkle_path.rs:592:13` (the `shared` field deleted) and the three
-replacements of the guard at `660:27`/`660:33`. Each changes only which nodes a
-later walk reuses: a node's hash at a level and offset is a function of its
-inputs, not of the walk that reaches it (BRC-74's root derivation), and every
-walk still returns its root, which the constructor compares with the first
-(`MerklePath.ts:242-261`, the sibling's `Bump.root`, `BUMP.lean:382-393`), so a
-differing root is refused before any mark is read and no verdict, root or byte
-moves. Declared on three reads: the cold read (0.92), the adversarial read
-(equivalent ×4, 0.93: paths sharing every internal node and none, duplicates on
-both sides of a shared node, a lone leaf at offset 0 and off it, `combine` and
-`trim` after walks) and the rule read (equivalent ×4, 0.95). The three guard
-mutants are `exclude_re` entries in `.cargo/mutants.toml`; `592:13` has no
-entry there, because cargo-mutants 27.1.0 adds a struct-field deletion without
-its name filter (`src/visit.rs:703-747`), so it still lists and still survives,
-the oracle's one standing miss on this file until the tool filters it. The Merkle surface's selection
-(`test_skips('merkle')`, `.github/scripts/nightly_mutants.py`) skipped every
-`transaction::` module but `merkle_path`, so under the oracle the seven tests
-never ran (64 caught, 25 missed, 0 timed out, 12 unviable on this tip, the cold
-read's re-measure); it now keeps every `transaction::` module whose name starts
-with `merkle_path`, pinned by
-`test_the_merkle_surface_runs_merkle_path_603_tests` in
-`.github/scripts/test_nightly_mutants.py` (`transaction::beef::` still skipped).
-Re-measured on the tip under the fixed selection's `mutation_args` with the
-conformance corpus at `ts-stack@edf6e03`: 85 caught, 4 missed, 0 timed out,
-12 unviable, 95.51 percent of viable; with the three guard mutants declared
-(98 listed): 85 caught, 1 missed (`592:13`), 0 timed out, 12 unviable, 98.84
-percent of viable. No behaviour changes.
+The modes, U2 at version 2 (the full table in the vector):
 
-### Notes: cross-SDK parity (#603)
+| Mode | Before | After | Node (Lean) | TypeScript default |
+|---|---|---|---|---|
+| `block` / `standard`, post-Chronicle, node-signed | refused (`OP_VERIFY`) | valid | valid | (no word) |
+| `block` / `standard`, post-Chronicle, signed over `ac6a0100` | valid | refused | invalid | (no word) |
+| default, `set_require_push_only(false)`, node-signed | refused | valid | | refused |
+| default, `set_require_push_only(false)`, signed over `ac6a0100` | valid | refused | | valid |
 
-The recorded vector shows three differences from the reference's `MerklePath`
-at `ts-stack@edf6e03`. Each is older than #603. None is a change. Two are the
-reference's bugs, filed as ts-stack #1469 and #1470 on 2026-11-02 from the #375
-queue's twenty-third and twenty-fourth drafts; answer pending. First, the reference refuses a
-path of more than 54 levels (`MerklePath.ts:198-199`, `Merkle Path must contain
-between 1 and 54 levels`), in its constructor and so in `fromBinary`, narrower
-than BRC-74's 64 (`transactions/0074.md:51`, the sibling's `BUMP.lean:66`), which
-this crate holds; the vector records the reference's refusal of the 64-level path
-beside this crate's root for it, the root the reference's own walk climbs to one
-level at a time. Second, `combine` of a receiver with fewer levels than the
-other: the reference merges over the receiver's levels alone (`:520`), so
-`bump-005` combined into its own level 1 gives one level and a root other than
-the one its combine checked; this crate extends the receiver to the other's
-levels and gives `bump-005` back byte for byte, its root unchanged. Go at
-`2ca481c` indexes past the receiver's levels there
-(`transaction/merklepath.go:453-467`) and has no level bound or offset rule in
-`NewMerklePath` (`:149`). Third, a crate-side difference conformed by #631 and
-no longer a difference: a leaf off every path is refused in the reference's
-words with its `, with legal offsets: …` list (`:230-235`); the lone leaf at an
-offset other than 0 stays this crate's refusal (0.4.2). No block holds 2^54
-transactions, and a path's verdict on the BEEF and BUMP readers is the stream's
-(bsv-rs#167).
-The line is in CLAUDE.md's divergence list.
+The serializer's stop itself stays: it is the reference's writer
+(`Script.ts:450-484` at `ts-stack@edf6e03`), a script read from bytes writes
+its bytes back (the folded chunk is always its last), no template places a
+chunk behind such a chunk, and since #654 no scriptCode is built through it;
+only chunks a caller puts behind a data-carrying `OP_RETURN` are not written,
+as in the reference (pinned).
 
-### Added: src/script/script.rs's surviving mutants, shard B (the chunk parser), killed from the sibling's rules and vectors (#603)
+A downstream on the live chain-parameter word (#440: the wallet toolbox's
+`verify_beef_spends`, `bsv-wallet-toolbox-rs` at `=0.9.0-beta.6`, on its next
+pin) refused a node-valid post-Chronicle spend whose unlocking script carries a
+codeseparator, a CHECKSIG and a data-carrying `OP_RETURN`, and accepted one the
+node refuses; after the update it accepts the node-valid spend and refuses the
+other. A default-mode caller (the overlay engine's submit door,
+`bsv-overlay-cloudflare` `script_door.rs`, `Spend` with no word, at `=0.7.2` on
+its `main`) refuses the unlocking-script shapes (U1, U2, U3, M2, P1) at
+push-only before and after, and on the update sees L1 alone (a `0x01` signature in the locking script behind its own
+`OP_RETURN`, a push-only unlocking script) accepted, where it was refused. The
+relay (`rust-message-box`, `=0.4.5`) sees nothing until it moves.
 
-The widened oracle (run 41327640129) left 28 mutants alive in
-`Script::parse_chunks`. Killed by tests: 24. Declared equivalent: 4.
-Remaining: 0. Re-measured on the function alone (`cargo mutants --file
-src/script/script.rs --re parse_chunks --jobs 1`, the script surface's
-selection, `BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`): 91 caught, 0 missed,
-3 timed out (`210:17` `*=`, `245:28` `-`, `258:28` `-`, each a parse that no
-longer advances; none of this shard's survivors), 0 unviable, 96.81 percent
-of viable.
+The witnesses are `tests/sighash_scriptcode_654.rs`:
+`an_unlocking_checksig_signs_the_locking_script_past_a_top_level_op_return_654`
+(U2 under both post-Chronicle words, `ALL|FORKID` over BIP143 and
+`ALL|FORKID|CHRONICLE` over the original digest accepted, the old digest
+refused), `an_unlocking_checkmultisig_signs_the_locking_script_past_a_top_level_op_return_654`
+(M2, the same through `OP_CHECKMULTISIG`, run),
+`a_bare_op_return_ending_the_unlocking_script_keeps_the_locking_script_654`
+(U3, `ac6a6951` before, after and at the node),
+`an_unlocking_checksig_under_a_pre_chronicle_word_signs_the_unlocking_script_alone_654`
+(P1 and U2 under the post-Genesis block word without `SIGPUSHONLY`: the spend
+signed over the unlocking script's bytes alone valid, the one over the bytes
+with the locking script refused by NULLFAIL, `OP_CHECKSIG requires failing
+signatures to be empty.`),
+`a_non_forkid_signature_is_refused_by_the_words_before_its_script_code_654`
+(L1 and U1 under the five words, the words' refusal; L1 in the default mode
+valid), `the_chunk_serializer_keeps_the_references_stop_and_a_read_script_its_bytes_654`
+and `the_vector_holds_the_cases_this_crate_writes_and_their_verdicts_654`,
+against `tests/vectors/sighash_scriptcode_654.json`: twenty cases (ten shapes at
+versions 1 and 2, signatures by this crate's signer), each with its three
+scriptCodes (post-Chronicle, pre-Chronicle, this crate's before #654), the
+sibling's Lean evaluator's digest of each (`bsv-script-lean@387dab35` `eval/bsvs
+sighash`; U2's `6fd93a20...92f18370` the node's, `79a755dd...5b661b9900`
+this crate's before), this crate's verdict in seven modes, the evaluator's
+verdict under each of the five words (`eval --flags`; the node's rules,
+`Ops/Crypto.lean` `scriptCodeOf`, `Sighash.lean` `findAndDelete`; its
+self-test green on its flow and seed corpora), equal to this crate's on all
+100 cells, and the reference's default `Spend` verdict, recorded by
+`tests/support/sighash_scriptcode_654.mjs` under Node v22.18.0 from a bundle of
+`ts-stack@edf6e03`, two runs byte-identical. The `FindAndDelete` port answers
+the node's own unit cases (`src/script/spend/script_code_tests.rs`, as the
+Lean states them, `Sighash.lean:323-341`). RED on `3fd977be` (a scratch copy
+with the test and the vector alone): 5 of 6, U3 green there (the same
+scriptCode before and after).
 
-The rule is the node's `GetOp` as the sibling states it
-(`bsv-script-lean@5dc337e1` `lean/BsvScript/Machine.lean:29-50`, bitcoin-sv
-`script.h:165-200`). The sibling's harness (`harness/run --impl bsv-rs
---corpus all --spec recorded`, then `road`, `million`, `xsig-144`) moved the
-recorded verdicts of 18 mutants, each a panic on a short size word (flow-00751
-to 00754, seed-000397, 001993, 003106, 006614, 009101, 009276); the others
-moved no verdict. `tests/script_script_603_b.rs` takes those entries by id
-with their recorded verdicts, the node's own decoder vectors from the
-sibling's `corpus/cpp` (`cscript_tests.cpp` `GetOp2`,
-`instruction_iterator_tests.cpp`, cpp-sighash-00018's scriptCode
-`656a6a00ab` with its recorded original digest), seed-009157 (a size word's
-third byte set), bytes-00107 (a bare `OP_RETURN`, valid), and the ts-stack
-vectors `script-001` and `node.script.bitcoin-sv.0074`; the 2^24-byte push
-of `280:62` is built by this crate's writer (no corpus entry carries a size
-word with its fourth byte set and anything after it). Each test RED on its
-mutants in a scratch copy, all ten green on the tree. The four `|` to `^`
-mutants of the size reads (`257:30`, `280:31`, `280:43`, `280:56`) are
-declared in `.cargo/mutants.toml`: the size bytes occupy disjoint 8-bit
-lanes (`Machine.lean:39,43`), where `|` and `^` agree. No `src/` behaviour
-changed.
+### Notes: cross-SDK parity (#654)
 
-### Notes: cross-SDK parity (#603, shard B)
+The reference's `Spend` builds the scriptCode from chunks and writes it through
+the same stopping serializer (`ts-stack@edf6e03` `Spend.ts:1676-1702`,
+`Script.ts:450-484`), its parser folding the bytes after a top-level
+`OP_RETURN` into one chunk, a bare one as `data: []` (`Script.ts:608-610`), on
+which the serializer stops too. So in the default mode, where this crate now
+reads the node's bytes, the two differ: U2 at version 2 (the unlocking script
+need not be push-only there: the reference's default runs it; here with
+`set_require_push_only(false)`) is valid here and refused there when signed
+over the node's scriptCode, the converse when signed over `ac6a0100`; U3 at
+version 2 (a bare `OP_RETURN` ends the unlocking script) is valid here and at
+the node, refused there; M2 as U2; L1 at both versions (a push-only unlocking
+script, reachable with no switch) valid here, refused there, its signature's
+push behind the `OP_RETURN` kept in the reference's scriptCode. Under the words
+the reference has no parity mode to compare (its explicit flags append the
+locking script at every era, where the node appends it under `CHRONICLE`
+alone, P1). Go at `2ca481c` was not run here. Ours: the node's bytes
+(bitcoin-sv v1.2.3 `interpreter.cpp:1470-1484`, `script.h:201-224`), in every
+mode, as 0.3.27 made the scriptCode's cleanup the node's (bsv-rs#12). Theirs:
+a draft on the queue ([sighash-scriptcode-op-return-stop-ts-stack](./docs/lanes/375-filings/sighash-scriptcode-op-return-stop-ts-stack.md), row 27; unfiled).
 
-The kill of `215:35` pins a reading the reference does not share: a bare
-`OP_RETURN` (no byte after it) is a chunk without data that prints
-`OP_RETURN` here, as the node reads and prints it (`GetOp`, bitcoin-sv v1.2.3
-`script.h:173-198`; `ScriptToAsmStr`, `core_write.cpp:115-173`, the opcode's
-name). `ts-stack@edf6e03` `Script.ts:608-610` gives it `data: []`, and its
-`toASM` prints the empty string, which `fromASM` reads back as `OP_0` (`00`),
-a different script (run under Node 22.23.3 from the source at the pin:
-`fromHex('6a')` gives `[{op:106,data:[]}]` and `''`; `fromASM('')` gives
-`00`; `fromASM('OP_RETURN')` gives `6a`, whose `fromHex` is the empty-data
-chunk again). go-sdk at `2ca481c` gives it an empty `Data` too
-(`script/script_chunk.go:258-270`). The mutant is the reference's reading;
-the node's is kept, the reference's round trip losing the opcode. Stated, not
-filed.
+### CI: the Test Suite job builds from a dependency cache keyed by rustc, `Cargo.toml` and a lockfile generated in the job and runs under nextest, without debuginfo (speed round 1, cut 1)
 
-### Added: src/transaction/beef.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+What was slow: `Test Suite (ubuntu-latest, stable)` took 26 of a run's 29
+minutes (run 41537280176) and is every landing's critical path. 2:45 went to
+restoring a 7,350 MB `actions/cache` archive that an exact hit never
+refreshed, 4:15 to compiles, 18:49 to tests run one binary at a time (the
+memory step's 13 on one thread). What changed, in the `test` job alone:
+`Swatinem/rust-cache` v2.9.3 (sha-pinned) caches the dependencies' build,
+keyed by rustc's version, host and hash, the `CARGO*`/`RUST*` environment,
+`Cargo.toml` and the lockfile `cargo generate-lockfile` writes in the job just
+before it (no lockfile is tracked, so without that step a dependency's
+compatible release would be rebuilt on every exact hit; with it the key
+moves, one miss, a rebuild and a save), saved on a pull request and on a push
+to a line;
+`CARGO_PROFILE_DEV_DEBUG`, `CARGO_PROFILE_TEST_DEBUG` and `CARGO_INCREMENTAL`
+are 0 in the job's env (a developer's `cargo test` keeps its debuginfo);
+`cargo-nextest` 0.9.150 (by `taiki-e/install-action` v2.89.1, sha-pinned)
+runs the lib, integration, memory and tracing steps with `--no-fail-fast`;
+the linker stays rustc's default rust-lld on Linux. What did not change:
+every test runs once per step as before, on the same features, target
+selectors and steps, hermetic as before; doc tests stay `cargo test --doc`.
+The memory tests' isolation is now nextest's process per test, not
+`--test-threads=1`, with `RUST_TEST_THREADS=1` on that step so libtest
+inside each process keeps its synchronous path and no 60-second warning
+allocates in the profile (#372). `tests/arch_ci_runs_every_test.rs` (#146) reads a
+`cargo nextest run` line as a step as it reads `cargo test`
+(`a_nextest_run_is_a_step_as_cargo_test_is`; the base guard refuses all 272
+files against the new workflow). The record, with the split per step and the
+sharding rule (the memory step's one 5:36 test and the doc tests already put
+the job past 8 minutes, so the next round splits it by step), is
+`docs/lanes/ci-speed-1.md`.
+Measured after: the Test Suite went from 26m01s to 15m26s on a cache hit (beta's
+push run 41563214016) and 16m06s cold (run 41558273855), and a landing's run from
+29m11s to 20m05s (run 41558273855); a fast runner's miss took 12m45s (run
+41560881228), so the job is test-bound and the cache saves about 40 seconds.
 
-The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
-left 25 of the file's 117 viable mutants missed and 1 timed out (77.78
-percent). The sibling's wire corpus (bsv-script-lean@387dab35
-`corpus/wire/beef.jsonl` and `atomic-beef.jsonl`, 63 rows, run through a
-scratch copy of its `harness/src/bin/run_wire.rs` linked to this tree) moved
-under one survivor alone (`is_atomic` to `true`: 28 plain rows read as
-atomic). Eighteen tests in `src/transaction/beef/reference_603_tests.rs`
-(inside the surface's `--lib` selection, outside the `beef*.rs` glob) take
-the rows by id (beef-001, -002, -004, -023, -029, -030, atomic-beef-001) and
-expect the reference's answer on them: `tests/vectors/beef_reference_603.json`,
-17 cases recorded from `Beef.ts` at `ts-stack@edf6e03` under Node v22.18.0 by
-`tests/support/beef_reference_603.mjs` (two runs byte-identical), with the
-sibling's BEEF view cited per test (`lean/BsvChain/Views/Wire/BEEF.lean`
-`:121-128`, `:344-364`, `:398-416`; `AtomicBEEF.lean:102-112`). The rules:
-`mergeBump`'s combine, `#mergeBumpEntry`, `#markMutated` and the sort before
-serializing, `findBump`, `findTransactionForSigning`, `findAtomicTransaction`,
-`fromReader`, `isAtomic`, `clone`, `toLogString`, `#collectBumpTxids`'s one
-root per height (both directions), `#verifyBumpIndexLeaves` (beef-029 also in
-the streaming reader's kind, `BumpIndexNamesNoBump`), `partitionTxs` on a raw
-transaction with no input, `verifyValid` on a ring held in the input cache,
-`#reindexBumps`' guard; `trim_known_proven`'s cut at a proof from the mined
-object (BRC-62 `0062.md:183-187`). Each mutant RED on its test in a scratch
-copy, 24 of 25 (the conformed log string removed the 26th's `!`).
+### Changed: the chunker reads the IF depth as the reference does, three chunks on `686a51`; the ASM round trip fixed on both shapes (#634)
 
-Killed by tests: 23 of the 25 missed (one more, the inputs list's `!` at
-`1174:16`, left with the code its conformed log no longer has); declared
-equivalent: 1; remaining: 0. The timeout, `add_input_proof`'s `+=` to `*=`
-(`beef.rs:278:28`), fails its test now (the frame's parent index underflows)
-but stays a timeout, not counted as caught: other tests of the selection,
-whose inputs name no entry of the BEEF, loop under it until the 300 s bound.
-The declared, `sort_txs`' `i < j` to `i <= j` (`beef.rs:912:33`): `i == j` is
-reached only if a transaction waits on its own txid at its own acceptance,
-and a waiter is released before it is ready (`dependents` is removed at the
-release, a repeat returns early), so the branch is not reached even with a
-hand-written input cache; no row of either corpus moves under it. Declared equivalent in
-`.cargo/mutants.toml`'s `exclude_re` with that reason, the sibling's
-`BeefEntry.txid` and `parents` (`BEEF.lean:338-342,370-373`: no txid among
-its own parents) and the reference's `sortTxs` (`Beef.ts` at
-`ts-stack@edf6e03`), on three reads that accept it: the cold read (MERGE at
-0.9), the adversarial read (EQUIVALENT at 0.95: a raw transaction naming its
-own txid as a source, one transaction merged twice as raw and txid-only in
-each order, an entry whose input cache lists itself, a ring of two, a
-txid-only entry whose txid a raw entry carries, the subject first, last and
-in the middle, each written, read, sorted, verified and serialized
-byte-identical under both) and the rule read (EQUIVALENT at 0.96: BRC-62's
-sources-precede order and the sort's invariant leave `i != j` at the line).
-Re-measured with the surface's selection and `BSV_CONFORMANCE_DIR` at
-`ts-stack@edf6e03` (the corpus read, its pinned totals unchanged), the
-declared one excluded: 114 caught, 0 missed, 1 timed out (`278:28`), 6
-unviable of 121, 99.13 percent of viable (114 of 115).
+A public behaviour change, semver minor: `Script::chunks`, `Script::to_asm`,
+`Script::from_asm`, `PushDrop::decode` and the registry's token reader answer
+differently on a script with a stray `OP_ENDIF` (one with no `OP_IF` open)
+before an `OP_RETURN`, and `to_asm` writes every folded `OP_RETURN` otherwise.
 
-Two readings conformed to the reference (rule 1; reference-shaped public
-changes on the 0.9.0 line): `Beef::find_transaction_for_signing` now links
-each input without a source transaction to the one the BEEF holds
-(`Beef.ts:615-631`; until #603 the inputs were left unlinked, "simplified for
-now"), and `Beef::to_log_string` writes `Beef.toLogString`'s text
-(`Beef.ts:1698-1733`: `BUMPS`, the lists joined with `,\n`, a BUMP's txids
-list written when empty). Both RED on the base through their tests.
-The semver reading: both are public behaviour, reference-shaped on the 0.9.0
-line (the owner's word of 2026-10-26); a caller matching the old log text
-(`BUMPs`, no separators) reads the reference's, and a caller of
-`find_transaction_for_signing` finds its inputs' held sources linked where
-they were `None`. None of the named downstreams calls either (grepped at the
-cold read, 2026-11-01).
+`Script::parse_chunks` counts an IF depth and folds the rest of the script into
+an `OP_RETURN` read at depth 0. It clamped the depth at 0, so after a stray
+`OP_ENDIF` an `OP_RETURN` was read as top level: `686a51` (`OP_ENDIF OP_RETURN
+OP_1`) was two chunks, `[OP_ENDIF, OP_RETURN <51>]`. The reference lets the
+depth go negative and folds only at `=== 0` (`ts-stack@edf6e03`
+`Script.ts:599-631`, the test at `:608`, the decrement at `:616`): three
+chunks. The keeper's word of 2026-11-02 22:1xZ: the verdict is the node's and
+no reading moves it, but the chunker is an application-layer reader this
+crate's public readers consume while claiming the reference's parity, so it
+follows the reference's reading. `parse_chunks` and `truncated_push_index` are
+now ported from `:599-631` line for line, no floor.
 
-### Notes: cross-SDK parity (#603)
+`to_asm` wrote a folded `OP_RETURN` as its data's hex alone (the reference's
+`_chunkToString`, `Script.ts:668-677`), which `from_asm` reads back as a push:
+`686a51` under the clamp gave `OP_ENDIF 51`, read back as `680151`, and
+`68636a5168` (where the reference's own reading folds) gives the same loss on
+either rule. A script that re-reads as a different script is a reader bug
+whatever the door: `to_asm` now writes a folded `OP_RETURN` as `OP_RETURN` and
+the rest's own ASM read with no fold (`0 OP_RETURN 68656c6c6f` for
+`006a0568656c6c6f`, was `0 0568656c6c6f`), or as `OP_RETURN 0x<hex>` when that
+would not read back to the same bytes (a truncated push, a non-minimal one),
+and an empty rest as `OP_RETURN` alone (the reference writes `""` for `6a`,
+which reads back as `00`); `from_asm` reads a `0x<hex>` token as the raw rest
+when it is the last token and follows an `OP_RETURN` (`OP_RETURN 0x` is the
+bare `OP_RETURN`), and refuses it anywhere else (it was refused everywhere;
+the reference's `fromASM` refuses `0x` as invalid hex). The rest is written
+with no fold and no recursion, linear in its length, and reads back byte for
+byte whatever it holds; a chunk before it that
+`to_asm` cannot write back (a non-minimal push, `4c01aa` reading back as
+`01aa`; an undefined opcode) is as before. `ScriptChunk::to_asm` is unchanged.
 
-The two conformed readings close differences no list carried; none remains
-at the cases recorded. The log's `isValid` stays `is_valid(false)`, where the
-reference calls `isValid()` (`allow_txid_only` decides nothing here, the
-stated 0.4.2 row), and a txid-flagged leaf with no hash is left out of the
-txids list where the reference writes `''`. The reference's
-`findTransactionForSigning` links the BEEF's own transaction objects in
-place, so a later call sees the links; this crate returns a clone with each
-held source cloned in, the BEEF unchanged, one level deep on a BEEF read from
-bytes as the reference's; an input with no source txid is left unlinked here
-where the reference throws `sourceTXID must be valid` (`Beef.ts:621`).
+`tests/script_if_depth_634.rs` (fifteen shapes, `vectors/script_if_depth_634.json`):
 
-### Added: src/script/locking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+- `a_stray_endif_before_op_return_parses_as_three_chunks_the_if_depth_negative_634`
+  (was `..._two_chunks_the_if_depth_clamped_at_0_634`): `686a51` the reference's
+  three chunks and ASM, go-sdk's two; the issue's other forms.
+- `the_chunks_are_the_references_and_part_from_go_sdk_after_a_stray_endif_634`
+  (was `the_readers_differ_only_after_a_stray_endif_634`): this crate's chunks the
+  reference's on all fifteen; go-sdk's but on the six whose `OP_RETURN` follows a
+  stray `OP_ENDIF` at a negative depth.
+- `the_asm_round_trips_on_every_shape_both_readings_of_op_return_included_634`
+  (new): `from_asm(to_asm(s)) == s` on the fifteen, `686a51` and `68636a5168`
+  named, the reference's text for `68636a5168` reading back as `6863025168`, a
+  truncated rest as `0x`, a nested fold, `0x` refused elsewhere.
+- the three verdict tests unchanged and green on both rules.
 
-The widened oracle (run 41327640129) left 8 of the file's 27 viable mutants
-alive (70.37 percent): `into_script`, `len` (twice), `is_empty` (twice),
-`is_push_only` (twice) and `From<Script>::from`. Killed by tests: 8. Declared
-equivalent: 0. Remaining: 0. Re-measured with the script surface's selection
-(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` at
-`ts-stack@edf6e03`): 27 caught, 0 missed, 0 timed out, 1 unviable, 100 percent.
+`tests/script_if_depth_consequences_634.rs` (the adversarial read's four, now
+the reference's recorded answers, `vectors/script_if_depth_consequences_634.json`):
+`pushdrop_decode_reads_the_references_four_fields_after_a_stray_endif_634`
+(`[abcd, "", "", hello]`, was `[abcd, "", 0568656c6c6f6d]`);
+`the_registry_reader_refuses_the_envelope_in_the_references_words_634`
+(`PushDrop token must use the canonical PushDrop envelope`, was `Unexpected
+PushDrop token field count`); `the_asm_after_a_stray_endif_is_the_references_and_reads_back_634`;
+`a_work_budget_reaches_the_unbalanced_verdict_the_nodes_scriptcode_gives_634`
+(the 200 signature pushes after the stray `OP_ENDIF` deleted from the scriptCode
+as the node's `FindAndDelete` deletes them, `script.h:202-224`, so a work budget
+of 1,000 reaches `OP_ENDIF requires a preceeding OP_IF.`; under the clamp it
+declined, `ScriptResourceLimit`).
 
-The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
-bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
-of the eight: the harness builds its locking script with `from_binary` and the
-interpreter reads it through `as_script` and `chunks`. Each mutant is
-observable, so each is a hand vector, not an equivalent:
-`tests/script_locking_script_603.rs` takes six public corpus entries by id
-with their recorded verdicts (flow-01005, lock `5151`, valid; flow-01009, the
-empty lock, valid; flow-01011, the empty lock under an empty scriptSig, refused;
-seed-000013, lock `8f5187`, `SCRIPT_ERR_INVALID_STACK_OPERATION`; flow-01061,
-scriptSig `60`, valid; flow-01092, scriptSig `5161` at version 1,
-`SCRIPT_ERR_SIG_PUSHONLY`), run under the post-Chronicle block word: `len` and
-`is_empty` count `getOpTail`'s instructions (`lean/BsvScript/Machine.lean:29-50`;
-four mutants); `is_push_only` is `isPushOnly` over the script's bytes
-(`:52-59`), the predicate `verifyScript`'s SIGPUSHONLY gate applies
-(`:500-503`), true on flow-01061's accepted `60` and the empty lock, false on
-flow-01092's refused `5161` and on `8f5187` (two); `into_script` and
-`From<Script>` hand `verifyScript` the scriptPubKey's own bytes (`:495-509`),
-flow-01005's `5151` round-tripped through `Script` still valid, where the
-mutants' empty lock is flow-01011's recorded refusal (two). Each test RED on
-its mutants in a scratch copy, all three green on the tree. No vector revealed
-a divergence.
+RED: on the code before the fold (a scratch copy, its own target), 7 of the 10
+(3 of 6 and 4 of 4; the verdict tests green); with the clamp removed and `to_asm`
+unfixed, the round-trip test alone (5 of 6 and 4 of 4 green).
 
-### Added: src/script/templates/p2pk.rs and src/script/template.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+Migration: a caller that relied on two chunks after a stray `OP_ENDIF` (the
+rest of the script one `OP_RETURN` chunk's data) reads them as opcodes now, as
+the reference and the node's `GetOp` do; a caller that parsed `to_asm`'s text
+of a data carrier read from bytes finds `OP_RETURN` and the pushes where the
+hex of the rest stood. No dependent named in `CLAUDE.md` calls `to_asm` or
+`from_asm`. One counts the chunks itself: `bsv-overlay-cloudflare`'s
+`overlay-engine` (`chunk_count`, `crates/overlay-engine/src/script_door.rs:147-169`,
+the depth floored by `saturating_sub` as this crate's was), pinned to this
+crate's parse by `e585f2_m1_the_chunk_count_is_the_sdks`, whose edge
+`OP_ENDIF OP_ENDIF OP_RETURN 0x01` counts 3 there and 4 here: that pin goes
+RED at its bump from `=0.7.2` until its counter drops the floor; its sig-op
+count over `Script::chunks` (`engine.rs:851`) reads the opcodes after a stray
+`OP_ENDIF` too.
 
-The P2PK lock is `<pubkey> OP_CHECKSIG`, so the rule source is the sibling
-`bsv-script-lean` at `5dc337e1`: `decodePubKey`
-(`lean/BsvScript/Crypto/Secp256k1.lean:151-175`, the tags `02`/`03` with 32
-bytes, `04`/`06`/`07` with 64) and, under STRICTENC,
-`isCompressedOrUncompressedPubKey` in `checkSigOp`
-(`lean/BsvScript/Ops/Crypto.lean:77-84`, `:133-156`). The reference has no P2PK
-template at `ts-stack@edf6e03`, nor go-sdk at `2ca481c`. The widened run
-41327640129 left 5 survivors in `p2pk.rs` (54.55%) and 4 in `template.rs`
-(75.00%). 8 are killed by tests, 1 is declared equivalent, and 0 remain.
+### Notes: cross-SDK parity (#634)
 
-`tests/script_p2pk_template_603.rs` copies four entries of the sibling's
-`corpus/crypto/cases.jsonl` by id, each with its recorded verdict (every column
-`valid`). The signer is the corpus's `key("a")`, the sha256 of its label, and
-its signatures are RFC 6979, so the templates must write the recorded bytes:
+The node reads no chunks: `CScript::GetOp2` (bitcoin-sv v1.2.3 `6504a3a`
+`src/script/script.h:165-198`) reads one opcode and its push with no depth, and
+the interpreter refuses an `OP_ENDIF` on an empty conditional stack
+(`interpreter.cpp:835-840`) before any `OP_RETURN` the readers fold
+differently, so no verdict depends on the chunking (fifteen shapes, eight
+modes, on every SDK's chunks). go-sdk at `2ca481c` has four readers:
+`Script.Chunks()` (`DecodeScript`, no floor, `OP_RETURN` an opcode only at
+`> 0`, `script_chunk.go:255-260`: two chunks on `686a51`, the reference's three
+on `68636a5168`), the interpreter's legacy parser (clamped at 0,
+`interpreter/opcodeparser.go:389-401`), `ToASM` and the engine's parser (no
+fold). This crate parts from `DecodeScript` on six of the fifteen shapes; the
+draft `docs/lanes/375-filings/script-chunker-if-depth-clamp-go-sdk.md` is
+queue row 28, unfiled. The reference's own reading the keeper names wrong is
+`68636a5168` (`OP_ENDIF OP_IF OP_RETURN OP_1 OP_ENDIF`): the `OP_RETURN` sits
+inside an open `OP_IF` and is folded as top level, the depth -1 + 1 = 0,
+against the parser's own rule that only an `OP_RETURN` outside every
+conditional folds the rest (the interpreter's data reading, top level alone);
+this crate follows the reference there too, and queue row 26
+(`docs/lanes/375-filings/script-if-depth-negative-ts-stack.md`) is narrowed to
+it. The reference's ASM round trip fails on every folded `OP_RETURN` carrying
+data: its `toASM` writes the rest's hex alone, its `fromASM` reads it as a
+push (`Script.ts:108-117`); recorded under Node v22.18.0 on the fifteen shapes
+(`6a0568656c6c6f`, `5163686a51`, `6a6851`, `5163516368686a51`, `68636a5168`,
+`5163686851636a5168` fail; `68636a5168` reads back as `6863025168`) and on
+`006a0568656c6c6f` (read back as `00060568656c6c6f`). It fails on a bare
+`OP_RETURN` too: its parser gives one an empty data array (`Script.ts:609`),
+which `_chunkToString` writes as nothing (`:668-677`), so `toASM` gives `""`
+for `6a` and `"OP_0 "` for `006a`, read back as `00` and `0000`, and its
+`fromASM` refuses `OP_RETURN 0x` (`toArray`'s invalid hex, `:111-117`);
+recorded under Node v22.18.0 at `edf6e03`. This crate's `to_asm` parts from
+`toASM` on every such script, the rest reading back whole and a bare
+`OP_RETURN` written as `OP_RETURN`.
 
-- `the_lock_writes_both_key_forms_as_the_corpus_crypto_p2pk_crypto_00001_00002`
-  locks the compressed and uncompressed keys to the corpus's scripts. It kills
-  `p2pk.rs:116:47` (`!=` to `==`), `p2pk.rs:126:35` (the guard `false`) and
-  `p2pk.rs:126:48` (`==` to `!=`).
-- `the_unlock_signs_the_corpus_spend_and_it_verifies_crypto_p2pk_crypto_00001_00002`
-  signs with `P2PK::unlock`, writes the recorded unlocking script and spends
-  valid under the post-Chronicle block word. It kills `template.rs:286:9`
-  (`sign` answering an empty script; in the sibling's `corpus/signer`, run
-  through its bsv-rs signer adapter against this tree, the mutant moved 97
-  template rows) and the three lock mutants above.
-- `the_lock_refuses_a_tag_its_length_does_not_carry_crypto_p2pk_crypto_00001_00002`
-  retags the corpus keys (`02`/`03` at 65 bytes, `04`/`06`/`07` at 33), as the
-  corpus builds its hybrid key. The lock refuses each, and the same key as a raw
-  lock is refused under the block word, as `crypto-00014` records
-  (`SCRIPT_ERR_PUBKEYTYPE`). It kills `p2pk.rs:125:28` and `p2pk.rs:126:35`
-  (each guard `true`).
-- `the_p2pkh_helper_writes_the_corpus_unlock_crypto_p2pkh_crypto_00015` covers
-  `build_p2pkh_unlocking_script`, which writes `crypto-00015`'s unlock, and the
-  spend is valid. It kills `template.rs:325:5`.
+### Fixed: OP_CHECKMULTISIG refuses a badly encoded public key or signature in the encoding check's own words, as OP_CHECKSIG does (#657)
 
-`the_unlock_debug_is_nonempty_and_names_its_estimate_c_debug_nonempty_603` (in
-`template.rs`'s unit tests) pins the Rust API Guidelines' C-DEBUG and
-C-DEBUG-NONEMPTY (<https://rust-lang.github.io/api-guidelines/debuggability.html>:
-every public type implements `Debug`, and its representation is never empty):
-the unlock's text is non-empty, names `ScriptTemplateUnlock`, shows the
-estimate's value and elides the two opaque functions. It kills
-`template.rs:299:9` (`fmt` answering `Ok(())` and writing nothing).
+Under STRICTENC (every default-mode spend and every supported word),
+`OP_CHECKMULTISIG` and `OP_CHECKMULTISIGVERIFY` swallowed the refusal of
+`check_signature_encoding` and `check_public_key_encoding` and wrote their own
+sentence in its place (`src/script/spend/crypto.rs`, `op_checkmultisig`):
 
-The ninth, `template.rs:210:36` (`|` to `^` in `compute_sighash_scope`), is
-declared equivalent in `.cargo/mutants.toml`'s `exclude_re`. The base types 1
-to 3 and FORKID `0x40` occupy disjoint bits, so the two operators give the
-same word for every `SignOutputs` (bitcoin-sv v1.2.3
-`sighashtype.h:16-21,43,73-74,87`; `TransactionSignature.ts:240-245` and
-`SignatureUtils.ts:44-62` at `ts-stack@edf6e03`;
-`lean/BsvScript/Sighash.lean:52-58`, `:73`, `:79`, `:478`). Three independent
-reads accept it: the cold read; the adversarial read (EQUIVALENT, 0.97: every
-`SignOutputs` value under both `anyone_can_pay` values and twelve signed and
-verified transactions byte-identical on both sides; `SignOutputs` is closed and
-no conversion puts `0x40` into its flag); the rule read (EQUIVALENT, 0.97: the
-six scopes `0x41`, `0xc1`, `0x42`, `0xc2`, `0x43`, `0xc3` equal on the tree and
-the mutant). No entry of the sibling's `--corpus all` run or of its
-`corpus/signer` moved under it either. For the other eight mutants, the
-`--corpus all` run (9 corpora, GREEN) moved no verdict: the harness judges
-script bytes and never calls a template.
+- before: `OP_CHECKMULTISIG requires correct encoding for the public key and signature.`
+  (`OP_CHECKMULTISIGVERIFY ...` for the other opcode), whatever the fault;
+- after: the check's own words, the ones `OP_CHECKSIG` already returned:
+  `The public key is in an unknown format.` (a hybrid `06`/`07` key, a `05`
+  tag, a key off the curve), `The non-compressed public key must be 65 bytes.`
+  (a 33-byte `04` key, a 66-byte one), `The compressed public key must be 33
+  bytes.`, `The public key is too short, it must be at least 33 bytes.`,
+  `Public key is empty.`, `The signature format is invalid.` (a signature
+  that is no DER), `The public key must be compressed.` under
+  COMPRESSED_PUBKEYTYPE, and every other sentence of the signature check
+  (low S, hash type, FORKID under a word).
 
-Re-measured with the script surface's selection and the corpus:
+The reference throws from its helpers (`ts-stack@edf6e03` `Spend.ts:606-629`,
+`#checkSignatureEncoding`; `:687-718`, `#checkPublicKeyEncoding`), so its
+wrapper sentence at the CHECKMULTISIG site (`:1809-1815`) and the CHECKSIG one
+(`:1669-1673`) is never reached (its own comment: "Fallback, should be
+unreachable"). The node returns the helper's error at both sites too
+(`bitcoin-sv` v1.2.3 `interpreter.cpp:1459-1469`, `:1605-1615`;
+`CheckPubKeyEncoding` `:312-327` over `IsCompressedOrUncompressedPubKey`
+`:132-152`), `SCRIPT_ERR_PUBKEYTYPE`, an error code and no contract sentence
+(`script_error.cpp:90-91`'s text is a debug string); this crate's
+`ScriptEvaluationError` carries no code, so its words are the contract and they
+are now the reference's at both sites. The signature is judged before the key,
+the order both references keep. No verdict moved.
 
-| File | Caught | Missed | Timeouts | Unviable | Caught of viable |
-|---|---:|---:|---:|---:|---:|
-| `p2pk.rs` | 11 | 0 | 0 | 1 | 100.00% |
-| `template.rs` | 15 | 0 | 0 | 2 | 100.00% |
+Pinned by `tests/pubkey_words_657.rs` against
+`tests/vectors/pubkey_words_657.json` (348 cases recorded from the unmodified
+reference under Node v22.18.0 by `tests/support/pubkey_words_657.mjs`, two runs
+byte-identical; every lock and unlock rebuilt by this crate's writer): thirteen
+key shapes (two controls, hybrid `06` and `07`, a 33-byte `04` and `05`, a
+34-byte compressed, a 66-byte uncompressed, a 32-byte key, empty, a compressed
+and an uncompressed key off the curve, `02` with x = p + 1) by a DER signature
+and an empty one, three keys by a truncated DER signature, at the four
+signature opcodes, in the default mode at versions 1 and 2 and under an
+explicit word with STRICTENC. On `e49cf55d` 3 of the 4 tests RED (the
+CHECKMULTISIG key and signature tests and the census: `left:
+Err("OP_CHECKMULTISIG requires correct encoding for the public key and
+signature.")`, `right: Err("The public key is in an unknown format.")`); the
+CHECKSIG test green on both, the statement that CHECKSIG matched already.
 
-`template.rs` re-measured with the declaration in place (`cargo mutants --file
-src/script/template.rs --jobs 1`): 17 mutants, 15 caught, 0 missed, 2 unviable,
-the declared one not listed.
+The ripple: `tests/support/conformance_forkid_gate_429.rs` no longer special-cases
+`node.tx-valid.shared.0097` (this crate now says the recorded `The signature
+format is invalid.`), `tests/support/conformance_signature_words_417.rs`
+matches that sentence alone, and `tests/conformance_scripts.rs`'s BUG 1 comment
+quotes the new words. The census with `BSV_CONFORMANCE_DIR` at `edf6e03`'s
+`conformance/` is unchanged base against tip: 5,116 total, 4,120 run, 4,109
+passed, 959 unsupported, 37 skipped, 11 known failures, every class count the
+same. No dependent matched the old words (bsv-overlay-cloudflare,
+rust-message-box, bsv-wallet-toolbox-rs, rust-chaintracks,
+bsv-middleware-cloudflare-public).
 
-Stated, not changed: the template locks a hybrid key (`06`/`07` at 65 bytes),
-which `decodePubKey` reads. But every column of the sibling's corpus refuses
-that output's spend under STRICTENC (`crypto-00014`, `SCRIPT_ERR_PUBKEYTYPE`),
-so such an output cannot be spent under the node's words.
+Migration: a caller matching `requires correct encoding for the public key and
+signature.` matches the encoding check's sentences above instead (the
+`OP_CHECKSIG` ones, unchanged).
 
-### Fixed: the public PushDrop::decode reads a key-only and a no-CHECKSIG token as the reference does; the refusal stands on the canonical path (#618)
+### Notes: cross-SDK parity (#657)
 
-On the keeper's word of 2026-11-01 22:1xZ on census row 93 (#614's read):
-`PushDrop::decode` refused a script that is a key alone (`Script too short for
-PushDrop`) and a key whose second chunk is not `OP_CHECKSIG` (`Expected
-OP_CHECKSIG after pubkey`), where the reference's `PushDrop.decode` at its
-default position reads both (`ts-stack@edf6e03` `PushDrop.ts:63-121`): the key
-the first chunk, the second chunk never read, the fields from the third, each
-pushed before the read ends at a *next* chunk that is a DROP. A first chunk of
-33 or 65 bytes followed by anything but `OP_CHECKSIG`, or by nothing, is now
-read that way (`src/script/templates/pushdrop_reference_read.rs`), the lock
-position `Before`, the key's compressed bytes the reference's
-`lockingPublicKey`; a lock-after token whose first field is a point is such a
-token and is read as the reference's default reads it. Nothing else of the
-door moves: the writer's lock-before token reads as it did, a first chunk that
-is no 33- or 65-byte push is read lock-after (the reference's `'after'`), the
-empty script and one chunk that is no key are `Script too short for PushDrop`,
-and a key the parse refuses is refused in its words (`Point not on curve` for
-an x off the curve, where the reference says `Invalid point`). The vector
-`tests/vectors/pushdrop_decode_618.json` is the reference's reading of
-fourteen shapes at both positions and of the two shapes at each of the six
-#537 sites, written by `tests/support/pushdrop_decode_618.mjs` under Node
-v22.18.0, two runs byte-identical; `tests/script_pushdrop_decode_618.rs`
-pins the door (3 of 5 RED on the tree before the fix: the key alone, the
-token without CHECKSIG, and the off-curve key alone's words). The fold
-(the read's FIX 1): every path of the door, lock-before, lock-after and the
-reference read, reads its fields through one loop, `reference_fields`
-(`PushDrop.ts:96-115`), so `<key> OP_CHECKSIG OP_DROP` and `<key>
-OP_CHECKSIG OP_2DROP` read one empty field where they read none, an
-`OP_RESERVED` field reads `00` where it read empty, and a lock-after token
-reads to the next DROP as the reference's `'after'` does (the key and
-`OP_CHECKSIG` fields when no DROP comes), ten more recorded shapes, the three
-RED on `646209a3` at both positions, `decode_before`'s refusals unchanged.
+The census row `node.tx-valid.shared.0097` (#429, #434) is closed: its words
+are now the reference's. One key shape keeps other words at both sites, older
+than #657: `02` with x = p + 1. The reference reduces x modulo p
+(`Point.ts:365-367`), passes the encoding check and fails the signature
+(`The top stack element must be truthy after script evaluation.` and the
+VERIFY opcodes' sentences); this crate's `PublicKey::from_bytes` refuses the key
+at the encoding check, `The public key is in an unknown format.` (#183's
+residue; enumerated as `READ_OTHERWISE` in the test, 24 cases).
 
-The canonical path is unchanged and refuses both shapes as each site's
-reference counterpart does: `PushDrop::decode_before` (`Script too short for
-PushDrop`, `Expected OP_CHECKSIG after pubkey`) and `canonical_refusal`'s
-words at the five `decodeCanonicalPushDrop` sites (`PushDropValidation.ts:54-79`),
-the identity and contacts managers' field-count and canonical-script checks
-(`IdentityClient.ts:130-147`, `ContactsManager.ts:225-242`). The two sites
-that read through the public door, the local store's decode
-(`src/kvstore/local_parser_words.rs`) and the revocation
-(`src/identity/revoke.rs`), now call `decode_before`, the same verdict on
-every token those sites gate. A witness per site, each the recorded
-reference outcome on the site's own #537 token in the two shapes (this
-crate's writer, its bytes the recording's): the identity parsers and the
-revocation skip them in the reference's words (`No authenticated revelation
-output matches the requested certificate.`), the contacts manager drops
-them, the registry's reader refuses them in `decodeCanonicalPushDrop`'s words
-and its resolvers skip them, the kvstore interpreter reads no value, the
-admin token is refused in the recorded words, the downloader names no host,
-and the local store refuses `token_key_only` and `token_no_checksig` of
-`kvstore_local_454.json`'s `parser_words_489` in the recorded words
-(`_618` tests in the six `*_lock_position_537.rs` files and
-`kvstore_local_parser_words_489.rs`).
-
-Semver: a behaviour change on a public function. A caller of
-`PushDrop::decode` that relied on its refusal of a key alone or of a key
-without CHECKSIG second now gets the reference's reading; a caller that needs
-the refusal checks the token's shape itself (the crate's own sites read
-through the canonical path, `decode_before` and the canonical-script checks).
-One such caller is downstream: `bsv-overlay-cloudflare`'s topic managers
-(`overlay-discovery` SHIP, SLAP, UHRP, agent, DM delegation and LOW, and
-`overlay-engine`'s `engine.rs`, at `9dff935b`) gate admission on
-`PushDrop::decode` and a field count, so on a bump past their `=0.7.2` pin a
-token with no `OP_CHECKSIG` second decodes there; one that must keep refusing
-it checks that the second chunk is `OP_CHECKSIG`.
-
-### Notes: cross-SDK parity (#618)
-
-The public door follows the reference from this landing; the stated
-difference stands on the canonical path alone, where every site refuses both
-shapes as its reference counterpart refuses them. go-sdk at `2ca481c` refuses
-both, as this crate did (`transaction/template/pushdrop/pushdrop.go:20-53`:
-`nil` for fewer than two chunks, and the lock-before branch taken only with
-`OpCHECKSIG` second): stated, no filing. Residues: a key the reference reads
-and this crate's parse refuses (hybrid, x above p; #489, #498) keeps the
-parse's words on both shapes, as on the writer's token; the refused shapes'
-words are this crate's where the reference throws a JavaScript `TypeError` or
-its key parse's words (`Cannot read properties of undefined (reading
-'data')`, `script.chunks[0].data must have value`, `Unknown point format`,
-`Invalid point`), recorded in the vector beside them.
-
-Census (#375; current reading):
-
-- Row 93: Ours: since #618 the public `PushDrop::decode` reads a key-only script and a token without CHECKSIG second as `PushDrop.decode` at its default position reads them (PushDrop.ts:63-121 at edf6e03; tests/vectors/pushdrop_decode_618.json, tests/script_pushdrop_decode_618.rs); the refusal stands on the canonical path alone (`decode_before` and the canonical-script checks), where every site refuses both as its counterpart does (PushDropValidation.ts:54-79 at the local store, the kvstore interpreter, the registry, the overlay admin token and the storage downloader; IdentityClient.ts:130-147; ContactsManager.ts:225-242; one `_618` witness per site), as go-sdk at 2ca481c refuses them at its public `Decode` (pushdrop.go:20-53); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73), and the key parse's and the refused shapes' words where the reference throws its own. Theirs: go-sdk, its public `Decode` refusing what the reference reads, no filing made (the #618 entry).
-
-### Added: src/script/not_judged.rs's surviving mutants killed from the sibling's rules and vectors (#603)
-
-The widened run 41327640129 left 1 of the file's 3 viable mutants missed
-(66.67%): `<impl fmt::Display for NotJudgedCause>::fmt` replaced with
-`Ok(Default::default())` (`src/script/not_judged.rs:90:9`), the empty
-sentence. The cause's sentences were pinned only through the verifiers
-(`tests/beef_not_judged_452.rs`, `tests/transaction_work_budget_519.rs`,
-`src/transaction/beef_stream/not_judged_tests.rs`), outside the script
-surface's selection. The file is off the interpreter's verdict path: the
-sibling's spec verdict is `valid | invalid reason`
-(`bsv-script-lean@5dc337e1` `lean/BsvScript/Machine.lean:418-425`) and its
-harness reads an input an engine does not judge as `undecided`, apart from
-both (`docs/DESIGN.md:140-150`); the harness calls `Spend::validate`, which
-never builds a `NotJudgedCause`, so the corpus step does not apply.
-`tests/script_not_judged_text_603.rs`,
-`every_not_judged_cause_renders_its_own_sentence_603`, pins every cause's
-sentence at the cause itself, the four height causes produced by
-`ChainParams::word_for_input` on mainnet's heights, the others at their
-witnesses' values; RED on the mutant (`left: ""`), GREEN on the tree.
-Killed by tests 1, declared equivalent 0, remaining 0; re-measured with the
-script surface's selection and the corpus set: 3 caught, 0 missed, 0
-timeout, 0 unviable, 100% of viable. No `src/` behaviour changed; no parity
-note.
-
-### Added: src/script/unlocking_script.rs's surviving mutants killed from the sibling's rules and vectors (#603)
-
-The widened oracle (run 41327640129) left 8 of the file's 26 viable mutants
-alive (69.23 percent): `into_script`, `to_asm` (twice), `len` (twice),
-`is_empty` (twice) and `From<Script>::from`. Killed by tests: 8. Declared
-equivalent: 0. Remaining: 0. Re-measured with the script surface's selection
-(`nightly_mutants.py`'s `mutation_args`, `BSV_CONFORMANCE_DIR` at
-`ts-stack@edf6e03`): 26 caught, 0 missed, 0 timed out, 0 unviable, 100 percent.
-
-The sibling's whole corpus (`bsv-script-lean@387dab35`, `harness/run --impl
-bsv-rs --corpus all --spec recorded`, nine corpora) moved no verdict under any
-of the eight: the harness builds its scriptSig with `from_binary` and the
-interpreter reads it through `chunks`, `as_script` and `is_push_only`. Each
-mutant is observable, so each is a hand vector, not an equivalent:
-`tests/script_unlocking_script_603.rs` takes three public corpus entries by id
-with their recorded verdicts (flow-01013, scriptSig `000000`, valid;
-flow-01059, `5150`, `SCRIPT_ERR_BAD_OPCODE`; seed-000013, empty,
-`SCRIPT_ERR_INVALID_STACK_OPERATION`), run under the post-Chronicle block word:
-`len` and `is_empty` count `getOpTail`'s instructions
-(`lean/BsvScript/Machine.lean:29-50`, the empty script `:55`; four mutants);
-`into_script` and `From<Script>` hand `verifyScript` the scriptSig's own bytes
-(`:499-509`), flow-01059 round-tripped through `Script` still refused as
-recorded (two); `to_asm` is `Script`'s, as the reference's `UnlockingScript`
-overrides no serializer (`ts-stack@edf6e03`
-`packages/sdk/src/script/UnlockingScript.ts:12-30`), and reads back to
-flow-01059's refused bytes (two). Each test RED on its mutants in a scratch
-copy, all three green on the tree. No vector revealed a divergence.
-
-### Added: src/transaction/beef_tx.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+### Added: src/transaction/beef_stream.rs's surviving mutants, shard S1 (the stream's cursor and element reading), killed from the sibling's rules and vectors (#603)
 
 The widened oracle (run 41327640129, `docs/census/mutants-2026-11-01.md`)
-left 17 of the file's 54 viable mutants alive (68.52 percent): the surface's
-selection (`nightly_mutants.py`'s `beef`: the library's `transaction::` tests,
-`transaction_tests`, `beef_stream`, `beef_limits`, `beef_atomic_graph`,
-`conformance_beef` with the corpus) never named `tx_mut`, `refresh`,
-`has_txid`, `raw_tx_or_compute`, `has_no_inputs`, `has_no_outputs` or the
-input list's dedup directly. Seven tests in the file's own module now do, each
-named for its rule: the node's first two transaction checks from
-bsv-script-lean@387dab3 `lean/BsvScript/TxRules.lean:88-89`
-(`checkTransactionCommon_vinEmpty`, `_voutEmpty`, `:220-231`) on the vectors
-`regular-empty-inputs` and `regular-empty-outputs` of its
-`corpus/chain/mempool/mempool.jsonl` (recorded `bad-txns-vin-empty`,
-`bad-txns-vout-empty`), each read from its bytes and from its parse; and the
-reference's `BeefTx.ts` at `ts-stack@edf6e03` (`txid` `:105-116`,
-`getRawTxBytes` `:144-151`, `syncRawTxFromTransaction` `:160-177`,
-`updateInputTxids`' set `:218-233`) on block 170's spend and an entry the
-crate's writer builds. Killed by tests: 17; declared equivalent: 0;
-remaining: 0. Re-measured with the surface's selection and
-`BSV_CONFORMANCE_DIR` at `ts-stack@edf6e03`: 54 caught, 0 missed, 0 timed
-out, 7 unviable, 100 percent of viable. No vector revealed a divergence from
-the reference.
+left 44 survivors in this shard's sixteen functions of
+`src/transaction/beef_stream.rs` (the decoder's and the stream's accessors,
+`finish`, `on_varint`, `on_run_done`, `next_element`, the cursor's
+`to_binary`, `from_binary` and `input_reached`, the verifier's `cursor` and
+`step_until`); two of them timed out. Of the 44: killed 41 (30 from the
+sibling's rules and the reference's recordings, 11 on crate-contract pins
+stated apart, below); declared equivalent 1 (`788:9`, on three reads); two
+timeouts the oracle counts as such, never as caught (`1263:9`, `3214:32`);
+remaining 0 (`2828:26` decided by reachability, below).
 
-### Added: src/script/transaction.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+The sibling's wire corpus (bsv-script-lean@387dab35 `corpus/wire`, 150
+rows, through a scratch copy of its `run_wire` linked to this tree) reaches
+only the whole-BEEF path: under six of the survivors no row moved, and under
+`on_run_done` replaced by `()` the run stops at beef-001, the earliest row
+with a script. Seventeen tests in `tests/beef_stream_603_s1.rs` take the rows by id
+(beef-001, -023 to -026, -031, atomic-beef-023, bump-003) and expect the
+reference's reading of them. The shared recorder
+`tests/support/beef_reference_603.mjs` gains three cases (`stream`:
+`Beef.fromReader`'s position after the header and after each element, the
+version, the atomic subject, the element kinds and `verifyValid` on seven
+rows; `stream_txids`; `bump_offset_outside_its_level`, bump-003 with a
+level-1 leaf moved to its level's width, which the reference refuses) and
+three rows (beef-024, beef-025, bump-003), merged after S2's and S4's cases;
+`tests/vectors/beef_reference_603.json` regenerated at `ts-stack@edf6e03`
+under Node v22.18.0, two runs byte-identical, every entry of beta's vector
+(14 rows, 30 cases) and of the lane's (13 rows, 20 cases) byte-identical,
+17 rows and 33 cases in all. Each test cites the sibling's wire views
+(`lean/BsvChain/Views/Wire/BEEF.lean:89-128`, `AtomicBEEF.lean:36-41`,
+`BUMP.lean:108-115`). The cursor tests resume every cursor between the
+rows' elements (BSC3, BSC4 for beef-026's held child, BSC5 under a work
+budget) to the one-pass verdict, the reference's `verifyValid`; the pause
+and the held-and-charged cursor are fixtures this crate's writer builds in
+the rows' shapes. `input_reached` is held to the input that the resumed
+reading's verdict names (a third input refused by CLEANSTACK at version 1),
+not to a constant. Each kill is RED on its test in a scratch copy.
 
-The widened run 41327640129 left seven survivors in `src/script/transaction.rs`
-(3 caught of 10 viable, 30 percent): `TransactionContext`'s four default
-methods (`input` and `output` as `None`, `input_count` and `output_count` as 0
-and 1) and `SpendValidation::validate_all_inputs` as `Ok(())`. No implementor of
-the traits exists in the crate or in the sibling's harness, so under each
-survivor no entry of the sibling's nine corpora (`bsv-script-lean` at
-`387dab35`: seed, flow, arith, stack, crypto, bytes, eras, gen, tx) moves its
-verdict; each is killed by a hand test over this crate's own transactions,
-`tests/script_transaction_context_603.rs`, every rule cited from the sibling's
-Lean definition: `input` by `Sighash.lean:127-128` (`inputAt`) on
-`TX_VALID_2`'s second input, `output` by `Sighash.lean:164-170`
-(`bip143Outputs`' `tx.outputs[nIn]?`) on its two outputs, the counts by
-`Sighash.lean:134-137,259-263` and `Tx.lean:88-98`, and `validate_all_inputs`
-by `BsvChain/Utxo.lean:149-165` (`checkInputScripts`: every input judged in
-order, the first refusal the transaction's) on a two-input P2PKH spend built and
-signed by this crate's writer, refused at input 1 with its second unlocking
-script replaced. Killed by tests 7, declared equivalent 0, remaining 0;
-re-measured under the script surface's selection with the conformance corpus at
-`ts-stack@edf6e03`: 10 caught, 0 missed, 0 timed out, 2 unviable, 100 percent.
-No behaviour changes; no parity note (no vector revealed a divergence).
+The crate-contract pins (the keeper's ruling of 2026-11-02 14:1xZ: no
+`BSC*` layout is the sibling's or the reference's, so each test names the
+public line it pins and says "crate-contract pin, no sibling rule, stated"),
+11 kills:
 
-### Added: the seven key calls' argument validators as public helpers, each named for its reference site (#609)
+- `a_cursor_in_no_layout_is_refused_by_its_word_wire_beef_023`, `2769:22`:
+  `Cursor::to_binary`'s rustdoc, "BSC1 is refused: restart its reading".
+- `a_bsc2_cursor_carrying_the_spent_bit_reads_and_resumes_wire_beef_023`,
+  `2828:22` (`>` to `==` and to `>=`) and `2861:32`: `Cursor::to_binary`'s
+  rustdoc, "reads a BSC2 cursor as BSC3 with no edge for a transaction read
+  before it", with 0.8.0's "the transactions by txid with a spent flag".
+- `a_cursor_edge_of_a_transaction_not_held_raw_is_refused_wire_atomic_beef_023`,
+  `2886:36`, `2886:46` and `2828:44` (`&` to `^` and to `|`, which refuse
+  the entry's flags 0 for its flags, not its edge): `src/transaction/CLAUDE.md`,
+  "edges of a txid the index does not hold raw, is refused", and 0.8.1's
+  entry below.
+- `a_pause_before_its_frame_is_refused`, `2941:23` (`<` to `>`) and
+  `2941:38`: `Cursor::input_reached`'s rustdoc, "the transaction starts at
+  `offset`", with `src/transaction/CLAUDE.md`'s exception for a released
+  held transaction, "the cursor naming it before the frame".
+- `a_bsc3_cursor_with_flags_its_writer_never_writes_is_refused_wire_beef_023`,
+  `2828:26` (`||` to `&&`): `Cursor::from_binary`'s rustdoc, promoted for
+  it, "A BSC3 (and BSC4, BSC5) transaction's flags byte is 0 or 2, the raw
+  bit; any other value is refused", cross-referenced from `to_binary`'s.
 
-#609, the CLI's ask filed from bsv-wallet-toolbox-rs's #186/#142 lane
-(the owner's word of 2026-11-01 14:1xZ: the seven key calls route a
-privileged request to the wallet's privileged key manager, as the
-reference's `Wallet.ts:455-570` does): the toolbox must judge the arguments
-before it routes, so a refusal keeps its words and its place (`The
-privilegedReason parameter must be a value when 'privileged' is true`, pinned
-by the toolbox's `tests/proto_validator_pin.rs`), and the validators were
-crate-private, so it called `ProtoWallet` once only to validate. The
-keeper's word of 2026-11-01 20:1xZ: shape (2) of the 01:1xZ word on #579,
-one public helper per reference validator, named for its site; never an
-internal reader as public API.
+Two tests changed under the ruling. The lane's spent-bit test also asserted
+that BSC3 refuses the spent bit and that every flags byte above 3 is
+refused. No public line stated either, so those assertions went and
+`2828:26` (`||` to `&&` in the flags check) was left a stated candidate.
+The keeper's word (2026-11-03 01:1xZ) put it to reachability, and the
+second fold decided it: the parser is public and takes stored bytes, while
+the writer never produces the state, so the refusal is a contract a
+persisting caller relies on. The line went into `Cursor::from_binary`'s
+rustdoc and `src/transaction/CLAUDE.md`, and the deciding test asserts the
+valid cursor's round trip byte for byte and `Err` for flags 1, 3, 4, 6, 5,
+7 and 255, never a message; cargo-mutants catches `2828:26` under it and
+misses it without it (`780:13` caught either way). The two rustdoc lines
+move the check to line 2830; the mutants here keep the run's numbers. The
+lane's edge test
+refused an empty edge list, which no public line states either. It now
+refuses the stated case, an edge of an entry not held raw.
 
-The reference has seven validators, one per call, over shared rules (one
-view for all seven would hide getPublicKey's identity branch and the
-signature calls' exclusivity), so there are seven helpers, re-exported at
-`wallet::`, each `fn(&<Call>Args) -> Result<()>`:
+The two timeouts are RED on tests with their own bound. `step_until`'s `&&`
+to `||` (`3214:32`) is bounded by a step count: twice the row's elements.
+`on_run_done` replaced by `()` (`1263:9`) is bounded by a 60 s wall-clock
+timer, because under that mutant the decoder loops inside one
+`BeefDecoder::next` call without consuming a byte, so no count the public
+surface offers reaches it. The oracle still counts both as timeouts, since
+every unbounded reading in the selection hangs under them. The tests are
+kill witnesses, not the oracle's verdict.
 
-| Helper | Reference (`ts-stack@edf6e03`, `packages/sdk/src/wallet/validationHelpers.ts`) | Rules after the shared ones |
-|---|---|---|
-| `validate_get_public_key_args(&GetPublicKeyArgs)` | `validateGetPublicKeyArgs`, `:1717-1732` | without `identity_key` the protocol and key ID required (`The protocolID parameter must be a [securityLevel, protocolName] tuple`, `The keyID parameter must be a string`); with it, each supplied field judged and the privilege always |
-| `validate_wallet_encrypt_args(&EncryptArgs)` | `validateWalletEncryptArgs`, `:1752-1756` | `plaintext` at most 268,435,456 bytes |
-| `validate_wallet_decrypt_args(&DecryptArgs)` | `validateWalletDecryptArgs`, `:1758-1762` | `ciphertext` at most 268,435,456 bytes |
-| `validate_create_hmac_args(&CreateHmacArgs)` | `validateCreateHmacArgs`, `:1764-1768` | `data` at most 268,435,456 bytes |
-| `validate_verify_hmac_args(&VerifyHmacArgs)` | `validateVerifyHmacArgs`, `:1770-1775` | `data` at most 268,435,456 bytes (the HMAC's 32 bytes are its type's) |
-| `validate_create_signature_args(&CreateSignatureArgs)` | `validateCreateSignatureArgs`, `:1789-1793` | exactly one of `data` and `hash_to_directly_sign` (`validateExclusiveDataAndHash`, `:1777-1787`), `data` bounded |
-| `validate_verify_signature_args(&VerifySignatureArgs)` | `validateVerifySignatureArgs`, `:1795-1804` | exactly one of `data` and `hash_to_directly_verify`, then the signature at most 72 bytes, then canonical DER (`isCanonicalDERSignature`, `Secp256k1Validation.ts:33-53`) |
+Declared equivalent on three reads (`.cargo/mutants.toml`): `take_deferred`
+replaced by `None` (`788:9`). Only the collecting decoder fills `deferred`
+and only `Beef::collect` reads it; under the mutant the fold reaches the
+pure `check_transaction` with the same arguments, so the refusal, its name
+and its offset are the same, the earliest kept either way
+(`beef_stream.rs:787-799, 1323, 2019`; `beef/collect.rs:67-86, 118, 131`;
+bsv-script-lean@387dab35 `lean/BsvScript/TxRules.lean:82-95`;
+bsv-stack-lean@5df1e0a3 `lean/BeefOfAnySize.lean:797-825, 951-965`; BRC-62
+`0062.md:183`; `Beef.ts:1054-1090` at `ts-stack@edf6e03`). The cold read
+(MERGE, 0.95), the adversarial read (EQUIVALENT, 0.96, 325,122 inputs) and
+the rule read (EQUIVALENT, 0.96). Its witness is
+`the_earliest_refusal_is_a_transactions_before_a_trailing_byte_lean_no_input_anchor`:
+bsv-stack-lean's `no_input_anchor` row with a trailing byte, refused
+`NoInputs` at 49 by the stream and by `Beef::from_binary`.
 
-The shared rules, in the reference's order (`validateEncryptionArgs`,
-`:224-230`): `protocolID[1]` 5 to 400 UTF-8 bytes (`validateProtocol`,
-`:198-205`), `keyID` 1 to 800, then `validatePrivilege` (`:207-222`): a
-present `privilegedReason` 5 to 50 UTF-8 bytes whether or not `privileged`,
-and `privileged: Some(true)` without one refused in the words above. Every
-refusal is `Error::WalletRefusal` of class `InvalidParameter`, code 6, `The
-<name> parameter must be <rule>`. The names are the reference's
-(`validateWalletEncryptArgs` gives `validate_wallet_encrypt_args`, where the
-Rust type is `EncryptArgs`). The helpers are the #415/#420 validators made
-public under those names, the definitions `ProtoWallet`'s seven calls and
-the wire processor already ran; `ProtoWallet` and the processor call them
-(getPublicKey through the crate-private reader the helper wraps, which also
-hands back the protocol and key ID), so no refusal text or verdict moves:
-nothing refused is accepted, nothing accepted refused.
-The counterparty is not judged by the helpers: `Counterparty` is typed, and a
-text is judged where it is read, by `Counterparty::from_hex` through #579's
-`validate_public_key`, so a host reading a counterparty text refuses a bad one
-before the call exists, ahead of a bad protocol the reference would name first
-(the order `src/wallet/CLAUDE.md` has stated since #420).
+The beef surface's mutation selection takes `tests/beef_stream_603_*.rs`
+(beta's glob since #643); `test_the_beef_selection_runs_the_streams_603_files`
+now names `beef_stream_603_s1` too. Re-measured on this shard's sixteen
+functions at the rebased tree (`--re` over the sixteen, the surface's
+selection, the corpus at `edf6e03`, `--jobs 1`, ten pieces of 14 mutants in
+the foreground): 141 mutants, `788:9`'s `None` absent, 131 caught, 1 missed
+(`2828:26`, the stated candidate then, killed by the second fold), 2 timeouts (`1263:9`, `3214:32`), 7
+unviable; 97.76 percent caught of 134 viable. One of the caught is outside
+the sixteen: `BeefDecoder::collecting`'s field deletion (`780:13`), which
+cargo-mutants 27.1.0 lists whatever the `--re` (see `.cargo/mutants.toml` on
+`592:13`). The whole file's figure is the witness's after the four shards
+land.
 
-Pinned by `tests/wallet_key_args_validators_609.rs` against
-`tests/vectors/key_args_validators_609.json` (222 cases, 26 shared rules on
-each of the seven calls and 40 call-specific, recorded from the seven
-exported reference validators at `ts-stack@edf6e03` under Node v22.18.0 by
-`tests/support/key_args_validators_609.mjs`, two runs byte-identical; 102
-accepted, 120 refused): every case through its helper, and every refusal
-through `ProtoWallet` to the same `Error`; one test per rule. RED on
-`9640eaa7` as a compile failure (`E0432`, the seven helpers absent), and each
-of the nine rules (the privilege required, the reason's bounds, the
-protocol name's, the key ID's, getPublicKey's required fields, the byte
-bound, the exclusivity, the signature's length, its DER) red on a scratch
-copy of the tip with that rule removed. `tests/wallet_proto_args_415.rs`
-and `tests/wallet_proto_args_420.rs` green unchanged.
+### Changed: CI's small gates are steps of two jobs, `lint` and `checks`, one setup each; the required contexts re-pointed (CI speed round 1, cuts 2 and 3)
 
-The reference's own order, for the hosts: its `Wallet` routes on
-`args.privileged` before any validator
-(`packages/wallet/wallet-toolbox/src/Wallet.ts:455-570` at the pin), and
-its `PrivilegedKeyManager` asks `getPrivilegedKey(args.privilegedReason)`
-before the inner `ProtoWallet` validates (`PrivilegedKeyManager.ts:343-383`),
-so there a privileged request without a reason reaches the key manager's
-fetch first and is refused by the validator after it; a host that calls the
-helper before routing refuses before the fetch, with the same words.
+What was wasteful: a pull request into `beta` ran twelve jobs, ten of them small
+gates each on a runner of its own, with its own checkout, toolchain and cache
+restore. On run 41537280176 (2026-11-02, 30 minutes, the `Test Suite` 26 of
+them) those ten took 632 s of runner time, 261 s of it setup steps against
+283 s of gate steps (`deny` 139 s of setup, building cargo-deny from source,
+for 3 s of checks), and queued 4 to 9.5 minutes for a slot of the account's
+twenty, shared by three captains. What changed (`ci.yml`): `lint` carries
+Rustfmt, Clippy (`--all-targets --all-features`, then each published slice
+alone), deny and ratchet; `checks` carries vectors, fixtures, secrets,
+Documentation and wasm32 (combined), its one-cell matrix now a step. Each job
+has one checkout, one toolchain setup and one `Swatinem/rust-cache` restore
+(v2.9.3, `d1527c8f67ef9af357290475d4af4b0fab8f12e0`), saved by a push to a
+line alone, so a pull request restores its line's build; cargo-deny 0.20.2 is
+the release binary through `taiki-e/install-action` (v2.89.1,
+`682ce6c3c696a4cd5168a05f98e51aa02b877941`). What did not change: every gate
+still runs, with the same commands, on the same events; each is its own step
+that runs when an earlier gate failed, prints its own `PASS <gate>` or
+`FAIL <gate>` line, and the job's last step fails naming every gate that did
+not pass. `semver`, `main-in-beta`, `beta-born` and the dependents jobs stay
+jobs of their own (their own events, `main-in-beta` beta's alone). The test
+job is unchanged here.
 
-Migration: bsv-wallet-toolbox-rs (#186) and bsv-wallet-cli replace the
-validating `ProtoWallet` call ahead of a privileged route with
-`bsv_rs::wallet::validate_<site>_args(&args)?` at the pin that carries this,
-then route; the texts are unchanged. Semver: seven public functions added, a
-minor addition on the beta line; no shape or behaviour moves.
+The required contexts move: `beta` from twelve to five (`Test Suite
+(ubuntu-latest, stable)`, `lint`, `checks`, `main-in-beta`, `semver`); `main`
+keeps its thirteen until the pull request that promotes this commit to it
+(that pull request runs its merge ref's `ci.yml` and reports `lint` and
+`checks`), then six (`Test Suite (ubuntu-latest, stable)`, `lint`, `checks`,
+`dependents`, `semver`, `beta-born`), the PATCH at that pull request after its
+run is green and before its merge. The verdict step skips no line: an empty
+outcome, an empty gate name or a blank line is a `FAIL` naming its position. The branch protection and the sequencer's names move at the
+landing (`docs/lanes/ci-speed-2.md` lists each). Cut 3, the twin runs: none
+were found to end. `ci.yml` already runs `push` on `main` and `beta` alone
+(every run of the last thirty on a lane branch is a `pull_request` run), so the
+`on:` block is unchanged, as is the concurrency group, which cancels a
+superseded run of the same pull request.
 
-### Notes: cross-SDK parity (#609)
+The tests: `tests/arch_ci_lines.rs`'s
+`the_bundled_gates_each_run_and_report_and_the_last_step_names_every_failure`
+(RED on `ffff16d0`'s `ci.yml`: no `lint`, no `checks`) and
+`a_bundle_with_a_gate_stopped_unreported_or_unjudged_is_refused` (a gate
+without `!cancelled()`, without its line, unjudged, gone, a second cache, a
+lenient last step, each refused naming it);
+`tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` and
+`REQUIRED_ON_MAIN` (12 of its 16 tests RED on `ffff16d0`'s `ci.yml` with the
+new constants). `docs/ARCH-RULES.md` section 7, `tests/CLAUDE.md`'s rows,
+`RELEASING.md` step 2 and `CLAUDE.md` rule 7 name the new contexts.
 
-Go at `2ca481c` has no argument-validation layer for the seven calls: its
-`ProtoWallet` judges no protocol name, key ID, byte length, signature or
-privilege (`wallet/proto_wallet.go:63-135` and the five calls after it), and
-`PrivilegedReason` is a plain `string` (`wallet/interfaces.go:449`), so an
-absent reason and an empty one are one value there; its one check is
-getPublicKey's, in its own words (`protocolID and keyID are required if
-identityKey is false`, `:72-74`). This crate follows the reference, so no new
-divergence is stated; the two typed-representation residues (`identity_key:
-false` for the absent flag, a counterparty text judged at
-`Counterparty::from_hex` before the protocol) are #420's, unchanged and
-stated in `src/wallet/CLAUDE.md`.
+### CI: the nightly incremental by the reach rule, the figures carried with their run's sha, the complete run per prerelease, a fixed fuzz budget, the bench weekly (speed round 1, cut 7)
 
-### Added: src/script/templates/pushdrop.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+The last nightly, run 41347058507 (dispatched 2026-11-01 20:28Z at
+`9640eaa7`, measured `42a74f1b`), took 10h43m from creation: 3h23m queued
+behind the concurrency group, 3h12m of twenty mutation shards at six at a
+time (script 128 to 136 minutes a shard, BEEF 36 to 43, Merkle 5 to 6, wire 20
+to 24, substrates 36 to 44; 4,843 mutants over 93 files), then 4h07m of
+nineteen fuzz targets at an hour each. Its twenty baselines succeeded; the
+score job failed on eleven gate-path files below 80 (#603's standing list).
+On the owner's word of 2026-11-02 ("even the nightly... is all that
+necessary? or maybe a fraction"):
 
-The widened run 41327640129 left 13 of the file's 53 viable mutants missed
-(75.47%). Two of them, `-` to `+` and to `/` in `decode_lock_after`'s
-`take(last_idx - 1)` (`pushdrop.rs:308:50` at `b8d0a008`), are gone: #618's
-fold at `4b0678fa` removed that loop for `reference_fields`. They are not
-counted as killed. The file is a template, outside the sibling's Lean
-definition: `bsv-script-lean@5dc337e1` has no PushDrop rule in `corpus/`,
-`lean/` or `spec/`. A full-corpus run of each of the eleven that stand
-(`harness/run --impl bsv-rs --corpus all --spec recorded`, nine corpora, all
-GREEN) moved no verdict, so the rule source is the reference, `PushDrop.ts`
-at `ts-stack@edf6e03`. `tests/support/pushdrop_decode_618.mjs` is extended
-rather than duplicated. It now writes two more sections of
-`tests/vectors/pushdrop_decode_618.json` under Node v22.18.0, and its earlier
-sections are byte-identical:
+- **The reach rule** (`nightly_mutants.py plan`): a night mutates only the
+  measured files the changes since the last complete run reach (a measured
+  file; a selection test's `tests/CLAUDE.md` row or its surfaces; a vector or
+  support file through the sources that name it; a module's other sources;
+  an exclusion's file), and carries every other figure. `Cargo.toml`,
+  `Cargo.lock`, `build.rs`, `.cargo/*`, `src/lib.rs`, `src/error.rs`, the
+  nightly's workflow, script and memory-ceiling runner reach everything and
+  make the night complete; documentation reaches nothing. On beta's last ten
+  commits, with the two folds below: two plan nothing, one plans three
+  files, three plan nine (the four BEEF and Merkle files and the five
+  substrates files that call `crate::transaction`), one forty (its row naming
+  a test-only file; the measured script files it changes reaching their
+  module's callers), one 43 (the script surface's 40, its row naming none,
+  and the three BEEF files naming `crate::script`), two (the nightly's own
+  script) plan the complete run
+  (`docs/lanes/ci-speed-7.md`). The table and the reasons are in `docs/NIGHTLY.md`.
+- **The reach rule's five holes, closed (PR #666's fold)**, each pinned by a
+  `test_fold_*` case in `test_nightly_mutants.py` that failed on the cut's
+  script: a deleted selection test is judged by the base's selection and row
+  (`git rm tests/script_script_603_a.rs` planned nothing, now the script
+  surface's 40); a data file is named by its whole name or a directory two
+  deep (`tests/fixtures/wire/createAction.json`, read through a
+  `format!`-built path, planned nothing, now the wire surface's 15) and a
+  support `.rs` by the `#[path]` or `mod` line that compiles it in (a change
+  to `tests/support/fixtures/*` or `tests/vectors/sighash.json` was a
+  complete run through the bare word `fixtures`, now 15 and 55 files); a
+  changed source of an unmeasured module re-measures, one level, the measured
+  files that name it by `crate::<m>` (`CALLEE_RULE`: an edit to
+  `src/primitives/hash.rs` planned nothing, now 39 files in 16 shards); a row
+  naming a test-only file reaches the files it tests; the thirteen
+  `#[cfg(test)]` modules under the globs are tests of their surface, never
+  measured (82 measured files, not 95). Beta's last ten commits: 29 shards
+  over the eight incremental ones before, 34 after.
+- **The callee rule's letter and its count per night (PR #666's second
+  fold)**, on the keeper's word ("the record names per night how many files
+  the cure added"; a changed module re-measures every measured file that
+  names it). The rule now reaches from every changed source under
+  `src/<m>/`, measured or not (a test-only one excepted), where the fold
+  applied it to an unmeasured source alone: an edit to the measured
+  `src/transaction/beef.rs` planned 1 file and plans 7 (it, `beef_tx.rs` and
+  the five substrates files that `use crate::transaction`), one to
+  `src/script/spend/flow.rs` 1 and 29. Of beta's last ten, `script-a` moves
+  from 40 files in 11 shards to 43 in 14 and `script-c` from 15 in 5 to 40 in
+  14, the eight incremental nights from 34 shards to 46; the cold read's
+  three probes are unchanged (40, 15, 39). The plan's JSON carries
+  `callee_rule` and `callee_added` (the files the rule reached that no other
+  rule did, by the reach run again with the rule off), the record's `runs[]`
+  entry the count under its run id and sha, and the scoreboard's header "The
+  callee rule added N files tonight (<mode>)" with their names; a complete
+  run prints 0. On the sample: 5 for `ffff16d0..84a01d2a`, 3 for `script-a`,
+  25 for `script-c`, 39 for the `primitives/hash.rs` probe, 0 for a
+  documentation night. Pinned by three `test_fold2_*` cases that failed on
+  the fold's script (the count absent; a measured file reaching no caller).
+- **The record**: the `mutation-record` artifact (90 days), found by the
+  source job through the artifacts API, never a commit (no write permission
+  on beta, no race with the sequencer): per file the figure, the counts,
+  `night` or `carried`, and the run id and sha it came from, beside the
+  complete run's `Cargo.lock`, which every night builds. The scoreboard gains
+  a Figure column and names the complete run it carries from; a carried
+  figure below its floor is listed as a finding with its run, never a
+  failure of the night.
+- **The complete run** (`-f mode=complete`, at each prerelease pin and before
+  a minor tag, `RELEASING.md` step 3): twenty shards in one wave (eleven
+  script, three BEEF, one Merkle, two wire, three substrates, about 50
+  minutes each by run 41347058507's rates) in place of the surfaces by four.
+- **The fuzz budget**: `FUZZ_MINUTES`, 10 minutes per target by default
+  (the repository variable `NIGHTLY_FUZZ_MINUTES`), every target every night;
+  it was an hour.
+- **The bench weekly**: the `weekly` input dispatches `bench.yml` on the line
+  (`gh workflow run nightly.yml --ref beta -f weekly=true`, the captain's
+  Sunday line); the workflow still has no schedule.
 
-- `locks_603`: the reference's own `lock` of nine fields at both positions,
-  under a second key, with other fields, and with the key pushed uncompressed.
-- `two_chunks_603`: three two-chunk scripts with no key first, read at
-  `'after'`.
+Pinned by `.github/scripts/test_nightly_mutants.py` (23 new tests: each reach
+rule on a fixture tree and its diffs, the plan's modes and sizes, the merge of
+a night onto a complete run, the provenance column, the carried-below-floor
+finding, an empty plan, an empty shard, the record's lookup). The record of
+the cut is `docs/lanes/ci-speed-7.md`.
 
-`tests/script_pushdrop_mutants_603.rs` holds the tests:
+### CI: every `.cargo/mutants.toml` equivalence entry checked against the mutant list in `checks` and the nightly's pin job (#663)
 
-- `a_zero_byte_field_is_op_0_and_a_longer_one_a_push_pushdrop_ts_20_41_locks_603`
-  kills `create_minimally_encoded_chunk`'s `||` to `&&` and `==` to `!=`
-  (`:165:28`, `:165:43`). The reference writes `00` as `OP_0` and `0001` as a
-  push (`PushDrop.ts:21-41`). The node's `CheckMinimalPush` would write the
-  one-byte zero as `01 00` (`lean/BsvScript/Machine.lean:69-75`). The
-  reference reads its `OP_0` back as `00` (`:104-105`), and this crate writes
-  as the reference does.
-- `a_two_chunk_lock_after_is_refused_for_its_checksig_or_key_pushdrop_ts_79_94_two_chunks_603`
-  kills `decode_lock_after`'s `<` to `<=` and to `==` (`:290:25`). The
-  reference refuses each of these scripts for its last chunk or its key
-  (`:81-92`), never for its length.
-- Three `PartialEq` tests kill `eq`'s seven mutants (`:463:9` twice,
-  `:463:49`, `:464:13`, `:464:28`, `:465:13`, `:465:35`). They are
-  `tokens_the_reference_reads_alike_are_equal_pushdrop_ts_63_121_locks_603`,
-  `tokens_differing_in_position_alone_are_unequal_pushdrop_ts_197_201_locks_603`
-  and `tokens_differing_in_key_or_fields_alone_are_unequal_pushdrop_ts_63_121_locks_603`.
-  Tokens the reference reads alike at the same position are equal, the
-  uncompressed key included, because `PublicKey.toString` gives the same
-  text for both. Tokens that differ in the key alone, the fields alone or
-  the position alone are unequal. The reference has no equality of its own,
-  and its reading carries no position: two tokens that differ in position
-  alone read alike (`locks_603`). The position rule is this crate's
-  `PartialEq` contract (`src/script/templates/CLAUDE.md`: the compressed
-  key, the fields and the position), and the reference's `lock` writes the
-  two positions as different scripts (`PushDrop.ts:197-201`).
+An `exclude_re` entry names one mutant by file, line, column and text. A line
+shift leaves it naming a line that holds no such mutant: it excludes nothing,
+the equivalent mutant runs at its new line and survives, and the file reads
+below its true figure. Beta carried fifteen stale `script.rs` entries after
+#639 (found by #652's rebase lane), three stale `merkle_path.rs` entries
+(#677) and one stale `beef.rs` entry since #651 (#678), each found by hand.
 
-Each test was RED on its mutants in a scratch copy and GREEN on the tree.
-Killed by tests 11, declared equivalent 0, remaining 0, removed by #618 2.
-Re-measured with the script surface's selection and the corpus set: 41
-caught, 0 missed, 1 timeout, 5 unviable, 97.62% caught of viable. The
-timeout is `add_drop_operations`' `-=` to `+=` (`:196:23`), an unbounded
-push. It was caught under the nightly's memory ceiling (0 timeouts in the
-census), and macOS has no `ulimit -v` to apply that ceiling here. No `src/`
-behaviour changed and no vector revealed a divergence from the reference,
-so there is no parity note.
+- `.github/scripts/mutants_entries.py` lists the mutants of every file the
+  entries name (`cargo mutants --list --file <file> --no-config`: a listing
+  from the source, nothing built; seven files, 1,302 mutants, about six
+  seconds locally) and fails when an entry matches no listed mutant
+  (`STALE entry`, then `re-point to <line>:<col>` when one free listed mutant
+  of the same text, at the same column, else any, is the only candidate, or
+  every candidate) or more than one (`DOUBLE match`, every line). Stale
+  entries of one text pair with as many free candidates in line order, the
+  order a shift keeps. `--fix` rewrites each uniquely re-pointed entry and the
+  `<line>:<col>` its comment names, for the captain's hand use. A script of
+  its own, not a subcommand of `nightly_mutants.py` (whose change reaches
+  every measured file and makes the next night complete) and not a ratchet
+  counter (the ratchet compares counters with a recorded baseline; this is
+  an absolute check against a listing).
+- Two gates: `mutants-entries`, a step of CI's `checks` job on every pull
+  request and push (`PASS mutants-entries`/`FAIL mutants-entries`, named by
+  the last step on failure), and `Refuse a stale equivalence entry` in the
+  nightly's `source` job before its plan, so a stale entry refuses the run
+  before any shard. Both run cargo-mutants 27.1.0, the nightly's
+  `CARGO_MUTANTS_VERSION`, installed by `cargo install --locked` as the
+  nightly's shards install it (in `checks` into the cargo home; rust-cache
+  keeps `~/.cargo/bin` but saves only on a beta push whose key missed, so the
+  build, 1m 15s on PR #679's run, recurs until the key next moves); the
+  script refuses another version. The listing runs under `NO_COLOR=1` and
+  `--colors=never`: ci.yml's `CARGO_TERM_COLOR=always` styles cargo-mutants'
+  `--list` lines, and PR #679's own `checks` run read all 27 entries as
+  STALE before it. The pin job's timeout moves
+  from 10 to 20 minutes for the build, and its Rust install is unconditional.
+- The `beef.rs` `Beef::sort_txs` entry re-pointed from 912:33 to 915:33, the
+  script's `--fix` output byte for byte as PR #678's change, so beta passes
+  the new gate whichever lands second.
 
-### Added: src/script/templates/pushdrop_position.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+Pinned by `.github/scripts/test_mutants_entries.py` (13 tests: a colored
+listing environment listing plain lines, a match, a
+miss with a unique re-point, a miss with two candidates, a double match, a
+triple-quoted entry with a lifetime, a shift under entries of one text, a
+held line, `--fix` on the entries and their comment, a one-line shift under
+adjacent entries, a repeated entry, an unreadable entry, the repository's
+entries readable) and by `tests/arch_ci_lines.rs` (`BUNDLES` names the new
+gate; `every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663`
+refuses a `checks` job without the check, a pin job without it before its
+plan, a workflow passing `--fix`, and two cargo-mutants versions).
 
-The widened run 41327640129 left 25 of the file's 26 viable mutants missed
-(3.85%): the helpers' witnesses lived in the kvstore, registry, storage and
-overlay tests, outside the script surface's selection. The file is a template,
-outside the sibling's Lean definition (`bsv-script-lean@5dc337e1`; the corpus
-step does not apply), so its rule source is the reference, `PushDrop.ts` and
-`PushDropValidation.ts` at `ts-stack@edf6e03`. Six unit tests in
-`src/script/templates/pushdrop_position_603_tests.rs`, each expectation a Node
-v22.18.0 recording already in the tree: `public_key_forms_498.json` (39 key
-texts through `PublicKey.fromString`: `key_text_refusal`, and the 34 hex ones
-as bytes through `Point.fromDER`: `point_message`), `sec1_tag_05_550.json`'s
-`PublicKey.fromDER` case, and `kvstore_local_454.json`'s `parser_words_489`
-(16 tokens: `PushDrop.decode`'s verdict for `decode_before`, and
-`decodeCanonicalPushDrop`'s words with `fieldCount: 2` for
-`canonical_refusal`); the one token no recording carries, a key and a
-CHECKSIG with no field, is this crate's writer in `PushDrop.lock`'s shape
-(`PushDrop.ts:164-171,185-193`), which `PushDrop.decode` reads as zero fields
-(`:73-77,97`). Killed by tests 25, declared equivalent 0, remaining 0;
-re-measured with the script surface's selection and the corpus set: 26
-caught, 0 missed, 0 timeout, 1 unviable, 100% of viable. No `src/` behaviour
-changed and no vector moved; the recording the tests read states one
-difference, below.
+### CI: the ten slowest tests made fast, each with the kill it guards kept (speed loop two, #670)
 
-### Notes: cross-SDK parity (#603)
+What was slow: by nextest's per-test timings in the Test Suite job of runs
+41558273855, 41560881228 and 41563214016, ten tests took 804 s (their
+medians), 45% of each run's 1,396 to 1,793 test-seconds: the memory step's
+`test_http_json_success_tx_in_the_array_form_costs_the_typed_reading` alone
+339 s of a 363 s step, the rest in the integration step (70 s to 30 s each).
+What changed, tests only (no source behaviour, no workflow line; the one
+source line of the fold names the transport's timeout, below): each test
+asks the same thing of a smaller input, the bound unchanged where it is a
+ratio; every one of the ten took that cut, made fast, none made
+nightly-only and none fixed (an `#[ignore]` would leave a test no job runs).
+The array-form answer's `tx` is 128 KiB, not 1 MiB (`TX_PUSH`; the
+peak under four times the text at both sizes, 13.2 MB against 1.9 MB with
+the typed reading skipped). The streaming BEEF heap test reads 1,000, 4,000
+and 16,000 links, not to 100,000: the index's table doubles, so its peak is
+a step of the depth, and at 1,000 times a power of two each depth sits at
+the same point of the step (351 B per element at all three, where 10,000
+read 281 and 100,000 read 225). The same per-element bounds, and a new check
+that the marginal cost per element from 4,000 to 16,000 is within 1.25 of
+that from 1,000 to 4,000 (the #676 fold; a kept spent output RED at 1,000; a
+planted per-link allocation growing with the index, about 0.008 B times n
+squared, RED at 16,000, 470 B per element, where 1,000, 3,000 and 10,000
+passed it). The two readers' sweeps (`beef_two_readers_agree`,
+`merkle_path_two_readers_agree`) cut and change every byte but bytes 2 to 30
+of each 32-byte hash of a well-formed seed, which neither reader reads apart
+from the hash (`tests/support/hash_interiors.rs`; RED on a `>=` to `>` in
+`verify_structure`'s BUMP index check and on a truncation offset moved in
+`MerklePath::from_reader`). The three `linear_root_equivalence_tests` draw
+compound blocks of at most 32 leaves in two of their three block arms, not
+80 and 64; the third keeps 80, so partial blocks of 33 to 80 leaves are
+still drawn (the #676 fold); the rounds unchanged
+(cargo-mutants on `find_or_compute_once` and `root_from`, 23 mutants:
+18 caught, 4 missed, 1 unviable before and after). `merkle_path_cost`'s compound BUMP
+asks the root of nine txids spread over the block, the last included, not of
+every 97th. The deep chain's `to_beef` round trip runs 25,000 links on a
+256 KiB stack, the links per byte of 100,000 on 1 MiB (a recursion per link
+planted in `to_beef` overflows it). The auth transport's timeout test uses a
+client of a one-second timeout through `with_client`, the class the error's
+(the transport's own 30 s client is no longer waited on). Its 30 s is
+pinned without the wait instead (the #676 fold): `REQUEST_TIMEOUT` in
+`src/auth/transports/http/client.rs`, which `default_client` builds with
+through the `default_client_with(timeout)` seam, a unit test asserting the
+constant, the default's construction through the seam at it, and the seam's
+timeout ending a request the far side never answers (1 s against 5 s). On
+this host the ten went from 612 s to 92 s, and to about 108 s with the
+fold's 80-leaf arm and 16,000-link depth; the record, `docs/lanes/ci-speed-loop2-slowest.md`, has
+each test's seconds, the cut, the RED, the runner ratio and the five figures.
 
-`parser_words_489` records two tokens the reference's `PushDrop.decode` reads
-at its default position (no `parser_error`) and this crate's `PushDrop::decode`
-and `decode_before` refuse: `token_key_only`, the key push alone, which the
-reference reads as the key and no field (`ts-stack@edf6e03`
-`PushDrop.ts:73-78,97`) and `pushdrop.rs:229` refuses as `Script too short for
-PushDrop`; and `token_no_checksig`, `OP_1` in the CHECKSIG's place, whose
-second chunk the reference never reads (its two fields returned) and
-`pushdrop.rs:261` refuses as `Expected OP_CHECKSIG after pubkey`. The public
-verdict that differs is the template's `PushDrop::decode`. At every caller of
-`decode_before` the reference refuses both as well: `decodeCanonicalPushDrop`
-on the field count or the envelope (`PushDropValidation.ts:54-79`; the local
-store, the kvstore interpreter, the registry, the overlay admin token and the
-storage downloader, in the recorded words through `canonical_refusal`), and
-the identity client and the contacts manager on their field count and
-canonical script (`IdentityClient.ts:130-147,773-776`,
-`ContactsManager.ts:225-242,431-441`; a skip or a wrapped refusal on both
-sides). Go at `2ca481c` refuses both, as this crate does
-(`transaction/template/pushdrop/pushdrop.go:20-53`: two chunks at least,
-`OpCHECKSIG` second). A residue the cold read found, derived from the
-reference's code and not recorded: a no-CHECKSIG token with the site's field
-count and a field over the site's bound is refused here in the envelope's
-words, where `decodeCanonicalPushDrop` checks the bounds before the envelope
-(`PushDropValidation.ts:63-73`) and says `PushDrop token contains an oversized
-field` or `PushDrop token payload is too large`; the verdict is the same.
+### CI: a pull request's Test Suite runs the test targets its changed files reach; the whole suite once per landing by the `full-suite` label (speed loop one, cut 4, #667)
 
-Census (#375; current reading):
+Before this cut a pull request's run and the sequencer's landing run each ran the whole
+Test Suite (12m05s to 15m15s on #664's, #666's and #669's runs, #669 a docs-only change;
+integration and memory 80 to 85 percent of it), so every landing cost two.
 
-- Row 93: Ours: since #618 the public `PushDrop::decode` reads a key-only script and a token without CHECKSIG second as `PushDrop.decode` at its default position reads them (PushDrop.ts:63-121 at edf6e03; tests/vectors/pushdrop_decode_618.json, tests/script_pushdrop_decode_618.rs); the refusal stands on the canonical path alone (`decode_before` and the canonical-script checks), where every site refuses both as its counterpart does (PushDropValidation.ts:54-79 at the local store, the kvstore interpreter, the registry, the overlay admin token and the storage downloader; IdentityClient.ts:130-147; ContactsManager.ts:225-242; one `_618` witness per site), as go-sdk at 2ca481c refuses them at its public `Decode` (pushdrop.go:20-53); residue the envelope's words where the reference names an oversized field behind a missing CHECKSIG (PushDropValidation.ts:63-73), and the key parse's and the refused shapes' words where the reference throws its own. Theirs: go-sdk, its public `Decode` refusing what the reference reads, no filing made (the #618 entry).
+- **On a pull request** the job plans before its test steps
+  (`.github/scripts/affected_tests.py`, the #666 reach rule read the other way, reusing
+  `nightly_mutants.py`'s readings) from the merge ref's diff against its base: a library source reaches the unit and doc tests and
+  every integration binary using its module or, one level out, a module naming
+  `crate::<module>` (by `bsv_rs::` paths, crate-root re-exports and the
+  `tests/CLAUDE.md` rows); a test file itself; a changed row its binary; a support file,
+  vector or fixture the binaries that declare it, name it in a string literal or walk its
+  directory; `Cargo.toml`, `Cargo.lock`, `build.rs`, `src/lib.rs`, `src/error.rs`,
+  `.cargo/config*`, the toolchain, `ci.yml` and the plan's script everything. The
+  integration step runs the reached binaries as `--test` names (cargo builds those
+  alone), the unit, memory, tracing and doc steps run when the plan reaches them, and a
+  step checks the reached set against `cargo metadata`'s integration targets. On the
+  last fifty landings: 25 reach 0 to 12 binaries and no unit, doc or memory step, 20
+  library landings reach 103 to 275 (one more, a vector a library source includes, 5),
+  4 plan everything (`docs/lanes/ci-speed-4.md`). A walked literal is tested with
+  `os.path.isdir`, since `Path.is_dir` raises on a name too long on Python 3.11 to 3.13,
+  the runner's 3.12 among them; a path is matched to `\Z`, so a `README.md` change
+  reaches `readme_examples` (#680 fold).
+- **Once per landing** the whole suite: the sequencer labels the PR `full-suite` before
+  it pushes the rebased head, and the job reads the label live through the API at its
+  start (`pull-requests: read`, granted on `release.yml`'s call too), never by a
+  `labeled` trigger. A push to `beta` or `main`, a dispatch and a tag's call run the
+  whole suite as before.
+- A pull request saves the dependency cache only when its plan is the whole suite (an
+  empty or partial target under the shared key, a subset's build without the memory or
+  tracing features, would be every later run's exact hit); the landing run carries
+  `full-suite`, so a complete cache is saved once per landing.
+- **The guard**: `tests/arch_ci_runs_every_test.rs` (#146) reads each step's `if:` and
+  pins the shape (`reached_refusals`): the whole-suite step under the plan's `whole`
+  flag, the reached step beside the subset check, every flag set on a run that is not a
+  pull request, the live label read and no `labeled` trigger;
+  `.github/scripts/test_affected_tests.py` (19 cases on a fixture tree) pins the plan
+  and runs before it on every pull request.
 
-### Added: src/script/templates/rpuzzle.rs's surviving mutants killed from the sibling's rules and vectors (#603)
+### Tests: src/script/spend/key_point.rs's survivors of the complete run killed (#681)
 
-The template sits outside the sibling's Lean definition, so its rule source
-is the reference's `RPuzzle.ts` at `ts-stack@edf6e03`
-(`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`) and its `__tests`. The widened
-run 41327640129 left 10 survivors (50.00%). 9 are killed by tests and none is
-declared equivalent, so 1 remains. The tests are two in `tests/template_tests.rs`
-(`rpuzzle_reference_603`) against `tests/vectors/rpuzzle_lock_and_spend_603.json`,
-which `tests/support/rpuzzle_lock_and_spend_603.mjs` records under Node v22.18.0.
-`the_lock_pushes_the_value_minimally_rpuzzle_lock_and_spend_603_lock` pins `lock`'s
-push at ten lengths and kills the `<` replacements at `rpuzzle.rs:350:34`
-(`==`, `>`) and `rpuzzle.rs:352:32` (`<=`, `==`, `>`).
-`the_unlock_signs_with_the_given_k_rpuzzle_lock_and_spend_603_spend` checks 36
-spends (six puzzle types by six scopes, k = 12345678, the private key 1, as
-`__tests/RPuzzle.test.ts:19-51` builds them): each signed transaction matches the
-reference byte for byte and each spend is valid. It kills the four
-replacements in `sign_with_k`'s `s = k⁻¹ (z + r d)` at `rpuzzle.rs:403`. The one that
-remains is `rpuzzle.rs:350:34` `<` → `<=`. It changes the opcode only for a
-76-byte value, where the length and `OP_PUSHDATA1` are the same byte, so the
-chunk and its serialization do not change. The reference's own `{ op:
-value.length }` (`RPuzzle.ts:65`, `Script.ts:544-547`) writes those same bytes. It is
-not declared in `exclude_re` until three independent reads accept it.
-Re-measured with the script surface's selection and the corpus:
-19 caught, 1 missed, 0 timeouts, 8 unviable: 95.00% of viable.
+- The complete nightly (run 41579707627 on `e3fef6dc`) measured `key_point.rs` at 25.00%
+  (1 caught, 3 missed, 1 unviable): the #660 pins live in `tests/pubkey_encoding_660.rs` and
+  `tests/pubkey_point_shapes_660_adv.rs`, outside the script surface's selection (`--lib`
+  and `tests/script_*.rs`), so no test the oracle runs read the switch. Three library tests,
+  `src/script/spend/key_point_tests.rs`: `a_key_that_is_no_point_passes_the_encoding_check_and_checks_false_in_every_mode_681`
+  (seven non-points, `<key> OP_CHECKSIG OP_NOT` and the CHECKMULTISIG form valid under an
+  empty signature in the default mode and the block and standard words at both eras, the
+  node's `IsCompressedOrUncompressedPubKey` and `CPubKey::Verify` at `879fc8b`) kills
+  `&&` to `||` in `check_public_key_point` and `reads_the_reference_point` to `true`;
+  `an_x_past_the_field_prime_is_no_signature_key_in_every_mode_681` (`03||p+1`, a point
+  to a reducing reader) kills `true` at `signature_key` alone;
+  `a_wrong_length_or_prefix_is_refused_as_the_scripts_error_in_every_mode_681` pins the
+  error class of a 33-byte `04`, a 65-byte `02` and a 32-byte key and kills nothing here.
+  After: 3 caught, 1 missed, 1 unviable, 75.00%. The one survivor,
+  `check_public_key_point` to `Ok(())` (`key_point.rs:39:9`), is declared equivalent in
+  `.cargo/mutants.toml` on three reads of 2026-11-03 (DECLARE 0.96, EQUIVALENT 0.97,
+  DECLARE 0.85): the switch is the literal `false`, so the body is `Ok(())` on every input;
+  the entry is removed when the switch reads a flag or a feature. With it the file reads
+  3 of 3 viable, 100% (`docs/lanes/kill-key-point.md`).
 
-### Notes: cross-SDK parity (#603)
+### CI: every heavy run on the runners carries max-parallel 14 (the fleet's runner cap, 2026-11-03)
 
-The reference's `RPuzzle.lock` writes the value as `{ op: value.length, data:
-value }` (`RPuzzle.ts:65`). Up to 76 bytes that is a minimal push, and this
-crate's bytes are the same. From 77 bytes it is not the minimal push: at 77
-the reference writes the value under an `OP_PUSHDATA2` whose length is 77 and at
-78 under an `OP_PUSHDATA4` (non-minimal pushes of the value; 78 is read from
-`Script.ts:553-560` and is not among the vector's lengths), and from 79 no push
-at all, the opcode byte alone with the data dropped (`Script.ts:539-562`; at 256
-the single byte `00`). This crate keeps the minimal push at every length,
-`OP_PUSHDATA1` from 76 to 255 and `OP_PUSHDATA2` from 256, as the reference's
-`Script.writeBin` does (`Script.ts:340-352`). The recorded vector pins both
-answers at 0, 20, 32, 33, 75, 76, 77, 100, 255 and 256. An R value or its hash
-is 20 to 33 bytes, so no puzzle that either SDK can spend crosses the gap.
-The line is in CLAUDE.md's divergence list.
+The account's twenty hosted runners are one pool across bsv-rs, the CLI,
+the toolbox and the stack: the complete nightly 41579707627 asked for its
+twenty shards in one wave and PR #679's run, created 05:05:32Z, finished 52
+minutes later. The nightly's `mutants` matrix now holds at most 14 (the
+plan's `HEAVY_MAX_PARALLEL` for a complete run, read through the pin job's
+`max_parallel` output; a night stays at 6), and the `fuzz` matrix keeps its
+6, so six runners stay for the fleet's pull request and queue runs. The cost:
+a complete run's shards go 14 then 6, about 35 minutes longer (41579707627's
+shard times replayed on 14 slots: about 100 minutes against 65). Pinned by
+`tests/arch_nightly_cap.rs` (a heavy matrix without `max-parallel` or above
+14, in any workflow, refused; two heavy jobs of the nightly with no `needs:`
+path between them refused). The dispatch of the two whole `ci.yml` runs now
+runs after the shards and the fuzz targets, and one run after the other
+(the keeper's word (a)): beta's run holds up to 9 jobs at once and main's,
+on main's `ci.yml`, up to 22 (16 before its seven dependents start), up to
+31 together where the shards had held them to about 12. `ci-full` is split
+into `ci-full-beta`, which dispatches beta's run and waits for it (the run
+it dispatched, found among the bot's runs not listed before the dispatch,
+so a hand dispatch on beta is never the run watched; a `failure`
+conclusion fails the job, the give-up at 55 minutes a warning with no verdict
+and any other failed watch an error, the step under `set -euo pipefail`; one runner for its 23 minutes; a concurrency group in `ci.yml` would not hold
+main's run, which reads main's own file), and `ci-full-main`, which needs
+it; `ci.yml`'s Test Suite and dependents matrices carry `max-parallel: 14`
+(at most seven wide, so nothing moves today). The residual: a matrix cap
+does not bound singleton jobs, so main's run holds up to 22 for about a
+minute and a half. The CI phase in sequence is about 39 minutes replayed
+from the measured jobs (beta's 22m42s, then main's 16m32s alone), an hour
+and 23 minutes at the hour main's run took beside the shards (04:43Z to
+05:43Z in 41579707627); the next complete run measures it. The record and the stagger slots are
+`docs/lanes/ci-speed-7.md`, "The fleet's runner cap". The number's owner is
+loop four's #675.
 
-### Added: the key bytes Certificate.toBinary writes for a subject or certifier key, as a public helper named for the operation (#610)
+### Tests
 
-On the keeper's word of 2026-11-01 20:1xZ on the toolbox's ask (shape (2)):
-`auth::certificates::certificate_key_bytes(text, field) -> Result<[u8; 33]>`
-(`src/auth/certificates/to_binary_key.rs`, under `auth`) is the reference's
-`Certificate.toBinary` on a `subject` or `certifier` text (`ts-stack@edf6e03`
-`packages/sdk/src/auth/certificates/Certificate.ts:240-254`): the text taken as
-given, never trimmed, `/^(02|03)[0-9a-fA-F]{64}$/` in either case, else
-`Invalid certificate <field>: expected compressed public key hex`; the decoded
-bytes a key to `PublicKey.fromDER` (`assertCompressedPublicKey`, `:136-143`),
-else `Invalid certificate <field>: expected a compressed secp256k1 public key`;
-both `Error::CertificateValidationError`. It returns the 33 bytes `toBinary`
-writes, so a compressed x at or above p that `fromDER` reduces to a point is
-returned unreduced, as the reference writes it; a caller that needs the key
-reads the bytes with `PublicKey::from_bytes`, which refuses that x (#183).
-`read_to_binary_key` (#585) keeps its name and visibility, crate-private under
-`identity`, and is the helper followed by `from_bytes` in the second sentence:
-one definition, the identity parsers' reading and words unchanged.
+- The HTTP wallet's typed reading measured apart from the transport, the array-form pin deterministic (#697):
+  `test_http_json_success_tx_in_the_array_form_costs_the_typed_reading` measured the four-times bound through a
+  wiremock server, so its peak counted the transport's buffers, and on a loaded runner one more body's worth was
+  alive at it (2,218,461 B for 468,692 B of text, 4.73 times, on PR #691's run and #694's re-run, green on the
+  same code otherwise). The bound now sits on the typed reading alone,
+  `the_typed_reading_of_a_create_action_answer_costs_under_four_times_its_text_apart_from_the_transport_697`:
+  `serde_json::from_slice::<CreateActionResult>` on the body in memory, the reading
+  `src/wallet/substrates/http_json/answer.rs:89` does (its function `pub(super)`), 262,240 B on every run, RED at
+  8,519,898 B with the `tx` read through a `Value`; a crate-contract pin labeled with
+  `src/wallet/substrates/CLAUDE.md:15`, which now states the cost. The wiremock figure stays printed and is held
+  under five times the text, a stated bound naming the extra copy (9,345,126 B on the RED). The fixture moved to
+  `tests/support/http_json_answer_697.rs`. Record: `docs/lanes/fix-697.md`.
+- `src/script/spend/script_code.rs`'s survivors of the complete run killed (#681): ten library tests in
+  `src/script/spend/script_code_tests.rs` pin the scriptCode's writer and walker against bitcoin-sv `879fc8b`
+  `src/script/script.h` (`operator<<` at 102-130, `GetOp2` at 163-198, `FindAndDelete` at 200-222): `push_of`'s
+  header byte for byte at 0, 1, 75, 76, 255, 256, 65535 and 65536 bytes; `find_and_delete`'s walk stepping over
+  a direct, PUSHDATA1, PUSHDATA2 and PUSHDATA4 push whose data holds the pattern (minimal at each boundary size and
+  non-minimal) and deleting the copy after it; a PUSHDATA2 of `0x0100` read as 256 bytes; a one-byte push cut
+  short at the last byte kept. The six timeouts of the issue's run (eight on this host's baseline) are answered by
+  a bound, not a longer timeout: `find_and_delete`'s two loops now run over ranges of the script's length (a walk
+  that advances ends inside them, `the_bound_never_cuts_short_a_walk_of_one_byte_steps_681`), so a walker that
+  returns its own position or one behind it ends and answers another script
+  (`a_copy_after_two_instructions_is_deleted_by_a_walk_that_advances_681`, which hangs on seven of the eight
+  without the bound). The bound adds no mutant (51 before and after). 15 of the 16 survivors and all 8 timeouts
+  killed, each RED on its mutant; `104:26` (`<` to `<=` in `next_op`'s cut-push check) is named an equivalence
+  candidate (it differs only at the script's last instruction, where breaking and stepping keep the same bytes).
+  The file: 27 caught, 16 missed, 8 timeouts (52.94%) on this host's baseline (the issue's run: 29, 16, 6,
+  56.86%); 50 caught, 1 missed (98.04%) after. Record: `docs/lanes/kill-script-code.md`.
+- `src/script/templates/multisig.rs`'s survivors of the complete run killed (#681): six tests in the file's own
+  module pin the m-of-n edges against the node's `GetScriptForMultisig` form (bitcoin-sv `879fc8b`
+  `src/script/standard.cpp:315-324`): the bytes of a 1-of-1 and a 2-of-3 on both lock paths, m = n written and
+  m = n + 1 refused, 16-of-16 as `OP_16` twice with 17 keys refused, 257 keys refused (a count cast to `u8` would
+  read 1), and the #625 reachability rule at its edge (`n - 1 - j < m` refused, `= m` written). 12 of the 13
+  survivors killed, each RED on its mutant: two on the node's rule (`241:38`, m <= n, `standard.cpp:135`) and
+  ten crate-contract pins counted apart (the keeper's ruling), each test labeled with its documenting line
+  (`multisig.rs:103`'s 16-key bound for `114:19` and `238:14`; `multisig.rs:224-229`'s #625 refusal for the seven
+  of `266`-`267`). The one survivor, `108:19` (`||` to `&&` on the threshold), is named an equivalence
+  candidate for the captain's reads (every threshold it lets past is refused later as `CryptoError`, the error
+  message the only difference). The
+  file: 33 caught, 13 missed (71.74%) before; 45 caught, 1 missed, 1 unviable (97.83%) after. Record:
+  `docs/lanes/kill-multisig.md`.
 
-Pinned against `tests/vectors/certificate_key_bytes_610.json`, written by
-`tests/support/certificate_key_bytes_610.mjs` (a bun bundle of `mod.ts` at
-`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical): for each of
-the subject (an `03` key) and the certifier (an `02` key) 23 texts, #585's eight
-and the shapes around them (the other prefix, mixed case, a leading space, a
-trailing line break, empty, 64 and 68 digits, `0x`, the prefixes `04`, `05` and
-`00` at compressed length, a non-hex and a non-ASCII character, x at p and the
-largest x), each with the 33 bytes `toBinary(false)` writes or the words it
-throws. `tests/auth_certificate_key_bytes_610.rs`: the helper's bytes equal the
-reference's for the 12 accepted texts and its error the reference's for the 34
-refused, and the same for the 16 `to_binary` outcomes of #585's vector, none
-enumerated apart; an x above p and the largest x written unreduced and refused
-by `from_bytes`. Compile-RED on `9640eaa7` (`E0432`, the helper absent); on a
-scratch copy, 1 of 3 RED with the text rule cut to the length, 3 of 3 with the
-point read by `from_bytes`; #585's three pins green unchanged.
+### CI: a docs-only pull request's Test Suite, lint and checks build nothing (speed loop two, #668)
 
-Migration (bsv-wallet-toolbox-rs): drop `internalize_args::compressed_key` and
-call `bsv_rs::auth::certificates::certificate_key_bytes(text, "subject")` (or
-`"certifier"`) at the key sites, `PublicKey::from_bytes` on its bytes where a
-key is held; the texts are unchanged. One input to read at those sites: a
-compressed x at or above p whose reduction is a point is written, as `toBinary`
-writes it, and `from_bytes` refuses its bytes.
+#669, a pull request of `CHANGELOG.md` and a lane record, ran the whole set
+for 10m05s (run 41574976294); after cut 4 the Test Suite's plan already ran
+no test for such a change, but every job still restored its cache, installed
+its tools and built. Now the Test Suite's plan writes `build` (some unit, doc
+or integration target reached) and every step after it carries `build` or a
+flag that implies it, a last step printing `docs-only: nothing to build` so
+the required context reports green; `lint` and `checks` plan too and read
+`docs_only` (every changed path a `*.md` other than `README.md`, which the
+ratchet measures, and outside `tools/ratchet/`, the ratchet's code; a file
+under `docs/` that is not Markdown, `docs/ratchets.json` the ratchet's record
+above all, is never docs only; no unit or doc test; none of the binaries
+`ci.yml` runs by `--test` reached): their toolchain, cache and
+lockfile steps skip, their gates skip with them, and the verdict step reads a
+skipped gate as `SKIP` on a docs-only change alone. `secrets` still scans the
+pull request's commits. A change to `CHANGELOG.md` still reaches
+`arch_ci_lines` (its needle names the file), so the Test Suite builds and runs
+that one binary there; `semver` (about 50 s on a cache hit) and
+`main-in-beta` (seconds) run as before. Pinned by
+`tests/arch_ci_docs_only_exit.rs` (each step after a plan carries its
+condition, read whole, never by substring; only a checkout before a plan;
+each refusal shown on a mutated `ci.yml`; `arch_ci_lines`' bundle
+rule reads the plan step as no gate and admits `secrets`' docs-only arm) and
+the plan's unit tests
+in `.github/scripts/test_affected_tests.py` (the ratchet's record and code
+never docs only; every `steps.plan.outputs` key `ci.yml` reads one the plan
+writes, on a pull request and on a push). The record is
+`docs/lanes/ci-speed-loop2-docs-only.md`; the after figure is the next
+docs-only pull request's run.
 
-### Changed: the mutation gate's floors live in the ratchet's record, 80 on the interpreter and the BEEF and Merkle readers and the measured widened value elsewhere, never lowered (#602)
+### CI: a docs-only pull request's `semver` job checks nothing (speed loop two, #689)
 
-On the owner's word of 2026-11-01 14:1xZ through the keeper (23.5 (c)): the
-nightly's mutation gate is 80 percent caught on `src/script/**`,
-`src/transaction/beef*.rs` and `src/transaction/merkle_path.rs`, and the
-ratchet elsewhere (`src/wallet/wire/**`, `src/wallet/substrates/**`): the
-measured value is the floor, never lowered, raised by a landing that raises the
-score; on the 14:3xZ word and the keeper's 14:4xZ reading, the floors come from
-the widened figure (the oracle with the conformance corpus), never the narrow
-one. The floors move from `nightly.yml`'s `MUTATION_FLOORS` string (removed) to
-`docs/ratchets.json`'s new `mutation_floors` member, 29 files at their widened
-score rounded down with #602 as their issue, read by `nightly_mutants.py report
---floors` (default `docs/ratchets.json`) from the measured commit; a gate-path
-entry is refused. `tools/ratchet/run --check --against <base>` refuses a floor
-lowered or removed from the base's record, a raise or a new entry passing, and
-`--record` carries the member over unchanged
-(`a_lowered_or_removed_mutation_floor_is_refused_602`, RED on a copy with the
-refusal's body removed). A file whose generated mutants are all unviable is
-`NO VIABLE MUTANTS`, unscored, when its surface has viable mutants, and still
-fails when the surface has none (`src/wallet/substrates/http_json/answer.rs`:
-two `Default::default()` replacements of a type without `Default`;
-`test_a_file_whose_mutants_are_all_unviable_has_no_score`).
+#690, the earliest docs-only pull request under #668's exit, ran 4m43s
+(run 41617426467) against #669's 10m05s: the Test Suite 8 s, `lint` 9 s,
+`checks` 30 s, `main-in-beta` 5 s, and `semver` 4m39s, the one job the exit
+left alone. `semver` now runs lint's plan step after its own checkout and
+every step after it carries `docs_only != 'true'` (the tool's install with
+its cache miss), a last step printing `docs-only: no API to check` so the
+required context reports green; on every other pull request it runs as
+before, against the same baseline tag. Read from its own plan rather than
+the Test Suite's through `needs`, which would hold `semver` behind the
+suite on every code change. Pinned by `tests/arch_ci_docs_only_exit.rs`
+(`semver_refusals`, RED with the check's condition removed and on the base's
+`ci.yml`) and `test_affected_tests.py`'s plan-key tests. The record is
+`docs/lanes/ci-speed-loop2-docs-only.md`, "The semver exit".
 
-The two figures: the narrow run 41294262955 at `ab155018` (no corpus) scored
-31 PASS, 46 FAIL and 15 NO MUTANTS at 80 everywhere; the widened run
-41327640129 at `b8d0a008` (corpus at ts-stack `edf6e03`) 33 PASS, 44 FAIL and
-15 NO MUTANTS at 80 everywhere, and 62 PASS, 14 FAIL, 15 NO MUTANTS and 1 NO
-VIABLE MUTANTS under the record's floors: the fourteen failures are the
-gate-path files below 80, red until #603's lanes land. The survivors' record,
-both runs side by side with the gate paths' 548 widened survivors by
-`file:line:column` and the 97 the corpus killed, is
-`docs/census/mutants-2026-11-01.md` and `.json`, written from the artifacts by
-`.github/scripts/mutants_record.py` (`fetch`, `floors`, `write`). No crate code
-moves.
+### CI: every heavy run capped at six on the opening occupancy read, the complete dispatch at 07:00Z (the fleet's runner cap, 2026-11-03)
 
-### Changed: the nightly's Mutants oracle runs the conformance corpus, so the mutation scores are measured against the sibling's vectors (#602, #31)
+The keeper's line of 10:0xZ, on the opening API read of the pool (12,251 jobs
+over three days): the twenty runners sit at twenty in 22 of 24 hours, the
+non-heavy p95 is 14 slots, and a job queued beside a heavy run waits a median
+of 0:38 (worst 88:53) against 0:02 (worst 3:16) beside none. The cap of 14
+below becomes 6: the plan's `HEAVY_MAX_PARALLEL` for a complete run (a night
+stays at `NIGHT_PARALLEL` 6), the `fuzz` matrix's 6, and `ci.yml`'s Test
+Suite and dependents literals, so the seven dependents run six, then one,
+on a dispatch, a tag, a push to main and a pull request into main (the
+seventh's 1m37s after bsv-tracker's 1m13s, inside the toolbox's 7m08s in
+run 41579745459: no longer by the replay). The cost: a complete run's twenty
+shards in four waves, about 3h07m replayed from run 41579707627's shard
+times against 1h40m on 14. The complete dispatch moves from 00:00Z to
+07:00Z, alone (the toolbox's 16:00Z, the CLI's 17:30Z); the cap rises only
+when a read shows the p95 under 10. Pinned by `tests/arch_nightly_cap.rs`
+(a cap above 6 refused, RED with the plan's constant and a matrix literal
+restored to 14). The record is `docs/lanes/ci-speed-7.md`, "The fleet's
+runner cap".
 
-On the owner's word of 2026-11-01 14:3xZ through the keeper (the stack's brief,
-23.9): the first complete scoreboard (run 41294262955 at `ab155018`) was
-measured without the ts-stack corpus. `conformance_scripts` and
-`conformance_beef` sit in the script, BEEF and Merkle selections, but skip when
-`BSV_CONFORMANCE_DIR` is unset, and the `mutants` job never checked the corpus
-out, so the 517 gate-path survivors (#603) and #602's floors table are the
-narrow figure. `nightly.yml`'s `mutants` job now checks the corpus out exactly
-as `ci.yml`'s `vectors` job does (`bsv-blockchain/ts-stack` at
-`edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9`, sparse `conformance`, no
-credentials, `path: ts-stack`), sets `BSV_CONFORMANCE_DIR` in the job's
-environment and asserts `META.json` before the baseline. The floors are set
-from the widened figure (the first dispatch after this landing), never the
-narrow one; `docs/NIGHTLY.md` carries both. No crate code moves.
+### CI: the compile time by evidence: the lib's unit tests run once, the tracing step shares the library build, the dependencies at opt-level 1 in the test profile (speed loop three, #672)
 
-The witness, `src/script/not_judged.rs` under the script surface's selection
-(cargo-mutants 27.1.0, local): unset, the baseline's `conformance_scripts`
-passes its three tests in 0.00 s (the suites return at the missing
-`META.json`), 2 caught and 1 missed; set, in 1.44 s, in the baseline and in the
-surviving mutant's run alike, 2 caught and 1 missed (the `Display::fmt`
-replacement at `not_judged.rs:90:9`, which no conformance verdict observes);
-set to a copy of the corpus without `evaluation.json`, the unmutated baseline
-fails at `conformance_scripts_evaluation`. libtest captures a passing test's
-output, so the suite's `SKIP` and `total=5116 ...` lines are not in
-`mutants.out/log/`; the time and the red baseline are the reading. The
-environment reaches cargo-mutants' test runs; the other files' movement is the
-widened dispatch's to measure.
+- The integration step names `--test '*'` (cargo's glob over the integration
+  binaries) where `--tests` also ran the lib's 1,725 unit tests a second time
+  after the unit step's: 16 percent of the step's test-seconds in three beta
+  runs (24 s to 37 s of its run) and a 20-second build beside the binaries.
+  On one host after a one-line change: build 97.1 s to 92.8, run 98.0 s to
+  80.3.
+- The tracing step builds on `--all-features` (which carries `tracing`), the
+  library the memory step built, where `full,http,tracing` built one of its
+  own: 17.5 s to 3.2 on one host, 18 s of CI's step.
+- The dependencies build at opt-level 1 in the Test Suite's test profile,
+  the crate at 0: a step writes `[profile.test.package."*"]` into the cargo
+  home's configuration from the job's `CARGO_DEPENDENCIES_TEST_OPT_LEVEL`
+  (cargo reads a package's profile from no environment variable; rust-cache
+  hashes the `CARGO` name into its key, so another level misses). On one
+  host: integration run 81.0 s to 50.3, unit 20.2 to 14.4, memory 61.7 to
+  47.0, the warm build 93.7 to 90.1; a cache miss builds the dependencies in
+  208 s for 137. The crate at 1 as well cost 214 s of build for 47 of run:
+  not taken. The PR's own run carries the miss, and so does the landing's
+  `beta` push (a pull request's cache is its ref's alone): the hit is the
+  second `beta` run after the landing.
+
+Pinned by `tests/arch_ci_runs_every_test.rs` (`shared_build_refusals`,
+`dependency_profile_refusals`). Clippy's feature set, the ratchet's build,
+`CARGO_INCREMENTAL`, unused dependencies (machete finds none) and merging
+binaries measured and left: `docs/lanes/ci-speed-3.md`.
+
+### CI: the semver tool's cache seeded from a push to a line, every pull request's opening `semver` run a restore (speed loop three, #696)
+
+- `semver` runs on pull requests alone, and a pull request's cache is read by
+  that pull request's re-runs only, so every pull request's opening `semver`
+  run built cargo-semver-checks 0.51.0: 241 s, 285 s and 294 s of a 299 s to
+  358 s job (runs 41634821365, 41624795016, 41621814166), against 65 s on a
+  hit. A job of its own, `semver-tool-seed` (`semver tool cache`), runs on a
+  push to `beta` or `main`, looks up `semver`'s key (`lookup-only`, nothing
+  downloaded on a hit) and on a miss installs the tool as `semver` does,
+  saving it in the line's scope, which every pull request into the line
+  reads. No required context added: five on `beta`, six on `main`.
+
+Pinned by `tests/arch_ci_semver_tool_seed.rs` (the seed's action, path, key,
+toolchain and install equal to `semver`'s) and `PUSH_SEEDS` in
+`tests/arch_ci_pr_runs_the_required_set.rs`. cargo-deny is a release binary
+and the ratchet's build is seeded by `lint`'s push saves; the `checks` cache
+on `beta` predates #663 and carries no cargo-mutants, so its 68 s build
+recurs on every run until the key moves: `docs/lanes/ci-speed-3.md`.
+
+### CI: the `checks` job's cache keyed by the cargo-mutants version it installs, the tool built once per key and restored after (speed loop three, #699)
+
+- `Swatinem/rust-cache` saves on a miss alone, and `checks`' entry on `beta`
+  was saved at 03:39Z 2026-11-03, before the mutants-entries gate (#663)
+  installed cargo-mutants; every run restored it by a full match and built
+  cargo-mutants 27.1.0 again: 64 s, 68 s and 71 s of a 74 s to 80 s step
+  (runs 41672716963, 41648342758, 41646365090). `CARGO_MUTANTS_VERSION`
+  moves from the step's `env:` to the job's, a `CARGO*` name the action
+  hashes into its key, so the key moves with the version: one miss on the
+  line's push builds the tool and saves `~/.cargo/bin` with the entry, every
+  run after restores it. A `key:` input would not do it: the action ignores
+  `key` beside `shared-key` (rust-cache v2.9.3 `src/config.ts:75-82`).
+
+Pinned by `tests/arch_ci_tool_cache_key.rs`: every `cargo install` after a
+rust-cache step names a version its cache key carries (a hashed job or
+workflow variable, or the version in `prefix-key`/`shared-key`), with
+`cache-bin` and the environment hash on; RED on the base's `ci.yml`
+(`sets CARGO_MUTANTS_VERSION at step level, outside the cache key`). The
+before, the budget and the after: `docs/lanes/ci-speed-3.md`.
+
+### CI: a measured file's test surface is every target the reach rule names for it, not a fixed list per surface (the oracle, #685)
+
+The keeper's row of 2026-11-03: #681's opening lane (PR #684) found the #660
+tests (`tests/pubkey_encoding_660.rs`, `tests/pubkey_point_shapes_660_adv.rs`)
+asserting what two of `src/script/spend/key_point.rs`'s survivors break, and
+`tests/p2pk_hybrid_625.rs` the same for `src/script/templates/multisig.rs`,
+while the script surface's fixed list (`tests/script_*.rs` and five targets,
+45) never ran them, so the measured scores left out kills the suite had.
+
+- A measured file's targets are the integration binaries naming its module,
+  the direct reading (`Tree.direct` in `affected_tests.py`, the run's alone: a
+  `bsv_rs::<m>` path, a crate-root re-export, a `tests/CLAUDE.md` row naming
+  the module or a file of it; the keeper's word of 2026-11-03 16:1xZ), less
+  a binary that only reads source text (the six `arch_*` walks of `src/`), the two run apart and the cost checks (the five stress and
+  wall-clock suites the loop always left out, and `wallet_http_json_linear_432`);
+  `--lib` alone where none (`lib_only` in the plan; none at `55424846`). The
+  plan writes each file's set (`selection`), each surface's union over the
+  night's files (`surface_tests`, the shard's `--test` list) and prints the
+  sizes: 136 targets for the 43 script files, 104 for the four BEEF and Merkle
+  files, 134 for the 38 wire and substrates files.
+- The callers' level (one level of the modules naming `crate::<m>`,
+  `Tree.users`) stays a pull request's plan (`reach`), where a build and not a
+  run per mutant is the cost; the branch's reading before the fold took it in
+  the run, 216, 206 and 166 targets and about 5,237 to 8,090 estimated
+  shard-minutes against 903. Two readings, two
+  rules: the callee rule (11-03 00:1xZ, #666) decides which files a night
+  re-measures (the PLAN), the direct rule which targets a mutant's tests are
+  (the RUN); no reader takes the one for the other. Both findings' tests are
+  in the direct sets by their `bsv_rs::script` paths; their `tests/CLAUDE.md`
+  rows name no module (the rule read of `59eeedcc`).
+- Left uncounted by construction: a binary reaching a module only through a
+  caller, 80 script, 102 transaction and 32 wallet binaries by the rule read of
+  `59eeedcc` (reproduced by the docs fold from `Tree`); 233 of the 256 rows of
+  the tree's binaries name no module (the rule read gave 223), and no guard
+  pins the row convention (`docs/NIGHTLY.md`, "What the direct reading leaves
+  uncounted").
+- A test's change re-measures the files whose selection runs it, at the head
+  or at the complete run's sha; a `tests/CLAUDE.md` row whose modules change
+  re-measures the files whose selection that moves; `affected_tests.py` now
+  reaches everything.
+- A mutant's test timeout is three times its shard's baseline test time, the
+  old fixed 120 s (300 for BEEF) its floor: a survivor running 216 targets
+  outlasts 120 s and was read as a timeout (`multisig.rs:108:19` on one host;
+  under the direct reading at a 200 s timeout, a Missed at 168 s of tests).
+- The cost: about 0.005 minutes a target a mutant (the record's own slope, a
+  line through two points, script and wire, that the other three surfaces
+  miss; one host's `multisig.rs` run measured 0.845 minutes a mutant where it
+  gives 0.77), 3,669 estimated shard-minutes under the direct reading against
+  903 (5,237 with the callers' level); read in two parts (0.28 s a target
+  rebuilt by every mutant, 0.64 s a target run by each survivor; the
+  substrates' share is 84 percent), about 5,717. Each matrix entry carries
+  its `estimated_minutes`.
+- The complete run's shards (`complete_split`, #703's second fold): the
+  record's own method (the twenty shared out by the slope's estimate: floors,
+  one shard at least, the largest remainders) over the direct reading's sets
+  at `f7ea87ae` gives eight, three, one, three and five, and a ceiling raises
+  a surface until no shard's two-part estimate passes 300 minutes (the job's
+  360 with a margin): eight, three, one, three and eight, twenty-three shards,
+  about 198, 173, 63, 200 and 113 minutes a shard by the slope and 235, 231,
+  90, 284 and 275 in two parts. Replayed at six slots, about 11h24m by the
+  slope and 17h05m in two parts, against the fixed lists' 187 minutes (run
+  41579707627's shards at six): the 07:00Z complete run is expected to take
+  that, and measures it, checkpointed at 12:00Z under the keeper's word of
+  2026-11-03 17:1xZ (a projection past twelve hours of six slots cancels the run
+  and keeps the measured per-mutant rate per surface as the figure; the retry at
+  the weekend slot after the survivor-term row #705). The fold before kept the callers' level's nine,
+  three, one, three and four, which the method does not give; its substrates
+  shards were 551 minutes in two parts, past the job's 360. The conformance
+  corpus is about 1 percent of a baseline (`conformance_scripts` 0.60 s and
+  `conformance_beef` 0.01 s on runner job 125937464890).
+
+Pinned by `.github/scripts/test_nightly_mutants.py` (`SelectionWitnesses685`:
+the two findings, RED on the fixed lists; the complete shards under
+`JOB_MINUTES`; the split recomputed by the method and every surface's
+two-part shard under 300 minutes, RED on nine, three, one, three, four; `transaction`'s binaries out of a script file's set unless they
+name `script`, RED on the callers' level; the fixture's `test_685_*`, a
+caller's binaries out of its callee's selection and still in a pull request's
+reach, RED on the callers' level). The record
+is `docs/lanes/fix-685.md`; `docs/NIGHTLY.md`, "The selection" and "The cost
+of #685's selection".
+
+### CI: the nightly's weekly bench runs after the shards, the fuzz targets and beta's run, under the cap guard's rule (#683)
+
+- The nightly's `bench` job (`-f weekly=true`, the captain's Sunday night)
+  dispatched `bench.yml` with no `needs`, so its run (`Benchmarks Build` and
+  the regression check at once, then the scoreboard) started beside the
+  opening wave of shards, and `tests/arch_nightly_cap.rs` counted only a heavy
+  matrix or a dispatch of `ci.yml` as heavy. The job now needs `mutants`,
+  `fuzz` and `ci-full-beta` under `if: ${{ !cancelled() && inputs.weekly }}`,
+  waits for the run it dispatched as `ci-full-beta` waits for beta's (the
+  runs listed before the dispatch, the bot's alone, the give-up at 55
+  minutes, the conclusion read, a `failure` failing the job, under
+  `set -euo pipefail`), and `ci-full-main` needs it too, so main's 22 never
+  start beside it; on another night the job is skipped and main's dispatch
+  follows beta's as before. The cost on a Sunday: main's dispatch waits for
+  the bench's run, and this job holds one runner while it does.
+
+Pinned by `tests/arch_nightly_cap.rs` (7 tests, 6 before): a job that
+dispatches any workflow is a heavy job of the nightly, ordered by `needs:`
+with every other, and a dispatch job another job runs after is held to
+`ci-full-beta`'s wait rules; RED on `ba0952c9`'s nightly (`nightly.yml bench
+and mutants can overlap: no `needs: mutants` edge on bench (its needs: [])`
+and seven more), each refusal shown on a mutated text (the bench's edge
+removed, main's edge on it removed, a new dispatch job named by no list,
+the bench's watch and actor filter removed). The record is
+`docs/lanes/fix-683.md`.
+
+### Tests: every `tests/CLAUDE.md` row names the modules its file reaches, pinned by a guard; the rows completed from the sources (#706)
+
+- The nightly's run selection (#685, PR #703) reads a measured file's targets
+  from the binaries' `bsv_rs::` paths and their `tests/CLAUDE.md` rows, and
+  no guard pinned what a row names: on `ba0952c9` 235 of the 258 rows of a
+  binary named no module and 28 binaries had no row. The `## Files` table
+  gains a Modules cell (the fourth), and every top-level `tests/*.rs` has a
+  row naming at least the modules its source names (a `bsv_rs::<m>` path or
+  a crate-root re-export named through the crate, over the binary and the
+  module files it declares). `.github/scripts/rows_from_sources.py` wrote
+  the cells (`--check` refuses as the guard does, and runs in the Test
+  Suite's plan step beside the plan's own tests, so the Python and Rust
+  readings cannot drift unnoticed); six rows whose binary reaches a module
+  only through a caller, and whose description says it exercises it, name
+  that module too. That caller clause is a judgment, the one part of the
+  convention that moves a selection: its six pairs are frozen in
+  `tests/caller_modules_706.txt`, which the guard and `--check` read, and a
+  row that drops one is refused. 28 rows added, each from its file's header;
+  no existing row's description changed.
+- A row shared by several files (the #537 and #544 rows, six files each)
+  names each file's modules apart (`` `a.rs`: `m`; `b.rs`: none ``), and a
+  file's part is its reading in the guard, the writer and `row_modules`: the
+  row's union put all twelve binaries in the `identity`, `kvstore`,
+  `registry` and `storage` sets (five in `primitives`) their sources never
+  name, so a pull request touching one of those modules ran up to ten more
+  binaries. A union cell over a shared row is refused.
+- The fourteen lowercase crate-root re-exports (`bsv_rs::sha256`,
+  `bsv_rs::sign`, `get_url_for_file`, `run_dispatch`, ...) count as their
+  module's in both readings, as the convention's "a crate-root re-export"
+  says; a glob import reads them as bare calls. No test names one today: no
+  row moved.
+- Two readings of `affected_tests.py` tightened, each with a test showing what
+  it over-matched: `row_modules` reads the Modules cell alone (a description
+  pointing at another file's witnesses, `src/identity/...` in an auth
+  binary's row, put that binary in identity's set; a row of four cells, the
+  table before #706, keeps the old reading), and `used_modules` reads a
+  re-exported name only through the crate's path (the word reading took
+  `WalletFaultFamily::Transport` for `auth`, a comment's "Address" for
+  `script`, overlay's `Protocol` for `wallet`; an alias of the crate is
+  read).
+- The figures on #685's direct reading: the targets a measured file runs go
+  from 104 to 136 to 107 to 138 (script 138, BEEF and Merkle 107, wire and
+  substrates 131); the binaries reaching a module only through a caller, the
+  reading's stated limit, from 80 script, 102 transaction and 32 wallet to
+  76, 97 and 33 (`docs/NIGHTLY.md`, "What the direct reading leaves
+  uncounted").
+
+Pinned by `tests/arch_tests_claude_rows_name_modules_706.rs`: RED on
+`ba0952c9` with 274 refusals (29 binaries without a row, the guard's own
+among them; 245 rows naming fewer), green after; its unit tests pin the two
+over-matches, the shared row's parts, the lowercase re-exports and the frozen
+pairs, each RED before (a scratch drop of `beef_order_held`'s `script`, the
+#537 row's union restored and the lowercase names left uncounted: 7 refusals
+and the unit test). `tests/arch_ci_runs_every_test.rs` refuses a `ci.yml`
+without the `--check` step. The record: `docs/lanes/fix-706.md`.
+
+### Docs: one merged integration binary measured against its parts (speed loop three, #693)
+
+- `docs/lanes/ci-merged-binary.md`: the ten `tests/script_*witness*.rs` binaries
+  (one gate, one Modules cell) built and run as one scratch binary on the Studio:
+  about 0.25 s of rustc per binary removed (0.15 s of it the link), the same 100
+  tests, no reach loss on a library change, a test-only change running the
+  group; projected 39 to 53 s of a CI build over the 35 equal-cell groups. A
+  measurement row: no test, source or manifest changes.
+
+### CI: the cap guard reads every workflow for a heavy dispatch or `uses:`, pins `!cancelled()` after the shards, the give-up bound and the wait's `--workflow` (#709)
+
+- The rule read of #683's landing found five ways a later edit could put two
+  heavy runs on the twenty runners with `tests/arch_nightly_cap.rs` green: a
+  dispatch from a workflow other than `nightly.yml`, a reusable call
+  (`uses: ./.github/workflows/<file>`) in place of a `gh workflow run` line,
+  `!cancelled()` dropped from a job after the shards, the wait's give-up
+  raised past its job's timeout, and the wait's `--workflow` naming another
+  file. No workflow changes; the guard reads each from the YAML by a rule.
+  The rule's reading of today's files: `release.yml`'s six calls start on a
+  push of tags alone, the owner's release ritual, and pass by their trigger;
+  `sync-main-into-beta.yml`'s dispatch of `ci.yml` on a push to main is named
+  in the guard's record with its reason, not sequenced with the nightly (a
+  stated residual for the keeper); an `echo`'s text and a comment are no
+  dispatch.
+
+Pinned by `tests/arch_nightly_cap_rules_709.rs` (5 tests): each rule RED on a
+mutation of the tip's YAML with the old guard green on it (a `gh workflow
+run bench.yml` step and a `uses:` job in `ci.yml`, `!cancelled()` dropped
+from the bench's `if:`, the bench's budget at 58 minutes, its `--workflow`
+at `ci.yml`, a `uses:` job in the nightly with no `needs`). The record is
+`docs/lanes/fix-709.md`.
+
+The fold on PR #713 (the strength read's holes): a dispatch job of the nightly
+with a job after it must carry a `gh run watch` per dispatch, each watch under
+`timeout "$budget"` with `budget` the one `$((N * 60 - SECONDS))` the give-up
+rule reads (a watch dropped, its `timeout` dropped, a literal `timeout 7200` or
+a budget doubled inside `$((...))` refused; a `sleep 2m` refused as unreadable,
+a decoy `sleep` before the loop no reading); the wait's list equals the set its
+job dispatched in both directions (two dispatches with one listed refused, `-w`
+and `--workflow=` read, a `WF=bench.yml` variable read through its one literal
+assignment, else refused as unreadable); the absent-`if:` and the give-up
+refusals reworded (``with no `if:` ``, and ``the wait can run N minutes (the
+larger of the budget's B and the poll's P × I s, M)``, the larger term named). Pinned by
+`tests/arch_nightly_cap_watch_713.rs` (4 tests), each new rule RED on a mutation
+of the real YAML (the bench's watch deleted, its `timeout` dropped,
+`ci-full-beta`'s budget doubled, a second dispatch in the bench, its list on
+`-w ci.yml`), the last four green on the old guard; the bench's watch deleted
+was refused by the old guard already, in its conclusion-after-the-watch words.
+The readers move to `tests/support/nightly_cap_rules.rs`. The lane record's
+sync line corrected: the sync's dispatched `ci.yml` run is on the sync branch
+built from beta (both matrices at six, at most nine jobs at once, not main's
+22), fired zero times on record.
+
+The second fold (the scoped check of the fold): rule 5's reusable-call
+exemption read any `uses:` line, so a step's `uses: actions/checkout` in a
+dispatch job exempted it; it reads the job-level `uses` field now, pinned by
+`a_steps_uses_does_not_make_a_dispatch_job_a_reusable_call_713` (RED before).
+A `(( budget *= 2 ))` after the budget's assignment is read by no rule, a
+stated residue in the record.
+
+### Tests: one row per file in `tests/CLAUDE.md` (#712)
+
+- Three files had two rows each in the `## Files` table:
+  `script_int64_operand_witness.rs`, `script_shift_count_witness.rs` and
+  `transport_fault_wallet.rs`. Every reader (the #706 guard, `rows_from_sources.py`,
+  the plan's and the night's `test_rows`) keys the table by the file's stem and keeps the
+  last copy; the shift row read was the stale one (the default mode "shifts by any
+  count", before #383). Each pair is merged to the copy its file's tests pin
+  (`docs/lanes/fix-712.md`); the Modules cells were equal, so no plan selection moves.
+- `tests/arch_tests_claude_rows_name_modules_706.rs` and
+  `rows_from_sources.py --check` refuse a stem named in two rows, naming its files and
+  each row's line (`a_file_named_in_two_rows_is_refused_with_both_lines_712`, its Python
+  twin in `test_affected_tests.py`); RED on `472c2fd8` with three refusals, green after.
+  The check keys by the stem, as the readers do, through the readers' own table reading
+  (`table_rows` in the guard, `nightly_mutants.table_rows` in Python), so a
+  `support/a.rs` row beside an `a.rs` row, one row to every reader, is refused as two
+  (`a_support_file_beside_a_top_level_file_of_its_stem_is_two_rows_712` in both; RED
+  on the name-keyed check of the review's `67ad7d28`, which returned no refusal).
+
+### Fixed: PushDrop's canonical refusal checks the field bounds before the envelope (#616)
+
+- A token this crate's lock-before read refuses (no `OP_CHECKSIG` second) is refused
+  in `decodeCanonicalPushDrop`'s words (`ts-stack@edf6e03`
+  `PushDropValidation.ts:54-79`) by `canonical_refusal`
+  (`src/script/templates/pushdrop_position.rs`). It read the first chunk, the key and
+  the field count, then answered the envelope's words whatever the fields held; the
+  reference checks each field against `maximumFieldBytes` and the running payload
+  against `maximumPayloadBytes` before the envelope (`:63-73`). A no-CHECKSIG token
+  with the right field count and one field past its bound now refuses with
+  `PushDrop token contains an oversized field`, one whose payload passes its bound
+  with `PushDrop token payload is too large`, and the envelope's words stay for a token
+  whose fields are in bounds. The fields' lengths are `PushDrop.decode`'s
+  (`PushDrop.ts:96-115`: a push's data, one byte for `OP_0`, `OP_1NEGATE` and the
+  opcodes 80 to 96). Each of the five sites passes its own limits, the reference's
+  at its counterpart: the local store (2 MiB, 2 MiB + 1 KiB), the kvstore interpreter
+  (1 MiB, 1 MiB + 64 KiB), the registry (16 KiB, 64 KiB), the overlay admin token
+  (4 KiB, 8 KiB) and the storage downloader (2 KiB, 2 KiB + 256 bytes).
+- `tests/script_pushdrop_canonical_bounds_616.rs` (4 tests) reads four registry basket
+  tokens built by this crate's PushDrop writer through
+  `decode_and_verify_registry_token`, their bytes pinned by the SHA-256 the reference
+  recorded for the same shape (`tests/vectors/pushdrop_canonical_bounds_616.json`,
+  written by `tests/support/pushdrop_canonical_bounds_616.mjs` from a bundle of
+  `packages/sdk` at `edf6e03` under Node v22.18.0, two runs byte-identical; each case
+  the words of `decodeCanonicalPushDrop` with the registry's limits and of
+  `decodeAndVerifyRegistryToken('basket', ..)`, equal). The oversized-field and
+  payload tests RED on `9cf60844` (`left: RegistryError("PushDrop token must use the
+  canonical PushDrop envelope")`); the in-bounds no-CHECKSIG token keeps the
+  envelope's words and the CHECKSIG control keeps the bounds' words, green on both.
+- The strength fold adds five tests (9 in the file), the vector's seven new shapes
+  recorded by the same script (the earlier four byte-identical): six fields with an
+  oversized one keep the count's words, a payload exactly at 65,536 bytes keeps the
+  envelope's, an oversized field that also crosses the payload is the field's, an
+  `OP_1` field counts one byte toward the payload, and the overlay admin token's
+  static decode (`decode_overlay_admin_token`, 4096 and 8192 bytes,
+  `OverlayAdminTokenTemplate.ts:29-30,159-167`) refuses at its own bounds, a second
+  site wired to the shared check. Each is RED on a scratch copy of the tip with the
+  order or limit it pins changed (the bounds before the count, the payload's `>=`, the
+  payload before the field, an opcode field as no byte, the site's limits swapped).
+- No public type or signature changes: `canonical_refusal` is crate-visible, and an
+  error's text is not a type. A caller matching the envelope's words on a token with
+  an oversized field or payload and no `OP_CHECKSIG` second now reads the bounds'
+  words. No difference with the reference remains on this input class; the
+  `CLAUDE.md` row 93 residue is closed (`docs/lanes/fix-616.md`).
+
+### CI: a `CHANGELOG.md` change reaches no binary through an assertion's literal, and a module's `CLAUDE.md` reaches nothing (#689's two remaining rows)
+
+- The Test Suite's plan (`.github/scripts/affected_tests.py`) read every
+  string literal of a test source as a read of the path it names, so
+  `tests/arch_ci_lines.rs`'s needle of `ci.yml`'s text (`case "$file" in
+  Cargo.toml | CHANGELOG.md) ;; ...`) put that binary in the plan of every
+  pull request touching the changelog. A literal holding whitespace is now a
+  sentence, a message or a command, never a path read: no tracked path holds
+  a space. On the tip a `CHANGELOG.md`-only change plans `integration
+  binaries reached: 0 of 288`, `build: False` (1 before). No test reads
+  `CHANGELOG.md` (four name it in comments, `arch_ci_lines` in a needle).
+  Across the 3,934 tracked paths the rule drops 98 (binary, path) pairs over
+  20 paths' reach, each a word in a message or a needle (`docs/FIXTURES.md` in
+  a stub's label, a recorder's `.mjs` named in its test's message, the fuzz
+  corpora's `hex` and `base64`, `tools/ratchet/run`'s `run`); none of those
+  binaries opens or runs the file.
+- A module's Markdown under `src/` (`src/<m>/CLAUDE.md`, 28 files) reached
+  the seven binaries that walk `src/`, every one of which reads the `.rs`
+  files alone (`tests/arch_support/mod.rs`) or the module directories
+  (`arch_tests_claude_rows_name_modules_706`). It reaches no walker now:
+  `src/script/CLAUDE.md` alone plans 0 of 288, `build: False` (7 before). A
+  source under `src/` reaches the same set as before (`src/script/spend/mod.rs`:
+  229 binaries, unit, doc, memory and tracing, before and after).
+
+Pinned by `.github/scripts/test_affected_tests.py`:
+`test_a_path_only_in_an_assertions_literal_is_not_read_689` (a fixture with
+the path only in an assertion's needle, its message and a `format!` reaches
+nothing; `include_str!` and `Path::new` of it reach) and
+`test_a_module_claude_md_reaches_no_walker_of_src_689` (a module's `CLAUDE.md`
+and another Markdown under `src/` reach nothing, a Rust source beside them and
+Markdown under a walked `tests/` tree still do), each RED on the base's script;
+`test_a_docs_only_change_reaches_nothing` now asserts no binary and no build.
+No Rust file changes.
+
+### Fixed: the contacts manager reads a listed token as the reference's `PushDrop.decode` does, so its count, bounds and envelope refuse in the reference's order and words (#718)
+
+- #717's rule read checked the shared canonical refusal against
+  `decodeCanonicalPushDrop` (`ts-stack@edf6e03` `PushDropValidation.ts:54-79`) at
+  its five callers, but not the identity and contacts sites. None of those calls
+  it; each reference counterpart reads with `PushDrop.decode` at its default
+  position (`PushDrop.ts:63-121`, the second chunk never read) and runs its own
+  checks. The four sites are read in `docs/lanes/fix-718.md`, with a table:
+  the contacts manager's `authenticate_contact`
+  (`#authenticateContactScript`, `ContactsManager.ts:431-466`), the identity
+  revocation's lookup loop (`IdentityClient.ts:768-829`), and the two
+  `ls_identity` parsers (the toolbox's `decodeIdentityOutput`,
+  `identityUtils.ts:497-559`). Each site's limits equal its counterpart's: two
+  fields; a contact ciphertext of 1 to 66,560 bytes and a signature of 8 to 80;
+  an identity certificate of 1 to 262,144 bytes and a signature of 8 to 80.
+- The contacts site differed. Its read was the canonical lock-before decode
+  (`PushDrop::decode_before`), which refuses four kinds of token in its own
+  words before the count, the bounds and the envelope: an empty script, a key
+  alone, a `05` key, and a token without `OP_CHECKSIG` second. That is the
+  issue's envelope-before-bounds class, in the decode's form.
+  `authenticate_contact` now reads as the reference does, using the reference
+  decode's own words for the read's refusals and `decode_reference_before`
+  (#618's reading, crate-visible now) for the fields. A token without
+  `OP_CHECKSIG` second with an oversized ciphertext is now refused as
+  `contact ciphertext must contain 1-66560 bytes`; before, it was
+  `Expected OP_CHECKSIG after pubkey`. The words reach no caller: the listing
+  drops the output, and the update and removal replace the error with the
+  reference's outer words, as before.
+- The identity sites agree with the reference. Every refusal is a skip on both
+  sides, and the revocation's run words are the reference's
+  (`No authenticated revelation output matches the requested certificate.`).
+  The parsers check the record before the envelope, where the toolbox checks
+  the envelope first; no caller can see that order.
+- The witness is `tests/vectors/identity_contacts_canonical_718.json`, written
+  by `tests/support/identity_contacts_canonical_718.mjs` against the whole SDK
+  at `edf6e03` under Node v22.18.0; two runs are byte-identical. It holds ten
+  shapes, each with the reference's `getContacts` drop words and its
+  revocation's run words. The tokens are built by this crate's PushDrop writer
+  and pinned to the recorded SHA-256.
+- The unit test `src/identity/contacts_auth_718_tests.rs` is RED on 8 of the 10
+  shapes with the read put back to `decode_before`, and GREEN after.
+  `tests/identity_contacts_canonical_718.rs` pins the agreement at the
+  revocation, both parsers and the contacts listing; it is GREEN on both.
+- No public API change.
+
+### Notes: cross-SDK parity (#718)
+
+Two residues at the contacts site, both older than #718. A compressed key with
+x at or above p is reduced by the reference and read on; this crate's
+`from_bytes` refuses it in native words (the #498 and #183 rows). The
+reference's update and removal refusals carry the inner words as `cause`; this
+crate's `Error` has no cause chain, so the outer words alone reach the caller.
+go-sdk@2ca481c has no contacts manager or identity revocation.
+
+### Tests: a script built by hand from chunks with empty or misplaced data is the reference's, its ASM pinned (#661)
+
+No behaviour change. #652's re-read found `Script::from_chunks` with
+`ScriptChunk::new` holding chunks no parser produces (`Some(vec![])` on `OP_1`,
+`OP_0`, `0x01` or `OP_PUSHDATA1`, which writes `""`; data on `OP_DUP`, which
+writes `0102`; an `OP_RETURN` with data followed by more chunks, which the
+serializer drops and `to_asm` writes) and asked for a rule: refuse at
+construction, or write what the serializer writes. The reference does
+neither: `new Script(chunks)` holds any `{ op, data? }` (`ts-stack@edf6e03`
+`ScriptChunk.ts`), its bytes are `#writeChunkData`'s
+(`Script.ts:474-490,539-562`: the data after an opcode below `OP_PUSHDATA1`,
+after a PUSHDATA opcode with its length, after an `OP_RETURN` with nothing
+after it, after any other opcode none) and its ASM `#_chunkToString`'s
+(`:668-677`: a chunk with data its data's hex alone, whatever the opcode), so it
+round-trips none of these shapes either. This crate already writes the
+reference's bytes on every one of them and its ASM save the eight texts the
+parity note names, and its answer stays the reference's, not a stricter one:
+`from_chunks` refuses nothing, `to_binary` writes the reference's bytes and
+`to_asm` its text but for those eight.
+
+`tests/script_chunk_asm_661.rs` (five tests) against
+`vectors/script_chunk_asm_661.json` (twenty-four shapes recorded by
+`support/script_chunk_asm_661.mjs` under Node v22.18.0, two runs
+byte-identical: the reference's `toHex`, `toASM`, `fromASM` of that text and
+`fromHex` of those bytes): the bytes on all 24; the ASM on 16, the other 8
+enumerated (`ASM_STATED`); `from_asm` of the reference's text the reference's
+bytes on 13, refused by both on 2 (`undefined`), the other 9 #603 shard A's
+stated readings (`READ_BACK_STATED`);
+the round trip holding here on 7 shapes and in the reference on 5, each
+listed; the issue's four empty-data shapes and `OP_DUP` with `[1, 2]` by
+name. Green on `c6781b4a` (nothing to fix). RED under the issue's two other
+rules, planted in a scratch copy: `to_asm` writing the ASM of the serialized
+bytes, 3 of 5; `from_chunks` normalizing as go-sdk's writer does, 5 of 5.
+
+### Notes: cross-SDK parity (#661)
+
+Three texts this crate writes differ from the reference's, all older than #661
+and unchanged by it (the `0`/`-1` and `OP_UNKNOWN<n>` texts stated against the
+reference by this note and its row alone): `OP_0` and `OP_1NEGATE` are `0` and
+`-1` here and `OP_0` and `OP_1NEGATE` there (go-sdk@2ca481c writes `OP_FALSE`
+and `OP_1NEGATE`, `script/opcodes.go:545-546,625`, and its `NewFromASM` cannot
+read `0` or `-1`, `script/script.go:46-63`), a public output of every script
+holding them, open for the keeper's word; a direct push opcode without data is
+`OP_UNKNOWN<n>` here and `undefined` there (`OP[op]`), neither reading back;
+and #634's `OP_RETURN` writer, stated there (with empty data, #603 shard B's
+bare `OP_RETURN` row). go-sdk holds no such chunk in a script:
+`NewScriptFromScriptOps` (`script/script_chunk.go:119-163`) re-encodes a push
+opcode's data as its minimal push (`01` with empty data is `00`, `03` with one
+byte `01aa`, `OP_PUSHDATA1` with one byte `01aa`) and drops data on every other
+opcode but `OP_RETURN`, whose data it appends before it stops, so its bytes
+differ from the reference's and this crate's on 11 of the 24 shapes
+(transcribed in the recorder, not run). The row is in `CLAUDE.md`'s divergence
+list.
+
+### Fixed: the `ls_identity` parsers read the output from the BEEF's subject, as the reference's discovery does (#721)
+
+- #720's rule read found both `ls_identity` parsers
+  (`parse_output_to_certificate`, `parse_output_to_verifiable_certificate`)
+  taking the transaction of a lookup output's BEEF by `beef.txs.first()`. The
+  reference's discovery (the toolbox's `IdentityEvidenceVerifier.parse`,
+  `identityUtils.ts:600-612` at `ts-stack@edf6e03`) loads
+  `beef.atomicTxid ?? beef.txs.at(-1)?.txid` through `findAtomicTransaction`
+  and reads `outputIndex` on it (`TransactionEvidence.ts:110-127`), the rule of
+  `Transaction.fromBEEF` and of this crate's `Transaction::from_beef(_, None)`,
+  which the revocation already used. Every writer (TS 2, TS 3, this crate)
+  lists parents first, so for a revelation whose own transaction is unproven
+  (its BEEF carries a parent, proven or not) the parsers read the parent and
+  skipped the token; and a
+  BEEF listing the subject before its parent with no atomic header was read
+  where the reference reads the parent and skips. Both parsers now read
+  through `Transaction::from_beef(&output.beef, None)`; a BEEF it refuses is a
+  skip. The table of shapes is `docs/lanes/fix-721.md`.
+- The witness is `tests/vectors/identity_beef_subject_721.json`, written by
+  `tests/support/identity_beef_subject_721.mjs` against #553's bundle (the SDK
+  and the toolbox's `identityUtils.ts` at `edf6e03`, `parseEvidence`
+  exported) under Node v22.18.0; two runs are byte-identical. Five shapes of
+  one proven parent and one subject carrying the reference's revelation token
+  (#553's), each with the bytes, the selected txid and `parseResults`' outcome.
+  `tests/identity_beef_subject_721.rs` rebuilds each with this crate's BEEF
+  writer to the recorded bytes and serves it through `resolve_by_attributes`
+  and `discover_certificates`: RED on `0d8546c0` on 3 of 5 shapes (parent
+  first, atomic parent first: skipped where the reference reads; subject first
+  without a header: read where it skips), GREEN after; the lone subject and the
+  atomic subject first agree on both.
+- No public API change. The results of `resolve_by_identity_key`,
+  `resolve_by_attributes`, `query`, `discover_certificates` and
+  `discover_certificates_by_type` move for a multi-transaction BEEF: a
+  revelation whose own transaction is unproven is now returned, and one listed
+  before its parent in a non-atomic BEEF is now skipped. No error text changes.
+
+### Changed: `to_asm` writes `OP_0` and `OP_1NEGATE`, the reference's names, where it wrote `0` and `-1` (#723)
+
+`ScriptChunk::to_asm`, and through it `Script::to_asm`, `LockingScript::to_asm`
+and `UnlockingScript::to_asm`, wrote `0x00` as `0` and `0x4f` as `-1`. The
+reference names them `OP_0` and `OP_1NEGATE` (`ts-stack@edf6e03`
+`packages/sdk/src/script/OP.ts:6-7,11`: `OP_0` listed before `OP_FALSE`, "the
+top one will be used in standard ASM output"; `toASM` writes `OP[op]` through
+`#_chunkToString`, `Script.ts:668-677`), go-sdk@2ca481c's `NewFromASM` reads
+those names and cannot read `0` or `-1` (`script/script.go:46-63`: neither is a
+name, and neither is hex), and no BRC defines an ASM text, so the reference's
+text is this crate's (the keeper's word of 2026-11-03 23:1xZ on #661's open
+text). `to_asm` now writes the names; every other opcode's name is unchanged.
+`from_asm` keeps reading both forms, as the reference's `fromASM` reads the
+literals `0` and `-1` before any name (`#parseASMToken`, `Script.ts:91-92`), so
+a text the old writer wrote reads back to the same bytes.
+
+`tests/script_asm_names_723.rs` (five tests) against
+`vectors/script_asm_names_723.json` (recorded by `support/script_asm_names_723.mjs`
+under Node v22.18.0, two runs byte-identical): eight scripts written as the
+reference writes them through the three script types and read back to their
+bytes (`OP_0` and `OP_1NEGATE` alone and together, `OP_0` before a push,
+`OP_1NEGATE OP_1ADD OP_0 OP_EQUAL`, `OP_DUP OP_0 OP_DROP`, pushes of `00` and
+`81` written as their hex); ten texts read to the reference's bytes and written
+back in its text (`0`, `-1`, `0 -1` and `OP_DUP 0 OP_DROP`, the reference
+reading a bare `0` as the byte `00` and `-1` as `4f`; `OP_0`, `OP_FALSE`,
+`OP_1NEGATE`; `00` a push of one zero byte); go-sdk's reader (transcribed, not
+run) reading every text written. 5 of 5 RED on `0d8546c0` (`left: "0"`,
+`right: "OP_0"`; `left: "OP_DUP 0 OP_DROP"`), the reader halves green there.
+
+The tests that asserted the old text now assert the writer's: the chunk unit
+test, three `OP_0 OP_RETURN` outputs in `src/transaction/transaction.rs`, four
+in `tests/script_if_depth_634.rs`, one in `tests/script_script_603_b.rs`; in
+`tests/script_chunk_asm_661.rs` the two `0`/`-1` rows leave `ASM_STATED` (the
+reference's ASM on 18 of its 24 shapes, 16 before). No vector carried the old
+text as an output (`script_asm_603_a.json`'s `0` and `-1` are `fromASM`'s
+input). The ts-stack census's one ASM regression, `writebin-empty.0001`
+(`writeBin([]).toASM()` is `OP_0`), passes, its known failure removed from
+`tests/conformance_scripts.rs`: the script regressions 11 run, 11 passed, 0
+known (10 and 1 before); the evaluation census, judged by hex, unchanged at
+5,116 total, 4,120 run, 4,109 passed, 959 unsupported, 37 skipped, 11 known
+failures, against both `~/bsv/ts-stack/conformance` and `edf6e03`'s.
+
+Semver: no type or signature changed; the text of a public output changed.
+Every script holding `OP_0` (a data carrier's `OP_0 OP_RETURN <data>`, a
+CHECKMULTISIG unlocking script's leading `OP_0`) or `OP_1NEGATE` reads
+differently in ASM. Migration: a caller that matched `0` or `-1` in `to_asm`'s
+text matches `OP_0` or `OP_1NEGATE`; a caller that stored the old text reads it
+back with `from_asm` unchanged. No dependent named in `CLAUDE.md` calls
+`to_asm` or `from_asm`.
+
+### Notes: cross-SDK parity (#723)
+
+`CLAUDE.md`'s #661 row loses its `0`/`-1` clause: this crate writes the
+reference's text for both opcodes. go-sdk@2ca481c writes `0x00` as `OP_FALSE`
+(`script/opcodes.go:546`), which this crate and the reference read; its
+`NewFromASM` refuses the old `0` and `-1` (`ErrInvalidOpCode`). The row's
+`OP_UNKNOWN<n>` and `OP_RETURN` clauses stand, and so does #603 shard A's
+reading of `from_asm("")` and a double space: go-sdk's reading (`NewFromASM("")`
+the empty script, `script/script.go:46-50` at v1.7.1), the divergence from
+ts-sdk alone (`fromASM('')` one empty push `{ data: [], op: 0 }` where
+`toASM` of the empty script is `''`, `Script.ts:73-82,92-125,222-229`), filed
+upstream as ts-stack #1479 (2026-11-04); the owner's word (2026-11-04
+13:5xZ, through the keeper): HELD as the empty script, with go-sdk, the
+upstream row the filing, the item closed.
+
+### Tests: the three BEEF shapes of the identity subject pick pinned against the reference (#725)
+
+No behaviour change. #724's strength read named three BEEF shapes the #721
+vector leaves. `tests/vectors/identity_beef_subject_725.json` is written by
+`tests/support/identity_beef_subject_725.mjs`, which uses the reference's own
+writers (`Beef.toBinary`, `toBinaryAtomic`; the order held for the absent
+subject, which `toBinaryAtomic` refuses), at `ts-stack@edf6e03` under Node
+v22.18.0; two runs are byte-identical. For each shape it records the bytes,
+`parseEvidence`'s pick or refusal, which check refused (replayed through
+`Beef`'s public methods) and `parseResults`' outcome.
+`tests/identity_beef_subject_725.rs` rebuilds all five BEEFs with this
+crate's writer (`to_writer`, `to_binary`, `to_binary_atomic`) to the recorded
+bytes: on these shapes the two writers' sorts agree, txid-only entry before the
+raw one and grandparent, parent, subject.
+
+- **An Atomic BEEF header naming an absent txid**: the reference skips it
+  (`findAtomicTransaction` is undefined, `TransactionEvidence.ts:118-121`).
+  At the public doors this crate never hands it to a parser:
+  `LookupResolver`'s dedup drops any output that `Transaction::from_beef`
+  refuses, as the reference's resolver does (`LookupResolver.ts:2232-2237`).
+  So the integration pin is GREEN on `0d8546c0` too. The parsers' own skip is
+  the unit test `src/identity/client_beef_subject_725_tests.rs`, RED on
+  `0d8546c0`, where `beef.txs.first()` read the token's transaction.
+- **A three-transaction chain** (a proven grandparent, an unproven parent
+  and subject), plain and atomic: read from its subject on both sides; RED on
+  `0d8546c0`, where the grandparent was read and skipped.
+- **A txid-only parent before a raw unproven subject**, plain and atomic:
+  read here and skipped by the reference (the row below); RED on `0d8546c0`,
+  where the txid-only entry, which holds no transaction, was read and skipped.
+
+### Notes: cross-SDK parity
+
+A txid-only parent before a raw unproven subject is skipped by the reference's
+discovery: `parseEvidence` selects the subject and `assertUnconfirmedGraph`
+refuses it, because the subject's input has no source transaction
+(`TransactionEvidence.ts:143`, `:155-177` at `edf6e03`). This crate's
+parsers run no unconfirmed-graph check, so they read it. This is #553's stated
+evidence-layer residue. #721's subject pick exposed it (the base skipped the
+shape by accident). It is pinned as this crate's reading in
+`a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_there_553_725`,
+and the residue sentence of `CLAUDE.md`'s #553 row now names it.
+
+### Tests: four more BEEF shapes of the identity subject pick pinned against the reference, and the #725 pins tightened (#728)
+
+No behaviour change. #727's strength read named four `ls_identity` BEEF shapes
+the #721 and #725 vectors leave. `tests/vectors/identity_beef_subject_728.json`
+is written by `tests/support/identity_beef_subject_728.mjs` (#725's helpers
+copied, #725's vector untouched), which uses the reference's own writers
+(`Beef.toBinary`, `toBinaryAtomic`; one Atomic BEEF prefix written by hand, as
+#725's was) at `ts-stack@edf6e03` under Node v22.18.0; two runs are
+byte-identical. For each of its five BEEFs it records the bytes, the output
+index, `parseEvidence`'s pick or refusal, which check refused and
+`parseResults`' outcome: the reference skips all five.
+`tests/identity_beef_subject_728.rs` rebuilds every BEEF with this crate's
+writer (`to_binary`, `to_binary_atomic`) to the recorded bytes and serves it
+through `resolve_by_attributes` and `discover_certificates`; the unit test
+`src/identity/client_beef_subject_728_tests.rs` hands the five to both parsers
+directly and asserts the vector's count.
+
+- **An `outputIndex` past the subject's outputs** (#725's chain at index 1):
+  skipped on both sides (`TransactionEvidence.ts:126`; here `outputs.get`).
+  GREEN on `0d8546c0` too, an agreement pinned; the test's index-0 control is
+  RED there (`beef.txs.first()`, the grandparent).
+- **A txid-only entry written last, no atomic header** (the reference's sort
+  keeps it last, so no hand bytes), and **an Atomic BEEF header naming a
+  txid-only entry**, by `toBinaryAtomic` and as a hand prefix over shape 2's
+  bytes (the token's transaction beside the subject): skipped on both sides (`findAtomicTransaction` is undefined,
+  `:120-121`; here `Transaction::from_beef` refuses, so the resolver drops the
+  output). The doors are GREEN on `0d8546c0`; the unit test is RED there on
+  the two shapes that hold the token's transaction ahead of the txid-only
+  entry (read).
+- **A raw parent whose BUMP names another txid**: read here and skipped by the
+  reference (the row below); RED on `0d8546c0`, whose `beef.txs.first()`, the
+  parent, skipped.
+
+The #725 pins: the txid-only parent test now asserts that the reference's
+refusing line names the subject (`TransactionEvidence.ts:143: <subject> input`),
+so the reference's pick is pinned and not only the line, and its doc comment
+quotes the documenting line of `CLAUDE.md`'s #553 row; the unit test asserts
+the vector's five BEEFs.
+
+### Notes: cross-SDK parity (#728)
+
+A raw parent merged with the index of a BUMP whose leaf names another txid,
+before a raw unproven subject, is skipped by the reference's discovery:
+`fromBinaryStrict` checks no BUMP index, `findBump` finds no BUMP carrying the
+parent's txid (`Beef.ts:570-574`), so the parent is unproven and
+`assertUnconfirmedGraph` refuses the subject's graph at the parent's input
+(`TransactionEvidence.ts:143` at `edf6e03`). This crate reads the bytes too
+(`TxidNotInBump` is `Beef::verify_structure`'s refusal, which no identity
+parser calls; the issue's "refused at the parse" is not this crate's reading),
+links the parent unproven the same way, and its parsers, which run no
+unconfirmed-graph check, read the subject's token. This is #553's stated
+evidence-layer residue, the class of #725's txid-only parent; it is pinned as
+this crate's reading in
+`a_parent_whose_bump_names_another_txid_is_read_here_and_skipped_there_553_728`,
+and the residue sentence of `CLAUDE.md`'s #553 row now names it.
+
+### Fixed: the identity parsers run the reference's evidence check and skip a refused token where they read it (#730)
+
+The keeper's word of 2026-11-04 01:2xZ on #728's shape 4: the toolbox's
+discovery reads an `ls_identity` output only after its verifier admits the
+evidence (`ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:600-634`, the
+coordinator calling `parseEvidence` under `defaultTransactionEvidenceLimits`,
+`packages/sdk/src/transaction/TransactionEvidenceCoordinator.ts:184`), and
+this crate's two parsers read the token of any BEEF `Transaction::from_beef`
+parsed: a leniency at an identity door, not a stated residue.
+`src/identity/evidence.rs` is `parseEvidence` (`TransactionEvidence.ts:93-201`):
+the 1 MiB bytes bound, the strict parse (`Beef::from_binary` refuses a byte
+after the frame, as `fromBinaryStrict` does), at most 256 transactions, the
+target (the atomic txid, else the last entry), the output index, then
+`assertUnconfirmedGraph`'s walk of the whole unconfirmed graph from the
+subject (`:137-177`): each input's source the entry the BEEF holds under its
+txid, a transaction proven when a BUMP of the BEEF carries its txid (`findBump`,
+`Beef.ts:570-574`, whatever index its entry names), a proven one ending its
+branch, an unproven one without inputs refused, an input without its source
+refused, a second spend of one outpoint refused, 4096 inputs and 256 KiB of
+script across the graph. The walk reads the BEEF, not the
+`source_transaction` links, because the linear linking hands a repeated
+parent to a later input as a stub. It asks no BUMP index of its leaf, as
+`parseEvidence` does not (`#verifyBumpIndexLeaves` is `verifyValid`'s,
+`Beef.ts:1129-1138`): `TxidNotInBump`, which `Beef::verify_structure` and the
+streaming reader's `check_bump_index` raise, is not this door's refusal.
+Both parsers call it in place of their `Transaction::from_beef` line: an
+`invalid-evidence` refusal skips the output, as the verifier's catch does
+(`identityUtils.ts:630-634`); a `limit` refuses the discovery in the
+reference's words, `identity error: Transaction evidence: limit`
+(`Error::IdentityError`), as that catch rethrows it and `Wallet.ts:950-955`
+rethrows it again. No new error variant.
+
+`tests/vectors/identity_evidence_730.json` is written by
+`tests/support/identity_evidence_730.mjs`, which calls the reference's
+`parseEvidence` directly on BEEFs its own writer builds and records
+`parseResults`' outcome, at `ts-stack@edf6e03` under Node v22.18.0; two runs
+are byte-identical. Twelve BEEFs: a second spend of one outpoint in the graph
+(`:149`), an unproven subject without inputs (`:174`), 4096 and 4097 inputs and
+262144 and 262145 script bytes (`:170-171`), 256 and 257 transactions (`:117`)
+and 1048576 and 1048577 bytes (`:101`), a proven parent whose own parent is
+absent (read on both), and #728's shape 4 with the grandparent present raw and
+proven by its own BUMP (read on both: the guard that the check is the walk and
+not `verify_structure`). The `sourceTXID` check (`:145-146`) is recorded as
+unreached from bytes: both SDKs find a source under the txid its bytes hash
+to. `tests/identity_evidence_730.rs` rebuilds each BEEF with this crate's
+writer to the recorded SHA-256 and serves it through `resolve_by_attributes`
+and `discover_certificates`; `src/identity/evidence_730_tests.rs` compares the
+check's code and line with the reference's on the twelve and on the #725 and
+#728 shapes.
+
+On `11bb04ce` (the scratch copy with the tip's tests), RED:
+`a_txid_only_parent_before_an_unproven_subject_is_skipped_as_the_reference_skips_it_725`
+(`left: (1, 1)`, `right: (0, 0)`),
+`a_parent_whose_bump_names_another_txid_is_skipped_as_the_reference_skips_it_728`
+(the same), the two unit modules (`bump_names_another_txid: (true, true),
+expected false`; both txid-only parent BEEFs), the #553 pin
+(`certificate_at_bound`: `left: Ok((1, 1))`, `right: Err("identity error:
+Transaction evidence: limit")`), and four of the six #730 door tests (six
+shapes `Ok((1, 1))` where the reference skips or refuses); the proven-parent
+agreement and the guard GREEN on both. #728's shapes 1 to 3 and #725's (a) and
+(c) GREEN on both. The #725 and #728 pins now assert each shape's
+`selected_txid` and shapes 1 to 3 their `refused_at` by equality, shape 4 the
+whole line (`TransactionEvidence.ts:143: <parent> input <grandparent>.0 has
+no source transaction`). The test fixtures that published an unproven
+transaction spending a made-up parent (`tests/support/pushdrop_lock_position_537.rs`'s
+`output_of`, `src/identity/client_field_value_261_tests.rs`,
+`tests/auth_identity_certificate_field_order_394.rs`) now prove it by a block
+of its own, as complete evidence.
+
+Semver: a behaviour change at a public door, no signature change. The five
+discovery functions (`resolve_by_identity_key`, `resolve_by_attributes`,
+`discover_certificates`, `discover_certificates_by_type`, `query`) drop a
+lookup output whose evidence the check refuses, where they read it, and fail
+with `Transaction evidence: limit` on an answer past the reference's limits.
+Migration: none for a caller whose overlay answers with complete evidence; a
+caller whose overlay answers with a parent not carried sees the output
+dropped.
+
+### Notes: cross-SDK parity (#730)
+
+The check is `parseEvidence`'s; the coordinator's verification after it is
+not ported: `tx.verify` on the admitted subject against the wallet's chain
+tracker (`TransactionEvidenceCoordinator.ts:317-345`), so an unproven
+ancestor's failing script, a BUMP root the tracker refuses or a coinbase proof
+under 100 blocks deep (`MerklePath.ts:488-496`) is skipped there and read
+here (`CLAUDE.md`'s #553 row, the residue it keeps). Its concurrency limits
+(`pendingTransactions`, `consumers`) are not ported either: one discovery
+parses its outputs in turn. Where `Beef::from_binary` refuses bytes
+`fromBinaryStrict` reads (#86's reserved forms), the output is skipped here.
+The reference checks the lookup output's `txid` hint against the subject it
+picked (`TransactionEvidence.ts:123-124`); `OutputListItem` carries no `txid`,
+so a JSON answer whose `txid` disagrees with its BEEF's subject is skipped
+there and read here (#735: the port is a public field, the owner's word).
+The reference's `timeout` code comes from the coordinator's tracker verify,
+unported, so this check has no timeout path.
+
+### Fixed: `resolve_by_identity_key` reads every output of the lookup answer before it answers, keeps only the asked subject's certificates and returns the first one's identity, as the reference's wallet does (#737)
+
+From the strength read of PR #733 (#730, 2026-11-04 02:2xZ), older than #730
+and widened by it: `IdentityClient::resolve_by_identity_key` parsed
+`outputs[0]` of the `ls_identity` answer alone, where the reference's wallet
+parses every output in order (`ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/Wallet.ts:950-1016`, `discoverOverlayCertificates`
+and `discoverByIdentityKey`, through `parseResults`,
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:671-707`): a
+skipped output (`IdentityEvidenceVerifier.parse` answering `null`, `:596-634`)
+is dropped and the next one read, a `limit` rethrown (`:630-634`). Since #730
+a first output the evidence check refuses, or one with no identity token,
+ended this crate's resolution with `None` where the reference reads the
+second. The function now walks every output through the same parser and
+returns the first admitted certificate's identity; the contacts override is
+unchanged, the signature too.
+
+The reads' fold (the rule and strength reads of PR #738) ports two more rules
+of the same path. The subject filter: the reference's discovery keeps only
+certificates whose subject is the key asked (`filterCertificatesByIdentityKey`,
+`identityUtils.ts:247-255`, `certificate.subject.toLowerCase() === identityKey.toLowerCase()`,
+called at `Wallet.ts:1012` inside `discoverByIdentityKey`), where this crate
+returned the first admitted certificate whatever its subject (the parser
+checks only that a token is signed by the subject it names); a certificate
+for another subject is now passed over, the subject's compressed hex compared
+with the asked key lower-cased. The whole walk: `parseResults` parses every
+output before the discovery answers (`identityUtils.ts:671-707`), so a
+`limit` anywhere in the answer refuses the call (`:630-634`, `Wallet.ts:950-955`),
+where this crate answered at the first admitted output; it now parses every
+output, a limit before or after an admitted one failing the call with
+`identity error: Transaction evidence: limit`, an `invalid-evidence` output
+anywhere a skip. The other doors are unchanged: `resolve_by_attributes` is
+the reference's `discoverByAttributes` path, which filters by attributes
+(`filterCertificatesByAttributes`, `identityUtils.ts:283-302`, called at
+`Wallet.ts:1078`), not by subject; `query`, `discover_certificates` and
+`discover_certificates_by_type` are this crate's own doors, with no
+counterpart in the reference's `IdentityClient` (`IdentityClient.ts`, whose
+lookups are `resolveByIdentityKey` and `resolveByAttributes` alone); all four
+already parse every output before they answer (a `?` on the parser inside
+the `for output in &outputs` loop, the result returned after it).
+
+`tests/vectors/identity_resolve_737.json` is written by
+`tests/support/identity_resolve_737.mjs` (#730's helpers, the reference's
+writer, #553's two revelation tokens) at `ts-stack@edf6e03` under Node
+v22.18.0 with bun 1.3.11's bundle, the wallet's path run whole:
+`parseResults` over both outputs, `filterCertificatesByIdentityKey`
+(`:247-255`), the trust step (`transformVerifiableCertificatesWithTrust`,
+`:313-382`, the certifier trusted at the threshold) and
+`IdentityClient.parseIdentities` (`packages/sdk/src/identity/IdentityClient.ts:994-1011`);
+two runs byte-identical. Seven answers of two outputs: an unproven subject
+without inputs then the token, and an `OP_TRUE` output then the token (one
+identity), the token then the refused output (one), two certificates (two),
+one certificate at two outpoints (one, the trust step keeping one per serial
+number, `:360-361`), one outpoint twice (one), 257 transactions then the token
+(`refused: Transaction evidence: limit`). The fold's five: another
+subject's certificate (the scalar 10's, issued and published by the
+reference's own `MasterCertificate` and `publiclyRevealAttributes`, recorded
+under `tokens`) alone (no identity), before the asked one's and after a
+skipped output then before the asked one's (the asked identity); the token
+then 257 transactions whose subject spends `88`x32 (another txid than the
+token's, so no resolver drops it as a repeat; refused); and the refused
+first output's shape re-recorded with a second token of the subject (carol,
+another serial number) after it, so a broken evidence skip answers alice
+there. The vector's `certificates`, `serial_numbers` and `output_index` are
+asserted since the fold: every shape's certificates read through this
+crate's `query` (the same parser, every output, no subject filter) equal
+`parseResults`' count and serial numbers, and each output served at its
+recorded index. `tests/identity_resolve_737.rs`
+rebuilds every output with this crate's writer to the recorded SHA-256 and
+serves the answer through `resolve_by_identity_key` on an injected `.invalid`
+resolver. On `b5d008d1` (the tip's test, vector and recorder over the base,
+measured by the fold's cold re-read) three of six tests are RED:
+`a_skipped_first_output_is_passed_over_for_the_token_after_it_737` on both
+shapes (`Ok(None)`, expected carol's identity after the refused output and
+`Ok(Some(("03acd484...", "alice@example.com")))` after the `OP_TRUE` one),
+`another_subjects_certificate_is_not_the_asked_identity_737` (`Ok(Some(bob))`
+on the two answers whose first output is bob's, `Ok(None)` on the skipped
+one's) and `a_limit_after_an_admitted_output_refuses_the_resolution_737`
+(`Ok(Some(alice))`); the token-first, the first-output limit and the
+stated-difference tests GREEN there. On `a3f5fd03` (the lane's commit, the fold's test, vector and recorder over
+it) `another_subjects_certificate_is_not_the_asked_identity_737` is RED on
+its three shapes (`Ok(Some(("03a0434d...", "bob@example.com"))), expected Ok(None)`,
+and `expected Ok(Some(("03acd484...", "alice@example.com")))` twice) and
+`a_limit_after_an_admitted_output_refuses_the_resolution_737` RED
+(`Ok(Some(("03acd484...", "alice@example.com"))), expected Err("identity error: Transaction evidence: limit")`);
+the other four GREEN there. On the tip all six GREEN.
+
+Semver: a behaviour change at a public door without a signature change:
+`resolve_by_identity_key` answers `Some` for an answer whose first output is
+skipped and a later one admitted, where it answered `None`; answers the
+asked identity, or `None`, where it answered another subject's identity; and
+fails with `Error::IdentityError("Transaction evidence: limit")` on a limit
+anywhere in the answer, where it answered `Some` when an admitted output came
+before the limit. Migration: none.
+
+### Notes: cross-SDK parity (#737)
+
+The reference's `resolveByIdentityKey` returns every identity the wallet's
+discovery admits (`IdentityClient.ts:559-591`, `Promise<DisplayableIdentity[]>`);
+this crate's `resolve_by_identity_key` returns `Option<DisplayableIdentity>`
+and so the first admitted, in the answer's order: on two certificates of the
+subject the reference returns two identities and this crate the first
+(`two_certificates_resolve_to_the_first_where_the_reference_returns_both_stated_737`).
+The return type is the owner's word; `resolve_by_attributes` already returns
+every identity (`Vec<DisplayableIdentity>`, `src/identity/client.rs`), the
+shape that word would give this function. The subject filter is ported
+(the fold); the wallet's trust settings and its trust sort
+(`identityUtils.ts:330,379`: a certificate whose certifier the wallet does
+not trust dropped, the rest sorted by trust) and its page (`discoveryPage`,
+`Wallet.ts:228-233`) are wallet configuration, not ported at this door: the
+first identity here is the answer's first admitted of the asked subject, the
+reference's first the most trusted. Two certifiers in reverse trust order
+are stated, not pinned, on the owner's brief with the list return; the
+vector's recorder trusts every certifier it finds at level 1 (the
+threshold), so its trust step drops nothing and reorders nothing, the
+vector's limit.
+
+### Tests: the evidence check's bounds pinned graph-wide across a proven ancestor, a parent raw and txid-only in both orders, and the limit error at every discovery door (#736)
+
+No behaviour change. #733's strength read named three gaps in #730's pins,
+each a refactor the current pins would let through.
+`tests/vectors/identity_evidence_736.json` is written by
+`tests/support/identity_evidence_736.mjs` (#730's helpers copied, #730's
+vector untouched), which builds every BEEF with the reference's own writers
+at `ts-stack@edf6e03` under Node v22.18.0 and records the bytes,
+`parseEvidence`'s pick or refusal with its code and line, and
+`parseResults`' outcome; two runs are byte-identical.
+`tests/identity_evidence_736.rs` rebuilds each BEEF with this crate's writer
+to the recorded SHA-256 and serves it through `resolve_by_attributes` and
+`discover_certificates`; the unit module `src/identity/evidence_736_tests.rs`
+judges each with `parse_evidence` to the recorded code and line and asserts
+the vector's six shapes.
+
+- **The inputs bound over the graph**: 2048 inputs at an unproven subject and
+  2049 at its unproven parent, which spends a proven grandparent with no
+  inputs, refuse the discovery at the parent (`TransactionEvidence.ts:170-171`,
+  `limit`); 2048 and 2048 read. Neither transaction crosses 4096 alone.
+- **A proven parent's scripts count**: the subject's scripts 131072 bytes and
+  its PROVEN parent's 131073 refuse (`graphScriptBytes` over every visited
+  transaction, `:168`, before the proof ends the branch at `:173`); 131072 and
+  131072 read.
+- **One parent written raw and txid-only**: the later entry is the index's on
+  both sides (`Beef.#rebuildTxIndexes`, `Beef.ts:516-524`; `rebuild_index`
+  here), so raw then txid-only is skipped (`:143`) and txid-only then raw is
+  read. No merge writes both entries, so both sides write these two BEEFs by
+  hand over `txs` (`Beef.toWriter` there, `Beef::to_writer` here), unsorted.
+- **The limit at every door**: `resolve_by_identity_key`,
+  `resolve_by_attributes`, `discover_certificates`,
+  `discover_certificates_by_type` and `query` each refuse #730's
+  `transactions_over_bound` and this vector's `graph_inputs_over_bound` with
+  `identity error: Transaction evidence: limit`. #730's door helper stopped at
+  `resolve_by_attributes`'s `?`, so on a limit shape it ran that door alone.
+
+Every pin is GREEN on `b5d008d1` (the behaviour landed with #730). In a scratch
+copy, sums counted per transaction make 3 of the 4 unit pins and 7 of the 8
+door pins RED while #730's ten stay green; an index that keeps the earlier
+entry makes the two-entry pins RED (2 unit, 1 door).
+
+### Fixed: `discover_certificates` and `discover_certificates_by_type` keep only the asked subject's certificates, the rule `resolve_by_identity_key` carries from the reference (#739)
+
+From the scoped cold re-read of PR #738 (#737, 2026-11-04 03:4xZ), a residual
+outside that row: `IdentityClient::discover_certificates(identity_key)` and
+`discover_certificates_by_type(identity_key, cert_type)` returned every
+certificate the parser admitted, whatever its subject, so an overlay host
+answering a by-key discovery with another subject's certificate had it shown
+as the asked key's. Both now keep only certificates whose subject is the
+asked key, compared as `resolve_by_identity_key` compares since #737 (the
+subject's compressed hex against the asked key lower-cased, the reference's
+`filterCertificatesByIdentityKey`, `ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:247-255`, called
+at `Wallet.ts:1012`); one private helper, `is_asked_subject`, serves the
+three doors, and the two `discover_*` doors share one private walk. The walk
+and the error path are unchanged: every output parsed in order, a skipped
+one passed over, a `limit` anywhere failing the call (#730). `discover_certificates(identity_key)` is this crate's door for the BRC-100
+wallet's `discoverByIdentityKey` (`packages/sdk/src/wallet/Wallet.interfaces.ts:989-1001,1296-1299`;
+the toolbox's `Wallet.ts:966-1015`, the subject filter at `:1012`), the path
+whose parsers this crate ports (#553, #730, #737), so the filter is a parity
+rule (the rule read of PR #742); `discover_certificates_by_type` has no
+counterpart (`DiscoverByIdentityKeyArgs` carries no type), and the
+certificates' type is not checked here (#744).
+
+`tests/identity_discover_subject_739.rs` serves the #737 vector's shapes
+(`tests/vectors/identity_resolve_737.json`, unchanged, rebuilt by this
+crate's writer to the recorded SHA-256) through both doors on an injected
+`.invalid` resolver, the asked key lower- and upper-cased, the expected
+subjects the reference's identities on the same shapes: another subject's
+certificate alone (`other_subject_alone`, `[]`), then the asked one's
+(`other_subject_then_asked` and `skipped_then_other_subject_then_asked`, the
+asked one alone), and the control, the subject's two certificates, both
+returned. `tests/identity_lock_position_537.rs` asked `discover_certificates`
+for `02aa`, which the filter would answer `[]` whatever the parser did; it
+now asks the token's own subject (read from its certificate JSON; a key-only
+token carries none), so its skip stays a pin. On `13cd2c74` (the test
+overlaid) both door tests are RED:
+``assertion `left == right` failed: other_subject_alone, upper-cased false``,
+`left: ["03a0434d9e47f3c86235477c7b1ae6ae5d3442d49b1943c2b752a68e2a47e247c7"]`,
+`right: []`; the control GREEN there. On the tip all three GREEN.
+
+Semver: a behaviour change at two public doors without a signature change:
+`discover_certificates` and `discover_certificates_by_type` drop a
+certificate whose subject is not the asked key, where they returned it.
+Migration: none.
+
+### Notes: cross-SDK parity (#739)
+
+What the wallet's `discoverByIdentityKey` door does that `discover_certificates`
+does not (`ts-stack@edf6e03` `Wallet.ts:966-1015`): the overlay query is sent
+as `{identityKey, certifiers}` (`:1004`) where this crate sends
+`{identityKey, certificatesOnly: true}`; the certificates are filtered and
+sorted by the wallet's trust step with `certifierInfo` attached (`:1010-1011`),
+unported here (the #737 row); a page of offset and limit (default 10, at most
+10000) with `totalCertificates` (`:228-233`, `validationHelpers.ts:1540-1543`)
+where this crate returns every admitted certificate; the asked key is trimmed
+and lower-cased by `validateHexString` (`:522-533`), so a space-padded key is
+found there and answers `[]` here, and a malformed or uncompressed key is
+refused there and answers `Ok([])` here after a lookup; a contact-source
+shortcut (`:983-992`) and the `IdentityCertificate` result type. The by-type
+door's unchecked certificate type is #744.
+
+### Tests: the two `ls_identity` parsers' lock position pinned at their decode site, past the token check (#744)
+
+From #742's cold read (2026-11-04 05:0xZ): since #544 the token check
+(`is_authenticated_token`) refuses every lock-after layout on its own:
+`is_canonical_signed_pushdrop` requires a 33-byte key push then `OP_CHECKSIG`
+as the script's leading two chunks. No lock-after token can pass it, so with
+both parsers reverted to `PushDrop::decode` (the lock position either way)
+`tests/identity_lock_position_537.rs` stayed green (measured: 2 of 2 under the
+mutation). Both parsers now decode through one crate-private function,
+`decode_token` (`PushDrop::decode_before`, unchanged behaviour), and the unit
+module `src/identity/client_decode_token_744_tests.rs` pins it on the
+reference's own revelation token relocked after its fields (the same key, the
+same two fields, the same signature): `PushDrop::decode` reads it with the
+same fields, the token check refuses it, and `decode_token` refuses it by the
+position alone. RED with `decode_token` reading through `PushDrop::decode`
+(`the parsers' decode site reads lock-before alone`). The 537 file's relocked
+control is unchanged; its helper `subject_of` (#742), which asked `02aa` when
+the token carried no `"subject":"` marker, now refuses that case naming the
+token, and the #618 key-only case asks `02aa` explicitly (`KEY_ONLY_ASKED`),
+so no certificate-carrying case can fall to an ask the subject filter answers
+`[]`.
+
+### Fixed: `discover_certificates_by_type` keeps only the asked type's certificates (#744)
+
+From the strength read of PR #742 (#739, 2026-11-04 04:5xZ): the by-type door
+sent its `cert_type` in the `ls_identity` query and never checked it on the
+certificates it read, so an overlay host answering with another type's
+certificate was believed. The door now keeps a certificate only when its type
+is the asked one, applied on #742's shared walk (`discover_of_subject`: every
+output parsed in order, a `limit` anywhere failing the call, #730, #737) after
+its subject filter (`is_asked_subject`, #739), so a certificate is returned
+only when both its subject and its type are the asked ones. The comparison is the certificate's canonical base64 text
+(`type_base64()`) against the asked text, exactly: a token's `type` is
+canonical base64 of 32 bytes or the token is skipped (#553), so its
+re-encoding is the token's own text and the text comparison is the bytes'
+comparison for every canonical asked text; an asked text no token can carry
+(unpadded, spaced) matches nothing. `discover_certificates` and the other
+doors are unchanged.
+
+Hardening, not parity: the reference has no by-type door
+(`DiscoverByIdentityKeyArgs` carries no type at `ts-stack@edf6e03`), so this
+crate's own rule answers the question its own door asks.
+
+Semver: a behaviour change at one public door without a signature change:
+`discover_certificates_by_type` drops a certificate whose type is not the
+asked one where it returned it. Migration: none.
+
+`tests/identity_discover_type_744.rs`: #737's token (#553's `reference` case,
+type `AQEB...AQE=`) and the same record re-typed to `AwMD...AwM=`, re-signed by
+its certifier and revealed by its subject (this crate's writer), served on an
+injected `.invalid` resolver: `discover_certificates` returns both, the by-type
+door the asked type's alone either way round, nothing for another type alone
+or for the asked text unpadded; and the asked type under another subject's
+certificate (the same record re-typed and revealed by the subject 5) beside
+them: the asked key's and type's certificate alone, the foreign subject's
+dropped by the subject filter, the foreign type's by the type filter. Built
+on `cbf27827` before PR #742 landed and folded onto it (`b2760031`): RED there
+with the tip's file overlaid, 3 of 3 (`left: ["AQEB...AQE=", "AwMD...AwM="]`,
+`right: ["AQEB...AQE="]`; at the three-output assertion
+``the foreign subject's and the foreign type's certificates``, the asked
+key's foreign-type certificate returned), the foreign-subject assertions
+before it passing there (the subject filter is #742's). On the tip 3 of 3.
+
+### Tests: the evidence check's inputs bound pinned over two unproven branches, witnessed under Node 22; the 2049-input BEEF built once per test binary (#741)
+
+No behaviour change. From #740's strength read: #736's single-chain pin of
+the inputs bound (2048 at the subject, 2049 at its parent) passes a walk that
+sums each path alone, so a recursive refactor of `assert_unconfirmed_graph`
+carrying the sums per branch would land green.
+`tests/vectors/identity_evidence_741.json` is written by
+`tests/support/identity_evidence_741.mjs` (#736's helpers copied, #736's
+vector untouched) with the reference's own writers at `ts-stack@edf6e03`
+under Node v22.18.0; two runs are byte-identical.
+
+- **Two unproven branches**: a subject of 2 inputs spends two unproven
+  parents, P1 of 2047 inputs and P2 of 2048, each spending its own outputs of
+  one proven grandparent with no inputs: 4097 over the graph, `limit` at
+  `TransactionEvidence.ts:170-171` on both sides (the stack pops P2 first, so
+  the refusal is at P1); 2047 and 2047, 4096, read. Along either path alone
+  the sum is at most 2050. `tests/identity_evidence_741.rs` rebuilds both
+  BEEFs with this crate's writer to the recorded SHA-256 and serves them
+  through `resolve_by_attributes` and `discover_certificates`; the unit module
+  `src/identity/evidence_741_tests.rs` judges them with `parse_evidence` to
+  the recorded code and line. In a scratch copy, the sums carried per path
+  turn both RED while every #736 and #730 pin stays green.
+- **Built once per binary**: `tests/support/identity_evidence_736.rs`'s
+  `build` keeps each shape in a `OnceLock`, so the door file builds the
+  2049-input BEEF once where it built it six times. No pin changes. The
+  saving is small (the file's single-threaded run 24.46 s to 23.78 s in
+  debug): the time is the parse and linking of the large BEEF at each door,
+  not its build (`docs/lanes/fix-741.md`).
+
+### Tests: the revocation's lock position pinned at its decode site, past the token check (#746)
+
+The revocation (`revoke.rs`, the reference's `IdentityClient.ts:773` site,
+lock-before) called `PushDrop::decode_before` inline, its position masked by
+the same token check that masked the parsers' until #744
+(`is_canonical_signed_pushdrop` refuses every lock-after layout). It now
+decodes through one crate-private function, `decode_revocation_token`
+(unchanged behaviour), and the unit module
+`src/identity/revoke_decode_746_tests.rs` pins it on #553's `reference`
+token relocked after its fields: `PushDrop::decode` reads it with the same
+key and fields, the token check refuses it, `decode_revocation_token` refuses
+it. RED with the function reading through `PushDrop::decode` (`the
+revocation's decode site reads lock-before alone`).
+
+### Fixed: `IdentityClient::query` keeps only the certificates its question asked for (#746)
+
+From the strength read of PR #745 (#744, 2026-11-04 05:5xZ): `query` sent the
+question's `identityKey`, `certificateType` and `certifiers` to `ls_identity`
+and kept every certificate the parser admitted, so an overlay host could
+answer with another subject's, type's or certifier's certificate, as the two
+`discover_*` doors could before #739 and #744. After the walk (every output
+parsed in order, a `limit` anywhere failing the call, unchanged) `query` now
+keeps a certificate only when it matches every field the question carries:
+`identity_key` through `is_asked_subject` (both sides lower-cased, the rule of
+the by-key doors, #737, #739); `certificate_type` as the canonical base64
+text, `type_base64()` compared exactly with the asked text (#744);
+`certifier` (an `Option<String>`, one key, sent as a one-entry `certifiers`
+list) as the certificate's certifier key in lower-case hex against the asked
+text lower-cased. A field the question does not carry filters nothing: with
+`certifier` unset the lookup still asks the default SocialCert certifier, and
+a certificate of another certifier is kept; `attributes` is sent and not
+checked on the answer.
+
+Hardening, not parity: the reference has no such door (`IdentityClient.ts`'s
+lookups at `ts-stack@edf6e03` are `resolveByIdentityKey` and
+`resolveByAttributes`), so this crate's own rule answers the question its own
+door asks.
+
+Semver: a behaviour change at one public door without a signature change:
+`query` drops a certificate its question did not ask for where it returned
+it. Migration: none.
+
+`tests/identity_query_filters_746.rs`: #737's harness and tokens on an
+injected `.invalid` resolver, one RED per filter on `8a2cc173` (a scratch copy,
+its own target dir, the test file copied in): #737's `other_subject_then_asked`
+answered to `by_identity_key` (`left` both subjects, `right` the asked one);
+#744's re-typed record answered to the asked type; the reference record
+re-certified and re-signed by the scalar 8, revealed by the subject 9 (this
+crate's writer), answered to the certifier 7; the three together on four
+certificates. A question with no filter keeps all four in the answer's order,
+GREEN on both. `tests/identity_resolve_737.rs`'s `admitted` helper read the
+parser's admissions through `query(IdentityQuery::by_identity_key(key))`,
+which kept every subject; it now reads through `query(IdentityQuery::default())`,
+a question that carries no filter (its six tests green on `8a2cc173` and on the
+tip).
+
+### Tests: the evidence walk's visited set pinned (a grandparent shared by two unproven paths; a proven grandparent reached twice), witnessed under Node 22 (#748)
+
+No behaviour change. From #747's strength read, which held that no pin of
+#730, #736 or #741 reaches a node of the unconfirmed graph twice, so the
+visited set of `assert_unconfirmed_graph` (`TransactionEvidence.ts:162-166`
+at `ts-stack@edf6e03`) could go with every pin green. That was not so: #736's
+subject reaches its unproven parent 2048 times and #741's parents reach the
+proven G 4094 times, and with the set's skip removed both go RED (the inputs
+sum and the script-bytes sum). The two shapes here pin the set directly.
+`tests/vectors/identity_evidence_748.json` is written by
+`tests/support/identity_evidence_748.mjs` (#741's helpers copied, its vector
+untouched) with the reference's own writers under Node v22.18.0, its replay
+also run with the set's skip removed; two runs are byte-identical.
+
+- **A grandparent shared by two unproven paths**: the subject spends P1:0
+  and P2:0, both unproven; P1 spends G:0 and P2 G:1; G is unproven and spends
+  GG:0; GG is proven with no inputs. Read on both sides, G walked once.
+  Without the set GG:0 is spent twice, `invalid-evidence` at `:149`, and the
+  output is skipped.
+- **A proven grandparent reached twice**: the same parents over a proven G
+  with 4092 inputs whose sources are absent: 4096 over the graph, read on both
+  sides. Without the set the sum is 8188, `limit` at `:170-171`.
+
+`tests/identity_evidence_748.rs` rebuilds both BEEFs with this crate's
+writer to the recorded SHA-256 and serves them through
+`resolve_by_attributes` and `discover_certificates`; the unit module
+`src/identity/evidence_748_tests.rs` judges them with `parse_evidence`. In a
+scratch copy both are RED with the set's skip removed; with the skip kept for
+proven nodes alone, the shared unproven G is RED here (so is #736's inputs
+pin, and #741's stays green).
+
+### Fixed: the by-type questions send `certificateTypes` with `identityKey`, as the reference overlay reads them (#752)
+
+From the rule read of PR #750 (#746, 2026-11-04 07:0xZ), older than that PR:
+`IdentityClient::discover_certificates_by_type` and `IdentityClient::query`
+(with `certificate_type` set) sent the type to `ls_identity` as
+`certificateType`, a string. The reference overlay's identity lookup service
+admits seven keys and refuses any other for the whole question
+(`ts-stack@edf6e03` `packages/overlays/topics/src/identity/IdentityLookupService.ts:74-82`:
+`attributes`, `certifiers`, `identityKey`, `certificateTypes`,
+`serialNumber`, `limit`, `offset`; `shared/queryValidation.ts:35-38`,
+`Invalid lookup query: unexpected field <key>`), reads `certificateTypes` as
+an array of at most 32 base64 texts of 32 decoded bytes (`:97-100`; the
+check trims and tests the alphabet, the padding and the length, with no
+trailing-bit check, `validationHelpers.ts:488-498`), and
+answers by type only beside `identityKey` (`:136-143`, then
+`IdentityStorageManager.ts:315-339`, `findByCertificateType`; the overlay's
+own `IdentityQuery` type, `types.ts:28-36`). A reference host therefore
+refused every by-type question, so #744's and #746's type filters took effect
+only against a non-reference host. Both doors now send
+`certificateTypes: [cert_type]`; `discover_certificates_by_type`'s question is
+`{ identityKey, certificateTypes }`, `query`'s carries the same key beside
+its others, every other key as before. The reference wallet asks no by-type
+question (`wallet-toolbox` `Wallet.ts:1004`, `discoverByIdentityKey`, sends
+`{ identityKey, certifiers }`), so the overlay's allowlist is the reference
+for the shape. The refusal is witnessed by reading the allowlist, no live
+overlay.
+
+Semver: the question's shape is a wire contract toward overlay hosts, not a
+signature: a behaviour change at two public doors without a signature change.
+Migration: a non-reference host that read `certificateType` now receives
+`certificateTypes`, an array of one; such a host reads the new key or loses
+the type (a reference host answered nothing before). `IdentityQuery`'s own
+serde JSON keeps its `certificateType` member: it is the struct's
+serialization, not the lookup question.
+
+Not changed, a finding for a follow-up: `discover_certificates` sends
+`certificatesOnly: true`, a key the same allowlist refuses
+(`IdentityLookupService.ts:74-82`), so a reference host refuses that door's
+question too; outside #752's two doors.
+
+`tests/identity_question_752.rs`: a recording facilitator on an injected
+`.invalid` resolver keeps each question it receives; the by-type door's
+question `{ identityKey, certificateTypes: [type] }` and `query`'s with a type,
+limit and offset each equal to the expected JSON and admitted by the
+allowlist, `query` without a type carrying no type key. 2 of 3 RED on
+`56caa15d` (a scratch copy, its own target dir, the test file copied in):
+`left: [Object {"certificateType": String("AQEB...AQE="), "identityKey": ...}]`,
+`right: [Object {"certificateTypes": Array [String("AQEB...AQE=")], ...}]`;
+the no-type control green on both.
+
+### Fixed: `Transaction::from_beef` and `Beef::find_bump` take the last BUMP holding a txid, as the reference's index does (#732)
+
+From the strength read of PR #729 (#728, 2026-11-04 01:2xZ): the reference
+indexes the level-0 leaves of every BUMP with a `Map.set` loop over the BUMPs
+in order, so the LAST BUMP holding a txid is the one `findBump` answers and
+`#addInputProof` makes the transaction's `merklePath`
+(`ts-stack@edf6e03` `Beef.ts:570-585`, `:649-680`). This crate's
+`add_input_proof` built its index with `or_insert` and `find_bump` scanned
+from the front, so both kept the EARLIEST, and the comment on the index claimed
+the reference's answer. Both readers keep every BUMP they read and merge none
+(`Beef.ts:1257-1261`; `beef/collect.rs`), so two proofs of one txid at level 0
+(two blocks after a reorg, two roots at one height, a BUMP the writer did not
+merge) reach `from_beef` from the wire, and the attached path, and so the root
+a tracker is asked about, was another than the reference's. The index now
+keeps the last (`insert`), `find_bump` scans from the back, and the comment
+says so. `merge_bump` is unchanged: as the reference's `#findOrInsertBump`
+(`:791-810`) it combines only a BUMP of the same height and root.
+
+Semver: a behaviour change without a signature change: for a BEEF carrying
+two proofs of one txid, `Transaction::from_beef`, `from_atomic_beef`,
+`Beef::find_atomic_transaction` and `Beef::find_bump` answer the last proof
+where they answered the earliest. Migration: none for a BEEF with one proof per
+txid; a caller that relied on the earliest proof names it (`beef.bumps[i]`).
+
+`tests/beef_bump_lookup_732.rs` against `tests/vectors/beef_bump_lookup_732.json`
+(`tests/support/beef_bump_lookup_732.mjs`, the bun bundle of `packages/sdk` at
+`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical): four BEEFs,
+each built by this crate's writer (`merge_raw_tx`, `merge_bump`, `to_binary`)
+to the bytes the reference's writer recorded: a parent proven at 800000
+(root its txid) and at 800001 beside a sibling, in both orders; two roots at
+800000; and an unproven child spending both of that parent's outputs. The
+attached path, `find_bump`'s answer and both inputs' source paths (the full
+link and the stub) are the reference's, the last BUMP; the wire bump index
+(the earliest, on both sides) and both BUMPs read back unchanged. 3 of 4 RED on
+`9ae3ebcc` (`left: (800000, "86bd3ea1...")`, `right: (800001, "e476c603...")`),
+the wire-index agreement green on both.
+
+Residue, stated: `merge_raw_tx` after two BUMPs holding its txid sets the
+entry's bump index to the earliest holding it as a txid leaf
+(`try_to_validate_bump_index`), where the reference's `#tryToValidateBumpIndex` takes its index's, the
+last (`Beef.ts:1329-1340`; probed under Node 22: `bumpIndex 1`), so the two
+writers write another index byte for that merge order; no reader's verdict
+moves (both BUMPs hold the txid) and a reader's attached path follows the
+index, not the byte, but both atomic writers carry the BUMP the byte names
+(`atomic_closure`; the reference's `#copySelectedTransactions`,
+`Beef.ts:448-470`), so `to_binary_atomic` of that entry carries the earliest
+BUMP where `toBinaryAtomic` carries the last, and a reread attaches another
+path and asks a tracker about another root (#757; closed there).
+
+### Fixed: `discover_certificates` asks `ls_identity` as the reference wallet does, without the `certificatesOnly` key the overlay's allowlist refuses (#754)
+
+From the #752 lane's reading of the reference overlay (2026-11-04 08:0xZ):
+`IdentityClient::discover_certificates(identity_key)` sent
+`{ identityKey, certificatesOnly: true }` to `ls_identity`. The reference
+overlay's identity lookup service admits seven keys and refuses any other
+for the whole question (`ts-stack@edf6e03`
+`packages/overlays/topics/src/identity/IdentityLookupService.ts:74-82`:
+`attributes`, `certifiers`, `identityKey`, `certificateTypes`,
+`serialNumber`, `limit`, `offset`; `shared/queryValidation.ts:35-38`,
+`Invalid lookup query: unexpected field <key>`), so a reference host refused
+the by-key discovery outright, the class of #752's `certificateType`. The
+door now asks `{ identityKey }`. The reference wallet's
+`discoverByIdentityKey`, the door this one stands for, asks
+`{ identityKey, certifiers }` (`wallet-toolbox` `Wallet.ts:1004`), its
+certifiers its trust settings' keys (`:992`; Metanet Trust Services and
+SocialCert by default, `WalletSettingsManager.ts:160-178`). This crate has
+no trust settings (the trust step unported, #739's parity note), so it names
+no certifier: the key alone reaches `findByIdentityKey` with no certifier
+filter (`IdentityLookupService.ts:144-145`,
+`IdentityStorageManager.ts:285-301`), where naming the SocialCert certifier
+alone, as `resolve_by_identity_key` and `query` do, would drop the
+certificates of the reference's other default certifier. #739's subject
+filter on the answer is unchanged. The refusal is witnessed by reading the
+allowlist, no live overlay.
+
+What `certificatesOnly` was: a key written with the door by the commit that
+added the identity module (`5e4b9503`), sent by neither go-sdk@2ca481c nor
+ts-sdk@9e3ede6b (a `grep` of each finds no such key), read by no reference host and
+documented nowhere in this repository (no rustdoc, README, `docs/` or
+changelog line describes it as a contract; the #739 parity note and #752's
+finding name it only as the difference from the reference).
+
+Semver: the question's shape is a wire contract toward overlay hosts, not a
+signature: a behaviour change at one public door without a signature change.
+Migration: a non-reference host that read `certificatesOnly` no longer
+receives it; nothing in this crate documented the key, and a reference host
+answered nothing before.
+
+`tests/identity_question_754.rs`: #752's recording facilitator on an
+injected `.invalid` resolver; `discover_certificates`' question equal to
+`{ identityKey }` and admitted by the allowlist, and the questions of the
+four by-key doors (`discover_certificates`, `discover_certificates_by_type`,
+`resolve_by_identity_key`, `query` with a type, limit and offset) each
+admitted by it. 2 of 2 RED on `c92ab842` (a scratch copy, its own target
+dir, the test file copied in): `left: [Object {"certificatesOnly": Bool(true),
+"identityKey": ...}]`, `right: [Object {"identityKey": ...}]`, and the census's
+`left: ["certificatesOnly"]`, `right: []`.
+
+### Fixed: the lookup resolver records success for any output list and keeps a freeform answer neutral, as the reference's host reputation does (#760)
+
+From the strength read of PR #759 (#754, 2026-11-04 09:1xZ), outside that
+row: `LookupResolver` read a host's answer as valid only when it was an
+output list with at least one output or a freeform answer, and recorded
+`Invalid lookup response` as a host failure for an empty output list
+(`src/overlay/lookup_resolver/query.rs:122-132` at `8601c66b`). Both
+references record a success for any output list, the empty one included:
+`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/LookupResolver.ts:2395-2398`
+(`isOutputListAnswer`, then `recordSuccess`) and `ts-sdk@9e3ede6`
+`src/overlay-tools/LookupResolver.ts:518-528` (`answer.type === 'output-list'
+&& Array.isArray((answer).outputs)`, then `recordSuccess`). The host
+reputation tracker is one global keyed by host URL with two failures of grace
+and a backoff of 1 s doubling to 60 s, so three lookups answered empty (a
+subject with no certificates, a key with no record) backed that host off for
+every resolver in the process, and the next identity, kvstore or registry
+lookup against it failed with `All competent hosts for <service> are backing
+off`. The site now records a success for every output list. A freeform answer
+recorded a success here, which cleared any backoff; `edf6e03` treats it as
+neutral (`:2399-2402`: "A valid freeform response is neutral: it proves this
+request reached the service, but it must not erase an availability backoff",
+then `if (isFreeformAnswer(normalizedAnswer)) return normalizedAnswer`, no
+call on the tracker), and so does this crate now: nothing is recorded, neither
+success nor latency nor failure. A `formula` answer stays a failure with
+`Invalid lookup response`, the text `ts-sdk@9e3ede6` records for it too
+(`:527`; `edf6e03`'s normalizer refuses it as `Malformed lookup response`,
+`:2388-2392`, `:2403-2405`); the text is the tracker's recorded reason, matched
+by no reader in the crate.
+
+`tests/lookup_host_accounting_760.rs`, a recording facilitator in #752's shape
+answering from a script, each test on its own `.invalid` host: four lookups
+answered with an empty output list are all answered, and two failures, a
+freeform answer, a failure, then a fifth lookup refused as backing off; a third
+test (the #761 strength read's line) has a host that only ever answered
+freeform leave no tracker record at all, RED on `b285d621` (the freeform
+success of the old rule made a record). The two RED on `8601c66b` (a scratch copy, its own target dir, the test file copied
+in): `lookup 4: Err(OverlayError("All competent hosts for
+ls_host_accounting_760 are backing off for approximately 1000ms"))` and
+``called `Result::unwrap_err()` on an `Ok` value: OutputList { outputs: [] }``
+(the freeform success had reset the count, so the third failure fell inside
+the grace). `tests/identity_question_752.rs` is unchanged: its three empty
+answers on one host sat at the edge of the backoff and are now successes.
+`tests/overlay_mock_tests.rs`'s `test_lookup_resolver_records_reputation`
+answered a freeform result and asserted only that the host had a record (the
+old freeform success); it now answers an empty output list and asserts the
+one success.
+
+Semver: a behaviour change in the host reputation accounting with no
+signature change. Migration: none for a caller; an empty answer no longer
+backs a host off, and a freeform answer no longer clears a backoff.
+
+### Notes: cross-SDK parity (#760)
+
+The non-empty rule was this crate's own: neither reference had it. The
+freeform reading follows `ts-stack@edf6e03`; the older `ts-sdk@9e3ede6`
+records a failure for a freeform answer (`:518-528`, its `isValid` reading
+the output list alone), a reading this crate did not have before and does not
+take now. One error class stays a failure here, older than #760 and outside
+it: `edf6e03` keeps a semantic HTTP rejection neutral (a 4xx other than 408,
+425 and 429, `:816-827`; `throwTrackedLookupFailure` throws it before
+`recordFailure`, `:2416`, as it does a resource limit, `:2415`), where this
+crate's facilitator answers every non-2xx as an error
+(`src/overlay/facilitators.rs:174-178`) and the resolver records it as a
+failure (found by #760's cold read).
+
+### Fixed: `merge_raw_tx` writes the last BUMP's index for a txid two BUMPs prove, as the reference does; a caller-set merkle path at `add_input_proof` replaced by the BEEF's proof and descended past where there is none (#757)
+
+From the #732 lane (2026-11-04 08:4xZ), two residues at `ts-stack@edf6e03`
+(`packages/sdk/src/transaction/Beef.ts`).
+
+The written index. The reference's `#tryToValidateBumpIndex` asks its
+level-0 index (`:1329-1340`: `const i = this.#ensureBumpTxidIndex().get(txid)`,
+then `newTx.bumpIndex = i`), the index a `Map.set` over the BUMPs in order
+(`:576-585`), so an entry merged after two BUMPs that hold its txid takes the
+LAST one's index; `BeefTx.toWriter` writes it and the atomic writer carries
+that BUMP (`#copySelectedTransactions`, `:448-470`). This crate's
+`try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only` and
+`merge_transaction`) scanned from the front and took the EARLIEST, so
+`to_binary` wrote another index byte and `to_binary_atomic` carried another
+BUMP than the reference's, and an atomic BEEF read back attached another path.
+It now scans from the back. An entry merged before a BUMP is unchanged and
+agrees: the BUMP present at its merge, as `#mergeBumpEntry` sets only an entry
+without an index (`:774-786`). The readers are unchanged: `add_input_proof`
+attaches the last BUMP holding a txid whatever the written byte (#732), and
+both forms prove the txid.
+
+The caller's path. `#addInputProof` (`:649-668`) sets
+`current.merklePath = mp` whenever `findBump(txid)` answers, over a
+`merklePath` the transaction already carries, and goes on to the inputs only
+when it does not answer, the carried path kept. `add_input_proof` kept a
+carried path (`enter` and `bare_stub` attached a BUMP only to a transaction
+without one) and treated any carried path as the end of the walk. Both now
+follow the reference: this BEEF's BUMP replaces a carried path and ends the
+walk; a transaction this BEEF does not prove is descended, its own path kept.
+A carried path reaches the walk only through the in-memory API (`BeefTx::tx_mut`,
+`merge_transaction` of a transaction with a path, an input's own
+`source_transaction`); the readers set none, so `Transaction::from_beef` on
+bytes is unchanged. `Transaction::verify` reads a transaction with a path as
+proven and does not descend it, so the extra links are not judged.
+
+Semver: a behaviour change without a signature change: for a BEEF holding two
+BUMPs that prove one txid, the entry merged after both carries the last
+BUMP's index, so the bytes `to_binary` writes change in that entry's index
+byte and `to_binary_atomic` carries the last BUMP; readers accept both forms.
+`find_atomic_transaction` replaces a path a held transaction carries with the
+BEEF's BUMP for its txid, and links the inputs of a transaction that carries a
+path the BEEF does not hold. Migration: a fixture pinning the old bytes
+re-records; a caller that set a path on a held transaction to override the
+BEEF's merges that path as a BUMP instead. The four dependents' fixtures were
+scanned (every BEEF found in a test, vector, fixture, bench or example file of
+`bsv-overlay-cloudflare`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli` and
+`rust-message-box`: 66 parsed) and none holds two BUMPs sharing a level-0 hash.
+
+`tests/beef_bump_index_757.rs` against `tests/vectors/beef_bump_index_757.json`
+(`tests/support/beef_bump_index_757.mjs`, the bun bundle of `packages/sdk` at
+`ts-stack@edf6e03` under Node v22.18.0; the fold's three runs byte-identical,
+the eleven earlier cases unchanged): eight BEEFs (eleven since the fold)
+rebuilt by this crate's writer from the merge steps the vector carries and
+compared with the reference's `toHex` and `toBinaryAtomic` bytes (a raw or
+txid-only parent merged after BUMPs at 800000 and 800001 in both orders, after
+two roots at 800000, with a child beside it; merged before and between them),
+and three path cases (a BEEF read back, a caller's 800001 path set on the
+proven parent or subject, a caller's 800003 path on the unproven child), each
+walk `findAtomicTransaction` leaves. 4 of 6 RED on `b285d621` (a scratch copy,
+its own target dir): `raw_after_both: the bytes the reference's toBinary
+writes`, `left: "...0101000100000001aa..."`, `right: "...0101010100000001aa..."`
+(the entry's index byte `00` for `01`); the atomic BEEF carrying
+`fe00350c...` (800000) where the reference carries `fe01350c...` (800001); the
+caller's `800001` kept where the reference attaches `800000`; the walk stopped
+at the child's own path where the reference links both of its inputs. The
+before-or-between agreement and the stated sibling case green on both.
+
+The fold (the three reads of PR #763). The atomic writer's txid-only branch
+took the EARLIEST BUMP carrying the txid, whatever the entry's index; the
+reference copies `bumps[tx.bumpIndex]` for a txid-only entry as for a raw one
+(`#copySelectedTransactions`, `:448-470`): `atomic_closure` now carries the
+BUMP the index names, else the last carrying the txid. `make_txid_only` set no
+index; the reference's `makeTxidOnly` asks `#tryToValidateBumpIndex` again
+(`:550-565`), and so does this crate's now. Three cases recorded:
+`txid_only_after_both_with_child` (the atomic BEEF of the child carrying
+800001), `made_txid_only_between_with_child` (an entry merged between the
+BUMPs, index 0, made txid-only: index 1 on both sides) and
+`raw_before_a_sibling_leaf`, and one path case, a proven child whose inputs the
+BEEF carries raw (`proven_parent_with_its_input_in_the_beef`: the walk stops
+at the proof on both sides). RED on `f23fb60c` (a scratch copy, the fold's test
+file and vector overlaid, its own target dir): `txid_only_after_both_with_child:
+the bytes the reference's toBinaryAtomic("child") writes`, `left: "...0200beef01fe00350c..."`,
+`right: "...0200beef01fe01350c..."`; with that case passing,
+`made_txid_only_between_with_child: the parent's bump index`, `left: None`,
+`right: Some(1)`. The path case is an agreement, green on `f23fb60c` and RED
+with `enter` descending a proven transaction (`inputs_linked` `[true, true]`
+for `[false, false]`), which the older proven-parent case does not catch. The
+stated sibling pin asserts the two bytes it differs by (the leaf's flag and the
+entry's index or format byte) where it asserted any difference. A BEEF this
+crate wrote before #757 (`raw_between`'s bytes, one hex digit from
+`raw_after_both`'s, at offset 247) reads valid on `Beef::from_binary` with
+`verify_valid` and on `verify_stream_structure`.
+
+### Notes: cross-SDK parity
+
+The strict sibling-leaf match this paragraph stated (v0.3.5, `ef98e246`) is
+reversed by #765: both merge sites take any level-0 leaf and flag it, as the
+reference does (go-sdk takes any level-0 hash where it attaches a path and
+proves an unindexed entry by a flagged leaf alone); see that entry.
+
+A txid-only entry without a BUMP index (one read from bytes: neither reader
+gives it one, `BeefTx.ts:294-295`) in an atomic closure: the reference's
+`#copySelectedTransactions` copies no BUMP for it (`Beef.ts:453`), so its
+`toBinaryAtomic` writes the txid-only entry unproven; this crate's
+`atomic_closure` carries the last BUMP holding the txid (the earliest until
+#757's fold). Measured at the fold's re-read on `txid_only_after_both_with_child`'s
+bytes read back: the child's atomic BEEF `...0200beef00...` (no BUMP) there,
+`...0200beef01fe01350c...` here. Older than #757; this crate keeps the proof
+its own `verify_valid` asks of a txid-only entry. Unpinned; filed as #766.
+
+### Fixed: the SLAP path's accounting and the freeform answer without a result follow the reference's host reputation (#762)
+
+From the rule read of PR #761 (#760, 2026-11-04 09:5xZ), two residues beside
+that row. `LookupResolver::find_competent_hosts` recorded a success for a
+tracker's output list and a failure for its error, and nothing for any other
+answer (`src/overlay/lookup_resolver.rs:379-381` at `6aee2bf9`). The reference
+sends a tracker's `ls_slap` question through the tracked call a host's
+question takes (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:1974`,
+`lookupSlapTrackerHosts` calling `lookupHostWithTracking`), so its answer is
+accounted by `completeTrackedLookup` (`:2379-2406`): an output list a success,
+a freeform answer neutral, anything its normalizer cannot read a failure
+(`Malformed lookup response`, `:2388-2392`, `:2403-2405`). The SLAP path now
+records a failure for a formula answer, with the host path's text (`Invalid
+lookup response`, #760), and nothing for a freeform one. And the HTTP
+facilitator read a `freeform` answer with no `result` member as
+`Freeform { result: Null }` (`src/overlay/facilitators.rs:373-378` at
+`6aee2bf9`), which #760 made neutral; the reference's normalizer reads a
+freeform answer only with an own `result` (`:430-433`, `Object.hasOwn`), so
+it is malformed there, a failure for the host. The facilitator now refuses it,
+`Malformed lookup response: a freeform answer without a result member`, and
+the resolver records the failure as for any facilitator error; `"result":
+null` stays an answer (presence, not non-null). The host reputation tracker's
+doc line on `record_failure` names both paths.
+
+`tests/lookup_tracker_accounting_762.rs`: three formula answers from a SLAP
+tracker on #760's scripted facilitator back it off (the fourth discovery does
+not ask it), RED on `6aee2bf9` (`a formula answer from a tracker is
+recorded`: no record); a `wiremock` host answering `{"type":"freeform"}` an
+`Err` and one recorded failure, RED on `6aee2bf9` (`a freeform answer without
+result was read: Freeform { result: Null }`); a freeform-only tracker leaves
+no record and `{"type":"freeform","result":null}` is `Freeform { result:
+Null }` with no record, green on both. `tests/overlay_http_tests.rs`'s
+`test_lookup_freeform_null_result` pinned the missing member as `Null`; it now
+answers `"result": null`.
+
+Semver: behaviour changes in the SLAP accounting and in one facilitator
+answer shape, no signature change. Migration: a tracker answering formula
+answers is backed off like a host; a host answering `freeform` without
+`result` is an error now.
+
+### Notes: cross-SDK parity (#762)
+
+The formula parse is left: `HttpsOverlayLookupFacilitator` still reads a
+`formula` answer as `LookupAnswer::Formula`, where `edf6e03`'s normalizer
+returns only an output list or a freeform answer (`:446-448`) and refuses it;
+its HTTPS facilitator runs that normalizer and throws `Malformed lookup
+response` itself (`:865-866`), so a direct caller there gets the error. The resolver records a `Formula` as a failure on both paths and aggregates
+nothing from it, the reference's accounting; the recorded text is
+`ts-sdk@9e3ede6`'s (`:527`), and a direct facilitator caller still gets the
+typed answer. Older and outside the row: the facilitator reads a JSON answer
+without `type` as an output list and an output list without `outputs` as
+empty, where the normalizer asks for `type: 'output-list'` and an array
+(`:389-397`) and the facilitator refuses both (`:865-866`); since #760 such an
+answer is a success for the host here and a failure there (#768, closed by
+that row: both refused). On the
+tracker path as on the host path (#760's residue), every error is a failure
+here, where `edf6e03` keeps a semantic rejection neutral (`:2416`). And with
+every tracker backed off, `find_competent_hosts` answers no hosts and `query`
+refuses in `No competent <network> hosts found by the SLAP trackers for lookup
+service: <service>`, where the reference's query refuses in
+`prepareHostsForQuery`'s words, `All SLAP trackers hosts are backing off for
+approximately <n>ms due to repeated failures.` (`:1956-1964`, `:2307-2313`,
+`:1671`); older than #762, reached now by a formula answer too (#769).
+
+### Fixed: `merge_transaction` merges the transaction's merkle path as a BUMP and walks its source transactions, as the reference does (#764)
+
+From the #757 lane's reading (2026-11-04 10:2xZ) and the rule read of PR #763.
+The reference's `mergeTransaction` (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Beef.ts:875-901`) runs `#mergeTransactionGraph`,
+which pops each transaction off a stack and runs `#mergeTransactionEntry`
+(`:849-856`): `current.merklePath` merged through `#mergeBumpEntry`
+(`:774-786`) and the returned index taken for the entry, else
+`#tryToValidateBumpIndex` (`:1329-1340`); an entry that ends with no index
+queues its inputs' `sourceTransaction`s (`#queueSourceTransactions`,
+`:858-863`, at `:897`), each txid once per call. go-sdk@2ca481c's
+`MergeTransaction` (`transaction/beef.go:875-912`) does the same save a held
+entry and a held BUMP: `MergeBump(tx.MerklePath)`, then `MergeTransaction` of
+each source when there is no index, but `mergeWouldNotChange` (`:920-950`)
+keeps a proven entry it holds instead of replacing it, and its
+`tryToValidateBumpIndex` (`:858-868`) never looks up a held BUMP, so for a
+transaction with no path that a held BUMP proves Go walks the sources where
+the reference and this crate stop (`subject_proven_by_a_held_bump`; read, not
+run). This crate's `merge_transaction` stored the transaction alone
+(`src/transaction/beef.rs:391-405` at `d14f560d`: `let bump_index = None; //
+Could be set if tx has merklePath`): its path was never written as a BUMP and
+no ancestor was merged, so `find_atomic_transaction` on such a BEEF descended
+past a parent the reference stops at.
+
+It now walks as the reference does (`src/transaction/beef/merge_graph.rs`, a
+stack, linear in the graph, no recursion): a transaction carrying a path has
+it merged through `merge_bump` and takes the returned index (a path whose
+BUMP the BEEF holds, the same height and root, is combined into it, no second
+BUMP); one without takes the last BUMP flagging its txid, as before; an entry
+that ends with an index stops the walk, one that ends with none has its
+inputs' sources merged and walked in turn, from the first input on. A source
+the BEEF already holds is replaced in its place, as the reference's
+`#replaceOrAppendTx` replaces it (`:531-540`), so an ancestor merged by hand
+is one entry still and a graph merged again moves no entry. The transaction given is stored as
+given; each ancestor is stored as a copy without its own source links (they
+are entries of the BEEF), so the walk clones each transaction once, where the
+reference holds the objects. `merge_beef` keeps its one-entry merge of an
+in-memory entry (no path or source walk), as the reference's `mergeBeef`
+reads a snapshot of the bytes, which carries neither (`:975`).
+
+Since #764's fold every door that replaces a held txid (`merge_raw_tx`,
+`merge_transaction` and its walk, the one-entry merge `merge_beef` and
+`to_beef` use) goes through one helper, the reference's `#replaceOrAppendTx`
+(`beef/index.rs`, `replace_or_append`): the entry is stored at the held one's
+position, where it was removed (`Vec::remove`, then the index rebuilt) and the
+new one appended. `merge_txid_only` keeps a held entry, as `mergeTxidOnly`
+does (`:919-929`). That made a re-merge over a held graph of G entries cost
+O(G·N) in a BEEF of N, where the reference's costs O(G), and it wrote another
+order: two unrelated transactions A and B held (raw, both proven or both
+unproven), A merged again, the reference writes A then B and this crate wrote
+B then A, as `sort_txs` keeps insertion order between entries no dependency
+orders. Older than #764 (the same on `d14f560d`, through `merge_raw_tx` too);
+found by the cold read of PR #770.
+
+Semver: a behaviour change without a signature change. The bytes `to_binary`
+writes after `merge_transaction` of a transaction carrying a `merkle_path` or
+input `source_transaction`s change: a BUMP and the ancestors appear, and the
+entry carries the BUMP's index. A re-merge of a held txid (`merge_raw_tx`,
+`merge_transaction`) leaves the entry in its place: the bytes after it change
+only where independent entries were written in the moved order (A then B
+above, B then A before). Readers are unchanged. `Transaction::to_beef`,
+`to_beef_v1` and `to_atomic_beef` write the bytes they wrote: since #764's fold
+they store their collected ancestors with the one-entry merge (their BUMPs are
+merged already, so a walk would merge each proven ancestor's path again), and
+the `iterative_equivalence_tests` byte comparison and `readme_examples` hold.
+Migration: a caller that merged a transaction's ancestors by hand as well
+merges them once (the replacement dedupes); a fixture pinning the old bytes of
+such a merge re-records; a site that re-merges an in-memory entry meant to
+stand alone (a root to prune or split from its ancestry, the toolbox's
+`create_action/beef_graph.rs:265` and `create_action/beef.rs:84`) keeps the
+one-entry merge with `beef.merge_raw_tx(tx.to_binary(), None)`. The dependents' sites (`grep -rn merge_transaction` in
+`bsv-overlay-cloudflare`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
+`rust-message-box`; 82 matching lines, each read at its window): four
+production sites, the rest tests. `overlay-engine`'s `gasp_overlay.rs:461`
+merges transactions parsed by `Transaction::from_binary` (no path, no links):
+unchanged. `overlay-cloudflare`'s `ef.rs:245` (`strip_subject_bump`'s
+fallback, the subject from `transaction_from_beef` with its path cleared but its sources linked) now
+writes the subject's ancestry and their BUMPs where its comment says "parents
+dropped", the guard (the subject raw, no proof claimed for it) still holding.
+The toolbox's `create_action/beef_graph.rs:265` and `create_action/beef.rs:84`
+re-merge an in-memory entry's transaction (`tx.tx()` with no raw bytes), which
+now walks the sources it carries. Thirteen test sites name a path or a
+source link within the forty lines before the call (`overlay-cloudflare`
+`submit_census.rs`, `low-app-layer` `compaction.rs`, the toolbox's
+`broadcast_memory_tests.rs`, `arcade_tests.rs`,
+`arcade_status_vector_tests.rs`, `rust-message-box` `payments.rs`; not run
+here): where the transaction merged carries them, its BEEF gains the BUMPs and
+ancestors the reference's would hold.
+
+`tests/beef_merge_transaction_764.rs` against
+`tests/vectors/beef_merge_transaction_764.json`
+(`tests/support/beef_merge_transaction_764.mjs`, the bun bundle of
+`packages/sdk` at `ts-stack@edf6e03` under Node v22.18.0; two runs
+byte-identical): nine graphs over #757's parent, child and grandchild, each
+rebuilt here (the transactions' bytes, the paths they carry, the sources their
+inputs carry, the case's prior merges) and compared with the reference's
+`mergeTransaction` then `toHex` bytes, its BUMP count and its entries'
+indices: a lone transaction carrying its path at 800000 (bumps `[alone]`,
+index 0) and a lone unproven one; a child carrying its proven parent on both
+inputs (one BUMP, the parent indexed, the child raw) and its unproven parent;
+a chain of three proven at the middle (the walk stops, the grandparent absent)
+and at the root (all three, one BUMP); a child whose parent the BEEF holds raw
+and with its BUMP (no duplicate entry, no second BUMP); a child a held BUMP
+proves (its sources not walked); and the stored forms (the transaction given
+keeps its links, an ancestor holds none). 6 of 10 RED on `d14f560d` (a scratch
+copy, its own target dir): `lone_proven: the bytes the reference's
+mergeTransaction then toHex writes`, `left: "0200beef0001000100000001aa..."`
+(no BUMP), `right: "0200beef01fe00350c000101000262b0..."`;
+`child_of_a_proven_parent` `left: "0200beef000100010000000262b0..."` (the
+child alone, the parent absent); the agreement cases (the lone unproven
+control, the two held-parent cases, the held-BUMP case) green on both.
+
+The fold's six cases, recorded by the same recorder (its runs byte-identical,
+the nine cases unchanged; a grandparent, two parents each spending one of its
+outputs, and a child spending both, with three lone-leaf BUMPs): two distinct
+unproven parents (the first input's merged first, the sort keeping it); the
+grandparent reached through both, without a path under the first and with one
+under the second (merged once, on the first branch: no BUMP); two unrelated
+transactions held, the first merged again unproven, proven, and through
+`merge_raw_tx` (A then B); a chain merged twice (one merge's bytes). Four of
+16 RED on `8db1878a` (a scratch copy, its own target dir): the three held
+cases (`left` writes the right parent's 3900-satoshi output first, `right` the
+left's 2900) and the re-merge's index pin (`the second merge moved an entry`,
+the order after the sort reversed); the distinct-parents and grandparent cases
+green on both, and RED on the tip with `.rev()` removed (both) or the
+once-per-call set removed (the grandparent case).
+
+### Notes: cross-SDK parity
+
+Ancestors are held without their links: the reference's `#mergeTransactionEntry`
+(`ts-stack@edf6e03` `Beef.ts:849-856`) stores each source object as given, its
+own `sourceTransaction` links kept; this crate stores `clone_for_beef` copies.
+The transaction given keeps its links on both sides, the bytes are the same,
+and `find_atomic_transaction` answers the same graph (its walk takes the
+root's own links, then this BEEF's entries, copies of those objects, and stops
+where both stop, `:649-680`). What differs: `find_txid(ancestor).tx()` has no
+`source_transaction` on its inputs where the reference's has the caller's, and
+`find_transaction_for_signing(ancestor)` links one level from the BEEF where
+the reference's returns the caller's whole chain. go-sdk@2ca481c differs from
+both: `mergeWouldNotChange` (`transaction/beef.go:920-950`) keeps a held proven
+entry rather than replacing it, and its `tryToValidateBumpIndex` (`:858-868`)
+only clears a path that lacks the txid, so a pathless transaction a held BUMP
+proves gets no index and its sources are walked (the recorded
+`subject_proven_by_a_held_bump`: the child alone here and in the reference,
+child and parent in Go; read, not run). Ours: linear storage by Rust
+ownership. Theirs: go-sdk, not filed.
+
+### Fixed: a BEEF entry takes the last BUMP holding its txid as any level-0 leaf, flagged on the way, as the reference does; v0.3.5's strict match reversed (#765)
+
+`Beef::try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only`,
+`merge_transaction`, `make_txid_only`) and `update_bump_indices` (behind
+`merge_bump`) took a BUMP for an entry only where its level-0 leaf for the
+txid was flagged `txid` (the `flags` helper, v0.3.5, `ef98e246`). The
+reference's index holds every level-0 hash of every BUMP, the last winning
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:576-585`), and
+`#tryToValidateBumpIndex` takes it and flags the leaf (`:1329-1340`, the flag at
+`:1334-1338`); `#mergeBumpEntry` gives an entry without an index the merged
+BUMP through `#tryMarkTxProvenByBump`, which does the same (`:774-786`,
+`:813-822`). go-sdk@2ca481c takes any level-0 hash where it attaches a path (`bumpProves`,
+`transaction/beef.go:67-83`; `FindBumpByHash`, `:620-630`, the earliest;
+`MergeBump`, `:780-785`), but flags no leaf and writes no index for an entry
+merged without one (`MergeRawTx`, `:820-849`; `beefBytes`, `:1679-1694`), and
+its validator proves an entry without an index only by a leaf flagged `txid`
+(`ValidateTransactions`, `:1070-1083`, `:1105-1113`, `:1137-1140`): Go's own
+merges leave the p25 BEEF refused, as v0.3.5 left it here, while the bytes
+this crate now writes (the entry indexed, the leaf `02`) read valid there
+(`:1114-1128`). BRC-74's flag `00` is "data follows, not a client txid"
+(`transactions/0074.md:75`), not "unproven". Both sites now take the LAST BUMP
+whose level 0 holds the txid as any leaf and flag that leaf with
+`MerklePath::contains_and_mark`; #757's last-wins order is kept. The reason: a
+level-0 leaf of a BUMP is a txid of that block and its path computes the same
+root, so the any-hash match claims no proof that is not there. `ef98e246`
+argued the opposite ("a tx's txid can legitimately appear as a sibling hash in
+an unrelated bump") and read Go as strict from its `tryToValidateBumpIndex`
+(`:858-868`), which only checks a path already set; its production failure
+left no shape and no test, and #763's fold could not reproduce it in seven
+arrangements on v0.3.4.
+
+The keeper's word (2026-11-04 12:2xZ): the April incident is not in LOW's
+records, so v0.3.5's shape cannot be found; what LOW holds is the same rule's
+effect on the other side, its decision ledger of 2026-09-04 (p25). Two drain
+inputs were mined as siblings in block 964422; the toolbox's walk merged A's
+proof, whose BUMP carried B's hash as a plain leaf (flag false), took its "a
+BUMP already proves this" shortcut, merged B raw with no bump index and never
+walked B's parent (`2617c486...`); this crate's linker took flagged leaves only,
+the sorter demanded the parent, and the wallet's door refused the BEEF:
+`inputBEEF: BEEF structure is invalid: roots [04da74cc..., 7e9f364d...,
+1f2e5c0a..., 1076329a..., 3538181c...]; missing inputs [2617c486...];
+transactions with missing inputs [1f2e5c0a...]; 5 tx(s), 3 bump(s), 7,377
+bytes` (the CLI 0.2.24's drain through toolbox 0.3.61; the toolbox's 0.3.64,
+`ffd1b0f`, flags the leaf in its shortcut). The strict rule's one recorded
+production effect was the refusal of a BEEF the references link.
+
+`tests/beef_sibling_leaf_765.rs` rebuilds the p25 shape with this crate's
+writers (a block of four at 964422, its root computed from the leaves; A's
+BUMP flagging A at offset 2 with B plain at 3; A raw, then B raw with no
+index, then the drain spending both; B's parent not in the BEEF): on the tip
+B takes index 0, its leaf written `02`, and `verify_structure`, the bytes read
+back, `verify_stream_structure` and `Transaction::from_beef` (B's BUMP
+attached) accept it. RED on `81c312e2` (a scratch copy, its own target dir):
+`BEEF structure is invalid (InputNamesNoElement): roots ["de8ad6fc..."];
+missing inputs ["2626...26"]; transactions with missing inputs ["455a901c..."];
+3 tx(s), 1 bump(s), 348 bytes` (A, P, B; this crate's refusal in the door's
+shape). A txid no BUMP holds is still refused so (the control, green on
+both). #763's seven arrangements of `ef98e246`'s shape (a sibling spent by a
+chain of two unproven transactions: the BUMP before the entries and after
+them, `merge_beef` both ways, two BUMPs of the block combined, the entries
+newest to oldest, the sibling mid-chain over a parent proven a block below) link
+on the tip; on `81c312e2` six are refused for the missing parent and the
+mid-chain one is accepted with the sibling unindexed. The two #763 found
+refused on v0.3.4 answer for their own reasons: a txid-only sibling is valid
+under both `allow_txid_only` values (the flag decides nothing since 0.4.2;
+v0.3.4's refusal was the flag's), two roots at one height `RootNotCarried`.
+3 of 4 RED on `81c312e2`. The #757 sibling pin is an equality pin now
+(`a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765`):
+`raw_after_a_sibling_leaf` and `raw_before_a_sibling_leaf` written to the
+reference's recorded bytes, RED on `81c312e2` (the parent's leaf
+`...bb010062b05f...` for `...bb010262b05f...`, its entry `...0101000100...` for
+`...0101010100...`). The two unit tests that pinned the strict match,
+`test_try_to_validate_bump_index_strict_no_sibling_fallback` and
+`test_update_bump_indices_ignores_siblings`, pin the any-hash rule at their
+site now (`..._takes_a_sibling_leaf_and_flags_it_765`).
+
+Semver: a behaviour change in which BUMP an entry takes and in the written
+flag byte, no signature change; readers accept both forms. Migration: a BEEF
+whose txid sits only as an unflagged sibling leaf now links and verifies where
+it was refused, and its written bytes carry the flag (`02` for `00`) and the
+entry's index; a fixture pinning the old bytes re-records. For the hosts: a
+BEEF a reference wallet builds this way now links where it was refused; the
+toolbox's 0.3.64 shortcut flag stays harmless (a flagged leaf was taken before
+and is taken now).
+
+### Notes: cross-SDK parity (the empty ASM text, ts-stack #1479)
+
+`Script::from_asm("")` and a double space inside a text read as go-sdk v1.7.1's
+`NewFromASM` reads them (the empty script; `script/script.go:46-50`), where
+`ts-stack@edf6e03`'s `Script.fromASM('')` splits `''` into `['']` and reads the
+empty token as an unknown hex token, one chunk `{ data: [], op: 0 }`, an empty
+push (`Script.ts:73-82`, the token path `:92-125`), while its `toASM` of the
+empty script is `''` (`:222-229`); a double space inserts a silent empty push the
+same way. Filed upstream by the keeper as ts-stack #1479 (2026-11-04, the ask
+additive at the default). `CLAUDE.md`'s #603 shard A row and the #723 parity
+note now cite it: the divergence is from ts-sdk alone, the port's reading held
+as go-sdk's; the owner's word (2026-11-04 13:5xZ, through the keeper) holds it
+so: the empty script, with go-sdk, ts-stack #1479 the upstream row, the item
+closed. Records only; no code or test moved.
+
+### Fixed: the JSON lookup parse refuses what the reference's normalizer refuses (#768)
+
+From the rule and strength reads of PR #767 (#762, 2026-11-04 11:46Z), the
+residues #762's parity note named. `parse_json_lookup_answer`
+(`src/overlay/facilitators.rs:314-370` at `81c312e2`) read a body that is not
+a JSON object, a missing or non-string `type` as `output-list`, a missing or
+non-array `outputs` as an empty list, and dropped any item without a byte
+`beef` (or a hex or base64 text of one) and an integer `outputIndex` by
+`filter_map`; since #760 every such answer was a host success. The reference's
+HTTPS facilitator runs `normalizeLookupAnswer` and throws when it reads
+nothing (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:865-866`: `if
+(normalizedAnswer == null) throw new Error('Malformed lookup response')`),
+and `normalizeOutputListAnswer` (`:389-406`) reads an output list only from a
+plain object (`dataRecord`, `:305-307`) whose `type` is the string
+`output-list` and whose `outputs` is an array every item of which
+`normalizeLookupOutput` admits (`:327-357`): an object whose `beef` is a byte
+array of 1 to 32 MiB (`isByteArray`, `:288-303`; `MAX_LOOKUP_BEEF_BYTES`,
+`:256`), `outputIndex` an integer from 0 to `0xffffffff`, an optional
+`context` a byte array of at most 1 MiB and an optional `txid` 64 hex digits;
+one refused item refuses the answer. `beef` and `context` are repaired first
+by `normalizeBRC100ByteFields` (`:858-863`, `BRC100ByteEncoding.ts:126-146`):
+the historical object form `{"0": 7, ..}` read as its bytes, `{}` as `[]`.
+`completeTrackedLookup` (`:2379-2406`) records the thrown error as the host's
+failure; `ts-sdk@9e3ede6`'s facilitator returned the body as parsed
+(`LookupResolver.ts:189`) and its `lookupHostWithTracking` (`:518-528`)
+recorded a failure for an answer without `type: 'output-list'` and an array
+`outputs`, so both references record `{}` a failure. The parse now refuses
+each shape as `Err(OverlayError("Malformed lookup response: <what>"))`, the
+member named after the colon as #762's text does (`the answer is not a JSON
+object`, `the answer has no string type member`, `an output-list answer
+without an outputs array`, `output N is not a JSON object`, `output N beef is
+not an array of 1 to 33554432 bytes`, `output N outputIndex is not an integer
+from 0 to 4294967295`, `output N context is not an array of at most 1048576
+bytes`, `output N txid is not 64 hex digits`), which the resolver records as a
+failure; the byte fields read through the wallet substrates' reading of the
+same normalizer (`byte_fields::byte_array`, now `pub(crate)`), an integral
+float index (`1.0`) read as `JSON.parse` reads it. A well-formed empty list
+stays a success; an unknown string `type` stays `Unknown answer type`.
+
+`tests/lookup_answer_normalizer_768.rs`, each shape on a `wiremock` host
+through the facilitator and the resolver (the host's counts read before and
+after: the tracker is global; each host a server of its own, outside
+`wiremock`'s pool, so no earlier test's failures back it off): `{}`,
+`[]`, `"x"`, `null`, `5`, `{"type":5}`, `{"type":"output-list"}`,
+`{"type":"output-list","outputs":"x"}`,
+`{"type":"output-list","outputs":[{"beef":[1]}]}`, a good item beside one
+without `beef`, a hex text `beef`, an empty `beef`, a `null` context and a
+two-digit txid each refused in the reference's text with one failure and no
+success recorded; RED on `81c312e2` (a scratch copy with the file overlaid),
+each `<body> was read: OutputList { outputs: [] }` (or the filtered list:
+`OutputList { outputs: [OutputListItem { beef: [1, 2], output_index: 0,
+context: None }] }` for the hex text and for the good item beside the bad;
+`beef: []` for the empty one); the historical object form, `{}` context, an
+index of `1.0` and a txid read (RED there too, the item dropped); and
+`{"type":"output-list","outputs":[]}` a success on both. 14 of 15 RED on the
+base. `tests/overlay_http_tests.rs`'s four pins of the old reading
+(`test_lookup_missing_type_is_refused`,
+`test_lookup_output_list_missing_outputs_field`,
+`test_lookup_output_list_with_a_malformed_item_is_refused`,
+`test_lookup_output_list_beef_as_hex_string`) now assert the refusal, and the
+unit test `test_parse_json_default_type` is
+`test_parse_json_missing_type_is_malformed`.
+
+Semver: a behaviour change in `HttpsOverlayLookupFacilitator`'s JSON answer
+parse, no signature change. Migration: a host answering a shape the
+normalizer refuses (no `type`, no `outputs`, a malformed item, a non-object
+body, a hex or base64 `beef`) now gets an error and a recorded failure where
+it got an empty or filtered success. The LOW overlay host serialises this
+crate's `LookupAnswer` (`~/bsv/bsv-overlay-cloudflare`
+`crates/overlay-cloudflare/src/routes.rs:2432,2459`, `json_ok(&answer)`), so it
+always writes `type`, an `outputs` array and byte-array `beef`.
+
+### Notes: cross-SDK parity (#768)
+
+#762's two residues are closed by this row: a JSON answer without `type` and
+an output list without `outputs` are refused as the normalizer refuses them.
+Left, stated: a `formula` answer is still read as `LookupAnswer::Formula`
+(#762's note; the normalizer refuses it, `:446-448`); the reference's 32 MiB
+response bound (`:252`) and `maxOutputs` bound (4096,
+`LookupResources.ts:24`, thrown as `LookupResourceLimitError` at `:859-860`,
+which the tracked call rethrows without recording a host failure, `:2415`,
+and the host's query keeps as a session limit, `:1764-1765`) are not ported,
+the item bounds alone checked here (the two bounds are #775's row); a valid
+`txid` member is checked and not carried (`OutputListItem` has no `txid`,
+#735). An unknown
+string `type` is refused here as `Unknown answer type` where the reference
+says `Malformed lookup response`: the verdict the same (one failure recorded),
+the words different. Go at `2ca481c` unmarshals the body into its typed answer
+(`overlay/lookup/facilitator.go:65`, `types.go:38-43`, `outputs` with
+`omitempty`), so `{}` is an answer of empty type there; its
+`OutputListItem.Beef` is a `[]byte` (`overlay/lookup/types.go:19-22`), which
+`encoding/json` reads from a base64 text and writes as base64, so a JSON
+answer Go writes is refused here and in the reference (`beef` no byte array);
+not filed.
+
+### Added: the complete run's record of 2026-11-04 (run 41753882105 at `2ff81a44`): the scores, the floors raised, the survivors per file, the survivor term for #705 (#602, #705)
+
+The complete run 41753882105 (`nightly.yml -f mode=complete` on beta, pinned
+`2ff81a44`, dispatched 2026-11-04 01:24:50Z, the corpus at ts-stack `edf6e03`,
+cargo-mutants 27.1.0, rustc 1.99.1, 23 shards at six at a time under the
+4,000,000 KB ceiling) is recorded in `docs/census/mutants-2026-11-04.md` and
+`.json`. Its mutation part ran 13h35m (the last shard ended 14:59:33Z, the
+score job 14:59:46Z; the fuzz jobs after it are not the record's), 4,438
+job-minutes over 4,902 mutants. The 12:00Z checkpoint ran under the keeper's
+bound rule of 2026-11-04 in place of the twelve-hour cancel (the end projected
+by the mean before 15:00Z, the bound the longest measured end plus thirty
+minutes, no cancel), and the record's producing run says so (`write
+--checkpoint`). Every one of the 85 measured files passes: 80
+PASS, 0 FAIL and 5 NO MUTANTS under the floors at `2ff81a44`; 80 PASS, 4 NO
+MUTANTS and 1 NO VIABLE MUTANTS under the raised floors; 72 PASS and 8 FAIL at
+80 everywhere (the eight floored files below 80). 332 survivors, 152 on the gate
+paths, where the 2026-11-01 widened run left 1,583 and 548.
+
+The floors: `mutants_record.py floors --write` raised 27 of `docs/ratchets.json`'s
+29 `mutation_floors` entries to the run's scores rounded down (the substrates'
+`http_json.rs` 50 to 92, `http_wire.rs` 15 to 93, `result_values/raw_tree.rs` 19
+to 57; the wire's `bounds.rs` 68 to 97, `mod.rs` 60 to 97, `transceiver.rs` 40
+to 100, among them) and held `wire/diagnostics.rs` at 0 and `wire/processor.rs`
+at 60, their figures; no entry added. None of the 29 files' source moved
+between `2ff81a44` and `4ed58d05`, and the tip's selections hold every target
+the run's did, so the raised floors stand at the tip (`tools/ratchet/run
+--check --against 4ed58d05`: pass).
+
+The survivor term for #705, measured by each mutant's build and test phases:
+the 332 survivors took 779 minutes and the 4,136 kills 3,496, 17.8 percent of
+the 4,369 minutes for the survivors (2.35 minutes a survivor, 0.85 a kill):
+script 252 of 1,513 minutes (16.7 percent), BEEF 20 (4.8), Merkle 1.4 (4.1),
+wire 60 (9.7), substrates 445 of 1,787 (24.9). The kills carry the run, where
+#705's row read the survivors as its cost. The measured rates a mutant (script
+0.71, BEEF 0.56, Merkle 0.37, wire 0.79, substrates 1.57 minutes) set the
+complete run at 1.21 times the slope's 3,669 shard-minutes and 0.78 of the
+two-part 5,717 (`docs/NIGHTLY.md`, "The measured complete run").
+
+`mutants_record.py` writes a one-run record (`write --widened <run> --previous
+<record>.json`, mutually exclusive with `--narrow`): the per-file delta against
+the previous record's widened figure, the survivors of every file, the shard
+table (each job's start, end and minutes from the run's jobs listing, which
+`fetch` now saves with the `mutation-record` and `mutation-plan` artifacts) and
+the survivor term; `measure` reads the plan's shards and leaves out the
+test-only files the plan does not list. The two-run form is unchanged
+(`test_the_survivor_term_sums_each_shards_outcomes_measured_and_by_its_rate`).
+No crate code moves.
 
 ## [0.9.0-beta.6] - 2026-11-01
 
