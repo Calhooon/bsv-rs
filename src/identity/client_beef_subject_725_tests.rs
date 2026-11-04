@@ -24,9 +24,11 @@ async fn the_parsers_read_each_725_beef_from_its_subject_save_the_stated_residue
         "../../tests/vectors/identity_beef_subject_725.json"
     ))
     .unwrap();
+    let shapes = v["shapes"].as_array().unwrap();
+    assert_eq!(shapes.len(), 5, "the vector's five BEEFs of three shapes");
     let client = IdentityClient::new(ProtoWallet::new(None), Default::default());
     let mut differ = Vec::new();
-    for case in v["shapes"].as_array().unwrap() {
+    for case in shapes {
         let name = case["name"].as_str().unwrap();
         let output = OutputListItem {
             beef: crate::primitives::from_hex(case["beef"].as_str().unwrap()).unwrap(),
