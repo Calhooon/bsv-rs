@@ -14,6 +14,8 @@ use super::sdk::transaction::{
     Beef, BeefTx, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
 };
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 /// The vector.
 pub fn vector() -> Value {
@@ -89,6 +91,7 @@ pub fn grandparent() -> Transaction {
 }
 
 /// A shape's BEEF and subject.
+#[derive(Clone)]
 pub struct Built {
     /// The bytes.
     pub beef: Vec<u8>,
@@ -96,8 +99,27 @@ pub struct Built {
     pub subject: String,
 }
 
-/// `name`'s BEEF at the vector's `size`.
+/// The shapes built so far, by name and size.
+type Cache = Mutex<HashMap<(String, Option<usize>), Built>>;
+
+/// `name`'s BEEF at the vector's `size`, built once per test binary (#741:
+/// the 2049-input BEEF was built by the inputs test and each of the five
+/// doors, about 15 s in debug); the lock held through the build, so a shape
+/// asked by two tests at once is built once.
 pub fn build(name: &str, size: Option<usize>) -> Built {
+    static BUILT: OnceLock<Cache> = OnceLock::new();
+    let mut built = BUILT
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    built
+        .entry((name.to_string(), size))
+        .or_insert_with(|| build_once(name, size))
+        .clone()
+}
+
+/// `name`'s BEEF at `size`, built.
+fn build_once(name: &str, size: Option<usize>) -> Built {
     let v = vector();
     let subject_inputs = v["subject_inputs"].as_u64().unwrap() as usize;
     let subject_padding = v["subject_padding"].as_u64().unwrap() as usize;

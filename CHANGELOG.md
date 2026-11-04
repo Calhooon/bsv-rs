@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the evidence check's inputs bound pinned over two unproven branches, witnessed under Node 22; the 2049-input BEEF built once per test binary (#741)
+
+No behaviour change. From #740's strength read: #736's single-chain pin of
+the inputs bound (2048 at the subject, 2049 at its parent) passes a walk that
+sums each path alone, so a recursive refactor of `assert_unconfirmed_graph`
+carrying the sums per branch would land green.
+`tests/vectors/identity_evidence_741.json` is written by
+`tests/support/identity_evidence_741.mjs` (#736's helpers copied, #736's
+vector untouched) with the reference's own writers at `ts-stack@edf6e03`
+under Node v22.18.0; two runs are byte-identical.
+
+- **Two unproven branches**: a subject of 2 inputs spends two unproven
+  parents, P1 of 2047 inputs and P2 of 2048, each spending its own outputs of
+  one proven grandparent with no inputs: 4097 over the graph, `limit` at
+  `TransactionEvidence.ts:170-171` on both sides (the stack pops P2 first, so
+  the refusal is at P1); 2047 and 2047, 4096, read. Along either path alone
+  the sum is at most 2050. `tests/identity_evidence_741.rs` rebuilds both
+  BEEFs with this crate's writer to the recorded SHA-256 and serves them
+  through `resolve_by_attributes` and `discover_certificates`; the unit module
+  `src/identity/evidence_741_tests.rs` judges them with `parse_evidence` to
+  the recorded code and line. In a scratch copy, the sums carried per path
+  turn both RED while every #736 and #730 pin stays green.
+- **Built once per binary**: `tests/support/identity_evidence_736.rs`'s
+  `build` keeps each shape in a `OnceLock`, so the door file builds the
+  2049-input BEEF once where it built it six times. No pin changes. The
+  saving is small (the file's single-threaded run 24.46 s to 23.78 s in
+  debug): the time is the parse and linking of the large BEEF at each door,
+  not its build (`docs/lanes/fix-741.md`).
+
 ### Fixed: `discover_certificates_by_type` keeps only the asked type's certificates (#744)
 
 From the strength read of PR #742 (#739, 2026-11-04 04:5xZ): the by-type door

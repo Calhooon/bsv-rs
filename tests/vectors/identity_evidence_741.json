@@ -1,0 +1,57 @@
+{
+  "description": "#741: the reference's parseEvidence on ls_identity lookup BEEFs (the inputs limit as a running sum over two unproven branches of one proven grandparent, at and over its bound, each path alone within it): the code, the line, the selected txid, and parseResults' outcome",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/TransactionEvidence.ts:61-77,93-201; packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:600-634,671-707",
+  "node": "v22.18.0",
+  "recorder": "tests/support/identity_evidence_741.mjs",
+  "token_from": "tests/vectors/identity_certificate_record_553.json cases[0].locking_script",
+  "limits": {
+    "inputs": 4096,
+    "script_bytes": 262144
+  },
+  "subject_inputs": 2,
+  "p1_inputs": 2047,
+  "txids": {
+    "two_branches_over_bound": {
+      "g": "a6dfc58e11ebac9ec27b3075fa71a084532642f4c85d03d8358dea968b501605",
+      "p1": "1f9e7d7045df6f3c9c8b210d4dc8fc40407d8a558dcd021683845301d7f368b5",
+      "p2": "daa2d1e7890a90514a6f324e1ffb6ced127616583ac045f0ab0a2182f667e9ea"
+    },
+    "two_branches_at_bound": {
+      "g": "a17dd7130a819823aa0b702d638ff8b00162c01ab0abf50f457aabad662731e0",
+      "p1": "9cbcf37899009caa2d9f2814d9e90a6290b611f3d768b9148adcf692f8828a77",
+      "p2": "4697b50fd78360b99ec01646e69711bf8f7a7a13e0f174de6f0f7fdc7787b905"
+    }
+  },
+  "shapes": [
+    {
+      "name": "two_branches_over_bound",
+      "check": "limits.inputs over two unproven branches, 2 at the subject, 2047 at P1, 2048 at P2: 4097, :170-171",
+      "writer": "Beef.toBinary, merged the unproven subject, P1, P2, the proven grandparent",
+      "size": 2048,
+      "output_index": 0,
+      "subject_txid": "8b93f7a20d7a55ce6e012f2d263c2509034aba1b6aefd0c8fdf7d1db2e6160a8",
+      "beef_bytes": 210009,
+      "beef_sha256": "2a35dbf7a74c4db3c0309ad0ad05d79ce2fe25e014fdfb31603f6262c7f09ddf",
+      "selected_txid": "refused: Transaction evidence: limit",
+      "code": "limit",
+      "site": "TransactionEvidence.ts:170-171",
+      "refused_at": "TransactionEvidence.ts:170-171: 1f9e7d7045df6f3c9c8b210d4dc8fc40407d8a558dcd021683845301d7f368b5: 4097 inputs, 5052 script bytes",
+      "outcome": "refused: Transaction evidence: limit"
+    },
+    {
+      "name": "two_branches_at_bound",
+      "check": "limits.inputs over two unproven branches, 2 at the subject, 2047 at P1, 2047 at P2: 4096, read",
+      "writer": "Beef.toBinary, merged the unproven subject, P1, P2, the proven grandparent",
+      "size": 2047,
+      "output_index": 0,
+      "subject_txid": "15a3efd6c4f042972e327ab2e276bfcbb582fbc99b3fb959da2b8b62ef854074",
+      "beef_bytes": 209958,
+      "beef_sha256": "8bd44d31a2f90733f0ffafb86113c6d41774a90b9d0c3427d34b34d1651fd25f",
+      "selected_txid": "15a3efd6c4f042972e327ab2e276bfcbb582fbc99b3fb959da2b8b62ef854074",
+      "code": null,
+      "site": null,
+      "refused_at": null,
+      "outcome": "read"
+    }
+  ]
+}
