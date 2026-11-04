@@ -167,13 +167,14 @@ fn a_parent_written_twice_is_read_by_its_later_entry_736() {
             beef,
             output_index: 0,
             context: None,
+            txid: None,
         };
         let expected = match case["outcome"].as_str().unwrap() {
             "read" => Some(case["subject_txid"].as_str().unwrap().to_string()),
             _ => None,
         };
         assert_eq!(
-            admit(&output).map(|t| t.map(|t| t.id())),
+            admit(&output, &Default::default()).map(|t| t.map(|t| t.id())),
             Ok(expected),
             "{name}"
         );

@@ -142,6 +142,7 @@ impl OverlayLookupFacilitator for Lookup {
                 beef: self.beef.clone(),
                 output_index: 0,
                 context: None,
+                txid: None,
             }],
         })
     }

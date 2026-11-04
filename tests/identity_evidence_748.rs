@@ -64,6 +64,7 @@ fn client(beef: Vec<u8>) -> IdentityClient<ProtoWallet> {
         beef,
         output_index: 0,
         context: None,
+        txid: None,
     };
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Answering(output))),

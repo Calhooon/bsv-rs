@@ -131,6 +131,7 @@ fn test_lookup_answer_output_list() {
         beef: vec![1, 2, 3, 4],
         output_index: 0,
         context: Some(vec![0xAB]),
+        txid: None,
     }];
 
     let answer = LookupAnswer::OutputList {

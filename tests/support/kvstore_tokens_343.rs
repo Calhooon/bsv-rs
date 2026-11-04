@@ -107,6 +107,7 @@ pub async fn setup(global: bool, count: usize) -> Harness {
             beef: tx.to_beef(true).unwrap(),
             output_index: *index,
             context: None,
+            txid: None,
         });
     }
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
@@ -313,6 +314,7 @@ pub async fn unrelated_tokens() -> Vec<OutputListItem> {
             beef: source(&lock, 0, 1).to_beef(true).unwrap(),
             output_index: 0,
             context: None,
+            txid: None,
         });
     }
     tokens

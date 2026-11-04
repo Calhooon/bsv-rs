@@ -76,6 +76,7 @@ async fn compare(global: bool, remove: bool) {
             beef: tx.to_beef(true).unwrap(),
             output_index: 0,
             context: None,
+            txid: None,
         })
         .collect();
     if remove {

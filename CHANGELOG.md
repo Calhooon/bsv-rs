@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the lookup output's `txid` hint carried by `OutputListItem` and compared by the identity evidence check; a disagreeing hint read and counted as the host's fault (#735, the owner's word)
+
+The reference's HTTPS facilitator keeps a JSON answer's `txid` member as
+given (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:356`, after
+`normalizeLookupOutput` refuses one that is not 64 hex digits, `:347-350`)
+and sets every output of a binary aggregated answer's `txid` from its
+outpoint (`:905-936`); the toolbox hands the whole output to the evidence
+check (`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:602`),
+whose `loadEvidenceTransaction` refuses a hint that, lower-cased, is not the
+picked subject's txid as `invalid-evidence`, and the output is skipped
+(`packages/sdk/src/transaction/TransactionEvidence.ts:123-124`). This crate's
+`OutputListItem` carried no `txid`, so #730's check had nothing to compare
+(#733's stated row).
+
+`OutputListItem` gains `pub txid: Option<String>` (wire name `txid`,
+`#[serde(default, skip_serializing_if = "Option::is_none")]`). The JSON
+reader keeps a present one as given, its case included; a non-string or
+non-64-hex `txid` was already refused with the whole answer since #768 (`output
+N txid is not 64 hex digits`), as `normalizeLookupOutput` refuses it, so no
+reading changes there. The binary reader sets each output's `txid` to its
+outpoint's, as `toHex(r.read(32))` reads it. The identity evidence check
+(`src/identity/evidence.rs`, `admit`) compares the hint with the subject as
+`:123-124` does, lower-cased; by the owner's word of 2026-11-04 13:5xZ
+("carry the field and keep the divergence") a disagreement does not refuse
+the evidence: the proven subject is read and the contradiction counted as the
+host's fault, read by the new `IdentityClient::txid_hint_contradictions() ->
+u64` (an output the check refuses for another reason not counted). No hint:
+as before.
+
+Pinned by `tests/identity_evidence_hint_735.rs` against
+`tests/vectors/identity_evidence_hint_735.json` (Node v22.18.0, the
+reference's facilitator on a stub fetch, `parseEvidence`, `parseResults`;
+`tests/support/identity_evidence_hint_735.mjs`): the JSON reader keeps the
+hint as given, a binary answer carries the outpoint's txid, no hint and the
+subject's txid in either case are read on both sides with nothing counted,
+the grandparent's txid and `33`x32 are skipped by the reference and read here
+with the count 2 (one per parse). Compile-RED on `b836096e` (E0599, E0609);
+on a scratch of the tip with both readers' hint dropped and the count
+removed, 3 of 4 RED, the agreeing control green.
+
+Semver: a PUBLIC SHAPE change on the beta line (0.9), the beta.8 break
+beside #737's list return, by the keeper's word of 2026-11-04 15:5xZ.
+Migration: a struct literal of `OutputListItem` adds `txid: None` (the
+behaviour of every output before #735). bsv-wallet-toolbox-rs builds it by
+literal at eight sites in four files (`src/wallet/discovery_evidence_tests.rs`,
+`lookup_evidence_tests.rs`, `lookup_decode_tests.rs`, `lookup_fixture.rs`,
+counted with `grep -c` on its checkout at `545aa38b`); bsv-wallet-cli at none. A caller
+reading identities may log or act on `txid_hint_contradictions()`; nothing
+else moves. In this crate the 34 literals of the tests and the unit modules
+add `txid: None`; `IdentityClient::new` now builds its resolver and calls
+`with_resolver` (one constructor body, no behaviour change).
+
+### Notes: cross-SDK parity (#735)
+
+Ours: a disagreeing hint is read and counted (`txid_hint_contradictions`),
+where `ts-stack@edf6e03` `TransactionEvidence.ts:123-124` refuses the
+evidence and `parseResults` skips the output; the owner's word of 2026-11-04
+13:5xZ keeps the divergence, the hint being the host's untrusted claim and the
+BEEF's proven subject the evidence. Theirs: ts-stack #1482, the keeper's
+filing of the hint's reading (the witness:
+tests/identity_evidence_hint_735.rs;
+tests/vectors/identity_evidence_hint_735.json). Residues, older than #735 and
+unported: the reference's resolver also reads the hint, skipping a SLAP
+advertisement whose hint disagrees (`LookupResolver.ts:2201`) and dropping a
+disagreeing output from its aggregation (`resolveTxIdForOutput`,
+`:1700,1747,2223-2240`); and its binary reader hands each output the
+`toBinaryAtomic` BEEF of its txid (`:921-929`), where this crate's hands
+every output the whole BEEF, so on a binary answer of several transactions
+the subject is the BEEF's last and the outpoint's hint is counted as a
+contradiction for the others. go-sdk at `2ca481c` has no evidence check.
+
 ### Fixed: every SLAP tracker backed off refuses in the reference's words, and a cached host list with no host available is not reused (#769)
 
 From the strength read of PR #767 (#762, 2026-11-04 11:48Z). With every SLAP

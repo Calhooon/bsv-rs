@@ -145,6 +145,7 @@ fn output(byte: &str, lock: LockingScript) -> OutputListItem {
         beef: beef.to_binary(),
         output_index: 0,
         context: None,
+        txid: None,
     }
 }
 
