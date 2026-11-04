@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `IdentityClient::query` keeps only the certificates its question asked for (#746)
+
+From the strength read of PR #745 (#744, 2026-11-04 05:5xZ): `query` sent the
+question's `identityKey`, `certificateType` and `certifiers` to `ls_identity`
+and kept every certificate the parser admitted, so an overlay host could
+answer with another subject's, type's or certifier's certificate, as the two
+`discover_*` doors could before #739 and #744. After the walk (every output
+parsed in order, a `limit` anywhere failing the call, unchanged) `query` now
+keeps a certificate only when it matches every field the question carries:
+`identity_key` through `is_asked_subject` (both sides lower-cased, the rule of
+the by-key doors, #737, #739); `certificate_type` as the canonical base64
+text, `type_base64()` compared exactly with the asked text (#744);
+`certifier` (an `Option<String>`, one key, sent as a one-entry `certifiers`
+list) as the certificate's certifier key in lower-case hex against the asked
+text lower-cased. A field the question does not carry filters nothing: with
+`certifier` unset the lookup still asks the default SocialCert certifier, and
+a certificate of another certifier is kept; `attributes` is sent and not
+checked on the answer.
+
+Hardening, not parity: the reference has no such door (`IdentityClient.ts`'s
+lookups at `ts-stack@edf6e03` are `resolveByIdentityKey` and
+`resolveByAttributes`), so this crate's own rule answers the question its own
+door asks.
+
+Semver: a behaviour change at one public door without a signature change:
+`query` drops a certificate its question did not ask for where it returned
+it. Migration: none.
+
+`tests/identity_query_filters_746.rs`: #737's harness and tokens on an
+injected `.invalid` resolver, one RED per filter on `8a2cc173` (a scratch copy,
+its own target dir, the test file copied in): #737's `other_subject_then_asked`
+answered to `by_identity_key` (`left` both subjects, `right` the asked one);
+#744's re-typed record answered to the asked type; the reference record
+re-certified and re-signed by the scalar 8, revealed by the subject 9 (this
+crate's writer), answered to the certifier 7; the three together on four
+certificates. A question with no filter keeps all four in the answer's order,
+GREEN on both. `tests/identity_resolve_737.rs`'s `admitted` helper read the
+parser's admissions through `query(IdentityQuery::by_identity_key(key))`,
+which kept every subject; it now reads through `query(IdentityQuery::default())`,
+a question that carries no filter (its six tests green on `8a2cc173` and on the
+tip).
+
+### Tests: the revocation's lock position pinned at its decode site, past the token check (#746)
+
+The revocation (`revoke.rs`, the reference's `IdentityClient.ts:773` site,
+lock-before) called `PushDrop::decode_before` inline, its position masked by
+the same token check that masked the parsers' until #744
+(`is_canonical_signed_pushdrop` refuses every lock-after layout). It now
+decodes through one crate-private function, `decode_revocation_token`
+(unchanged behaviour), and the unit module
+`src/identity/revoke_decode_746_tests.rs` pins it on #553's `reference`
+token relocked after its fields: `PushDrop::decode` reads it with the same
+key and fields, the token check refuses it, `decode_revocation_token` refuses
+it. RED with the function reading through `PushDrop::decode` (`the
+revocation's decode site reads lock-before alone`).
+
 ### Tests: the evidence check's inputs bound pinned over two unproven branches, witnessed under Node 22; the 2049-input BEEF built once per test binary (#741)
 
 No behaviour change. From #740's strength read: #736's single-chain pin of

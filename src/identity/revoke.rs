@@ -187,7 +187,7 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
     ) -> Option<Revelation> {
         let tx = Transaction::from_beef(&output.beef, None).ok()?;
         let source = tx.outputs.get(output.output_index as usize)?;
-        let token = PushDrop::decode_before(&source.locking_script).ok()?;
+        let token = decode_revocation_token(&source.locking_script)?;
         if token.fields.len() != 2
             || !super::token_envelope::is_canonical_signed_pushdrop(
                 &source.locking_script,
@@ -425,6 +425,15 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
     }
 }
 
+/// The revocation's decode site: lock-before alone, as the reference's
+/// `PushDrop.decode` at its default position reads the revelation token
+/// (`ts-stack@edf6e03` `IdentityClient.ts:773`, #537). The token check after
+/// it (`is_canonical_signed_pushdrop`, #544) also refuses every lock-after
+/// layout, so the position is pinned here, at the call (#746).
+fn decode_revocation_token(script: &crate::script::LockingScript) -> Option<PushDrop> {
+    PushDrop::decode_before(script).ok()
+}
+
 /// The reference builds a `Certificate` of the token's seven members and
 /// asks `verify` (`:789-802`); here the certificate is read from those
 /// members' JSON, a member it cannot hold a `false`, as the reference's
@@ -524,3 +533,7 @@ fn check_signed(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "revoke_decode_746_tests.rs"]
+mod decode_746_tests;
