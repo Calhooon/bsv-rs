@@ -144,7 +144,7 @@ impl LookupResolver {
 
 ### Key Behaviors
 
-- **`find_competent_hosts(service)`**: Public low-level SLAP discovery method. Queries all SLAP trackers in parallel to find hosts advertising a service. Does **not** use the hosts cache or request coalescing (those are in the internal `get_competent_hosts` called by `query`). Each tracker is accounted as a host (#762): a formula answer or an error a failure, a freeform answer nothing, a tracker in backoff skipped
+- **`find_competent_hosts(service)`**: Public low-level SLAP discovery method. Queries all SLAP trackers in parallel to find hosts advertising a service. Does **not** use the hosts cache or request coalescing (those are in the internal `get_competent_hosts` called by `query`). Each tracker is accounted as a host (#762): a formula answer or an error a failure, a freeform answer nothing, a tracker in backoff skipped; its tests are `tests/lookup_discovery_779.rs` on a scripted facilitator (#779; the four unit tests that asked the live trackers removed)
 - **TX Memoization**: Caches parsed transaction IDs from BEEF, deduplicating outputs using `txId.outputIndex` as the unique key (matches TS SDK behavior). Cache key is comma-separated byte values
 - **Request Coalescing**: Concurrent requests for the same service share a single SLAP tracker query via `tokio::sync::watch` channels
 - **Validation**: Host override service names must start with `ls_` or the constructor will panic
