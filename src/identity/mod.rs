@@ -79,6 +79,7 @@
 
 pub mod client;
 pub mod contacts;
+mod evidence;
 mod reveal;
 mod revoke;
 mod token_envelope;

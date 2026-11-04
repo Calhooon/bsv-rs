@@ -9,19 +9,17 @@
 //! txid-only subjects never reach a parser there; here the parsers' own
 //! rule is pinned: an output index past the subject's outputs skipped, a
 //! txid-only entry last or named by the atomic header skipped (until #721
-//! `beef.txs.first()` read the token's transaction beside it), and the
-//! parent whose BUMP names another txid read where the reference's
-//! `assertUnconfirmedGraph` refuses it (`TransactionEvidence.ts:143`),
-//! #553's stated evidence-layer residue (`tests/identity_beef_subject_728.rs`).
+//! `beef.txs.first()` read the token's transaction beside it), and since
+//! #730 the parent whose BUMP names another txid skipped where the
+//! reference's `assertUnconfirmedGraph` refuses it (`TransactionEvidence.ts:143`),
+//! the parsers running that walk (`src/identity/evidence.rs`); every shape
+//! the reference's outcome (`tests/identity_beef_subject_728.rs`). RED on
+//! `11bb04ce` on the other-txid BUMP (read there).
 
 use super::*;
 
-/// The shapes the reference skips and this crate's parsers read (#553's
-/// evidence-layer residue: no unconfirmed-graph check here).
-const READ_HERE: [&str; 1] = ["bump_names_another_txid"];
-
 #[tokio::test]
-async fn the_parsers_skip_each_728_beef_as_the_reference_save_the_stated_residue_728() {
+async fn the_parsers_skip_each_728_beef_as_the_reference_728() {
     let v: serde_json::Value = serde_json::from_str(include_str!(
         "../../tests/vectors/identity_beef_subject_728.json"
     ))
@@ -38,7 +36,7 @@ async fn the_parsers_skip_each_728_beef_as_the_reference_save_the_stated_residue
             context: None,
         };
         let reference = case["outcome"] == "read";
-        let expected = reference != READ_HERE.contains(&name);
+        let expected = reference;
         let certificate = client.parse_output_to_certificate(&output).await.unwrap();
         let verifiable = client
             .parse_output_to_verifiable_certificate(&output)

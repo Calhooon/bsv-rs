@@ -8,18 +8,16 @@
 //! atomic header naming an absent txid never reaches a parser there; here
 //! the parsers' own rule is pinned: that shape skipped (until #721
 //! `beef.txs.first()` read the token's transaction), the chain read from its
-//! subject, and the txid-only parent read where the reference's
-//! `assertUnconfirmedGraph` refuses it (`TransactionEvidence.ts:143`), #553's
-//! stated evidence-layer residue (`tests/identity_beef_subject_725.rs`).
+//! subject, and since #730 the txid-only parent skipped where the
+//! reference's `assertUnconfirmedGraph` refuses it (`TransactionEvidence.ts:143`),
+//! the parsers running that walk (`src/identity/evidence.rs`); every shape
+//! the reference's outcome (`tests/identity_beef_subject_725.rs`). RED on
+//! `11bb04ce` on the two txid-only parent BEEFs (read there).
 
 use super::*;
 
-/// The shapes the reference skips and this crate's parsers read (#553's
-/// evidence-layer residue: no unconfirmed-graph check here).
-const READ_HERE: [&str; 2] = ["txid_only_parent", "txid_only_parent_atomic"];
-
 #[tokio::test]
-async fn the_parsers_read_each_725_beef_from_its_subject_save_the_stated_residue_725() {
+async fn the_parsers_read_or_skip_each_725_beef_as_the_reference_725() {
     let v: serde_json::Value = serde_json::from_str(include_str!(
         "../../tests/vectors/identity_beef_subject_725.json"
     ))
@@ -36,7 +34,7 @@ async fn the_parsers_read_each_725_beef_from_its_subject_save_the_stated_residue
             context: None,
         };
         let reference = case["outcome"] == "read";
-        let expected = reference != READ_HERE.contains(&name);
+        let expected = reference;
         let certificate = client.parse_output_to_certificate(&output).await.unwrap();
         let verifiable = client
             .parse_output_to_verifiable_certificate(&output)

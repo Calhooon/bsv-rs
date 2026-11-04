@@ -12,7 +12,8 @@
 //! `parseEvidence`'s selected txid or refusal
 //! (`packages/sdk/src/transaction/TransactionEvidence.ts:110-128`, `:143`),
 //! the check that refused, and `parseResults`' outcome. Every shape is
-//! skipped on both sides, each by its own check. Hermetic: an in-process
+//! skipped on both sides, each by its own check (the fourth since #730,
+//! whose evidence check is the reference's walk). Hermetic: an in-process
 //! facilitator on an `.invalid` host.
 #![cfg(feature = "identity")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -201,13 +202,19 @@ async fn read(beef: Vec<u8>, output_index: u32, subject: &str) -> (usize, usize)
 }
 
 /// The recorded shape's bytes equal `built`; its output index, its
-/// recorded outcome and refusing line.
+/// recorded outcome and refusing line; its selected txid, the one field the
+/// reference's `parseEvidence` itself produces, `refused: Transaction
+/// evidence: invalid-evidence` on every shape here.
 fn recorded(v: &Value, name: &str, built: &[u8]) -> (u32, String, String) {
     let case = shape(v, name);
     assert_eq!(
         to_hex(built),
         case["beef"].as_str().unwrap(),
         "{name}: this crate's writer and the reference's recorded bytes"
+    );
+    assert_eq!(
+        case["selected_txid"], "refused: Transaction evidence: invalid-evidence",
+        "{name}: parseEvidence's answer"
     );
     (
         case["output_index"].as_u64().unwrap() as u32,
@@ -240,9 +247,12 @@ async fn an_output_index_past_the_subjects_outputs_is_skipped_by_both_parsers_72
     let (index, outcome, refused_at) = recorded(&v, "output_index_past_outputs", &beef);
     assert_eq!(index, 1);
     assert_eq!(outcome, "skipped");
-    assert!(
-        refused_at.starts_with("TransactionEvidence.ts:126") && refused_at.contains(&t.tip.id()),
-        "{refused_at}"
+    assert_eq!(
+        refused_at,
+        format!(
+            "TransactionEvidence.ts:126: {} has 1 outputs, outputIndex 1",
+            t.tip.id()
+        )
     );
     let tx = Transaction::from_beef(&beef, None).unwrap();
     assert_eq!((tx.id(), tx.outputs.len()), (t.tip.id(), 1));
@@ -271,10 +281,12 @@ async fn a_txid_only_entry_written_last_is_skipped_by_both_parsers_728() {
     let beef = txid_only_last(&t).to_binary();
     let (index, outcome, refused_at) = recorded(&v, "txid_only_last", &beef);
     assert_eq!((index, outcome.as_str()), (0, "skipped"));
-    assert!(
-        refused_at.starts_with("TransactionEvidence.ts:120-121")
-            && refused_at.contains(&t.parent.id()),
-        "{refused_at}"
+    assert_eq!(
+        refused_at,
+        format!(
+            "TransactionEvidence.ts:120-121: findAtomicTransaction({}) is undefined",
+            t.parent.id()
+        )
     );
     let parsed = Beef::from_binary(&beef).unwrap();
     let order: Vec<String> = parsed.txs.iter().map(|tx| tx.txid()).collect();
@@ -307,10 +319,13 @@ async fn an_atomic_header_naming_a_txid_only_entry_is_skipped_by_both_parsers_72
     ] {
         let (index, outcome, refused_at) = recorded(&v, name, &beef);
         assert_eq!((index, outcome.as_str()), (0, "skipped"), "{name}");
-        assert!(
-            refused_at.starts_with("TransactionEvidence.ts:120-121")
-                && refused_at.contains(&t.parent.id()),
-            "{name}: {refused_at}"
+        assert_eq!(
+            refused_at,
+            format!(
+                "TransactionEvidence.ts:120-121: findAtomicTransaction({}) is undefined",
+                t.parent.id()
+            ),
+            "{name}"
         );
         let parsed = Beef::from_binary(&beef).unwrap();
         assert_eq!(parsed.atomic_txid.as_deref(), Some(t.parent.id().as_str()));
@@ -326,19 +341,17 @@ async fn an_atomic_header_naming_a_txid_only_entry_is_skipped_by_both_parsers_72
 /// (`fromBinaryStrict` checks no BUMP index), finds no BUMP carrying the
 /// parent's txid (`findBump`, `Beef.ts:570-574`), so the parent is
 /// unproven and its input has no source transaction
-/// (`TransactionEvidence.ts:143`): skipped. This crate's `Beef::from_binary`
-/// reads the bytes too: the `TxidNotInBump` refusal is `verify_structure`'s,
-/// which no identity parser calls; `Transaction::from_beef` picks the
-/// subject and links the parent unproven (`add_input_proof` finds a BUMP by
-/// txid, as `#addInputProof` does), and both parsers read the subject's
-/// token. The same class as #725's txid-only parent: #553's stated
-/// evidence-layer residue (`CLAUDE.md`'s #553 row: "no evidence layer ...
-/// `assertUnconfirmedGraph` skips a lookup output whose unconfirmed graph
-/// has an input without its source transaction"). This pin asserts this
-/// crate's reading, the stated residue; RED on `0d8546c0`, whose
-/// `beef.txs.first()`, the parent (`OP_TRUE`), skipped it by accident.
+/// (`TransactionEvidence.ts:143`): skipped. Since #730 both parsers run that
+/// walk (`src/identity/evidence.rs`) and skip it at the same node; the
+/// check is the walk and not `Beef::verify_structure`, whose `TxidNotInBump`
+/// (the streaming reader's `check_bump_index` raises it too) neither side
+/// asks here (`tests/identity_evidence_730.rs` reads this BEEF with the
+/// grandparent proven). RED on `11bb04ce`, which read the subject's token
+/// (`(1, 1)`), the stated residue #730 closes; RED on `0d8546c0` too, whose
+/// `beef.txs.first()`, the parent (`OP_TRUE`), skipped it by accident, so
+/// the pin read the residue then.
 #[tokio::test]
-async fn a_parent_whose_bump_names_another_txid_is_read_here_and_skipped_there_553_728() {
+async fn a_parent_whose_bump_names_another_txid_is_skipped_as_the_reference_skips_it_728() {
     let v = vector();
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
@@ -346,9 +359,13 @@ async fn a_parent_whose_bump_names_another_txid_is_read_here_and_skipped_there_5
     let beef = another_bump(&t, another);
     let (index, outcome, refused_at) = recorded(&v, "bump_names_another_txid", &beef);
     assert_eq!((index, outcome.as_str()), (0, "skipped"));
-    assert!(
-        refused_at.starts_with("TransactionEvidence.ts:143") && refused_at.contains(&t.parent.id()),
-        "{refused_at}"
+    assert_eq!(
+        refused_at,
+        format!(
+            "TransactionEvidence.ts:143: {} input {}.0 has no source transaction",
+            t.parent.id(),
+            "11".repeat(32)
+        )
     );
     let mut parsed = Beef::from_binary(&beef).unwrap();
     assert_eq!(parsed.verify_structure(), Err(Kind::TxidNotInBump));
@@ -356,5 +373,5 @@ async fn a_parent_whose_bump_names_another_txid_is_read_here_and_skipped_there_5
     assert_eq!(selected.id(), t.subject.id());
     let parent = selected.inputs[0].source_transaction.as_ref().unwrap();
     assert!(parent.merkle_path.is_none(), "the parent unproven");
-    assert_eq!(read(beef, index, &subject).await, (1, 1), "this crate");
+    assert_eq!(read(beef, index, &subject).await, (0, 0), "this crate");
 }

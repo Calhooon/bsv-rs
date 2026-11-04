@@ -55,13 +55,23 @@ fn publish_by(json: &serde_json::Value, subject: &PrivateKey) -> OutputListItem 
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, locking)).unwrap();
-    let mut beef = Beef::new();
-    beef.merge_transaction(tx);
     OutputListItem {
-        beef: beef.to_binary(),
+        beef: proven(&tx),
         output_index: 0,
         context: None,
     }
+}
+
+/// A BEEF of `tx` proven by a block of its own (a lone leaf at offset 0),
+/// the evidence the reference's check admits without its made-up parent
+/// (#730, `TransactionEvidence.ts:173`).
+fn proven(tx: &Transaction) -> Vec<u8> {
+    let leaf = crate::transaction::MerklePathLeaf::new_txid(0, tx.id());
+    let path = crate::transaction::MerklePath::new(900, vec![vec![leaf]]).unwrap();
+    let mut beef = Beef::new();
+    let index = beef.merge_bump(path);
+    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.to_binary()
 }
 
 /// The subject's signed revelation of `json` (#544), as the reference's
@@ -213,10 +223,8 @@ fn published_with_txid_alone() -> (Certificate, OutputListItem) {
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, locking)).unwrap();
-    let mut beef = Beef::new();
-    beef.merge_transaction(tx);
     let output = OutputListItem {
-        beef: beef.to_binary(),
+        beef: proven(&tx),
         output_index: 0,
         context: None,
     };

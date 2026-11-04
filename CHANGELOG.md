@@ -7,6 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the identity parsers run the reference's evidence check and skip a refused token where they read it (#730)
+
+The keeper's word of 2026-11-04 01:2xZ on #728's shape 4: the toolbox's
+discovery reads an `ls_identity` output only after its verifier admits the
+evidence (`ts-stack@edf6e03`
+`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:600-634`, the
+coordinator calling `parseEvidence` under `defaultTransactionEvidenceLimits`,
+`packages/sdk/src/transaction/TransactionEvidenceCoordinator.ts:184`), and
+this crate's two parsers read the token of any BEEF `Transaction::from_beef`
+parsed: a leniency at an identity door, not a stated residue.
+`src/identity/evidence.rs` is `parseEvidence` (`TransactionEvidence.ts:93-201`):
+the 1 MiB bytes bound, the strict parse (`Beef::from_binary` refuses a byte
+after the frame, as `fromBinaryStrict` does), at most 256 transactions, the
+target (the atomic txid, else the last entry), the output index, then
+`assertUnconfirmedGraph`'s walk of the whole unconfirmed graph from the
+subject (`:137-177`): each input's source the entry the BEEF holds under its
+txid, a transaction proven when a BUMP of the BEEF carries its txid (`findBump`,
+`Beef.ts:570-574`, whatever index its entry names), a proven one ending its
+branch, an unproven one without inputs refused, an input without its source
+refused, a second spend of one outpoint refused, 4096 inputs and 256 KiB of
+script across the graph. The walk reads the BEEF, not the
+`source_transaction` links, because the linear linking hands a repeated
+parent to a later input as a stub. It asks no BUMP index of its leaf, as
+`parseEvidence` does not (`#verifyBumpIndexLeaves` is `verifyValid`'s,
+`Beef.ts:1129-1138`): `TxidNotInBump`, which `Beef::verify_structure` and the
+streaming reader's `check_bump_index` raise, is not this door's refusal.
+Both parsers call it in place of their `Transaction::from_beef` line: an
+`invalid-evidence` refusal skips the output, as the verifier's catch does
+(`identityUtils.ts:630-634`); a `limit` refuses the discovery in the
+reference's words, `identity error: Transaction evidence: limit`
+(`Error::IdentityError`), as that catch rethrows it and `Wallet.ts:950-955`
+rethrows it again. No new error variant.
+
+`tests/vectors/identity_evidence_730.json` is written by
+`tests/support/identity_evidence_730.mjs`, which calls the reference's
+`parseEvidence` directly on BEEFs its own writer builds and records
+`parseResults`' outcome, at `ts-stack@edf6e03` under Node v22.18.0; two runs
+are byte-identical. Twelve BEEFs: a second spend of one outpoint in the graph
+(`:149`), an unproven subject without inputs (`:174`), 4096 and 4097 inputs and
+262144 and 262145 script bytes (`:170-171`), 256 and 257 transactions (`:117`)
+and 1048576 and 1048577 bytes (`:101`), a proven parent whose own parent is
+absent (read on both), and #728's shape 4 with the grandparent present raw and
+proven by its own BUMP (read on both: the guard that the check is the walk and
+not `verify_structure`). The `sourceTXID` check (`:145-146`) is recorded as
+unreached from bytes: both SDKs find a source under the txid its bytes hash
+to. `tests/identity_evidence_730.rs` rebuilds each BEEF with this crate's
+writer to the recorded SHA-256 and serves it through `resolve_by_attributes`
+and `discover_certificates`; `src/identity/evidence_730_tests.rs` compares the
+check's code and line with the reference's on the twelve and on the #725 and
+#728 shapes.
+
+On `11bb04ce` (the scratch copy with the tip's tests), RED:
+`a_txid_only_parent_before_an_unproven_subject_is_skipped_as_the_reference_skips_it_725`
+(`left: (1, 1)`, `right: (0, 0)`),
+`a_parent_whose_bump_names_another_txid_is_skipped_as_the_reference_skips_it_728`
+(the same), the two unit modules (`bump_names_another_txid: (true, true),
+expected false`; both txid-only parent BEEFs), the #553 pin
+(`certificate_at_bound`: `left: Ok((1, 1))`, `right: Err("identity error:
+Transaction evidence: limit")`), and four of the six #730 door tests (six
+shapes `Ok((1, 1))` where the reference skips or refuses); the proven-parent
+agreement and the guard GREEN on both. #728's shapes 1 to 3 and #725's (a) and
+(c) GREEN on both. The #725 and #728 pins now assert each shape's
+`selected_txid` and shapes 1 to 3 their `refused_at` by equality, shape 4 the
+whole line (`TransactionEvidence.ts:143: <parent> input <grandparent>.0 has
+no source transaction`). The test fixtures that published an unproven
+transaction spending a made-up parent (`tests/support/pushdrop_lock_position_537.rs`'s
+`output_of`, `src/identity/client_field_value_261_tests.rs`,
+`tests/auth_identity_certificate_field_order_394.rs`) now prove it by a block
+of its own, as complete evidence.
+
+Semver: a behaviour change at a public door, no signature change. The five
+discovery functions (`resolve_by_identity_key`, `resolve_by_attributes`,
+`discover_certificates`, `discover_certificates_by_type`, `query`) drop a
+lookup output whose evidence the check refuses, where they read it, and fail
+with `Transaction evidence: limit` on an answer past the reference's limits.
+Migration: none for a caller whose overlay answers with complete evidence; a
+caller whose overlay answers with a parent not carried sees the output
+dropped.
+
+### Notes: cross-SDK parity (#730)
+
+The check is `parseEvidence`'s; the coordinator's verification after it is
+not ported: `tx.verify` on the admitted subject against the wallet's chain
+tracker (`TransactionEvidenceCoordinator.ts:317-345`), so an unproven
+ancestor's failing script, a BUMP root the tracker refuses or a coinbase proof
+under 100 blocks deep (`MerklePath.ts:488-496`) is skipped there and read
+here (`CLAUDE.md`'s #553 row, the residue it keeps). Its concurrency limits
+(`pendingTransactions`, `consumers`) are not ported either: one discovery
+parses its outputs in turn. Where `Beef::from_binary` refuses bytes
+`fromBinaryStrict` reads (#86's reserved forms), the output is skipped here.
+The reference checks the lookup output's `txid` hint against the subject it
+picked (`TransactionEvidence.ts:123-124`); `OutputListItem` carries no `txid`,
+so a JSON answer whose `txid` disagrees with its BEEF's subject is skipped
+there and read here (#735: the port is a public field, the owner's word).
+The reference's `timeout` code comes from the coordinator's tracker verify,
+unported, so this check has no timeout path.
+
 ### Tests: four more BEEF shapes of the identity subject pick pinned against the reference, and the #725 pins tightened (#728)
 
 No behaviour change. #727's strength read named four `ls_identity` BEEF shapes
