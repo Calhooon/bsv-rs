@@ -588,7 +588,13 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// Resolve an identity by identity key.
     ///
     /// Queries the overlay network to find certificates associated with the key.
-    /// Returns the first matching displayable identity, or None if not found.
+    /// Reads every output of the lookup answer in order before it answers,
+    /// passing over one it skips, keeps only certificates whose subject is
+    /// `identity_key` (compared lower-cased, as the reference's
+    /// `filterCertificatesByIdentityKey`), and returns the first such
+    /// certificate's displayable identity, or None if none is admitted (#737).
+    /// The reference's `resolveByIdentityKey` returns every identity;
+    /// [`Self::resolve_by_attributes`] returns a list.
     ///
     /// If `override_with_contacts` is true (default), personal contacts take priority
     /// over discovered certificates.
@@ -605,7 +611,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// }
     /// ```
     ///
-    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
+    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when any lookup output's evidence exceeds the reference's limits (#730), before or after an admitted one (#737); an output whose evidence the check refuses as invalid is skipped.
     pub async fn resolve_by_identity_key(
         &self,
         identity_key: &str,
@@ -629,19 +635,24 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
         let answer = self.resolver.query(&question, None).await?;
 
+        // Every output parsed in order before the answer, a skipped one passed
+        // over and a limit anywhere refusing the call, as the reference's
+        // wallet walks them (identityUtils.ts:671-707, #737); then only the
+        // asked subject's certificates (filterCertificatesByIdentityKey,
+        // identityUtils.ts:247-255, Wallet.ts:1012); the first answers, where
+        // the reference returns every one (IdentityClient.ts:568-571)
         match answer {
             LookupAnswer::OutputList { outputs } => {
-                if outputs.is_empty() {
-                    return Ok(None);
+                let expected = identity_key.to_lowercase();
+                let mut first = None;
+                for output in &outputs {
+                    if let Some(cert) = self.parse_output_to_certificate(output).await? {
+                        if first.is_none() && cert.subject_hex() == expected {
+                            first = Some(Self::parse_identity(&cert));
+                        }
+                    }
                 }
-
-                // Process the first output
-                if let Some(cert) = self.parse_output_to_certificate(&outputs[0]).await? {
-                    let identity = Self::parse_identity(&cert);
-                    return Ok(Some(identity));
-                }
-
-                Ok(None)
+                Ok(first)
             }
             _ => Ok(None),
         }
