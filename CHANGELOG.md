@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the four discovery tests ask a scripted tracker and assert exactly, hermetic with and without `http` (#779)
+
+From #769's lane and the reads of PR #778. The four unit tests
+`test_find_competent_hosts_*` (`src/overlay/lookup_resolver.rs:698-785` at
+`4ed58d05`) built `LookupResolver::default()` or the `Local` preset with no
+facilitator, so under `http` they asked the four Mainnet SLAP trackers
+(`NetworkPreset::slap_trackers`, bsvb.tech and bapp.dev) or
+`http://localhost:8080`, and accepted `Ok` or `Err` ("depends on network
+availability"): a breach of `CLAUDE.md` rule 4, as the five kvstore tests of
+0.3.24 were. They are removed (the file 786 lines to 697) and replaced by
+`tests/lookup_discovery_779.rs` on the public API, a scripted facilitator
+answering by URL and recording each question's URL, service and query, every
+tracker an `.invalid` name or a URL it never dials: `find_competent_hosts`
+answers the two hosts a tracker advertises (compared as a set: the discovery
+gathers into a `HashSet`, so its order is not pinned) while a second tracker's
+scripted refusal is accounted, not returned, each tracker asked once with
+`ls_slap` and `{"service": "ls_test_service"}`; the empty service sent as
+`{"service": ""}` and an advertisement for another service no answer for it;
+the `Local` preset's question recorded at `http://localhost:8080` and its
+advertised host returned; a host override for the service not applied by the
+discovery (the tracker's `https://discovered.host` alone), while `query` on the
+same resolver asks `https://override.host` and no tracker. No behaviour
+changes, so no test was RED on the base in rule 2's sense; the new file runs
+the same under `overlay` alone and under `full,http`, and
+`cargo test --features "full,http" --lib overlay` runs whole without
+`--skip test_find_competent_hosts`.
+
 ## [0.9.0-beta.7] - 2026-11-04
 
 The 0.9.0 line's seventh prerelease (RELEASING.md point 14), cut from `beta` under the owner's standing green light through the keeper (the chain set on the complete run at 2026-11-04 01:2xZ, his word a stop and never a go; the keeper's word of 15:5xZ: the content is `beta` at #780's landing, the tag on the version PR's green, #777 and #778 to beta.8 with #735's field) at the tip after #780 landed (`8ac66446`): warranted by the complete mutation run's record (#780: run 41753882105 at `2ff81a44`, 80 PASS / 0 FAIL / 5 NO MUTANTS, 27 of 29 floors raised, 332 survivors against 1,583, the survivor term 17.8%) and the landings since beta.6: the identity client's lookups made the reference's (the evidence check #730, the subject and type filters #737 #739 #744 #746, the by-type question #752, the `ls_identity` question #754, the BEEF subject #721, the listed token #718, with their pins #725 #728 #736 #741 #748), the BEEF readers' BUMP index and merge walk (#732, #757, #764, #765) and the MerklePath doors (#631, #641, #649), the lookup resolver's reputation, accounting and JSON parse (#760, #762, #768), the script layer's node readings (the IF depth #634, the key encoding #660 and #625, CHECKMULTISIG's words #657, the scriptCode #654, `to_asm`'s names #723, the hand-built script's ASM #661), PushDrop's decode and bounds (#616, #618), the wallet wire's public validators and the certificate key helper (#609, #610), the nightly oracle made whole (the corpus and the floors #602, the pin #629, the equivalence check #663, the reach rule #685, the record #780) with the kill lanes (#603's nineteen entries, #681) and the speed loops (#664, #667, #668, #670, #672, #683, #689, #693, #696, #699, #706, #709, #712, the fleet's caps): 83 entries. No api-break since beta.6 by the entries' own words; the additions are #609's seven validators and #610's helper, and the behaviour changes carry their migration lines (#634, #657, #723, #730, #737, #739, #744, #746, #752, #732, #754, #757, #760, #762, #764, #765, #768) on the dependents' intakes (bsv-wallet-cli#386, bsv-wallet-toolbox-rs#533).
