@@ -7,6 +7,145 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `merge_raw_tx` writes the last BUMP's index for a txid two BUMPs prove, as the reference does; a caller-set merkle path at `add_input_proof` replaced by the BEEF's proof and descended past where there is none (#757)
+
+From the #732 lane (2026-11-04 08:4xZ), two residues at `ts-stack@edf6e03`
+(`packages/sdk/src/transaction/Beef.ts`).
+
+The written index. The reference's `#tryToValidateBumpIndex` asks its
+level-0 index (`:1329-1340`: `const i = this.#ensureBumpTxidIndex().get(txid)`,
+then `newTx.bumpIndex = i`), the index a `Map.set` over the BUMPs in order
+(`:576-585`), so an entry merged after two BUMPs that hold its txid takes the
+LAST one's index; `BeefTx.toWriter` writes it and the atomic writer carries
+that BUMP (`#copySelectedTransactions`, `:448-470`). This crate's
+`try_to_validate_bump_index` (behind `merge_raw_tx`, `merge_txid_only` and
+`merge_transaction`) scanned from the front and took the EARLIEST, so
+`to_binary` wrote another index byte and `to_binary_atomic` carried another
+BUMP than the reference's, and an atomic BEEF read back attached another path.
+It now scans from the back. An entry merged before a BUMP is unchanged and
+agrees: the BUMP present at its merge, as `#mergeBumpEntry` sets only an entry
+without an index (`:774-786`). The readers are unchanged: `add_input_proof`
+attaches the last BUMP holding a txid whatever the written byte (#732), and
+both forms prove the txid.
+
+The caller's path. `#addInputProof` (`:649-668`) sets
+`current.merklePath = mp` whenever `findBump(txid)` answers, over a
+`merklePath` the transaction already carries, and goes on to the inputs only
+when it does not answer, the carried path kept. `add_input_proof` kept a
+carried path (`enter` and `bare_stub` attached a BUMP only to a transaction
+without one) and treated any carried path as the end of the walk. Both now
+follow the reference: this BEEF's BUMP replaces a carried path and ends the
+walk; a transaction this BEEF does not prove is descended, its own path kept.
+A carried path reaches the walk only through the in-memory API (`BeefTx::tx_mut`,
+`merge_transaction` of a transaction with a path, an input's own
+`source_transaction`); the readers set none, so `Transaction::from_beef` on
+bytes is unchanged. `Transaction::verify` reads a transaction with a path as
+proven and does not descend it, so the extra links are not judged.
+
+Semver: a behaviour change without a signature change: for a BEEF holding two
+BUMPs that prove one txid, the entry merged after both carries the last
+BUMP's index, so the bytes `to_binary` writes change in that entry's index
+byte and `to_binary_atomic` carries the last BUMP; readers accept both forms.
+`find_atomic_transaction` replaces a path a held transaction carries with the
+BEEF's BUMP for its txid, and links the inputs of a transaction that carries a
+path the BEEF does not hold. Migration: a fixture pinning the old bytes
+re-records; a caller that set a path on a held transaction to override the
+BEEF's merges that path as a BUMP instead. The four dependents' fixtures were
+scanned (every BEEF found in a test, vector, fixture, bench or example file of
+`bsv-overlay-cloudflare`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli` and
+`rust-message-box`: 66 parsed) and none holds two BUMPs sharing a level-0 hash.
+
+`tests/beef_bump_index_757.rs` against `tests/vectors/beef_bump_index_757.json`
+(`tests/support/beef_bump_index_757.mjs`, the bun bundle of `packages/sdk` at
+`ts-stack@edf6e03` under Node v22.18.0; the fold's three runs byte-identical,
+the eleven earlier cases unchanged): eight BEEFs (eleven since the fold)
+rebuilt by this crate's writer from the merge steps the vector carries and
+compared with the reference's `toHex` and `toBinaryAtomic` bytes (a raw or
+txid-only parent merged after BUMPs at 800000 and 800001 in both orders, after
+two roots at 800000, with a child beside it; merged before and between them),
+and three path cases (a BEEF read back, a caller's 800001 path set on the
+proven parent or subject, a caller's 800003 path on the unproven child), each
+walk `findAtomicTransaction` leaves. 4 of 6 RED on `b285d621` (a scratch copy,
+its own target dir): `raw_after_both: the bytes the reference's toBinary
+writes`, `left: "...0101000100000001aa..."`, `right: "...0101010100000001aa..."`
+(the entry's index byte `00` for `01`); the atomic BEEF carrying
+`fe00350c...` (800000) where the reference carries `fe01350c...` (800001); the
+caller's `800001` kept where the reference attaches `800000`; the walk stopped
+at the child's own path where the reference links both of its inputs. The
+before-or-between agreement and the stated sibling case green on both.
+
+The fold (the three reads of PR #763). The atomic writer's txid-only branch
+took the EARLIEST BUMP carrying the txid, whatever the entry's index; the
+reference copies `bumps[tx.bumpIndex]` for a txid-only entry as for a raw one
+(`#copySelectedTransactions`, `:448-470`): `atomic_closure` now carries the
+BUMP the index names, else the last carrying the txid. `make_txid_only` set no
+index; the reference's `makeTxidOnly` asks `#tryToValidateBumpIndex` again
+(`:550-565`), and so does this crate's now. Three cases recorded:
+`txid_only_after_both_with_child` (the atomic BEEF of the child carrying
+800001), `made_txid_only_between_with_child` (an entry merged between the
+BUMPs, index 0, made txid-only: index 1 on both sides) and
+`raw_before_a_sibling_leaf`, and one path case, a proven child whose inputs the
+BEEF carries raw (`proven_parent_with_its_input_in_the_beef`: the walk stops
+at the proof on both sides). RED on `f23fb60c` (a scratch copy, the fold's test
+file and vector overlaid, its own target dir): `txid_only_after_both_with_child:
+the bytes the reference's toBinaryAtomic("child") writes`, `left: "...0200beef01fe00350c..."`,
+`right: "...0200beef01fe01350c..."`; with that case passing,
+`made_txid_only_between_with_child: the parent's bump index`, `left: None`,
+`right: Some(1)`. The path case is an agreement, green on `f23fb60c` and RED
+with `enter` descending a proven transaction (`inputs_linked` `[true, true]`
+for `[false, false]`), which the older proven-parent case does not catch. The
+stated sibling pin asserts the two bytes it differs by (the leaf's flag and the
+entry's index or format byte) where it asserted any difference. A BEEF this
+crate wrote before #757 (`raw_between`'s bytes, one hex digit from
+`raw_after_both`'s, at offset 247) reads valid on `Beef::from_binary` with
+`verify_valid` and on `verify_stream_structure`.
+
+### Notes: cross-SDK parity
+
+The match stays strict at both merge sites, older than #757 (v0.3.5,
+`ef98e246`): `try_to_validate_bump_index` and `update_bump_indices` take a BUMP
+only where its level-0 leaf for the txid is flagged `txid`, where the
+reference's `#tryToValidateBumpIndex` (`Beef.ts:1334-1338`) and
+`#tryMarkTxProvenByBump` (`:813-822`) take any level-0 hash and flag the leaf.
+go-sdk@2ca481c takes any level-0 hash too (`bumpProves`, `beef.go:67-83`;
+`FindBumpByHash`, `:620-630`; `MergeBump`, `:780-785`); its
+`tryToValidateBumpIndex` (`:858-868`) only checks a path already set, the
+reading v0.3.5's comment took for the whole of Go. BRC-74's flag `00` says
+"data follows, not a client txid" (`transactions/0074.md:75` at `5119a9b`), not
+that the leaf is unproven; this crate's own readers take any level-0 hash
+(`find_bump`, `verify_structure`). A BUMP carrying the txid only as an
+unflagged sibling is the entry's index in the reference and no proof here:
+merged after the txid's proof, index 1 there and 0 here
+(`raw_after_a_sibling_leaf`); merged before the BUMP, index 0 there and none
+here, so this crate's BEEF reads invalid (the parent's input names no entry)
+where the reference's reads valid (`raw_before_a_sibling_leaf`). In
+`raw_after_a_sibling_leaf` this crate's whole BEEF read back attaches the
+sibling's 800002 (`find_bump` takes any level-0 hash, the last), as the reference's does, but
+its atomic BEEF carries the 800000 its written index names where the
+reference's carries 800002: the written index and the attached path part
+here alone. Pinned by
+`a_bump_holding_the_txid_as_an_unflagged_sibling_is_no_proof_of_it_states_757`
+and stated in `CLAUDE.md`'s divergence list. The keeper's word (2026-11-04
+10:3xZ) is to conform, bound to a guard: v0.3.5's production shape rebuilt and
+shown valid under the any-hash rule. The fold could not rebuild it from what
+`ef98e246` left: the shape its message describes (a txid held as a sibling in
+a BUMP of a chain of unproven transactions), in seven arrangements (the BUMP
+before and after the entry, through `merge_beef` both ways, at another BUMP's
+height, newest first, the sibling mid-chain), is accepted by v0.3.4's `verify_valid` (`5ea9c52`, the
+any-hash fallback), save where a txid-only entry meets `allow_txid_only =
+false` or two roots share a height, which the rule does not decide. The
+rebuild is its own row; until it lands the strict match stands. Not filed.
+
+A txid-only entry without a BUMP index (one read from bytes: neither reader
+gives it one, `BeefTx.ts:294-295`) in an atomic closure: the reference's
+`#copySelectedTransactions` copies no BUMP for it (`Beef.ts:453`), so its
+`toBinaryAtomic` writes the txid-only entry unproven; this crate's
+`atomic_closure` carries the last BUMP holding the txid (the earliest until
+#757's fold). Measured at the fold's re-read on `txid_only_after_both_with_child`'s
+bytes read back: the child's atomic BEEF `...0200beef00...` (no BUMP) there,
+`...0200beef01fe01350c...` here. Older than #757; this crate keeps the proof
+its own `verify_valid` asks of a txid-only entry. Unpinned; filed as #766.
+
 ### Fixed: the lookup resolver records success for any output list and keeps a freeform answer neutral, as the reference's host reputation does (#760)
 
 From the strength read of PR #759 (#754, 2026-11-04 09:1xZ), outside that
@@ -168,7 +307,7 @@ index, not the byte, but both atomic writers carry the BUMP the byte names
 (`atomic_closure`; the reference's `#copySelectedTransactions`,
 `Beef.ts:448-470`), so `to_binary_atomic` of that entry carries the earliest
 BUMP where `toBinaryAtomic` carries the last, and a reread attaches another
-path and asks a tracker about another root (#757).
+path and asks a tracker about another root (#757; closed there).
 
 ### Fixed: the by-type questions send `certificateTypes` with `identityKey`, as the reference overlay reads them (#752)
 
