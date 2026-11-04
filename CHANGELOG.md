@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the evidence check's bounds pinned graph-wide across a proven ancestor, a parent raw and txid-only in both orders, and the limit error at every discovery door (#736)
+
+No behaviour change. #733's strength read named three gaps in #730's pins,
+each a refactor the current pins would let through.
+`tests/vectors/identity_evidence_736.json` is written by
+`tests/support/identity_evidence_736.mjs` (#730's helpers copied, #730's
+vector untouched), which builds every BEEF with the reference's own writers
+at `ts-stack@edf6e03` under Node v22.18.0 and records the bytes,
+`parseEvidence`'s pick or refusal with its code and line, and
+`parseResults`' outcome; two runs are byte-identical.
+`tests/identity_evidence_736.rs` rebuilds each BEEF with this crate's writer
+to the recorded SHA-256 and serves it through `resolve_by_attributes` and
+`discover_certificates`; the unit module `src/identity/evidence_736_tests.rs`
+judges each with `parse_evidence` to the recorded code and line and asserts
+the vector's six shapes.
+
+- **The inputs bound over the graph**: 2048 inputs at an unproven subject and
+  2049 at its unproven parent, which spends a proven grandparent with no
+  inputs, refuse the discovery at the parent (`TransactionEvidence.ts:170-171`,
+  `limit`); 2048 and 2048 read. Neither transaction crosses 4096 alone.
+- **A proven parent's scripts count**: the subject's scripts 131072 bytes and
+  its PROVEN parent's 131073 refuse (`graphScriptBytes` over every visited
+  transaction, `:168`, before the proof ends the branch at `:173`); 131072 and
+  131072 read.
+- **One parent written raw and txid-only**: the later entry is the index's on
+  both sides (`Beef.#rebuildTxIndexes`, `Beef.ts:516-524`; `rebuild_index`
+  here), so raw then txid-only is skipped (`:143`) and txid-only then raw is
+  read. No merge writes both entries, so both sides write these two BEEFs by
+  hand over `txs` (`Beef.toWriter` there, `Beef::to_writer` here), unsorted.
+- **The limit at every door**: `resolve_by_identity_key`,
+  `resolve_by_attributes`, `discover_certificates`,
+  `discover_certificates_by_type` and `query` each refuse #730's
+  `transactions_over_bound` and this vector's `graph_inputs_over_bound` with
+  `identity error: Transaction evidence: limit`. #730's door helper stopped at
+  `resolve_by_attributes`'s `?`, so on a limit shape it ran that door alone.
+
+Every pin is GREEN on `b5d008d1` (the behaviour landed with #730). In a scratch
+copy, sums counted per transaction make 3 of the 4 unit pins and 7 of the 8
+door pins RED while #730's ten stay green; an index that keeps the earlier
+entry makes the two-entry pins RED (2 unit, 1 door).
+
 ### Fixed: `resolve_by_identity_key` reads every output of the lookup answer before it answers, keeps only the asked subject's certificates and returns the first one's identity, as the reference's wallet does (#737)
 
 From the strength read of PR #733 (#730, 2026-11-04 02:2xZ), older than #730
