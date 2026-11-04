@@ -88,7 +88,7 @@ impl LookupResolver {
                 .unwrap_or(0);
             let wait_ms = soonest.saturating_sub(now);
             return Err(Error::OverlayError(format!(
-                "All competent hosts for {} are backing off for approximately {}ms",
+                "All lookup service {} hosts are backing off for approximately {}ms due to repeated failures.",
                 question.service, wait_ms
             )));
         }

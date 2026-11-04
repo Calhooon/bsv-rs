@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: every SLAP tracker backed off refuses in the reference's words, and a cached host list with no host available is not reused (#769)
+
+From the strength read of PR #767 (#762, 2026-11-04 11:48Z). With every SLAP
+tracker backing off, `LookupResolver::find_competent_hosts` answered `Ok([])`
+(`src/overlay/lookup_resolver.rs:343-345` at `4ed58d05`), `get_competent_hosts`
+cached that empty list for `DEFAULT_HOSTS_CACHE_TTL_MS` (5 minutes, `:267-285`)
+and reused any entry younger than that (`:186-192`), so `query` refused in `No
+competent mainnet hosts found by the SLAP trackers for lookup service:
+<service>` for 5 minutes although a tracker's backoff ends after 1 s (growing
+to 60 s). The reference's discovery asks only the trackers not backing off and
+throws when none is left (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:2306-2314`,
+`prepareHostsForQuery`, caught at `:1963` and thrown by the query at `:1671`):
+
+```text
+const soonest = Math.min(...ranked.map(h => h.backoffUntil))
+const waitMs = Math.max(soonest - now, 0)
+throw new Error(
+  `All ${context} hosts are backing off for approximately ${waitMs}ms due to repeated failures.`
+```
+
+with `context` `'SLAP trackers'` (`:1958`); and it reuses a cached host list
+only while some host in it is not backing off (`lookupCacheHasAvailableHost`,
+`:1898-1903`, `refresh` at `:1913-1918`), so an empty entry is never reused.
+The reference's incomplete flag (`discoveryComplete`, `:2277-2278`: a failed
+tracker, a limit hit or a skipped host) is stored with its entry and read back
+into the session (`:1933`), never into the reuse decision: a discovery that
+found hosts is cached as before, whatever its trackers did. This crate stores
+no such flag (`HostsCacheEntry` holds the hosts and the expiry alone), the
+reuse decision unchanged by its absence. Now `find_competent_hosts`
+refuses with every tracker backing off, `Error::OverlayError("All SLAP trackers
+hosts are backing off for approximately <N>ms due to repeated failures.")`, N
+the soonest end of a tracker's backoff less now (the reference's `Math.min`),
+the variant the resolver's other host refusals use; the refusal is not cached
+(it never was: the cache takes an answer alone), and `get_competent_hosts`
+reuses an entry only while some host in it is not backing off. `No competent
+<network> hosts found by the SLAP trackers for lookup service: <service>`
+stays for the discovery whose trackers were asked and named no host (the
+reference's `:1669-1674`, a settled session with no host and no
+`noHostsError`); no trackers configured is still no host, as
+`prepareHostsForQuery` answers `[]` for an empty list (`:2285`). The two
+methods are in `src/overlay/lookup_resolver/backoff.rs` (the parent file under
+the ratchet's 800-line bound).
+
+`tests/lookup_tracker_backoff_769.rs`, on #762's scripted facilitator on a
+tracker host (three formula answers through the discovery back it off), each
+test on its own tracker and host names: the lookup inside the backoff refused
+in the reference's words, N at most the tracker's remaining backoff and its
+1 s base, the tracker not asked, and the discovery itself refusing; past the
+backoff (a sleep to the snapshot's `backoff_until` and 20 ms) the lookup asks
+the tracker again, which names a host (a SLAP advertisement by this crate's
+writer, `create_signed_overlay_admin_token`), and is answered; a discovery
+that named a host cached (the tracker asked once for two lookups); a cached
+host list whose one host is backed off (three formula answers from it through
+three lookups) not reused, the fourth lookup asking the tracker again. 3 of 4
+RED on `4ed58d05` (a scratch copy with the file overlaid): `not the
+reference's words: No competent mainnet hosts found by the SLAP trackers for
+lookup service: ls_tracker_backoff_issue`; past the backoff
+`OverlayError("No competent mainnet hosts found by the SLAP trackers for
+lookup service: ls_tracker_backoff_issue")`, the cached empty list; `the cache
+was reused` with the tracker asked once; the caching pin green on both.
+`tests/lookup_tracker_accounting_762.rs`'s fourth discovery, which pinned
+`Ok([])` for the backed-off tracker, now asserts the refusal.
+
+The fold (the three reads of PR #778). The additional hosts: with
+`additional_hosts` configured for the service and every tracker backing off,
+`get_competent_hosts` returned the discovery's refusal through `result?` (and
+a waiter's `Err` arm) before `add_additional_hosts`, where `4ed58d05` answered
+the additional hosts and queried them and the reference admits them beside the
+discovery (`:2063-2071`), raising its trackers' refusal only when no host was
+admitted (`:1669-1671`); now a refused discovery is an empty one when the
+service has additional hosts (`beside_additional_hosts`, `backoff.rs`, read
+before the broadcast and the cache), and refuses only when it has none. The
+waiters' text: a lookup that joined the in-flight discovery received the
+leader's `to_string()` wrapped in `OverlayError` again (`overlay error:
+overlay error: All SLAP ...`); the in-flight channel now carries the `Error`
+itself, so a waiter's refusal equals the leader's. The query's words: with
+every discovered host backing off, `query` refused in this crate's `All
+competent hosts for <service> are backing off for approximately <N>ms`; it
+now refuses in the reference's, `All lookup service <service> hosts are
+backing off for approximately <N>ms due to repeated failures.` (`:1860`, the
+context of `prepareHostsForQuery`'s words at `:2313`), N unchanged;
+`tests/lookup_host_accounting_760.rs`'s `contains` on the old prefix now
+matches the new one. Pins: `an_additional_host_is_asked_with_every_slap_tracker_backing_off_769`
+(the cold read's probe: the additional host asked, no refusal) and
+`every_host_discovered_backing_off_is_refused_in_the_reference_words_769`,
+RED on `19b1dfc6` (`Err(OverlayError("All SLAP trackers hosts are backing off
+for approximately 1000ms due to repeated failures."))` with only the tracker
+asked; `not the reference's words: All competent hosts for
+ls_tracker_backoff_issue are backing off for approximately 996ms`); the
+crate-internal `a_waiter_on_a_refused_discovery_receives_the_leader_error_769`
+(`backoff.rs`; on one thread the public path never yields between a leader's
+registration and its broadcast, the refusal coming before any `.await`, and two
+threads sharing one resolver reach the waiter's arm only by a race, so the test
+registers the sender), RED on `19b1dfc6` with
+its broadcast's `to_string()` (`overlay error: overlay error: All SLAP ...`);
+and the inside-the-backoff test bounds N below too, `wait >=
+backoff_until - after` from the snapshot read after the refusal (a constant
+`0ms` fails it, shown in a scratch copy).
+
+Semver: a behaviour change in the discovery's refusal, the hosts cache's
+reuse and the query's every-host-backing-off words, no signature change. Migration: `find_competent_hosts` with every
+tracker backing off is an `Err` where it was `Ok([])`, and a caller matching
+`No competent` for that case reads `All SLAP trackers hosts are backing off`;
+a lookup whose cached hosts are all backing off asks the trackers again; a
+caller matching `All competent hosts for` reads `All lookup service <service>
+hosts are backing off`. No dependent matches either text (`grep -rn 'No
+competent'` over `~/bsv/rust-message-box/src`, `~/bsv/bsv-overlay-cloudflare`,
+`~/bsv/bsv-wallet-toolbox-rs`, `~/bsv/bsv-wallet-cli`: the one hit is the
+toolbox's own SLAP client's `tracing::debug!` line, `src/wallet/lookup.rs:276`,
+in its own text, `No SLAP trackers returned competent hosts`, not this
+crate's, and no reader of this crate's error).
+
+### Notes: cross-SDK parity (#769)
+
+#762's note's last residue is closed by this row: the backed-off discovery
+refuses in `prepareHostsForQuery`'s words, the query's every-host refusal too
+since the fold (`:1860`, `:2313`). Left, stated (a line in `CLAUDE.md`'s
+list): the reference selects at most `maxTrackers` trackers (16 by default,
+`LookupResources.ts:19`) from a rotating cursor over the list
+(`selectSlapTrackers`, `:1939-1965`) where this crate asks every tracker, a
+liveness difference under a flapping tracker set; a row if the keeper wants
+the cursor ported.
+
 ### Changed: the oracle's timeout judge: a timed-out mutant re-run once alone; a second timeout a row outside the score's denominator, never a survivor nor a kill (#781)
 
 The keeper's word of 2026-11-04 15:2xZ: "a mutant that times out is re-run once,
@@ -4736,7 +4860,8 @@ refuses in `No competent <network> hosts found by the SLAP trackers for lookup
 service: <service>`, where the reference's query refuses in
 `prepareHostsForQuery`'s words, `All SLAP trackers hosts are backing off for
 approximately <n>ms due to repeated failures.` (`:1956-1964`, `:2307-2313`,
-`:1671`); older than #762, reached now by a formula answer too (#769).
+`:1671`); older than #762, reached now by a formula answer too (#769, closed by
+that row: the reference's words, and no empty host list reused).
 
 ### Fixed: `merge_transaction` merges the transaction's merkle path as a BUMP and walks its source transactions, as the reference does (#764)
 

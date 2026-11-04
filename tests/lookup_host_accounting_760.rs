@@ -117,7 +117,7 @@ async fn a_freeform_answer_after_two_failures_keeps_the_backoff_coming_760() {
     let refused = resolver.query(&question(5), None).await.unwrap_err();
     assert!(
         refused.to_string().contains(&format!(
-            "All competent hosts for {SERVICE} are backing off"
+            "All lookup service {SERVICE} hosts are backing off"
         )),
         "{refused}"
     );
