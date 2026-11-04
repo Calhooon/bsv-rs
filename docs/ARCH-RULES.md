@@ -293,19 +293,26 @@ The required contexts become `lint` and `checks` in place of the nine;
 `tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` (five) and
 `REQUIRED_ON_MAIN` (six) carry them.
 
-## 8. A heavy run holds at most six runners
+## 8. A heavy run holds the runners of its window
 
 Every matrix that is a heavy run on the account's runners (a job that runs
-mutants or fuzzes) carries `max-parallel` at most 6, a literal or the
-mutation plan's `HEAVY_MAX_PARALLEL`, so fourteen of the twenty runners,
-the pool's non-heavy p95, stay for the fleet's pull request and queue runs
-(`tests/arch_nightly_cap.rs`; the keeper's line of 10:0xZ 2026-11-03 on the
-opening occupancy read, 14 from 06:2xZ, `docs/lanes/ci-speed-7.md`); the cap
-rises only when an occupancy read shows that p95 under 10. In the nightly no
+mutants or fuzzes) carries `max-parallel`: the nightly's three (the mutant
+shards of the window's waves, their tail, the fuzz targets) read the mutation
+plan's `max_parallel`, `max_parallel_tail` and `max_parallel_fuzz` outputs and
+no literal (the tail at six for the waves projected past the window's end,
+#791's fold, the keeper's word of 2026-11-04 18:0xZ), the figure by window (#791, the owner's word of 2026-11-04
+17:1xZ through the keeper: fourteen of the twenty inside the run's own
+window, 01:00Z to 09:00Z, when no other heavy run of the account is
+scheduled there, six otherwise; the dispatch input `heavy_max_parallel`
+over both, 1 to 20; `HEAVY_WINDOWS` and `heavy_max_parallel` in
+`.github/scripts/nightly_mutants.py`, owned by #675), any other a literal at
+most 6 (`tests/arch_nightly_cap.rs`; until #791 six in every hour, the
+keeper's line of 10:0xZ 2026-11-03, 14 from 06:2xZ before it,
+`docs/lanes/ci-speed-7.md`). In the nightly no
 two heavy jobs (a heavy matrix or a dispatch of `ci.yml`, a whole run of up
 to 22 jobs) can hold the runners at once: each pair is ordered by a `needs:`
-path; fuzz, the score job and `ci-full-beta` need the shards, `ci-full-beta`
-the fuzz targets too, and `ci-full-main` needs `ci-full-beta`, which waits
+path; the tail needs the window's shards, fuzz and the score job need both,
+`ci-full-beta` needs the shards and the fuzz targets, and `ci-full-main` needs `ci-full-beta`, which waits
 for beta's run (`gh run watch`), the one it dispatched (the runs listed
 before the dispatch, the bot's alone), and fails on its `failure`
 conclusion (#682's third fold) and on a failed watch other than the

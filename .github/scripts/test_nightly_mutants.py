@@ -1,6 +1,8 @@
 """Exercise score math and rejection of incomplete or inconsistent evidence."""
 
 import argparse
+from datetime import datetime, timezone
+
 from collections import Counter
 import io
 import json
@@ -13,6 +15,10 @@ import unittest
 from unittest.mock import patch
 
 import nightly_mutants as nightly
+
+# #791: a plan's hour, inside this crate's window and outside every window.
+INSIDE = datetime(2026, 11, 5, 7, 0, tzinfo=timezone.utc)
+OUTSIDE = datetime(2026, 11, 5, 12, 30, tzinfo=timezone.utc)
 
 
 class ScoreTests(unittest.TestCase):
@@ -1056,7 +1062,7 @@ class ReachRuleFixture(unittest.TestCase):
                                       head_mutants=head.replace("^src", "src", 1))
         self.assertEqual(everything, ".cargo/mutants.toml")
 
-    def plan(self, mode="incremental", record=True):
+    def plan(self, mode="incremental", record=True, at=OUTSIDE, max_parallel=None):
         commit = self.git("rev-parse", "HEAD")
         base_dir = self.repo / ("base" if record else "no-record")
         if record:
@@ -1069,7 +1075,8 @@ class ReachRuleFixture(unittest.TestCase):
         output = self.repo / "plan.json"
         with patch.dict(os.environ, {"GITHUB_OUTPUT": ""}):
             nightly.plan(argparse.Namespace(commit=commit, mode=mode, base_record=base_dir,
-                                            repo=self.repo, output=output))
+                                            repo=self.repo, output=output, at=at,
+                                            max_parallel=max_parallel))
         return json.loads(output.read_text())
 
     def land(self, path, body="changed\n"):
@@ -1094,7 +1101,7 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertEqual(nightly.minutes_per_mutant("script", 3), 0.125)
         self.assertEqual([(m["surface"], m["shard"]) for m in planned["matrix"]], [
             ("script", "0/2"), ("script", "1/2"), ("beef", "0/1")])
-        self.assertEqual(planned["max_parallel"], nightly.NIGHT_PARALLEL)
+        self.assertEqual(planned["max_parallel"], nightly.SHARED_PARALLEL)
         self.assertEqual(len(planned["carried"]), 6)
         self.assertEqual(planned["lockfile"], "carry")
 
@@ -1112,7 +1119,7 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertIn("Cargo.toml changed", planned["why_complete"])
         self.assertEqual(planned["lockfile"], "generate")
         self.assertEqual(sum(1 for m in planned["matrix"]), 8 + 3 + 1 + 3 + 8)
-        self.assertEqual(planned["max_parallel"], nightly.HEAVY_MAX_PARALLEL)
+        self.assertEqual(planned["max_parallel"], nightly.SHARED_PARALLEL)
         self.assertEqual(self.plan(record=False)["why_complete"],
                          "no record of a complete run on the line to carry from")
         self.assertEqual(self.plan(mode="complete")["mode"], "complete")
@@ -1122,9 +1129,186 @@ class ReachRuleFixture(unittest.TestCase):
         self.assertEqual(nightly.SLOT_LIMIT, 20)
         self.assertEqual(sum(nightly.COMPLETE_SHARDS.values()), 23)
         self.assertEqual(set(nightly.COMPLETE_SHARDS), set(nightly.SURFACES))
-        # The fleet's runner cap (10:0xZ 2026-11-03, the opening occupancy read): six of the twenty.
-        self.assertEqual(nightly.HEAVY_MAX_PARALLEL, 6)
-        self.assertLessEqual(nightly.NIGHT_PARALLEL, nightly.HEAVY_MAX_PARALLEL)
+        # #791: fourteen of the twenty inside the run's window, six otherwise.
+        self.assertEqual((nightly.WINDOW_PARALLEL, nightly.SHARED_PARALLEL), (14, 6))
+        self.assertEqual(nightly.PARALLEL_BOUNDS, (1, 20))
+
+    # #791, the owner's word of 2026-11-04 17:1xZ: the heavy-run cap by window.
+    def test_the_complete_run_inside_the_window_takes_fourteen_791(self):
+        self.land("Cargo.toml", "[package]\nname = 'bumped'\n")
+        planned = self.plan(at=INSIDE)
+        self.assertEqual((planned["mode"], planned["max_parallel"]), ("complete", 14))
+        self.assertTrue(planned["max_parallel_reason"].startswith(
+                         "at 07:00Z, inside this crate's window (bsv-rs: the complete run's 01:00Z slot, the incremental night's 07:00Z and the pin-chain dispatches, 01:00Z to 09:00Z); the waves of 14 "
+                         "projected from the plan estimates end at "), planned["max_parallel_reason"])
+        # A night is a heavy run by the word: the same figure in its window.
+        self.assertEqual(self.plan(mode="incremental", at=INSIDE)["max_parallel"], 14)
+
+    def test_outside_the_window_or_in_another_runs_the_run_takes_six_791(self):
+        planned = self.plan(mode="complete", at=OUTSIDE)
+        self.assertEqual((planned["max_parallel"], planned["max_parallel_reason"]),
+                         (6, "at 12:30Z, outside every window"))
+        cli = self.plan(mode="complete", at=datetime(2026, 11, 5, 17, 5, tzinfo=timezone.utc))
+        self.assertEqual(cli["max_parallel"], 6)
+        self.assertIn("inside another heavy run's window (bsv-wallet-cli", cli["max_parallel_reason"])
+        # The keeper's table of 2026-11-04 18:0xZ: the CLI's night 17:00Z to 20:00Z, the
+        # toolbox's 20:00Z to 01:00Z (past midnight), the day at six outside every window.
+        late = self.plan(mode="complete", at=datetime(2026, 11, 5, 19, 30, tzinfo=timezone.utc))
+        self.assertIn("inside another heavy run's window (bsv-wallet-cli: its night, 17:00Z to 20:00Z",
+                      late["max_parallel_reason"])
+        for hour, minute in ((20, 0), (23, 30), (0, 59)):
+            toolbox = nightly.heavy_max_parallel(datetime(2026, 11, 5, hour, minute, tzinfo=timezone.utc))
+            self.assertEqual(toolbox[0], 6)
+            self.assertIn("inside another heavy run's window (wallet-toolbox: its night, 20:00Z to 01:00Z",
+                          toolbox[1])
+        # The window's edges: 01:00Z in, 00:59Z and 09:00Z out.
+        at = lambda h, m=0: datetime(2026, 11, 5, h, m, tzinfo=timezone.utc)  # noqa: E731
+        self.assertEqual([nightly.heavy_max_parallel(at(*t))[0]
+                          for t in ((0, 59), (1, 0), (8, 59), (9, 0))], [6, 14, 14, 6])
+
+    def test_the_dispatch_input_overrides_the_window_bounded_to_the_slots_791(self):
+        planned = self.plan(mode="complete", at=INSIDE, max_parallel="3")
+        self.assertEqual(planned["max_parallel"], 3)
+        self.assertTrue(planned["max_parallel_reason"].startswith(
+            "the dispatch input heavy_max_parallel=3; the waves of 3 projected"))
+        self.assertEqual(self.plan(mode="complete", at=OUTSIDE, max_parallel="20")["max_parallel"], 20)
+        # Empty (the input's default) is the window's figure.
+        self.assertEqual(self.plan(mode="complete", at=INSIDE, max_parallel="")["max_parallel"], 14)
+        for bad in ("0", "21", "-1", "six", "1.5"):
+            with self.assertRaises(SystemExit) as refused:
+                nightly.heavy_max_parallel(INSIDE, bad)
+            self.assertIn("is not an integer from 1 to 20", str(refused.exception))
+
+    def test_the_plan_writes_the_figure_and_its_reason_to_the_step_output_791(self):
+        self.land("Cargo.toml", "[package]\nname = 'bumped'\n")
+        out = self.repo / "github_output"
+        out.write_text("")
+        commit = self.git("rev-parse", "HEAD")
+        with patch.dict(os.environ, {"GITHUB_OUTPUT": str(out)}):
+            nightly.plan(argparse.Namespace(commit=commit, mode="complete",
+                                            base_record=self.repo / "none", repo=self.repo,
+                                            output=self.repo / "p.json", at=INSIDE,
+                                            max_parallel=None))
+        lines = out.read_text().splitlines()
+        self.assertIn("max_parallel=14", lines)
+        self.assertIn("max_parallel_reason=at 07:00Z, inside this crate's window (bsv-rs: the "
+                      "complete run's 01:00Z slot, the incremental night's 07:00Z and the pin-chain dispatches, 01:00Z to 09:00Z); the "
+                      "waves of 14 projected from the plan estimates end at 07:46Z, 08:10Z: every "
+                      "wave ends by 09:00Z, all 23 shards at 14", lines)
+        # #791's tail: none on the fixture's estimates, the tail job's matrix empty.
+        self.assertIn("shards_tail=0", lines)
+        self.assertIn("max_parallel_tail=6", lines)
+        self.assertIn("max_parallel_fuzz=14", lines)
+        self.assertIn("matrix_tail=[]", lines)
+
+    # #791's fold, the keeper's word of 2026-11-04 18:0xZ: the waves projected past the
+    # window's end run at six, from the last complete record's minutes in the tree.
+    RECORD = Path(__file__).resolve().parents[2] / "docs/census/mutants-2026-11-04.json"
+
+    def with_record(self):
+        self.put("docs/census/mutants-2026-11-04.json", self.RECORD.read_text())
+
+    def labels(self, rows):
+        return [row["label"] for row in rows]
+
+    def test_a_complete_run_tails_the_waves_projected_past_the_window_at_six_791(self):
+        self.with_record()
+        at = lambda h, m=0: datetime(2026, 11, 5, h, m, tzinfo=timezone.utc)  # noqa: E731
+        # The record's waves of 14 in matrix order: the opening wave's longest is script
+        # 0/8's 212.8 minutes, the second's wire 2/3's 244.8 (457.6 in all): a run
+        # dispatched by 01:22Z ends by 09:00Z whole at fourteen.
+        for clock, ends in (((1, 0), "04:32Z, 08:37Z"), ((1, 22), "04:54Z, 08:59Z")):
+            planned = self.plan(mode="complete", at=at(*clock))
+            self.assertEqual((len(planned["matrix_window"]), planned["shards_tail"],
+                              planned["max_parallel"], planned["max_parallel_fuzz"]),
+                             (23, 0, 14, 14))
+            self.assertTrue(planned["max_parallel_reason"].endswith(
+                f"the waves of 14 projected from docs/census/mutants-2026-11-04.json end at "
+                f"{ends}: every wave ends by 09:00Z, all 23 shards at 14"),
+                planned["max_parallel_reason"])
+        # At 03:00Z the second wave ends at 10:37Z: its nine shards are the tail at six.
+        planned = self.plan(mode="complete", at=at(3))
+        self.assertEqual((len(planned["matrix_window"]), planned["shards_tail"],
+                          planned["max_parallel"], planned["max_parallel_tail"],
+                          planned["max_parallel_fuzz"]), (14, 9, 14, 6, 6))
+        self.assertEqual(self.labels(planned["matrix_window"] + planned["matrix_tail"]),
+                         self.labels(planned["matrix"]))
+        self.assertEqual(self.labels(planned["matrix_tail"]),
+                         ["wire-2-3"] + [f"substrates-{i}-8" for i in range(8)])
+        self.assertEqual(planned["max_parallel_reason"],
+                         "at 03:00Z, inside this crate's window (bsv-rs: the complete run's 01:00Z slot, the incremental night's 07:00Z and the pin-chain dispatches, 01:00Z to 09:00Z); the waves of 14 "
+                         "projected from docs/census/mutants-2026-11-04.json end at 06:32Z, "
+                         "10:37Z: the 14 shards of the waves ending by 09:00Z at 14, the 9 after "
+                         "them the tail at 6")
+        # A minute later than 01:22Z the second wave ends at 09:00.6Z, past the end.
+        self.assertEqual(self.plan(mode="complete", at=at(1, 23))["shards_tail"], 9)
+        # At 07:00Z the opening wave ends at 10:32Z: the whole run at six, no tail.
+        planned = self.plan(mode="complete", at=INSIDE)
+        self.assertEqual((len(planned["matrix_window"]), planned["shards_tail"],
+                          planned["max_parallel"], planned["max_parallel_fuzz"]), (23, 0, 6, 6))
+        self.assertTrue(planned["max_parallel_reason"].endswith(
+            "end at 10:32Z, 14:37Z: the opening wave ends past the window, every one of the "
+            "23 shards at 6"), planned["max_parallel_reason"])
+
+    def test_outside_the_window_no_tail_and_six_791(self):
+        self.with_record()
+        planned = self.plan(mode="complete", at=OUTSIDE)
+        self.assertEqual((planned["max_parallel"], planned["max_parallel_reason"],
+                          planned["shards_tail"], planned["max_parallel_fuzz"]),
+                         (6, "at 12:30Z, outside every window", 0, 6))
+        self.assertEqual(planned["matrix_window"], planned["matrix"])
+        # The CLI's window: six, no projection.
+        cli = self.plan(mode="complete", at=datetime(2026, 11, 5, 18, 0, tzinfo=timezone.utc))
+        self.assertEqual((cli["max_parallel"], cli["shards_tail"]), (6, 0))
+
+    def test_the_input_sets_the_windows_waves_and_the_tail_stays_six_791(self):
+        self.with_record()
+        at = datetime(2026, 11, 5, 3, 0, tzinfo=timezone.utc)
+        # Waves of 20: the opening one's longest wire 2/3's 244.8 (07:04Z), the three
+        # substrates shards after it 234.7 more (10:59Z), the tail at six.
+        planned = self.plan(mode="complete", at=at, max_parallel="20")
+        self.assertEqual((len(planned["matrix_window"]), planned["shards_tail"],
+                          planned["max_parallel"], planned["max_parallel_tail"]), (20, 3, 20, 6))
+        self.assertEqual(planned["max_parallel_reason"],
+                         "the dispatch input heavy_max_parallel=20; the waves of 20 projected "
+                         "from docs/census/mutants-2026-11-04.json end at 07:04Z, 10:59Z (the "
+                         "input sets the window's waves; the tail stays six): the 20 shards of "
+                         "the waves ending by 09:00Z at 20, the 3 after them the tail at 6")
+        # Outside the window the input is the whole run's figure, as before the fold.
+        outside = self.plan(mode="complete", at=OUTSIDE, max_parallel="20")
+        self.assertEqual((outside["max_parallel"], outside["shards_tail"]), (20, 0))
+
+    def test_a_shard_the_record_does_not_name_reads_as_its_surfaces_longest_791(self):
+        self.with_record()
+        source, minutes = nightly.recorded_shard_minutes(self.repo)
+        self.assertEqual((source, len(minutes)), ("docs/census/mutants-2026-11-04.json", 23))
+        estimate = lambda surface, shard: nightly.shard_estimate(  # noqa: E731
+            {"surface": surface, "shard": shard, "estimated_minutes": 1}, minutes)
+        self.assertEqual(estimate("script", "0/8"), 212.8)
+        self.assertEqual(estimate("script", "0/9"), 212.8)
+        self.assertEqual(estimate("wire", "0/4"), 244.8)
+        self.assertEqual(estimate("substrates", "3/9"), 237.4)
+        # No record in the tree: the plan's own estimate.
+        self.assertEqual(nightly.shard_estimate({"surface": "script", "shard": "0/8",
+                                                 "estimated_minutes": 31}, {}), 31)
+        # A ninth script shard is the surface's longest: its wave is projected so.
+        rows = [{"surface": "script", "shard": f"{i}/9", "label": f"script-{i}-9"}
+                for i in range(9)]
+        waves = nightly.project_waves(rows, minutes, datetime(2026, 11, 5, 1, 0,
+                                                              tzinfo=timezone.utc), 14)
+        self.assertEqual([end.strftime("%H:%MZ") for _, end in waves], ["04:32Z"])
+
+    def test_a_wave_ending_at_the_windows_end_is_inside_it_791(self):
+        rows = [{"surface": "beef", "shard": f"{i}/30", "label": f"beef-{i}-30",
+                 "estimated_minutes": 60} for i in range(30)]
+        window, tail, figure, reason = nightly.split_tail(
+            rows, INSIDE, 14, "r", recorded=(None, {}))
+        # Waves end at 08:00Z, 09:00Z (at the end: inside) and 10:00Z.
+        self.assertEqual((len(window), len(tail), figure), (28, 2, 14))
+        self.assertEqual(reason, "r; the waves of 14 projected from the plan estimates end at "
+                                 "08:00Z, 09:00Z, 10:00Z: the 28 shards of the waves ending by "
+                                 "09:00Z at 14, the 2 after them the tail at 6")
+        self.assertEqual(nightly.split_tail([], INSIDE, 14, "r"), ([], [], 14, "r"))
 
     # PR #666's fold: the five holes the reads found, each on the fixture tree.
     def put(self, path, body):
@@ -1451,6 +1635,41 @@ class RecordCarriesTheFigures(unittest.TestCase):
         later = nightly.merge({"files": []}, dict(plan, commit="f" * 40), record, {}, "300")[0]
         row = {r["file"]: r for r in later}["src/transaction/beef.rs"]
         self.assertEqual((row["provenance"], row["run_id"], row["commit"]), ("carried", "200", "e" * 40))
+
+    def test_the_record_names_the_slots_the_run_held_and_why_791(self):
+        plan = dict(self.plan([], {}), max_parallel=14,
+                    max_parallel_reason="at 07:00Z, inside this crate's window")
+        run = nightly.merge({"files": []}, plan, self.base, {}, "200")[3]["runs"][-1]
+        self.assertEqual((run["max_parallel"], run["max_parallel_reason"]),
+                         (14, "at 07:00Z, inside this crate's window"))
+        # A plan before #791 names none, and the record adds none.
+        older = nightly.merge({"files": []}, self.plan([], {}), self.base, {}, "200")[3]
+        self.assertNotIn("max_parallel", older["runs"][-1])
+
+    def test_a_run_with_a_tail_names_the_tail_in_the_record_sentence_791(self):
+        import mutants_record as record
+        window = {"max_parallel": 14, "max_parallel_reason": "at 03:00Z, inside this crate's window"}
+        self.assertEqual(record.slots(window), "at 14 at a time, at 03:00Z, inside this crate's window; ")
+        tail = dict(window, shards_tail=9, max_parallel_tail=6)
+        self.assertEqual(record.slots(tail),
+                         "at 14 at a time for the window's shards and the 9 after them at 6 (the tail "
+                         "matrix, #791), at 03:00Z, inside this crate's window; ")
+        self.assertEqual(record.slots({}), "at six at a time, ")
+
+    def test_a_record_before_791_is_rewritten_byte_for_byte_791(self):
+        import mutants_record as record
+        census = Path(__file__).resolve().parents[2] / "docs" / "census"
+        doc = json.loads((census / "mutants-2026-11-04.json").read_text())
+        self.assertNotIn("max_parallel_reason", doc["runs"]["complete"])
+        self.assertEqual(record.markdown_complete(doc),
+                         (census / "mutants-2026-11-04.md").read_text())
+        doc["runs"]["complete"].update(max_parallel=14, max_parallel_reason="at 07:00Z, inside this crate's window",
+                          github_waits=["the macos-26-arm64 image failure | run 41861794622"])
+        text = record.markdown_complete(doc)
+        self.assertIn("(23 shards at 14 at a time, at 07:00Z, inside this crate's window; ", text)
+        self.assertIn("\n- the macos-26-arm64 image failure | run 41861794622\n", text)
+        with self.assertRaises(argparse.ArgumentTypeError):
+            record.one_line("an incident\n## a heading")
 
     def test_a_carried_figure_below_its_floor_is_a_finding_not_a_failure(self):
         plan = self.plan([], {})

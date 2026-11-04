@@ -599,6 +599,19 @@ def write_complete(args):
     # The checkpoint's reading, which no artifact carries (the captain's text, given by hand).
     if args.checkpoint:
         run["checkpoint"] = args.checkpoint
+    # #791: the slots the plan gave the shards and why, only when the plan names a reason
+    # (a plan before #791 gave six with none, and its record stays byte for byte as it
+    # was); GitHub's own waits, given by hand, named as GitHub's.
+    planned = the_plan(args.widened) or {}
+    if "max_parallel_reason" in planned:
+        run["max_parallel"] = planned["max_parallel"]
+        run["max_parallel_reason"] = planned["max_parallel_reason"]
+        # The tail matrix (#791): the shards projected past the window's end ran at six.
+        if planned.get("shards_tail"):
+            run["shards_tail"] = planned["shards_tail"]
+            run["max_parallel_tail"] = planned["max_parallel_tail"]
+    if getattr(args, "github_wait", None):
+        run["github_waits"] = list(args.github_wait)
     found = survivors(args.widened)
     rule = result["timeout_rule"]
     files, groups = [], []
@@ -677,6 +690,24 @@ def hours(value):
     return f"{int(value // 60)}h{int(round(value % 60)):02d}m"
 
 
+def slots(run):
+    """The shards' slots in the producing-run sentence (#791); a run before #791, six."""
+    if run.get("max_parallel_reason"):
+        if run.get("shards_tail"):
+            return (f"at {run['max_parallel']} at a time for the window's shards and the "
+                    f"{run['shards_tail']} after them at {run['max_parallel_tail']} (the tail "
+                    f"matrix, #791), {run['max_parallel_reason']}; ")
+        return f"at {run['max_parallel']} at a time, {run['max_parallel_reason']}; "
+    return "at six at a time, "
+
+
+def one_line(text):
+    """A `--github-wait` text, one line of the record's list (#791)."""
+    if not text.strip() or any(ch in text for ch in "\r\n"):
+        raise argparse.ArgumentTypeError("a GitHub wait is one non-empty line")
+    return text.strip()
+
+
 def markdown_complete(doc):
     run, totals = doc["runs"]["complete"], doc["totals"]
     rerun_rule = doc.get("timeout_rule") == "rerun"
@@ -720,7 +751,7 @@ def markdown_complete(doc):
         f"| {timeouts} | {run['vmem_ceiling_kb']:,} KB |",
         "",
         f"The mutation part's wall clock, dispatch to the score job's end: {hours(wall)} "
-        f"({totals['shards']} shards at six at a time, {totals['shard_minutes']:,} shard-minutes "
+        f"({totals['shards']} shards {slots(run)}{totals['shard_minutes']:,} shard-minutes "
         f"of job time over {totals['mutants']:,} mutants). The run's status when its artifacts "
         f"were read: `{run['status_at_fetch']}` (the fuzz jobs and the full-matrix dispatches run "
         "after the score job and are not this record's).",
@@ -728,6 +759,9 @@ def markdown_complete(doc):
     ]
     if run.get("checkpoint"):
         lines += [f"The checkpoint: {run['checkpoint']}", ""]
+    if run.get("github_waits"):
+        lines += ["GitHub's own waits in this run (GitHub's, not this crate's; #791):", "",
+                  *(f"- {wait}" for wait in run["github_waits"]), ""]
     lines += [
         "Artifact ids:",
         "",
@@ -949,6 +983,9 @@ def main():
                         help="the widened run, or the complete run with --previous")
     writer.add_argument("--checkpoint",
                         help="the checkpoint's reading of a one-run record (no artifact has it)")
+    writer.add_argument("--github-wait", action="append", default=[], type=one_line,
+                        help="a wait of GitHub's in the run (an image change, an incident, a "
+                             "hosted-runner queue), named as GitHub's in the record (#791)")
     writer.add_argument("--record", type=Path, default=nightly.FLOORS_RECORD)
     writer.add_argument("--out", type=Path, required=True,
                         help="the record's path without its suffix")

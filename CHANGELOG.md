@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the heavy-run cap by window, fourteen slots inside the run's own window and six outside, the fuzz stage to match, a dispatch input to override (#791)
+
+The owner's word of 2026-11-04 17:1xZ, through the keeper: "a heavy hosted run (a
+complete mutation run, a nightly) takes up to fourteen of the twenty slots inside
+its own window when no other heavy run of the account is scheduled in that window,
+six otherwise." Until now the nightly's two heavy matrices held six of the account's
+twenty slots in every hour (`HEAVY_MAX_PARALLEL = 6` and `NIGHT_PARALLEL = 6` in
+`.github/scripts/nightly_mutants.py`, the fuzz stage a literal `max-parallel: 6`),
+so the complete run's twenty-three shards went in four waves. The plan now reads
+the plan step's UTC clock (minutes after the dispatch) against the keeper's
+windows table, data in the script
+(`HEAVY_WINDOWS`: this crate's 01:00Z to 09:00Z, the 07:00Z slot and the pin-chain
+dispatches; the CLI's night at 17:00Z; the toolbox's night 20:00Z to 01:00Z and the CLI's 17:00Z to 20:00Z by the keeper's table of 18:0xZ, the day 09:00Z to 17:00Z at six),
+and `heavy_max_parallel` gives fourteen inside this crate's window with no other
+window at the hour and six otherwise, for both modes of the night (the word names
+a nightly a heavy run, so `NIGHT_PARALLEL` is gone). A new `workflow_dispatch`
+input, `heavy_max_parallel` (1 to 20, empty by default), overrides it for one run.
+The plan writes `max_parallel` and `max_parallel_reason` to `plan.json` and the
+step's outputs; the fuzz matrix reads `max_parallel` as the shards' matrix does;
+the night's record names the figure and its reason in its run entry, and a
+complete run's record in its producing-run section, with GitHub's own waits named
+as GitHub's (`mutants_record.py write --github-wait`). The figure's owner stays
+loop four's #675. Pinned by `tests/arch_nightly_cap.rs`
+(`every_heavy_matrix_reads_the_plans_window_figure_791`,
+`a_literal_cap_or_the_line_removed_is_refused_791`: a literal on either matrix,
+the line removed, the window's figure above 14, the shared one above 6, the
+input's bound above 20) and five `_791` tests in
+`.github/scripts/test_nightly_mutants.py` (fourteen at 07:00Z, six at 12:30Z and
+17:05Z, the window's edges, the input and its bound, the step output, the record's
+run entry), each RED on `02f14949`. The next complete run in the window is the CI
+witness. The fold (the keeper's word of 2026-11-04 18:0xZ, "a run overrunning its
+window drops to six for the waves after the window's end"): inside the window the
+plan projects each wave of the figure from the last complete record's shard
+minutes in the tree (`split_tail`, an incremental night from its own estimates), the
+shards whose wave ends by 09:00Z run in `mutants` at the figure and the rest in a new
+`mutants-tail` job at six after it (the same steps, pinned byte for byte, the same
+artifact names), the fuzz stage at `max_parallel_fuzz` (six after a tail); on the
+2026-11-04 record a complete run is whole at fourteen when dispatched by 01:22Z,
+14 and a tail of 9 at 03:00Z, and whole at six at 07:00Z. Pinned by
+`the_waves_past_the_window_run_in_a_tail_matrix_at_six_791`, the three matrices'
+readings, and five more `_791` plan tests, each RED on `67b309fe`.
+
 ### Fixed: every SLAP tracker backed off refuses in the reference's words, and a cached host list with no host available is not reused (#769)
 
 From the strength read of PR #767 (#762, 2026-11-04 11:48Z). With every SLAP
