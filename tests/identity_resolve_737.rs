@@ -175,11 +175,13 @@ async fn resolve(outputs: Vec<(Vec<u8>, u32)>, key: &str) -> Answer {
 }
 
 /// The certificates this crate's parser admits on `outputs`, read through
-/// `query`, which walks every output with the parser `resolve_by_identity_key`
-/// uses and keeps every subject, as `parseResults` does.
-async fn admitted(outputs: Vec<(Vec<u8>, u32)>, key: &str) -> Admitted {
+/// `query` with a question that carries no filter, which walks every output
+/// with the parser `resolve_by_identity_key` uses and keeps every subject,
+/// as `parseResults` does (since #746 a question naming a key keeps only
+/// that subject's).
+async fn admitted(outputs: Vec<(Vec<u8>, u32)>) -> Admitted {
     client(outputs)
-        .query(IdentityQuery::by_identity_key(key))
+        .query(IdentityQuery::default())
         .await
         .map(|results| {
             results
@@ -269,7 +271,7 @@ async fn agrees(names: &[&str]) {
                 case["check"]
             ));
         }
-        let (got, expected) = (admitted(outputs, &key).await, recorded_admitted(&case));
+        let (got, expected) = (admitted(outputs).await, recorded_admitted(&case));
         if got != expected {
             differ.push(format!("{name} admitted: {got:?}, expected {expected:?}"));
         }
@@ -359,7 +361,7 @@ async fn two_certificates_resolve_to_the_first_where_the_reference_returns_both_
     );
     let key = vector()["subject"].as_str().unwrap().to_string();
     assert_eq!(
-        admitted(outputs.clone(), &key).await,
+        admitted(outputs.clone()).await,
         recorded_admitted(&case),
         "both certificates admitted on both sides"
     );

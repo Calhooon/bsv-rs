@@ -816,6 +816,22 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
     /// Query identities with complex filters.
     ///
+    /// Every output of the `ls_identity` answer is parsed in order (a skipped
+    /// one passed over, a limit anywhere the call's refusal), then only the
+    /// certificates the question asked for are kept (#746), as the two
+    /// `discover_*` doors keep theirs (#739, #744): with `identity_key` set,
+    /// the subject's (lower-cased on both sides, `is_asked_subject`); with
+    /// `certificate_type` set, the type's (the canonical base64 text,
+    /// `type_base64()`, compared exactly with the asked text); with
+    /// `certifier` set, the certifier's (the certificate's certifier key,
+    /// lower-cased hex, against the asked text lower-cased). A field the
+    /// question does not carry filters nothing: with `certifier` unset the
+    /// lookup asks the default SocialCert certifier, but a certificate of
+    /// another certifier is not dropped. `attributes` is sent to the overlay
+    /// and not checked on the answer. The door has no reference counterpart
+    /// (`IdentityClient.ts`'s lookups are `resolveByIdentityKey` and
+    /// `resolveByAttributes`): this crate's own rule.
+    ///
     /// # Arguments
     /// * `query` - The query parameters
     ///
@@ -872,6 +888,14 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                         });
                     }
                 }
+                // Every output parsed, then only what the question asked
+                // for (#746)
+                results.retain(|result| {
+                    result
+                        .certificates
+                        .iter()
+                        .all(|cert| is_asked_certificate(cert, &query))
+                });
 
                 Ok(results)
             }
@@ -1080,6 +1104,25 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 /// `Wallet.ts:1012`): the one rule of the three by-key doors (#737, #739).
 fn is_asked_subject(subject: &crate::primitives::PublicKey, identity_key: &str) -> bool {
     subject.to_hex() == identity_key.to_lowercase()
+}
+
+/// Whether `cert` is one `query` asked for (#746): the subject through
+/// `is_asked_subject`, the type's canonical text exactly, the certifier's key
+/// lower-cased against the asked text lower-cased; a field the question does
+/// not carry filters nothing.
+fn is_asked_certificate(cert: &VerifiableCertificate, query: &IdentityQuery) -> bool {
+    query
+        .identity_key
+        .as_deref()
+        .is_none_or(|key| is_asked_subject(cert.subject(), key))
+        && query
+            .certificate_type
+            .as_deref()
+            .is_none_or(|cert_type| cert.type_base64() == cert_type)
+        && query
+            .certifier
+            .as_deref()
+            .is_none_or(|certifier| cert.certifier().to_hex() == certifier.to_lowercase())
 }
 
 /// The two `ls_identity` parsers' decode site: lock-before alone, as the
