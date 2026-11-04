@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `to_asm` writes `OP_0` and `OP_1NEGATE`, the reference's names, where it wrote `0` and `-1` (#723)
+
+`ScriptChunk::to_asm`, and through it `Script::to_asm`, `LockingScript::to_asm`
+and `UnlockingScript::to_asm`, wrote `0x00` as `0` and `0x4f` as `-1`. The
+reference names them `OP_0` and `OP_1NEGATE` (`ts-stack@edf6e03`
+`packages/sdk/src/script/OP.ts:6-7,11`: `OP_0` listed before `OP_FALSE`, "the
+top one will be used in standard ASM output"; `toASM` writes `OP[op]` through
+`#_chunkToString`, `Script.ts:668-677`), go-sdk@2ca481c's `NewFromASM` reads
+those names and cannot read `0` or `-1` (`script/script.go:46-63`: neither is a
+name, and neither is hex), and no BRC defines an ASM text, so the reference's
+text is this crate's (the keeper's word of 2026-11-03 23:1xZ on #661's open
+text). `to_asm` now writes the names; every other opcode's name is unchanged.
+`from_asm` keeps reading both forms, as the reference's `fromASM` reads the
+literals `0` and `-1` before any name (`#parseASMToken`, `Script.ts:91-92`), so
+a text the old writer wrote reads back to the same bytes.
+
+`tests/script_asm_names_723.rs` (five tests) against
+`vectors/script_asm_names_723.json` (recorded by `support/script_asm_names_723.mjs`
+under Node v22.18.0, two runs byte-identical): eight scripts written as the
+reference writes them through the three script types and read back to their
+bytes (`OP_0` and `OP_1NEGATE` alone and together, `OP_0` before a push,
+`OP_1NEGATE OP_1ADD OP_0 OP_EQUAL`, `OP_DUP OP_0 OP_DROP`, pushes of `00` and
+`81` written as their hex); ten texts read to the reference's bytes and written
+back in its text (`0`, `-1`, `0 -1` and `OP_DUP 0 OP_DROP`, the reference
+reading a bare `0` as the byte `00` and `-1` as `4f`; `OP_0`, `OP_FALSE`,
+`OP_1NEGATE`; `00` a push of one zero byte); go-sdk's reader (transcribed, not
+run) reading every text written. 5 of 5 RED on `0d8546c0` (`left: "0"`,
+`right: "OP_0"`; `left: "OP_DUP 0 OP_DROP"`), the reader halves green there.
+
+The tests that asserted the old text now assert the writer's: the chunk unit
+test, three `OP_0 OP_RETURN` outputs in `src/transaction/transaction.rs`, four
+in `tests/script_if_depth_634.rs`, one in `tests/script_script_603_b.rs`; in
+`tests/script_chunk_asm_661.rs` the two `0`/`-1` rows leave `ASM_STATED` (the
+reference's ASM on 18 of its 24 shapes, 16 before). No vector carried the old
+text as an output (`script_asm_603_a.json`'s `0` and `-1` are `fromASM`'s
+input). The ts-stack census's one ASM regression, `writebin-empty.0001`
+(`writeBin([]).toASM()` is `OP_0`), passes, its known failure removed from
+`tests/conformance_scripts.rs`: the script regressions 11 run, 11 passed, 0
+known (10 and 1 before); the evaluation census, judged by hex, unchanged at
+5,116 total, 4,120 run, 4,109 passed, 959 unsupported, 37 skipped, 11 known
+failures, against both `~/bsv/ts-stack/conformance` and `edf6e03`'s.
+
+Semver: no type or signature changed; the text of a public output changed.
+Every script holding `OP_0` (a data carrier's `OP_0 OP_RETURN <data>`, a
+CHECKMULTISIG unlocking script's leading `OP_0`) or `OP_1NEGATE` reads
+differently in ASM. Migration: a caller that matched `0` or `-1` in `to_asm`'s
+text matches `OP_0` or `OP_1NEGATE`; a caller that stored the old text reads it
+back with `from_asm` unchanged. No dependent named in `CLAUDE.md` calls
+`to_asm` or `from_asm`.
+
+### Notes: cross-SDK parity (#723)
+
+`CLAUDE.md`'s #661 row loses its `0`/`-1` clause: this crate writes the
+reference's text for both opcodes. go-sdk@2ca481c writes `0x00` as `OP_FALSE`
+(`script/opcodes.go:546`), which this crate and the reference read; its
+`NewFromASM` refuses the old `0` and `-1` (`ErrInvalidOpCode`). The row's
+`OP_UNKNOWN<n>` and `OP_RETURN` clauses stand, and so does #603 shard A's
+reading of `from_asm("")` and a double space, held pending the owner's word.
+
 ### Fixed: the `ls_identity` parsers read the output from the BEEF's subject, as the reference's discovery does (#721)
 
 - #720's rule read found both `ls_identity` parsers

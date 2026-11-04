@@ -595,12 +595,12 @@ fn every_return_inside_an_if_is_an_opcode_node_script_tests_0074() {
 /// push (`ScriptChunk::new_push`, no data). The node pushes an empty element
 /// for it (`Machine.lean:32,49`), which `Spend` does from the opcode. Kills
 /// `232:19` (`>` to `>=`), under which `OP_0` carries an empty `Some` and
-/// prints as `""` where the tree prints `0`.
+/// prints as `""` where the tree prints `OP_0` (`0` until #723).
 #[test]
 fn op_0_is_an_opcode_without_data_ts_stack_script_001() {
     let script = Script::from_binary(&hex("00")).unwrap();
     assert_eq!(script.chunks(), vec![ScriptChunk::new_push(Vec::new())]);
-    assert_eq!(script.to_asm(), "0");
+    assert_eq!(script.to_asm(), "OP_0");
 }
 
 /// A bare `OP_RETURN` is an opcode above `OP_PUSHDATA4`, which consumes no

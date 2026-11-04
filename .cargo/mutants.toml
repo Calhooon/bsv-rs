@@ -130,8 +130,9 @@ exclude_re = [
   '^src/script/script\.rs:409:27: replace < with > in Script::write_number$',
   '^src/script/script\.rs:409:27: replace < with <= in Script::write_number$',
   '^src/script/script\.rs:428:28: replace < with <= in Script::encode_script_number$',
-  # src/script/script_asm.rs:71:37, `<` to `<=` in Script::from_asm (#603 shard A, PR #639;
-  # script.rs:91:37 before #634 moved the ASM code, 94:33 before #639's fold). The comparison
+  # src/script/script_asm.rs:73:37, `<` to `<=` in Script::from_asm (#603 shard A, PR #639;
+  # 71:37 before #723's comment, script.rs:91:37 before #634 moved the ASM code, 94:33 before
+  # #639's fold). The comparison
   # bounds a hex token's direct push against OP_PUSHDATA1: at 76, the one length where the two
   # branches differ, `len as u8` is 0x4c, OP_PUSHDATA1 itself, so both write the same chunk
   # (bitcoin-sv v1.2.3 script.h:106-113, a direct push for 1 to 75 bytes and OP_PUSHDATA1 from
@@ -139,7 +140,7 @@ exclude_re = [
   # cold read with lengths 70 to 80 in five ASM shapes (0.97), the adversarial read with every
   # length 0 to 80 and 255, 256, 65535, 65536 through from_asm, to_binary, to_asm and the
   # interpreter byte-identical (EQUIVALENT, 0.99), the rule read (EQUIVALENT, 0.97).
-  '^src/script/script_asm\.rs:71:37: replace < with <= in Script::from_asm$',
+  '^src/script/script_asm\.rs:73:37: replace < with <= in Script::from_asm$',
   # src/transaction/beef_stream.rs:788:9, `BeefDecoder::take_deferred` replaced by `None` (#603,
   # shard S1, PR #647; the line unmoved by #643 to #648). Only the collecting decoder fills
   # `deferred` and only `Beef::collect` reads it; under the mutant the fold reaches the pure

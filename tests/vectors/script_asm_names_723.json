@@ -1,0 +1,222 @@
+{
+ "source": "tests/support/script_asm_names_723.mjs",
+ "runtime": "node v22.18.0",
+ "reference": "bsv-blockchain/ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9 packages/sdk (bun bundle)",
+ "go": "bsv-blockchain/go-sdk@2ca481c5931b987a0c8f48bb341c70b7477b6b07 script/script.go:46-63,190-215, transcribed, not run",
+ "bytes": [
+  {
+   "id": "op0",
+   "note": "OP_0 alone",
+   "hex": "00",
+   "ts": {
+    "asm": "OP_0",
+    "asm_back_hex": "00"
+   }
+  },
+  {
+   "id": "op1negate",
+   "note": "OP_1NEGATE alone",
+   "hex": "4f",
+   "ts": {
+    "asm": "OP_1NEGATE",
+    "asm_back_hex": "4f"
+   }
+  },
+  {
+   "id": "op0-op1negate",
+   "note": "both, side by side",
+   "hex": "004f",
+   "ts": {
+    "asm": "OP_0 OP_1NEGATE",
+    "asm_back_hex": "004f"
+   }
+  },
+  {
+   "id": "op0-push",
+   "note": "OP_0 then a push, a CHECKMULTISIG unlocking shape",
+   "hex": "0003aabbcc",
+   "ts": {
+    "asm": "OP_0 aabbcc",
+    "asm_back_hex": "0003aabbcc"
+   }
+  },
+  {
+   "id": "op1negate-arith",
+   "note": "OP_1NEGATE OP_1ADD OP_0 OP_EQUAL",
+   "hex": "4f8b0087",
+   "ts": {
+    "asm": "OP_1NEGATE OP_1ADD OP_0 OP_EQUAL",
+    "asm_back_hex": "4f8b0087"
+   }
+  },
+  {
+   "id": "dup-op0-drop",
+   "note": "OP_0 inside a longer script",
+   "hex": "760075",
+   "ts": {
+    "asm": "OP_DUP OP_0 OP_DROP",
+    "asm_back_hex": "760075"
+   }
+  },
+  {
+   "id": "push-zero-byte",
+   "note": "a push of one zero byte: its data hex, not a name",
+   "hex": "0100",
+   "ts": {
+    "asm": "00",
+    "asm_back_hex": "0100"
+   }
+  },
+  {
+   "id": "push-81",
+   "note": "a push of 0x81: its data hex, not a name",
+   "hex": "0181",
+   "ts": {
+    "asm": "81",
+    "asm_back_hex": "0181"
+   }
+  }
+ ],
+ "texts": [
+  {
+   "id": "zero",
+   "note": "the old writer's text for 0x00",
+   "text": "0",
+   "ts": {
+    "hex": "00",
+    "error": null,
+    "asm": "OP_0"
+   },
+   "go_transcribed": {
+    "hex": null,
+    "error": "ErrInvalidOpCode"
+   }
+  },
+  {
+   "id": "negative-one",
+   "note": "the old writer's text for 0x4f",
+   "text": "-1",
+   "ts": {
+    "hex": "4f",
+    "error": null,
+    "asm": "OP_1NEGATE"
+   },
+   "go_transcribed": {
+    "hex": null,
+    "error": "ErrInvalidOpCode"
+   }
+  },
+  {
+   "id": "op0-name",
+   "note": "the reference's name for 0x00",
+   "text": "OP_0",
+   "ts": {
+    "hex": "00",
+    "error": null,
+    "asm": "OP_0"
+   },
+   "go_transcribed": {
+    "hex": "00",
+    "error": null
+   }
+  },
+  {
+   "id": "op-false-name",
+   "note": "the alias of 0x00",
+   "text": "OP_FALSE",
+   "ts": {
+    "hex": "00",
+    "error": null,
+    "asm": "OP_0"
+   },
+   "go_transcribed": {
+    "hex": "00",
+    "error": null
+   }
+  },
+  {
+   "id": "op1negate-name",
+   "note": "the reference's name for 0x4f",
+   "text": "OP_1NEGATE",
+   "ts": {
+    "hex": "4f",
+    "error": null,
+    "asm": "OP_1NEGATE"
+   },
+   "go_transcribed": {
+    "hex": "4f",
+    "error": null
+   }
+  },
+  {
+   "id": "zero-negative-one",
+   "note": "both old texts",
+   "text": "0 -1",
+   "ts": {
+    "hex": "004f",
+    "error": null,
+    "asm": "OP_0 OP_1NEGATE"
+   },
+   "go_transcribed": {
+    "hex": null,
+    "error": "ErrInvalidOpCode"
+   }
+  },
+  {
+   "id": "op0-op1negate-names",
+   "note": "both names",
+   "text": "OP_0 OP_1NEGATE",
+   "ts": {
+    "hex": "004f",
+    "error": null,
+    "asm": "OP_0 OP_1NEGATE"
+   },
+   "go_transcribed": {
+    "hex": "004f",
+    "error": null
+   }
+  },
+  {
+   "id": "dup-zero-drop",
+   "note": "the old text inside a longer script",
+   "text": "OP_DUP 0 OP_DROP",
+   "ts": {
+    "hex": "760075",
+    "error": null,
+    "asm": "OP_DUP OP_0 OP_DROP"
+   },
+   "go_transcribed": {
+    "hex": null,
+    "error": "ErrInvalidOpCode"
+   }
+  },
+  {
+   "id": "dup-op0-drop",
+   "note": "the name inside a longer script",
+   "text": "OP_DUP OP_0 OP_DROP",
+   "ts": {
+    "hex": "760075",
+    "error": null,
+    "asm": "OP_DUP OP_0 OP_DROP"
+   },
+   "go_transcribed": {
+    "hex": "760075",
+    "error": null
+   }
+  },
+  {
+   "id": "hex-00",
+   "note": "two hex digits: a push of one zero byte",
+   "text": "00",
+   "ts": {
+    "hex": "0100",
+    "error": null,
+    "asm": "00"
+   },
+   "go_transcribed": {
+    "hex": "0100",
+    "error": null
+   }
+  }
+ ]
+}
