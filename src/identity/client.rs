@@ -763,13 +763,17 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// Discover certificates of a specific type.
     ///
     /// Keeps only certificates whose subject is `identity_key`, as
-    /// [`Self::discover_certificates`] does (#739). This door has no reference
-    /// counterpart; `cert_type` goes to the overlay query and the returned
-    /// certificates' type is not checked here (#744).
+    /// [`Self::discover_certificates`] does (#739), and of those only the
+    /// ones whose type is `cert_type` (#744): the type is sent in the
+    /// `ls_identity` query and checked again on each certificate read, its
+    /// canonical base64 text compared exactly with the asked text, so a host
+    /// answering with another type's certificate is not believed. The
+    /// reference has no by-type door (`DiscoverByIdentityKeyArgs` carries no
+    /// type at `ts-stack@edf6e03`): this crate's own rule.
     ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
-    /// * `cert_type` - The certificate type ID (base64)
+    /// * `cert_type` - The certificate type ID (base64 of 32 bytes, canonical)
     ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn discover_certificates_by_type(
@@ -779,7 +783,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     ) -> Result<Vec<VerifiableCertificate>> {
         let query =
             serde_json::json!({ "identityKey": identity_key, "certificateType": cert_type });
-        self.discover_of_subject(identity_key, query).await
+        let mut certificates = self.discover_of_subject(identity_key, query).await?;
+        // Every output parsed and the subject filtered, then only the asked
+        // type's (#744): the token's type text is canonical base64 of 32
+        // bytes (#553), so its re-encoding is the token's own text
+        certificates.retain(|cert| cert.type_base64() == cert_type);
+        Ok(certificates)
     }
 
     /// The two `discover_*` doors' walk: every output parsed in order, a
@@ -940,9 +949,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         };
 
         // Step 3: Decode lock-before alone, as IdentityClient.ts:773 does (#537)
-        let pushdrop = match PushDrop::decode_before(&tx_output.locking_script) {
-            Ok(pd) => pd,
-            Err(_) => return Ok(None), // Failed to decode PushDrop
+        let Some(pushdrop) = decode_token(&tx_output.locking_script) else {
+            return Ok(None); // Failed to decode PushDrop
         };
 
         // Step 4: The toolbox's record checks and byte bounds, or skipped (#553)
@@ -1027,9 +1035,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         };
 
         // Step 3: Decode lock-before alone, as IdentityClient.ts:773 does (#537)
-        let pushdrop = match PushDrop::decode_before(&tx_output.locking_script) {
-            Ok(pd) => pd,
-            Err(_) => return Ok(None), // Failed to decode PushDrop
+        let Some(pushdrop) = decode_token(&tx_output.locking_script) else {
+            return Ok(None); // Failed to decode PushDrop
         };
 
         // Step 4: The toolbox's record checks and byte bounds, or skipped (#553)
@@ -1073,6 +1080,15 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 /// `Wallet.ts:1012`): the one rule of the three by-key doors (#737, #739).
 fn is_asked_subject(subject: &crate::primitives::PublicKey, identity_key: &str) -> bool {
     subject.to_hex() == identity_key.to_lowercase()
+}
+
+/// The two `ls_identity` parsers' decode site: lock-before alone, as the
+/// reference's `PushDrop.decode` at its default position reads a revelation
+/// token (`ts-stack@edf6e03` `IdentityClient.ts:773`, #537). The token check
+/// after it (#544, `is_canonical_signed_pushdrop`) also refuses every
+/// lock-after layout, so the position is pinned here, at the call (#744).
+fn decode_token(script: &crate::script::LockingScript) -> Option<PushDrop> {
+    PushDrop::decode_before(script).ok()
 }
 
 #[cfg(test)]
@@ -1669,6 +1685,10 @@ mod field_value_261_tests;
 
 #[path = "client_token.rs"]
 mod token;
+
+#[cfg(test)]
+#[path = "client_decode_token_744_tests.rs"]
+mod decode_token_744_tests;
 
 #[path = "client_record.rs"]
 mod record;
