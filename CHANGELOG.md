@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `discover_certificates` asks `ls_identity` as the reference wallet does, without the `certificatesOnly` key the overlay's allowlist refuses (#754)
+
+From the #752 lane's reading of the reference overlay (2026-11-04 08:0xZ):
+`IdentityClient::discover_certificates(identity_key)` sent
+`{ identityKey, certificatesOnly: true }` to `ls_identity`. The reference
+overlay's identity lookup service admits seven keys and refuses any other
+for the whole question (`ts-stack@edf6e03`
+`packages/overlays/topics/src/identity/IdentityLookupService.ts:74-82`:
+`attributes`, `certifiers`, `identityKey`, `certificateTypes`,
+`serialNumber`, `limit`, `offset`; `shared/queryValidation.ts:35-38`,
+`Invalid lookup query: unexpected field <key>`), so a reference host refused
+the by-key discovery outright, the class of #752's `certificateType`. The
+door now asks `{ identityKey }`. The reference wallet's
+`discoverByIdentityKey`, the door this one stands for, asks
+`{ identityKey, certifiers }` (`wallet-toolbox` `Wallet.ts:1004`), its
+certifiers its trust settings' keys (`:992`; Metanet Trust Services and
+SocialCert by default, `WalletSettingsManager.ts:160-178`). This crate has
+no trust settings (the trust step unported, #739's parity note), so it names
+no certifier: the key alone reaches `findByIdentityKey` with no certifier
+filter (`IdentityLookupService.ts:144-145`,
+`IdentityStorageManager.ts:285-301`), where naming the SocialCert certifier
+alone, as `resolve_by_identity_key` and `query` do, would drop the
+certificates of the reference's other default certifier. #739's subject
+filter on the answer is unchanged. The refusal is witnessed by reading the
+allowlist, no live overlay.
+
+What `certificatesOnly` was: a key written with the door by the commit that
+added the identity module (`5e4b9503`), sent by neither go-sdk@2ca481c nor
+ts-sdk@9e3ede6b (a `grep` of each finds no such key), read by no reference host and
+documented nowhere in this repository (no rustdoc, README, `docs/` or
+changelog line describes it as a contract; the #739 parity note and #752's
+finding name it only as the difference from the reference).
+
+Semver: the question's shape is a wire contract toward overlay hosts, not a
+signature: a behaviour change at one public door without a signature change.
+Migration: a non-reference host that read `certificatesOnly` no longer
+receives it; nothing in this crate documented the key, and a reference host
+answered nothing before.
+
+`tests/identity_question_754.rs`: #752's recording facilitator on an
+injected `.invalid` resolver; `discover_certificates`' question equal to
+`{ identityKey }` and admitted by the allowlist, and the questions of the
+four by-key doors (`discover_certificates`, `discover_certificates_by_type`,
+`resolve_by_identity_key`, `query` with a type, limit and offset) each
+admitted by it. 2 of 2 RED on `c92ab842` (a scratch copy, its own target
+dir, the test file copied in): `left: [Object {"certificatesOnly": Bool(true),
+"identityKey": ...}]`, `right: [Object {"identityKey": ...}]`, and the census's
+`left: ["certificatesOnly"]`, `right: []`.
+
 ### Fixed: `Transaction::from_beef` and `Beef::find_bump` take the last BUMP holding a txid, as the reference's index does (#732)
 
 From the strength read of PR #729 (#728, 2026-11-04 01:2xZ): the reference
