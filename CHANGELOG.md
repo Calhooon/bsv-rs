@@ -103,8 +103,9 @@ empty script is `''` (`:222-229`); a double space inserts a silent empty push th
 same way. Filed upstream by the keeper as ts-stack #1479 (2026-11-04, the ask
 additive at the default). `CLAUDE.md`'s #603 shard A row and the #723 parity
 note now cite it: the divergence is from ts-sdk alone, the port's reading held
-as go-sdk's pending the filing; the owner's word on the empty ASM stays open on
-its brief with that recommendation. Records only; no code or test moved.
+as go-sdk's; the owner's word (2026-11-04 13:5xZ, through the keeper) holds it
+so: the empty script, with go-sdk, ts-stack #1479 the upstream row, the item
+closed. Records only; no code or test moved.
 
 ### Fixed: `merge_transaction` merges the transaction's merkle path as a BUMP and walks its source transactions, as the reference does (#764)
 
@@ -1294,8 +1295,9 @@ reading of `from_asm("")` and a double space: go-sdk's reading (`NewFromASM("")`
 the empty script, `script/script.go:46-50` at v1.7.1), the divergence from
 ts-sdk alone (`fromASM('')` one empty push `{ data: [], op: 0 }` where
 `toASM` of the empty script is `''`, `Script.ts:73-82,92-125,222-229`), filed
-upstream as ts-stack #1479 (2026-11-04) and held pending it; the
-recommendation on the owner's brief is now to hold the port's reading.
+upstream as ts-stack #1479 (2026-11-04); the owner's word (2026-11-04
+13:5xZ, through the keeper): HELD as the empty script, with go-sdk, the
+upstream row the filing, the item closed.
 
 ### Fixed: the `ls_identity` parsers read the output from the BEEF's subject, as the reference's discovery does (#721)
 
