@@ -568,9 +568,9 @@ impl Transaction {
             beef.merge_bump(bump);
         }
 
-        // Add all ancestor transactions in dependency order (oldest first)
+        // The ancestors in dependency order, each entry alone (#764's fold)
         for ancestor in ancestors {
-            beef.merge_transaction(ancestor);
+            beef.push_transaction(ancestor.id(), ancestor, None);
         }
 
         Ok(beef.to_binary())
@@ -616,9 +616,9 @@ impl Transaction {
             beef.merge_bump(bump);
         }
 
-        // Add all ancestor transactions in dependency order (oldest first)
+        // The ancestors in dependency order, each entry alone (#764's fold)
         for ancestor in ancestors {
-            beef.merge_transaction(ancestor);
+            beef.push_transaction(ancestor.id(), ancestor, None);
         }
 
         Ok(beef.to_binary())
@@ -665,9 +665,9 @@ impl Transaction {
             beef.merge_bump(bump);
         }
 
-        // Add all ancestor transactions in dependency order (oldest first)
+        // The ancestors in dependency order, each entry alone (#764's fold)
         for ancestor in ancestors {
-            beef.merge_transaction(ancestor);
+            beef.push_transaction(ancestor.id(), ancestor, None);
         }
 
         let txid = self.id();
@@ -791,7 +791,7 @@ impl Transaction {
     /// ancestry, with each input's `source_txid` filled from its source when
     /// it had none, so its bytes, its txid and its input txids are this
     /// transaction's.
-    fn clone_for_beef(&self) -> Transaction {
+    pub(super) fn clone_for_beef(&self) -> Transaction {
         let mut copy = self.clone_without_sources();
         for (copy_input, input) in copy.inputs.iter_mut().zip(&self.inputs) {
             if copy_input.source_txid.is_none() {
