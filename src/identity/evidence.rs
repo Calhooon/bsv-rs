@@ -28,17 +28,47 @@
 //! against a chain tracker (`TransactionEvidenceCoordinator.ts:317-345`),
 //! the `CLAUDE.md` #553 row's remaining residue.
 //!
-//! The lookup output's `txid` hint (`TransactionEvidence.ts:123-124`, the
-//! toolbox passing the whole output at `identityUtils.ts:602`) is not
-//! carried by `OutputListItem`, so this port has no hint to compare: a JSON
-//! answer whose `txid` disagrees with its BEEF's subject is skipped there
-//! and read here (#735). The reference's `timeout` code comes from the
-//! coordinator's tracker verify, unported: this check has no timeout path.
+//! The lookup output's `txid` hint (`OutputListItem::txid` since #735, the
+//! toolbox passing the whole output at `identityUtils.ts:602`) is compared
+//! with the subject as `loadEvidenceTransaction` compares it
+//! (`TransactionEvidence.ts:123-124`, lower-cased), but a disagreement does
+//! not refuse the evidence here: the subject is read and the contradiction
+//! counted as the host's fault ([`HintContradictions`], read by
+//! `IdentityClient::txid_hint_contradictions`), by the owner's word of
+//! 2026-11-04 13:5xZ, where the reference refuses it as `invalid-evidence`
+//! and skips the output (ts-stack #1482). The reference's `timeout` code
+//! comes from the coordinator's tracker verify, unported: this check has no
+//! timeout path.
 
 use crate::overlay::OutputListItem;
 use crate::transaction::{Beef, BeefTx, Transaction};
+use crate::wallet::WalletInterface;
 use crate::Error;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// The admitted outputs whose host's `txid` hint named another transaction
+/// than the BEEF's subject (#735): a counted outcome, the subject read.
+#[derive(Debug, Default)]
+pub(super) struct HintContradictions(AtomicU64);
+
+impl HintContradictions {
+    fn record(&self) {
+        self.0.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+impl<W: WalletInterface> super::IdentityClient<W> {
+    /// How many lookup outputs this client read whose host's `txid` hint
+    /// disagreed with the BEEF's subject (#735). The output is read from its
+    /// subject, as the evidence proves it, and the disagreement counted as
+    /// the host's fault, a figure the caller can log or act on; the
+    /// reference skips such an output (`TransactionEvidence.ts:123-124`,
+    /// ts-stack #1482). Outputs the evidence check refuses are not counted.
+    pub fn txid_hint_contradictions(&self) -> u64 {
+        self.hint_contradictions.0.load(Ordering::Relaxed)
+    }
+}
 
 /// `defaultTransactionEvidenceLimits.candidateBytes`
 /// (`TransactionEvidence.ts:62`).
@@ -99,10 +129,20 @@ const fn limit(site: &'static str) -> Refusal {
 /// The parsers' door: the subject, `None` where the toolbox's verifier
 /// skips the output (`invalid-evidence`), and the reference's words,
 /// `Transaction evidence: limit` (`TransactionEvidence.ts:29`), where it
-/// rethrows and the discovery fails (`identityUtils.ts:630-634`).
-pub(super) fn admit(output: &OutputListItem) -> crate::Result<Option<Transaction>> {
+/// rethrows and the discovery fails (`identityUtils.ts:630-634`). A
+/// subject whose output carries a disagreeing hint is admitted and counted
+/// in `contradictions` (#735).
+pub(super) fn admit(
+    output: &OutputListItem,
+    contradictions: &HintContradictions,
+) -> crate::Result<Option<Transaction>> {
     match parse_evidence(&output.beef, output.output_index) {
-        Ok(subject) => Ok(Some(subject)),
+        Ok(subject) => {
+            if hint_disagrees(output.txid.as_deref(), &subject) {
+                contradictions.record();
+            }
+            Ok(Some(subject))
+        }
         Err(refusal) if refusal.code == Code::InvalidEvidence => Ok(None),
         Err(refusal) => Err(Error::IdentityError(format!(
             "Transaction evidence: {}",
@@ -111,9 +151,16 @@ pub(super) fn admit(output: &OutputListItem) -> crate::Result<Option<Transaction
     }
 }
 
+/// `loadEvidenceTransaction`'s hint test (`TransactionEvidence.ts:123-124`):
+/// a hint present that, lower-cased, is not the subject's txid. The
+/// reference refuses the evidence there; [`admit`] counts it (#735).
+pub(super) fn hint_disagrees(hint: Option<&str>, subject: &Transaction) -> bool {
+    hint.is_some_and(|hint| hint.to_ascii_lowercase() != subject.id())
+}
+
 /// `parseEvidence` (`TransactionEvidence.ts:179-201`) on a lookup output's
-/// BEEF and index, no txid hint (an `OutputListItem` carries none): the
-/// subject, or the refusal.
+/// BEEF and index, the txid hint left to [`admit`] (#735): the subject, or
+/// the refusal.
 pub(super) fn parse_evidence(bytes: &[u8], output_index: u32) -> Result<Transaction, Refusal> {
     // snapshotEvidenceBytes (:93-108): the length before anything else
     if bytes.len() > CANDIDATE_BYTES {

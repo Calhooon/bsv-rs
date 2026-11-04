@@ -35,6 +35,7 @@ impl OverlayLookupFacilitator for Lookup {
                     beef: bytes.clone(),
                     output_index: 0,
                     context: None,
+                    txid: None,
                 })
                 .collect(),
         })

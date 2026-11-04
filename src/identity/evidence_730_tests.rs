@@ -151,6 +151,7 @@ fn admit_skips_invalid_evidence_and_refuses_a_limit_in_the_reference_words_730()
             beef: built.beef,
             output_index: 0,
             context: None,
+            txid: None,
         };
         let expected = match case["outcome"].as_str().unwrap() {
             "skipped" => Ok(None),
@@ -159,7 +160,7 @@ fn admit_skips_invalid_evidence_and_refuses_a_limit_in_the_reference_words_730()
             )),
         };
         assert_eq!(
-            admit(&output).map(|t| t.map(|t| t.id())),
+            admit(&output, &Default::default()).map(|t| t.map(|t| t.id())),
             expected,
             "{name}"
         );

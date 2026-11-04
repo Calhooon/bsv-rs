@@ -46,6 +46,7 @@ impl OverlayLookupFacilitator for TokenLookup {
                 beef: self.0.clone(),
                 output_index: 0,
                 context: None,
+                txid: None,
             }],
         })
     }
