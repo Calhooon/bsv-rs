@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the checkpoint of the pause of 2026-11-04 (the owner's word)
+
+`docs/CHECKPOINT-2026-11-04.md`: the lines of beta and main, every pull request's state, the blocking set of the beta.8 cut, the strength line, the three steps on resume, every process stopped by name and the worktrees at the pause. Nothing in the crate changes.
+
 ### Fixed: the atomic writer copies no BUMP for a txid-only entry without a matching index, as the reference does (#766)
 
 From the scoped cold re-read of PR #763's fold (2026-11-04 11:25Z).
