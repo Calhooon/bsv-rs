@@ -110,12 +110,6 @@ pub struct Beef {
     needs_sort: bool,
 }
 
-/// `bump`'s level 0 holds `txid` as a leaf flagged `txid` (the strict match).
-fn flags(bump: &MerklePath, txid: &str) -> bool {
-    let mut level0 = bump.path.first().into_iter().flatten();
-    level0.any(|l| l.txid && l.hash.as_deref() == Some(txid))
-}
-
 impl Beef {
     /// Creates a new empty BEEF with V2 format.
     pub fn new() -> Self {
@@ -367,21 +361,20 @@ impl Beef {
     }
 
     /// Gives each entry without an index the merged BUMP when its level 0
-    /// holds the txid as a leaf flagged `txid`, as the reference's
-    /// `#mergeBumpEntry` gives it (`ts-stack@edf6e03` `Beef.ts:774-786`). A
-    /// strict site beside `try_to_validate_bump_index`: the reference's
-    /// `#tryMarkTxProvenByBump` takes any level-0 hash and flags the leaf
-    /// (`:813-822`), a stated difference since v0.3.5 (`ef98e246`).
+    /// holds the txid as any leaf, flagging the leaf `txid`, as the
+    /// reference's `#mergeBumpEntry` and `#tryMarkTxProvenByBump` do
+    /// (`ts-stack@edf6e03` `Beef.ts:774-786`, `:813-822`); see
+    /// `try_to_validate_bump_index` for the strict match this was until #765.
     fn update_bump_indices(&mut self, bump_index: usize) {
-        let bump = &self.bumps[bump_index];
+        let bump = &mut self.bumps[bump_index];
         for tx in self.txs.iter_mut().filter(|tx| tx.bump_index().is_none()) {
-            if flags(bump, &tx.txid()) {
+            if bump.contains_and_mark(&tx.txid()) {
                 tx.set_bump_index(Some(bump_index));
             }
         }
     }
 
-    /// Stores `tx` under `txid` with `bump_index`, else the last BUMP flagging
+    /// Stores `tx` under `txid` with `bump_index`, else the last BUMP holding
     /// it, in the place of an entry of the txid: one entry, no walk
     /// (`merge_graph.rs`; `to_beef`'s collected ancestors).
     pub(super) fn push_transaction(
@@ -444,24 +437,26 @@ impl Beef {
     }
 
     /// Gives a new entry without an index the LAST BUMP whose level 0 holds
-    /// its txid as a leaf flagged `txid`, as the reference's
-    /// `#tryToValidateBumpIndex` reads its index (`ts-stack@edf6e03`
-    /// `Beef.ts:1329-1340`, the index a `Map.set` over the BUMPs, `:576-585`);
-    /// the earliest until #757. The match is strict here and at
-    /// `update_bump_indices`, a stated difference since v0.3.5 (`ef98e246`):
-    /// the reference takes any level-0 hash and flags the leaf (`:1334-1338`,
-    /// `:813-822`), as go-sdk@2ca481c's `bumpProves`, `FindBumpByHash` and
-    /// `MergeBump` do (`beef.go:67-83`, `:620-630`, `:780-785`; its
-    /// `tryToValidateBumpIndex`, `:858-868`, only checks a path already set),
-    /// and as this crate's `find_bump` and `verify_structure` read a BUMP.
-    /// BRC-74's flag `00` says a leaf is no client txid, not that it is
-    /// unproven (`transactions/0074.md:75-77` at `5119a9b`).
+    /// its txid as any leaf, flagging that leaf `txid` (its flag byte written
+    /// `02` for `00`), as the reference's `#tryToValidateBumpIndex` does
+    /// (`ts-stack@edf6e03` `Beef.ts:1329-1340`, the index a `Map.set` over
+    /// every level-0 hash, `:576-585`, the leaf flagged at `:1334-1338`) and
+    /// go-sdk@2ca481c's `bumpProves` reads (`beef.go:67-83`). A level-0 leaf
+    /// is a txid of the BUMP's block whose path computes the same root, so
+    /// the match claims no proof that is not there; BRC-74's `00` says no
+    /// client txid, not unproven (`transactions/0074.md:75`). From v0.3.5
+    /// (`ef98e246`) to #765 the match was strict (a flagged leaf only) on a
+    /// `verify_valid` failure that left no shape; reversed on the keeper's
+    /// word (2026-11-04) with the p25 sibling shape the witness, the strict
+    /// rule's one recorded effect a refusal of a BEEF the reference links
+    /// (`tests/beef_sibling_leaf_765.rs`).
     fn try_to_validate_bump_index(&mut self, tx_idx: usize) {
         if self.txs[tx_idx].bump_index().is_some() {
             return;
         }
         let txid = self.txs[tx_idx].txid();
-        if let Some(i) = self.bumps.iter().rposition(|b| flags(b, &txid)) {
+        let mut bumps = self.bumps.iter_mut();
+        if let Some(i) = bumps.rposition(|b| b.contains_and_mark(&txid)) {
             self.txs[tx_idx].set_bump_index(Some(i));
         }
     }
@@ -2092,20 +2087,16 @@ mod tests {
     }
 
     #[test]
-    fn test_try_to_validate_bump_index_strict_no_sibling_fallback() {
-        // When a tx's txid only appears as a SIBLING hash (txid=false) in an
-        // unrelated bump, `try_to_validate_bump_index` must leave the tx's
-        // bump_index as None — not fall back to the sibling match.
-        //
-        // Regression test for: consolidation failing with "BEEF structure is
-        // invalid" because a tx's bump_index was being set to a bump that
-        // contained its hash only as a sibling (used only for merkle
-        // computation of some OTHER tx's proof). The reference and go-sdk
-        // take the sibling (the stated difference at the function).
+    fn test_try_to_validate_bump_index_takes_a_sibling_leaf_and_flags_it_765() {
+        // A tx's txid held at level 0 only as a leaf flagged `00` beside
+        // another tx's: the BUMP proves it (same block, same root), so
+        // `try_to_validate_bump_index` takes it and flags the leaf, as the
+        // reference's `#tryToValidateBumpIndex` does (`Beef.ts:1334-1338`).
+        // From v0.3.5 (`ef98e246`) to #765 this pinned `None`.
         let mut beef = Beef::new();
 
-        // Build a bump that proves SOME OTHER tx (txid=true for it) and
-        // happens to include `tx_id` as a sibling hash (txid=false).
+        // A bump that proves SOME OTHER tx (txid=true for it) and holds
+        // `tx_id` beside it (txid=false).
         let tx_raw = make_raw_tx(None, 1234, None);
         let tx_id = BeefTx::from_raw_tx(tx_raw.clone(), None).txid();
         let other_txid = "d".repeat(64);
@@ -2121,7 +2112,7 @@ mod tests {
                 },
                 MerklePathLeaf {
                     offset: 1,
-                    hash: Some(tx_id.clone()), // our tx appears here as SIBLING
+                    hash: Some(tx_id.clone()), // our tx, flagged `00`
                     txid: false,
                     duplicate: false,
                 },
@@ -2129,23 +2120,20 @@ mod tests {
         };
         beef.merge_bump(bump);
 
-        // Now add our tx via merge_raw_tx (bump_index=None, forcing
-        // try_to_validate_bump_index to run). Before the fix this would
-        // fall back to the sibling match and set bump_index=Some(0).
+        // merge_raw_tx (bump_index=None) runs try_to_validate_bump_index.
         beef.merge_raw_tx(tx_raw, None);
 
         let tx = beef.find_txid(&tx_id).unwrap();
-        assert_eq!(
-            tx.bump_index(),
-            None,
-            "tx must not be assigned to a bump where it appears only as a sibling hash"
-        );
+        assert_eq!(tx.bump_index(), Some(0), "the sibling leaf's BUMP");
+        assert!(beef.bumps[0].path[0][1].txid, "the leaf flagged on the way");
     }
 
     #[test]
-    fn test_update_bump_indices_ignores_siblings() {
-        // Verify that update_bump_indices (called by merge_bump) does not
-        // assign bump indices based on sibling hashes.
+    fn test_update_bump_indices_takes_a_sibling_leaf_and_flags_it_765() {
+        // update_bump_indices (called by merge_bump) gives an entry the BUMP
+        // holding its txid as a leaf flagged `00` and flags the leaf, as the
+        // reference's `#tryMarkTxProvenByBump` does (`Beef.ts:813-822`).
+        // From v0.3.5 (`ef98e246`) to #765 this pinned `None`.
         let mut beef = Beef::new();
 
         let tx_raw = make_raw_tx(None, 1000, None);
@@ -2165,7 +2153,7 @@ mod tests {
                 MerklePathLeaf {
                     offset: 1,
                     hash: Some(tx_id.clone()),
-                    txid: false, // Our tx appears as sibling only
+                    txid: false, // our tx, flagged `00`
                     duplicate: false,
                 },
             ]],
@@ -2173,13 +2161,9 @@ mod tests {
 
         beef.merge_bump(bump);
 
-        // The tx should NOT have been assigned this bump
         let tx = beef.find_txid(&tx_id).unwrap();
-        assert_eq!(
-            tx.bump_index(),
-            None,
-            "Transaction must not be assigned a bump where it appears only as a sibling"
-        );
+        assert_eq!(tx.bump_index(), Some(0), "the sibling leaf's BUMP");
+        assert!(beef.bumps[0].path[0][1].txid, "the leaf flagged on the way");
     }
 }
 

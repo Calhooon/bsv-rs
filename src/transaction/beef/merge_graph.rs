@@ -20,7 +20,7 @@ impl Beef {
     /// and takes the index that returns (`#mergeTransactionEntry`,
     /// `:849-856`): a path whose BUMP this BEEF holds (the same height and
     /// root) is combined into it, no second BUMP. One without a path takes
-    /// the last BUMP flagging its txid, as [`merge_raw_tx`](Self::merge_raw_tx)
+    /// the last BUMP holding its txid as any level-0 leaf (flagged on the way, #765), as [`merge_raw_tx`](Self::merge_raw_tx)
     /// does. A transaction whose entry ends with an index stops the walk; one
     /// that ends with none has its sources merged and walked in turn
     /// (`:897`). An entry of the same txid already held is replaced in its
