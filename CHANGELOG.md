@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the by-type questions send `certificateTypes` with `identityKey`, as the reference overlay reads them (#752)
+
+From the rule read of PR #750 (#746, 2026-11-04 07:0xZ), older than that PR:
+`IdentityClient::discover_certificates_by_type` and `IdentityClient::query`
+(with `certificate_type` set) sent the type to `ls_identity` as
+`certificateType`, a string. The reference overlay's identity lookup service
+admits seven keys and refuses any other for the whole question
+(`ts-stack@edf6e03` `packages/overlays/topics/src/identity/IdentityLookupService.ts:74-82`:
+`attributes`, `certifiers`, `identityKey`, `certificateTypes`,
+`serialNumber`, `limit`, `offset`; `shared/queryValidation.ts:35-38`,
+`Invalid lookup query: unexpected field <key>`), reads `certificateTypes` as
+an array of at most 32 base64 texts of 32 decoded bytes (`:97-100`; the
+check trims and tests the alphabet, the padding and the length, with no
+trailing-bit check, `validationHelpers.ts:488-498`), and
+answers by type only beside `identityKey` (`:136-143`, then
+`IdentityStorageManager.ts:315-339`, `findByCertificateType`; the overlay's
+own `IdentityQuery` type, `types.ts:28-36`). A reference host therefore
+refused every by-type question, so #744's and #746's type filters took effect
+only against a non-reference host. Both doors now send
+`certificateTypes: [cert_type]`; `discover_certificates_by_type`'s question is
+`{ identityKey, certificateTypes }`, `query`'s carries the same key beside
+its others, every other key as before. The reference wallet asks no by-type
+question (`wallet-toolbox` `Wallet.ts:1004`, `discoverByIdentityKey`, sends
+`{ identityKey, certifiers }`), so the overlay's allowlist is the reference
+for the shape. The refusal is witnessed by reading the allowlist, no live
+overlay.
+
+Semver: the question's shape is a wire contract toward overlay hosts, not a
+signature: a behaviour change at two public doors without a signature change.
+Migration: a non-reference host that read `certificateType` now receives
+`certificateTypes`, an array of one; such a host reads the new key or loses
+the type (a reference host answered nothing before). `IdentityQuery`'s own
+serde JSON keeps its `certificateType` member: it is the struct's
+serialization, not the lookup question.
+
+Not changed, a finding for a follow-up: `discover_certificates` sends
+`certificatesOnly: true`, a key the same allowlist refuses
+(`IdentityLookupService.ts:74-82`), so a reference host refuses that door's
+question too; outside #752's two doors.
+
+`tests/identity_question_752.rs`: a recording facilitator on an injected
+`.invalid` resolver keeps each question it receives; the by-type door's
+question `{ identityKey, certificateTypes: [type] }` and `query`'s with a type,
+limit and offset each equal to the expected JSON and admitted by the
+allowlist, `query` without a type carrying no type key. 2 of 3 RED on
+`56caa15d` (a scratch copy, its own target dir, the test file copied in):
+`left: [Object {"certificateType": String("AQEB...AQE="), "identityKey": ...}]`,
+`right: [Object {"certificateTypes": Array [String("AQEB...AQE=")], ...}]`;
+the no-type control green on both.
+
 ### Tests: the evidence walk's visited set pinned (a grandparent shared by two unproven paths; a proven grandparent reached twice), witnessed under Node 22 (#748)
 
 No behaviour change. From #747's strength read, which held that no pin of

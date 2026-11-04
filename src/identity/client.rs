@@ -769,7 +769,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// canonical base64 text compared exactly with the asked text, so a host
     /// answering with another type's certificate is not believed. The
     /// reference has no by-type door (`DiscoverByIdentityKeyArgs` carries no
-    /// type at `ts-stack@edf6e03`): this crate's own rule.
+    /// type at `ts-stack@edf6e03`): this crate's own rule. The question is
+    /// `{ identityKey, certificateTypes: [cert_type] }`, the keys the
+    /// reference overlay's `ls_identity` allowlist admits and its by-type
+    /// branch reads together (`IdentityLookupService.ts:74-82,136-143`); until
+    /// #752 the type went as `certificateType`, a key that allowlist refuses.
     ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
@@ -781,8 +785,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         identity_key: &str,
         cert_type: &str,
     ) -> Result<Vec<VerifiableCertificate>> {
+        // The type as the reference overlay reads it: `certificateTypes`, an
+        // array, beside `identityKey` (#752)
         let query =
-            serde_json::json!({ "identityKey": identity_key, "certificateType": cert_type });
+            serde_json::json!({ "identityKey": identity_key, "certificateTypes": [cert_type] });
         let mut certificates = self.discover_of_subject(identity_key, query).await?;
         // Every output parsed and the subject filtered, then only the asked
         // type's (#744): the token's type text is canonical base64 of 32
@@ -828,7 +834,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// question does not carry filters nothing: with `certifier` unset the
     /// lookup asks the default SocialCert certifier, but a certificate of
     /// another certifier is not dropped. `attributes` is sent to the overlay
-    /// and not checked on the answer. The door has no reference counterpart
+    /// and not checked on the answer. A `certificate_type` is sent as
+    /// `certificateTypes: [type]`, the key and shape the reference overlay's
+    /// `ls_identity` allowlist admits (`IdentityLookupService.ts:74-82`; that
+    /// overlay reads the types only beside `identityKey` and with no
+    /// `attributes` or `serialNumber` in the question, `:130-136`), where
+    /// until #752 it went as `certificateType`. The door has no reference counterpart
     /// (`IdentityClient.ts`'s lookups are `resolveByIdentityKey` and
     /// `resolveByAttributes`): this crate's own rule.
     ///
@@ -851,7 +862,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         }
 
         if let Some(ref cert_type) = query.certificate_type {
-            lookup_query.insert("certificateType".to_string(), serde_json::json!(cert_type));
+            lookup_query.insert(
+                "certificateTypes".to_string(),
+                serde_json::json!([cert_type]),
+            );
         }
 
         if let Some(ref certifier) = query.certifier {
