@@ -52,9 +52,11 @@ Semver: a PUBLIC SHAPE change on the beta line (0.9), the beta.8 break
 beside #737's list return, by the keeper's word of 2026-11-04 15:5xZ.
 Migration: a struct literal of `OutputListItem` adds `txid: None` (the
 behaviour of every output before #735). bsv-wallet-toolbox-rs builds it by
-literal at eight sites in four files (`src/wallet/discovery_evidence_tests.rs`,
-`lookup_evidence_tests.rs`, `lookup_decode_tests.rs`, `lookup_fixture.rs`,
-counted with `grep -c` on its checkout at `545aa38b`); bsv-wallet-cli at none. A caller
+literal at four sites in four files (`src/wallet/discovery_evidence_tests.rs:126`,
+`lookup_evidence_tests.rs:65`, `lookup_decode_tests.rs:22`, `lookup_fixture.rs:181`,
+read on its checkout at `545aa38b`; a fifth literal, `discovery_evidence_tests.rs:131`,
+takes `..unproven.clone()` and needs no edit, and three more `OutputListItem {` lines
+are return types); bsv-wallet-cli at none. A caller
 reading identities may log or act on `txid_hint_contradictions()`; nothing
 else moves. In this crate the 34 literals of the tests and the unit modules
 add `txid: None`; `IdentityClient::new` now builds its resolver and calls
@@ -73,7 +75,10 @@ tests/vectors/identity_evidence_hint_735.json). Residues, older than #735 and
 unported: the reference's resolver also reads the hint, skipping a SLAP
 advertisement whose hint disagrees (`LookupResolver.ts:2201`) and dropping a
 disagreeing output from its aggregation (`resolveTxIdForOutput`,
-`:1700,1747,2223-2240`); and its binary reader hands each output the
+`:2223-2240`, its `null` skipped by `mergeAnswer` at `:1104-1105` through
+`:1700`; on the toolbox's identity path, `identityUtils.ts:444`'s
+`resolver.query`, this drop precedes the evidence check, and porting it would
+refuse what the owner's word reads); and its binary reader hands each output the
 `toBinaryAtomic` BEEF of its txid (`:921-929`), where this crate's hands
 every output the whole BEEF, so on a binary answer of several transactions
 the subject is the BEEF's last and the outpoint's hint is counted as a
