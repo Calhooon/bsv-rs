@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `discover_certificates_by_type` keeps only the asked type's certificates (#744)
+
+From the strength read of PR #742 (#739, 2026-11-04 04:5xZ): the by-type door
+sent its `cert_type` in the `ls_identity` query and never checked it on the
+certificates it read, so an overlay host answering with another type's
+certificate was believed. The door now keeps a certificate only when its type
+is the asked one, applied on #742's shared walk (`discover_of_subject`: every
+output parsed in order, a `limit` anywhere failing the call, #730, #737) after
+its subject filter (`is_asked_subject`, #739), so a certificate is returned
+only when both its subject and its type are the asked ones. The comparison is the certificate's canonical base64 text
+(`type_base64()`) against the asked text, exactly: a token's `type` is
+canonical base64 of 32 bytes or the token is skipped (#553), so its
+re-encoding is the token's own text and the text comparison is the bytes'
+comparison for every canonical asked text; an asked text no token can carry
+(unpadded, spaced) matches nothing. `discover_certificates` and the other
+doors are unchanged.
+
+Hardening, not parity: the reference has no by-type door
+(`DiscoverByIdentityKeyArgs` carries no type at `ts-stack@edf6e03`), so this
+crate's own rule answers the question its own door asks.
+
+Semver: a behaviour change at one public door without a signature change:
+`discover_certificates_by_type` drops a certificate whose type is not the
+asked one where it returned it. Migration: none.
+
+`tests/identity_discover_type_744.rs`: #737's token (#553's `reference` case,
+type `AQEB...AQE=`) and the same record re-typed to `AwMD...AwM=`, re-signed by
+its certifier and revealed by its subject (this crate's writer), served on an
+injected `.invalid` resolver: `discover_certificates` returns both, the by-type
+door the asked type's alone either way round, nothing for another type alone
+or for the asked text unpadded; and the asked type under another subject's
+certificate (the same record re-typed and revealed by the subject 5) beside
+them: the asked key's and type's certificate alone, the foreign subject's
+dropped by the subject filter, the foreign type's by the type filter. Built
+on `cbf27827` before PR #742 landed and folded onto it (`b2760031`): RED there
+with the tip's file overlaid, 3 of 3 (`left: ["AQEB...AQE=", "AwMD...AwM="]`,
+`right: ["AQEB...AQE="]`; at the three-output assertion
+``the foreign subject's and the foreign type's certificates``, the asked
+key's foreign-type certificate returned), the foreign-subject assertions
+before it passing there (the subject filter is #742's). On the tip 3 of 3.
+
+### Tests: the two `ls_identity` parsers' lock position pinned at their decode site, past the token check (#744)
+
+From #742's cold read (2026-11-04 05:0xZ): since #544 the token check
+(`is_authenticated_token`) refuses every lock-after layout on its own:
+`is_canonical_signed_pushdrop` requires a 33-byte key push then `OP_CHECKSIG`
+as the script's leading two chunks. No lock-after token can pass it, so with
+both parsers reverted to `PushDrop::decode` (the lock position either way)
+`tests/identity_lock_position_537.rs` stayed green (measured: 2 of 2 under the
+mutation). Both parsers now decode through one crate-private function,
+`decode_token` (`PushDrop::decode_before`, unchanged behaviour), and the unit
+module `src/identity/client_decode_token_744_tests.rs` pins it on the
+reference's own revelation token relocked after its fields (the same key, the
+same two fields, the same signature): `PushDrop::decode` reads it with the
+same fields, the token check refuses it, and `decode_token` refuses it by the
+position alone. RED with `decode_token` reading through `PushDrop::decode`
+(`the parsers' decode site reads lock-before alone`). The 537 file's relocked
+control is unchanged; its helper `subject_of` (#742), which asked `02aa` when
+the token carried no `"subject":"` marker, now refuses that case naming the
+token, and the #618 key-only case asks `02aa` explicitly (`KEY_ONLY_ASKED`),
+so no certificate-carrying case can fall to an ask the subject filter answers
+`[]`.
+
 ### Fixed: `discover_certificates` and `discover_certificates_by_type` keep only the asked subject's certificates, the rule `resolve_by_identity_key` carries from the reference (#739)
 
 From the scoped cold re-read of PR #738 (#737, 2026-11-04 03:4xZ), a residual

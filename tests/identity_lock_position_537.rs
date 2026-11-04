@@ -16,22 +16,28 @@ use bsv_rs::wallet::ProtoWallet;
 use indexmap::IndexMap;
 use serde_json::Value;
 
-/// The subject the token's certificate JSON names, if it carries one (a
-/// key-only token carries none, so no certificate is there to filter).
-fn subject_of(script: &[u8]) -> String {
+/// The subject the token's certificate JSON names; `case` names the token
+/// in the refusal when it carries none (a token that should carry a
+/// certificate and does not would ask `02aa`, which the subject filter (#739)
+/// answers `[]` whatever the parser did).
+fn subject_of(script: &LockingScript, case: &str) -> String {
+    let script = script.to_binary();
     let marker = b"\"subject\":\"";
-    match script.windows(marker.len()).position(|w| w == marker) {
-        Some(at) => {
-            let at = at + marker.len();
-            String::from_utf8(script[at..at + 66].to_vec()).unwrap()
-        }
-        None => "02aa".to_string(),
-    }
+    let at = script
+        .windows(marker.len())
+        .position(|w| w == marker)
+        .unwrap_or_else(|| panic!("{case}: the token carries no certificate subject"))
+        + marker.len();
+    String::from_utf8(script[at..at + 66].to_vec()).unwrap()
 }
 
-/// How many identities and certificates the two parsers return for `script`.
-async fn read(script: LockingScript) -> (usize, usize) {
-    let script_bytes = script.to_binary();
+/// The key a key-only token (#618) is asked under: it carries no
+/// certificate, so no subject is there to filter, and none is looked for.
+const KEY_ONLY_ASKED: &str = "02aa";
+
+/// How many identities and certificates the two parsers return for
+/// `script`, `discover_certificates` asked for `asked`.
+async fn read(script: LockingScript, asked: &str) -> (usize, usize) {
     let resolver = lock_position::answering("ls_identity", script);
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
@@ -40,12 +46,15 @@ async fn read(script: LockingScript) -> (usize, usize) {
         .resolve_by_attributes(attributes, false)
         .await
         .unwrap();
-    // The token's own subject, so the subject filter (#739) skips nothing
-    let certificates = client
-        .discover_certificates(&subject_of(&script_bytes))
-        .await
-        .unwrap();
+    let certificates = client.discover_certificates(asked).await.unwrap();
     (identities.len(), certificates.len())
+}
+
+/// `read` asking the token's own certificate subject, so the subject filter
+/// (#739) skips nothing and the skip stays a pin.
+async fn read_certificate(script: LockingScript, case: &str) -> (usize, usize) {
+    let asked = subject_of(&script, case);
+    read(script, &asked).await
 }
 
 #[tokio::test]
@@ -55,7 +64,7 @@ async fn a_lock_after_identity_token_is_skipped_as_the_reference_skips_it_537() 
     for case in &cases {
         assert_eq!(case["outcome"], "skipped", "{}", case["name"]);
         assert_eq!(
-            read(lock_position::script(case)).await,
+            read_certificate(lock_position::script(case), case["name"].as_str().unwrap()).await,
             (0, 0),
             "{}",
             case["name"]
@@ -65,7 +74,7 @@ async fn a_lock_after_identity_token_is_skipped_as_the_reference_skips_it_537() 
     // since then the reference's authentication skips them too: the key and
     // the signature are not the subject's (`IdentityClient.ts:776-815`).
     let control = lock_position::relocked_before(&cases[0]);
-    assert_eq!(read(control).await, (0, 0));
+    assert_eq!(read_certificate(control, "relocked_before").await, (0, 0));
 }
 
 /// The #537 case a #618 case was built from.
@@ -89,7 +98,12 @@ async fn a_key_only_and_a_no_checksig_identity_token_are_skipped_as_the_referenc
     for case in &cases {
         assert_eq!(case["outcome"], "skipped", "{}", case["name"]);
         let script = decode_618::script(case, from_537(&old, case));
-        assert_eq!(read(script.clone()).await, (0, 0), "{}", case["name"]);
+        let name = case["name"].as_str().unwrap();
+        let read_here = match case["shape"].as_str().unwrap() {
+            "key_only" => read(script.clone(), KEY_ONLY_ASKED).await,
+            _ => read_certificate(script.clone(), name).await,
+        };
+        assert_eq!(read_here, (0, 0), "{name}");
         let resolver = lock_position::answering("ls_identity", script);
         let client =
             IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
