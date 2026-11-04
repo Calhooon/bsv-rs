@@ -604,6 +604,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     ///     println!("Found: {}", id.name);
     /// }
     /// ```
+    ///
+    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn resolve_by_identity_key(
         &self,
         identity_key: &str,
@@ -662,6 +664,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// attrs.insert("email".to_string(), "user@example.com".to_string());
     /// let identities = client.resolve_by_attributes(attrs, true).await?;
     /// ```
+    ///
+    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn resolve_by_attributes(
         &self,
         attributes: IndexMap<String, String>,
@@ -728,6 +732,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
+    ///
+    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn discover_certificates(
         &self,
         identity_key: &str,
@@ -763,6 +769,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key to look up
     /// * `cert_type` - The certificate type ID (base64)
+    ///
+    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn discover_certificates_by_type(
         &self,
         identity_key: &str,
@@ -798,6 +806,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     ///
     /// # Arguments
     /// * `query` - The query parameters
+    ///
+    /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn query(&self, query: IdentityQuery) -> Result<Vec<IdentityResolutionResult>> {
         let mut lookup_query = serde_json::Map::new();
 
@@ -913,10 +923,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         output: &OutputListItem,
     ) -> Result<Option<IdentityCertificate>> {
-        // Step 1: The BEEF's subject, its atomic txid else the last on the
-        // wire, as the toolbox's evidence loader reads it
-        // (TransactionEvidence.ts:116-126, #721)
-        let Ok(tx) = Transaction::from_beef(&output.beef, None) else {
+        // Step 1: The BEEF's subject (#721) under the reference's evidence
+        // check, a refused one skipped, a limit the discovery's refusal
+        // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730)
+        let Some(tx) = super::evidence::admit(output)? else {
             return Ok(None);
         };
 
@@ -1000,10 +1010,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         output: &OutputListItem,
     ) -> Result<Option<VerifiableCertificate>> {
-        // Step 1: The BEEF's subject, its atomic txid else the last on the
-        // wire, as the toolbox's evidence loader reads it
-        // (TransactionEvidence.ts:116-126, #721)
-        let Ok(tx) = Transaction::from_beef(&output.beef, None) else {
+        // Step 1: The BEEF's subject (#721) under the reference's evidence
+        // check, a refused one skipped, a limit the discovery's refusal
+        // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730)
+        let Some(tx) = super::evidence::admit(output)? else {
             return Ok(None);
         };
 

@@ -26,7 +26,9 @@ use bsv_rs::overlay::{
 use bsv_rs::primitives::{to_hex, PrivateKey, PublicKey};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
-use bsv_rs::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
+use bsv_rs::transaction::{
+    Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+};
 use bsv_rs::wallet::types::Outpoint;
 use bsv_rs::wallet::{
     Counterparty, CreateSignatureArgs, GetPublicKeyArgs, ProtoWallet, Protocol, SecurityLevel,
@@ -393,8 +395,12 @@ fn published(json: &str) -> OutputListItem {
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, locking)).unwrap();
+    // Proven by a block of its own, the evidence the identity parsers'
+    // check admits without the made-up parent (#730)
+    let leaf = MerklePathLeaf::new_txid(0, tx.id());
     let mut beef = Beef::new();
-    beef.merge_transaction(tx);
+    let index = beef.merge_bump(MerklePath::new(900, vec![vec![leaf]]).unwrap());
+    beef.merge_raw_tx(tx.to_binary(), Some(index));
     OutputListItem {
         beef: beef.to_binary(),
         output_index: 0,

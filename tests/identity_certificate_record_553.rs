@@ -8,7 +8,8 @@
 //! `tests/vectors/identity_certificate_record_553.json`
 //! (`tests/support/identity_certificate_record_553.mjs`, Node v22.18.0): the
 //! reference's own token and twenty-five signed for the subject 9 over its JSON
-//! changed in one respect, each with `parseResults`' outcome. Hermetic: an
+//! changed in one respect, each with `parseResults`' outcome, the two of
+//! 256 KiB refused whole by the evidence check since #730. Hermetic: an
 //! in-process resolver on an `.invalid` host.
 #![cfg(feature = "identity")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -25,8 +26,10 @@ use serde_json::Value;
 
 /// The two cases whose transaction passes the reference evidence layer's
 /// 256 KiB script bound (`TransactionEvidence.ts:155-172`), refused whole by
-/// the toolbox wallet's verifier before the record is read; this crate has
-/// no evidence layer, so its parsers answer as `decodeIdentityOutput` does.
+/// the toolbox wallet's verifier before the record is read
+/// (`identityUtils.ts:630-634`); since #730 this crate's parsers run that
+/// check first and refuse the discovery in its words, where they read the
+/// record as `decodeIdentityOutput` does until then.
 const EVIDENCE_REFUSED: [&str; 2] = ["certificate_at_bound", "certificate_over_bound"];
 
 fn vector() -> Value {
@@ -87,9 +90,14 @@ async fn an_identity_record_is_read_only_when_the_reference_discovery_reads_it_5
     assert_eq!(cases.len(), 26);
     for case in cases {
         let name = case["name"].as_str().unwrap();
-        let expected = match case["decode"]["outcome"].as_str().unwrap() {
+        // The whole discovery's outcome, the wallet verifier's (#730)
+        let expected = match case["wallet"]["outcome"].as_str().unwrap() {
             "read" => Ok((1, 1)),
             "skipped" => Ok((0, 0)),
+            "refused" => Err(format!(
+                "identity error: {}",
+                case["wallet"]["words"].as_str().unwrap()
+            )),
             other => panic!("{name}: unexpected outcome {other}"),
         };
         assert_eq!(
@@ -98,7 +106,7 @@ async fn an_identity_record_is_read_only_when_the_reference_discovery_reads_it_5
             "{name}: {}",
             case["check"]
         );
-        // The wallet's verifier answers the same but where its evidence
+        // The record checks alone answer the same but where the evidence
         // layer refuses the whole answer first
         if EVIDENCE_REFUSED.contains(&name) {
             assert_eq!(case["wallet"]["outcome"], "refused", "{name}");

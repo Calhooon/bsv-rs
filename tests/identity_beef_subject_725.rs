@@ -9,8 +9,10 @@
 //! (`tests/support/identity_beef_subject_725.mjs`, Node v22.18.0,
 //! `ts-stack@edf6e03`): per shape the bytes, `parseEvidence`'s selected txid
 //! or refusal (`packages/sdk/src/transaction/TransactionEvidence.ts:110-127`,
-//! `:143`), the check that refused, and `parseResults`' outcome. Hermetic: an
-//! in-process facilitator on an `.invalid` host.
+//! `:143`), the check that refused, and `parseResults`' outcome; every shape
+//! answered as the reference answers it since #730 (the txid-only parent
+//! skipped by the reference's evidence walk). Hermetic: an in-process
+//! facilitator on an `.invalid` host.
 #![cfg(feature = "identity")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -29,6 +31,9 @@ use indexmap::IndexMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+/// `parseEvidence`'s answer on every shape it refuses.
+const REFUSED: &str = "refused: Transaction evidence: invalid-evidence";
 
 fn vector() -> Value {
     serde_json::from_str(include_str!("vectors/identity_beef_subject_725.json")).unwrap()
@@ -184,13 +189,19 @@ async fn read(beef: Vec<u8>, subject: &str) -> (usize, usize) {
     (identities.len(), certificates.len())
 }
 
-/// The recorded shape's bytes equal `built`, and its recorded outcome.
-fn recorded(v: &Value, name: &str, built: &[u8]) -> (String, String) {
+/// The recorded shape's bytes equal `built`, its selected txid (the one
+/// field the reference's `parseEvidence` itself produces) is `selected`, and
+/// its recorded outcome and refusing line.
+fn recorded(v: &Value, name: &str, built: &[u8], selected: &str) -> (String, String) {
     let case = shape(v, name);
     assert_eq!(
         to_hex(built),
         case["beef"].as_str().unwrap(),
         "{name}: this crate's writer and the reference's recorded bytes"
+    );
+    assert_eq!(
+        case["selected_txid"], selected,
+        "{name}: parseEvidence's answer"
     );
     (
         case["outcome"].as_str().unwrap().to_string(),
@@ -215,11 +226,14 @@ async fn an_atomic_header_naming_an_absent_txid_is_skipped_by_both_parsers_725()
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
     let beef = absent_atomic_txid(&t, v["absent_txid"].as_str().unwrap());
-    let (outcome, refused_at) = recorded(&v, "absent_atomic_txid", &beef);
+    let (outcome, refused_at) = recorded(&v, "absent_atomic_txid", &beef, REFUSED);
     assert_eq!(outcome, "skipped");
-    assert!(
-        refused_at.starts_with("TransactionEvidence.ts:120-121"),
-        "{refused_at}"
+    assert_eq!(
+        refused_at,
+        format!(
+            "TransactionEvidence.ts:120-121: findAtomicTransaction({}) is undefined",
+            v["absent_txid"].as_str().unwrap()
+        )
     );
     // The BEEF itself parses, its one entry the token's transaction
     let parsed = Beef::from_binary(&beef).unwrap();
@@ -234,19 +248,12 @@ async fn an_atomic_header_naming_an_absent_txid_is_skipped_by_both_parsers_725()
 /// reference selects the subject and then refuses it in
 /// `assertUnconfirmedGraph` (`TransactionEvidence.ts:155-177`): its input's
 /// source transaction is absent (`enqueueUnconfirmedParents`, `:143`), so
-/// `parseResults` skips the output. This crate's parsers run no
-/// unconfirmed-graph check (#553's stated evidence-layer residue) and read
-/// the subject's token: the one shape where the tip differs from the
-/// reference, newly exposed by #721 (the base skipped it by accident, its
-/// `beef.txs.first()` the txid-only entry, which holds no transaction). This
-/// pin asserts this crate's reading, the stated residue, documented by
-/// `CLAUDE.md`'s #553 row ("`assertUnconfirmedGraph` skips a lookup output
-/// whose unconfirmed graph has an input without its source transaction,
-/// `:143`, so a txid-only parent before a raw unproven subject is skipped
-/// there and read here"), and that the reference's refusing line names the
-/// subject, the txid both sides pick.
+/// `parseResults` skips the output. Since #730 both parsers run that walk
+/// (`src/identity/evidence.rs`) and skip it at the same node, the subject's
+/// input: the agreement. RED on `11bb04ce`, which read the subject's token
+/// (`(1, 1)`), #553's stated evidence-layer residue that #730 closes.
 #[tokio::test]
-async fn a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_there_553_725() {
+async fn a_txid_only_parent_before_an_unproven_subject_is_skipped_as_the_reference_skips_it_725() {
     let v = vector();
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
@@ -258,22 +265,20 @@ async fn a_txid_only_parent_before_an_unproven_subject_is_read_here_and_skipped_
         ("txid_only_parent", plain),
         ("txid_only_parent_atomic", atomic),
     ] {
-        let (outcome, refused_at) = recorded(&v, name, &beef);
+        let (outcome, refused_at) = recorded(&v, name, &beef, REFUSED);
         assert_eq!(outcome, "skipped", "{name}: the reference");
-        assert!(
-            refused_at.starts_with("TransactionEvidence.ts:143"),
-            "{name}: {refused_at}"
-        );
-        assert!(
-            refused_at.contains(&format!(
-                "TransactionEvidence.ts:143: {} input",
-                t.subject.id()
-            )),
-            "{name}: the reference's pick is the subject: {refused_at}"
+        assert_eq!(
+            refused_at,
+            format!(
+                "TransactionEvidence.ts:143: {} input {}.0 has no source transaction",
+                t.subject.id(),
+                t.parent.id()
+            ),
+            "{name}: the reference's pick is the subject"
         );
         let selected = Transaction::from_beef(&beef, None).unwrap().id();
         assert_eq!(selected, t.subject.id(), "{name}");
-        assert_eq!(read(beef, &subject).await, (1, 1), "{name}: this crate");
+        assert_eq!(read(beef, &subject).await, (0, 0), "{name}: this crate");
     }
 }
 
@@ -293,10 +298,12 @@ async fn a_three_transaction_chain_is_read_from_its_subject_by_both_parsers_725(
     let plain = chain(&t).to_binary();
     let atomic = chain(&t).to_binary_atomic(&t.tip.id()).unwrap();
     for (name, beef) in [("chain", plain), ("chain_atomic", atomic)] {
-        let (outcome, _) = recorded(&v, name, &beef);
-        assert_eq!(outcome, "read", "{name}: the reference");
-        let case = shape(&v, name);
-        assert_eq!(case["selected_txid"], t.tip.id().as_str(), "{name}");
+        let (outcome, refused_at) = recorded(&v, name, &beef, &t.tip.id());
+        assert_eq!(
+            (outcome.as_str(), refused_at.as_str()),
+            ("read", ""),
+            "{name}: the reference"
+        );
         let parsed = Beef::from_binary(&beef).unwrap();
         let order: Vec<String> = parsed.txs.iter().map(|tx| tx.txid()).collect();
         assert_eq!(

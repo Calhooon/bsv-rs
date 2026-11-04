@@ -9,7 +9,9 @@ use bsv_rs::overlay::{
 };
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
-use bsv_rs::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
+use bsv_rs::transaction::{
+    Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -47,10 +49,16 @@ pub fn source_of(script: LockingScript) -> Transaction {
     tx
 }
 
-/// A lookup output carrying `script` at index 0.
+/// A lookup output carrying `script` at index 0, its transaction proven by
+/// a block of its own (a lone leaf at offset 0), so the identity parsers'
+/// evidence check, the reference's, admits it without the made-up parent
+/// (#730, `TransactionEvidence.ts:173`).
 pub fn output_of(script: LockingScript) -> OutputListItem {
+    let tx = source_of(script);
+    let leaf = MerklePathLeaf::new_txid(0, tx.id());
     let mut beef = Beef::new();
-    beef.merge_transaction(source_of(script));
+    let index = beef.merge_bump(MerklePath::new(900, vec![vec![leaf]]).unwrap());
+    beef.merge_raw_tx(tx.to_binary(), Some(index));
     OutputListItem {
         beef: beef.to_binary(),
         output_index: 0,
