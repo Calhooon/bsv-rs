@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: an Atomic subject written twice is judged by its later entry, as the reference judges it (#731)
+
+An `ls_identity` lookup output whose Atomic BEEF names X and carries X twice,
+once raw and once txid-only, is judged by the later entry on both sides. The
+reference keeps every entry in the order written (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Beef.ts:1263-1265`, the atomic txid at
+`:1245-1247`, `:1267`), indexes them by `Map.set` in order so the later entry
+of a txid wins (`#rebuildTxIndexes`, `:516-524`), and loads the target
+through `findAtomicTransaction` (`:639-645`;
+`TransactionEvidence.ts:116-121`). This crate's `Beef::from_binary` collects
+each element as the decoder yields it (`src/transaction/beef/collect.rs`;
+no reordering of a repeated txid's entries: the issue's open question,
+answered by reading and now pinned), and `push_tx` sets the txid's index to
+the new position (`src/transaction/beef.rs`), so `evidence.rs`'s
+`find_txid(&target)` reads the same entry.
+
+Four shapes over #725's transactions, recorded under Node v22.18.0 by
+`tests/support/identity_evidence_731.mjs` into
+`tests/vectors/identity_evidence_731.json` (two runs byte-identical) and
+rebuilt by this crate's writer (`tests/support/identity_evidence_731.rs`:
+the Atomic prefix by `Writer`, `Beef::to_writer` over `txs` set by hand) to
+the recorded bytes:
+
+| Shape | Index entry | Reference (`parseEvidence` / `parseResults`) | Here |
+|---|---|---|---|
+| `proven_subject_raw_then_txid_only` | txid only | `invalid-evidence` at `:120-121` / skipped | the same |
+| `proven_subject_txid_only_then_raw` | raw | X / read | the same |
+| `unproven_subject_raw_then_txid_only` | txid only | `invalid-evidence` at `:120-121` / skipped | the same |
+| `unproven_subject_txid_only_then_raw` | raw | X / read | the same |
+
+Pinned below the door by `src/identity/evidence_731_tests.rs` (the entries in
+the written order, the index's entry, `parse_evidence`'s code and line or X,
+`admit`) and at the door by `tests/identity_evidence_731.rs` (both parsers on
+an injected `.invalid` resolver). The two skip shapes are GREEN at the door
+whatever `evidence.rs` does: the resolver's `Transaction::from_beef` drops
+them ahead of any parser (`src/overlay/lookup_resolver.rs:465`, `get_or_cache_tx_id`, called from `src/overlay/lookup_resolver/query.rs:145`, the same index; the reference's resolver drops them too, `LookupResolver.ts:2232-2239`). GREEN on
+`7a047467`; RED in a scratch copy under three mutations: `push_tx` keeping
+the earlier entry (4 of 5 unit, 4 of 5 door, the index's entry wrong);
+`load_evidence_transaction` taking the raw entry of the target (the two
+raw-then-txid-only unit tests, the door green); the collect mode inserting a
+txid-only entry before a raw one of its txid (the two raw-then-txid-only unit
+tests at the wire-order assertion, and their door tests). No behaviour
+change, no public item.
+
+### Notes: cross-SDK parity (#731)
+
+Both sides read the later entry at the pin: no divergence row. go-sdk at
+`2ca481c` has no evidence door (`identity/client.go:240-276` resolves through
+its wallet), so no Go column.
+
 ### Fixed: an offset-0 proof under 100 blocks deep is refused by `Transaction::verify`, as the reference does (#734)
 
 From the #730 lane's recording (2026-11-04 02:1xZ), the keeper's word of
