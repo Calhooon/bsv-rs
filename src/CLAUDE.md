@@ -74,7 +74,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 | `messages` | `MessageVersionMismatch`, `MessageError`, `MessageRecipientMismatch` |
 | `compat` | `InvalidMnemonic`, `InvalidEntropyLength`, `InvalidMnemonicWord`, `InvalidExtendedKey`, `HardenedFromPublic`, `InvalidDerivationPath`, `EciesInvalidPlaintext`, `EciesDecryptionFailed`, `EciesHmacMismatch` |
 | `auth` | `AuthError`, `SessionNotFound`, `CertificateValidationError`, `TransportError` |
-| `overlay` | `OverlayError`, `NoHostsFound`, `OverlayBroadcastFailed` |
+| `overlay` | `OverlayError`, `OverlayResourceLimit` (a lookup client limit reached, the reference's `LookupResourceLimitError`, neutral for host reputation, #775), `NoHostsFound`, `OverlayBroadcastFailed` |
 | `registry` | `RegistryError`, `DefinitionNotFound`, `InvalidDefinitionData` |
 | `kvstore` | `KvStoreError`, `KvStoreLocalError` (reference local lookup/action words, #454/#470), `KvStoreKeyNotFound`, `KvStoreCorruptedState`, `KvStoreEmptyContext`, `KvStoreInvalidKey`, `KvStoreInvalidValue` |
 | `identity` | `IdentityError`, `IdentityNotFound`, `ContactNotFound` |

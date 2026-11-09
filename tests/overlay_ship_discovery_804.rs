@@ -36,10 +36,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bsv_rs::overlay::{
-    create_signed_overlay_admin_token, AdmittanceInstructions, LookupAnswer, LookupQuestion,
-    LookupResolver, LookupResolverConfig, OutputListItem, OverlayBroadcastFacilitator,
-    OverlayLookupFacilitator, Protocol, RequireAck, Steak, TaggedBEEF, TopicBroadcaster,
-    TopicBroadcasterConfig,
+    create_signed_overlay_admin_token, AdmittanceInstructions, LookupAnswer, LookupLimits,
+    LookupQuestion, LookupResolver, LookupResolverConfig, OutputListItem,
+    OverlayBroadcastFacilitator, OverlayLookupFacilitator, Protocol, RequireAck, Steak, TaggedBEEF,
+    TopicBroadcaster, TopicBroadcasterConfig,
 };
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::script::LockingScript;
@@ -93,9 +93,29 @@ impl OverlayBroadcastFacilitator for Acknowledging {
     }
 }
 
+/// The resolver's limits these tests run under: the reference's defaults
+/// with `maxResponseBytes` and `maxTotalBytes` raised to 128 MiB. The
+/// reference's resolver refuses a custom facilitator's answer past 32 MiB
+/// (`assertTrackedOutputBudget`, `LookupResolver.ts:2351-2362`; #775 here),
+/// so the SHIP bounds past it (`:765-767`) are reached only past the
+/// resolver's; the recording ran on a stub resolver, which has none.
+/// `the_resolvers_default_limits_take_an_answer_past_32_mib_first_775_804`
+/// pins the default.
+fn raised_limits() -> LookupLimits {
+    let mut limits = LookupLimits::default();
+    limits.max_response_bytes = 128 * MIB;
+    limits.max_total_bytes = 128 * MIB;
+    limits
+}
+
 /// A resolver whose `ls_ship` host (one of its own: the reputation tracker
-/// is one global keyed by URL) answers `answer`.
+/// is one global keyed by URL) answers `answer`, under `raised_limits`.
 fn resolver(answer: LookupAnswer) -> Arc<LookupResolver> {
+    resolver_under(answer, raised_limits())
+}
+
+/// `resolver` under the resolver limits `limits`.
+fn resolver_under(answer: LookupAnswer, limits: LookupLimits) -> Arc<LookupResolver> {
     static N: AtomicUsize = AtomicUsize::new(0);
     let n = N.fetch_add(1, Ordering::Relaxed);
     Arc::new(LookupResolver::new(LookupResolverConfig {
@@ -105,6 +125,7 @@ fn resolver(answer: LookupAnswer) -> Arc<LookupResolver> {
             "ls_ship".to_string(),
             vec![format!("https://ls-ship-{n}.ship-discovery-804-rs.invalid")],
         )])),
+        limits,
         ..Default::default()
     }))
 }
@@ -314,6 +335,31 @@ async fn four_outputs_of_16_mib_then_an_advertisement_skip_it_804() {
     outputs.extend(sixteen.iter().cloned());
     outputs.push(ad("after"));
     assert_eq!(admitted(outputs).await, Ok(vec![host("before")]));
+}
+
+/// At the resolver's default limits the answer of four 16 MiB outputs
+/// passes `maxResponseBytes` (32 MiB) and the resolver drops it, neutral for
+/// the host, before the SHIP discovery reads it: no host is admitted, as the
+/// reference's `TopicBroadcaster` on its own `LookupResolver` admits none
+/// (`LookupResolver.ts:2351-2362`, `:2415`; #775 beside #804).
+#[tokio::test]
+async fn the_resolvers_default_limits_take_an_answer_past_32_mib_first_775_804() {
+    let (sixteen, _) = paddings();
+    let mut outputs = vec![ad("before")];
+    outputs.extend(sixteen.iter().cloned());
+    let b = TopicBroadcaster::new(
+        vec![TOPIC.to_string()],
+        TopicBroadcasterConfig {
+            resolver: Some(resolver_under(
+                LookupAnswer::OutputList { outputs },
+                LookupLimits::default(),
+            )),
+            facilitator: Some(Arc::new(Acknowledging)),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(b.find_interested_hosts().await.map(|h| h.len()), Ok(0));
 }
 
 #[tokio::test]

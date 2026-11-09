@@ -97,17 +97,18 @@ fn run<'a>(v: &'a Vector, name: &str) -> &'a Run {
 }
 
 /// Answers every lookup with the answer given.
-struct Lookup(LookupAnswer);
+/// Each lookup host's answer, by its URL.
+struct Lookup(HashMap<String, LookupAnswer>);
 
 #[async_trait::async_trait(?Send)]
 impl OverlayLookupFacilitator for Lookup {
     async fn lookup(
         &self,
-        _url: &str,
+        url: &str,
         _question: &LookupQuestion,
         _timeout_ms: Option<u64>,
     ) -> bsv_rs::Result<LookupAnswer> {
-        Ok(self.0.clone())
+        Ok(self.0[url].clone())
     }
 }
 
@@ -157,20 +158,32 @@ async fn revoke(
     signable: Option<&[u8]>,
     answers: Vec<bsv_rs::Result<SignActionResult>>,
 ) -> (Counting, bsv_rs::Result<()>, Vec<String>) {
+    revoke_across(serial, vec![answer], signable, answers).await
+}
+
+/// [`revoke`] with the lookup answered by one host per answer, the
+/// resolver aggregating them (`http://identity-lookup-<n>.invalid`).
+async fn revoke_across(
+    serial: &str,
+    lookups: Vec<LookupAnswer>,
+    signable: Option<&[u8]>,
+    answers: Vec<bsv_rs::Result<SignActionResult>>,
+) -> (Counting, bsv_rs::Result<()>, Vec<String>) {
     let mut wallet = Counting::of_scalar(9);
     wallet.signable = signable.map(|tx| SignableTransaction {
         tx: tx.to_vec(),
         reference: vec![0x52; 8],
     });
     wallet.sign_answers.lock().unwrap().extend(answers);
+    let hosts: Vec<String> = (0..lookups.len())
+        .map(|n| format!("http://identity-lookup-{n}.invalid"))
+        .collect();
+    let by_host: HashMap<String, LookupAnswer> = hosts.iter().cloned().zip(lookups).collect();
     let mut host_overrides = HashMap::new();
-    host_overrides.insert(
-        "ls_identity".to_string(),
-        vec!["http://identity-lookup.invalid".to_string()],
-    );
+    host_overrides.insert("ls_identity".to_string(), hosts);
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(Lookup(answer)) as Arc<dyn OverlayLookupFacilitator>),
+        facilitator: Some(Arc::new(Lookup(by_host)) as Arc<dyn OverlayLookupFacilitator>),
         slap_trackers: Some(vec![]),
         host_overrides: Some(host_overrides),
         ..Default::default()
@@ -296,14 +309,20 @@ fn beef_of(size: usize) -> Vec<u8> {
 
 /// The resolver keeps one output per `<txid>.<index>` and none whose BEEF
 /// does not parse, so the answers here are distinct outputs of a real BEEF
-/// where the reference's were copies (`LookupResolver.query` replaced).
+/// where the reference's were copies (`LookupResolver.query` replaced). One
+/// host's answer past 4096 outputs is the resolver's `Malformed lookup
+/// response` (the normalizer's constant, `LookupResolver.ts:254,395`, #775's
+/// fold) in either SDK, so the 10,001 come from three hosts of 3,334, 3,334
+/// and 3,333, the resolver aggregating them as the reference's does.
 #[tokio::test]
 async fn a_lookup_past_the_references_bounds_is_refused_before_any_token_is_read() {
     let v = vector();
     let r = run(&v, "too_many_results");
-    let indexes: Vec<u32> = (0..10001).collect();
-    let answer = outputs(&v.lookups.single, &indexes);
-    let (wallet, verdict, sent) = revoke(&v.serial_number, answer, None, vec![]).await;
+    let lookups = [0..3334u32, 3334..6668, 6668..10001]
+        .into_iter()
+        .map(|range| outputs(&v.lookups.single, &range.collect::<Vec<_>>()))
+        .collect();
+    let (wallet, verdict, sent) = revoke_across(&v.serial_number, lookups, None, vec![]).await;
     let words = r.verdict.clone().unwrap();
     assert_eq!(words, "Identity revelation lookup exceeded 10000 results");
     assert_eq!(verdict, Err(Error::IdentityError(words)));

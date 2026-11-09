@@ -3,6 +3,9 @@
 //! Provides traits and implementations for communicating with overlay services
 //! over HTTP(S).
 
+use crate::overlay::lookup_limits::LookupRequestOptions;
+#[cfg(feature = "http")]
+use crate::overlay::lookup_limits::{normalized_output_count, resource_limit};
 #[cfg(feature = "http")]
 use crate::overlay::types::OutputListItem;
 use crate::overlay::types::{LookupAnswer, LookupQuestion, Steak, TaggedBEEF};
@@ -52,6 +55,30 @@ pub trait OverlayLookupFacilitator: Send + Sync {
     ) -> Result<LookupAnswer> {
         let _ = query_text;
         self.lookup(url, question, timeout_ms).await
+    }
+
+    /// Execute a lookup query under the bounds of `options` (#775), the
+    /// reference's `options?: LookupRequestOptions` (`ts-stack@edf6e03`
+    /// `LookupResolver.ts:740-746`): the resolver calls this method with its
+    /// limits and its query's byte budget. The default ignores the options
+    /// and calls `lookup_ordered`, so a facilitator that keeps it is bounded
+    /// only by the resolver's check of the answer it returns, after that
+    /// answer is in memory; an implementation that reads a response
+    /// overrides this method, refuses a body above
+    /// `options.max_response_bytes` and an output list above
+    /// `options.max_outputs` as [`Error::OverlayResourceLimit`], and charges
+    /// the bytes it reads with `options.consume`.
+    async fn lookup_bounded(
+        &self,
+        url: &str,
+        question: &LookupQuestion,
+        query_text: Option<&RawValue>,
+        timeout_ms: Option<u64>,
+        options: &LookupRequestOptions,
+    ) -> Result<LookupAnswer> {
+        let _ = options;
+        self.lookup_ordered(url, question, query_text, timeout_ms)
+            .await
     }
 }
 
@@ -124,9 +151,31 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
         query_text: Option<&RawValue>,
         timeout_ms: Option<u64>,
     ) -> Result<LookupAnswer> {
+        let options = LookupRequestOptions::default();
+        self.lookup_bounded(url, question, query_text, timeout_ms, &options)
+            .await
+    }
+
+    /// The reference's bounded read (`ts-stack@edf6e03`
+    /// `LookupResolver.ts:829-866`, `LookupResponseReader.ts:150-214`; #775):
+    /// a declared `Content-Length` above `options.max_response_bytes` is
+    /// refused before the body is read, a body is read chunk by chunk and
+    /// refused at the chunk that passes the bound, each chunk charged to the
+    /// options' budget; an output list above `options.max_outputs` is
+    /// refused at the parse, on the JSON path (`:859-860`) and on the binary
+    /// path's outpoint count (`:878-883`). Each is
+    /// [`Error::OverlayResourceLimit`].
+    async fn lookup_bounded(
+        &self,
+        url: &str,
+        question: &LookupQuestion,
+        query_text: Option<&RawValue>,
+        timeout_ms: Option<u64>,
+        options: &LookupRequestOptions,
+    ) -> Result<LookupAnswer> {
         #[cfg(not(feature = "http"))]
         {
-            let _ = (url, question, query_text, timeout_ms);
+            let _ = (url, question, query_text, timeout_ms, options);
             return Err(Error::OverlayError(
                 "HTTP feature not enabled. Enable the 'http' feature to use HTTP facilitators."
                     .into(),
@@ -169,7 +218,7 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
                 .json(&body)
                 .timeout(timeout);
 
-            let response = request
+            let mut response = request
                 .send()
                 .await
                 .map_err(|e| Error::OverlayError(format!("Request failed: {}", e)))?;
@@ -182,31 +231,65 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
             }
 
             // Check content type for binary vs JSON response
-            let content_type = response
+            let binary = response
                 .headers()
                 .get("content-type")
                 .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
+                .unwrap_or("")
+                .contains("octet-stream");
 
-            if content_type.contains("octet-stream") {
+            let payload = read_bounded_body(&mut response, options).await?;
+
+            if binary {
                 // Binary response - parse as output list with outpoints and BEEF
-                let bytes = response
-                    .bytes()
-                    .await
-                    .map_err(|e| Error::OverlayError(format!("Failed to read response: {}", e)))?;
-
-                parse_binary_lookup_response(&bytes)
+                parse_binary_lookup_response(&payload, options)
             } else {
                 // JSON response
-                let json: serde_json::Value = response
-                    .json()
-                    .await
+                let json: serde_json::Value = serde_json::from_slice(&payload)
                     .map_err(|e| Error::OverlayError(format!("Failed to parse JSON: {}", e)))?;
 
-                parse_json_lookup_answer(json)
+                parse_json_lookup_answer(json, options.max_outputs)
             }
         }
     }
+}
+
+/// Read a lookup response's body under `options.max_response_bytes`, the
+/// reference's `readLookupResponseBytes` (`ts-stack@edf6e03`
+/// `LookupResponseReader.ts:150-214`): a declared length above the bound is
+/// refused before any read (`assertDeclaredLengthIsWithinLimit`), and a body
+/// with no length, or a longer one than declared, at the chunk that passes
+/// the bound, the bytes read until then dropped. Each chunk is charged to
+/// the options' budget (`consumeBytes`). Never `reqwest`'s `.bytes()` or
+/// `.json()`, which buffer the whole body before a limit can apply (#775).
+#[cfg(feature = "http")]
+async fn read_bounded_body(
+    response: &mut reqwest::Response,
+    options: &LookupRequestOptions,
+) -> Result<Vec<u8>> {
+    let max = options.max_response_bytes;
+    let header_length = response
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u64>().ok());
+    let declared = header_length.into_iter().chain(response.content_length());
+    if declared.into_iter().any(|length| length > max as u64) {
+        return Err(resource_limit("maxResponseBytes"));
+    }
+    let mut payload: Vec<u8> = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|e| Error::OverlayError(format!("Failed to read response: {}", e)))?
+    {
+        if chunk.len() > max - payload.len() {
+            return Err(resource_limit("maxResponseBytes"));
+        }
+        options.consume(chunk.len())?;
+        payload.extend_from_slice(&chunk);
+    }
+    Ok(payload)
 }
 
 /// HTTPS implementation of broadcast facilitator.
@@ -314,7 +397,9 @@ impl OverlayBroadcastFacilitator for HttpsOverlayBroadcastFacilitator {
 
 /// The reference's bounds on an output-list item (`ts-stack@edf6e03`
 /// `packages/sdk/src/overlay-tools/LookupResolver.ts:252-256`): a BEEF at
-/// most the 32 MiB response bound, a context at most 1 MiB.
+/// most the 32 MiB response bound, a context at most 1 MiB
+/// (`MAX_LOOKUP_CONTEXT_BYTES`, `:255`; the JSON reader's item bound and the
+/// binary reader's context bound, `:889-891`).
 #[cfg(feature = "http")]
 const MAX_LOOKUP_BEEF_BYTES: usize = 32 * 1024 * 1024;
 #[cfg(feature = "http")]
@@ -346,7 +431,7 @@ fn malformed(what: std::fmt::Arguments<'_>) -> Error {
 /// well-formed empty list is an answer. An unknown string `type` stays this
 /// crate's `Unknown answer type`.
 #[cfg(feature = "http")]
-fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
+fn parse_json_lookup_answer(json: serde_json::Value, max_outputs: usize) -> Result<LookupAnswer> {
     let json = json
         .as_object()
         .ok_or_else(|| malformed(format_args!("the answer is not a JSON object")))?;
@@ -365,6 +450,15 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
                         "an output-list answer without an outputs array"
                     ))
                 })?;
+            // The facilitator's count check, before any item is read
+            // (`LookupResolver.ts:859-860`, #775).
+            if items.len() > max_outputs {
+                return Err(resource_limit("maxOutputs"));
+            }
+            // Then the normalizer's constant (`:395`, `:865-866`): past 4096
+            // `Malformed lookup response` whatever `max_outputs` is (#775's
+            // fold)
+            normalized_output_count(items.len())?;
             let outputs = items
                 .iter()
                 .enumerate()
@@ -485,8 +579,26 @@ fn lookup_output_index(value: &serde_json::Value) -> Option<u32> {
 /// outpoints, then one BEEF, each output carrying the Atomic BEEF of its
 /// outpoint's txid and that txid as its hint
 /// ([`binary_answer::atomic_outputs`], `LookupResolver.ts:876-936`).
+///
+/// An outpoint count above `options.max_outputs` is refused before any
+/// outpoint is read (`ts-stack@edf6e03` `LookupResolver.ts:877-883`), and
+/// each outpoint's Atomic BEEF and context bytes, summed over the outputs,
+/// once they pass `options.max_response_bytes` (`:929-932`); each
+/// [`Error::OverlayResourceLimit`] (#775), the reference's
+/// reputation-neutral `LookupResourceLimitError`, and the only two neutral
+/// refusals of this path. Every other refusal is an
+/// [`Error::OverlayError`] the resolver records against the host, as the
+/// reference's plain `Error`s are (`throwTrackedLookupFailure`,
+/// `:2408-2419`): an output index past `0xffffffff` (`:888`, `Overlay output
+/// index is out of range.`), a context past 1 MiB (`:889-891`, `Overlay
+/// output context exceeds the maximum permitted size.`, checked before the
+/// context is read), a BEEF that does not parse (`:900`), an outpoint whose
+/// txid the BEEF lacks, and the 64 MiB of generated Atomic BEEF (`:926`).
 #[cfg(feature = "http")]
-fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
+fn parse_binary_lookup_response(
+    data: &[u8],
+    options: &LookupRequestOptions,
+) -> Result<LookupAnswer> {
     use crate::primitives::{bounded_capacity, to_hex, Reader};
 
     let mut reader = Reader::new(data);
@@ -494,8 +606,12 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
     // Read number of outpoints
     let n_outpoints = reader
         .read_var_int()
-        .map_err(|e| Error::OverlayError(format!("Failed to read outpoint count: {}", e)))?
-        as usize;
+        .map_err(|e| Error::OverlayError(format!("Failed to read outpoint count: {}", e)))?;
+    // Compared before the cast: on wasm32 a `usize` is 32 bits
+    if n_outpoints > options.max_outputs as u64 {
+        return Err(resource_limit("maxOutputs"));
+    }
+    let n_outpoints = n_outpoints as usize;
 
     // Each outpoint is >= 34 bytes (txid 32 + vout varint 1 + context len 1);
     // bound the pre-allocation so a bogus count cannot OOM-abort before any read.
@@ -508,17 +624,28 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
             .map_err(|e| Error::OverlayError(format!("Failed to read txid: {}", e)))?;
         let txid = to_hex(txid_bytes);
 
-        // Read output index
+        // Read output index: past `0xffffffff` the whole answer refused in
+        // the reference's words (`:888`, a plain `Error`, a host failure),
+        // never cut to its low 32 bits
         let output_index = reader
             .read_var_int()
-            .map_err(|e| Error::OverlayError(format!("Failed to read output index: {}", e)))?
-            as u32;
+            .map_err(|e| Error::OverlayError(format!("Failed to read output index: {}", e)))?;
+        let output_index = u32::try_from(output_index)
+            .map_err(|_| Error::OverlayError("Overlay output index is out of range.".into()))?;
 
-        // Read context length and data
+        // Read context length and data: past 1 MiB the whole answer refused
+        // in the reference's words before the context is read or held
+        // (`:889-891`, a plain `Error`, a host failure), the JSON reader's
+        // bound
         let context_len = reader
             .read_var_int()
-            .map_err(|e| Error::OverlayError(format!("Failed to read context length: {}", e)))?
-            as usize;
+            .map_err(|e| Error::OverlayError(format!("Failed to read context length: {}", e)))?;
+        if context_len > MAX_LOOKUP_CONTEXT_BYTES as u64 {
+            return Err(Error::OverlayError(
+                "Overlay output context exceeds the maximum permitted size.".into(),
+            ));
+        }
+        let context_len = context_len as usize;
 
         let context = if context_len > 0 {
             Some(
@@ -535,8 +662,13 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
     }
 
     // The rest is the BEEF: parsed once, each output carrying the Atomic
-    // BEEF of its own outpoint's txid (`:900-936`; #735's fold)
-    let outputs = binary_answer::atomic_outputs(outpoints, reader.read_remaining())?;
+    // BEEF of its own outpoint's txid (`:900-936`; #735's fold), the
+    // extracted bytes bounded by `options.max_response_bytes` (#775)
+    let outputs = binary_answer::atomic_outputs(
+        outpoints,
+        reader.read_remaining(),
+        options.max_response_bytes,
+    )?;
 
     Ok(LookupAnswer::OutputList { outputs })
 }
@@ -578,7 +710,7 @@ mod tests {
             ]
         });
 
-        let answer = parse_json_lookup_answer(json).unwrap();
+        let answer = parse_json_lookup_answer(json, 4096).unwrap();
         match answer {
             LookupAnswer::OutputList { outputs } => {
                 assert_eq!(outputs.len(), 1);
@@ -597,7 +729,7 @@ mod tests {
             "result": {"key": "value"}
         });
 
-        let answer = parse_json_lookup_answer(json).unwrap();
+        let answer = parse_json_lookup_answer(json, 4096).unwrap();
         match answer {
             LookupAnswer::Freeform { result } => {
                 assert_eq!(result["key"], "value");
@@ -613,7 +745,7 @@ mod tests {
             "outputs": []
         });
 
-        let err = parse_json_lookup_answer(json).unwrap_err();
+        let err = parse_json_lookup_answer(json, 4096).unwrap_err();
         assert!(
             err.to_string().contains("Malformed lookup response"),
             "{err}"

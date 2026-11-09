@@ -55,6 +55,7 @@ mod admin_token_validation;
 pub mod facilitators;
 pub mod historian;
 pub mod host_reputation_tracker;
+pub mod lookup_limits;
 pub mod lookup_resolver;
 pub mod overlay_admin_token_template;
 pub mod retry;
@@ -82,6 +83,13 @@ pub use host_reputation_tracker::{
 
 // Re-exports from lookup_resolver
 pub use lookup_resolver::{LookupResolver, LookupResolverConfig};
+
+// Re-exports from lookup_limits (#775)
+pub use lookup_limits::{
+    LookupByteBudget, LookupLimits, LookupRequestOptions, DEFAULT_LOOKUP_MAX_HOSTS,
+    DEFAULT_LOOKUP_MAX_HOSTS_PER_TRACKER, DEFAULT_LOOKUP_MAX_OUTPUTS,
+    DEFAULT_LOOKUP_MAX_RESPONSE_BYTES, DEFAULT_LOOKUP_MAX_TOTAL_BYTES,
+};
 
 // Re-exports from overlay_admin_token_template
 #[allow(deprecated)]
