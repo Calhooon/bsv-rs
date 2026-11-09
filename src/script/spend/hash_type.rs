@@ -10,6 +10,15 @@ use crate::script::{ScriptEvaluationError, ScriptFlags};
 
 use super::Spend;
 
+/// The default mode's relaxation as the reference computes it: `#isRelaxed()`
+/// is `transactionVersion > 1` (`Spend.ts:319-321` at `ts-stack@edf6e03`) on
+/// the number `readUInt32LE` read (`Transaction.ts:471`), so a version at or
+/// above 2^31 is relaxed there; the parameter's bits are the wire's four bytes
+/// (#418). A word keeps the node's `int32_t` (`interpreter.cpp:34-44`).
+pub(super) const fn relaxed_by_default(version: i32) -> bool {
+    version as u32 > 1
+}
+
 impl Spend {
     pub(super) fn check_signature_hash_type(
         &self,
@@ -42,12 +51,13 @@ impl Spend {
                     return Err(self
                         .error("The signature must not use SIGHASH_CHRONICLE before Chronicle."));
                 }
-                // Spend.ts:586-591, :338-341: the default uses version > 1.
+                // Spend.ts:586-591, :338-341: the default uses version > 1,
+                // read unsigned as the reference reads it (#418).
                 // The gate's own text (`... invalid before Chronicle.`) is
                 // thrown inside the try at :614-622, whose catch (:622-625) rethrows the
                 // DER wrapper's words (the default always enforces DER,
                 // :376-386); the caller sees only those.
-                None if self.transaction_version <= 1 => {
+                None if !relaxed_by_default(self.transaction_version) => {
                     return Err(self.error("The signature format is invalid."));
                 }
                 _ => {}

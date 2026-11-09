@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the default mode reads the transaction version unsigned, as the reference does; a word keeps the node's `int32_t` (#418)
+
+From the #397 re-review's observation (2026-10-28). `Spend`'s default mode
+(no word) compared the `i32` it holds, so a version whose four bytes are at or
+above 2^31 (`0x80000000`, `0xFFFFFFFF`) read as negative and every version
+rule judged it strict: MINIMALDATA, LOW_S, CLEANSTACK and NULLDUMMY enforced,
+the Chronicle hash type refused in the DER wrapper's words. The reference
+reads the version with `readUInt32LE` (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Transaction.ts:471`, passed as
+`transactionVersion: tx.version` at `:1446`), and its default
+`#isRelaxed()` is `transactionVersion > 1` (`Spend.ts:319-321`; the Chronicle
+hash type's `#isAfterChronicle()` the same without flags, `:338-341`,
+`:586-591`): 2147483648 and 4294967295 are relaxed there. The default mode now
+reads the bits as `u32` through one crate-private helper,
+`relaxed_by_default` (`src/script/spend/hash_type.rs`), at its four sites:
+the four rules and the coin-era switch at `Spend::new`
+(`src/script/spend/mod.rs`), the Chronicle hash-type gate (`hash_type.rs`)
+and #417's version-1 wrapper (`signature_encoding.rs`). Under a word nothing
+moves: the gates read the node's `int32_t` (`ScriptFlags::gates`,
+`src/script/flags.rs`), so those versions stay strict under a Chronicle word,
+as at the node and in go-sdk. `OP_VER` and `OP_VERIF` write the four bytes in
+every mode, unchanged.
+
+`tests/script_transaction_version_sign_418.rs` (nine tests) against
+`tests/vectors/script_transaction_version_sign_418.json`, recorded from the
+unmodified reference under Node v22.18.0 by
+`tests/support/script_transaction_version_sign_418.mjs`: versions 1, 2,
+`0x7FFFFFFF`, `0x80000000`, `0xFFFFFFFF` with and without the reference's
+explicit flags (the names of `ScriptFlags::standard(PostChronicle)`), six
+rules each (a non-minimal push, two items left, a non-empty CHECKMULTISIG
+dummy, a high-S signature, an `ALL|FORKID|CHRONICLE` signature, `OP_VER`'s
+bytes), and `Transaction.fromHex`'s unsigned read of `00000080` and
+`ffffffff`. The default mode equals every recorded verdict, word and stack;
+under `ScriptFlags::standard` and `ScriptFlags::block` (post-Chronicle) the
+versions at or above 2^31 give the version-1 verdicts and words, 2 and
+`0x7FFFFFFF` relaxed; a transaction at `0x80000000` built, written, read back
+and verified through `Transaction::verify` beside the direct `Spend`.
+`a_version_at_or_above_2_31_is_relaxed_in_the_default_mode_as_the_reference_reads_it_418`
+and the `Transaction::verify` test RED on `7a047467`
+(`This data is not minimally-encoded. (PC: 0)` at `0x80000000`; `The
+signature format is invalid.` through `verify`); the word pin
+(`a_version_at_or_above_2_31_is_strict_under_a_word_as_the_node_reads_int32_418`)
+and the three agreement tests green there.
+
+The fold (the strength read of 2026-11-09): three pins of behaviour the tip
+already had, recorded apart in the vector's `fold_cases` (24 cells, the 60 of
+`cases` unchanged; the recorder's two runs byte-identical under Node v22.18.0).
+`a_version_of_0_is_strict_in_every_mode_as_at_1_418`: the six rules at version
+0, the default mode equal to the recording, a word giving the version-1
+verdicts (`OP_VER` its own falsy push). `an_undefined_hash_type_at_or_above_2_31_is_refused_in_the_version_2_words_418`:
+a scope-0x44 signature in the default mode refused in the reference's DER
+wrapper at 0 and 1 and in #23's sentence, `The signature's hash type (0x44)
+has no defined base type.`, at 2, `0x7FFFFFFF`, `0x80000000` and `0xFFFFFFFF`
+(the reference's wrapper at every version: #417's stated row, the same above
+2^31 as at 2). `a_non_push_only_unlocking_script_at_or_above_2_31_is_refused_under_a_word_418`:
+`OP_1 OP_DROP` before `OP_1` under the post-Chronicle mempool word refused at
+0, 1, `0x80000000` and `0xFFFFFFFF` (`ScriptFlags::requires_push_only` on the
+`int32_t`), run at 2 and `0x7FFFFFFF`, the reference's flags relaxing at and
+above 2^31 (this entry's parity note). Each RED on a scratch copy of the tip
+with one line planted: `relaxed_by_default`'s `> 1` as `!= 1` (2 of 9),
+`signature_encoding.rs`'s arm back to the signed `transaction_version <= 1`
+(1 of 9), `requires_push_only`'s `tx_version as u32 <= 1` (1 of 9).
+
+Behaviour: in the default mode a spend of a transaction whose version is at
+or above 2^31 moves from strict to relaxed (a refusal under the four rules or
+a version-1 Chronicle hash-type refusal becomes the version-2 verdict). Under
+a word, no verdict moves. No public type changes (`SpendParams::transaction_version`
+stays `i32`, its bits the wire's four bytes; `Transaction::version` stays
+`u32`); no migration. The same reading reaches the streaming reader's default
+mode (`src/transaction/beef_stream/spends.rs:246`, the version's bits cast to the
+`i32` as `src/transaction/verify.rs:365` casts them, both into
+`Spend::with_transaction`), and a caller handing `Spend` a negative
+`transaction_version` directly (`-1`) is now relaxed as `0xFFFFFFFF`, where the
+reference's `new Spend({ transactionVersion: -1 })` is strict: the parameter
+holds the wire's bits, not a signed number.
+
+### Notes: cross-SDK parity (#418)
+
+The default mode is the reference's (`Spend.ts:319-321` on `readUInt32LE`'s
+number). Under a word this crate is the node's: bitcoin-sv v1.2.2 holds
+`const int32_t nVersion` (`src/primitives/transaction.h:273`) and decides
+`IsMalleableTxnVersion(const int32_t version) { return (version > 1); }` and
+`EnforceNonMalleability` on it (`src/script/interpreter.cpp:34-44`, used at
+`:285`, `:433`, `:801`, `:1493`, `:1643`, `:1666`, `:2327`, `:2441`; CSV alone casts to `uint32_t`, `:2212`); go-sdk at
+`2ca481c` reads `uint32` and converts, `txVersion = int32(t.tx.Version)`,
+`malleableTxVersion = txVersion > 1` (`script/interpreter/thread.go:513-518`).
+The reference's explicit flags apply the same `transactionVersion > 1` to the
+unsigned number (`#enforceNonMalleability`, `Spend.ts:343-345`; the five rules
+at `:347-373`), so under the node's post-Chronicle word the recorded versions
+at or above 2^31 are relaxed there and strict at the node, in go-sdk and here:
+the reference diverging from consensus. Theirs: ts-stack, filing pending (the
+draft `docs/lanes/375-filings/transaction-version-sign-ts-stack.md`, queue row
+29; the ask `(this.transactionVersion | 0) > 1` under explicit flags).
+
 ### Fixed: an attribute question keeps only the certificates matching it, as the reference wallet does (#751)
 
 `IdentityClient::query` sent `attributes` to `ls_identity` and checked none

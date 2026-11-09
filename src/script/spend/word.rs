@@ -9,7 +9,7 @@ impl Spend {
     /// Overrides MINIMALDATA enforcement (script-number and push minimality).
     ///
     /// Default follows ts-sdk: enforced for version <= 1 transactions, relaxed
-    /// for version > 1 (post-Genesis semantics). Called after [`set_flags`](Self::set_flags),
+    /// for version > 1 read unsigned, as `readUInt32LE` reads it (#418). Called after [`set_flags`](Self::set_flags),
     /// it overrides the rule the word derived.
     pub fn set_require_minimal(&mut self, require: bool) {
         self.require_minimal = require;

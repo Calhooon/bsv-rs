@@ -1,0 +1,967 @@
+{
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "node": "v22.18.0",
+  "flags": [
+    "P2SH",
+    "STRICTENC",
+    "DERSIG",
+    "LOW_S",
+    "NULLDUMMY",
+    "SIGPUSHONLY",
+    "MINIMALDATA",
+    "DISCOURAGE_UPGRADABLE_NOPS",
+    "CLEANSTACK",
+    "CHECKLOCKTIMEVERIFY",
+    "CHECKSEQUENCEVERIFY",
+    "NULLFAIL",
+    "SIGHASH_FORKID",
+    "GENESIS",
+    "UTXO_AFTER_GENESIS",
+    "CHRONICLE",
+    "UTXO_AFTER_CHRONICLE"
+  ],
+  "cases": [
+    {
+      "rule": "MINIMALDATA",
+      "version": 1,
+      "mode": "default",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "error": "Script evaluation error: This data is not minimally-encoded. (PC: 0)",
+      "stack": []
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 1,
+      "mode": "default",
+      "unlock": "5151",
+      "lock": "51",
+      "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 3.",
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 1,
+      "mode": "default",
+      "unlock": "51",
+      "lock": "0000ae",
+      "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty.",
+      "stack": []
+    },
+    {
+      "rule": "LOW_S",
+      "version": 1,
+      "mode": "default",
+      "unlock": "4930460221009e37a0530740b86fc3a57d487f79af894aba43f61fe134736f6c2ed9f7e3714f0221008f96f149b52bb6ecc9ea351cc41a3eb2bbfcb9d5785ccd0bdd1534d5c9f8652541",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "a87749802574332a4466d67b384df6396208633452d7b8a56bbed76376649fa3"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 1,
+      "mode": "default",
+      "unlock": "483045022100acaecd58a8fbc1f3bb64a30b18191772edd72db0587d3d8da229907ef2c23c7f0220407d064043e7fcc7171a7c46de50b99ad52439e8871639ee40fc417bb314bcd161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "828ccb268c1a9be48559b7e06f9d84060d82afcfa8325c675d4919a889d59b06"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 1,
+      "mode": "default",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "01000000"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 2,
+      "mode": "default",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 2,
+      "mode": "default",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 2,
+      "mode": "default",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 2,
+      "mode": "default",
+      "unlock": "493046022100fddb170c4cb67ac14e8cffd7b3d0d9c6f580b4d6b4b6e10fc71a7df10736faa0022100c21315352d95ff09ccd8ad4f80bb106875160a9a28a94e39909229f3f767f38741",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "de61fdca584e8f73c9025335327f5b1ff93ee1d6ce3a353d1a9f56bf704a05b6"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 2,
+      "mode": "default",
+      "unlock": "473044022060a4bd7cda343c72f833225aeac5584669b1e32981b62ca9e7319a427671b0b8022047fcd65a5f43593608ab34e7dd7c74dffc11b9a5c112f798e356b541cebf187061",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "31b3898977d877ab5015af7c145dbb6ab68d6380b384c6b9a22883f4ed73256c"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 2,
+      "mode": "default",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "02000000"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "4930460221008d6bd7f630558efe560863b1568a265dc2ba5e4c3a4508568e070280e4a25375022100951a7eb6a8000f3e2369c3b7838268cb12a43f537dcd99f0725ea269b52fd32241",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "ffec69fbce776731cd6e4deacce747d30616b03884946c0136508f9f1782724c"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "47304402202c3b14ee62207d4a5dd01e3bce3245a382d68877cc84b893c365279340417bbe02205cb3da29c2e9a62865b1b746f58b33cadd2c55c41ab0f3a064289c205bf832a161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "5b147cc451c8f70057fcb01f7facfa2178aa3bd4e4c9cf3168e2c316d2d45346"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "ffffff7f"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "493046022100d7abb55a09ebb6e5ba0d081009aabf1e8ff6eb207c578b812938f8901b84220b022100e163630418c35491a82615cd52d553448c2e82ec2fa494a2488993cdaa3ceff641",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "0cf332f1689a5919f08fe1e9745a7e641beef7683cbabb16a7535374b9c72936"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "4730440220576e7418114347cda10d230f5333594b213e4dcccc5f93c1fbce4087f6b4f8af02206b410408009a8b41bc64a897251c1ab65f2af4fb02eda277801ed0c5e5ec34ab61",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "9def260bf31b2d3537b90d27089f25b5e9742b258ccbdd1497b53ba439683123"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "",
+      "lock": "62",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        "00000080"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "48304502206d13903f65ed737e524a41cb7f2bdf8e0b74c0ae95035170d5a6e4fc9a8681ce022100e2dca00d9cd6e4e49afbbd92d084ef59cf9e94186d64576033214a3a484230f341",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "2c662f7353d323b9c25df44e4340f11b9913cf995be425ad69f3935aee571a2a"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "483045022100dc7667230f770aa457e5af88f38e96bfe1a8223a220d9467463241ed47f0531b0220318d7b40d56185cddc96f5e3846ee757bd0a603faadb2668fb76102ef97d3cf061",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "f381ea8562a95124eb3cc20fcb8f5ab6590dc235d41dac7b536ec5f04ade4e31"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "ffffffff"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "error": "Script evaluation error: This data is not minimally-encoded. (PC: 0)",
+      "stack": []
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "5151",
+      "lock": "51",
+      "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 3.",
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "51",
+      "lock": "0000ae",
+      "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty.",
+      "stack": []
+    },
+    {
+      "rule": "LOW_S",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "4930460221009e37a0530740b86fc3a57d487f79af894aba43f61fe134736f6c2ed9f7e3714f0221008f96f149b52bb6ecc9ea351cc41a3eb2bbfcb9d5785ccd0bdd1534d5c9f8652541",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "a87749802574332a4466d67b384df6396208633452d7b8a56bbed76376649fa3"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "483045022100acaecd58a8fbc1f3bb64a30b18191772edd72db0587d3d8da229907ef2c23c7f0220407d064043e7fcc7171a7c46de50b99ad52439e8871639ee40fc417bb314bcd161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "828ccb268c1a9be48559b7e06f9d84060d82afcfa8325c675d4919a889d59b06"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "01000000"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "493046022100fddb170c4cb67ac14e8cffd7b3d0d9c6f580b4d6b4b6e10fc71a7df10736faa0022100c21315352d95ff09ccd8ad4f80bb106875160a9a28a94e39909229f3f767f38741",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "de61fdca584e8f73c9025335327f5b1ff93ee1d6ce3a353d1a9f56bf704a05b6"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "473044022060a4bd7cda343c72f833225aeac5584669b1e32981b62ca9e7319a427671b0b8022047fcd65a5f43593608ab34e7dd7c74dffc11b9a5c112f798e356b541cebf187061",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "31b3898977d877ab5015af7c145dbb6ab68d6380b384c6b9a22883f4ed73256c"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "02000000"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "4930460221008d6bd7f630558efe560863b1568a265dc2ba5e4c3a4508568e070280e4a25375022100951a7eb6a8000f3e2369c3b7838268cb12a43f537dcd99f0725ea269b52fd32241",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "ffec69fbce776731cd6e4deacce747d30616b03884946c0136508f9f1782724c"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "47304402202c3b14ee62207d4a5dd01e3bce3245a382d68877cc84b893c365279340417bbe02205cb3da29c2e9a62865b1b746f58b33cadd2c55c41ab0f3a064289c205bf832a161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "5b147cc451c8f70057fcb01f7facfa2178aa3bd4e4c9cf3168e2c316d2d45346"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "ffffff7f"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "493046022100d7abb55a09ebb6e5ba0d081009aabf1e8ff6eb207c578b812938f8901b84220b022100e163630418c35491a82615cd52d553448c2e82ec2fa494a2488993cdaa3ceff641",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "0cf332f1689a5919f08fe1e9745a7e641beef7683cbabb16a7535374b9c72936"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "4730440220576e7418114347cda10d230f5333594b213e4dcccc5f93c1fbce4087f6b4f8af02206b410408009a8b41bc64a897251c1ab65f2af4fb02eda277801ed0c5e5ec34ab61",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "9def260bf31b2d3537b90d27089f25b5e9742b258ccbdd1497b53ba439683123"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "",
+      "lock": "62",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        "00000080"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "5151",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "51",
+      "lock": "0000ae",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "LOW_S",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "48304502206d13903f65ed737e524a41cb7f2bdf8e0b74c0ae95035170d5a6e4fc9a8681ce022100e2dca00d9cd6e4e49afbbd92d084ef59cf9e94186d64576033214a3a484230f341",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "2c662f7353d323b9c25df44e4340f11b9913cf995be425ad69f3935aee571a2a"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "483045022100dc7667230f770aa457e5af88f38e96bfe1a8223a220d9467463241ed47f0531b0220318d7b40d56185cddc96f5e3846ee757bd0a603faadb2668fb76102ef97d3cf061",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "f381ea8562a95124eb3cc20fcb8f5ab6590dc235d41dac7b536ec5f04ade4e31"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "ffffffff"
+      ]
+    }
+  ],
+  "reads": [
+    {
+      "bytes": "00000080",
+      "hex": "000000800100000000000000000000000000000000000000000000000000000000000000000000000000ffffffff0100000000000000000000000000",
+      "version": 2147483648
+    },
+    {
+      "bytes": "ffffffff",
+      "hex": "ffffffff0100000000000000000000000000000000000000000000000000000000000000000000000000ffffffff0100000000000000000000000000",
+      "version": 4294967295
+    }
+  ],
+  "fold_cases": [
+    {
+      "rule": "MINIMALDATA",
+      "version": 0,
+      "mode": "default",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "error": "Script evaluation error: This data is not minimally-encoded. (PC: 0)",
+      "stack": []
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 0,
+      "mode": "default",
+      "unlock": "5151",
+      "lock": "51",
+      "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 3.",
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 0,
+      "mode": "default",
+      "unlock": "51",
+      "lock": "0000ae",
+      "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty.",
+      "stack": []
+    },
+    {
+      "rule": "LOW_S",
+      "version": 0,
+      "mode": "default",
+      "unlock": "493046022100bb8e12222d5c84de279b509a34e19078655fb76008e0b12cae913a8ad96edf730221008334410c5302e40aec53529f5497dfe1dde8c7c91478d85dfe800425b3978dd841",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "99a0510be907102d3c210291c10e2de4c8ac5b537ea8980298bee5ecc3f57e3d"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 0,
+      "mode": "default",
+      "unlock": "483045022100837364923d6941f11c123cb1d391483196526e7b9dc719dc9b55517c2064b098022070e325a88cc9e6ec948b33e1fe18101fdd6b1c7c5dcf87430cb7c09b68d3442761",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "ace877f09a13305df308702802df06ffd0a82abc9809970c73231d5f1c49b3c8"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 0,
+      "mode": "default",
+      "unlock": "",
+      "lock": "62",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        "00000000"
+      ]
+    },
+    {
+      "rule": "MINIMALDATA",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "4c0102",
+      "lock": "5287",
+      "error": "Script evaluation error: This data is not minimally-encoded. (PC: 0)",
+      "stack": []
+    },
+    {
+      "rule": "CLEANSTACK",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "5151",
+      "lock": "51",
+      "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 3.",
+      "stack": [
+        "01",
+        "01",
+        "01"
+      ]
+    },
+    {
+      "rule": "NULLDUMMY",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "51",
+      "lock": "0000ae",
+      "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty.",
+      "stack": []
+    },
+    {
+      "rule": "LOW_S",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "493046022100bb8e12222d5c84de279b509a34e19078655fb76008e0b12cae913a8ad96edf730221008334410c5302e40aec53529f5497dfe1dde8c7c91478d85dfe800425b3978dd841",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "99a0510be907102d3c210291c10e2de4c8ac5b537ea8980298bee5ecc3f57e3d"
+    },
+    {
+      "rule": "CHRONICLE_HASH_TYPE",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "483045022100837364923d6941f11c123cb1d391483196526e7b9dc719dc9b55517c2064b098022070e325a88cc9e6ec948b33e1fe18101fdd6b1c7c5dcf87430cb7c09b68d3442761",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "ace877f09a13305df308702802df06ffd0a82abc9809970c73231d5f1c49b3c8"
+    },
+    {
+      "rule": "OP_VER",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "",
+      "lock": "62",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        "00000000"
+      ]
+    },
+    {
+      "rule": "UNDEFINED_HASH_TYPE",
+      "version": 0,
+      "mode": "default",
+      "unlock": "483045022100bb8e12222d5c84de279b509a34e19078655fb76008e0b12cae913a8ad96edf7302207ccbbef3acfd1bf513acad60ab68201cdcc6151d9acfc7ddc1525a671c9eb36944",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": []
+    },
+    {
+      "rule": "UNDEFINED_HASH_TYPE",
+      "version": 1,
+      "mode": "default",
+      "unlock": "4830450221009e37a0530740b86fc3a57d487f79af894aba43f61fe134736f6c2ed9f7e3714f022070690eb64ad449133615cae33be5c14bfeb2231136ebd32fe2bd29b7063ddc1c44",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": []
+    },
+    {
+      "rule": "UNDEFINED_HASH_TYPE",
+      "version": 2,
+      "mode": "default",
+      "unlock": "483045022100fddb170c4cb67ac14e8cffd7b3d0d9c6f580b4d6b4b6e10fc71a7df10736faa002203deceacad26a00f6332752b07f44ef964598d24c869f52022f403498d8ce4dba44",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": []
+    },
+    {
+      "rule": "UNDEFINED_HASH_TYPE",
+      "version": 2147483647,
+      "mode": "default",
+      "unlock": "4830450221008d6bd7f630558efe560863b1568a265dc2ba5e4c3a4508568e070280e4a2537502206ae5814957fff0c1dc963c487c7d9733a80a9d93317b064b4d73bc231b066e1f44",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": []
+    },
+    {
+      "rule": "UNDEFINED_HASH_TYPE",
+      "version": 2147483648,
+      "mode": "default",
+      "unlock": "483045022100d7abb55a09ebb6e5ba0d081009aabf1e8ff6eb207c578b812938f8901b84220b02201e9c9cfbe73cab6e57d9ea32ad2aacba2e8059fa7fa40b997748cabf25f9514b44",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": []
+    },
+    {
+      "rule": "UNDEFINED_HASH_TYPE",
+      "version": 4294967295,
+      "mode": "default",
+      "unlock": "47304402206d13903f65ed737e524a41cb7f2bdf8e0b74c0ae95035170d5a6e4fc9a8681ce02201d235ff263291b1b6504426d2f7b10a4eb1048ce41e448db8cb1145287f4104e44",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": []
+    },
+    {
+      "rule": "SIGPUSHONLY",
+      "version": 0,
+      "mode": "flags",
+      "unlock": "5175",
+      "lock": "51",
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.",
+      "stack": []
+    },
+    {
+      "rule": "SIGPUSHONLY",
+      "version": 1,
+      "mode": "flags",
+      "unlock": "5175",
+      "lock": "51",
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes.",
+      "stack": []
+    },
+    {
+      "rule": "SIGPUSHONLY",
+      "version": 2,
+      "mode": "flags",
+      "unlock": "5175",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "SIGPUSHONLY",
+      "version": 2147483647,
+      "mode": "flags",
+      "unlock": "5175",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "SIGPUSHONLY",
+      "version": 2147483648,
+      "mode": "flags",
+      "unlock": "5175",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "rule": "SIGPUSHONLY",
+      "version": 4294967295,
+      "mode": "flags",
+      "unlock": "5175",
+      "lock": "51",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    }
+  ]
+}

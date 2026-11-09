@@ -119,6 +119,7 @@ mod stack_ops;
 mod word;
 
 use flow::is_opcode_disabled;
+use hash_type::relaxed_by_default;
 use limits::MAX_SCRIPT_ELEMENT_SIZE;
 use push::is_chunk_minimal_push;
 
@@ -260,7 +261,7 @@ pub struct Spend {
     /// called; `None` in the TypeScript default mode.
     flags: Option<ScriptFlags>,
     /// The coin's era for a word's number length; its UTXO_AFTER_CHRONICLE
-    /// bit, overridden by the setter. Stored as version > 1 by default,
+    /// bit, overridden by the setter. Version > 1 unsigned by default,
     /// where no number length limit applies (Spend.ts:393-401).
     utxo_after_chronicle: bool,
     /// All ten Chronicle opcodes: on at every version by default, as in
@@ -403,13 +404,12 @@ impl Spend {
             alt_stack_mem: 0,
             node_mem: 0,
             require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING,
-            // ts-sdk parity (isRelaxed()): version > 1 enforces no MINIMALDATA,
-            // LOW_S, CLEANSTACK, NULLDUMMY; the node gates the same four on the
-            // version at Chronicle (`interpreter.cpp:40-44`).
-            require_minimal: REQUIRE_MINIMAL_PUSH && transaction_version <= 1,
-            require_low_s: REQUIRE_LOW_S_SIGNATURES && transaction_version <= 1,
-            require_clean_stack: REQUIRE_CLEAN_STACK && transaction_version <= 1,
-            require_null_dummy: transaction_version <= 1,
+            // ts-sdk isRelaxed(): version > 1 (u32, #418) drops MINIMALDATA, LOW_S,
+            // CLEANSTACK, NULLDUMMY; a word: the node's i32 (interpreter.cpp:40-44).
+            require_minimal: REQUIRE_MINIMAL_PUSH && !relaxed_by_default(transaction_version),
+            require_low_s: REQUIRE_LOW_S_SIGNATURES && !relaxed_by_default(transaction_version),
+            require_clean_stack: REQUIRE_CLEAN_STACK && !relaxed_by_default(transaction_version),
+            require_null_dummy: !relaxed_by_default(transaction_version),
             // ts-sdk: NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS only under
             // explicit verifyFlags; here derived from a word by `set_flags`.
             require_null_fail: false,
@@ -418,7 +418,7 @@ impl Spend {
             discourage_upgradable_nops: false,
             flags: None,
             // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags
-            utxo_after_chronicle: transaction_version > 1,
+            utxo_after_chronicle: relaxed_by_default(transaction_version),
             chronicle_opcodes: true,
             script_num_length_policy: DEFAULT_SCRIPT_NUM_LENGTH_POLICY,
             stack_memory_policy: DEFAULT_STACK_MEMORY_USAGE_POLICY,

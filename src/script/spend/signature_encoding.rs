@@ -8,6 +8,7 @@ use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::script::ScriptEvaluationError;
 
 use super::crypto::{is_valid_signature_encoding, signature_overflows_the_order};
+use super::hash_type::relaxed_by_default;
 use super::Spend;
 
 impl Spend {
@@ -21,7 +22,7 @@ impl Spend {
         let tx_sig = TransactionSignature::from_checksig_format(sig)
             .map_err(|_| self.error("The signature format is invalid."))?;
 
-        if self.flags.is_none() && self.transaction_version <= 1 {
+        if self.flags.is_none() && !relaxed_by_default(self.transaction_version) {
             self.check_default_signature_requirements(&tx_sig)
                 .map_err(|_| self.error("The signature format is invalid."))?;
         } else {
