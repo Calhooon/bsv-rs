@@ -54,7 +54,9 @@ impl Fixture {
         }
         let height = 800_000;
         parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), height));
-        let mut tracker = MockChainTracker::new(height);
+        // The tip 101 blocks above the parent's lone-leaf proof, 100 above the
+        // subject's at 800,001 below: both deep enough (#734), the era the same.
+        let mut tracker = MockChainTracker::new(height + 101);
         tracker.add_root(height, parent.id());
         let mut tx = Transaction::new();
         tx.version = 2;

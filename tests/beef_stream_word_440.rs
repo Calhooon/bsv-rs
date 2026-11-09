@@ -303,7 +303,7 @@ async fn whole_transaction_and_async_reader_use_the_same_height_facts() {
         let tx = signed(scope, Some(CHRONICLE - 1));
         let bytes = tx.to_beef(false).unwrap();
         let headers = facts(&tx, Some(CHRONICLE));
-        let mut tracker = MockChainTracker::new(CHRONICLE).with_mining_tip(headers.tip);
+        let mut tracker = MockChainTracker::new(CHRONICLE + 99).with_mining_tip(headers.tip);
         for (height, root) in headers.roots {
             tracker.add_root(
                 height as u32,

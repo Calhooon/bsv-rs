@@ -176,7 +176,7 @@ pub trait ChainTracker: Send + Sync {
     ///
     /// # Returns
     ///
-    /// The current block height.
+    /// The chain's tip height. `Transaction::verify` asks it for a proof at level-0 offset 0 and refuses one under 100 blocks deep, so a placeholder refuses such a proof (#734).
     async fn current_height(&self) -> Result<u32, ChainTrackerError>;
 
     /// Active tip, median time past and network activation heights for the streaming reader.
@@ -302,7 +302,7 @@ impl Headers for MockChainTracker {
 
 /// A chain tracker that always returns true for any merkle root.
 ///
-/// This is useful for testing when you want to skip chain validation.
+/// For tests that skip the root check; its `height` still decides the depth of an offset-0 proof in `Transaction::verify` (100 blocks, #734).
 #[derive(Debug, Clone, Copy)]
 pub struct AlwaysValidChainTracker {
     /// The current block height to report.

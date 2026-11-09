@@ -35,7 +35,8 @@ fn bench(c: &mut Criterion) {
         .collect();
     let txid = source.id();
     source.merkle_path = Some(MerklePath::from_coinbase_txid(&txid, 800_000));
-    let mut tracker = MockChainTracker::new(800_000);
+    // 100 blocks past the lone-leaf proof (offset 0, #734).
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, txid);
     let mut unsigned = Transaction::new();
     for index in 0..100 {

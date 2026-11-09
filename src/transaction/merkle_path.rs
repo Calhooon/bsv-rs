@@ -333,7 +333,7 @@ impl MerklePath {
     }
 
     /// Returns the index (offset) of a transaction in the path.
-    fn index_of(&self, txid: &str) -> Result<u64> {
+    pub(super) fn index_of(&self, txid: &str) -> Result<u64> {
         for leaf in self.level0() {
             if leaf.hash.as_deref() == Some(txid) {
                 return Ok(leaf.offset);

@@ -780,7 +780,7 @@ fn a_chronicle_bit_signature_in_a_version_1_family_is_refused_at_its_input_in_th
             .build()
             .unwrap()
             .block_on(tx.verify(
-                &MockChainTracker::always_valid(beef_chain::HEIGHT as u32),
+                &MockChainTracker::always_valid(beef_chain::HEIGHT as u32 + 100),
                 None,
                 None,
             ))

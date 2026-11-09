@@ -66,8 +66,9 @@ fn main() {
 
     // And the verdict: the spend's script executed against the linked
     // source; the proven ancestor checked against the tracker and not
-    // descended.
-    let mut tracker = MockChainTracker::new(800_000);
+    // descended. The proof sits at offset 0, a coinbase's place, so the
+    // tracker's tip must be 100 blocks past it, as the reference reads it.
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, funding_txid);
     let ok = futures::executor::block_on(tx.verify(&tracker, None, None)).unwrap();
     assert!(ok);

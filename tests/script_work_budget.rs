@@ -395,7 +395,7 @@ async fn whole_transaction_charges_the_existing_signature_work_378() {
     let fixture = witness(16, ORIGINAL);
     let mut parent = Transaction::from_binary(&fixture.parent).unwrap();
     parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 800_000));
-    let mut tracker = MockChainTracker::new(800_000);
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, parent.id());
     let mut tx = Transaction::from_binary(&fixture.raw).unwrap();
     tx.inputs[0].source_transaction = Some(Box::new(parent));

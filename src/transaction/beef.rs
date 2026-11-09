@@ -2342,7 +2342,7 @@ mod merkle_path_reattach_tests {
         assert!(
             matches!(
                 parsed
-                    .verify(&MockChainTracker::always_valid(800_010), None, None)
+                    .verify(&MockChainTracker::always_valid(800_100), None, None)
                     .await,
                 Ok(true)
             ),
@@ -2370,7 +2370,7 @@ mod merkle_path_reattach_tests {
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
             .expect("a 24-deep diamond of unproven spends must parse and link");
         let verified = parsed
-            .verify(&MockChainTracker::always_valid(800_010), None, None)
+            .verify(&MockChainTracker::always_valid(800_100), None, None)
             .await;
         let elapsed = started.elapsed();
 

@@ -374,8 +374,10 @@ fn main() {
     // EXECUTED against its source output, and its outputs weighed against its
     // inputs. The spend is unproven, so the interpreter judges it; the
     // funding transaction is proven, so the tracker is asked for its root
-    // and its own ancestry is not needed.
-    let mut tracker = MockChainTracker::new(800_000);
+    // and its own ancestry is not needed. Its proof sits at offset 0 (the
+    // one transaction of its block, a coinbase's place), so the tracker's
+    // tip must be 100 blocks past it, as the reference reads it.
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, funding_txid);
     let ok = futures::executor::block_on(spend.verify(&tracker, None, None)).unwrap();
     assert!(ok);
@@ -523,8 +525,9 @@ fn main() {
 
     // And the verdict: the spend's script executed against the linked
     // source; the proven ancestor checked against the tracker and not
-    // descended.
-    let mut tracker = MockChainTracker::new(800_000);
+    // descended. The proof sits at offset 0, a coinbase's place, so the
+    // tracker's tip must be 100 blocks past it, as the reference reads it.
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, funding_txid);
     let ok = futures::executor::block_on(tx.verify(&tracker, None, None)).unwrap();
     assert!(ok);

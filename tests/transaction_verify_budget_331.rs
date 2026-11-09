@@ -73,7 +73,7 @@ fn verify(tx: &Transaction, memory_limit: Option<usize>) -> Result<bool, Error> 
     tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap()
-        .block_on(tx.verify(&MockChainTracker::always_valid(800_010), None, memory_limit))
+        .block_on(tx.verify(&MockChainTracker::always_valid(800_100), None, memory_limit))
 }
 
 /// Without a caller's budget nothing caps the stack: the shape #38 declined

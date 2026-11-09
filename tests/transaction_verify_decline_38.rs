@@ -66,7 +66,7 @@ fn verify(tx: &Transaction) -> Result<bool, Error> {
     tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap()
-        .block_on(tx.verify(&MockChainTracker::always_valid(800_010), None, BUDGET))
+        .block_on(tx.verify(&MockChainTracker::always_valid(800_100), None, BUDGET))
 }
 
 /// 32 copies on the stack are 32,000,000 bytes, the caller's budget exactly: valid.
