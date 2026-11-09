@@ -67,6 +67,11 @@ pub struct BeefTx {
     /// Set by [`tx_mut`](Self::tx_mut): `input_txids` waits for
     /// [`refresh`](Self::refresh) (bsv-rs#171).
     mutated: bool,
+    /// Set by [`tx_mut`](Self::tx_mut) when it drops bytes the entry held:
+    /// the reference keeps such an entry's `_rawTx`, re-synced from the
+    /// mutated transaction (`BeefTx.ts:160-169`), so its atomic copy takes
+    /// the raw branch (`Beef.ts:465`; #798's second fold).
+    raw_dropped: bool,
 }
 
 impl BeefTx {
@@ -80,6 +85,7 @@ impl BeefTx {
             input_txids: Vec::new(),
             is_valid: None,
             mutated: false,
+            raw_dropped: false,
         };
         btx.update_input_txids();
         btx
@@ -95,6 +101,7 @@ impl BeefTx {
             input_txids: Vec::new(),
             is_valid: None,
             mutated: false,
+            raw_dropped: false,
         };
         btx.update_input_txids();
         btx
@@ -111,6 +118,7 @@ impl BeefTx {
             input_txids: Vec::new(),
             is_valid: None,
             mutated: false,
+            raw_dropped: false,
         };
         btx.update_input_txids();
         btx
@@ -135,6 +143,7 @@ impl BeefTx {
             input_txids: Vec::new(),
             is_valid: None,
             mutated: false,
+            raw_dropped: false,
         }
     }
 
@@ -212,6 +221,7 @@ impl BeefTx {
         self.parse_raw();
         if let Some(ref tx) = self.tx {
             tx.invalidate_caches();
+            self.raw_dropped |= self.raw_tx.is_some();
             self.raw_tx = None;
             self.txid = None;
             self.mutated = true;
@@ -265,6 +275,13 @@ impl BeefTx {
         }
 
         None
+    }
+
+    /// True when the entry holds bytes or held them before
+    /// [`tx_mut`](Self::tx_mut) dropped them: the reference's
+    /// `tx._rawTx != null`, the atomic copy's raw branch (`Beef.ts:464-465`).
+    pub(crate) fn held_raw(&self) -> bool {
+        self.raw_tx.is_some() || self.raw_dropped
     }
 
     /// Returns raw transaction bytes, computing from parsed tx if needed.

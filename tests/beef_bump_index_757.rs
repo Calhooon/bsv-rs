@@ -72,11 +72,24 @@ fn build(v: &Value, case: &Value) -> Beef {
             "raw" => {
                 beef.merge_raw_tx(tx(v, name).to_binary(), None);
             }
+            "tx" => {
+                beef.merge_transaction(tx(v, name));
+            }
             "txid" => {
                 beef.merge_txid_only(tx(v, name).id());
             }
             "txidonly" => {
                 beef.make_txid_only(&tx(v, name).id());
+            }
+            "mut" => {
+                // The held entry mutated in place, as the recorder sets
+                // `findTxid(..).tx.lockTime` (#798's second fold).
+                let (name, lock_time) = name.split_once('=').unwrap();
+                beef.find_txid_mut(&tx(v, name).id())
+                    .unwrap()
+                    .tx_mut()
+                    .unwrap()
+                    .lock_time = lock_time.parse().unwrap();
             }
             "index" => {
                 let (name, index) = name.split_once('=').unwrap();
@@ -107,6 +120,12 @@ fn assert_written_as_recorded(v: &Value, name: &str) {
     let case = index_case(v, name);
     let mut beef = build(v, &case);
     let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
+    // A case recorded with its atomic BEEFs taken before `toHex` (whose sort
+    // reorders the source) is judged in that order here too.
+    let before_hex = case["atomic_before_hex"].as_bool().unwrap_or(false);
+    if before_hex {
+        assert_atomic_as_recorded(v, &case, &mut beef, name);
+    }
     assert_eq!(
         beef.to_hex(),
         case["beef"].as_str().unwrap(),
@@ -120,6 +139,13 @@ fn assert_written_as_recorded(v: &Value, name: &str) {
         case["parent_bump_index"].as_u64(),
         "{name}: the parent's bump index"
     );
+    if !before_hex {
+        assert_atomic_as_recorded(v, &case, &mut beef, name);
+    }
+}
+
+/// Every atomic BEEF of the case equals the reference's.
+fn assert_atomic_as_recorded(v: &Value, case: &Value, beef: &mut Beef, name: &str) {
     for atomic in case["atomic"].as_array().unwrap() {
         let subject = v["txs"][atomic["subject"].as_str().unwrap()]["txid"]
             .as_str()
@@ -387,4 +413,255 @@ fn a_callers_path_on_a_transaction_the_beef_does_not_prove_is_kept_and_descended
     let v = vector();
     let (walked, recorded) = path_case_walk(&v, "unproven_parent_of_the_subject");
     assert_eq!(Value::Array(walked), recorded);
+}
+
+/// The case's atomic BEEF of its one subject, read back.
+fn atomic_read(v: &Value, name: &str) -> Beef {
+    let case = index_case(v, name);
+    let mut beef = build(v, &case);
+    let subject = v["txs"][case["atomic"][0]["subject"].as_str().unwrap()]["txid"]
+        .as_str()
+        .unwrap();
+    Beef::from_binary(&beef.to_binary_atomic(subject).unwrap()).unwrap()
+}
+
+/// A raw entry whose index, set by hand, names a BUMP that does not hold its
+/// txid, or no BUMP at all, is written into the atomic BEEF with no BUMP and
+/// no index (format `00`), as the reference's `#copySelectedTransactions`
+/// maps an index through matching entries' BUMPs alone (`Beef.ts:453-456`,
+/// `:462`), and the walk stops at it (its `bumpIndex` setter empties its
+/// `inputTxids`, `BeefTx.ts:90-92`, `:219-221`). Until #798 the first kept
+/// the grandchild's BUMP and wrote `01 00` (a BEEF this crate's readers
+/// refuse, `TxidNotInBump`) and the second was an `Err`.
+#[test]
+fn a_raw_entry_whose_index_names_no_matching_bump_is_written_without_a_bump_798() {
+    let v = vector();
+    for name in [
+        "raw_naming_a_bump_without_its_txid_with_child",
+        "raw_naming_no_bump_with_child",
+    ] {
+        assert_written_as_recorded(&v, name);
+        let read = atomic_read(&v, name);
+        assert!(read.bumps.is_empty(), "{name}");
+        assert_eq!(read.txs.len(), 2, "{name}");
+        assert!(
+            read.txs.iter().all(|tx| tx.bump_index().is_none()),
+            "{name}"
+        );
+    }
+}
+
+/// The atomic walk stops at an entry carrying an index, matching or not: a
+/// child whose index names the parent's BUMP is copied without it, and the
+/// parent, reached only through the child, is not written, nor its BUMP, as
+/// the reference's walk (`Beef.ts:427-431`) finds no `inputTxids` to descend.
+/// Until #798 the walk reached the parent and carried BUMP 0.
+#[test]
+fn the_atomic_walk_stops_at_an_entry_carrying_an_index_798() {
+    let v = vector();
+    let name = "raw_child_naming_a_bump_without_its_txid";
+    assert_written_as_recorded(&v, name);
+    let read = atomic_read(&v, name);
+    let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
+    assert!(read.bumps.is_empty());
+    assert!(read.find_txid(parent).is_none());
+    assert_eq!(read.txs.len(), 2);
+}
+
+/// An entry whose index names a BUMP that does not hold its txid keeps that
+/// index, renumbered, when another included entry the BUMP proves carries it
+/// in: the reference's mapped index (`Beef.ts:462`), a BEEF the readers
+/// refuse, still the reference's bytes. The guard against dropping too much.
+#[test]
+fn a_raw_entry_sharing_a_matching_entrys_bump_keeps_the_mapped_index_798() {
+    let v = vector();
+    let name = "raw_sharing_a_matching_entrys_bump";
+    assert_written_as_recorded(&v, name);
+    let read = atomic_read(&v, name);
+    let uncle = v["txs"]["uncle"]["txid"].as_str().unwrap();
+    assert_eq!(read.bumps.len(), 1);
+    assert_eq!(read.find_txid(uncle).unwrap().bump_index(), Some(0));
+}
+
+/// The txids of an atomic BEEF's entries, in the order written.
+fn atomic_order(v: &Value, name: &str) -> Vec<String> {
+    atomic_read(v, name)
+        .txs
+        .iter()
+        .map(|tx| tx.txid())
+        .collect()
+}
+
+/// The vector's txids by name, in the order given.
+fn txids(v: &Value, names: &[&str]) -> Vec<String> {
+    names
+        .iter()
+        .map(|n| v["txs"][*n]["txid"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// An entry held raw whose hand-set index names no BUMP is copied with the
+/// source's `input_txids`, which the index emptied (`Beef.ts:464-465`), so
+/// the uncle sorts after the proven parent: parent, uncle, join, the
+/// reference's bytes. The strength read of PR #809: without the copy's
+/// restore the uncle gains its missing input and sorts ahead.
+#[test]
+fn a_raw_entry_naming_no_bump_keeps_the_sources_input_txids_798() {
+    let v = vector();
+    let name = "raw_uncle_naming_no_bump_beside_a_proven_parent";
+    assert_written_as_recorded(&v, name);
+    assert_eq!(
+        atomic_order(&v, name),
+        txids(&v, &["parent", "uncle", "join"])
+    );
+}
+
+/// An entry held as a transaction alone (`merge_transaction`, no bytes)
+/// whose hand-set index names no BUMP is copied as the reference's
+/// `BeefTx.fromTx` copies one never serialized (`Beef.ts:466-467`): its
+/// `input_txids` re-scanned, so the uncle, whose parent lies outside the
+/// BEEF, sorts ahead: uncle, join, parent. The rule read and the cold read
+/// of PR #809; until the fold parent, uncle, join.
+#[test]
+fn a_transaction_entry_naming_no_bump_is_copied_with_its_inputs_rescanned_798() {
+    let v = vector();
+    let name = "transaction_uncle_naming_no_bump_never_serialized";
+    assert!(index_case(&v, name)["atomic_before_hex"].as_bool().unwrap());
+    assert_written_as_recorded(&v, name);
+    assert_eq!(
+        atomic_order(&v, name),
+        txids(&v, &["uncle", "join", "parent"])
+    );
+}
+
+/// Stated: the reference's `toHex` fills each entry's `_rawTx`
+/// (`BeefTx.getRawTxBytes`), so the same entries written atomic after it
+/// copy through the raw branch (parent, uncle, join); this crate's writer
+/// caches no bytes in the entries, so its atomic BEEF is the never-serialized
+/// one whatever was written before (the root `CLAUDE.md` row).
+#[test]
+fn a_transaction_entry_after_to_hex_keeps_the_never_serialized_order_stated_798() {
+    let v = vector();
+    let name = "transaction_uncle_naming_no_bump_after_to_hex";
+    let case = index_case(&v, name);
+    let mut beef = build(&v, &case);
+    assert_eq!(beef.to_hex(), case["beef"].as_str().unwrap());
+    let join = v["txs"]["join"]["txid"].as_str().unwrap();
+    let ours = to_hex(&beef.to_binary_atomic(join).unwrap());
+    assert_ne!(ours, case["atomic"][0]["beef"].as_str().unwrap());
+    let never = index_case(&v, "transaction_uncle_naming_no_bump_never_serialized");
+    assert_eq!(ours, never["atomic"][0]["beef"].as_str().unwrap());
+    assert_eq!(
+        atomic_order(&v, name),
+        txids(&v, &["uncle", "join", "parent"])
+    );
+}
+
+/// A txid-only entry no BUMP proves, read by `Beef::from_binary` (a stub
+/// carries no index, `beef/collect.rs`), is written by `to_binary_atomic`
+/// with no BUMP, and both readers refuse the bytes `StubNotProven`, as the
+/// reference's writer writes them: the agreement, green before #798 too.
+#[test]
+fn a_stub_read_from_bytes_written_atomic_is_refused_as_stub_not_proven_798() {
+    let v = vector();
+    let case = index_case(&v, "txid_only_after_both_with_child");
+    let child = v["txs"]["child"]["txid"].as_str().unwrap();
+    let mut read = Beef::from_binary(&build(&v, &case).to_binary()).unwrap();
+    let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
+    // Read from bytes, the stub has no index.
+    assert_eq!(read.find_txid(parent).unwrap().bump_index(), None);
+    let bytes = read.to_binary_atomic(child).unwrap();
+    let any = HeadersFn(|_: u64, _: &Hash32| true);
+    let streamed = verify_stream_structure(bytes.as_slice(), &any, None).unwrap();
+    assert!(
+        format!("{streamed:?}").contains("StubNotProven"),
+        "{streamed:?}"
+    );
+    let mut again = Beef::from_binary(&bytes).unwrap();
+    assert!(again.bumps.is_empty());
+    assert_eq!(
+        again.verify_structure().err().map(|k| format!("{k:?}")),
+        Some("StubNotProven".to_string())
+    );
+    assert!(!again.verify_valid(false).valid);
+}
+
+/// The closure is taken from the entries as held, never from a sorted
+/// source: the reference's `#getBeefForAtomic` copies `this.txs` in their
+/// order and sorts the copy alone (`Beef.ts:375-390`). An uncle held as a
+/// transaction ahead of the parent and the join, no BUMP, its hand-set index
+/// naming none, written atomic before any `to_hex`: uncle, parent, join, the
+/// reference's bytes. PR #809's rule read; until its second fold the source
+/// was sorted first (parent, join, uncle) and the closure written parent,
+/// uncle, join.
+#[test]
+fn the_atomic_closure_is_taken_from_the_entries_as_held_798() {
+    let v = vector();
+    let name = "transaction_uncle_held_first_naming_no_bump_never_serialized";
+    assert!(index_case(&v, name)["atomic_before_hex"].as_bool().unwrap());
+    assert_written_as_recorded(&v, name);
+    assert_eq!(
+        atomic_order(&v, name),
+        txids(&v, &["uncle", "parent", "join"])
+    );
+}
+
+/// An entry held raw and mutated in place through `BeefTx::tx_mut` after
+/// its hand-set index named no BUMP is copied through the raw branch, as the
+/// reference's is: `syncRawTxFromTransaction` keeps `_rawTx` with the new
+/// bytes (`BeefTx.ts:160-169`) and `#copySelectedTransactions` copies it with
+/// the inputs the index emptied (`Beef.ts:465`), so the mutated uncle sorts
+/// after the proven parent: parent, uncle, join, the reference's bytes.
+/// PR #809's rule read; until its second fold the copy re-scanned the
+/// inputs (`tx_mut` drops the bytes) and the uncle, whose parent lies
+/// outside, sorted ahead.
+#[test]
+fn a_raw_entry_mutated_through_tx_mut_is_copied_through_the_raw_branch_798() {
+    let v = vector();
+    let name = "raw_uncle_mutated_naming_no_bump_beside_a_proven_parent";
+    assert_written_as_recorded(&v, name);
+    assert_eq!(
+        atomic_order(&v, name),
+        txids(&v, &["parent", "uncle_mut", "join_mut"])
+    );
+}
+
+/// The two shapes come from bytes: `Beef::from_binary` collects an entry's
+/// index unjudged, as the reference's `Beef.fromBinary` does, so a BEEF of
+/// the corpus naming BUMP 1 of 1 (`bad_index.bin`) and one naming a BUMP
+/// without its txid (`not_in_bump.bin`) reach the atomic writer, which
+/// writes the reference's `toBinaryAtomic` bytes: the entry with no BUMP and
+/// no index. PR #809's cold read; before #798 the first was an `Err`
+/// (`names BUMP 1 of 1`) and the second kept the BUMP.
+#[test]
+fn an_index_read_from_bytes_naming_no_matching_bump_is_written_atomic_as_the_reference_798() {
+    let v = vector();
+    let cases = v["from_bytes_cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 2);
+    for case in cases {
+        let path = format!(
+            "{}/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            case["file"].as_str().unwrap()
+        );
+        let mut read = Beef::from_binary(&std::fs::read(&path).unwrap()).unwrap();
+        for atomic in case["atomic"].as_array().unwrap() {
+            let subject = atomic["subject"].as_str().unwrap();
+            assert_eq!(
+                read.find_txid(subject)
+                    .unwrap()
+                    .bump_index()
+                    .map(|i| i as u64),
+                atomic["bump_index"].as_u64(),
+                "{}: the index read",
+                case["name"]
+            );
+            assert_eq!(
+                to_hex(&read.to_binary_atomic(subject).unwrap()),
+                atomic["beef"].as_str().unwrap(),
+                "{}: the bytes the reference's toBinaryAtomic({subject}) writes",
+                case["name"]
+            );
+        }
+    }
 }

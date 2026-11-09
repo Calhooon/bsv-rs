@@ -1005,19 +1005,28 @@ impl Beef {
     ///
     /// The BEEF written is the subject's BRC-95 closure, not every entry this
     /// one holds (0.8.1): from the subject, the inputs of each raw entry are
-    /// followed, stopping at a transaction a BUMP of this BEEF proves and at
-    /// a txid-only entry; every other entry is dropped, with the BUMPs that
-    /// no kept entry needs, and the kept BUMPs are renumbered. The order is
-    /// the reference's sort, the subject last. This is what `@bsv/sdk` 3
+    /// followed, stopping at an entry carrying a BUMP index (matching or not,
+    /// #798) and at a txid-only entry; every other entry is dropped. The BUMPs
+    /// kept are those that prove a kept entry, renumbered; an index naming no
+    /// BUMP holding its entry's txid is dropped unless another kept entry's
+    /// proof is the BUMP it names (the reference's `#copySelectedTransactions`). The order is
+    /// the reference's sort: the subject last when every kept entry's inputs
+    /// are kept or proven, else the entries with an input outside and those
+    /// resting on them ahead of the proven ones, the subject among them
+    /// (#798's fold; an entry held as a transaction alone has its inputs
+    /// re-scanned when its index is dropped, the reference's `BeefTx.fromTx`).
+    /// This is what `@bsv/sdk` 3
     /// (`Beef.#collectAtomicTransactions`) and go-sdk (`selectAtomicBeef`)
     /// write, and every reader accepts it: the readers of this crate, of
     /// 0.8.0, of TS 2, TS 3 and Go. [`to_binary`](Self::to_binary) still
     /// writes every entry.
     pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>> {
+        // The closure is copied from the entries as held and the copy alone
+        // sorted, as the reference's `#getBeefForAtomic` does
+        // (`Beef.ts:375-390`); until #798's second fold the source was sorted
+        // first, which moved the closure's order where entries with inputs
+        // outside lead.
         self.refresh_mutated();
-        if self.needs_sort {
-            self.sort_txs();
-        }
 
         if self.find_txid(txid).is_none() {
             return Err(crate::Error::BeefError(format!(
@@ -1063,53 +1072,61 @@ impl Beef {
                 continue;
             }
             let tx = &self.txs[i];
-            if tx.is_txid_only() || self.proves(tx) {
+            // Any index stops the walk, matching or not: the reference's
+            // `bumpIndex` setter empties `inputTxids` (`BeefTx.ts:90-92`,
+            // `:219-221`), so `:427-431` has nothing to descend (#798).
+            if tx.is_txid_only() || tx.has_proof() {
                 continue;
             }
             stack.extend(in_memory::spent_txids(tx).iter().filter_map(|t| at.get(t)));
         }
 
+        // The BUMPs of the included entries a BUMP of this BEEF proves, in
+        // entry order, renumbered (`#copySelectedTransactions`, `Beef.ts:453-456`).
         let mut beef = Beef::with_version(self.version);
         let mut renumbered: HashMap<usize, usize> = HashMap::new();
-        let mut keep = |index: usize, beef: &mut Beef| {
-            *renumbered.entry(index).or_insert_with(|| {
-                beef.bumps.push(self.bumps[index].clone());
-                beef.bumps.len() - 1
-            })
-        };
+        for (i, tx) in self.txs.iter().enumerate() {
+            if !included.contains(&i) || !self.proves(tx) {
+                continue;
+            }
+            if let Some(index) = tx.bump_index() {
+                renumbered.entry(index).or_insert_with(|| {
+                    beef.bumps.push(self.bumps[index].clone());
+                    beef.bumps.len() - 1
+                });
+            }
+        }
+        // Each included entry with its index mapped through those alone
+        // (`:462`): an index naming no BUMP holding its txid (another BUMP or
+        // none at all) is dropped unless another included entry's matching
+        // BUMP is the one it names, where the mapped index stays, as the
+        // reference writes it. A copy of an entry held raw keeps the
+        // source's `input_txids` (`:464-465`), which the sort reads; one held
+        // as a transaction alone, no bytes (`merge_transaction`), has them
+        // re-scanned with its mapped index, as `BeefTx.fromTx` does (`:466-467`),
+        // so an unmapped one whose parents lie outside joins the entries with
+        // missing inputs, sorted ahead (#798's fold). An entry held raw and
+        // mutated through `tx_mut` is one held raw (`held_raw`): the
+        // reference keeps its `_rawTx`, re-synced (`BeefTx.ts:160-169`;
+        // #798's second fold). Until #798 a raw entry's
+        // BUMP was kept whatever it held (#766 for a txid-only one) and an
+        // index out of range was an `Err`.
         for (i, tx) in self.txs.iter().enumerate() {
             if !included.contains(&i) {
                 continue;
             }
             let mut copy = tx.clone();
-            let txid = tx.txid();
-            if tx.is_txid_only() {
-                // The BUMP its index names when that BUMP holds the txid, else
-                // none and no index, as the reference's `#copySelectedTransactions`
-                // copies it (`Beef.ts:448-470`, `#hasMatchingBump` `:436-446`).
-                // Until #766 an entry without a matching index (one read from
-                // bytes carries none) took the last BUMP carrying the txid.
-                let index = tx.bump_index().filter(|_| self.proves(tx));
-                copy.set_bump_index(index.map(|i| keep(i, &mut beef)));
-            } else if let Some(index) = tx.bump_index() {
-                if index >= self.bumps.len() {
-                    return Err(crate::Error::BeefError(format!(
-                        "{txid} names BUMP {index} of {}",
-                        self.bumps.len()
-                    )));
-                }
-                copy.set_bump_index(Some(keep(index, &mut beef)));
+            copy.set_bump_index(tx.bump_index().and_then(|i| renumbered.get(&i).copied()));
+            if tx.held_raw() {
+                copy.input_txids = tx.input_txids.clone();
             }
             beef.txs.push(copy);
         }
+        // The reference's sort as it leaves the entries (`#getBeefForAtomic`,
+        // `Beef.ts:385-389`): the subject last when every entry links, else
+        // with the entries whose inputs lie outside, ahead of the proven ones
+        // (#798's fold; until then moved last after the sort).
         beef.sort_txs();
-        // Every other entry is an ancestor of the subject: last is in
-        // dependency order whatever the sort did with it.
-        if let Some(i) = beef.txs.iter().position(|tx| tx.txid() == subject) {
-            let tx = beef.txs.remove(i);
-            beef.txs.push(tx);
-            beef.rebuild_index();
-        }
         Ok(beef)
     }
 

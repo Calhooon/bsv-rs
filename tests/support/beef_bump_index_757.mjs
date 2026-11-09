@@ -17,7 +17,7 @@
 // The vector carries every input (the transactions' and the BUMPs' bytes,
 // each case's merge steps), so the Rust test rebuilds each BEEF with this
 // crate's writer and compares the bytes.
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 
 const [, , bundle, out] = process.argv
 const { Beef, MerklePath, Transaction, Script } = await import(bundle)
@@ -41,7 +41,17 @@ const child = new Transaction(1, [spend(P, 0), spend(P, 1)], [{ satoshis: 2500, 
 const C = child.id('hex')
 const grandchild = new Transaction(1, [spend(C, 0)], [{ satoshis: 2400, lockingScript: ONE() }], 0)
 const G = grandchild.id('hex')
-const TXS = { parent, child, grandchild }
+// #798: an uncle spending an outpoint outside the BEEF, and a join spending
+// the parent and the uncle.
+const uncle = new Transaction(1, [spend('cc'.repeat(32), 0)], [{ satoshis: 1500, lockingScript: ONE() }], 0)
+const U = uncle.id('hex')
+const join = new Transaction(1, [spend(P, 0), spend(U, 0)], [{ satoshis: 2400, lockingScript: ONE() }], 0)
+// #798's second fold: the uncle with its lock time moved to 1 (what a
+// `mut:uncle=1` step makes of the held uncle in place) and a join spending
+// the parent and that uncle.
+const uncleMut = new Transaction(1, [spend('cc'.repeat(32), 0)], [{ satoshis: 1500, lockingScript: ONE() }], 1)
+const joinMut = new Transaction(1, [spend(P, 0), spend(uncleMut.id('hex'), 0)], [{ satoshis: 2400, lockingScript: ONE() }], 0)
+const TXS = { parent, child, grandchild, uncle, join, uncle_mut: uncleMut, join_mut: joinMut }
 const SIBLING = 'bb'.repeat(32)
 
 // The BUMPs, by name, each a root of its own.
@@ -118,6 +128,79 @@ const INDEX_CASES = [
     name: 'txid_only_naming_a_bump_without_its_txid_with_child',
     steps: ['bump:alone_800000', 'bump:grandchild_800004', 'txid:parent', 'raw:child', 'index:parent=1'],
     atomic: ['child']
+  },
+  // #798: a raw entry whose index, set by hand, names no BUMP holding its
+  // txid (another BUMP, or none at all): `BeefTx`'s `bumpIndex` setter
+  // empties its `inputTxids` (`BeefTx.ts:90-92,219-221`), so the walk
+  // (`Beef.ts:427-431`) does not descend it; `#copySelectedTransactions`
+  // copies a BUMP only for an entry `#hasMatchingBump` proves (`:453-456`)
+  // and maps the index through those alone (`:462`), so the copy carries no
+  // BUMP unless another included entry's matching BUMP is the one it names.
+  {
+    name: 'raw_naming_a_bump_without_its_txid_with_child',
+    steps: ['bump:alone_800000', 'bump:grandchild_800004', 'raw:parent', 'raw:child', 'index:parent=1'],
+    atomic: ['child']
+  },
+  {
+    name: 'raw_naming_no_bump_with_child',
+    steps: ['bump:alone_800000', 'raw:parent', 'raw:child', 'index:parent=5'],
+    atomic: ['child']
+  },
+  {
+    name: 'raw_child_naming_a_bump_without_its_txid',
+    steps: ['bump:alone_800000', 'raw:parent', 'raw:child', 'raw:grandchild', 'index:child=0'],
+    atomic: ['grandchild']
+  },
+  {
+    name: 'raw_sharing_a_matching_entrys_bump',
+    steps: ['bump:alone_800000', 'raw:parent', 'raw:uncle', 'raw:join', 'index:uncle=0'],
+    atomic: ['join']
+  },
+  // The #798 fold: the copy's `inputTxids` (`#copySelectedTransactions`,
+  // `:464-467`). An entry held raw is copied with the source's, which the
+  // setter emptied, so the uncle sorts after the proven parent; an entry held
+  // as a `Transaction` never serialized (`mergeTransaction`, `tx:<name>`, a
+  // fresh parse of the transaction's bytes) is copied through
+  // `BeefTx.fromTx`, which re-scans them, so the uncle, whose parent lies
+  // outside the BEEF, sorts ahead (`sortTxs`). `toHex` fills each entry's
+  // `_rawTx` (`BeefTx.getRawTxBytes`), so the same steps written after it
+  // copy through the raw branch: `atomic_before_hex` records the atomic BEEF
+  // ahead of the whole one.
+  {
+    name: 'raw_uncle_naming_no_bump_beside_a_proven_parent',
+    steps: ['bump:alone_800000', 'raw:parent', 'raw:uncle', 'raw:join', 'index:uncle=5'],
+    atomic: ['join']
+  },
+  {
+    name: 'transaction_uncle_naming_no_bump_never_serialized',
+    steps: ['bump:alone_800000', 'tx:parent', 'tx:uncle', 'tx:join', 'index:uncle=5'],
+    atomic: ['join'],
+    atomic_before_hex: true
+  },
+  {
+    name: 'transaction_uncle_naming_no_bump_after_to_hex',
+    steps: ['bump:alone_800000', 'tx:parent', 'tx:uncle', 'tx:join', 'index:uncle=5'],
+    atomic: ['join']
+  },
+  // #798's second fold (PR #809's rule read). The source is not sorted before
+  // the closure is taken (`#getBeefForAtomic`, `Beef.ts:375-390`, sorts the
+  // copy alone): an uncle held as a transaction ahead of a parent and a join,
+  // no BUMP, both the uncle and the parent with an input outside, written
+  // atomic before any `toHex`. And an entry held raw, mutated in place after
+  // its index was set (`mut:<tx>=<lockTime>`, the `tx` getter's object):
+  // `syncRawTxFromTransaction` keeps `_rawTx` (`BeefTx.ts:160-169`), so the
+  // copy takes the raw branch (`Beef.ts:465`) with the inputs the index
+  // emptied, and the uncle sorts after the proven parent.
+  {
+    name: 'transaction_uncle_held_first_naming_no_bump_never_serialized',
+    steps: ['tx:uncle', 'raw:parent', 'raw:join', 'index:uncle=5'],
+    atomic: ['join'],
+    atomic_before_hex: true
+  },
+  {
+    name: 'raw_uncle_mutated_naming_no_bump_beside_a_proven_parent',
+    steps: ['bump:alone_800000', 'raw:parent', 'raw:uncle', 'index:uncle=5', 'mut:uncle=1', 'raw:join_mut'],
+    atomic: ['join_mut']
   }
 ]
 
@@ -127,7 +210,12 @@ const build = steps => {
     const [kind, name] = step.split(':')
     if (kind === 'bump') beef.mergeBump(BUMPS[name]())
     else if (kind === 'raw') beef.mergeRawTx(TXS[name].toBinary())
+    else if (kind === 'tx') beef.mergeTransaction(Transaction.fromHex(TXS[name].toHex()))
     else if (kind === 'txidonly') beef.makeTxidOnly(TXS[name].id('hex'))
+    else if (kind === 'mut') {
+      const [tx, lockTime] = name.split('=')
+      beef.findTxid(TXS[tx].id('hex')).tx.lockTime = Number(lockTime)
+    }
     else if (kind === 'index') {
       const [tx, index] = name.split('=')
       beef.findTxid(TXS[tx].id('hex')).bumpIndex = index === 'none' ? undefined : Number(index)
@@ -139,15 +227,21 @@ const build = steps => {
 
 const index_cases = INDEX_CASES.map(c => {
   const beef = build(c.steps)
-  return {
-    name: c.name,
-    steps: c.steps,
-    beef: beef.toHex(),
-    parent_bump_index: beef.findTxid(P).bumpIndex,
-    atomic: c.atomic.map(name => ({
+  const atomicOf = () =>
+    c.atomic.map(name => ({
       subject: name,
       beef: Buffer.from(beef.toBinaryAtomic(TXS[name].id('hex'))).toString('hex')
     }))
+  const early = c.atomic_before_hex ? atomicOf() : null
+  const written = beef.toHex()
+  const atomic = early ?? atomicOf()
+  return {
+    name: c.name,
+    steps: c.steps,
+    ...(c.atomic_before_hex ? { atomic_before_hex: true } : {}),
+    beef: written,
+    parent_bump_index: beef.findTxid(P).bumpIndex,
+    atomic
   }
 })
 
@@ -191,6 +285,28 @@ const path_cases = PATH_CASES.map(c => {
   return { name: c.name, steps: c.steps, beef: written, set_on: c.set_on, set: c.set, subject: c.subject, walk: seen }
 })
 
+// #798's second fold (PR #809's cold read): the two shapes come from bytes,
+// `Beef.fromBinary` collecting an entry's index unjudged. Two BEEFs of the
+// beef-of-any-size corpus, read here and written atomic for each raw entry
+// (`toBinaryAtomic`): one naming BUMP 1 of 1, one naming a BUMP without its
+// txid. Read relative to the working directory, the crate's root.
+const FROM_BYTES = ['bad_index', 'not_in_bump']
+const from_bytes_cases = FROM_BYTES.map(name => {
+  const bytes = readFileSync(`tests/vectors/beef_of_any_size/${name}.bin`)
+  const beef = Beef.fromBinary(Array.from(bytes))
+  return {
+    name,
+    file: `tests/vectors/beef_of_any_size/${name}.bin`,
+    atomic: beef.txs
+      .filter(tx => !tx.isTxidOnly)
+      .map(tx => ({
+        subject: tx.txid,
+        bump_index: tx.bumpIndex ?? null,
+        beef: Buffer.from(beef.toBinaryAtomic(tx.txid)).toString('hex')
+      }))
+  }
+})
+
 const vector = {
   issue: 757,
   reference: 'ts-stack@edf6e03 packages/sdk (Beef.ts:448-470, :550-565, :576-585, :649-668, :774-786, :813-822, :1329-1340)',
@@ -198,6 +314,7 @@ const vector = {
   txs: Object.fromEntries(Object.entries(TXS).map(([name, tx]) => [name, { txid: tx.id('hex'), raw: tx.toHex() }])),
   bumps: Object.fromEntries(Object.entries(BUMPS).map(([name, mp]) => [name, mp().toHex()])),
   index_cases,
-  path_cases
+  path_cases,
+  from_bytes_cases
 }
 writeFileSync(out, JSON.stringify(vector, null, 2) + '\n')
