@@ -104,6 +104,9 @@ pub struct LookupResolver {
     /// In-flight host discovery requests for request coalescing.
     /// Maps service name to watch sender for the result.
     hosts_in_flight: RwLock<HashMap<String, watch::Sender<InFlightResult>>>,
+    /// Outputs merged whose host's `txid` hint disagreed with the BEEF's
+    /// subject (#796), read by `txid_hint_contradictions`.
+    hint_contradictions: std::sync::atomic::AtomicU64,
 }
 
 impl LookupResolver {
@@ -155,6 +158,7 @@ impl LookupResolver {
             tx_memo_ttl_ms: config.tx_memo_ttl_ms,
             tx_memo_max_entries: config.tx_memo_max_entries,
             hosts_in_flight: RwLock::new(HashMap::new()),
+            hint_contradictions: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
