@@ -7,10 +7,39 @@ use crate::overlay::types::{LookupAnswer, LookupQuestion, OutputListItem};
 use crate::{Error, Result};
 use serde::Serialize;
 use serde_json::value::RawValue;
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
+/// The reference's hint test at the merge (`ts-stack@edf6e03`
+/// `LookupResolver.ts:2229`, `:2235`): a hint present that, ASCII
+/// lower-cased, is not the BEEF subject's txid. The reference drops such an
+/// output; this crate keeps and counts it (#796, the owner's word on #735).
+fn hint_disagrees(hint: Option<&str>, tx_id: &str) -> bool {
+    hint.is_some_and(|hint| hint.to_ascii_lowercase() != tx_id)
+}
+
 impl LookupResolver {
+    /// How many lookup outputs this resolver merged whose host's `txid` hint
+    /// disagreed with the BEEF's subject (#796): every one received, kept in
+    /// the answer or not, counted as the host's fault for the caller to log
+    /// or act on. The reference drops such an output at its merge
+    /// (`ts-stack@edf6e03` `LookupResolver.ts:1104-1105`, `:2223-2240`;
+    /// ts-stack #1482); here it is kept, by the owner's word on #735, unless
+    /// a copy of the same output whose hint agrees (or is absent) arrives,
+    /// which displaces it and stands where it arrived, so the answer less
+    /// its kept lying outputs is the reference's copies, and its order while
+    /// the hosts answer in rank order (this crate merges the answers in rank
+    /// order once every host has answered, the reference each answer as it
+    /// completes, `:1501-1502` into `:1065-1072`). The host's reputation is
+    /// not touched, as the reference's merge touches none. This count is separate from
+    /// `IdentityClient::txid_hint_contradictions`: an identity lookup that
+    /// keeps a lying output counts it here at the merge and again there at
+    /// the evidence check.
+    pub fn txid_hint_contradictions(&self) -> u64 {
+        self.hint_contradictions.load(Ordering::Relaxed)
+    }
+
     /// Execute a lookup query.
     ///
     /// Discovers competent hosts and queries them in parallel,
@@ -94,8 +123,11 @@ impl LookupResolver {
         }
 
         // Query all available hosts in parallel
-        let mut all_outputs: Vec<OutputListItem> = Vec::new();
-        let mut seen_outputs: HashSet<String> = HashSet::new();
+        // A slot emptied when an agreeing copy displaces a lying one (#796).
+        let mut all_outputs: Vec<Option<OutputListItem>> = Vec::new();
+        // The key to the held copy's slot in `all_outputs` and whether its
+        // hint disagrees with its subject (#796).
+        let mut seen_outputs: HashMap<String, (usize, bool)> = HashMap::new();
         let mut first_freeform: Option<LookupAnswer> = None;
 
         let futures: Vec<_> = available
@@ -142,14 +174,42 @@ impl LookupResolver {
                         LookupAnswer::OutputList { outputs } => {
                             // Deduplicate using TX memoization (txId.outputIndex as unique key)
                             for output in outputs {
-                                if let Some(tx_id) = self.get_or_cache_tx_id(&output.beef).await {
-                                    let uniq_key = format!("{}.{}", tx_id, output.output_index);
-                                    if !seen_outputs.contains(&uniq_key) {
-                                        seen_outputs.insert(uniq_key);
-                                        all_outputs.push(output);
-                                    }
-                                }
                                 // Skip outputs with invalid BEEF (can't parse)
+                                let Some(tx_id) = self.get_or_cache_tx_id(&output.beef).await
+                                else {
+                                    continue;
+                                };
+                                let disagrees = hint_disagrees(output.txid.as_deref(), &tx_id);
+                                if disagrees {
+                                    self.hint_contradictions.fetch_add(1, Ordering::Relaxed);
+                                }
+                                let uniq_key = format!("{}.{}", tx_id, output.output_index);
+                                match seen_outputs.get_mut(&uniq_key) {
+                                    None => {
+                                        seen_outputs
+                                            .insert(uniq_key, (all_outputs.len(), disagrees));
+                                        all_outputs.push(Some(output));
+                                    }
+                                    // A held copy whose hint lies is displaced by the
+                                    // first agreeing (or hintless) one (#796), which
+                                    // takes its own arrival's place: the reference drops
+                                    // the lying copy (`LookupResolver.ts:2229,2235`) and
+                                    // keys the agreeing one when it arrives (`:1106-1112`),
+                                    // so this answer less its kept lone liars is the
+                                    // reference's copies, and its order while the hosts
+                                    // answer in rank order (the reference merges in
+                                    // completion order, `:1501-1502`).
+                                    Some((slot, held_disagrees))
+                                        if *held_disagrees && !disagrees =>
+                                    {
+                                        all_outputs[*slot] = None;
+                                        *slot = all_outputs.len();
+                                        *held_disagrees = false;
+                                        all_outputs.push(Some(output));
+                                    }
+                                    // Otherwise the earlier copy stays (`:1107`).
+                                    Some(_) => {}
+                                }
                             }
                         }
                         LookupAnswer::Freeform { .. } => {
@@ -174,7 +234,7 @@ impl LookupResolver {
             Ok(freeform)
         } else {
             Ok(LookupAnswer::OutputList {
-                outputs: all_outputs,
+                outputs: all_outputs.into_iter().flatten().collect(),
             })
         }
     }

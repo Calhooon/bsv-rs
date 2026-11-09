@@ -1,0 +1,470 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk LookupResolver.query",
+  "node": "v22.18.0",
+  "beefs": {
+    "A": "0200beef01fd8503010100021b8f0986cf14d62192c18f767697543f2a7443cda009b464a43e0b39ce0956e0010100010000000111111111111111111111111111111111111111111111111111111111111111110000000000ffffffff010100000000000000015100000000",
+    "B": "0200beef01fd8603010100020e8f5de59e1f2e4967fc62c3ca09c2eca6287e7f08dea7c146bd5867cb7c54f8010100010000000111111111111111111111111111111111111111111111111111111111111111110000000000ffffffff010200000000000000015100000000",
+    "C": "0200beef01fd8703010100020a42e33495cf0fa28a1913b704f3e5e9e4e17fab3c22b4bf4457f33c40d7669d010100010000000111111111111111111111111111111111111111111111111111111111111111110000000000ffffffff010300000000000000015100000000"
+  },
+  "txids": {
+    "A": "e05609ce390b3ea464b409a0cd43742a3f549776768fc19221d614cf86098f1b",
+    "B": "f8547ccb6758bd46c1a7de087f7e28a6ecc209cac362fc67492e1f9ee55d8f0e",
+    "C": "9d66d7403cf35744bfb4223cab7fe1e4e9e5f304b713198aa20fcf9534e3420a"
+  },
+  "shapes": [
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        }
+      ],
+      "name": "liar_then_honest",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              2
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        }
+      ],
+      "name": "honest_then_liar",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              2
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            },
+            {
+              "context": [
+                3
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "B"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        }
+      ],
+      "name": "replaced_keeps_place",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "B",
+            "outputIndex": 0,
+            "hint": "B",
+            "context": [
+              3
+            ]
+          },
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              2
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        }
+      ],
+      "name": "lone_liar",
+      "reference": {
+        "type": "output-list",
+        "outputs": []
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A_upper",
+              "outputIndex": 0,
+              "tx": "A"
+            },
+            {
+              "context": [
+                3
+              ],
+              "hint": null,
+              "outputIndex": 0,
+              "tx": "B"
+            }
+          ],
+          "role": "honest"
+        }
+      ],
+      "name": "upper_and_absent",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A_upper",
+            "context": [
+              2
+            ]
+          },
+          {
+            "tx": "B",
+            "outputIndex": 0,
+            "hint": null,
+            "context": [
+              3
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                4
+              ],
+              "hint": null,
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "hintless"
+        }
+      ],
+      "name": "absent_replaces_liar",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": null,
+            "context": [
+              4
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                5
+              ],
+              "hint": "C",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar_2"
+        }
+      ],
+      "name": "liar_liar",
+      "reference": {
+        "type": "output-list",
+        "outputs": []
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                6
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest_2"
+        }
+      ],
+      "name": "honest_honest",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              2
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                5
+              ],
+              "hint": "C",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar_2"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        }
+      ],
+      "name": "liar_liar_honest",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              2
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                6
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest_2"
+        }
+      ],
+      "name": "liar_honest_honest",
+      "reference": {
+        "type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              2
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

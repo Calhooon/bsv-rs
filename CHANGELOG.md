@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a lying host's copy of a lookup output no longer shadows an honest host's at the resolver's merge (#796)
+
+`LookupResolver::query` deduplicates the outputs of every host's answer by
+the BEEF subject's txid and the output index, walking the answers in the
+hosts' rank order and keeping the earlier copy of a key. Since #735 an
+output carries its host's `txid` hint, and the owner's word on #735
+(2026-11-04 13:5xZ) keeps a disagreeing hint carried and counted, never
+refused. Until #796 the merge never read the hint: a lying host ranked ahead
+of an honest one had its copy kept, its lying hint and its own `context`
+included, and the honest copy discarded as the duplicate, where the
+reference drops the lying copy and returns the honest one.
+
+The merge now compares each output's hint with its subject's txid, ASCII
+lower-cased, as the reference's `resolveTxIdForOutput` does
+(`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/LookupResolver.ts:2229`,
+`:2235`). A disagreeing output is counted, every one received, kept or not.
+On a key already held, an agreeing (or hintless) copy displaces a held
+disagreeing one and stands where it arrived; otherwise the earlier copy
+stays, as `:1107`. The reference drops the lying copy and keys the agreeing
+one on arrival (`:1104-1112`), so this crate's answer less its kept lying
+outputs is the reference's copies, and its order too while the hosts answer
+in their rank order: this crate merges the answers in rank order once every
+host has answered (`futures::future::join_all`), the reference each answer
+as it completes (`recordLookupHostAnswer`, `:1501-1502`, into
+`recordOutputAnswer`, `:1065-1072`), so where the honest host answers before
+a liar ranked ahead of it the reference answers `[A honest, B]` for the
+vector's `replaced_keeps_place` and this crate `[B, A honest]` (the cold
+read's probe: the recorder with the host ranked ahead delayed 50 ms). The
+copies agree in every completion order; the order of outputs from different
+hosts is the reference's completion order and this crate's rank order, older
+than #796 and a row of its own. Where every copy of a key
+disagrees, the reference returns none and this crate the earliest, hint as
+given (the parity note below). The host's reputation is not touched, as the
+reference's merge touches none (`mergeAnswer`, `:1101-1115`; the success
+recorded for any output list at `:2395-2397`).
+
+Additive: `LookupResolver::txid_hint_contradictions(&self) -> u64`, the
+twin of `IdentityClient::txid_hint_contradictions`. The two counters are
+separate: an identity lookup that keeps a lying output counts it at the
+merge and again at the evidence check.
+
+Pinned by `tests/lookup_hint_merge_796.rs` against
+`tests/vectors/lookup_hint_merge_796.json` (recorded by
+`tests/support/lookup_hint_merge_796.mjs` under Node v22.18.0, the
+reference's own `LookupResolver.query` with a scripted facilitator; two
+runs byte-identical; the BEEFs this crate's writer's): ten shapes, the
+reference's answer on eight, the lone liar and the two liars stated. On the
+base `545eb36f` (the count's assertions held aside) 4 of the 8 tests then
+written RED:
+`a_lying_hint_ahead_of_an_honest_copy_does_not_shadow_it_796`,
+`an_agreeing_copy_displaces_a_liar_and_stands_where_it_arrived_796`,
+`an_agreeing_hint_in_upper_case_and_an_absent_hint_are_no_contradiction_796`
+and `every_shape_is_the_references_answer_save_the_stated_796`; the same 4
+on the tip with the displacement removed, and 2 (the place and the shapes)
+with the agreeing copy written into the liar's slot. The reads' fold
+recorded four more shapes, each pinning a stated rule against a one-line
+mutation of the merge, every one RED on a copy of the tip: `honest_honest`
+(two agreeing copies, the earlier kept by both; a later agreeing copy
+replacing an earlier one turns
+`an_earlier_agreeing_copy_stays_against_a_later_one_796` RED),
+`liar_liar` (two different lies, a stated cell: the earliest kept here and
+both counted, nothing there; the latest liar kept turns
+`two_lying_copies_keep_the_earliest_and_count_both_796` RED),
+`liar_honest_honest` (one displacement per key, the earlier agreeing copy
+standing; a second displacement turns
+`a_key_is_displaced_once_the_earlier_agreeing_copy_standing_796` RED) and
+`liar_liar_honest` (the agreeing copy displaces the held liar, both lies
+counted; a lying copy after the first left uncounted turns
+`an_agreeing_copy_displaces_the_held_liar_after_two_lies_796` RED, `left: 1`,
+`right: 2`).
+
+The brief's residue, a binary aggregated answer whose every output carried
+the whole BEEF so that outputs of other transactions keyed to one subject,
+is closed already by #735's fold (`facilitators/binary_answer.rs`: each
+output the Atomic BEEF of its own outpoint's txid, that txid its hint). A
+JSON host serving one BEEF of several transactions for outputs of a
+transaction other than its subject is judged by the subject on both sides
+(`Transaction.fromBEEF(output.beef)`, `:2233`): an honest hint naming the
+other transaction disagrees there and here, dropped there, kept and counted
+here, the stated cell below.
+
+### Notes: cross-SDK parity (#796)
+
+The reference drops an output whose hint disagrees with its subject at its
+merge (`ts-stack@edf6e03` `LookupResolver.ts:1104-1105` through
+`resolveTxIdForOutput`, `:2223-2240`); this crate keeps and counts it by the
+owner's word on #735, so a key that only lying copies carry is answered here
+with the earliest copy, hint as given, and is absent there (the vector's
+`lone_liar`). Go at `2ca481c` has no hint (`overlay/lookup/types.go:19-22`),
+keys by the BEEF's txid and index and keeps a later copy
+(`overlay/lookup/resolver.go:131-138`). Upstream: ts-stack #1482.
+
 ### Fixed: the SHIP discovery admits a host as the reference does: the answer and BEEF bounds, the txid hint, 1 satoshi, the endpoint's origin, 32 hosts (#804)
 
 `TopicBroadcaster::find_interested_hosts` parsed every output of the
