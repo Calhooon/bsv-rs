@@ -7,6 +7,158 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: an attribute question keeps only the certificates matching it, as the reference wallet does (#751)
+
+`IdentityClient::query` sent `attributes` to `ls_identity` and checked none
+of them on the certificates it read, and `resolve_by_attributes` kept every
+certificate the parser admitted, so a host could answer an attribute question
+with any certificate (the injection class #746 closed for the subject, the
+type and the certifier). The reference wallet re-binds the answer to the
+question it asked: `discoverByAttributes` filters through
+`filterCertificatesByAttributes` before its trust step and its page
+(`ts-stack@edf6e03` `packages/wallet/wallet-toolbox/src/Wallet.ts:1069-1082`;
+the matcher `packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:140-293`).
+The matcher is ported function for function (`src/identity/client_attributes.rs`)
+over each certificate's decrypted fields (the anyone wallet's): `userName`
+equal to the asked value after `normalizeIdentitySearch` (`:141`, `:214-215`),
+every other named field by `identityFuzzyMatches` (`:145-162`: the tokens in
+order on one line, each a literal under JavaScript's `gi` without `u`, its
+`Canonicalize` written out), `any` across every string field but
+`profilePhoto` and `icon` (`:229-244`: two UTF-16 units fuzzily, three or more
+by `identityTextMatches`, `:166-223`: NFD, `\p{Mn}` removed, lower case, the
+English stop words, `-term`, a quoted phrase; the fields joined in the order a
+JavaScript object walks them, array-index names ahead), the other names unread
+beside `any` (`:275`), and nothing kept when no attribute is usable
+(`:257-265`, `:291`). It runs at `query` when `attributes` is set and at
+`resolve_by_attributes` over the map sent, so that door's lone attribute is
+judged by the `any` rule, the search the overlay ran. A certificate whose
+revealed field does not decrypt carries no field and matches nothing.
+
+Pinned by `tests/vectors/identity_attributes_751.json` (42 cases, recorded by
+`tests/support/identity_attributes_751.mjs` from the exported
+`filterCertificatesByAttributes` under Node v22.18.0, two runs byte-identical),
+judged case for case by the unit module
+`src/identity/client_attributes_751_tests.rs`, and by
+`tests/identity_query_attributes_751.rs`: a host answering with another
+certificate not believed at `query` nor at `resolve_by_attributes`, the asked
+one kept, an undecryptable one dropped, nothing usable keeping nothing, a type
+beside attributes filtering by both. 5 of 6 RED on `545eb36f` (every
+certificate kept; the no-attributes control green); the unit module
+compile-RED there (the matcher absent). Two older pins read their certificates
+through `resolve_by_attributes` with values the certificate does not carry:
+`src/identity/client_field_value_261_tests.rs` asks the certificate's own
+email (`alice@example.com`, where it asked `x`), and
+`tests/identity_certificate_record_553.rs` reads through `query` with no
+filter, the same parser (its `fields_at_bound` certificate carries no
+`alice`).
+
+Migration: an attribute question through `query` or `resolve_by_attributes`
+now returns only the certificates whose decrypted fields match it; code that
+read every certificate a host answered reads fewer. No public type or
+signature changes.
+
+### Added: an `IdentityQuery` the overlay would refuse is refused locally in the overlay's words, never sent (#756)
+
+The reference overlay's identity lookup service refuses the whole question for
+a `limit` outside 1 to 100, an `offset` above 100000, an `identityKey` or a
+`certifiers` entry that is no compressed key, a type that is not base64 of 32
+bytes, an `attributes` map of 0 or more than 32 fields, an unsafe name or a
+value over 500 bytes (`ts-stack@edf6e03`
+`packages/overlays/topics/src/identity/IdentityLookupService.ts:83-123`; the
+words `packages/overlays/topics/src/shared/queryValidation.ts:9,58,72,126,174-178,188,247-256`).
+`IdentityClient::query` sent such a question, and `LookupResolver::query`
+read the overlay's refusal as an empty answer and charged the host's
+reputation for the caller's input. `query` now checks what it would send
+before the network, in the overlay's order (`limit`, `offset`, `identityKey`,
+a set certifier as `certifiers[0]`, a set type as `certificateTypes[0]`,
+then `attributes`: the count, then per entry the name and the value, the
+entries in the order the overlay walks them, `Object.entries` of the text
+`query` sends: array-index names ahead, ascending, then the rest as
+inserted), and refuses
+with `Error::IdentityError` carrying the overlay's whole message (`Invalid
+lookup query: limit must be an integer from 1 to 100`, `... identityKey must
+contain 1-66 UTF-8 bytes`, `... certifiers[0] must be a non-empty bounded
+string`, `... certifiers[0] must be a compressed public key`, `... must be a
+valid compressed public key`, `... certificateTypes[0] must be a non-empty
+bounded string` (empty or past 44 bytes), `... certificateTypes[0] must be a
+32-byte base64 value` (`IdentityLookupService.ts:97-100`,
+`queryValidation.ts:183-190`: `validateBase64String` of 32 bytes, trimmed,
+padding required, read by the port of it `publicly_reveal_attributes` already
+uses), `... attributes must contain 1-32 fields`, `... attribute names must
+be safe MongoDB field segments of at most 50 UTF-8 bytes`, `... attribute
+values must be strings of at most 500 UTF-8 bytes`); the key's point is read
+by `PublicKey::from_hex`, the reference's `PublicKey.fromString` reading
+(#498: an upper-case key and `02`+(p+1) admitted, an x of no point refused).
+`src/identity/query_bounds.rs`; the bounds named on `IdentityQuery`'s fields,
+`with_limit`, `with_offset` and `query`. One older pin of this crate's own
+follows the row (the captain's ruling of 2026-11-09): the last assertion of
+`a_query_by_type_keeps_only_the_asked_types_certificates_746`
+(`tests/identity_query_filters_746.rs`), which asked `query` with the
+unpadded type and read an empty list, now reads the refusal in the overlay's
+words; its assertions on a well-formed type are unchanged. No vector moved.
+
+The rule read's fold: `query` sent its attributes as a `serde_json::Value`
+writes them, sorted by bytes, while the check walked them as inserted, so a
+question with two attribute faults was named here by one and refused by the
+overlay by the other (`[email: 501 bytes, a.b]`: the value here, the name
+there). `query` now sends the attributes in insertion order, as
+`resolve_by_attributes` has since #394 (`LookupResolver::query_ordered`; the
+question's other members keep their sorted bytes), and the check walks them in
+JavaScript's order over that text (`client_attributes::js_order`), so the
+recorder's question is the one sent and judged. Pinned by the recorded
+`two_faults_index_value_then_name` (`a.b`, then `7` with a 501-byte value: the
+overlay holds `7` ahead and names the value; RED on `3b855252`, the name named)
+and `query_sends_its_attributes_in_insertion_order_751` in
+`tests/identity_lookup_attribute_order_394.rs` (RED on `3b855252`,
+`{"alpha":"a","zeta":"z"}`).
+Stated, the scoped cold re-read: an array-index name is written where it was
+inserted, where the reference wallet's `JSON.stringify` writes it ahead
+(`stringifyBRC100`, `LookupResolver.ts:787,797` at `ts-stack@edf6e03`)
+(`{"7":..,"a.b":..}` there, `{"a.b":..,"7":..}` here, Node v22.18.0); the
+overlay's `JSON.parse` holds it ahead either way, so the walk and the verdict
+are the same and only the bytes differ (#385's integer-like residue).
+
+Pinned by `tests/vectors/identity_query_bounds_756.json` (68 questions,
+recorded by `tests/support/identity_query_bounds_756.mjs` from
+`IdentityLookupService.lookup` over a stub storage manager, Node v22.18.0, two
+runs byte-identical) through `tests/identity_query_bounds_756.rs`: each
+refused question refused in the recorded message with nothing sent on #752's
+recording facilitator, each admitted edge sent (limit 1 and 100, offset
+100000, 32 attributes, a 50-byte name, a 500-byte value), two faults at once
+named in the overlay's order (a type fault named before an attribute fault),
+the type beside attributes sent with both. 6 of 9 RED on `545eb36f` before the
+type check (every question sent; the case count, the type-beside-attributes
+pin and the type group, then held back, green); with the type check, the type
+group and the type-then-attributes fault RED on `22c00064` (each type case
+`Ok([]), 1 sent`; the pair named in the attributes' words), and #746's moved
+assertion RED there (`unwrap_err()` on `Ok([])`).
+
+Migration: a question outside these bounds is an `Err` where it was an empty
+list (`Ok(vec![])`) after a network round trip.
+
+### Notes: cross-SDK parity (#751)
+
+Two rows. #751 is parity: the matcher is the reference wallet's at both doors
+that send attributes. Kept and stated, not changed: `resolve_by_attributes`
+rewrites a lone attribute to `any` (pinned by
+`tests/identity_lookup_attribute_order_394.rs`; the reference's SDK client
+sends its caller's `args` as given, `IdentityClient.ts:614`); `limit` and
+`offset` go to the overlay before the local filter, so a host padding its
+answer shortens a page below the limit, and a caller paging by
+`offset += limit` must not stop at a short page (the reference wallet asks no page of
+the overlay and pages after the filter, `Wallet.ts:1069-1082`); no stemming
+(the reference's either, `identityUtils.ts:190-194`). The case tables are
+Rust's Unicode version where the reference's are V8's (Node 22). The wallet's
+trust step after the filter (`transformVerifiableCertificatesWithTrust`) and
+its page are not ported at the attribute doors (#737's record). The keeper's
+reading of 2026-11-04 07:1xZ stands: an unset certifier filters nothing on the
+answer. #756 is hardening, not parity: the reference's SDK client validates
+nothing (`IdentityClient.ts:614,736`), and the overlay is the authority for the
+words. `resolve_by_attributes` is outside #756: an empty map, more than 32
+attributes, an unsafe name or a value over 500 bytes are sent there and
+refused by the overlay. Go at `2ca481c` asks its wallet
+(`identity/client.go:258-273`) and filters nothing in the client.
+
 ### Fixed: the lookup response bounded at 32 MiB and an output list at 4096 on both paths, neutral for host reputation; the discovered hosts in the trackers' order within the reference's bounds (#775, #785)
 
 From the rule read of PR #774 (#775) and the rule and strength reads of PR

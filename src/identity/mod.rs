@@ -78,8 +78,10 @@
 //! Certificate type IDs are consistent across all SDK implementations.
 
 pub mod client;
+mod client_attributes;
 pub mod contacts;
 mod evidence;
+mod query_bounds;
 mod reveal;
 mod revoke;
 mod token_envelope;
