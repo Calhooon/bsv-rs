@@ -1478,6 +1478,18 @@ difference of outcome (a failed discovery here, a skipped output there),
 reachable only by a host that both lies in its hint and serves a graph past
 the inputs or script-bytes limit. go-sdk at `2ca481c` has no evidence check.
 
+### Docs: the docs-only exit's runner witness read in, the guard's exact forms revisited on #789's step (#689 closed)
+
+`docs/lanes/ci-speed-loop2-docs-only.md` ("The runner witness and the guard's revisit") and
+`docs/lanes/ci-speed-2.md` read in #701's run 41647937588 (`2405aa25`), the earliest
+docs-only pull request after the semver exit: `semver` 10 s against 4m39s (#690), the run's
+wall clock 41 s against 4m43s (the Test Suite 9 s, lint 11 s, checks 38 s, main-in-beta
+6 s), the queue wait 2 s, the docs-only landing 2m41s. The guard's exact forms were
+revisited on #789's `Make the cargo home` step: its condition is the listed `BUILD` form,
+the guard took it unedited and every `beta` push run since is green, so nothing changes and
+the two residuals stand at 0.2 (the exact forms) and 0.1 (checkout alone before a plan).
+No code or workflow changed.
+
 ### Docs: the checkpoint of the pause of 2026-11-04 (the owner's word)
 
 `docs/CHECKPOINT-2026-11-04.md`: the lines of beta and main, every pull request's state, the blocking set of the beta.8 cut, the strength line, the three steps on resume, every process stopped by name and the worktrees at the pause. Nothing in the crate changes.
