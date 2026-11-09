@@ -14,6 +14,22 @@
     "grandchild": {
       "txid": "392fb2c84726416f14a17996bff92077ede0b3609588ea4ebb40348dfa7a3ec5",
       "raw": "0100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000"
+    },
+    "uncle": {
+      "txid": "ebba91bad8ea3581f10b2e8bd5c5496811bfd064466906240b421a8422e2227c",
+      "raw": "0100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc05000000000000015100000000"
+    },
+    "join": {
+      "txid": "9854be2f039ca334c2575aaef66b10f1a966d74599747ed213f48e5fc9c38aaa",
+      "raw": "010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000"
+    },
+    "uncle_mut": {
+      "txid": "86f61d2f6a158b87cc60e8049c43a427a9afdb712c177e6f71419d1329de88b3",
+      "raw": "0100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc05000000000000015101000000"
+    },
+    "join_mut": {
+      "txid": "66b5c9d227ecf6f174787be2f7da7d694794ac5afd457d1c3503adc5f115ec6e",
+      "raw": "010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffffb388de29139d41716f7e172c71dbafa927a4439c04e860cc878b156a2f1df686000000000151ffffffff016009000000000000015100000000"
     }
   },
   "bumps": {
@@ -237,6 +253,168 @@
           "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef00020262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8600010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
         }
       ]
+    },
+    {
+      "name": "raw_naming_a_bump_without_its_txid_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "bump:grandchild_800004",
+        "raw:parent",
+        "raw:child",
+        "index:parent=1"
+      ],
+      "beef": "0200beef02fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86fe04350c0001010002c53e7afa8d3440bb4eea889560b3e0ed7720f9bf9679a1146f412647c8b22f390201010100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "parent_bump_index": 1,
+      "atomic": [
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef0002000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_naming_no_bump_with_child",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "raw:child",
+        "index:parent=5"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860201050100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000",
+      "parent_bump_index": 5,
+      "atomic": [
+        {
+          "subject": "child",
+          "beef": "01010101094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa30200beef0002000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_child_naming_a_bump_without_its_txid",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "raw:child",
+        "raw:grandchild",
+        "index:child=0"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d0070000000000000151000000000100010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "grandchild",
+          "beef": "01010101c53e7afa8d3440bb4eea889560b3e0ed7720f9bf9679a1146f412647c8b22f390200beef000200010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff62b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86010000000151ffffffff01c409000000000000015100000000000100000001094a74f1a0e0c3c4cafcc8b63e8062c0dfc48edda92acbe16662e367f9c26fa3000000000151ffffffff016009000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_sharing_a_matching_entrys_bump",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "raw:uncle",
+        "raw:join",
+        "index:uncle=0"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000001000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "join",
+          "beef": "01010101aa8ac3c95f8ef413d27e749945d766a9f1106bf6ae5a57c234a39c032fbe54980200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000001000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_uncle_naming_no_bump_beside_a_proven_parent",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "raw:uncle",
+        "raw:join",
+        "index:uncle=5"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000001050100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "join",
+          "beef": "01010101aa8ac3c95f8ef413d27e749945d766a9f1106bf6ae5a57c234a39c032fbe54980200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "transaction_uncle_naming_no_bump_never_serialized",
+      "steps": [
+        "bump:alone_800000",
+        "tx:parent",
+        "tx:uncle",
+        "tx:join",
+        "index:uncle=5"
+      ],
+      "atomic_before_hex": true,
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000001050100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "join",
+          "beef": "01010101aa8ac3c95f8ef413d27e749945d766a9f1106bf6ae5a57c234a39c032fbe54980200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd8603000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff01600900000000000001510000000001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "transaction_uncle_naming_no_bump_after_to_hex",
+      "steps": [
+        "bump:alone_800000",
+        "tx:parent",
+        "tx:uncle",
+        "tx:join",
+        "index:uncle=5"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000001050100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "join",
+          "beef": "01010101aa8ac3c95f8ef413d27e749945d766a9f1106bf6ae5a57c234a39c032fbe54980200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "transaction_uncle_held_first_naming_no_bump_never_serialized",
+      "steps": [
+        "tx:uncle",
+        "raw:parent",
+        "raw:join",
+        "index:uncle=5"
+      ],
+      "atomic_before_hex": true,
+      "beef": "0200beef0003000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff01600900000000000001510000000001050100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc05000000000000015100000000",
+      "atomic": [
+        {
+          "subject": "join",
+          "beef": "01010101aa8ac3c95f8ef413d27e749945d766a9f1106bf6ae5a57c234a39c032fbe54980200beef0003000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc05000000000000015100000000000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffff7c22e222841a420b2406694664d0bf116849c5d58b2e0bf18135ead8ba91baeb000000000151ffffffff016009000000000000015100000000"
+        }
+      ]
+    },
+    {
+      "name": "raw_uncle_mutated_naming_no_bump_beside_a_proven_parent",
+      "steps": [
+        "bump:alone_800000",
+        "raw:parent",
+        "raw:uncle",
+        "index:uncle=5",
+        "mut:uncle=1",
+        "raw:join_mut"
+      ],
+      "beef": "0200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d00700000000000001510000000001050100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510100000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffffb388de29139d41716f7e172c71dbafa927a4439c04e860cc878b156a2f1df686000000000151ffffffff016009000000000000015100000000",
+      "parent_bump_index": 0,
+      "atomic": [
+        {
+          "subject": "join_mut",
+          "beef": "010101016eec15f1c5ad03351c7d45fd5aac9447697ddaf7e27b7874f1f6ec27d2c9b5660200beef01fe00350c000101000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd860301000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff02e8030000000000000151d007000000000000015100000000000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01dc0500000000000001510100000000010000000262b05fec8e8aee6e0c03973bcb20f71f87fa206d5edcbb298b564296a13ebd86000000000151ffffffffb388de29139d41716f7e172c71dbafa927a4439c04e860cc878b156a2f1df686000000000151ffffffff016009000000000000015100000000"
+        }
+      ]
     }
   ],
   "path_cases": [
@@ -369,6 +547,30 @@
             false,
             false
           ]
+        }
+      ]
+    }
+  ],
+  "from_bytes_cases": [
+    {
+      "name": "bad_index",
+      "file": "tests/vectors/beef_of_any_size/bad_index.bin",
+      "atomic": [
+        {
+          "subject": "d23d60ecd3221e527517433df70c20a675a377469fc66a8c8a574bd015df100b",
+          "bump_index": 1,
+          "beef": "010101010b10df15d04b578a8c6ac69f4677a375a6200cf73d431775521e22d3ec603dd20100beef00010100000001ff122c0ea37f12c5c0f330b2616791df8cb8cc8f1114304afbf0cff5d79cec540000000000ffffffff020100000000000000000100000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "name": "not_in_bump",
+      "file": "tests/vectors/beef_of_any_size/not_in_bump.bin",
+      "atomic": [
+        {
+          "subject": "9209de30a4024b7c109dca915336a1922a257bb00fca4a8b25855010f8bccfee",
+          "bump_index": 0,
+          "beef": "01010101eecfbcf8105085258b4aca0fb07b252a92a1365391ca9d107c4b02a430de09920100beef000101000000010b10df15d04b578a8c6ac69f4677a375a6200cf73d431775521e22d3ec603dd20100000000ffffffff010100000000000000000000000000"
         }
       ]
     }

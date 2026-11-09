@@ -705,6 +705,175 @@ list`, `:275-277`) and per output indexes the transaction's outputs
 unchecked (`:283`), reading no BEEF bound, total, hint, value, endpoint or
 host cap and keying a host by the domain's text (`:290-293`); not filed.
 
+### Fixed: the atomic writer writes a raw entry whose index names no matching BUMP with no BUMP and stops the walk at it, as the reference does (#798)
+
+From PR #797's rule and strength reads of `lane/fix-766`.
+`Beef::to_binary_atomic`'s closure (`atomic_closure`,
+`src/transaction/beef.rs`) gave a raw entry whose BUMP index, set by hand
+(`find_txid_mut` and `set_bump_index`, `tx_mut`), names a BUMP that does not
+hold its txid that BUMP and that index, so the BEEF written failed this
+crate's own readers with `TxidNotInBump`; an index past the BUMPs was an
+`Err` (`<txid> names BUMP 5 of 1`); and the walk descended such an entry,
+writing its ancestors and their BUMPs. The reference's `bumpIndex` setter
+empties an entry's `inputTxids` whenever it carries an index
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/BeefTx.ts:90-92`,
+`:219-221`), so its walk (`Beef.ts:427-431`) descends no entry with an index,
+matching or not; `#copySelectedTransactions` builds its BUMP map from the
+included entries `#hasMatchingBump` proves alone (`:453-456`, `:436-446`) and
+maps every entry's index through it (`:462`), the copy keeping the source's
+`inputTxids` (`:465`). Now the walk stops at a txid-only entry and at any
+entry with an index; the BUMPs are those of the included entries a BUMP of
+this BEEF proves, in entry order; each entry's index is mapped through them,
+dropped where they do not hold it, kept (renumbered) where another included
+entry's matching BUMP is the one it names; the copy keeps the source's
+`input_txids`. #766's txid-only bytes stay; the readers' graph rule,
+`from_atomic_beef` and `to_binary` do not move.
+
+`tests/beef_bump_index_757.rs` on four cases the #757 recorder now writes
+(`support/beef_bump_index_757.mjs`, `ts-stack@edf6e03` under Node v22.18.0;
+two transactions added, `uncle` and `join`):
+`a_raw_entry_whose_index_names_no_matching_bump_is_written_without_a_bump_798`
+(`raw_naming_a_bump_without_its_txid_with_child`: the reference writes
+`...0200beef0002000100...`, the parent as format `00`, where this crate wrote
+the grandchild's BUMP and `01 00`; `raw_naming_no_bump_with_child`: the same
+bytes, where this crate erred), `the_atomic_walk_stops_at_an_entry_carrying_an_index_798`
+(`raw_child_naming_a_bump_without_its_txid`: the grandchild's atomic BEEF
+carries the child as format `00` and no parent, where this crate reached the
+parent and carried BUMP 0), both RED on `e228c61a`;
+`a_raw_entry_sharing_a_matching_entrys_bump_keeps_the_mapped_index_798`
+(`raw_sharing_a_matching_entrys_bump`: the uncle keeps index `0`, the parent's
+BUMP), green on both, the guard against dropping too much; and
+`a_stub_read_from_bytes_written_atomic_is_refused_as_stub_not_proven_798`, an
+agreement pin (a stub read by `Beef::from_binary` carries no index, written
+atomic with no BUMP, refused `StubNotProven` by `verify_stream_structure` and
+`verify_structure`). Every earlier entry of `vectors/beef_bump_index_757.json`
+unchanged.
+
+The fold (PR #809's three reads): the copy follows both of the reference's
+branches (`#copySelectedTransactions`, `Beef.ts:464-467`): an entry held raw
+keeps the source's `input_txids` (`:465`), one held as a transaction alone,
+no bytes (`merge_transaction`'s entries), has them re-scanned with its mapped
+index, as `BeefTx.fromTx` re-scans them (`:467`), so an entry whose dropped
+index leaves its parents outside the closure joins the entries with missing
+inputs; and the closure is the reference's sort as it leaves it
+(`#getBeefForAtomic`, `:385-389`), where this crate moved the subject last
+after the sort (since 0.8.1): the subject stays last when every entry links,
+and otherwise sits with the entries resting on a missing input, ahead of the
+proven ones, as the reference writes it. Three cases the recorder adds (a
+`tx:<name>` step, `mergeTransaction` of a fresh parse; an `atomic_before_hex`
+flag recording the atomic BEEF ahead of the whole one): on BUMP
+`alone_800000`, `parent`, `uncle` and `join` with the uncle's index set to 5,
+`a_raw_entry_naming_no_bump_keeps_the_sources_input_txids_798` (merged raw:
+parent, uncle, join; green on `4d49936e`, RED on a scratch copy of the tip
+with the restore removed, the strength read's case),
+`a_transaction_entry_naming_no_bump_is_copied_with_its_inputs_rescanned_798`
+(merged by `mergeTransaction`, never serialized: uncle, join, parent; RED on
+`4d49936e`, parent, uncle, join, and on the tip with the subject moved last
+again, uncle, parent, join) and
+`a_transaction_entry_after_to_hex_keeps_the_never_serialized_order_stated_798`
+(the same merged entries after `toHex`: the reference's parent, uncle, join;
+this crate's uncle, join, parent, stated below; RED on `4d49936e` too).
+
+The second fold (PR #809's re-reads of `c530c85f`): `to_binary_atomic` no
+longer sorts the source before it takes the closure; the reference's
+`#getBeefForAtomic` copies `this.txs` in their order and sorts the copy alone
+(`Beef.ts:375-390`), so where entries rest on a missing input the order held
+decides between them. And an entry held raw and mutated through
+`BeefTx::tx_mut` is copied as one held raw (a private flag on `BeefTx`,
+`held_raw`), as the reference keeps and re-syncs its `_rawTx`
+(`BeefTx.ts:160-169`) and copies it through the raw branch with the inputs
+its index emptied (`Beef.ts:465`); `tx_mut` drops the bytes here, and the copy
+re-scanned them. Two cases the recorder adds (a `mut:<tx>=<lockTime>` step,
+the held transaction's lock time set in place; two transactions added,
+`uncle_mut` and `join_mut`), and the cold read's from-bytes pin (a
+`from_bytes_cases` section: `bad_index.bin` and `not_in_bump.bin` read by
+`Beef.fromBinary` and written by `toBinaryAtomic`); Node v22.18.0, two runs
+byte-identical, the vector additions only:
+`the_atomic_closure_is_taken_from_the_entries_as_held_798` (`tx:uncle`,
+`raw:parent`, `raw:join`, `index:uncle=5`, no BUMP, written before any
+`toHex`: uncle, parent, join; RED on `c530c85f`, parent, uncle, join),
+`a_raw_entry_mutated_through_tx_mut_is_copied_through_the_raw_branch_798`
+(BUMP `alone_800000`, `raw:parent`, `raw:uncle`, `index:uncle=5`,
+`mut:uncle=1`, `raw:join_mut`: parent, uncle, join; RED on `c530c85f`
+and on `c530c85f` with the sort removed alone, uncle, join, parent) and
+`an_index_read_from_bytes_naming_no_matching_bump_is_written_atomic_as_the_reference_798`
+(green on `c530c85f`; RED on its tests over `b9d048e7`'s `beef.rs`,
+`names BUMP 1 of 1`). The test helper takes a case's atomic BEEFs before
+`to_hex` where the recording did (`atomic_before_hex`).
+
+Semver: no public shape changes. Migration: the streaming reader and
+`verify_structure` refuse both shapes (`beef_stream.rs:2068-2077`), but
+`Beef::from_binary` collects an entry's index unjudged, as the reference's
+`Beef.fromBinary` does, so a BEEF read from bytes reaches the change too
+(`tests/vectors/beef_of_any_size/bad_index.bin`, an `Err` until #798, and
+`not_in_bump.bin`, its BUMP kept until #798, now written as the reference's
+`toBinaryAtomic` writes them at the pin; #809's cold re-read).
+`to_binary_atomic` no longer errs on an out-of-range index, and an
+entry whose index names no BUMP holding its txid is written as an
+unproven raw entry with its ancestors not written: give it the index of the
+BUMP that proves it, or clear the index, before writing. The same state is
+reached without `set_bump_index` by an index the caller passes unchecked
+(`merge_raw_tx(raw, Some(n))`, `BeefTx::from_raw_tx` and `from_tx` with
+`Some(n)`: `try_to_validate_bump_index` leaves a given index as it is) and by
+an edit of the public `bumps` under an entry's index; an index taken from
+`merge_bump`'s return for the BUMP that holds the txid is unaffected. A
+txid-only entry whose hand-set index names a BUMP another included entry is
+proven by now keeps the mapped index in memory too (its bytes carry none;
+the sort places it with the proven entries, as the reference's does), the one
+txid-only shape whose entry order can move from #766's; by reading, no
+recording.
+
+Behaviour change, no hand-set index needed (the fold's removal of the
+subject-last move; by reading, no recording): an atomic BEEF of a PARTIAL
+closure changes its entry order. When the subject, or an unproven ancestor
+it rests on, spends a txid this `Beef` does not hold
+(`Transaction::to_atomic_beef(true)` with a source missing; a `Beef` read
+from an input BEEF that lacks a parent, the subject merged and
+`to_binary_atomic` called, as a wallet builds `signableTransaction.tx`), the
+sort leaves those entries ahead of the txid-only and proven ones
+(`sort_txs`: missing inputs, not valid, txid-only, proven, linked), so a
+subject with a missing source and one proven parent is now written subject,
+parent, where it was written parent, subject since 0.8.1. A closure whose
+every input is held or proven is written as before, the subject last. No
+reader on record judges that order: each finds the subject by the atomic
+header's txid (this crate's `from_atomic_beef` at every release since 0.4.5,
+`Transaction.fromAtomicBEEF` in `@bsv/sdk` 2 and 3, go-sdk's
+`NewBeefFromAtomicBytes`), and each verifying reader refuses a missing input
+in either order (`InputNamesNoElement` here, at 0.8.0 and earlier too).
+Migration: a consumer that takes the last entry of an atomic BEEF as its
+subject must read the header's txid (`Beef::atomic_txid`) in its place. The
+reference's `Beef.toBinaryAtomic` writes the same order (`Beef.ts:385-389`,
+`:1390`); its `Transaction.toAtomicBEEF` does not pass through it (a V1 BEEF
+in collection order, the subject last, `Transaction.ts:1787-1789,1978-1983`),
+where this crate's `to_atomic_beef` writes V2 through the closure: older
+than #798, a row for the captain.
+
+### Notes: cross-SDK parity (#798)
+
+The reference's bytes at the pin, the root `CLAUDE.md` row closed. The
+reference's own shape is kept where it gives a BEEF the readers refuse: an
+entry whose index names a BUMP another included entry is proven by keeps the
+mapped index (`raw_sharing_a_matching_entrys_bump`, `TxidNotInBump` on read).
+go-sdk@2ca481c (`transaction/beef.go:1773-1787`, `includeAtomicBump`) refuses
+an out-of-range index (`invalid BEEF BUMP index: %d`), else copies and remaps
+the BUMP whatever it holds and descends the entry when the BUMP does not hold
+its txid: this crate's behaviour before #798. Theirs, not filed.
+
+One order differs, stated by the fold of PR #809: the reference's `toHex`
+(and every other serialization of an entry, `BeefTx.getRawTxBytes`) fills the
+entry's `_rawTx`, so an entry held as a `Transaction` and serialized once is
+copied through the raw branch afterwards (`Beef.ts:465`), the uncle above
+then sorted after the proven parent (parent, uncle, join); this crate's
+writers cache no bytes in an entry, so it copies those entries through the
+re-scan whatever was written before (uncle, join, parent). Both read the
+source in the order the serialization's sort left it (since the second fold;
+`to_binary` and `toHex` sort the source on both sides). The reference's
+branch there depends on its serialization cache; this crate's does not. An
+entry held raw and mutated through `tx_mut` is not this case: it copies
+through the raw branch on both sides since the second fold. Ours: the copy by the entry's held form alone (the witness:
+`a_transaction_entry_after_to_hex_keeps_the_never_serialized_order_stated_798`,
+the recorded `transaction_uncle_naming_no_bump_after_to_hex`).
+
 ### Tests: an Atomic subject written twice is judged by its later entry, as the reference judges it (#731)
 
 An `ls_identity` lookup output whose Atomic BEEF names X and carries X twice,
