@@ -7,11 +7,7 @@ use crate::overlay::{
     facilitators::{HttpsOverlayBroadcastFacilitator, OverlayBroadcastFacilitator},
     host_reputation_tracker::get_overlay_host_reputation_tracker,
     lookup_resolver::{LookupResolver, LookupResolverConfig},
-    overlay_admin_token_template::decode_and_verify_overlay_admin_token,
-    types::{
-        HostResponse, LookupAnswer, LookupQuestion, NetworkPreset, Protocol, TaggedBEEF,
-        MAX_SHIP_QUERY_TIMEOUT_MS,
-    },
+    types::{HostResponse, LookupQuestion, NetworkPreset, TaggedBEEF, MAX_SHIP_QUERY_TIMEOUT_MS},
 };
 use crate::transaction::{
     BroadcastFailure, BroadcastResponse, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
@@ -21,6 +17,8 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
+
+mod discovery; // the discovery's admission and the endpoint's origin (#804)
 
 /// Acknowledgment requirement for broadcast success.
 #[derive(Debug, Clone, Default)]
@@ -61,7 +59,12 @@ pub struct TopicBroadcasterConfig {
     pub require_ack_from_any_host: RequireAck,
     /// Specific host requirements.
     ///
-    /// Map of host URL to required acknowledgment for that host.
+    /// Map of host URL to required acknowledgment for that host. At most 32
+    /// entries; each key is read as the reference's `shipEndpoint` reads it
+    /// (`https:`, or `http:` under [`NetworkPreset::Local`], no credentials,
+    /// query, fragment or path) and held as its origin, the form the
+    /// discovery admits a host in; a key that is no such URL, or a second
+    /// key of one origin, refuses [`TopicBroadcaster::new`] (#804).
     pub require_ack_from_specific_hosts: HashMap<String, RequireAck>,
 }
 
@@ -102,7 +105,11 @@ impl TopicBroadcaster {
     ///
     /// # Returns
     ///
-    /// A new TopicBroadcaster, or an error if topics are invalid.
+    /// A new TopicBroadcaster, or an error if topics are invalid or the
+    /// specific-host requirements are refused as the reference's
+    /// constructor refuses them (`SHIPBroadcaster.ts:195-219`, #804): more
+    /// than 32 hosts, a host that is no endpoint origin, two hosts of one
+    /// origin.
     pub fn new(topics: Vec<String>, config: TopicBroadcasterConfig) -> Result<Self> {
         // Validate at least one topic
         if topics.is_empty() {
@@ -120,6 +127,14 @@ impl TopicBroadcaster {
                 )));
             }
         }
+
+        // Each key its endpoint's origin, as the reference snapshots them
+        // (`SHIPBroadcaster.ts:195-219`, under `allowHTTP` for the local
+        // preset alone, `:426`; #804)
+        let require_ack_from_specific_hosts = discovery::specific_hosts(
+            config.require_ack_from_specific_hosts,
+            config.network_preset.allow_http(),
+        )?;
 
         let facilitator = config.facilitator.unwrap_or_else(|| {
             Arc::new(HttpsOverlayBroadcastFacilitator::new(
@@ -140,7 +155,7 @@ impl TopicBroadcaster {
             resolver,
             require_ack_from_all_hosts: config.require_ack_from_all_hosts,
             require_ack_from_any_host: config.require_ack_from_any_host,
-            require_ack_from_specific_hosts: config.require_ack_from_specific_hosts,
+            require_ack_from_specific_hosts,
             network_preset: config.network_preset,
         })
     }
@@ -297,6 +312,17 @@ impl TopicBroadcaster {
     /// Find hosts interested in the configured topics.
     ///
     /// Returns a map of host URL to the set of topics that host is interested in.
+    ///
+    /// The `ls_ship` answer is read as the reference's `#fetchInterestedHosts`
+    /// reads it (`ts-stack@edf6e03` `SHIPBroadcaster.ts:725-789`, #804): an
+    /// answer that is no output list, or carries more than 256 outputs, is
+    /// refused (`SHIP answer is not a bounded output list.`); an output is
+    /// skipped when its BEEF is empty or over 16 MiB, its `txid` hint is not
+    /// 64 hex digits or, lower-cased, not its BEEF's subject, the answer's
+    /// BEEF passes 64 MiB at or before it, its selected output does not carry
+    /// exactly 1 satoshi, its advertisement does not authenticate as SHIP for
+    /// one of our topics, or the advertised domain is no `https:` origin; a
+    /// host is keyed by that origin, and at most 32 are admitted.
     pub async fn find_interested_hosts(&self) -> Result<HashMap<String, HashSet<String>>> {
         // Handle local preset
         if self.network_preset == NetworkPreset::Local {
@@ -316,38 +342,10 @@ impl TopicBroadcaster {
             .query(&question, Some(MAX_SHIP_QUERY_TIMEOUT_MS))
             .await?;
 
-        let mut results: HashMap<String, HashSet<String>> = HashMap::new();
-
-        if let LookupAnswer::OutputList { outputs } = answer {
-            for output in outputs {
-                // Parse BEEF and extract admin token
-                if let Ok(tx) = crate::transaction::Transaction::from_beef(&output.beef, None) {
-                    if let Some(script) = tx
-                        .outputs
-                        .get(output.output_index as usize)
-                        .map(|o| &o.locking_script)
-                    {
-                        // Decoded and authenticated as the reference's
-                        // broadcaster does (`SHIPBroadcaster.ts:775`, #544)
-                        if let Ok(token) =
-                            decode_and_verify_overlay_admin_token(script, Some(Protocol::Ship))
-                        {
-                            // Only include SHIP tokens for our topics
-                            if token.protocol == Protocol::Ship
-                                && self.topics.contains(&token.topic_or_service)
-                            {
-                                results
-                                    .entry(token.domain.clone())
-                                    .or_default()
-                                    .insert(token.topic_or_service);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(results)
+        // Admitted as the reference's `#fetchInterestedHosts` admits them
+        // (`SHIPBroadcaster.ts:737-786`, #804; the authentication, `:775`,
+        // since #544)
+        discovery::interested_hosts(&self.topics, answer)
     }
 
     /// Check acknowledgment requirements.

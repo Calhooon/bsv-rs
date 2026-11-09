@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the SHIP discovery admits a host as the reference does: the answer and BEEF bounds, the txid hint, 1 satoshi, the endpoint's origin, 32 hosts (#804)
+
+`TopicBroadcaster::find_interested_hosts` parsed every output of the
+`ls_ship` answer, took the output at its index, authenticated the
+advertisement (since #544, the reference's `SHIPBroadcaster.ts:775`, the one
+rule ported before) and matched the topic, keying the host by the token's
+domain text; a non-output-list answer was no hosts. The reference's
+`#fetchInterestedHosts` (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/SHIPBroadcaster.ts:725-789`) reads more:
+an answer that is no output list or carries more than 256 outputs throws
+`SHIP answer is not a bounded output list.` before any output is read
+(`:737-744`); an output whose BEEF is empty or over 16 MiB or whose `txid`
+hint is not 64 hex digits is skipped before it counts (`:752-764`); the
+BEEF lengths are summed and past 64 MiB the output is refused (`:765-768`);
+a hint that, lower-cased, is not the BEEF subject's txid skips it (`:771`),
+as does a selected output of other than exactly 1 satoshi (`:773`); the host
+is `shipEndpoint(domain, false).origin` (`:779`, `:103-127`), and the loop
+stops at 32 hosts (`:782`). So a host advertised at 0 or 2 satoshis, under
+another transaction's hint, by an `https+bsvauth://` or `wss://` URI, or as
+the 33rd was asked here and never there, and one host written two ways
+(`https://Host.example:443/`, `https://host.example`) was two. The
+discovery now reads in the reference's order (`src/overlay/topic_broadcaster/discovery.rs`,
+the four bounds crate-private constants named as the reference's); a
+refused answer is `ERR_HOST_DISCOVERY` at `broadcast_tx`, this crate's form
+of the rejected promise.
+
+Two readings the reference's code makes and this port keeps: (a) the throw
+at `:767` is inside the per-output `try` (`:747`) and swallowed at `:783`,
+so the output that crosses 64 MiB is skipped and, the total staying over,
+every later one; the hosts admitted before stay and the discovery returns
+normally. (b) `shipEndpoint` refuses every advertisement URI but plain
+`https://` without a query, so an advertisement the token admits under the
+`https+...` family, `wss://`, `js8c+bsvauth+smf:` or an `https://` with a
+query is skipped; the key is the WHATWG origin (the host lower-cased, a
+default port dropped, no trailing slash).
+
+`TopicBroadcaster::new` takes `require_ack_from_specific_hosts` as the
+reference's constructor snapshots it (`:195-219`): more than 32 entries
+refused in `Specific-host acknowledgment requirements contain too many
+hosts.`, each key held as `shipEndpoint(key, allowHTTP).origin` (`http:`
+allowed under `NetworkPreset::Local` alone, `:426`), refused in its words
+when it is no such URL, and a second key of one origin refused in
+`Specific-host acknowledgment requirements contain a duplicate host.`, so a
+key matches the origin the discovery admits.
+
+Pinned by `tests/overlay_ship_discovery_804.rs` (15 tests, the answer
+through a real `LookupResolver` on an `.invalid` host override and a
+scripted facilitator, the advertisements this crate's writer's): 0 and 2
+satoshis, a disagreeing, a 63-digit and a non-hex hint, `https+bsvauth://`,
+`wss://` and a query admit nothing; an upper-case agreeing hint admits;
+`https://Host.ship-discovery-804.invalid:443/` is admitted as
+`https://host.ship-discovery-804.invalid`; 33 hosts admit the leading 32;
+257 outputs and a freeform answer refuse; an advertisement, four 16 MiB
+BEEFs, an advertisement admit the leading one alone; a 16 MiB plus 1 BEEF
+is skipped before it counts; a specific-host key with a trailing slash or
+upper case and `:443` matches its discovered origin, 33 keys and two of one
+origin refuse `new`; and the reference's 17 discovery and 8 constructor
+verdicts of `tests/vectors/ship_discovery_admission_804.json` (recorded by
+`tests/support/ship_discovery_admission_804.mjs`: the reference's own
+`TopicBroadcaster` on a stub resolver and a recording facilitator, its
+advertisements by its `OverlayAdminTokenTemplate`, Node v22.18.0) are this
+crate's. 13 of 15 RED on a scratch copy of `167c56ae` (beta, the PR's base)
+with the tests and vector overlaid; the upper-case agreeing hint and the 16 MiB plus 1 pin green
+on both.
+
+Migration: `TopicBroadcaster::new`'s signature is unchanged, but a
+`require_ack_from_specific_hosts` key that is no `https:` origin (an
+`http:` key outside the local preset, a bare host name, a path or a query)
+is refused at construction where it went unmatched at broadcast; write the
+host's URL (`https://host.example`), and keep at most 32. A host advertised
+at a value other than 1 satoshi, under a mismatched hint, or by a URI other
+than plain `https://` is no longer discovered; the reference's advertisers
+write 1 satoshi and an `https://` origin.
+
+### Notes: cross-SDK parity (#804)
+
+Ours: the reference's discovery and constructor at the pin, the residues
+stated in `CLAUDE.md`'s #804 row (the index and byte-array checks the
+types', the resolver dropping a BEEF that does not parse before the count
+as the reference's resolver does, the requirement topic lists and the
+failure code older than #804). Theirs: go-sdk at `2ca481c`
+(`overlay/topic/broadcaster.go:255-300`, `FindInterestedHosts`) refuses a
+non-output-list answer in its own words (`SHIP answer is not an output
+list`, `:275-277`) and per output indexes the transaction's outputs
+unchecked (`:283`), reading no BEEF bound, total, hint, value, endpoint or
+host cap and keying a host by the domain's text (`:290-293`); not filed.
+
 ### Tests: an Atomic subject written twice is judged by its later entry, as the reference judges it (#731)
 
 An `ls_identity` lookup output whose Atomic BEEF names X and carries X twice,
