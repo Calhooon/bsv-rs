@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the designs for phases 2 to 5, one per issue (#90 to #100)
+
+`docs/design/`: eleven design documents (the interpreter's throughput, the streaming reader's memory bound, signing and verification throughput, merkle verification and the tracker's header window, the HTTP JSON substrate, ARC batches, the wasm32 budgets, the sibling's harness in CI, the chaos suite, release evidence, the canary and re-pin policy) and an index with the owner's questions. Each gives the exit test, today's state by `path:line`, the ranked steps with what stays identical and the proof each returns, and the slicing into lanes. Proposals only: no source, fixture or public shape changes.
+
 ### Changed: the lookup output's `txid` hint carried by `OutputListItem` and compared by the identity evidence check; a disagreeing hint read and counted as the host's fault (#735, the owner's word)
 
 The reference's HTTPS facilitator keeps a JSON answer's `txid` member as
