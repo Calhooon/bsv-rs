@@ -142,6 +142,7 @@ fn outputs(beef: &[u8], indexes: &[u32]) -> LookupAnswer {
                 beef: beef.to_vec(),
                 output_index,
                 context: None,
+                txid: None,
             })
             .collect(),
     }

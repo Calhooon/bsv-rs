@@ -126,6 +126,15 @@ pub struct OutputListItem {
     /// Optional context data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<Vec<u8>>,
+    /// The host's txid hint (#735): a JSON answer's `txid` member as
+    /// given, a binary aggregated answer's outpoint txid, as the
+    /// reference's resolver keeps them (`LookupResolver.ts:356`,
+    /// `:905-936`); a binary answer's `beef` is the Atomic BEEF of that
+    /// txid, so there the hint is the BEEF's own subject. Untrusted: the identity evidence check compares it
+    /// with the BEEF's subject and counts a disagreement
+    /// (`IdentityClient::txid_hint_contradictions`), reading the subject.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub txid: Option<String>,
 }
 
 /// Formula for computed lookups.

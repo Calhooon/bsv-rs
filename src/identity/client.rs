@@ -62,6 +62,7 @@ pub struct IdentityClient<W: WalletInterface> {
     resolver: Arc<LookupResolver>,
     contacts_manager: ContactsManager<W>,
     broadcast_facilitator: Option<Arc<dyn OverlayBroadcastFacilitator>>,
+    pub(super) hint_contradictions: super::evidence::HintContradictions,
 }
 
 // Static methods that don't require Clone
@@ -306,20 +307,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             network_preset: config.network_preset,
             ..Default::default()
         }));
-
-        let contacts_config = ContactsManagerConfig {
-            originator: config.originator.clone(),
-            ..Default::default()
-        };
-        let contacts_manager = ContactsManager::new(wallet.clone(), contacts_config);
-
-        Self {
-            wallet,
-            config,
-            resolver,
-            contacts_manager,
-            broadcast_facilitator: None,
-        }
+        Self::with_resolver(wallet, config, resolver)
     }
 
     /// Create an IdentityClient with a custom resolver.
@@ -340,6 +328,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             resolver,
             contacts_manager,
             broadcast_facilitator: None,
+            hint_contradictions: Default::default(),
         }
     }
 
@@ -977,7 +966,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         // Step 1: The BEEF's subject (#721) under the reference's evidence
         // check, a refused one skipped, a limit the discovery's refusal
         // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730)
-        let Some(tx) = super::evidence::admit(output)? else {
+        let Some(tx) = super::evidence::admit(output, &self.hint_contradictions)? else {
             return Ok(None);
         };
 
@@ -1063,7 +1052,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         // Step 1: The BEEF's subject (#721) under the reference's evidence
         // check, a refused one skipped, a limit the discovery's refusal
         // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730)
-        let Some(tx) = super::evidence::admit(output)? else {
+        let Some(tx) = super::evidence::admit(output, &self.hint_contradictions)? else {
             return Ok(None);
         };
 

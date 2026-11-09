@@ -43,6 +43,7 @@ fn token_outputs(tokens: &Value) -> Vec<OutputListItem> {
             beef: from_hex(token["beef"].as_str().unwrap()).unwrap(),
             output_index: token["output_index"].as_u64().unwrap() as u32,
             context: None,
+            txid: None,
         })
         .collect()
 }
@@ -253,6 +254,7 @@ pub fn setup(name: &str) -> Harness {
                     beef: advertisement.to_beef(true).unwrap(),
                     output_index: 0,
                     context: None,
+                    txid: None,
                 },
             })),
             ..Default::default()

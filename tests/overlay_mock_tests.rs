@@ -791,6 +791,7 @@ async fn test_mock_lookup_output_list_response() {
         beef: vec![0xbe, 0xef, 0x01],
         output_index: 0,
         context: Some(vec![0x42]),
+        txid: None,
     };
     let answer = LookupAnswer::OutputList {
         outputs: vec![output],

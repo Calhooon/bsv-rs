@@ -59,6 +59,7 @@ fn publish_by(json: &serde_json::Value, subject: &PrivateKey) -> OutputListItem 
         beef: proven(&tx),
         output_index: 0,
         context: None,
+        txid: None,
     }
 }
 
@@ -227,6 +228,7 @@ fn published_with_txid_alone() -> (Certificate, OutputListItem) {
         beef: proven(&tx),
         output_index: 0,
         context: None,
+        txid: None,
     };
     (cert, output)
 }

@@ -1070,179 +1070,136 @@ async fn test_lookup_missing_type_is_refused() {
     );
 }
 
-/// Test lookup with binary (octet-stream) response format.
-#[tokio::test]
-async fn test_lookup_binary_response() {
+/// A BEEF of two transactions, each proven by a block of its own, built by
+/// this crate's writer: its bytes and the two txids. A binary aggregated
+/// answer's BEEF is parsed (#735's fold), so the fixtures are real BEEFs.
+#[allow(clippy::unwrap_used)]
+fn two_transaction_beef() -> (Vec<u8>, String, String) {
+    use bsv_rs::script::{LockingScript, UnlockingScript};
+    use bsv_rs::transaction::{
+        Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+    };
+    let mut beef = Beef::new();
+    let mut txids = Vec::new();
+    for (byte, height) in [("11", 900), ("22", 901)] {
+        let mut input = TransactionInput::new(byte.repeat(32), 0);
+        input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
+        let mut tx = Transaction::new();
+        tx.add_input(input).unwrap();
+        for _ in 0..3 {
+            tx.add_output(TransactionOutput::new(
+                1,
+                LockingScript::from_hex("51").unwrap(),
+            ))
+            .unwrap();
+        }
+        let path =
+            MerklePath::new(height, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap();
+        let index = beef.merge_bump(path);
+        beef.merge_raw_tx(tx.to_binary(), Some(index));
+        txids.push(tx.id());
+    }
+    (beef.to_binary(), txids.remove(0), txids.remove(0))
+}
+
+/// The Atomic BEEF of `txid` out of `beef`, as each output of a binary
+/// answer carries it (`LookupResolver.ts:905-936` at `ts-stack@edf6e03`).
+#[allow(clippy::unwrap_used)]
+fn atomic_of(beef: &[u8], txid: &str) -> Vec<u8> {
+    bsv_rs::transaction::Beef::from_binary(beef)
+        .unwrap()
+        .to_binary_atomic(txid)
+        .unwrap()
+}
+
+/// A binary aggregated answer: the outpoints (txid, index, context), then
+/// the BEEF.
+#[allow(clippy::unwrap_used)]
+fn binary_answer(outpoints: &[(&str, u8, &[u8])], beef: &[u8]) -> Vec<u8> {
+    let mut body = vec![outpoints.len() as u8];
+    for (txid, index, context) in outpoints {
+        body.extend(bsv_rs::primitives::from_hex(txid).unwrap());
+        body.push(*index);
+        body.push(context.len() as u8);
+        body.extend_from_slice(context);
+    }
+    body.extend_from_slice(beef);
+    body
+}
+
+/// The facilitator's answer to a binary body served by a host of its own.
+async fn binary_lookup(body: Vec<u8>) -> bsv_rs::Result<LookupAnswer> {
     let mock_server = MockServer::start().await;
-
-    // Build a binary response:
-    // varint(num_outpoints) + for each: 32-byte txid + varint(output_index) + varint(context_len) + context_bytes
-    // followed by remaining BEEF bytes
-    let mut binary_response = Vec::new();
-
-    // Number of outpoints: 1
-    binary_response.push(1u8);
-
-    // Outpoint 1: 32-byte txid (all zeros for simplicity)
-    binary_response.extend_from_slice(&[0u8; 32]);
-
-    // Output index: 0
-    binary_response.push(0u8);
-
-    // Context length: 0 (no context)
-    binary_response.push(0u8);
-
-    // Remaining BEEF bytes
-    binary_response.extend_from_slice(&[0xBE, 0xEF]);
-
     Mock::given(method("POST"))
         .and(path("/lookup"))
         .respond_with(
             ResponseTemplate::new(200)
-                .set_body_bytes(binary_response)
+                .set_body_bytes(body)
                 .append_header("Content-Type", "application/octet-stream"),
         )
         .expect(1)
         .mount(&mock_server)
         .await;
-
     let facilitator = HttpsOverlayLookupFacilitator::new(true);
     let question = LookupQuestion::new("ls_test", serde_json::json!({}));
-
-    let result = facilitator
+    facilitator
         .lookup(&mock_server.uri(), &question, None)
-        .await;
+        .await
+}
 
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].output_index, 0);
-        assert!(outputs[0].context.is_none());
-        // The BEEF data should be the remaining bytes after outpoints
-        assert_eq!(outputs[0].beef, vec![0xBE, 0xEF]);
-    } else {
-        panic!(
-            "Expected OutputList from binary response, got: {:?}",
-            answer
-        );
-    }
+/// Test lookup with binary response (application/octet-stream): varint
+/// outpoint count, per outpoint a 32-byte txid, a varint output index and a
+/// varint-prefixed context, then the BEEF; the output carries the Atomic
+/// BEEF of its outpoint's txid and that txid as its hint (#735's fold).
+#[tokio::test]
+async fn test_lookup_binary_response() {
+    let (beef, a, _) = two_transaction_beef();
+    let answer = binary_lookup(binary_answer(&[(&a, 0, &[])], &beef))
+        .await
+        .unwrap();
+    let LookupAnswer::OutputList { outputs } = answer else {
+        panic!("Expected OutputList from binary response, got: {answer:?}");
+    };
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].output_index, 0);
+    assert!(outputs[0].context.is_none());
+    assert_eq!(outputs[0].txid.as_deref(), Some(a.as_str()));
+    assert_eq!(outputs[0].beef, atomic_of(&beef, &a));
 }
 
 /// Test lookup with binary response containing context data.
 #[tokio::test]
 async fn test_lookup_binary_response_with_context() {
-    let mock_server = MockServer::start().await;
-
-    let mut binary_response = Vec::new();
-
-    // Number of outpoints: 1
-    binary_response.push(1u8);
-
-    // 32-byte txid
-    binary_response.extend_from_slice(&[0xABu8; 32]);
-
-    // Output index: 2
-    binary_response.push(2u8);
-
-    // Context length: 3
-    binary_response.push(3u8);
-
-    // Context bytes
-    binary_response.extend_from_slice(&[0x01, 0x02, 0x03]);
-
-    // BEEF bytes
-    binary_response.extend_from_slice(&[0xCA, 0xFE]);
-
-    Mock::given(method("POST"))
-        .and(path("/lookup"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_bytes(binary_response)
-                .append_header("Content-Type", "application/octet-stream"),
-        )
-        .expect(1)
-        .mount(&mock_server)
-        .await;
-
-    let facilitator = HttpsOverlayLookupFacilitator::new(true);
-    let question = LookupQuestion::new("ls_test", serde_json::json!({}));
-
-    let result = facilitator
-        .lookup(&mock_server.uri(), &question, None)
-        .await;
-
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(outputs[0].output_index, 2);
-        assert_eq!(outputs[0].context, Some(vec![0x01, 0x02, 0x03]));
-        assert_eq!(outputs[0].beef, vec![0xCA, 0xFE]);
-    } else {
-        panic!(
-            "Expected OutputList from binary response, got: {:?}",
-            answer
-        );
-    }
+    let (beef, _, b) = two_transaction_beef();
+    let answer = binary_lookup(binary_answer(&[(&b, 2, &[0x01, 0x02, 0x03])], &beef))
+        .await
+        .unwrap();
+    let LookupAnswer::OutputList { outputs } = answer else {
+        panic!("Expected OutputList from binary response, got: {answer:?}");
+    };
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(outputs[0].output_index, 2);
+    assert_eq!(outputs[0].context, Some(vec![0x01, 0x02, 0x03]));
+    assert_eq!(outputs[0].beef, atomic_of(&beef, &b));
 }
 
-/// Test lookup with binary response containing multiple outpoints.
+/// Test lookup with binary response containing multiple outpoints: each
+/// output its own transaction's Atomic BEEF, not the shared BEEF.
 #[tokio::test]
 async fn test_lookup_binary_response_multiple_outpoints() {
-    let mock_server = MockServer::start().await;
-
-    let mut binary_response = Vec::new();
-
-    // Number of outpoints: 2
-    binary_response.push(2u8);
-
-    // Outpoint 1: txid (all 0x11), output_index=0, no context
-    binary_response.extend_from_slice(&[0x11u8; 32]);
-    binary_response.push(0u8); // output_index
-    binary_response.push(0u8); // context_len
-
-    // Outpoint 2: txid (all 0x22), output_index=1, no context
-    binary_response.extend_from_slice(&[0x22u8; 32]);
-    binary_response.push(1u8); // output_index
-    binary_response.push(0u8); // context_len
-
-    // Shared BEEF data
-    binary_response.extend_from_slice(&[0xDE, 0xAD]);
-
-    Mock::given(method("POST"))
-        .and(path("/lookup"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_bytes(binary_response)
-                .append_header("Content-Type", "application/octet-stream"),
-        )
-        .expect(1)
-        .mount(&mock_server)
-        .await;
-
-    let facilitator = HttpsOverlayLookupFacilitator::new(true);
-    let question = LookupQuestion::new("ls_test", serde_json::json!({}));
-
-    let result = facilitator
-        .lookup(&mock_server.uri(), &question, None)
-        .await;
-
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        assert_eq!(outputs.len(), 2);
-        assert_eq!(outputs[0].output_index, 0);
-        assert_eq!(outputs[1].output_index, 1);
-        // Both share the same BEEF data
-        assert_eq!(outputs[0].beef, vec![0xDE, 0xAD]);
-        assert_eq!(outputs[1].beef, vec![0xDE, 0xAD]);
-    } else {
-        panic!(
-            "Expected OutputList from binary response, got: {:?}",
-            answer
-        );
-    }
+    let (beef, a, b) = two_transaction_beef();
+    let answer = binary_lookup(binary_answer(&[(&a, 0, &[]), (&b, 1, &[])], &beef))
+        .await
+        .unwrap();
+    let LookupAnswer::OutputList { outputs } = answer else {
+        panic!("Expected OutputList from binary response, got: {answer:?}");
+    };
+    assert_eq!(outputs.len(), 2);
+    assert_eq!(outputs[0].output_index, 0);
+    assert_eq!(outputs[1].output_index, 1);
+    assert_eq!(outputs[0].beef, atomic_of(&beef, &a));
+    assert_eq!(outputs[1].beef, atomic_of(&beef, &b));
+    assert_ne!(outputs[0].beef, outputs[1].beef);
 }
 
 /// Test lookup with SLAP service discovery query format.
@@ -1455,39 +1412,24 @@ async fn test_lookup_formula_empty_formulas() {
     }
 }
 
-/// Test lookup with empty binary response is handled gracefully.
+/// A binary response of no outpoint and no BEEF is refused, as the
+/// reference's facilitator throws for it (`Beef.fromBinary` on nothing,
+/// `LookupResolver.ts:900` at `ts-stack@edf6e03`; recorded as
+/// `binary_no_outpoint_no_beef` in `vectors/identity_evidence_hint_735.json`);
+/// no outpoint before a BEEF is the empty list. Until #735's fold the BEEF
+/// was not parsed and the empty body answered an empty list.
 #[tokio::test]
 async fn test_lookup_empty_binary_response() {
-    let mock_server = MockServer::start().await;
+    // varint 0 = 0 outpoints, then no BEEF data
+    let refused = binary_lookup(vec![0u8]).await;
+    assert!(refused.is_err(), "Expected a refusal, got: {refused:?}");
 
-    // Empty binary response with 0 outpoints
-    let binary_response = vec![0u8]; // varint 0 = 0 outpoints, then no BEEF data
-
-    Mock::given(method("POST"))
-        .and(path("/lookup"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_bytes(binary_response)
-                .append_header("Content-Type", "application/octet-stream"),
-        )
-        .expect(1)
-        .mount(&mock_server)
-        .await;
-
-    let facilitator = HttpsOverlayLookupFacilitator::new(true);
-    let question = LookupQuestion::new("ls_test", serde_json::json!({}));
-
-    let result = facilitator
-        .lookup(&mock_server.uri(), &question, None)
-        .await;
-
-    assert!(result.is_ok(), "Expected success, got: {:?}", result);
-    let answer = result.unwrap();
-    if let LookupAnswer::OutputList { outputs } = answer {
-        assert!(outputs.is_empty(), "Expected empty outputs for 0 outpoints");
-    } else {
-        panic!("Expected OutputList, got: {:?}", answer);
-    }
+    let (beef, _, _) = two_transaction_beef();
+    let answer = binary_lookup(binary_answer(&[], &beef)).await.unwrap();
+    let LookupAnswer::OutputList { outputs } = answer else {
+        panic!("Expected OutputList, got: {answer:?}");
+    };
+    assert!(outputs.is_empty(), "Expected empty outputs for 0 outpoints");
 }
 
 /// Test that lookup handles a completely empty response body with JSON content type.

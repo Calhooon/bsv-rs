@@ -180,6 +180,7 @@ async fn read(beef: Vec<u8>, output_index: u32, subject: &str) -> (usize, usize)
         beef,
         output_index,
         context: None,
+        txid: None,
     };
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Answering(output))),

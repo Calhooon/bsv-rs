@@ -61,6 +61,7 @@ impl OverlayLookupFacilitator for TokenLookup {
             beef,
             output_index: 0,
             context: None,
+            txid: None,
         });
         Ok(LookupAnswer::OutputList {
             outputs: outputs.collect(),

@@ -89,6 +89,7 @@ async fn global_mutations_only_spend_authenticated_exact_namespace_tokens_343() 
                 beef: invalid.to_beef(true).unwrap(),
                 output_index: 0,
                 context: None,
+                txid: None,
             });
         if remove {
             h.store.remove().await
