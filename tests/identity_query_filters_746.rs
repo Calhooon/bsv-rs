@@ -36,6 +36,7 @@ use bsv_rs::transaction::{
 use bsv_rs::wallet::{
     Counterparty, CreateSignatureArgs, GetPublicKeyArgs, ProtoWallet, Protocol, SecurityLevel,
 };
+use bsv_rs::Error;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -274,10 +275,20 @@ async fn a_query_by_type_keeps_only_the_asked_types_certificates_746() {
         .map(|c| c.1)
         .collect();
     assert_eq!(types, vec![other.clone()]);
-    // The canonical text exactly: the asked type unpadded matches nothing
-    assert!(kept(outputs(), by_type(ASKED.trim_end_matches('=')))
-        .await
-        .is_empty());
+    // The asked type unpadded: moved by #756 (the captain's ruling of
+    // 2026-11-09). It answered an empty list here (the canonical text matching
+    // nothing); the reference overlay refuses that question whole
+    // (`IdentityLookupService.ts:97-100`, `queryValidation.ts:183-190`), so
+    // `query` now refuses it before the network in the overlay's words.
+    assert_eq!(
+        client(outputs())
+            .query(by_type(ASKED.trim_end_matches('=')))
+            .await
+            .unwrap_err(),
+        Error::IdentityError(
+            "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value".to_string()
+        )
+    );
 }
 
 #[tokio::test]

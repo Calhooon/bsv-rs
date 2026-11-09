@@ -190,7 +190,8 @@ async fn a_malformed_signature_skips_its_output_and_the_resolution_goes_on() {
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
 
-    let attributes = IndexMap::from([("email".to_string(), "x".to_string())]);
+    // The certificate's own value, so the attribute filter keeps it (#751)
+    let attributes = IndexMap::from([("email".to_string(), "alice@example.com".to_string())]);
     let identities = client
         .resolve_by_attributes(attributes, false)
         .await

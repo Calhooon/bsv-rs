@@ -5,12 +5,13 @@
 //! `packages/sdk/src/identity/IdentityClient.ts:667`), which keeps that
 //! order; a `serde_json::Value` sorts its keys, so `resolve_by_attributes`
 //! sends the `IndexMap`'s text through the facilitator's `lookup_ordered`
-//! (#394's fold), `LookupQuestion` unchanged. Every other lookup body keeps its
-//! bytes: `query` before `service`, the query as its `Value` writes it.
+//! (#394's fold), `LookupQuestion` unchanged; `query` sends its attributes the
+//! same way since #751's fold. Every other lookup body keeps its bytes: `query`
+//! before `service`, the query as its `Value` writes it.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(all(feature = "identity", feature = "http"))]
 
-use bsv_rs::identity::{IdentityClient, DEFAULT_SOCIALCERT_CERTIFIER};
+use bsv_rs::identity::{IdentityClient, IdentityQuery, DEFAULT_SOCIALCERT_CERTIFIER};
 use bsv_rs::overlay::{
     HttpsOverlayLookupFacilitator, LookupAnswer, LookupQuestion, LookupResolver,
     LookupResolverConfig, OverlayLookupFacilitator,
@@ -80,6 +81,40 @@ async fn resolve_by_attributes_sends_its_attributes_in_insertion_order() {
         bodies(&server).await,
         [format!(
             r#"{{"query":{{"attributes":{{"zeta":"z","alpha":"a"}},"certifiers":["{DEFAULT_SOCIALCERT_CERTIFIER}"]}},"service":"ls_identity"}}"#
+        )]
+    );
+}
+
+/// `query` sends its attributes in insertion order too (#751's fold, the
+/// rule read): the overlay walks the text it receives (`JSON.parse`, then
+/// `Object.entries`, `IdentityLookupService.ts:113-125`), and the bounds
+/// `query` checks before sending judge that walk, so the text is the one
+/// judged; the question's other members keep their bytes (sorted, as the
+/// `Value` wrote them before).
+#[tokio::test]
+async fn query_sends_its_attributes_in_insertion_order_751() {
+    let server = lookup_host().await;
+    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
+        facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
+        slap_trackers: Some(vec![]),
+        host_overrides: Some(HashMap::from([(
+            "ls_identity".to_string(),
+            vec![server.uri()],
+        )])),
+        ..Default::default()
+    }));
+    let client =
+        IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
+    let attributes = IndexMap::from([
+        ("zeta".to_string(), "z".to_string()),
+        ("alpha".to_string(), "a".to_string()),
+    ]);
+    let query = IdentityQuery::by_attributes(attributes).with_limit(10);
+    assert!(client.query(query).await.unwrap().is_empty());
+    assert_eq!(
+        bodies(&server).await,
+        [format!(
+            r#"{{"query":{{"attributes":{{"zeta":"z","alpha":"a"}},"certifiers":["{DEFAULT_SOCIALCERT_CERTIFIER}"],"limit":10}},"service":"ls_identity"}}"#
         )]
     );
 }

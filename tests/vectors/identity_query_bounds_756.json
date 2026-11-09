@@ -1,0 +1,1015 @@
+{
+  "description": "#756: the reference overlay's ls_identity lookup over the question IdentityClient::query sends (a stub storage manager): the thrown message verbatim, or the storage method reached",
+  "reference": "ts-stack@edf6e03 packages/overlays/topics/src/identity/IdentityLookupService.ts:74-152; packages/overlays/topics/src/shared/queryValidation.ts",
+  "node": "v22.18.0",
+  "recorder": "tests/support/identity_query_bounds_756.mjs",
+  "default_certifier": "02cf6cdf466951d8dfc9e7c9367511d0007ed6fba35ed42d425cc412fd6cfd4a17",
+  "cases": [
+    {
+      "name": "limit_0",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "limit": 0,
+      "outcome": {
+        "refused": "Invalid lookup query: limit must be an integer from 1 to 100"
+      }
+    },
+    {
+      "name": "limit_1",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "limit": 1,
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "limit_100",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "limit": 100,
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "limit_101",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "limit": 101,
+      "outcome": {
+        "refused": "Invalid lookup query: limit must be an integer from 1 to 100"
+      }
+    },
+    {
+      "name": "offset_0",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "offset": 0,
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "offset_100000",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "offset": 100000,
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "offset_100001",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "offset": 100001,
+      "outcome": {
+        "refused": "Invalid lookup query: offset must be an integer from 0 to 100000"
+      }
+    },
+    {
+      "name": "key_empty",
+      "subject": "",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must contain 1-66 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "key_bytes_67",
+      "subject": "02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must contain 1-66 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "key_prefix_04",
+      "subject": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a compressed public key"
+      }
+    },
+    {
+      "name": "key_upper_case",
+      "subject": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "key_upper_x",
+      "subject": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "key_p_plus_1",
+      "subject": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "key_no_point",
+      "subject": "020000000000000000000000000000000000000000000000000000000000000005",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a valid compressed public key"
+      }
+    },
+    {
+      "name": "key_not_hex",
+      "subject": "02gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a compressed public key"
+      }
+    },
+    {
+      "name": "key_short",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a compressed public key"
+      }
+    },
+    {
+      "name": "key_padded",
+      "subject": " 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a compressed public key"
+      }
+    },
+    {
+      "name": "key_multibyte",
+      "subject": "02éééééééééééééééééééééééééééééééé",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a compressed public key"
+      }
+    },
+    {
+      "name": "certifier_empty",
+      "certifier": "",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a non-empty bounded string"
+      }
+    },
+    {
+      "name": "certifier_bytes_67",
+      "certifier": "02aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a non-empty bounded string"
+      }
+    },
+    {
+      "name": "certifier_prefix_04",
+      "certifier": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a compressed public key"
+      }
+    },
+    {
+      "name": "certifier_upper_case",
+      "certifier": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
+    },
+    {
+      "name": "certifier_upper_x",
+      "certifier": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
+    },
+    {
+      "name": "certifier_p_plus_1",
+      "certifier": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
+    },
+    {
+      "name": "certifier_no_point",
+      "certifier": "020000000000000000000000000000000000000000000000000000000000000005",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a valid compressed public key"
+      }
+    },
+    {
+      "name": "certifier_not_hex",
+      "certifier": "02gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a compressed public key"
+      }
+    },
+    {
+      "name": "certifier_short",
+      "certifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a compressed public key"
+      }
+    },
+    {
+      "name": "certifier_padded",
+      "certifier": " 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a compressed public key"
+      }
+    },
+    {
+      "name": "certifier_multibyte",
+      "certifier": "02éééééééééééééééééééééééééééééééé",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a compressed public key"
+      }
+    },
+    {
+      "name": "certifier_g",
+      "certifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
+    },
+    {
+      "name": "type_valid",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+      "outcome": {
+        "reached": "findByCertificateType"
+      }
+    },
+    {
+      "name": "type_bytes_31",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value"
+      }
+    },
+    {
+      "name": "type_bytes_33",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value"
+      }
+    },
+    {
+      "name": "type_chars_45",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=A",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a non-empty bounded string"
+      }
+    },
+    {
+      "name": "type_not_base64",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value"
+      }
+    },
+    {
+      "name": "type_unpadded",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value"
+      }
+    },
+    {
+      "name": "type_padded",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": " AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value"
+      }
+    },
+    {
+      "name": "type_empty",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "",
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a non-empty bounded string"
+      }
+    },
+    {
+      "name": "attributes_empty",
+      "attributes": [],
+      "outcome": {
+        "refused": "Invalid lookup query: attributes must contain 1-32 fields"
+      }
+    },
+    {
+      "name": "attributes_32",
+      "attributes": [
+        [
+          "f0",
+          "v"
+        ],
+        [
+          "f1",
+          "v"
+        ],
+        [
+          "f2",
+          "v"
+        ],
+        [
+          "f3",
+          "v"
+        ],
+        [
+          "f4",
+          "v"
+        ],
+        [
+          "f5",
+          "v"
+        ],
+        [
+          "f6",
+          "v"
+        ],
+        [
+          "f7",
+          "v"
+        ],
+        [
+          "f8",
+          "v"
+        ],
+        [
+          "f9",
+          "v"
+        ],
+        [
+          "f10",
+          "v"
+        ],
+        [
+          "f11",
+          "v"
+        ],
+        [
+          "f12",
+          "v"
+        ],
+        [
+          "f13",
+          "v"
+        ],
+        [
+          "f14",
+          "v"
+        ],
+        [
+          "f15",
+          "v"
+        ],
+        [
+          "f16",
+          "v"
+        ],
+        [
+          "f17",
+          "v"
+        ],
+        [
+          "f18",
+          "v"
+        ],
+        [
+          "f19",
+          "v"
+        ],
+        [
+          "f20",
+          "v"
+        ],
+        [
+          "f21",
+          "v"
+        ],
+        [
+          "f22",
+          "v"
+        ],
+        [
+          "f23",
+          "v"
+        ],
+        [
+          "f24",
+          "v"
+        ],
+        [
+          "f25",
+          "v"
+        ],
+        [
+          "f26",
+          "v"
+        ],
+        [
+          "f27",
+          "v"
+        ],
+        [
+          "f28",
+          "v"
+        ],
+        [
+          "f29",
+          "v"
+        ],
+        [
+          "f30",
+          "v"
+        ],
+        [
+          "f31",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "attributes_33",
+      "attributes": [
+        [
+          "f0",
+          "v"
+        ],
+        [
+          "f1",
+          "v"
+        ],
+        [
+          "f2",
+          "v"
+        ],
+        [
+          "f3",
+          "v"
+        ],
+        [
+          "f4",
+          "v"
+        ],
+        [
+          "f5",
+          "v"
+        ],
+        [
+          "f6",
+          "v"
+        ],
+        [
+          "f7",
+          "v"
+        ],
+        [
+          "f8",
+          "v"
+        ],
+        [
+          "f9",
+          "v"
+        ],
+        [
+          "f10",
+          "v"
+        ],
+        [
+          "f11",
+          "v"
+        ],
+        [
+          "f12",
+          "v"
+        ],
+        [
+          "f13",
+          "v"
+        ],
+        [
+          "f14",
+          "v"
+        ],
+        [
+          "f15",
+          "v"
+        ],
+        [
+          "f16",
+          "v"
+        ],
+        [
+          "f17",
+          "v"
+        ],
+        [
+          "f18",
+          "v"
+        ],
+        [
+          "f19",
+          "v"
+        ],
+        [
+          "f20",
+          "v"
+        ],
+        [
+          "f21",
+          "v"
+        ],
+        [
+          "f22",
+          "v"
+        ],
+        [
+          "f23",
+          "v"
+        ],
+        [
+          "f24",
+          "v"
+        ],
+        [
+          "f25",
+          "v"
+        ],
+        [
+          "f26",
+          "v"
+        ],
+        [
+          "f27",
+          "v"
+        ],
+        [
+          "f28",
+          "v"
+        ],
+        [
+          "f29",
+          "v"
+        ],
+        [
+          "f30",
+          "v"
+        ],
+        [
+          "f31",
+          "v"
+        ],
+        [
+          "f32",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attributes must contain 1-32 fields"
+      }
+    },
+    {
+      "name": "name_dot",
+      "attributes": [
+        [
+          "a.b",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_dollar",
+      "attributes": [
+        [
+          "$a",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_nul",
+      "attributes": [
+        [
+          "a\u0000b",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_bytes_50",
+      "attributes": [
+        [
+          "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "name_bytes_51",
+      "attributes": [
+        [
+          "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_two_byte_25",
+      "attributes": [
+        [
+          "ééééééééééééééééééééééééé",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "name_two_byte_26",
+      "attributes": [
+        [
+          "éééééééééééééééééééééééééé",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_empty",
+      "attributes": [
+        [
+          "",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_proto",
+      "attributes": [
+        [
+          "__proto__",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_constructor",
+      "attributes": [
+        [
+          "constructor",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_prototype",
+      "attributes": [
+        [
+          "prototype",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "name_any",
+      "attributes": [
+        [
+          "any",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "value_500",
+      "attributes": [
+        [
+          "email",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "value_501",
+      "attributes": [
+        [
+          "email",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute values must be strings of at most 500 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "value_two_byte_250",
+      "attributes": [
+        [
+          "email",
+          "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "value_two_byte_251",
+      "attributes": [
+        [
+          "email",
+          "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute values must be strings of at most 500 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "value_empty",
+      "attributes": [
+        [
+          "email",
+          ""
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    },
+    {
+      "name": "two_faults_limit_then_key",
+      "subject": "",
+      "limit": 0,
+      "outcome": {
+        "refused": "Invalid lookup query: limit must be an integer from 1 to 100"
+      }
+    },
+    {
+      "name": "two_faults_offset_then_key",
+      "subject": "",
+      "offset": 100001,
+      "outcome": {
+        "refused": "Invalid lookup query: offset must be an integer from 0 to 100000"
+      }
+    },
+    {
+      "name": "two_faults_key_then_certifier",
+      "subject": "",
+      "certifier": "",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must contain 1-66 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "two_faults_certifier_then_type",
+      "certifier": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a compressed public key"
+      }
+    },
+    {
+      "name": "two_faults_type_then_attributes",
+      "certificateType": "!",
+      "attributes": [],
+      "outcome": {
+        "refused": "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value"
+      }
+    },
+    {
+      "name": "two_faults_count_then_name",
+      "attributes": [
+        [
+          "f0",
+          "v"
+        ],
+        [
+          "f1",
+          "v"
+        ],
+        [
+          "f2",
+          "v"
+        ],
+        [
+          "f3",
+          "v"
+        ],
+        [
+          "f4",
+          "v"
+        ],
+        [
+          "f5",
+          "v"
+        ],
+        [
+          "f6",
+          "v"
+        ],
+        [
+          "f7",
+          "v"
+        ],
+        [
+          "f8",
+          "v"
+        ],
+        [
+          "f9",
+          "v"
+        ],
+        [
+          "f10",
+          "v"
+        ],
+        [
+          "f11",
+          "v"
+        ],
+        [
+          "f12",
+          "v"
+        ],
+        [
+          "f13",
+          "v"
+        ],
+        [
+          "f14",
+          "v"
+        ],
+        [
+          "f15",
+          "v"
+        ],
+        [
+          "f16",
+          "v"
+        ],
+        [
+          "f17",
+          "v"
+        ],
+        [
+          "f18",
+          "v"
+        ],
+        [
+          "f19",
+          "v"
+        ],
+        [
+          "f20",
+          "v"
+        ],
+        [
+          "f21",
+          "v"
+        ],
+        [
+          "f22",
+          "v"
+        ],
+        [
+          "f23",
+          "v"
+        ],
+        [
+          "f24",
+          "v"
+        ],
+        [
+          "f25",
+          "v"
+        ],
+        [
+          "f26",
+          "v"
+        ],
+        [
+          "f27",
+          "v"
+        ],
+        [
+          "f28",
+          "v"
+        ],
+        [
+          "f29",
+          "v"
+        ],
+        [
+          "f30",
+          "v"
+        ],
+        [
+          "f31",
+          "v"
+        ],
+        [
+          "a.b",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attributes must contain 1-32 fields"
+      }
+    },
+    {
+      "name": "two_faults_value_then_name",
+      "attributes": [
+        [
+          "email",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ],
+        [
+          "a.b",
+          "v"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute values must be strings of at most 500 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "two_faults_name_then_value",
+      "attributes": [
+        [
+          "a.b",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "two_faults_index_value_then_name",
+      "attributes": [
+        [
+          "a.b",
+          "v"
+        ],
+        [
+          "7",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute values must be strings of at most 500 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "type_beside_attributes",
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "certificateType": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+      "attributes": [
+        [
+          "email",
+          "bob"
+        ]
+      ],
+      "outcome": {
+        "reached": "findByAttribute"
+      }
+    }
+  ]
+}

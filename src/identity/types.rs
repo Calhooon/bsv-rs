@@ -451,22 +451,25 @@ impl Contact {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentityQuery {
-    /// Filter by identity key (hex-encoded public key).
+    /// Filter by identity key: `02`/`03` and 64 hex digits, a point (#756).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity_key: Option<String>,
-    /// Filter by attribute name and value.
+    /// Filter by attribute: 1 to 32, names of 1 to 50 bytes without `.`, `$`,
+    /// NUL or `__proto__`, `constructor`, `prototype`, values at most 500 bytes
+    /// (#756); matched on the answer as the reference wallet matches (#751).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<IndexMap<String, String>>,
-    /// Filter by certificate type (base64 type ID).
+    /// Filter by certificate type: base64 of 32 bytes, padded, at most 44
+    /// bytes of text; `query` refuses another before the network (#756).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub certificate_type: Option<String>,
-    /// Filter by certifier (hex-encoded public key).
+    /// Filter by certifier: `02`/`03` and 64 hex digits, a point (#756).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub certifier: Option<String>,
-    /// Maximum results to return.
+    /// Maximum results to return: 1 to 100 (#756).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
-    /// Offset for pagination.
+    /// Offset for pagination: at most 100000 (#756).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<u32>,
 }
@@ -498,13 +501,13 @@ impl IdentityQuery {
         }
     }
 
-    /// Set the maximum number of results.
+    /// Set the maximum number of results; `query` refuses one outside 1 to 100 (#756).
     pub fn with_limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
 
-    /// Set the offset for pagination.
+    /// Set the offset for pagination; `query` refuses one above 100000 (#756).
     pub fn with_offset(mut self, offset: u32) -> Self {
         self.offset = Some(offset);
         self

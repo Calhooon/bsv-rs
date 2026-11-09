@@ -655,6 +655,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// let identities = client.resolve_by_attributes(attrs, true).await?;
     /// ```
     ///
+    /// Only certificates whose decrypted fields match the map sent are kept
+    /// (#751), the reference wallet's `filterCertificatesByAttributes`
+    /// (`identityUtils.ts:140-293` at `ts-stack@edf6e03`, `Wallet.ts:1078`):
+    /// a lone attribute is sent and judged as `any`, the overlay's
+    /// all-fields search; an empty map keeps nothing.
+    ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn resolve_by_attributes(
         &self,
@@ -680,12 +686,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             _ => attributes,
         };
         #[derive(serde::Serialize)]
-        struct Query {
-            attributes: IndexMap<String, String>,
+        struct Query<'a> {
+            attributes: &'a IndexMap<String, String>,
             certifiers: [&'static str; 1],
         }
         let query = Query {
-            attributes,
+            attributes: &attributes,
             certifiers: [DEFAULT_SOCIALCERT_CERTIFIER],
         };
         let answer = self
@@ -699,6 +705,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
                 for output in &outputs {
                     if let Some(cert) = self.parse_output_to_certificate(output).await? {
+                        // The map sent judged on the answer, as `discoverByAttributes` does (#751)
+                        if !super::client_attributes::keeps(&attributes, &cert.decrypted_fields) {
+                            continue;
+                        }
                         let subject = cert.subject_hex();
 
                         // Check if we have a contact for this identity key
@@ -823,8 +833,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// lower-cased hex, against the asked text lower-cased). A field the
     /// question does not carry filters nothing: with `certifier` unset the
     /// lookup asks the default SocialCert certifier, but a certificate of
-    /// another certifier is not dropped. `attributes` is sent to the overlay
-    /// and not checked on the answer. A `certificate_type` is sent as
+    /// another certifier is not dropped. With `attributes` set, the
+    /// certificates whose decrypted fields match them (#751), as the
+    /// reference wallet's `filterCertificatesByAttributes` judges them
+    /// (`identityUtils.ts:140-293`); `limit` and `offset` page the overlay's
+    /// answer before that filter: a short page is not its end. A
+    /// `certificate_type` is sent as
     /// `certificateTypes: [type]`, the key and shape the reference overlay's
     /// `ls_identity` allowlist admits (`IdentityLookupService.ts:74-82`; that
     /// overlay reads the types only beside `identityKey` and with no
@@ -836,75 +850,70 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// # Arguments
     /// * `query` - The query parameters
     ///
+    /// Fails with `Error::IdentityError("Invalid lookup query: ...")`, nothing
+    /// sent, for a question the reference overlay refuses whole (#756): a
+    /// `limit` outside 1 to 100, an `offset` above 100000, an `identity_key`
+    /// or `certifier` that is no `02`/`03` key of 64 hex digits on the curve,
+    /// a `certificate_type` that is not base64 of 32 bytes (1 to 44 bytes, then
+    /// `validateBase64String`), `attributes` of 0 or more than 32 fields, a
+    /// name over 50 bytes or with `.`, `$` or NUL or one of `__proto__`,
+    /// `constructor`, `prototype`, a value over 500 bytes.
+    ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
     pub async fn query(&self, query: IdentityQuery) -> Result<Vec<IdentityResolutionResult>> {
-        let mut lookup_query = serde_json::Map::new();
-
-        if let Some(ref key) = query.identity_key {
-            lookup_query.insert("identityKey".to_string(), serde_json::json!(key));
+        super::query_bounds::check(&query)?;
+        // The question's members in the order a `Value` writes them (sorted),
+        // the attributes in insertion order, as `resolve_by_attributes` sends
+        // its own (#394): the overlay walks them as `JSON.parse` holds that
+        // text, the order `query_bounds::check` judges them in (#751's fold)
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Question<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            attributes: Option<&'a IndexMap<String, String>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            certificate_types: Option<[&'a str; 1]>,
+            certifiers: [&'a str; 1],
+            #[serde(skip_serializing_if = "Option::is_none")]
+            identity_key: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            limit: Option<u32>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            offset: Option<u32>,
         }
-
-        if let Some(ref attrs) = query.attributes {
-            lookup_query.insert(
-                "attributes".to_string(),
-                serde_json::to_value(attrs).map_err(|e| Error::IdentityError(e.to_string()))?,
-            );
-        }
-
-        if let Some(ref cert_type) = query.certificate_type {
-            lookup_query.insert(
-                "certificateTypes".to_string(),
-                serde_json::json!([cert_type]),
-            );
-        }
-
-        if let Some(ref certifier) = query.certifier {
-            lookup_query.insert("certifiers".to_string(), serde_json::json!([certifier]));
-        } else {
-            lookup_query.insert(
-                "certifiers".to_string(),
-                serde_json::json!([DEFAULT_SOCIALCERT_CERTIFIER]),
-            );
-        }
-
-        if let Some(limit) = query.limit {
-            lookup_query.insert("limit".to_string(), serde_json::json!(limit));
-        }
-
-        if let Some(offset) = query.offset {
-            lookup_query.insert("offset".to_string(), serde_json::json!(offset));
-        }
-
-        let question = LookupQuestion::new("ls_identity", serde_json::Value::Object(lookup_query));
-
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-
-                for output in &outputs {
-                    if let Some(cert) = self.parse_output_to_certificate(output).await? {
-                        let identity = Self::parse_identity(&cert);
-                        results.push(IdentityResolutionResult {
-                            identity,
-                            certificates: vec![cert.certificate.clone()],
-                        });
-                    }
-                }
-                // Every output parsed, then only what the question asked
-                // for (#746)
-                results.retain(|result| {
-                    result
-                        .certificates
-                        .iter()
-                        .all(|cert| is_asked_certificate(cert, &query))
-                });
-
-                Ok(results)
+        let question = Question {
+            attributes: query.attributes.as_ref(),
+            certificate_types: query.certificate_type.as_deref().map(|t| [t]),
+            certifiers: [query
+                .certifier
+                .as_deref()
+                .unwrap_or(DEFAULT_SOCIALCERT_CERTIFIER)],
+            identity_key: query.identity_key.as_deref(),
+            limit: query.limit,
+            offset: query.offset,
+        };
+        let LookupAnswer::OutputList { outputs } = self
+            .resolver
+            .query_ordered("ls_identity", &question, None)
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        let mut certificates = Vec::new();
+        for output in &outputs {
+            if let Some(cert) = self.parse_output_to_certificate(output).await? {
+                certificates.push(cert);
             }
-            _ => Ok(Vec::new()),
         }
+        // Every output parsed, then only what the question asked for (#746, #751)
+        certificates.retain(|cert| super::client_attributes::is_asked(cert, &query));
+        Ok(certificates
+            .into_iter()
+            .map(|cert| IdentityResolutionResult {
+                identity: Self::parse_identity(&cert),
+                certificates: vec![cert.certificate],
+            })
+            .collect())
     }
 
     // =========================================================================
@@ -1106,27 +1115,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 /// Whether `subject` is the asked key, both lower-cased as the reference's
 /// `filterCertificatesByIdentityKey` compares (`identityUtils.ts:247-255`,
 /// `Wallet.ts:1012`): the one rule of the three by-key doors (#737, #739).
-fn is_asked_subject(subject: &crate::primitives::PublicKey, identity_key: &str) -> bool {
+pub(super) fn is_asked_subject(subject: &crate::primitives::PublicKey, identity_key: &str) -> bool {
     subject.to_hex() == identity_key.to_lowercase()
-}
-
-/// Whether `cert` is one `query` asked for (#746): the subject through
-/// `is_asked_subject`, the type's canonical text exactly, the certifier's key
-/// lower-cased against the asked text lower-cased; a field the question does
-/// not carry filters nothing.
-fn is_asked_certificate(cert: &VerifiableCertificate, query: &IdentityQuery) -> bool {
-    query
-        .identity_key
-        .as_deref()
-        .is_none_or(|key| is_asked_subject(cert.subject(), key))
-        && query
-            .certificate_type
-            .as_deref()
-            .is_none_or(|cert_type| cert.type_base64() == cert_type)
-        && query
-            .certifier
-            .as_deref()
-            .is_none_or(|certifier| cert.certifier().to_hex() == certifier.to_lowercase())
 }
 
 /// The two `ls_identity` parsers' decode site: lock-before alone, as the

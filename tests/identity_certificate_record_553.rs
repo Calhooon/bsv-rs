@@ -16,12 +16,11 @@
 #[path = "support/pushdrop_lock_position_537.rs"]
 mod lock_position;
 
-use bsv_rs::identity::IdentityClient;
+use bsv_rs::identity::{IdentityClient, IdentityQuery};
 use bsv_rs::primitives::{from_hex, sha256, to_hex};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
 use bsv_rs::wallet::ProtoWallet;
-use indexmap::IndexMap;
 use serde_json::Value;
 
 /// The two cases whose transaction passes the reference evidence layer's
@@ -70,9 +69,10 @@ async fn read(script: LockingScript, subject: &str) -> Result<(usize, usize), St
     let resolver = lock_position::answering("ls_identity", script);
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
-    let attributes = IndexMap::from([("email".to_string(), "alice@example.com".to_string())]);
+    // `query` with no filter, the same parser as `resolve_by_attributes`,
+    // whose answer the attribute matcher judges since #751
     let identities = client
-        .resolve_by_attributes(attributes, false)
+        .query(IdentityQuery::default())
         .await
         .map_err(|e| e.to_string())?;
     let certificates = client

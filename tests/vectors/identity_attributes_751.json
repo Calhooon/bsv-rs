@@ -1,0 +1,1679 @@
+{
+  "description": "#751: the reference wallet's filterCertificatesByAttributes over records of decryptedFields alone: userName exact, the other named fields fuzzy, any by its length, nothing kept when nothing is usable; kept the indices of the records the reference keeps",
+  "reference": "ts-stack@edf6e03 packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:140-293; packages/wallet/wallet-toolbox/src/Wallet.ts:1069-1082",
+  "node": "v22.18.0",
+  "recorder": "tests/support/identity_attributes_751.mjs",
+  "cases": [
+    {
+      "name": "username_exact",
+      "attributes": [
+        [
+          "userName",
+          "alice"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "userName",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "Alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice2"
+          ]
+        ],
+        [
+          [
+            "userName",
+            " alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "username_padded",
+      "attributes": [
+        [
+          "userName",
+          "  alice\t"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "userName",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "Alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice2"
+          ]
+        ],
+        [
+          [
+            "userName",
+            " alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "username_other_case",
+      "attributes": [
+        [
+          "userName",
+          "ALICE"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "userName",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "Alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice2"
+          ]
+        ],
+        [
+          [
+            "userName",
+            " alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ]
+      ],
+      "kept": []
+    },
+    {
+      "name": "username_inner_space",
+      "attributes": [
+        [
+          "userName",
+          "alice   smith"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "userName",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "Alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice2"
+          ]
+        ],
+        [
+          [
+            "userName",
+            " alice"
+          ]
+        ],
+        [
+          [
+            "userName",
+            "alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ]
+      ],
+      "kept": [
+        4
+      ]
+    },
+    {
+      "name": "fuzzy_in_order",
+      "attributes": [
+        [
+          "email",
+          "bob example"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "bob@example.com"
+          ]
+        ],
+        [
+          [
+            "email",
+            "example bob"
+          ]
+        ],
+        [
+          [
+            "email",
+            "BOB@EXAMPLE.COM"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bo b example"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bobexample"
+          ]
+        ],
+        [
+          [
+            "email",
+            "xbobx and exampley"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "name": "fuzzy_out_of_order",
+      "attributes": [
+        [
+          "email",
+          "example bob"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "bob@example.com"
+          ]
+        ],
+        [
+          [
+            "email",
+            "example bob"
+          ]
+        ],
+        [
+          [
+            "email",
+            "BOB@EXAMPLE.COM"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bo b example"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bobexample"
+          ]
+        ],
+        [
+          [
+            "email",
+            "xbobx and exampley"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "fuzzy_other_case",
+      "attributes": [
+        [
+          "email",
+          "BoB  EXAMPLE "
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "bob@example.com"
+          ]
+        ],
+        [
+          [
+            "email",
+            "example bob"
+          ]
+        ],
+        [
+          [
+            "email",
+            "BOB@EXAMPLE.COM"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bo b example"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bobexample"
+          ]
+        ],
+        [
+          [
+            "email",
+            "xbobx and exampley"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "name": "fuzzy_metacharacter",
+      "attributes": [
+        [
+          "email",
+          "a.b (c"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "a.b (c"
+          ]
+        ],
+        [
+          [
+            "email",
+            "axb (c"
+          ]
+        ],
+        [
+          [
+            "email",
+            "a.b c"
+          ]
+        ],
+        [
+          [
+            "email",
+            "A.B (C)"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        3
+      ]
+    },
+    {
+      "name": "fuzzy_two_lines",
+      "attributes": [
+        [
+          "name",
+          "alice smith"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "alice\nsmith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "bob\nalice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "x\r\nalice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice\rsmith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice\tsmith"
+          ]
+        ]
+      ],
+      "kept": [
+        1,
+        2,
+        5
+      ]
+    },
+    {
+      "name": "fuzzy_case_folding",
+      "attributes": [
+        [
+          "city",
+          "straße"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "city",
+            "STRASSE"
+          ]
+        ],
+        [
+          [
+            "city",
+            "Straße"
+          ]
+        ],
+        [
+          [
+            "city",
+            "STRAẞE"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "fuzzy_long_s_and_kelvin",
+      "attributes": [
+        [
+          "city",
+          "sk"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "city",
+            "ſk"
+          ]
+        ],
+        [
+          [
+            "city",
+            "SK"
+          ]
+        ],
+        [
+          [
+            "city",
+            "sK"
+          ]
+        ],
+        [
+          [
+            "city",
+            "Sk"
+          ]
+        ]
+      ],
+      "kept": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "fuzzy_dotless_i",
+      "attributes": [
+        [
+          "city",
+          "istanbul"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "city",
+            "ıstanbul"
+          ]
+        ],
+        [
+          [
+            "city",
+            "ISTANBUL"
+          ]
+        ],
+        [
+          [
+            "city",
+            "İstanbul"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "missing_field",
+      "attributes": [
+        [
+          "email",
+          "bob"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "bob"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bob"
+          ]
+        ],
+        []
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "blank_beside_usable",
+      "attributes": [
+        [
+          "email",
+          "bob"
+        ],
+        [
+          "phone",
+          "   "
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "bob"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bob"
+          ],
+          [
+            "phone",
+            "1"
+          ]
+        ],
+        [
+          [
+            "phone",
+            "1"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "all_blank",
+      "attributes": [
+        [
+          "email",
+          "  "
+        ],
+        [
+          "phone",
+          ""
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "x"
+          ]
+        ],
+        []
+      ],
+      "kept": []
+    },
+    {
+      "name": "empty_map",
+      "attributes": [],
+      "records": [
+        [
+          [
+            "email",
+            "x"
+          ]
+        ],
+        []
+      ],
+      "kept": []
+    },
+    {
+      "name": "two_named_fields",
+      "attributes": [
+        [
+          "email",
+          "bob"
+        ],
+        [
+          "name",
+          "smith"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "bob"
+          ],
+          [
+            "name",
+            "smith"
+          ]
+        ],
+        [
+          [
+            "email",
+            "bob"
+          ],
+          [
+            "name",
+            "jones"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "any_one_unit",
+      "attributes": [
+        [
+          "any",
+          "a"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "Alice"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Alicent"
+          ]
+        ],
+        [
+          [
+            "email",
+            "alice@x.com"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "Hall"
+          ]
+        ],
+        [
+          [
+            "profilePhoto",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Bob"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        []
+      ],
+      "kept": []
+    },
+    {
+      "name": "any_blank",
+      "attributes": [
+        [
+          "any",
+          "   "
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "Alice"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Alicent"
+          ]
+        ],
+        [
+          [
+            "email",
+            "alice@x.com"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "Hall"
+          ]
+        ],
+        [
+          [
+            "profilePhoto",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Bob"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        []
+      ],
+      "kept": []
+    },
+    {
+      "name": "any_two_units",
+      "attributes": [
+        [
+          "any",
+          "al"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "Alice"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Alicent"
+          ]
+        ],
+        [
+          [
+            "email",
+            "alice@x.com"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "Hall"
+          ]
+        ],
+        [
+          [
+            "profilePhoto",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Bob"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        []
+      ],
+      "kept": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "name": "any_two_units_padded",
+      "attributes": [
+        [
+          "any",
+          " AL "
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "Alice"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Alicent"
+          ]
+        ],
+        [
+          [
+            "email",
+            "alice@x.com"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "Hall"
+          ]
+        ],
+        [
+          [
+            "profilePhoto",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Bob"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        []
+      ],
+      "kept": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "name": "any_two_units_across_fields",
+      "attributes": [
+        [
+          "any",
+          "ab"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "first",
+            "a"
+          ],
+          [
+            "last",
+            "b"
+          ]
+        ],
+        [
+          [
+            "first",
+            "ab"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "any_three_units",
+      "attributes": [
+        [
+          "any",
+          "alice"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "Alice"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Alicent"
+          ]
+        ],
+        [
+          [
+            "email",
+            "alice@x.com"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "Hall"
+          ]
+        ],
+        [
+          [
+            "profilePhoto",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Bob"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        []
+      ],
+      "kept": [
+        0,
+        2
+      ]
+    },
+    {
+      "name": "any_stop_word",
+      "attributes": [
+        [
+          "any",
+          "the"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "the"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice the"
+          ]
+        ]
+      ],
+      "kept": []
+    },
+    {
+      "name": "any_stop_word_beside_term",
+      "attributes": [
+        [
+          "any",
+          "the alice"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "Alice"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Alicent"
+          ]
+        ],
+        [
+          [
+            "email",
+            "alice@x.com"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "Hall"
+          ]
+        ],
+        [
+          [
+            "profilePhoto",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "Bob"
+          ],
+          [
+            "lastName",
+            "Smith"
+          ]
+        ],
+        []
+      ],
+      "kept": [
+        0,
+        2
+      ]
+    },
+    {
+      "name": "any_negated_term",
+      "attributes": [
+        [
+          "any",
+          "alice -smith"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "alice"
+          ],
+          [
+            "lastName",
+            "smith"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "alice"
+          ],
+          [
+            "lastName",
+            "jones"
+          ]
+        ],
+        [
+          [
+            "firstName",
+            "bob"
+          ],
+          [
+            "lastName",
+            "smith"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "any_negated_alone",
+      "attributes": [
+        [
+          "any",
+          "-smith"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "name",
+            "smith"
+          ]
+        ]
+      ],
+      "kept": []
+    },
+    {
+      "name": "any_dash_alone",
+      "attributes": [
+        [
+          "any",
+          "alice -"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "name",
+            "bob"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "any_phrase",
+      "attributes": [
+        [
+          "any",
+          "\"alice smith\""
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "smith alice"
+          ]
+        ],
+        [
+          [
+            "first",
+            "alice"
+          ],
+          [
+            "last",
+            "smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "Alice  Smith"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        2
+      ]
+    },
+    {
+      "name": "any_negated_phrase",
+      "attributes": [
+        [
+          "any",
+          "bob -\"alice smith\""
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "bob alice smith"
+          ]
+        ],
+        [
+          [
+            "name",
+            "bob smith alice"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "any_unclosed_quote",
+      "attributes": [
+        [
+          "any",
+          "\"alice"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ],
+        [
+          [
+            "name",
+            "bob"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "any_phrase_of_stop_words",
+      "attributes": [
+        [
+          "any",
+          "\"the a\""
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "the a"
+          ]
+        ],
+        [
+          [
+            "name",
+            "alice"
+          ]
+        ]
+      ],
+      "kept": []
+    },
+    {
+      "name": "any_diacritic",
+      "attributes": [
+        [
+          "any",
+          "jose"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "José"
+          ]
+        ],
+        [
+          [
+            "name",
+            "JOSE"
+          ]
+        ],
+        [
+          [
+            "name",
+            "josé-maria"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "name": "any_diacritic_asked",
+      "attributes": [
+        [
+          "any",
+          "JOSÉ"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "jose"
+          ]
+        ],
+        [
+          [
+            "name",
+            "José"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "any_apostrophe",
+      "attributes": [
+        [
+          "any",
+          "o'neil"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "Mary O'Neil"
+          ]
+        ],
+        [
+          [
+            "name",
+            "oneil"
+          ]
+        ],
+        [
+          [
+            "name",
+            "o neil"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "any_punctuation_token",
+      "attributes": [
+        [
+          "any",
+          "alice.smith"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "email",
+            "alice.smith@x"
+          ]
+        ],
+        [
+          [
+            "email",
+            "smith"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "any_only_in_photo",
+      "attributes": [
+        [
+          "any",
+          "photo"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "profilePhoto",
+            "photo"
+          ]
+        ],
+        [
+          [
+            "icon",
+            "photo"
+          ]
+        ],
+        [
+          [
+            "name",
+            "photo"
+          ]
+        ]
+      ],
+      "kept": [
+        2
+      ]
+    },
+    {
+      "name": "any_beside_failing_named_field",
+      "attributes": [
+        [
+          "email",
+          "zzz"
+        ],
+        [
+          "any",
+          "alice"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "alice"
+          ],
+          [
+            "email",
+            "bob"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "any_beside_failing_named_field_after",
+      "attributes": [
+        [
+          "any",
+          "alice"
+        ],
+        [
+          "email",
+          "zzz"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "firstName",
+            "alice"
+          ],
+          [
+            "email",
+            "bob"
+          ]
+        ]
+      ],
+      "kept": [
+        0
+      ]
+    },
+    {
+      "name": "any_integer_like_field_order",
+      "attributes": [
+        [
+          "any",
+          "\"x y\""
+        ]
+      ],
+      "records": [
+        [
+          [
+            "b",
+            "x"
+          ],
+          [
+            "1",
+            "y"
+          ]
+        ],
+        [
+          [
+            "b",
+            "y"
+          ],
+          [
+            "1",
+            "x"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    },
+    {
+      "name": "any_final_sigma",
+      "attributes": [
+        [
+          "any",
+          "ΟΔΟΣ"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "οδος"
+          ]
+        ],
+        [
+          [
+            "name",
+            "οδος"
+          ]
+        ]
+      ],
+      "kept": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "any_two_units_two_lines",
+      "attributes": [
+        [
+          "any",
+          "ab"
+        ]
+      ],
+      "records": [
+        [
+          [
+            "name",
+            "a\nb"
+          ]
+        ],
+        [
+          [
+            "name",
+            "xab\ny"
+          ]
+        ]
+      ],
+      "kept": [
+        1
+      ]
+    }
+  ]
+}
