@@ -1,0 +1,2105 @@
+{
+  "issue": 782,
+  "reference": "ts-stack@edf6e03 packages/sdk/src/script/templates/PushDrop.ts:130-202",
+  "runtime": "node v22.18.0",
+  "wallet": "ProtoWallet(new PrivateKey(9))",
+  "other_counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+  "cases": [
+    {
+      "name": "grid_self_forself_false_signed_true_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": false,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": false
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d"
+    },
+    {
+      "name": "grid_self_forself_false_signed_true_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": false,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": false
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "grid_self_forself_false_signed_false_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": false
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac02686955006d75"
+    },
+    {
+      "name": "grid_self_forself_false_signed_false_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": false
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "02686955006d7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "grid_self_forself_true_signed_true_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d"
+    },
+    {
+      "name": "grid_self_forself_true_signed_true_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "grid_self_forself_true_signed_false_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac02686955006d75"
+    },
+    {
+      "name": "grid_self_forself_true_signed_false_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "02686955006d7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "grid_anyone_forself_false_signed_true_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": false,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02b",
+      "signature": "3045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a7",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": false
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02bac0268695500473045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a76d6d"
+    },
+    {
+      "name": "grid_anyone_forself_false_signed_true_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": false,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02b",
+      "signature": "3045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a7",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": false
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "0268695500473045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a76d6d21034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02bac"
+    },
+    {
+      "name": "grid_anyone_forself_false_signed_false_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02b",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": false
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02bac02686955006d75"
+    },
+    {
+      "name": "grid_anyone_forself_false_signed_false_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02b",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": false
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "02686955006d7521034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02bac"
+    },
+    {
+      "name": "grid_anyone_forself_true_signed_true_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "0377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292eb",
+      "signature": "3045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a7",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "210377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292ebac0268695500473045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a76d6d"
+    },
+    {
+      "name": "grid_anyone_forself_true_signed_true_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "0377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292eb",
+      "signature": "3045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a7",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "0268695500473045022100a23d1cf21b7f2edca1ab5ea5eee3ff43d7265bb2f7118508f4f41456390c5216022027748bee9e85fdf2a0a7f5ea31d79ebbd100c7348be4ad5b9773ebba755fc8a76d6d210377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292ebac"
+    },
+    {
+      "name": "grid_anyone_forself_true_signed_false_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "0377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292eb",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "210377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292ebac02686955006d75"
+    },
+    {
+      "name": "grid_anyone_forself_true_signed_false_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "0377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292eb",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "02686955006d75210377bd420f3fa11bb1a50d7c122dde8f5f93d9cce1116ee769446175510a5292ebac"
+    },
+    {
+      "name": "grid_other_forself_false_signed_true_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": false,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "03b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0",
+      "signature": "304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": false
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "2103b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0ac026869550046304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e6d6d"
+    },
+    {
+      "name": "grid_other_forself_false_signed_true_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": false,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "03b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0",
+      "signature": "304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": false
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "026869550046304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e6d6d2103b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0ac"
+    },
+    {
+      "name": "grid_other_forself_false_signed_false_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "03b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": false
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "2103b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0ac02686955006d75"
+    },
+    {
+      "name": "grid_other_forself_false_signed_false_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "03b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": false
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "02686955006d752103b9f70dd506cf2b1ab47a3f3b95def59a471df6d316fd8351bf8e5d7139c942a0ac"
+    },
+    {
+      "name": "grid_other_forself_true_signed_true_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0",
+      "signature": "304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0ac026869550046304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e6d6d"
+    },
+    {
+      "name": "grid_other_forself_true_signed_true_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0",
+      "signature": "304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "026869550046304402200db98a66b0d7eb05828f87c16313864961e3612b3b0bc2439a6c571de3f4133702203cb210c408d8beca7bc769e6b818166611b8ef20f3c257bdf8cffeb6d22da08e6d6d21032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0ac"
+    },
+    {
+      "name": "grid_other_forself_true_signed_false_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0ac02686955006d75"
+    },
+    {
+      "name": "grid_other_forself_true_signed_false_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "02686955006d7521032cbef1f464490dadf2e7bc487064737769d08dfa99807ec0d21f824831d132b0ac"
+    },
+    {
+      "name": "shape_no_fields_signed_true_before",
+      "originator": null,
+      "fields": [],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "30440220037a4e3b0cae4102f767eaf174228da06e89c293781f0413eacbac18987bc5a202202ce3aaaa70734e5655f0e67b6346704d641ba611b127481d3e53c375d91032eb",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": ""
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4630440220037a4e3b0cae4102f767eaf174228da06e89c293781f0413eacbac18987bc5a202202ce3aaaa70734e5655f0e67b6346704d641ba611b127481d3e53c375d91032eb75"
+    },
+    {
+      "name": "shape_no_fields_signed_true_after",
+      "originator": null,
+      "fields": [],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "30440220037a4e3b0cae4102f767eaf174228da06e89c293781f0413eacbac18987bc5a202202ce3aaaa70734e5655f0e67b6346704d641ba611b127481d3e53c375d91032eb",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": ""
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4630440220037a4e3b0cae4102f767eaf174228da06e89c293781f0413eacbac18987bc5a202202ce3aaaa70734e5655f0e67b6346704d641ba611b127481d3e53c375d91032eb7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_no_fields_signed_false_before",
+      "originator": null,
+      "fields": [],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_no_fields_signed_false_after",
+      "originator": null,
+      "fields": [],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_one_negate_signed_true_before",
+      "originator": null,
+      "fields": [
+        "81"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3044022057314a232818fbfdbb5838a844e30fee622564d14c4869bd39eb6e8e9f65dc3102206936330846363c0925c12a693db971e8aad13269af227a4d829d78b7546ba803",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "81"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4f463044022057314a232818fbfdbb5838a844e30fee622564d14c4869bd39eb6e8e9f65dc3102206936330846363c0925c12a693db971e8aad13269af227a4d829d78b7546ba8036d"
+    },
+    {
+      "name": "shape_one_negate_signed_true_after",
+      "originator": null,
+      "fields": [
+        "81"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3044022057314a232818fbfdbb5838a844e30fee622564d14c4869bd39eb6e8e9f65dc3102206936330846363c0925c12a693db971e8aad13269af227a4d829d78b7546ba803",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "81"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4f463044022057314a232818fbfdbb5838a844e30fee622564d14c4869bd39eb6e8e9f65dc3102206936330846363c0925c12a693db971e8aad13269af227a4d829d78b7546ba8036d21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_one_negate_signed_false_before",
+      "originator": null,
+      "fields": [
+        "81"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4f75"
+    },
+    {
+      "name": "shape_one_negate_signed_false_after",
+      "originator": null,
+      "fields": [
+        "81"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4f7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_a_76_byte_field_signed_true_before",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100ab293b71926ed6d1c98e775ef990a61bd6a73772077556c5db4825a1b22b366b02207b8e8354a54ed61add8ce8cef116e0414fceb648a395d31ceb2590469b758c96",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4c4c000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b473045022100ab293b71926ed6d1c98e775ef990a61bd6a73772077556c5db4825a1b22b366b02207b8e8354a54ed61add8ce8cef116e0414fceb648a395d31ceb2590469b758c966d"
+    },
+    {
+      "name": "shape_a_76_byte_field_signed_true_after",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100ab293b71926ed6d1c98e775ef990a61bd6a73772077556c5db4825a1b22b366b02207b8e8354a54ed61add8ce8cef116e0414fceb648a395d31ceb2590469b758c96",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4c4c000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b473045022100ab293b71926ed6d1c98e775ef990a61bd6a73772077556c5db4825a1b22b366b02207b8e8354a54ed61add8ce8cef116e0414fceb648a395d31ceb2590469b758c966d21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_a_76_byte_field_signed_false_before",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4c4c000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b75"
+    },
+    {
+      "name": "shape_a_76_byte_field_signed_false_after",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4c4c000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_a_256_byte_field_and_another_signed_true_before",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "aabb"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100a8ed4df446878f00267eeb9c7d78f0116c8a1a2f7f9d0b0c4324c85e7d44e9bb02201c4987cb73a7fa2d0229f33160b02caa6efd529a1ac23792bba76fc91a19f6b5",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffaabb"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4d0001000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff02aabb473045022100a8ed4df446878f00267eeb9c7d78f0116c8a1a2f7f9d0b0c4324c85e7d44e9bb02201c4987cb73a7fa2d0229f33160b02caa6efd529a1ac23792bba76fc91a19f6b56d75"
+    },
+    {
+      "name": "shape_a_256_byte_field_and_another_signed_true_after",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "aabb"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100a8ed4df446878f00267eeb9c7d78f0116c8a1a2f7f9d0b0c4324c85e7d44e9bb02201c4987cb73a7fa2d0229f33160b02caa6efd529a1ac23792bba76fc91a19f6b5",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffaabb"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4d0001000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff02aabb473045022100a8ed4df446878f00267eeb9c7d78f0116c8a1a2f7f9d0b0c4324c85e7d44e9bb02201c4987cb73a7fa2d0229f33160b02caa6efd529a1ac23792bba76fc91a19f6b56d7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_a_256_byte_field_and_another_signed_false_before",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "aabb"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac4d0001000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff02aabb6d"
+    },
+    {
+      "name": "shape_a_256_byte_field_and_another_signed_false_after",
+      "originator": null,
+      "fields": [
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "aabb"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "4d0001000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff02aabb6d21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_four_fields_signed_true_before",
+      "originator": null,
+      "fields": [
+        "01",
+        "10",
+        "11",
+        "00"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100865ce863077bd684ada55d701d5d8b1f27ea2324c886781e22c3812df68f52d902200695395755d4a7108e6ddd5bb3588c44e7d4bdf09d817be900d4234896c7f61f",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "01101100"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac5160011100473045022100865ce863077bd684ada55d701d5d8b1f27ea2324c886781e22c3812df68f52d902200695395755d4a7108e6ddd5bb3588c44e7d4bdf09d817be900d4234896c7f61f6d6d75"
+    },
+    {
+      "name": "shape_four_fields_signed_true_after",
+      "originator": null,
+      "fields": [
+        "01",
+        "10",
+        "11",
+        "00"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100865ce863077bd684ada55d701d5d8b1f27ea2324c886781e22c3812df68f52d902200695395755d4a7108e6ddd5bb3588c44e7d4bdf09d817be900d4234896c7f61f",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "01101100"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "5160011100473045022100865ce863077bd684ada55d701d5d8b1f27ea2324c886781e22c3812df68f52d902200695395755d4a7108e6ddd5bb3588c44e7d4bdf09d817be900d4234896c7f61f6d6d7521027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "shape_four_fields_signed_false_before",
+      "originator": null,
+      "fields": [
+        "01",
+        "10",
+        "11",
+        "00"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac51600111006d6d"
+    },
+    {
+      "name": "shape_four_fields_signed_false_after",
+      "originator": null,
+      "fields": [
+        "01",
+        "10",
+        "11",
+        "00"
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "51600111006d6d21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac"
+    },
+    {
+      "name": "originator_signed",
+      "originator": "pushdrop.example.com",
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "as_derived",
+      "wallet_answer": "027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": "pushdrop.example.com"
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": "pushdrop.example.com"
+        }
+      ],
+      "locking_script": "21027f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f338329ac0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d"
+    },
+    {
+      "name": "originator_unsigned",
+      "originator": "pushdrop.example.com",
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "for_self": false,
+      "include_signature": false,
+      "lock_position": "after",
+      "key_form": "as_derived",
+      "wallet_answer": "034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02b",
+      "signature": null,
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "forSelf": false
+          },
+          "originator": "pushdrop.example.com"
+        }
+      ],
+      "locking_script": "02686955006d7521034a67b275e5aa9b5c9cd7055fead6e5ae2dd0e009e1d6913e49ce529f4f4fc02bac"
+    },
+    {
+      "name": "uncompressed_answer_signed_before",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "before",
+      "key_form": "uncompressed",
+      "wallet_answer": "047f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f3383297bc1b3dd88622be5cdcdc63dcaba15aa9aea36bfd3a4c6d983b700cf5578e102",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "41047f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f3383297bc1b3dd88622be5cdcdc63dcaba15aa9aea36bfd3a4c6d983b700cf5578e102ac0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d"
+    },
+    {
+      "name": "uncompressed_answer_signed_after",
+      "originator": null,
+      "fields": [
+        "6869",
+        "05",
+        ""
+      ],
+      "protocol_id": [
+        2,
+        "pushdrop wallet lock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "for_self": true,
+      "include_signature": true,
+      "lock_position": "after",
+      "key_form": "uncompressed",
+      "wallet_answer": "047f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f3383297bc1b3dd88622be5cdcdc63dcaba15aa9aea36bfd3a4c6d983b700cf5578e102",
+      "signature": "3045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa",
+      "calls": [
+        {
+          "method": "getPublicKey",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "forSelf": true
+          },
+          "originator": null
+        },
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet lock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "686905"
+          },
+          "originator": null
+        }
+      ],
+      "locking_script": "0268695500473045022100e3de675068901d14176aaa3e9ff1ec256846f0f675586324cf1683c8b7ae340d02200fa1fa2f2eadf016e5bb889cffa3d0eb946f49d63f1099d9a7d3edb210726bfa6d6d41047f04d8ef56518c7940ebd25a81856164557964651175ff969406182c8f3383297bc1b3dd88622be5cdcdc63dcaba15aa9aea36bfd3a4c6d983b700cf5578e102ac"
+    }
+  ],
+  "key_texts": [
+    {
+      "name": "not_hex",
+      "wallet_answer": "zz",
+      "calls": [
+        "getPublicKey"
+      ],
+      "rejected": "Invalid hex string"
+    },
+    {
+      "name": "empty",
+      "wallet_answer": "",
+      "calls": [
+        "getPublicKey",
+        "createSignature"
+      ],
+      "resolved": "00ac02686946304402204b36b7a6192172ca9cab85d4808b85e38503d19b323512c952d3581911c8dc48022003a0edf15ac6406ab2fe98743f36b663c75374d1a21606a27087ac39026e17ec6d"
+    },
+    {
+      "name": "odd_not_hex",
+      "wallet_answer": "zzz",
+      "calls": [
+        "getPublicKey"
+      ],
+      "rejected": "Invalid hex string"
+    }
+  ]
+}

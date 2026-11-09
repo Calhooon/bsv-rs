@@ -94,6 +94,10 @@ pub mod p2pkh;
 pub mod pushdrop;
 pub(crate) mod pushdrop_key_bytes;
 mod pushdrop_reference_read;
+// The reference's wallet-aware `PushDrop.lock` (#782): it asks a
+// `WalletInterface`, so it stands on `wallet`.
+#[cfg(feature = "wallet")]
+mod pushdrop_wallet;
 // Its six callers (#537) all stand on `overlay`; a slice without it would
 // carry dead code (`ci.yml`'s clippy on each slice alone).
 #[cfg(feature = "overlay")]
