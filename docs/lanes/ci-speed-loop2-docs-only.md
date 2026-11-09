@@ -156,15 +156,67 @@ script). The plan's two flags have unit tests in
 binary named by `--runs`; code, the manifest, `README.md`, a workflow file and an empty
 change are never docs only).
 
-## The five figures
+## The six figures
 
 | Figure | Before | After |
 |---|---|---|
-| A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | 4m43s (#690, run 41617426467 on `849ff87e`: the Test Suite 8 s, lint 9 s, checks 30 s, main-in-beta 5 s, semver 4m39s) |
-| A docs-only PR's `semver` job (#689) | 4m39s (#690, run 41617426467) | measured by the pull request of `lane/docs-loop3-after` (the earliest docs-only one after #689 landed at `ec14da1c`, 13:00Z 2026-11-03), read in at its landing |
-| The queue wait | 0m02s to 1m57s (loop one closed) | (from the next docs-only PR's run) |
+| A docs-only PR's CI wall clock | 10m05s (#669, run 41574976294) | 4m43s (#690, run 41617426467 on `849ff87e`: the Test Suite 8 s, lint 9 s, checks 30 s, main-in-beta 5 s, semver 4m39s); after the semver exit 41 s (#701, run 41647937588: the Test Suite 9 s, lint 11 s, checks 38 s, main-in-beta 6 s, semver 10 s; checks bounds the run) |
+| A docs-only PR's `semver` job (#689) | 4m39s (#690, run 41617426467) | 10 s (#701, run 41647937588 on `2405aa25`) |
+| The queue wait | 0m02s to 1m57s (loop one closed) | 2 s (#701, run 41647937588: run creation 13:50:23Z to the earliest job's start) |
 | The nightly | 2h28m06s (run 41579707627) | unchanged by this cut |
 | A cold read | about 16 minutes; reads without cargo 3 to 7 minutes | unchanged by this cut |
-| The landing latency | 39, 46 and 64 minutes (#676, #684, #680) | (from the next docs-only PR's landing) |
+| The landing latency | 39, 46 and 64 minutes (#676, #684, #680) | 2m41s for a docs-only pull request (#701, opened 13:50:19Z, merged 13:53:00Z) |
 
 This lane measured nothing on GitHub: its own run changes `ci.yml` and plans everything.
+
+## The runner witness and the guard's revisit (#689 closed)
+
+Branch `lane/fix-689` from `origin/beta` at `c96f3c7e`. This section reads runs already on
+GitHub; it starts none.
+
+**The runner witness.** #701 (`lane/docs-loop3-after`, head `2405aa25`, merged as beta
+`6d0870af`; it changed four `docs/lanes/*.md` alone) is the earliest docs-only pull request
+after the semver exit landed (`ec14da1c`), and it landed without reading its own figure in.
+Read on 2026-11-09:
+
+- `gh run view 41647937588 --repo Calhooon/bsv-rs --json event,status,conclusion,headSha,createdAt,updatedAt,jobs`:
+  `pull_request`, success, head `2405aa25`, created 13:50:23Z, updated 13:51:04Z (41 s);
+  the Test Suite (ubuntu-latest, stable) 13:50:25Z to 13:50:34Z (9 s), `semver` 13:50:26Z
+  to 13:50:36Z (10 s), `lint` 13:50:26Z to 13:50:37Z (11 s), `checks` 13:50:25Z to
+  13:51:03Z (38 s), `main-in-beta` 13:50:25Z to 13:50:31Z (6 s); `beta-born`,
+  `semver tool cache`, `dependents` and its plan skipped. The earliest job started 2 s
+  after the run's creation.
+- `gh pr view 701 --repo Calhooon/bsv-rs --json createdAt,mergedAt,headRefOid,mergeCommit,files`:
+  opened 13:50:19Z, merged 13:53:00Z (2m41s), merge commit `6d0870af`.
+
+`semver` fell from 4m39s (#690, run 41617426467) to 10 s, and the docs-only run's wall
+clock from 4m43s to 41 s, `checks` now bounding it (its `secrets` scan runs on a docs-only
+change). The landing latency is a docs-only pull request's and is not read against the code
+landings of the before column.
+
+**The guard's revisit.** #688's fold left two scored residuals: `implies_build` and the
+constants (`tests/arch_ci_docs_only_exit.rs:86-109`) admit a condition only in a listed
+exact form (0.2), and `after_plan` (`:115-138`) lets only an `actions/checkout@` step run
+before a job's plan (0.1); the revisit's trigger was a new step. #789 (`5d7acc7f`,
+2026-11-04) added one to the Test Suite after the plan, `.github/workflows/ci.yml:364-367`
+at `c96f3c7e`:
+
+```yaml
+      - name: Make the cargo home
+        if: steps.plan.outputs.build == 'true'
+        shell: bash
+        run: mkdir -p "${CARGO_HOME:-$HOME/.cargo}"
+```
+
+Its condition is the `BUILD` form, `const BUILD: &str = "steps.plan.outputs.build ==
+'true'";` (`tests/arch_ci_docs_only_exit.rs:86`), and `implies_build` admits it as the
+`build` flag; no step was added before a plan. The guard took the step without an edit:
+`cargo test --features "full,http" --test arch_ci_docs_only_exit` is green on `c96f3c7e`,
+and every `beta` push run after it is green with the full suite (`gh run list --repo
+Calhooon/bsv-rs --workflow ci.yml --branch beta --event push`: seventeen runs from
+41872798862 on `02f14949` to 42711737851 on `c96f3c7e`, sixteen green and 41896972635 on
+`7ad38399` cancelled, superseded; on 42711737851 `Make the cargo home` succeeded and `Run every
+integration test` ran). #792 (`22f03d84`) changed only the matrix's runner. The answer is
+no change: both residuals stand at their scores (0.2, 0.1). The next trigger is the next
+step added after a plan in a condition shape the constants do not list, or any step placed
+before a plan.

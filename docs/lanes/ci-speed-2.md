@@ -218,7 +218,7 @@ cache key) open, #673 next.
 
 | Figure | Loop two closed | Loop three, rows one and two landed |
 |---|---|---|
-| A PR's CI wall clock | unchanged for a code PR (9m36s to 11m09s whole) | 5m06s whole on a cache hit (beta's push 41646365090); 6m26s on PR #691's last run (41640765441, a hit on its own ref's entry, not a miss: its log reads `full match: true`); on a miss 8m00s (beta's landing push 41641964966) and 5m55s (PR #691's opening run 41624795016). A docs-only PR: 4m43s before the semver exit (#690, run 41617426467), after measured by this record's pull request's run, read in at its landing |
+| A PR's CI wall clock | unchanged for a code PR (9m36s to 11m09s whole) | 5m06s whole on a cache hit (beta's push 41646365090); 6m26s on PR #691's last run (41640765441, a hit on its own ref's entry, not a miss: its log reads `full match: true`); on a miss 8m00s (beta's landing push 41641964966) and 5m55s (PR #691's opening run 41624795016). A docs-only PR: 4m43s before the semver exit (#690, run 41617426467), after 41 s on #701 (run 41647937588), semver 10 s |
 | The Test Suite | 9m10s whole | 3m57s whole on a hit (41646365090), against 9m10s to 9m11s at loop two's close (runs 41587646252, 41590906372) and 15m26s before loop one; 5m54s on PR #691's last run; on a miss 7m57s (41641964966) and 5m13s (41624795016) |
 | The queue wait | 0m02s to 1m57s to the Test Suite | 1 to 29 s (to the earliest job that ran 2 to 31 s) on the three runs above |
 | The nightly | 2h28m06s (run 41579707627) | unchanged until the 07:00Z complete run at the cap of six (2026-11-04) |
