@@ -47,14 +47,45 @@ impl PushDrop {
     }
 }
 
-/// The lock-before PushDrop of a wallet's `getPublicKey` answer: the key read
-/// by `PublicKey::from_hex` (its refusal unchanged) and pushed as the bytes
-/// the text decodes to by the reference's `toArray(_, 'hex')` (#545).
+/// The lock-before PushDrop of a wallet's `getPublicKey` answer, the five
+/// wallet sites' lock: the key read by [`read_wallet_key`] and locked at the
+/// reference's default position (#545). The public
+/// `PushDrop::lock_with_wallet` (#782) reads and locks through the same two
+/// steps, its read before its signature call.
 #[cfg(any(feature = "kvstore", feature = "identity", feature = "registry"))]
 pub(crate) fn wallet_key_lock(key_hex: &str, fields: Vec<Vec<u8>>) -> crate::Result<LockingScript> {
+    Ok(read_wallet_key(key_hex)?.lock(fields, LockPosition::Before))
+}
+
+/// A wallet's `getPublicKey` answer read: the key and the bytes its text
+/// decodes to.
+#[cfg(feature = "wallet")]
+pub(crate) struct WalletKey {
+    key: crate::primitives::PublicKey,
+    bytes: Vec<u8>,
+}
+
+/// Reads a wallet's key text: `PublicKey::from_hex` (its refusal unchanged),
+/// then the bytes by the reference's `toArray(_, 'hex')` (#545). The
+/// reference decodes the text at `PushDrop.ts:166-172`, before it asks any
+/// signature, so `lock_with_wallet` reads it here, before `createSignature`
+/// (#782's fold).
+#[cfg(feature = "wallet")]
+pub(crate) fn read_wallet_key(key_hex: &str) -> crate::Result<WalletKey> {
     let key = crate::primitives::PublicKey::from_hex(key_hex)?;
     let bytes = crate::primitives::ec::public_key_forms::reference_hex(key_hex)?;
-    Ok(PushDrop::new(key, fields).lock_with_key_bytes(&bytes))
+    Ok(WalletKey { key, bytes })
+}
+
+#[cfg(feature = "wallet")]
+impl WalletKey {
+    /// The PushDrop of `fields` at `position`, the key pushed as the bytes
+    /// read.
+    pub(crate) fn lock(self, fields: Vec<Vec<u8>>, position: LockPosition) -> LockingScript {
+        PushDrop::new(self.key, fields)
+            .with_position(position)
+            .lock_with_key_bytes(&self.bytes)
+    }
 }
 
 #[cfg(test)]

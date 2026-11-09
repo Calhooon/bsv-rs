@@ -12,7 +12,8 @@
 //! spending its output 0, so the contacts manager and the key-value stores
 //! reach signAction (#326); signAction answered by another wallet when one
 //! is set, the JSON substrate under wiremock (#339); getPublicKey's answer
-//! for a derived key rewritten into another form when one is set (#545).
+//! for a derived key rewritten into another form when one is set (#545);
+//! createSignature answering a set error (#782's fold).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -112,6 +113,9 @@ pub struct Counting {
     /// #545: the form getPublicKey answers a derived key in (its compressed
     /// text rewritten), the identity key unchanged.
     pub key_form: Arc<Mutex<Option<KeyForm>>>,
+    /// #782's fold: the error createSignature answers when set, after the
+    /// call is recorded.
+    pub signature_error: Arc<Mutex<Option<bsv_rs::Error>>>,
     pending: Arc<Mutex<Option<SignableTransaction>>>,
 }
 
@@ -163,6 +167,7 @@ impl Counting {
             create_mode: Arc::new(Mutex::new("")),
             sign_mode: Arc::new(Mutex::new("")),
             key_form: Arc::default(),
+            signature_error: Arc::default(),
             pending: Arc::default(),
         }
     }
@@ -322,6 +327,9 @@ macro_rules! counting {
             ) -> bsv_rs::Result<CreateSignatureResult> {
                 self.note("create_signature", o);
                 self.signature_args.lock().unwrap().push(args.clone());
+                if let Some(error) = self.signature_error.lock().unwrap().clone() {
+                    return Err(error);
+                }
                 WalletInterface::create_signature(&*self.inner, args, o).await
             }
             async fn is_authenticated(&self, o: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {

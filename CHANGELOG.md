@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: PushDrop's wallet-aware lock, PushDrop::lock_with_wallet, the sdk's PushDrop.lock (#782)
+
+`PushDrop::lock_with_wallet(wallet, originator, fields, protocol_id, key_id,
+counterparty, for_self, include_signature, position) -> Result<LockingScript>`
+(`src/script/templates/pushdrop_wallet.rs`, under the `wallet` feature) is the
+reference's `new PushDrop(wallet, originator).lock(fields, protocolID, keyID,
+counterparty, forSelf, includeSignature, lockPosition)` (`ts-stack@edf6e03`
+`packages/sdk/src/script/templates/PushDrop.ts:130-202`), in its order: the
+wallet's `getPublicKey` for the protocol, key ID, counterparty and `forSelf`
+(`:155-163`); when `includeSignature`, its `createSignature` over the fields
+concatenated (`fields.flat()`) for the same protocol, key ID and counterparty,
+no `forSelf`, the signature pushed as the last field as the wallet returned it,
+no DER read (`:173-185`); the key pushed as the wallet returned it under
+`OP_CHECKSIG` (`:166-172`, #545's rule: a compressed answer 33 bytes, an
+uncompressed or hybrid one 65); the fields minimally encoded, the
+`OP_2DROP`/`OP_DROP` tail and the lock position (`:186-201`). Both calls carry
+the originator; a wallet error is returned as it came, and no signature is
+asked after a failed key call. The reference's defaults are `for_self` false,
+`include_signature` true and `LockPosition::Before`.
+
+Why: the crate had no public wallet-aware lock. The raw `PushDrop::lock`
+pushes its `PublicKey` compressed, and #545's reading (the key as the wallet
+returned it) was crate-visible alone (`wallet_key_lock`, the five sites of the
+key-value stores, the registry, the contacts manager and the identity reveal),
+so a downstream composing `get_public_key` and `create_signature` by hand
+around the raw lock (the toolbox's permission mint, the reference's
+`WalletPermissionsManager.ts:3360-3367`, `:3453`, `:3645`) re-encoded the key.
+The raw `lock`, `new`, `with_position`, `decode` and the unlockers are
+unchanged, and the five sites' bytes do not move: `wallet_key_lock` and the
+new door read the key text through one crate-visible step (`read_wallet_key`,
+under `wallet`) and lock through another; the door reads the text right after
+`getPublicKey` answers, before it asks any signature, as the reference decodes
+it (`:166-172`) before `createSignature` (`:173-185`).
+
+Pinned by `tests/script_pushdrop_wallet_lock_782.rs` (eleven tests, names
+ending `_782`) against `tests/vectors/pushdrop_wallet_lock_782.json`, 48 cases
+recorded by `tests/support/pushdrop_wallet_lock_782.mjs` with the reference's
+own template over a `ProtoWallet` of the scalar 9 under Node v22.18.0 (two
+runs byte-identical): counterparty `self`, `anyone` and a key, `forSelf` and
+`includeSignature` both ways, both positions, six field shapes, an originator
+and none, an uncompressed key answer. RED on `e228c61a` at compile (E0599, no
+`lock_with_wallet`); on the tip three planted faults each RED (the key pushed
+compressed, `for_self` unsent, the signature over the fields reversed). The
+rule read's fold: the recording's `key_texts` (three answers that are no key,
+`zz`, `""` and `zzz`, the reference's calls and outcome) and four more tests:
+`zz` and `zzz` refused after the key call alone, as the reference throws
+`Invalid hex string` there; `""` refused here after one call where the
+reference signs and pushes it (stated); a createSignature error returned
+unwrapped. 4 of 11 RED on `d9e60780` (`left: ["get_public_key",
+"create_signature"]`, `right: ["get_public_key"]`), the unwrapped error green
+on both.
+
+Migration: none, purely additive (one new public item,
+`PushDrop::lock_with_wallet`). A hand composition of `get_public_key`,
+`create_signature` over `fields.concat()` and `PushDrop::new(key, fields).lock()`
+becomes one call:
+`PushDrop::lock_with_wallet(&wallet, originator, fields, protocol, key_id, counterparty, for_self, true, LockPosition::Before).await?`
+(the toolbox's permission mint: `Counterparty::Self_`, `for_self` true).
+
+### Notes: cross-SDK parity (#782)
+
+Two residues against `ts-stack@edf6e03`, stated. (a) The reference decodes the
+wallet's key text as hex and pushes it unparsed as a key (`PushDrop.ts:166-172`,
+`toArray(publicKey, 'hex')` under the opcode `publicKey.length / 2`), before it
+asks the signature (`:173-185`); this door reads it with `PublicKey::from_hex`
+at the same point and refuses a text that is no key in that parser's words, as
+the crate's five wallet sites do, after the key call alone. A text that is not
+hex (`zz`, `zzz`) is refused by both before any signature is asked, the
+reference in `Invalid hex string` (`assertValidHex`, `primitives/hex.ts:6-17`,
+through `hexToUint8Array`, `utils.ts:126-128`), this door in
+`PublicKey::from_hex`'s words: the words differ. A valid-hex text that is no
+key (`""`, which `assertValidHex` admits at `hex.ts:12`; a `05` tag) the
+reference pushes and signs, this door refuses after one call
+(`a_wallet_answer_that_is_no_key_is_refused_782`,
+`an_empty_key_text_is_refused_here_where_the_reference_signs_and_pushes_it_stated_782`).
+A createSignature error is returned unwrapped as the reference's rejection is,
+where go-sdk wraps it (`pushdrop.go:158`, `fmt.Errorf("error creating wallet
+signature for lock: %w", err)`; `a_signature_error_is_returned_as_the_wallet_gave_it_782`). (b) #545's odd-length
+opcode is inherited: for an odd-length key text the reference's opcode is
+truncated to `0x20` before 33 bytes, written here as the 33 bytes' own `0x21`.
+go-sdk@2ca481c asks the wallet in the same order but pushes the key
+re-encoded compressed (`transaction/template/pushdrop/pushdrop.go:136`,
+`pub.PublicKey.Compressed()`) and the signature re-serialised (`:160`,
+`sig.Signature.Serialize()`), so a wallet answering an uncompressed key or a
+signature in another DER form writes other bytes there; theirs, filing
+pending.
+
 ### Docs: the designs for phases 2 to 5, one per issue (#90 to #100)
 
 `docs/design/`: eleven design documents (the interpreter's throughput, the streaming reader's memory bound, signing and verification throughput, merkle verification and the tracker's header window, the HTTP JSON substrate, ARC batches, the wasm32 budgets, the sibling's harness in CI, the chaos suite, release evidence, the canary and re-pin policy) and an index with the owner's questions. Each gives the exit test, today's state by `path:line`, the ranked steps with what stays identical and the proof each returns, and the slicing into lanes. Proposals only: no source, fixture or public shape changes.
