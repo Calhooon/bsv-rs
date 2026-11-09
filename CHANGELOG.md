@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the SLAP discovery admits a host only from a 1-satoshi output whose txid hint agrees (#786)
+
+`LookupResolver::find_competent_hosts` read every output of a tracker's
+answer through `parse_slap_token` (`src/overlay/lookup_resolver.rs`), which
+authenticated the advertisement and compared the service but read neither
+the selected output's value nor the output's `txid` hint. The reference's
+`extractHostsFromAnswer` (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResolver.ts:2194-2216`) skips an output
+whose hint is present and, lower-cased, is not the BEEF subject's txid
+(`:2201`), and one whose selected output does not carry exactly 1 satoshi
+(`:2203`), each a `continue`: no throw, the tracker's other outputs still
+read, the tracker a success (its call at `:1974` returned). So a host
+advertised from an output of 0 or 2 satoshis, or under a hint naming another
+transaction, was admitted here and asked by `query`, where the reference
+never asks it. `parse_slap_token` now reads in the reference's order: the
+BEEF's subject, the hint (`OutputListItem::txid`, #735) when present, the
+output at the index and its `satoshis` (`Some(1)` alone), then the token and
+the service as before; a refusal is the skip it always was, the tracker's
+accounting unchanged. An empty domain cannot be admitted, as at `:2208`: the
+admin token's URI check refuses it (`admin_token_validation.rs`,
+`advertisement_uri`).
+
+Pinned by `tests/lookup_slap_admission_786.rs` (seven tests on a scripted
+facilitator and `.invalid` trackers): 0 and 2 satoshis admit no host; a
+tracker naming one host at 1 satoshi and one at 2 admits the one and is
+recorded a success, not backed off; a disagreeing hint admits no host; an
+upper-case agreeing hint and an absent hint admit the host; and the seven
+cases of `tests/vectors/lookup_slap_admission_786.json` (recorded by
+`tests/support/lookup_slap_admission_786.mjs`: the reference's own
+`LookupResolver.query` on a scripted facilitator, its advertisements written
+by its `OverlayAdminTokenTemplate`, Node v22.18.0) served here to the hosts
+the reference asked. 5 of 7 RED on a scratch copy of the tip with the
+reader's change removed (the host admitted), the two agreeing-hint controls
+green.
+
+Migration: a host advertised from an output of a value other than 1 satoshi,
+or served under a `txid` hint that is not its BEEF's subject, is no longer
+discovered. The reference's advertisers write 1 satoshi
+(`WalletAdvertiser.ts`' `AD_TOKEN_VALUE`), as `bsv-overlay-cloudflare`'s does.
+
+### Notes: cross-SDK parity (#786)
+
+Ours: the reference's skip followed on both checks (`LookupResolver.ts:2201`,
+`:2203` at `edf6e03`), closing the SLAP half of #735's stated residue; the
+owner's word on #735 (a disagreeing hint read and counted) is the identity
+evidence check's and does not reach this site, which admits a host and
+proves no subject. A binary aggregated answer's outputs each carry the
+Atomic BEEF of their outpoint's txid and that txid as their hint since
+#735's fold (`src/overlay/facilitators/binary_answer.rs`), so the hint check
+skips none of them; read, not changed. Theirs: go-sdk at `2ca481c`
+(`overlay/lookup/resolver.go:189-204`) reads neither the value nor a hint at
+this site, not filed. Stated, not built: the SHIP sibling has the same two
+lines in the reference (`SHIPBroadcaster.ts:771`, `:773`) and neither here
+(`src/overlay/topic_broadcaster.rs`), a row of its own.
+
 ### Added: PushDrop's wallet-aware lock, PushDrop::lock_with_wallet, the sdk's PushDrop.lock (#782)
 
 `PushDrop::lock_with_wallet(wallet, originator, fields, protocol_id, key_id,

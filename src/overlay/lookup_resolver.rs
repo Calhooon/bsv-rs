@@ -374,6 +374,8 @@ impl LookupResolver {
                 Ok(LookupAnswer::OutputList { outputs }) => {
                     self.reputation_tracker.record_success(&tracker, elapsed);
 
+                    // A refused output is skipped, the tracker still a
+                    // success, as the reference's `continue` (`:2197-2213`).
                     for output in outputs {
                         if let Ok(domain) = self.parse_slap_token(&output, service) {
                             hosts.insert(domain);
@@ -403,13 +405,31 @@ impl LookupResolver {
         let tx = Transaction::from_beef(&output.beef, None)
             .map_err(|e| Error::OverlayError(format!("Failed to parse BEEF: {}", e)))?;
 
-        // Get the output's locking script
-        let script = tx
+        // A hint that, lower-cased, is not the subject's txid skips the
+        // output before it is read, as the reference's does
+        // (`LookupResolver.ts:2201`, #786); an absent hint judges nothing.
+        if let Some(hint) = &output.txid {
+            let txid = tx.id();
+            if hint.to_ascii_lowercase() != txid {
+                return Err(Error::OverlayError(format!(
+                    "SLAP output txid hint {hint} is not its BEEF's subject {txid}"
+                )));
+            }
+        }
+
+        // The output at the index, admitted only at exactly 1 satoshi
+        // (`LookupResolver.ts:2202-2203`, #786): any other value skips it.
+        let selected = tx
             .outputs
             .get(output.output_index as usize)
-            .ok_or_else(|| Error::OverlayError("Output index out of bounds".into()))?
-            .locking_script
-            .clone();
+            .ok_or_else(|| Error::OverlayError("Output index out of bounds".into()))?;
+        if selected.satoshis != Some(1) {
+            return Err(Error::OverlayError(format!(
+                "SLAP advertisement carries {:?} satoshis, not 1",
+                selected.satoshis
+            )));
+        }
+        let script = selected.locking_script.clone();
 
         // Decode and authenticate as the reference's resolver does
         // (`LookupResolver.ts:2206`, #544)
