@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: an offset-0 proof under 100 blocks deep is refused by `Transaction::verify`, as the reference does (#734)
+
+From the #730 lane's recording (2026-11-04 02:1xZ), the keeper's word of
+02:2xZ: follow the reference where the verify door is this crate's. The
+reference's `MerklePath.verify` (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/MerklePath.ts:476-500`) computes the root, reads
+the txid's level-0 offset (`indexOf`, `:327-333`) and, at offset 0 alone (a
+coinbase's place; a transaction alone in its block, the lone leaf, is one
+case), asks the tracker's `currentHeight` and answers `false` when
+`blockHeight + 100 > height`, before the root is asked; `Transaction.verify`
+throws `Invalid merkle path for transaction <txid>` on that `false`
+(`#completeVerificationFromMerklePath`, `Transaction.ts:1298-1316`) for every
+proven transaction it reaches, the subject included (`#verifySnapshot`,
+`:1747-1771`). This crate's `proven` (`src/transaction/verify.rs`) asked the
+root alone, so a proof 0 to 99 blocks deep at offset 0 verified here and not
+there. New, additive: `MerklePath::verify(txid, tracker)`, the reference's
+method (the root, the offset, at offset 0 the height with `u64` arithmetic, no
+overflow at `u32::MAX`, then `is_valid_root_for_height`), which `proven` now
+calls behind all six doors of `Transaction::verify`; the refusal keeps its
+words, a tracker's error its class (`Chain tracker error: ...`, a transport
+fault `Error::TransportFault`). `Beef::verify_valid` and the streaming reader
+do not move (the reference's `Beef.verify`, `Beef.ts:1020-1035`, has no depth
+rule). Pinned by `tests/transaction_coinbase_depth_734.rs` against
+`tests/vectors/coinbase_depth_734.json` (`tests/support/coinbase_depth_734.mjs`,
+Node v22.18.0, 56 cells: verdicts or words and the tracker's calls in order),
+5 of 7 RED on `e228c61a`; the strength read's fold adds 24 cells of a tip
+below the proof (80 in all).
+
+The sites that verified a spend of `MerklePath::from_coinbase_txid(.., 800_000)`
+against a tracker at 800,000 (or 800,010) keep their verdicts with the tracker
+100 or more blocks above the proof, where no era is read from that height: the
+`transaction` and `beef_spv` examples (README pasted),
+`benches/transaction_sign_verify.rs`, `tests/support/fixtures/binary.rs` (its
+recipe guard's two hashes; no fixture byte moves), two `src/transaction/beef.rs`
+unit tests and ten `tests/` files (`docs/lanes/fix-734.md` lists them).
+
+Migration: a `ChainTracker` whose `current_height` is a placeholder, or under a
+proof's block height plus 100, now refuses every proof whose txid sits at
+level-0 offset 0 (`Err(TransactionError("Invalid merkle path for transaction
+<txid>"))`); answer the real tip, or set a mock's height 100 above its proofs.
+`current_height` is now asked by `Transaction::verify` (at offset 0 alone).
+A test or a caller that verifies an offset-0 (lone-leaf or coinbase) proof
+against a tracker fewer than 100 blocks above the proof now reads `false`, a
+tip below the proof included (a placeholder 0 or 1, pinned since the strength
+read's fold by `a_tip_below_the_proof_refuses_an_offset_0_proof_734`, 24 cells
+more, 80 in all); the overlay engine's
+`crates/overlay-engine/tests/script_verification.rs:785` (a funding proof 10
+blocks under its tracker) is such a test and sets its tracker to the proof's
+height plus 100 when it takes this release; no production door of the overlay
+engine, the toolbox or the CLI calls `Transaction::verify` with a tracker (the
+strength read's table).
+
+### Notes: cross-SDK parity (#734)
+
+The rule is the reference's, read from the offset; two cells where it is
+stricter than the node are followed and stated, not silent. The node refuses a
+coinbase spend when `nSpendHeight - coinHeight < COINBASE_MATURITY` (100;
+bitcoin-sv v1.2.3 `validation.cpp:2618`, `consensus.h:75`), the spend height
+the tip plus one: at a tip of `h + 99` the node admits the spend in the next
+block, the reference and `Transaction::verify` refuse it. And a proven
+offset-0 transaction no input spends (the subject itself) is refused under
+depth, where the node has no rule. The streaming reader keeps the node's
+reading, a coinbase by its null input against the mining tip
+(`beef_stream/spends.rs`, `tip + 1 - height < 100`), so on one BEEF the two
+doors part at `h + 99` for a coinbase (a null input), and at every tip under
+`h + 100` for an offset-0 transaction with a non-null input, which the stream
+does not read as a coinbase, and for a proven offset-0 subject no input spends
+(the second pinned by
+`the_stream_keeps_its_verdict_on_the_same_beef_at_the_four_tips_734`, whose
+parent carries a non-null input: the stream valid at `h` and `h + 99`, where
+`Transaction::verify` refuses both; a block's offset 0 is its coinbase, so no
+honest tracker carries that root).
+go-sdk@2ca481c's `MerklePath.Verify` has no depth rule
+(`transaction/merklepath.go:423-429`); its `spv.Verify` applies the node's
+figure to a coinbase source by its inputs (`spv/verify.go:674-714`,
+`coinbaseMature`). An upstream filing is the keeper's.
+
 ### Fixed: the SLAP discovery admits a host only from a 1-satoshi output whose txid hint agrees (#786)
 
 `LookupResolver::find_competent_hosts` read every output of a tracker's

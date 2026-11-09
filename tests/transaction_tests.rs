@@ -1685,7 +1685,7 @@ mod transaction_tests {
             spend_tx.sign().await.expect("sign should work");
 
             // Verify with AlwaysValidChainTracker
-            let tracker = AlwaysValidChainTracker::new(800_000);
+            let tracker = AlwaysValidChainTracker::new(800_100);
             let result = spend_tx.verify(&tracker, None, None).await;
             assert!(
                 result.is_ok(),
@@ -1727,7 +1727,7 @@ mod transaction_tests {
 
             spend_tx.sign().await.expect("sign should work");
 
-            let tracker = AlwaysValidChainTracker::new(800_000);
+            let tracker = AlwaysValidChainTracker::new(800_100);
             let fee_model = SatoshisPerKilobyte::new(100); // 100 sat/KB
 
             let result = spend_tx.verify(&tracker, Some(&fee_model), None).await;
@@ -1770,7 +1770,7 @@ mod transaction_tests {
 
             spend_tx.sign().await.expect("sign should work");
 
-            let tracker = AlwaysValidChainTracker::new(800_000);
+            let tracker = AlwaysValidChainTracker::new(800_100);
             // Use a very high fee rate: 100,000 sat/KB (requires ~20 sats for a ~200 byte tx)
             let fee_model = SatoshisPerKilobyte::new(100_000);
 

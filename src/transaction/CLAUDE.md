@@ -36,13 +36,14 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
-| `verify.rs` | The existing SPV graph walk and chain-parameter variants, sharing fee/value/proof/resource behavior and the per-transaction sighash cache; singular work-budget methods keep their signatures, plural `verify_with_work_budgets` / `verify_with_chain_params_and_work_budgets` accept `WorkBudget` and charge each transaction's inputs in order (#519) |
+| `verify.rs` | The existing SPV graph walk and chain-parameter variants, sharing fee/value/proof/resource behavior and the per-transaction sighash cache; singular work-budget methods keep their signatures, plural `verify_with_work_budgets` / `verify_with_chain_params_and_work_budgets` accept `WorkBudget` and charge each transaction's inputs in order (#519); a proven transaction is judged by `MerklePath::verify`, an offset-0 proof under 100 blocks deep refused in `Invalid merkle path for transaction <txid>` as the reference refuses it (`MerklePath.ts:476-500`, #734) |
 | `work_budget.rs` | `#[non_exhaustive] WorkBudget` with readable public `per_input: Option<u64>` and `per_transaction: Option<u64>` fields, `new()` and derived `Default` both unbounded, const `with_per_input` / `with_per_transaction` setters; common input accounting and the public transaction-total `charge(self, &mut total, input, work)`, the rule's one implementation for the verifiers and a host that judges inputs itself (#519, #527, #567) |
 | `verification_flags.rs` | Checks tip + 1, then calls `ChainParams::word_for_input(Word::Standard, ...)`; the public resolver owns the no-tip latest-era rule and returns `NotJudgedCause`, never a script failure (#452, #520) |
 | `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |
 | `merkle_path_legal.rs` | The constructor's legal offsets per level above 0, kept in the order level 0's leaves name them, and the off-path refusal in the reference's words with that list (`MerklePath.ts:220-235`, #631); `rooted`, the root check's end: a level 0 of duplicates alone refused as `Transaction ID is undefined` (`:241-263`, `:342-343`, #641); `no_levels`, the constructors' refusal of a path with no levels (`:198-200`, #649); `MerklePath::level0`, level 0's leaves or none, the one way every walk reads level 0 (#649) |
+| `merkle_path_verify.rs` | `MerklePath::verify`, the reference's (`MerklePath.ts:476-500`): the root, then at level-0 offset 0 alone the tracker's `current_height`, `block_height + 100 > height` (in `u64`) answering `Ok(false)` before the root is asked, else `is_valid_root_for_height`; `Transaction::verify`'s proof check (#734) |
 | `merkle_path_603_tests.rs` | #603's witnesses for `MerklePath`'s constructor rules, `combine` and `trim` (test-only, wired in `mod.rs`): the reference's recordings in `tests/vectors/merkle_path_603.json` over BUMPs of the sibling's `corpus/wire/bump.jsonl` and the conformance corpus |
 | `beef.rs` | `Beef` (BRC-62/95/96): the type, the public readers (over `beef/collect.rs`), `verify_structure`, sorting, merging, the writers (`to_binary`, the atomic closure), logging |
 | `beef/collect.rs` | The whole-BEEF reader: the streaming decoder's collect mode collected into a `Beef`, with the stream's judge beside it (#86) |
@@ -379,6 +380,7 @@ impl MerklePath {
     pub fn from_coinbase_txid(txid: &str, height: u32) -> Self  // Single-tx block
     pub fn to_hex/to_binary/to_writer(...)                      // Serialization
     pub fn compute_root(&self, txid: Option<&str>) -> Result<String>  // One cached walk (RootWalker)
+    pub async fn verify(&self, txid: &str, tracker: &dyn ChainTracker) -> Result<bool>  // The reference's: at level-0 offset 0 the height asked first, under 100 deep false (#734)
     pub fn contains(&self, txid: &str) -> bool
     pub fn txids(&self) -> Vec<String>
     pub fn combine(&mut self, other: &MerklePath) -> Result<()>  // Same height/root required

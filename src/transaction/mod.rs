@@ -98,6 +98,7 @@ pub mod merkle_path;
 #[cfg(test)]
 mod merkle_path_603_tests;
 mod merkle_path_legal;
+mod merkle_path_verify;
 pub mod output;
 #[allow(clippy::module_inception)]
 pub mod transaction;

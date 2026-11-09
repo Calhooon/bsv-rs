@@ -1,0 +1,1296 @@
+{
+  "description": "#734: an offset-0 proof under 100 blocks deep (MerklePath.ts:476-500 at ts-stack@edf6e03); each cell the verdict or thrown words and the tracker calls in order",
+  "recorded_with": "node v22.18.0, @bsv/sdk at ts-stack@edf6e03",
+  "parent": {
+    "txid": "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+    "raw": "0100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000"
+  },
+  "sibling": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "bumps": {
+    "lone_800000": "fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb",
+    "left_800000": "fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "right_800000": "fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb",
+    "lone_4294967295": "feffffffff010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb"
+  },
+  "cells": [
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800000,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800099,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "right",
+      "block_height": 800000,
+      "tip": 800101,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c0001020000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "8755868fd76cc492023b0ff3b74179c6f9ddb075a44cdc4ae532e42d0aea916a",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": false,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": false,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": false,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ],
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 800100,
+      "root_known": false,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": false,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 4294967295,
+      "tip": 4294967295,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 4294967295,
+      "tip": 4294967295,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 4294967295,
+      "tip": 4294967295,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 4294967295,
+      "tip": 4294967295,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01feffffffff010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          4294967295
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "lone",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010100023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 0,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 1,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "merklePath",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "ok": false,
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "child",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "parent",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "err": "Invalid merkle path for transaction bbab40158824f5af9ba7006e0c51ce22064fb8fd7a6ef22575e56a695c50cf3c",
+      "calls": [
+        [
+          "currentHeight"
+        ]
+      ]
+    },
+    {
+      "path": "left",
+      "block_height": 800000,
+      "tip": 799999,
+      "root_known": true,
+      "door": "beef",
+      "child_hex": "01000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff018403000000000000015100000000",
+      "beef_hex": "0100beef01fe00350c00010200023ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb0100bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb020100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000018700000000010001000000013ccf505c696ae57525f26e7afdb84f0622ce510c6e00a79baff524881540abbb00000000025151ffffffff01840300000000000001510000000000",
+      "ok": true,
+      "calls": [
+        [
+          "isValidRootForHeight",
+          "bf9bd8047f5115200d4b00adfbdb48eb5ce8c60a1e0a678d4b3dd1a4f840f8b2",
+          800000
+        ]
+      ]
+    }
+  ]
+}

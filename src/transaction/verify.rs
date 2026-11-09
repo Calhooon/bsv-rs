@@ -213,11 +213,9 @@ async fn proven(tx: &Transaction, txid: &str, tracker: &dyn ChainTracker) -> Res
     let Some(path) = &tx.merkle_path else {
         return Ok(false);
     };
-    let root = path.compute_root(Some(txid))?;
-    if tracker
-        .is_valid_root_for_height(&root, path.block_height)
-        .await?
-    {
+    // The reference's `MerklePath.verify` (`MerklePath.ts:476-500`, #734): an
+    // offset-0 proof under 100 blocks deep is not proven.
+    if path.verify(txid, tracker).await? {
         Ok(true)
     } else {
         Err(Error::TransactionError(format!(

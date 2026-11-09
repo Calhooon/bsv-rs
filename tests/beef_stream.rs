@@ -2081,7 +2081,7 @@ fn mined(n_inputs: usize, outputs: &[u64]) -> (Transaction, MockChainTracker) {
     }
     let id = tx.id();
     tx.merkle_path = Some(MerklePath::from_coinbase_txid(&id, 800_000));
-    let mut tracker = MockChainTracker::new(800_000);
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, id);
     (tx, tracker)
 }
@@ -2143,7 +2143,7 @@ fn verify_refuses_a_transaction_with_no_output() {
 }
 
 fn tracker_for(tx: &Transaction) -> MockChainTracker {
-    let mut tracker = MockChainTracker::new(800_000);
+    let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, tx.id());
     tracker
 }
