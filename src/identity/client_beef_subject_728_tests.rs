@@ -34,6 +34,7 @@ async fn the_parsers_skip_each_728_beef_as_the_reference_728() {
             beef: crate::primitives::from_hex(case["beef"].as_str().unwrap()).unwrap(),
             output_index: case["output_index"].as_u64().unwrap() as u32,
             context: None,
+            txid: None,
         };
         let reference = case["outcome"] == "read";
         let expected = reference;

@@ -156,6 +156,7 @@ fn client(outputs: Vec<(Vec<u8>, u32)>) -> IdentityClient<ProtoWallet> {
             beef,
             output_index,
             context: None,
+            txid: None,
         })
         .collect();
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {

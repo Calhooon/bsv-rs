@@ -515,6 +515,7 @@ async fn the_revocation_retries_a_double_spend_answered_over_the_json_substrate(
                 beef: lookup,
                 output_index: 0,
                 context: None,
+                txid: None,
             }],
         })) as Arc<dyn OverlayLookupFacilitator>),
         slap_trackers: Some(vec![]),

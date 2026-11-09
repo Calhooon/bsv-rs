@@ -63,6 +63,7 @@ pub fn output_of(script: LockingScript) -> OutputListItem {
         beef: beef.to_binary(),
         output_index: 0,
         context: None,
+        txid: None,
     }
 }
 

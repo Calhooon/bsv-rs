@@ -10,6 +10,9 @@ use crate::{Error, Result};
 use async_trait::async_trait;
 use serde_json::value::RawValue;
 
+#[cfg(feature = "http")]
+mod binary_answer;
+
 /// Facilitator for overlay lookup operations.
 ///
 /// Implementations send lookup queries to overlay service hosts and
@@ -432,19 +435,24 @@ fn parse_lookup_output(index: usize, item: &serde_json::Value) -> Result<OutputL
                 })?,
         ),
     };
+    // A present `txid` kept as given (`:356`, #735); not 64 hex digits, the
+    // whole answer refused, as `normalizeLookupOutput` refuses it (`:347-350`)
     let txid_ok = |t: &str| t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit());
-    if item
-        .get("txid")
-        .is_some_and(|v| !v.as_str().is_some_and(txid_ok))
-    {
-        return Err(malformed(format_args!(
-            "output {index} txid is not 64 hex digits"
-        )));
-    }
+    let txid = match item.get("txid") {
+        None => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .filter(|t| txid_ok(t))
+                .ok_or_else(|| malformed(format_args!("output {index} txid is not 64 hex digits")))?
+                .to_string(),
+        ),
+    };
     Ok(OutputListItem {
         beef,
         output_index,
         context,
+        txid,
     })
 }
 
@@ -473,7 +481,10 @@ fn lookup_output_index(value: &serde_json::Value) -> Option<u32> {
     Some(n as u32)
 }
 
-/// Parse binary lookup response (compact outpoints + BEEF format).
+/// Parse binary lookup response (compact outpoints + BEEF format): the
+/// outpoints, then one BEEF, each output carrying the Atomic BEEF of its
+/// outpoint's txid and that txid as its hint
+/// ([`binary_answer::atomic_outputs`], `LookupResolver.ts:876-936`).
 #[cfg(feature = "http")]
 fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
     use crate::primitives::{bounded_capacity, to_hex, Reader};
@@ -523,25 +534,9 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
         outpoints.push((txid, output_index, context));
     }
 
-    // Remaining bytes are BEEF
-    let beef_data = reader.read_remaining().to_vec();
-
-    // Parse BEEF and create OutputListItems for each outpoint
-    let outputs = outpoints
-        .into_iter()
-        .map(|(_txid, output_index, context)| {
-            // For each outpoint, we need to extract the relevant tx from BEEF
-            // and create a standalone BEEF for it
-            // For now, we return the full BEEF for each output
-            // A more efficient implementation would parse the BEEF once
-            // and extract individual transaction BEEFs
-            OutputListItem {
-                beef: beef_data.clone(),
-                output_index,
-                context,
-            }
-        })
-        .collect();
+    // The rest is the BEEF: parsed once, each output carrying the Atomic
+    // BEEF of its own outpoint's txid (`:900-936`; #735's fold)
+    let outputs = binary_answer::atomic_outputs(outpoints, reader.read_remaining())?;
 
     Ok(LookupAnswer::OutputList { outputs })
 }
