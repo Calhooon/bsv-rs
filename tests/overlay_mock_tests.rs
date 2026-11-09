@@ -290,6 +290,7 @@ async fn test_lookup_resolver_with_mock() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);
@@ -333,6 +334,7 @@ async fn test_lookup_resolver_empty_result() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);
@@ -376,6 +378,7 @@ async fn test_lookup_resolver_find_competent_hosts_cached() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);
@@ -428,6 +431,7 @@ async fn test_topic_broadcaster_with_mock_local() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
     let resolver = Arc::new(LookupResolver::new(resolver_config));
 
@@ -486,6 +490,7 @@ async fn test_topic_broadcaster_all_reject() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
     let resolver = Arc::new(LookupResolver::new(resolver_config));
 
@@ -547,6 +552,7 @@ async fn test_request_coalescing() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);
@@ -612,6 +618,7 @@ async fn test_lookup_resolver_multiple_hosts() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);
@@ -660,6 +667,7 @@ async fn test_lookup_resolver_records_reputation() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);
@@ -699,6 +707,7 @@ async fn test_lookup_resolver_all_hosts_fail() {
         hosts_cache_max_entries: 128,
         tx_memo_ttl_ms: 60_000,
         tx_memo_max_entries: 100,
+        limits: Default::default(),
     };
 
     let resolver = LookupResolver::new(config);

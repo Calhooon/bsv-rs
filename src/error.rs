@@ -456,6 +456,16 @@ pub enum Error {
     #[error("overlay error: {0}")]
     OverlayError(String),
 
+    /// A lookup client limit was reached, the reference's
+    /// `LookupResourceLimitError` in its words (`ts-stack@edf6e03`
+    /// `packages/sdk/src/overlay-tools/LookupResources.ts:29-34`), the
+    /// limit named as the reference names it (`maxResponseBytes`,
+    /// `maxOutputs`, `maxTotalBytes`). Neutral for host reputation: no
+    /// failure is recorded for the host that answered (#775).
+    #[cfg(feature = "overlay")]
+    #[error("Lookup resource limit reached: {0}")]
+    OverlayResourceLimit(String),
+
     /// No hosts found for service.
     #[cfg(feature = "overlay")]
     #[error("no hosts found for service: {0}")]

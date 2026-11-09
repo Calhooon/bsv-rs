@@ -7,6 +7,225 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the lookup response bounded at 32 MiB and an output list at 4096 on both paths, neutral for host reputation; the discovered hosts in the trackers' order within the reference's bounds (#775, #785)
+
+From the rule read of PR #774 (#775) and the rule and strength reads of PR
+#783 (#785).
+
+**The bounds (#775).** `HttpsOverlayLookupFacilitator` read a lookup response
+with reqwest's `.json()` and `.bytes()`, unbounded, and neither path counted an
+answer's outputs: an allocation a hostile host chose (on wasm32 a failed
+allocation is an abort, rule 5), and a 4,097-output answer was its host's
+success. The reference bounds both (`ts-stack@edf6e03`
+`packages/sdk/src/overlay-tools/LookupResources.ts:16-27`,
+`DEFAULT_LOOKUP_LIMITS`):
+
+| Limit | Default | Where the reference applies it | Here |
+|---|---|---|---|
+| `maxResponseBytes` | 32 MiB | the body as read (`LookupResponseReader.ts:150-214`: a declared length before the read, then chunk by chunk), the binary path's extracted outputs (`LookupResolver.ts:929-932`), a returned answer's BEEF and context bytes (`:2351-2364`) | `LookupLimits::max_response_bytes` |
+| `maxOutputs` | 4096 | the JSON answer (`:859-860`), the binary outpoint count (`:877-883`), a returned answer (`:2366-2375`) | `LookupLimits::max_outputs` |
+| `maxTotalBytes` | 64 MiB | a query's hosts together (`:1624-1631`, retained `:1734-1743`), a discovery's trackers together (`LookupDiscovery.ts:21-29`) | `LookupLimits::max_total_bytes` |
+| `maxHosts` | 256 | the discovered list (`:2006-2009`), a query's admission (`:1842-1849`) | `LookupLimits::max_hosts` |
+| `maxHostsPerTracker` | 64 | a tracker's share (`LookupDiscovery.ts:62-78,105-108`) | `LookupLimits::max_hosts_per_tracker` |
+
+A limit reached is the new `Error::OverlayResourceLimit(<limit>)`, the
+reference's `LookupResourceLimitError` in its words, `Lookup resource limit
+reached: maxResponseBytes` (`LookupResources.ts:29-34`), and is neutral for
+host reputation on the host path and the tracker path: the resolver records
+neither a success nor a failure (`LookupResolver.ts:2415`, the tracked call
+rethrowing it before `recordFailure`; `:1764-1767`). The facilitator reads the
+body with `Response::chunk` under the bound (a `Content-Length` past it refused
+before any read; a body with no length stopped at the chunk that passes it),
+charges each chunk to the request's budget, and counts the outputs at the
+parse. The resolver hands each request its limits through the new provided
+trait method `OverlayLookupFacilitator::lookup_bounded` (the reference's
+`options?: LookupRequestOptions`, `:740-746`), whose default ignores them and
+calls `lookup_ordered`, and checks every returned answer itself, so a custom
+facilitator is bounded too, after its answer is in memory.
+
+**The order (#785).** `find_competent_hosts` gathered the advertised hosts
+into a `HashSet` and returned its order, unbounded, so the hosts asked and
+cached differed from run to run. It now takes the trackers as they answer,
+each answer's hosts in its own order, deduplicated and cut to the tracker's
+share (the lesser of `maxHostsPerTracker` and `maxHosts` divided by the
+trackers asked), the whole deduplicated by earliest occurrence and cut to
+`maxHosts`; the cache holds that list and `query` admits the discovered (or
+overriding) hosts and then the additional ones the same way.
+
+Additions (semver, rule 9): `overlay::{LookupLimits, LookupRequestOptions,
+LookupByteBudget}` and the five `DEFAULT_LOOKUP_MAX_*` constants,
+`Error::OverlayResourceLimit`, `OverlayLookupFacilitator::lookup_bounded`
+(provided), and the public field `LookupResolverConfig::limits`.
+**Migration:** a `LookupResolverConfig { .. }` literal that names every field
+adds `limits: LookupLimits::default()` (or `..Default::default()`); one that
+ends in `..Default::default()` is unchanged. This crate's own
+`tests/overlay_mock_tests.rs` had nine such literals; none was found in
+`bsv-wallet-cli`, `bsv-wallet-toolbox-rs`, `bsv-overlay-cloudflare` or
+`rust-message-box` (grep of their sources, 2026-11-09). A caller matching a
+lookup failure on `Error::OverlayError` does not see a limit: it is its own
+variant. An error text moved on the JSON path (the strength read of PR #801):
+the body is read before it is parsed, so a body that is no JSON is `Failed to
+parse JSON: <serde_json's words>` (`expected value at line 1 column 1`), where
+it was reqwest's `Failed to parse JSON: error decoding response body`, and a
+body whose read fails is `Failed to read response: <reqwest's words>` on both
+paths, the binary path's words until now; a host's `last_error` in the
+reputation record carries the new words. `find_competent_hosts` moved to
+`src/overlay/lookup_resolver/discovery.rs`, the limits live in
+`src/overlay/lookup_limits.rs`; no public path moved.
+
+Pinned by `tests/lookup_limits_775.rs` (9 tests at the default limits, each
+RED on `e228c61a` on its assertion: `left: Ok("4097 outputs read")`, `left:
+Some((0, 1))` where the record is unchanged, `left: Err("overlay error: Failed
+to parse JSON: error decoding response body")` for the declared 32 MiB + 1,
+the hosts in a `HashSet`'s order) and `tests/lookup_limits_configured_775.rs`
+(13 tests at limits a host sets; compile-RED on the base, the API absent).
+`tests/lookup_discovery_779.rs` no longer sorts before it compares. #768's
+parity note's two residues (the response bound and `maxOutputs`) are closed by
+this row.
+
+**The fold (2026-11-09).** Rebased onto #735's per-txid Atomic BEEF
+(`binary_answer::atomic_outputs`): on the binary path `maxResponseBytes`
+counts each outpoint's Atomic BEEF and context, as `extractedBytes` does
+(`LookupResolver.ts:929-932`), after the 64 MiB bound on the generated
+bytes at the outpoint that crosses both, as the reference orders them; the
+lane's count of the whole aggregated BEEF once per outpoint is gone. A
+custom facilitator's answer is read as the reference reads it (the
+captain's ruling of 2026-11-09 on the lane's question: conform): the
+resolver runs the normalizer's constant 4096 (`MAX_LOOKUP_OUTPUTS`, `:254`,
+`:395`) before the tracked check (`:2385-2392`), so 4,097 outputs are
+`Malformed lookup response: an output list of 4097 outputs, past 4096` and
+the host's (or the tracker's) failure, and the HTTPS facilitator's JSON
+parse runs it after its configured count (`:859-866`): a `max_outputs`
+raised past 4096 admits no larger answer, as in the reference. Two older
+cells of the binary reader (from #735's reads): an output index past
+`0xffffffff`, cut to its low 32 bits until now, refuses the whole answer in
+the reference's words, `Overlay output index is out of range.` (`:888`), and
+a context past 1 MiB, read whole until now, refuses it in `Overlay output
+context exceeds the maximum permitted size.` (`:889-891`), checked before
+the context is read, the JSON reader's `MAX_LOOKUP_CONTEXT_BYTES` shared;
+the outpoint count is compared with `max_outputs` before its cast to
+`usize`.
+
+The class, stated once: in the reference only `maxResponseBytes`
+(`:930-932`, the body as read) and `maxOutputs` (`:859-860`, `:877-883`,
+`:2366-2375`), with the query's and discovery's `maxTotalBytes`, are
+`LookupResourceLimitError`, neutral for host reputation; the normalizer's
+count, the index range, the context bound, a BEEF that does not parse
+(`:900`), an outpoint whose txid the BEEF lacks and the 64 MiB of generated
+Atomic BEEF (`:926`) are plain `Error`s recorded against the host
+(`throwTrackedLookupFailure`, `:2408-2419`), and so they are here
+(`Error::OverlayError`).
+
+Pinned by six tests RED on the lane's rebased commit `4046c534` in a
+scratch copy with its own target: in `tests/lookup_limits_775.rs`
+`a_scripted_answer_of_4097_outputs_is_malformed_and_its_hosts_failure_775`
+and `a_tracker_answer_of_4097_outputs_is_malformed_and_names_no_host_775`
+(the lane's two neutral witnesses rewritten to the reference's reading;
+RED: nothing recorded),
+`a_binary_output_index_past_u32_is_refused_as_a_host_failure_775` (RED: the
+nine-byte index read as 0) and
+`a_binary_context_past_1_mib_is_refused_before_its_read_775` (RED: the
+context read whole); in `tests/lookup_limits_configured_775.rs`
+`a_raised_output_bound_admits_no_answer_past_the_normalizers_4096_775`
+(RED: `Some((0, 1))`) and
+`a_json_answer_past_4096_under_a_raised_bound_is_malformed_775` (RED: the
+4,097 read). The binary answers are built by this crate's writer over a
+real BEEF (`support/lookup_limits_775.rs`, `binary_beef`). The unit
+`extracted_bytes_count_each_outpoints_atomic_beef_and_context_775` pins the
+per-outpoint count. `tests/identity_revocation_checks_327.rs` no longer
+raises the resolver's `max_outputs`: its 10,001 outputs come from three
+hosts of at most 3,334, the resolver aggregating them, since one host's
+answer past 4096 is the normalizer's refusal in either SDK.
+
+**The reads' fold (2026-11-09, PR #801's cold, rule and strength reads).**
+`LookupByteBudget::consume` charges through a compare-exchange loop where it
+called `AtomicUsize::fetch_update`, which rustc 1.99 deprecates (renamed
+`try_update`, past this crate's MSRV of 1.88): under `-D warnings` CI's
+stable toolchain refused the build (`Test Suite`, `checks`, `lint`), RED by
+`cargo +1.99.0 clippy --lib --all-features -- -D warnings` at `c137649f`
+(`use of deprecated method ... fetch_update`), green after on 1.99.0 and
+1.88. Three branches no test reached are pinned in
+`tests/lookup_limits_configured_775.rs` (the strength read's S1 to S3), each
+RED on a scratch copy of `c137649f` with one line planted:
+`the_discovered_hosts_follow_the_trackers_arrival_order_785` (the tracker
+configured first answering 300 ms late; RED with the trackers taken in
+configured order, `FuturesOrdered`: `left: [ha, hb]`),
+`an_answer_past_what_the_query_may_retain_is_dropped_775` (two HTTP hosts,
+each three outpoints of a transaction of its own, under a total one byte
+under and at both answers' retained bytes; RED with the drop disabled,
+`left: 6`, and with its `>` made `>=`, `left: 3`) and
+`a_body_the_facilitator_charged_is_not_charged_again_775` (one HTTP host
+under a total one byte short of its body and retained bytes together; RED
+with the guard charging always, `left: 0`).
+
+**The rebase onto #786, #796 and #804 (2026-11-09).** `find_competent_hosts`
+lives in `lookup_resolver/discovery.rs` here, where #786 commented the
+parent's copy: its reader `parse_slap_token` (the 1 satoshi and the hint) runs
+before a tracker's share is counted, as the reference's candidates are its
+admitted hosts (`LookupDiscovery.ts:62-78`). The query's merge keeps #796's
+hint compare, count and displacement under this lane's byte budget: an answer
+past what the query may retain is dropped before the merge reads it. Three
+#804 tests (`four_outputs_of_16_mib_then_an_advertisement_skip_it_804`,
+`an_output_of_16_mib_plus_1_is_skipped_before_it_counts_804` and the recorded
+`total_budget` case) failed here: their answers of 64 MiB and more pass the
+resolver's `maxResponseBytes` (32 MiB), which the reference's resolver
+enforces on a custom facilitator's answer too (`assertTrackedOutputBudget`,
+`LookupResolver.ts:2351-2362`), and the recording ran on a stub resolver with
+no limits. Their resolver now runs at `maxResponseBytes` and `maxTotalBytes`
+of 128 MiB, so the SHIP bounds stay pinned, and
+`the_resolvers_default_limits_take_an_answer_past_32_mib_first_775_804` pins
+the composition at the defaults: the answer dropped, neutral, no host
+admitted. The consequence, the reference's too: behind a resolver at the
+default limits the SHIP discovery's total BEEF budget (64 MiB, refused only
+past it, `SHIPBroadcaster.ts:765-767`) is unreachable, since one host's answer
+is dropped past 32 MiB and a query retains at most `maxTotalBytes` (64 MiB) of
+BEEF and context across its hosts (`LookupResolver.ts:1734-1743`); it is
+reached only through a resolver whose limits are raised or one of the
+caller's own (the reference's `resolver` option, `SHIPBroadcaster.ts:429`).
+
+### Notes: cross-SDK parity (#775, #785)
+
+Stated differences from `ts-stack@edf6e03`, the `CLAUDE.md` row's five: (1)
+a discovery whose trackers all reached a limit is `No competent ... hosts`
+here, the limit's own error there (`:1436-1440`); `query` returns no
+`limitsHit` on either side; (2) a query's `maxTotalBytes` covers its hosts
+and a discovery's its trackers, where the reference charges the discovery's
+bytes to the query that started it (`:2097-2110`); (3) hosts are compared as
+the advertisement's text (no `normalizeLookupHost`), the admission quotas,
+the `maxHosts * 4` scan and `maxTrackers` (#769's row) are not ported, every
+tracker and host is asked at once, the additional hosts are admitted after
+the discovered ones where the reference admits them ahead of a refreshing
+discovery's (`:2063-2072`), the query's retained `maxTotalBytes` is charged
+in the hosts' rank order, not as answers arrive (`:1734-1743`), a
+`Content-Length` text is read by `u64`'s parser (a leading `+` the number)
+where the reference's `/^\d+$/` reads it as no length
+(`LookupResponseReader.ts:27-30`), unreachable through hyper 1.12.0, whose
+client refuses a length of other than digits before the header is read
+(`proto/h1/role.rs:1333-1337`), and a zero
+limit refuses everything where
+the reference's constructor refuses it (`LookupResources.ts:36-44`); (4) a
+facilitator keeping the default `lookup_bounded` is bounded after its answer
+is in memory, as the reference's custom facilitator is; (5) of the
+normalizer's reading of a custom facilitator's answer
+(`normalizeLookupOutput`, `:327-357`) the resolver ports the count alone: an
+item with an empty or 32 MiB-plus BEEF, a context past 1 MiB or a txid hint
+not 64 hex digits is `Malformed lookup response` there and read here (the
+HTTPS facilitator's JSON reader refuses each, #768), and so is an output of
+its binary answer whose Atomic BEEF passes 32 MiB under a raised
+`max_response_bytes` (`:333`, the normalizer at `:2388`). Until the fold a sixth
+stood first: the output bound the configured one on every path and neutral,
+where the reference's normalizer keeps the constant 4096; closed by the
+fold. go-sdk@2ca481c reads the body with `io.ReadAll`, counts no output,
+casts a binary output index past `0xffffffff` to its low 32 bits and bounds
+no context (`overlay/lookup/facilitator.go:55`, `:107-128`), and gathers the
+hosts in a map (`resolver.go:184`): none of these bounds, a map's order.
+
+On the binary path `maxResponseBytes` counts each outpoint's Atomic BEEF and
+context as the reference does (`extractedBytes += beefBytes.length +
+(x.context?.length ?? 0)`, `:929-932`), since this lane was rebased onto
+#735's per-txid extraction (`binary_answer::atomic_outputs`): the lane's
+earlier count of the whole aggregated BEEF once per outpoint is gone.
+
 ### Added: `AbortAcceptance` carries a `kind`, so a host tells the abort-on-chain refusal by type, not text (#604)
 
 From bsv-wallet-toolbox-rs #528, the owner's word of 2026-11-01 14:4xZ (a
@@ -5945,7 +6164,7 @@ response bound (`:252`) and `maxOutputs` bound (4096,
 `LookupResources.ts:24`, thrown as `LookupResourceLimitError` at `:859-860`,
 which the tracked call rethrows without recording a host failure, `:2415`,
 and the host's query keeps as a session limit, `:1764-1765`) are not ported,
-the item bounds alone checked here (the two bounds are #775's row); a valid
+the item bounds alone checked here (the two bounds are #775's row, closed by it: both ported); a valid
 `txid` member is checked and not carried (`OutputListItem` has no `txid`,
 #735). An unknown
 string `type` is refused here as `Unknown answer type` where the reference

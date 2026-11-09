@@ -6,21 +6,21 @@
 use crate::overlay::{
     facilitators::{HttpsOverlayLookupFacilitator, OverlayLookupFacilitator},
     host_reputation_tracker::{get_overlay_host_reputation_tracker, HostReputationTracker},
+    lookup_limits::LookupLimits,
     overlay_admin_token_template::decode_and_verify_overlay_admin_token,
     types::{
-        LookupAnswer, LookupQuestion, NetworkPreset, OutputListItem, Protocol,
-        DEFAULT_HOSTS_CACHE_MAX_ENTRIES, DEFAULT_HOSTS_CACHE_TTL_MS, DEFAULT_TX_MEMO_MAX_ENTRIES,
-        DEFAULT_TX_MEMO_TTL_MS, MAX_TRACKER_WAIT_TIME_MS,
+        NetworkPreset, OutputListItem, Protocol, DEFAULT_HOSTS_CACHE_MAX_ENTRIES,
+        DEFAULT_HOSTS_CACHE_TTL_MS, DEFAULT_TX_MEMO_MAX_ENTRIES, DEFAULT_TX_MEMO_TTL_MS,
     },
 };
 use crate::transaction::Transaction;
 use crate::{Error, Result};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use tokio::sync::{watch, RwLock};
 
 mod backoff; // the trackers' backoff and the cache's reuse rule (#769)
+mod discovery; // `find_competent_hosts`, in the trackers' order within the limits (#785)
 mod query; // `query` and the ordered lookup (#394)
 
 /// Configuration for the lookup resolver.
@@ -44,6 +44,9 @@ pub struct LookupResolverConfig {
     pub tx_memo_ttl_ms: u64,
     /// Maximum entries in TX memoization cache (default 4096).
     pub tx_memo_max_entries: usize,
+    /// The lookup client's limits, the reference's defaults (#775, #785):
+    /// a response's bytes and outputs, a query's bytes, the hosts kept.
+    pub limits: LookupLimits,
 }
 
 impl Default for LookupResolverConfig {
@@ -58,6 +61,7 @@ impl Default for LookupResolverConfig {
             hosts_cache_max_entries: DEFAULT_HOSTS_CACHE_MAX_ENTRIES,
             tx_memo_ttl_ms: DEFAULT_TX_MEMO_TTL_MS,
             tx_memo_max_entries: DEFAULT_TX_MEMO_MAX_ENTRIES,
+            limits: LookupLimits::default(),
         }
     }
 }
@@ -101,6 +105,8 @@ pub struct LookupResolver {
     tx_memo: RwLock<HashMap<String, TxMemoEntry>>,
     tx_memo_ttl_ms: u64,
     tx_memo_max_entries: usize,
+    /// The lookup client's limits (#775, #785).
+    limits: LookupLimits,
     /// In-flight host discovery requests for request coalescing.
     /// Maps service name to watch sender for the result.
     hosts_in_flight: RwLock<HashMap<String, watch::Sender<InFlightResult>>>,
@@ -157,6 +163,7 @@ impl LookupResolver {
             tx_memo: RwLock::new(HashMap::new()),
             tx_memo_ttl_ms: config.tx_memo_ttl_ms,
             tx_memo_max_entries: config.tx_memo_max_entries,
+            limits: config.limits,
             hosts_in_flight: RwLock::new(HashMap::new()),
             hint_contradictions: std::sync::atomic::AtomicU64::new(0),
         }
@@ -305,102 +312,6 @@ impl LookupResolver {
             }
         }
         hosts
-    }
-
-    /// Find hosts that can answer queries for a given lookup service via SLAP.
-    ///
-    /// Queries all available SLAP trackers in parallel to discover hosts that
-    /// advertise the specified service. Each tracker response is parsed as a
-    /// SLAP admin token to extract the host domain. Each tracker is accounted
-    /// as a host is (#760, #762): an output list a success, a freeform answer
-    /// nothing, an error or a formula answer a failure. A tracker backing off
-    /// is not asked; with every tracker backing off the discovery refuses in
-    /// the reference's words, `All SLAP trackers hosts are backing off for
-    /// approximately <N>ms due to repeated failures.`, N the soonest end of a
-    /// backoff (`LookupResolver.ts:2306-2314`, #769).
-    ///
-    /// This is the low-level discovery method. It does **not** use the hosts
-    /// cache or request coalescing (those are handled by `get_competent_hosts`,
-    /// which is called internally by `query`).
-    ///
-    /// # Arguments
-    ///
-    /// * `service` - The lookup service name (e.g. `"ls_myservice"`)
-    ///
-    /// # Returns
-    ///
-    /// A list of host URLs that advertise the given service, empty when the
-    /// trackers asked named none (or no tracker is configured).
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let resolver = LookupResolver::default();
-    /// let hosts = resolver.find_competent_hosts("ls_myservice").await?;
-    /// for host in &hosts {
-    ///     println!("Found host: {}", host);
-    /// }
-    /// ```
-    pub async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>> {
-        let question = LookupQuestion::new("ls_slap", serde_json::json!({ "service": service }));
-
-        // The trackers not backing off; every one backing off refuses (#769)
-        let available = self.available_slap_trackers()?;
-        if available.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut hosts: HashSet<String> = HashSet::new();
-
-        // Query all available trackers in parallel
-        let futures: Vec<_> = available
-            .iter()
-            .map(|tracker| {
-                let tracker = tracker.clone();
-                let facilitator = self.facilitator.clone();
-                let question = question.clone();
-
-                async move {
-                    let start = Instant::now();
-                    let result = facilitator
-                        .lookup(&tracker, &question, Some(MAX_TRACKER_WAIT_TIME_MS))
-                        .await;
-                    let elapsed = start.elapsed().as_millis() as u64;
-                    (tracker, result, elapsed)
-                }
-            })
-            .collect();
-
-        let results = futures::future::join_all(futures).await;
-
-        for (tracker, result, elapsed) in results {
-            match result {
-                Ok(LookupAnswer::OutputList { outputs }) => {
-                    self.reputation_tracker.record_success(&tracker, elapsed);
-
-                    // A refused output is skipped, the tracker still a
-                    // success, as the reference's `continue` (`:2197-2213`).
-                    for output in outputs {
-                        if let Ok(domain) = self.parse_slap_token(&output, service) {
-                            hosts.insert(domain);
-                        }
-                    }
-                }
-                // A tracker's question is the reference's tracked call too
-                // (`ts-stack@edf6e03` `LookupResolver.ts:1974`, #762): a
-                // freeform answer neutral, a formula one a failure (`:2399-2405`).
-                Ok(LookupAnswer::Freeform { .. }) => {}
-                Ok(LookupAnswer::Formula { .. }) => self
-                    .reputation_tracker
-                    .record_failure(&tracker, Some("Invalid lookup response")),
-                Err(e) => {
-                    self.reputation_tracker
-                        .record_failure(&tracker, Some(&e.to_string()));
-                }
-            }
-        }
-
-        Ok(hosts.into_iter().collect())
     }
 
     /// Parse a SLAP token from an output and extract the domain.

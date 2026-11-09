@@ -3,6 +3,7 @@
 //! 800-line bound and may not grow.
 
 use super::{now_ms, LookupResolver};
+use crate::overlay::lookup_limits::{earliest_distinct, retained_bytes, LookupByteBudget};
 use crate::overlay::types::{LookupAnswer, LookupQuestion, OutputListItem};
 use crate::{Error, Result};
 use serde::Serialize;
@@ -48,6 +49,18 @@ impl LookupResolver {
     /// not, a success; a freeform answer nothing, a backoff kept; an error or
     /// any other answer a failure.
     ///
+    /// The hosts asked are the admitted ones (#785): the discovered (or
+    /// overriding) hosts and then the additional ones, each at its earliest
+    /// occurrence, at most `limits.max_hosts` (`ts-stack@edf6e03`
+    /// `LookupResolver.ts:1842-1849`; the reference admits the additional
+    /// hosts ahead of a refreshing discovery's, `:2063-2072`, a stated row). Each answer is read under the lookup
+    /// limits (#775): one past `limits.max_response_bytes` or
+    /// `limits.max_outputs`, or past what the query's
+    /// `limits.max_total_bytes` has left, contributes nothing and records
+    /// nothing for its host, neither a success nor a failure (`:2415`,
+    /// `:1764-1767`); the query answers what the other hosts gave, as the
+    /// reference's does.
+    ///
     /// # Arguments
     ///
     /// * `question` - The lookup question to execute
@@ -91,6 +104,8 @@ impl LookupResolver {
     ) -> Result<LookupAnswer> {
         // Find hosts that can answer this query
         let hosts = self.get_competent_hosts(&question.service).await?;
+        // The query's admission past `seen` and `maxHosts` (`:1842-1849`, #785)
+        let hosts = earliest_distinct(hosts, self.limits.max_hosts);
 
         if hosts.is_empty() {
             return Err(Error::OverlayError(format!(
@@ -130,6 +145,10 @@ impl LookupResolver {
         let mut seen_outputs: HashMap<String, (usize, bool)> = HashMap::new();
         let mut first_freeform: Option<LookupAnswer> = None;
 
+        // The query's byte budget, shared by its hosts (`:1624-1631`, #775)
+        let budget = LookupByteBudget::new(self.limits.max_total_bytes);
+        let mut retained = 0usize;
+
         let futures: Vec<_> = available
             .iter()
             .map(|host| {
@@ -138,12 +157,19 @@ impl LookupResolver {
                 let question = question.clone();
                 let query_text = query_text.map(ToOwned::to_owned);
                 let timeout = timeout_ms;
+                let options = self.limits.request(&budget);
 
                 async move {
                     let start = Instant::now();
+                    // The tracked call's check of the answer, before any
+                    // accounting (`:2351-2375`, `:2392`)
                     let result = facilitator
-                        .lookup_ordered(&host, &question, query_text.as_deref(), timeout)
-                        .await;
+                        .lookup_bounded(&host, &question, query_text.as_deref(), timeout, &options)
+                        .await
+                        .and_then(|answer| {
+                            options.assert_tracked_answer(&answer)?;
+                            Ok(answer)
+                        });
                     let elapsed = start.elapsed().as_millis() as u64;
                     (host, result, elapsed)
                 }
@@ -169,6 +195,15 @@ impl LookupResolver {
                             .reputation_tracker
                             .record_failure(&host, Some("Invalid lookup response")),
                     }
+
+                    // An answer past what the query may retain is dropped
+                    // after its host's success (`retainLookupHostAnswer`,
+                    // `:1734-1743`, a `maxTotalBytes` limit, #775).
+                    let bytes = retained_bytes(&answer);
+                    if bytes > self.limits.max_total_bytes - retained {
+                        continue;
+                    }
+                    retained += bytes;
 
                     match answer {
                         LookupAnswer::OutputList { outputs } => {
@@ -222,6 +257,9 @@ impl LookupResolver {
                         }
                     }
                 }
+                // A resource limit is neutral: nothing recorded for the
+                // host (`:2415`, `:1764-1767`, #775)
+                Err(Error::OverlayResourceLimit(_)) => {}
                 Err(e) => {
                     self.reputation_tracker
                         .record_failure(&host, Some(&e.to_string()));

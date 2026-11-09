@@ -127,12 +127,11 @@ async fn find_competent_hosts_answers_the_hosts_a_scripted_tracker_names() {
         ],
     );
 
-    let mut hosts = resolver
+    // The tracker's answer order (#785; a `HashSet`'s until then, sorted here).
+    let hosts = resolver
         .find_competent_hosts("ls_test_service")
         .await
         .unwrap();
-    // The discovery gathers into a set: the hosts are pinned, not their order.
-    hosts.sort();
     assert_eq!(
         hosts,
         [
