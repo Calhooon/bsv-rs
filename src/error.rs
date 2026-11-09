@@ -5,7 +5,7 @@ use thiserror::Error;
 #[cfg(feature = "wallet")]
 mod wallet_fault;
 #[cfg(feature = "wallet")]
-pub use wallet_fault::{AbortAcceptance, WalletFault, WalletFaultFamily};
+pub use wallet_fault::{AbortAcceptance, AbortKind, WalletFault, WalletFaultFamily};
 
 #[cfg(feature = "wallet")]
 mod wallet_refusal;
@@ -212,7 +212,7 @@ pub enum Error {
     #[error("wallet error: {0}")]
     WalletFault(WalletFault),
 
-    /// The port's stored-acceptance extension for a refused abort, not a successful abort.
+    /// The port's extension for an abort guard's refusal, not a successful abort.
     /// Preserves the guard's class and complete string; see [`AbortAcceptance`].
     #[cfg(feature = "wallet")]
     #[error("{0}")]

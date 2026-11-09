@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: `AbortAcceptance` carries a `kind`, so a host tells the abort-on-chain refusal by type, not text (#604)
+
+From bsv-wallet-toolbox-rs #528, the owner's word of 2026-11-01 14:4xZ (a
+field on the existing payload, not a new `Error` variant). Until now a host
+that wanted to tell "the transaction is already on chain" from the other
+abort refusals (the store's accepting word, toolbox #165; the status guard)
+matched `AbortAcceptance::message` (bsv-wallet-cli#386). `AbortAcceptance`
+now carries `pub kind: AbortKind`, a `#[non_exhaustive]` enum
+(`src/error/wallet_fault.rs`, re-exported at `bsv_rs::error::AbortKind` and
+`bsv_rs::AbortKind`): `OnChain` (the transaction mined or known to the chain,
+the toolbox reference's predicate), `AcceptedInStore` (the store's accepting
+word refused the abort) and `Other` (every other guard refusal). The default,
+and the value `AbortAcceptance::new` leaves, is `Other`: an unset record
+claims no fact its guard did not set. The kind is set by the guard that
+knows it, never derived from text. The wire class and code, the `Display`
+text, `class` and `size_of::<Error>()` (56) are unchanged.
+
+Pinned by `tests/abort_kind_604.rs` (four tests: the default, a mined
+transaction told by kind with its text unchanged, every kind's abort frame
+equal to `Other`'s and to the `WalletRefusal` of the same class and message
+under `InvalidOperation` and `InvalidParameter`, the kind in equality and the
+size); compile-RED on `e228c61a` (`AbortKind` and the field absent).
+
+Semver: additive within 0.9. A new public field on a `#[non_exhaustive]`
+struct (no literal outside the crate can build it) and a new public enum. A
+downstream reading the record needs nothing; the toolbox's abort door sets
+`kind` at its two refusal sites (`OnChain` at the on-chain guard,
+`AcceptedInStore` at the accepting-word guard) by assignment after `new()`.
+The record's derived `Debug` text gains `kind: ..`; no test here matches it.
+
+The record's meaning, aligned at every site by the fold of the three reads
+(2026-11-09): its presence affirms that an abort guard refused the abort
+(stored acceptance, the chain or another guard), `kind` naming which; until
+#604 the docs said it affirmed stored acceptance alone. The wording moved in
+`src/error/wallet_fault.rs`, `src/error.rs` and the root, `src/wallet/` and
+`src/wallet/wire/` `CLAUDE.md`; no behaviour moved.
+
+### Notes: cross-SDK parity (#604)
+
+The reference has no acceptance record and no kind: its `WalletError` is a
+string and a code (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/WalletError.ts:7,79`), and its toolbox's on-chain
+refusal is not a throw but `{ aborted: false }`
+(`packages/wallet/wallet-toolbox/src/storage/StorageProvider.ts:878,889,927-932`:
+`chainStatus === 'mined' || chainStatus === 'known'`, the predicate
+`AbortKind::OnChain`'s doc follows, asked there only of a `nosend` action
+with a txid and no expiry state, `:870`); that `{ aborted: false }` answer is
+framed by this crate's processor as code 8 (#206), while an
+`Error::AbortAccepted` record is framed by its class as the `WalletRefusal`
+of that class and message, whatever its kind (`OnChain` under
+`InvalidOperation` as code 1). go-sdk@2ca481c has no acceptance record. The record and its kind
+stay in Rust; no byte on the wire moves. A port extension like #439's, not a
+divergence.
+
 ### Fixed: a lying host's copy of a lookup output no longer shadows an honest host's at the resolver's merge (#796)
 
 `LookupResolver::query` deduplicates the outputs of every host's answer by
