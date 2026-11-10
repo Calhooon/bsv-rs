@@ -81,7 +81,9 @@ fn bump_noncanonical_height_is_refused() {
     use bsv_rs::transaction::{MerklePath, MerklePathLeaf};
     let bump =
         MerklePath::new(1, vec![vec![MerklePathLeaf::new_txid(0, "01".repeat(32))]]).unwrap();
-    let mut bytes = bump.to_binary();
+    let mut bytes = bump
+        .to_binary()
+        .expect("the path holds only states a BUMP writes (#817)");
     assert!(MerklePath::from_binary(&bytes).is_ok());
     bytes.splice(0..1, [0xfd, 1, 0]);
     assert!(MerklePath::from_binary(&bytes).is_err());

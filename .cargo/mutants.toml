@@ -36,9 +36,10 @@ exclude_re = [
   # raw/txid-only, self-caching and ring shapes probed byte-identical (EQUIVALENT, 0.95), the
   # rule read (EQUIVALENT, 0.96).
   '^src/transaction/beef\.rs:1204:29: replace < with <= in dependency_order$',
-  # src/transaction/merkle_path_walk.rs:141:27 replaced by true, 141:27 replaced by false and
-  # 141:33 `!=` to `==`, with 73:13 (the `shared` field deleted from `RootWalker::shared`) (#603,
-  # PR #628; merkle_path.rs:652:27, 652:33 and 584:13 until the walker moved, #93 P0).
+  # src/transaction/merkle_path_walk.rs:142:27 replaced by true, 142:27 replaced by false and
+  # 142:33 `!=` to `==`, with 73:13 (the `shared` field deleted from `RootWalker::shared`) (#603,
+  # PR #628; merkle_path.rs:652:27, 652:33 and 584:13 until the walker moved, #93 P0; 141 until
+  # #817 put the pairing's `?` on a line of its own).
   # A node's hash at a level and offset is a function of its inputs, not of the walk that reaches
   # it, and a walk whose root differs from the first is refused before any mark is read (BRC-74
   # transactions/0074.md's root derivation; MerklePath.ts:242-261 at ts-stack@edf6e03;
@@ -47,9 +48,9 @@ exclude_re = [
   # (equivalent x4, 0.95). 73:13 is declared on the same reads but has no line here:
   # cargo-mutants 27.1.0 pushes a struct-field deletion without its name filter (src/visit.rs:
   # 703-747 against collect_mutant's allows_mutant at :335), so no exclude_re entry removes it.
-  '''^src/transaction/merkle_path_walk\.rs:141:27: replace match guard \*root != working_hash with true in RootWalker<'a>::root_from$''',
-  '''^src/transaction/merkle_path_walk\.rs:141:27: replace match guard \*root != working_hash with false in RootWalker<'a>::root_from$''',
-  '''^src/transaction/merkle_path_walk\.rs:141:33: replace != with == in RootWalker<'a>::root_from$''',
+  '''^src/transaction/merkle_path_walk\.rs:142:27: replace match guard \*root != working_hash with true in RootWalker<'a>::root_from$''',
+  '''^src/transaction/merkle_path_walk\.rs:142:27: replace match guard \*root != working_hash with false in RootWalker<'a>::root_from$''',
+  '''^src/transaction/merkle_path_walk\.rs:142:33: replace != with == in RootWalker<'a>::root_from$''',
   # src/transaction/beef_stream.rs:502:28 (the guard `*p == parent` replaced by true), 507:42 (`+`
   # to `-`) and 507:42 (`+` to `*`), the mismatch arm of bump_root's walk (#603, PR #644). The arm
   # is dead: each level keeps one value per offset, each node is agreement-checked before its own

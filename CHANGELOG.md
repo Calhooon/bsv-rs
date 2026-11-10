@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: MerklePath's writers return Result and refuse what they cannot write faithfully (#817)
+
+**Migration:** `path.to_binary()`, `path.to_hex()` and `path.to_writer(w)` now return
+`Result<Vec<u8>>`, `Result<String>` and `Result<()>`: add `?` (or `.ok()?` where the
+caller returns an `Option`). A survey of the dependents (each grepped by its own path)
+counts 131 call sites on a `MerklePath`: `bsv-wallet-toolbox-rs` 19 (5 in production),
+`bsv-overlay-cloudflare` 112 (10 in production), `bsv-wallet-cli` and `rust-message-box`
+none; no dependent calls `MerklePath::to_writer`. `Beef`'s writers are unchanged here.
+No signature moves at `MerklePath::new`, `new_unchecked`, `compute_root` or `verify`, but
+each now answers `Err(MerklePathError("Invalid hex string"))` for a path whose walk pairs a
+hash with a non-hex character, where through 0.9.0-beta.7 it answered `Ok` (a root hashed
+from the text with that hash dropped; `verify` then `Ok(false)` from the tracker): a caller
+that read that `Ok` as a verdict now reads the `Err`.
+
+What was wrong: the writer wrote some states it cannot carry without a word. A leaf not
+flagged duplicate with no hash, or with a hash that was not hex, was written as its flag
+and nothing more (`from_hex(..).unwrap_or_default()`), so the next leaf was read from the
+bytes meant for this one's hash; a hash of another length was written at its length; more
+than 255 levels were written `as u8`. None of these reaches the writer from a reader (the
+readers hold 32-byte hashes and 1 to 64 levels), but every one does through the public
+`path` field, `from_coinbase_txid` (which checks nothing) and `new` with a lone leaf (whose
+root is its text, unread). The reference's `toWriter` throws on a non-hex hash
+(`ts-stack@edf6e03` `MerklePath.ts:289`, `hex.ts:6-17`).
+
+The rule (decided on #817 by eleven design reads, three of three in round 2 for this cut):
+a writer refuses only a state it cannot write faithfully (bytes that would not frame, or
+would read back as another path) and writes every other state, valid or not, as the
+reference writes it; validity is the readers' and `verify`'s. Its words are the
+reference's where the reference refuses; where the reference writes bytes no reader reads
+back as written, this crate refuses in its own words and states the row.
+
+One read-only check runs before any byte, so a caller's `Writer` is untouched on `Err`;
+each refusal is `Error::MerklePathError`. A non-hex hash on a leaf not flagged duplicate
+is looked for over the whole path first, so a path holding one is refused in the
+reference's words whatever other state it holds (the reference's writer throws at that
+leaf, whatever it wrote before it); the other refusals follow in written order:
+
+| State | Refused in | The reference |
+|---|---|---|
+| a hash with a non-hex character | `Invalid hex string` | throws the same |
+| a leaf not flagged duplicate with no hash | `Missing hash at height H, offset O` | writes the flag alone |
+| a hash of other than 64 hex digits | `Invalid hash at height H, offset O: expected 64 hex digits, got N` | writes it at its length; pads 63 digits to another text |
+| more than 255 levels | `Invalid tree height: N, over the 255 levels a BUMP's tree height byte writes` | writes `n & 0xff` |
+| a leaf flagged duplicate carrying a hash | `Duplicate leaf at height H, offset O carries a hash, which a BUMP's duplicate flag cannot write` | writes the flag alone, the hash lost |
+| a leaf flagged duplicate and txid | `Duplicate leaf at height H, offset O is flagged txid, which a BUMP's duplicate flag cannot write` | writes `03`, read back as a plain duplicate, the txid flag lost (this crate's readers refuse `03`) |
+
+Written as before, valid or not, as the reference writes them: no level, 65 to 255
+levels, an empty level 0, a repeated offset, an illegal offset, mismatched roots, an
+upper-case hash, leaves out of offset order, a txid flag above level 0, a lone leaf at
+offset 1. `combine` can produce the duplicate flagged txid from two paths `new` accepts (a
+held duplicate at offset 1 and the other path's txid leaf there, both holding the hash at
+offset 0: a level whose txid equals its sibling's, no honest block's); its writer now
+refuses the result. `combine` is unchanged: the reference's `combine` makes the same leaf
+(`MerklePath.ts:508-536`, `existingLeaf.txid = true` on a held duplicate) and writes it `03`.
+
+The constructors and the root: `new`, `new_unchecked` and `compute_root` refuse a hash
+that a walk pairs and that has a non-hex character, in `Invalid hex string`, as the
+reference's `hashPair` throws (`MerklePath.ts:30-32`); through 0.9.0-beta.7 `hash_pair`
+dropped the text and hashed the rest. A lone leaf's text (returned unread) and a leaf no
+walk reads are not refused there, on either side. No signature changes there.
+
+`Beef::to_binary`, `to_hex`, `to_writer` and the atomic writers keep their signatures and
+bytes in this cut: they write each BUMP through a crate-private lenient writer
+(`MerklePath::to_writer_lenient_until_beef_817`), which the second change of #817 removes
+when the BEEF writers and `merge_beef` become fallible.
+
+Tests: `tests/merkle_path_writer_refusals_817.rs` (32), one per cell, each against the
+reference's recording `tests/vectors/merkle_path_writer_refusals_817.json` (30 cells,
+`tests/support/merkle_path_writer_refusals_817.mjs`, Node v22.18.0, two runs
+byte-identical: 20 cells equal, 10 stated), and a sweep: 601 merkle paths held by
+`tests/vectors/` and `tests/transaction/vectors/` written `Ok` and read back equal.
+Compile-RED on `cebd819a` (the writers return bytes); on that base every refused cell is
+written and the non-hex sibling is accepted by `new`. The equivalence entries of
+`.cargo/mutants.toml` move from `merkle_path_walk.rs:141` to `:142`. The fold (the reads
+of 2026-11-09): six cells added (a non-hex hash after 256 levels, after a hashless leaf at
+level 0 and at level 1, after a 62-digit hash; a duplicate carrying a non-hex hash; a
+computed node pairing a non-hex hash), the non-hex scan moved ahead of every check, and
+the duplicate flagged txid refused; on `2e313b48` five tests RED, the four cells' and the
+recorded-cell sweep (`left: "Missing hash at height 0, offset 0"`, `"Invalid hash at height 0, offset 0: expected 64 hex digits, got
+62"`, `"Invalid tree height: 256, ..."` for `right: "Invalid hex string"`; the `03` cell
+written; the cell census), the two shared pins RED on planted mutations of the tip. The lane record is
+`docs/lanes/fix-817-merkle-writers.md`.
+
+### Notes: cross-SDK parity (#817)
+
+The reference (`ts-stack@edf6e03`) throws for one of the six refused states, a non-hex
+hash, in the words this crate now uses, wherever it sits in the path. It writes the other
+five as bytes no reader reads back as the path written: a hashless leaf and a hash of the
+wrong length misframe the BUMP, 256 levels are written as a height of `00`, a duplicate's
+hash is dropped, and a duplicate flagged txid is written `03`, which its reader reads as a
+plain duplicate (`MerklePath.ts:133-140`); these are five stated rows in `CLAUDE.md`, drafted for upstream as row 58 of the #375 queue
+(`docs/lanes/375-filings/merkle-path-writer-unframed-states-ts-stack.md`; unfiled). Its
+writer also flags a leaf as a txid when its `txid` member is present, `false` included
+(`MerklePath.ts:284-286`), so `{ txid: false }` is written `02`; this crate writes its
+`false` as `00` (row 59, `merkle-path-writer-txid-false-ts-stack.md`; unfiled). go-sdk at
+`2ca481c` holds a hash as a 32-byte array, so it has no non-hex or wrong-length state; its
+`Bytes()` is infallible, panics on a nil hash (`transaction/merklepath.go:311`), writes
+`byte(treeHeight)` (`:297`) and a duplicate's flag alone (`:310`).
+
 ### Fixed: Beef::merge_beef leaves an entry the target holds alone, as the reference does, and files a raw source entry under the txid it holds, one hash less per entry (#621)
 
 From bsv-wallet-toolbox-rs's A8 cycle 1 (issue #621, its opening slice) and

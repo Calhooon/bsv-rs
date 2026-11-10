@@ -216,8 +216,16 @@ fn two_bumps_one_txid() -> TwoBumps {
 
     let mut plain = BEEF_V1.to_le_bytes().to_vec();
     plain.push(2);
-    plain.extend(bump_a.to_binary());
-    plain.extend(bump_b.to_binary());
+    plain.extend(
+        bump_a
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+    );
+    plain.extend(
+        bump_b
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+    );
     plain.push(2);
     plain.extend_from_slice(&anchor);
     plain.extend_from_slice(&[1, 0]);
@@ -312,7 +320,10 @@ fn lean_chain_atomic(n: usize) -> (Vec<u8>, HashMap<u64, Hash32>) {
     bytes.extend_from_slice(&prev);
     bytes.extend_from_slice(&BEEF_V1.to_le_bytes());
     bytes.push(1);
-    bytes.extend(bump.to_binary());
+    bytes.extend(
+        bump.to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+    );
     bytes.extend(varint(n as u64 + 1));
     bytes.extend_from_slice(&anchor);
     bytes.extend_from_slice(&[1, 0]);

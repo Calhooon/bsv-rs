@@ -43,7 +43,11 @@ fn write(bumps: &[MerklePath], entries: &[&[u8]], proven: &[(usize, u64)]) -> Ve
     w.write_u32_le(BEEF_V1);
     w.write_var_int(bumps.len() as u64);
     for bump in bumps {
-        w.write_bytes(&bump.to_binary());
+        w.write_bytes(
+            &bump
+                .to_binary()
+                .expect("the path holds only states a BUMP writes (#817)"),
+        );
     }
     w.write_var_int(entries.len() as u64);
     for (i, raw) in entries.iter().enumerate() {

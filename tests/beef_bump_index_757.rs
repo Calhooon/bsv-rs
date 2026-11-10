@@ -56,7 +56,11 @@ fn tx(v: &Value, name: &str) -> Transaction {
 fn bump(v: &Value, name: &str) -> MerklePath {
     let hex = v["bumps"][name].as_str().unwrap();
     let path = MerklePath::from_hex(hex).unwrap();
-    assert_eq!(path.to_hex(), hex);
+    assert_eq!(
+        path.to_hex()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        hex
+    );
     path
 }
 
@@ -199,8 +203,11 @@ fn the_atomic_beef_carries_the_last_bump_of_a_txid_two_bumps_prove_757() {
         let read = Beef::from_binary(&bytes).unwrap();
         assert_eq!(read.bumps.len(), 1);
         assert_eq!(
-            read.bumps[0].to_hex(),
-            last.to_hex(),
+            read.bumps[0]
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            last.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
             "{}",
             atomic["subject"]
         );

@@ -24,7 +24,8 @@ fuzz_target!(|data: &[u8]| {
 
     // Fuzz MerklePath parsing
     if let Ok(mp) = bsv_rs::transaction::MerklePath::from_binary(data) {
-        let _ = mp.to_binary();
+        mp.to_binary()
+            .expect("a path the reader accepted holds only states a BUMP writes (#817)");
     }
 
     // Metered cursors carry the transaction work total across a resume (#519).

@@ -538,7 +538,11 @@ fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
     w.write_u32_le(BEEF_V1);
     w.write_var_int(TXS as u64);
     for bump in &bumps {
-        w.write_bytes(&bump.to_binary());
+        w.write_bytes(
+            &bump
+                .to_binary()
+                .expect("the path holds only states a BUMP writes (#817)"),
+        );
     }
     w.write_var_int(TXS as u64);
     for (i, raw) in raws.iter().enumerate() {

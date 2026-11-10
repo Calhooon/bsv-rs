@@ -73,7 +73,7 @@ fn refusal(result: Result<MerklePath>) -> String {
     match result {
         Err(crate::Error::MerklePathError(words)) => words,
         Err(other) => panic!("not a merkle path refusal: {other}"),
-        Ok(mp) => panic!("accepted: {}", mp.to_hex()),
+        Ok(mp) => panic!("accepted: {:?}", mp.to_hex()),
     }
 }
 
@@ -247,7 +247,12 @@ fn combine_of_two_paths_of_one_block_is_the_references_compound_wire_bump_pairs(
         let other = MerklePath::from_hex(e["b_hex"].as_str().unwrap()).unwrap();
         mp.combine(&other)
             .unwrap_or_else(|err| panic!("{id}: combine refuses {err}"));
-        assert_eq!(mp.to_hex(), e["result_hex"].as_str().unwrap(), "{id}");
+        assert_eq!(
+            mp.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            e["result_hex"].as_str().unwrap(),
+            "{id}"
+        );
         assert_roots(&mp, &e["result"]["roots"], id);
         pairs += 1;
     }
@@ -271,7 +276,11 @@ fn combine_extends_a_shorter_path_to_the_others_levels_wire_bump_005() {
     assert_eq!(mp.compute_root(None).unwrap(), root);
     let other = MerklePath::from_hex(e["b_hex"].as_str().unwrap()).unwrap();
     mp.combine(&other).unwrap();
-    assert_eq!(mp.to_hex(), e["b_sorted_hex"].as_str().unwrap());
+    assert_eq!(
+        mp.to_hex()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        e["b_sorted_hex"].as_str().unwrap()
+    );
     assert_eq!(mp.compute_root(None).unwrap(), root);
     assert_eq!(e["result_path"].as_array().unwrap().len(), 1);
     assert_ne!(e["result"]["root"], root);
@@ -292,7 +301,12 @@ fn trim_drops_a_level_0_pair_with_no_client_txid_wire_bump_023_to_026() {
         let mut mp = MerklePath::from_hex(e["hex"].as_str().unwrap())
             .unwrap_or_else(|err| panic!("{id}: from_hex refuses {err}"));
         mp.trim();
-        assert_eq!(mp.to_hex(), e["result_hex"].as_str().unwrap(), "{id}");
+        assert_eq!(
+            mp.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            e["result_hex"].as_str().unwrap(),
+            "{id}"
+        );
         trimmed.push(id);
     }
     assert_eq!(trimmed.len(), 10);

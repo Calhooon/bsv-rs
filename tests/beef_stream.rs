@@ -876,8 +876,13 @@ fn the_brc62_example_is_cut_as_the_lean_cuts_it_and_is_accepted() {
         beef.bumps[0].compute_root(None).unwrap()
     );
     assert_eq!(
-        bump.to_merkle_path().unwrap().to_binary(),
-        beef.bumps[0].to_binary()
+        bump.to_merkle_path()
+            .unwrap()
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        beef.bumps[0]
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)")
     );
     let stream_txids: Vec<String> = els
         .iter()
@@ -1045,7 +1050,9 @@ fn a_block_of_one_transaction_has_a_one_leaf_bump_whose_root_is_the_txid() {
     let id = txid(&coinbase);
     let path = MerklePath::from_coinbase_txid(&display_hex(&id), 800_010);
     assert_eq!(path.compute_root(None).unwrap(), display_hex(&id));
-    let bump = path.to_binary();
+    let bump = path
+        .to_binary()
+        .expect("the path holds only states a BUMP writes (#817)");
     assert_eq!(root_of(&bump), id);
     let (bytes, _) = wire(V1, None, &[bump], &[Entry::Raw(coinbase, Some(0))]);
     assert!(structure(&bytes, &one_header(800_010, id)).is_valid());

@@ -389,7 +389,11 @@ fn lone_leaves(seeds: &mut Vec<(String, Vec<u8>)>) {
             block_height: 800_005,
             path: vec![vec![MerklePathLeaf::new_txid(offset, TXID.into())]],
         };
-        seeds.push((format!("lone leaf at {offset}"), path.to_binary()));
+        seeds.push((
+            format!("lone leaf at {offset}"),
+            path.to_binary()
+                .expect("the path holds only states a BUMP writes (#817)"),
+        ));
     }
 }
 
@@ -734,7 +738,11 @@ fn a_byte_after_the_bump_is_refused_by_the_slice_and_left_by_the_reader() {
     );
     let mut reader = Reader::new(&bytes);
     let path = MerklePath::from_reader(&mut reader).expect("the reader reads one frame");
-    assert_eq!(path.to_binary(), bump);
+    assert_eq!(
+        path.to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        bump
+    );
     assert_eq!(reader.position(), bytes.len() - 1);
     assert_eq!(reader.remaining(), 1);
 }
@@ -801,8 +809,14 @@ fn the_standalone_reader_and_the_beef_reader_agree_on_every_bump_the_tree_holds(
         let alone = standalone(bytes);
         // The three standalone entry points are one reader; the slice's
         // bytes are the BUMP, a byte after it `TrailingBytes` there.
-        let binary = MerklePath::from_binary(bytes).map(|p| p.to_binary());
-        let hex = MerklePath::from_hex(&to_hex(bytes)).map(|p| p.to_binary());
+        let binary = MerklePath::from_binary(bytes).map(|p| {
+            p.to_binary()
+                .expect("the path holds only states a BUMP writes (#817)")
+        });
+        let hex = MerklePath::from_hex(&to_hex(bytes)).map(|p| {
+            p.to_binary()
+                .expect("the path holds only states a BUMP writes (#817)")
+        });
         assert_eq!(binary, hex, "{name}: from_binary and from_hex");
         match (&alone, &binary) {
             (Answer::Valid { used, .. }, Ok(_)) => assert_eq!(*used, bytes.len(), "{name}"),

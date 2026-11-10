@@ -210,7 +210,11 @@ fn bytes(tx: &Transaction, deferred: bool) -> Vec<u8> {
     writer.write_u32_le(BEEF_V1);
     writer.write_var_int(beef.bumps.len() as u64);
     for bump in &beef.bumps {
-        writer.write_bytes(&bump.to_binary());
+        writer.write_bytes(
+            &bump
+                .to_binary()
+                .expect("the path holds only states a BUMP writes (#817)"),
+        );
     }
     writer.write_var_int(beef.txs.len() as u64);
     for entry in beef.txs.iter().rev() {
@@ -411,7 +415,9 @@ fn a_source_height_above_u32_is_reachable_through_streaming_headers_452() {
     let tx = spending(Case::Tip);
     let beef = Beef::from_binary(&tx.to_beef(false).unwrap()).unwrap();
     assert_eq!(beef.bumps.len(), 1);
-    let bump = beef.bumps[0].to_binary();
+    let bump = beef.bumps[0]
+        .to_binary()
+        .expect("the path holds only states a BUMP writes (#817)");
     let mut reader = Reader::new(&bump);
     reader.read_var_int().unwrap();
     let height = u64::from(u32::MAX) + 1;

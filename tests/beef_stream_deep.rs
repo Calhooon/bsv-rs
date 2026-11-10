@@ -329,7 +329,11 @@ fn full_tree(k: u32) -> Vec<Vec<[u8; 32]>> {
 fn beef_of_bump(bump: &MerklePath) -> Vec<u8> {
     let mut bytes = 0xEFBE_0001u32.to_le_bytes().to_vec();
     bytes.push(1);
-    bytes.extend_from_slice(&bump.to_binary());
+    bytes.extend_from_slice(
+        &bump
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+    );
     bytes.push(0);
     bytes
 }
@@ -484,8 +488,13 @@ fn the_stream_and_the_in_memory_reader_compute_the_same_roots() {
                 );
             }
             assert_eq!(
-                bump.to_merkle_path().unwrap().to_binary(),
-                beef.bumps[0].to_binary()
+                bump.to_merkle_path()
+                    .unwrap()
+                    .to_binary()
+                    .expect("the path holds only states a BUMP writes (#817)"),
+                beef.bumps[0]
+                    .to_binary()
+                    .expect("the path holds only states a BUMP writes (#817)")
             );
             read += 1;
         }
