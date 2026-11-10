@@ -1330,7 +1330,7 @@ pub struct WalletCertificate {
 }
 
 /// Arguments for acquiring a certificate.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)] // Debug: `certifier_url` via debug_redact (url_debug.rs)
 #[serde(rename_all = "camelCase")]
 pub struct AcquireCertificateArgs {
     /// Certificate type (base64 encoded); `type` in JSON, as BRC-100 names it (#105).

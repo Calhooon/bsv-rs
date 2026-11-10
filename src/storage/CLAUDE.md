@@ -12,7 +12,7 @@ This module provides decentralized file storage using content-addressed UHRP URL
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | 98 | Module root; re-exports public API |
-| `types.rs` | 202 | Core types (UploadableFile, DownloadResult, etc.) |
+| `types.rs` | 255 | Core types (UploadableFile, DownloadResult, etc.); the crate-private `UploadInfo`'s `Debug` redacts its presigned URL's query and its header values (`crate::util::debug_redact`, the secret Debug lane's second fold) |
 | `utils.rs` | 503 | UHRP URL generation, parsing, validation, and cross-SDK test vectors |
 | `downloader.rs` | 286 | Download files from UHRP URLs via overlay lookup; an advertisement decoded lock-before alone, as `UHRPAdvertisementValidation.ts:40` does, a lock-after one naming no host (#537, `tests/storage_lock_position_537.rs`); since #544 each output read through `advertisement.rs`, then bound to the file the URL names, unexpired, one host per location (`StorageDownloader.ts:116-121`; `tests/storage_advertisement_envelope_544.rs`) |
 | `advertisement.rs` | 189 | #544: `decodeAndVerifyUHRPAdvertisement` (`ts-stack@edf6e03` `UHRPAdvertisementValidation.ts:37-115`): the canonical six-field envelope and bounds, the host's canonical key, the 32-byte hash, a credential-free HTTPS location, positive canonical CompactSize expiry and size, a canonical DER signature of 8 to 80 bytes, the host-linked locking key, the host's signature over the five data fields, each refusal in the reference's words (crate-internal; its unit test replays the recorded words) |

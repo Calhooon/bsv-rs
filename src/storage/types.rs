@@ -135,7 +135,7 @@ impl RenewFileResult {
 
 /// Response from upload info endpoint.
 #[cfg(feature = "http")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)] // Debug redacts the URL and headers (below)
 pub(crate) struct UploadInfo {
     /// Status of the request.
     pub status: String,
@@ -148,6 +148,58 @@ pub(crate) struct UploadInfo {
     /// Amount charged (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amount: Option<i64>,
+}
+
+/// A presigned upload's URL carries its credential in its query and its
+/// required headers may carry another (the second fold of the secret Debug
+/// lane): the URL through `debug_redact::Url`, every header value redacted
+/// save the public names.
+#[cfg(feature = "http")]
+impl std::fmt::Debug for UploadInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::util::debug_redact::{HeaderMap, Url};
+        f.debug_struct("UploadInfo")
+            .field("status", &self.status)
+            .field("upload_url", &Url(&self.upload_url))
+            .field("required_headers", &HeaderMap(&self.required_headers))
+            .field("amount", &self.amount)
+            .finish()
+    }
+}
+
+#[cfg(all(test, feature = "http"))]
+mod upload_info_debug_tests {
+    use super::UploadInfo;
+
+    #[test]
+    fn an_upload_info_debug_prints_no_signature_and_no_header_value() {
+        let info = UploadInfo {
+            status: "success".into(),
+            upload_url: "https://bucket.invalid/obj?X-Amz-Signature=sig0123&X-Amz-Credential=cred"
+                .into(),
+            required_headers: [
+                ("x-amz-security-token".to_owned(), "tok4567".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/octet-stream".to_owned(),
+                ),
+            ]
+            .into(),
+            amount: Some(5),
+        };
+        for out in [format!("{info:?}"), format!("{info:#?}")] {
+            for secret in ["sig0123", "cred", "tok4567", "X-Amz-Signature"] {
+                assert!(!out.contains(secret), "{out}");
+            }
+            assert!(
+                out.contains("https://bucket.invalid/obj?<redacted>"),
+                "{out}"
+            );
+            assert!(out.contains("x-amz-security-token"), "{out}");
+            assert!(out.contains("application/octet-stream"), "{out}");
+            assert!(out.starts_with("UploadInfo"), "{out}");
+        }
+    }
 }
 
 /// API response status constants.

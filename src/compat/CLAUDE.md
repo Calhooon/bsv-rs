@@ -13,7 +13,8 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 |------|---------|
 | `mod.rs` | Module declaration and re-exports |
 | `base58.rs` | Base58 encoding wrapper (~133 lines) |
-| `bip32.rs` | BIP-32 HD key derivation (~1512 lines) |
+| `bip32.rs` | BIP-32 HD key derivation (~1500 lines) |
+| `bip32_format.rs` | `ExtendedKey`'s two formatters side by side (the secret Debug fold, 2026-11-10): `Debug` (depth, child number, private or not) and `Display` (the serialization, documented as revealing a private key); `#[path]` child of `bip32.rs` |
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
 | `bsm.rs` | Bitcoin Signed Message (~713 lines) |
 | `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1158 lines) |
@@ -220,7 +221,8 @@ pub struct Mnemonic {
     // Validation
     pub fn is_valid(&self) -> bool
 
-    // Also implements Display (outputs phrase())
+    // Also implements Display (outputs phrase()); Debug redacts the words:
+    // Mnemonic(<redacted, 12 words, English>)
 }
 
 // Wordlist verification
@@ -415,7 +417,7 @@ let decrypted = ecies::decrypt_shared_base64(&encrypted_b64, &bob, &alice.public
 // BIP-39 errors
 Error::InvalidMnemonic(String)
 Error::InvalidEntropyLength { expected: String, actual: usize }
-Error::InvalidMnemonicWord(String)
+Error::InvalidMnemonicWord(String)  // the word's position, never the word
 
 // BIP-32 errors
 Error::InvalidExtendedKey(String)

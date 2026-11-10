@@ -199,7 +199,8 @@ All points serialized in 33-byte compressed format for the challenge hash.
 ### Shamir Secret Sharing
 
 ```rust
-/// A collection of key shares for recovery (derives Clone, Debug)
+/// A collection of key shares for recovery (derives Clone; Debug shows the
+/// share count, threshold and integrity, never a share)
 pub struct KeyShares {
     pub points: Vec<PointInFiniteField>,
     pub threshold: usize,
@@ -246,7 +247,8 @@ pub fn split_private_key_with(
 
 ```rust
 /// A point in a finite field (for Shamir shares)
-/// Derives Clone, Debug, PartialEq, Eq. Implements Display (same as to_point_string).
+/// Derives Clone, PartialEq, Eq. Implements Display (same as to_point_string, the
+/// share's text) and a Debug showing x and `y: <redacted>`.
 pub struct PointInFiniteField {
     pub x: BigNumber,
     pub y: BigNumber,
@@ -258,7 +260,8 @@ impl PointInFiniteField {
     pub fn to_point_string(&self) -> String
 }
 
-/// Polynomial for Lagrange interpolation (derives Clone, Debug)
+/// Polynomial for Lagrange interpolation (derives Clone; Debug shows the point
+/// count and threshold, never a point)
 pub struct Polynomial {
     pub points: Vec<PointInFiniteField>,
     pub threshold: usize,
@@ -470,6 +473,8 @@ The integrity field allows verification that shares belong together and that rec
 - Polynomial coefficients generated from `PrivateKey::random()` for cryptographic randomness
 - Store shares in separate secure locations
 - Never store more than (threshold - 1) shares together
+- No share is printed by `Debug` (`KeyShares`, `PointInFiniteField`, `Polynomial`; `tests/secret_debug.rs`, the secret Debug lane of 2026-11-10); `to_backup_format` and `Display` are the explicit conversions
+- No share is printed by an error (the fold of 2026-11-10): `KeyShares::from_backup_format` refuses a share of other than four parts in the reference's words, naming its index (`Invalid share format in share <idx>. Expected format: "x.y.t.i"`, `ts-stack@edf6e03` `PrivateKey.ts:74`), and a threshold that is not a number as `Invalid canonical share data in share <idx>` (`:87`); `PointInFiniteField::from_string` refuses other than two parts as `Finite-field point must use a bounded canonical Base58 representation` (`Polynomial.ts:32-45`); both echoed the text, `y` included, until then (`tests/secret_debug.rs`, `a_malformed_share_is_named_by_its_index_not_echoed` and the door table). The rest of the share reader is older and not the reference's, stated (the cold re-read of the fold, a probe on both sides): the reference's integrity is the first 8 hex digits of the public key's hash, written and read only in that form (`PrivateKey.ts:15,24-25,535,617`), where this crate's is the first 4 base58 characters of the SHA-256 of the key's bytes (`compute_integrity`), so neither recovers from the other's backup; it refuses a threshold outside 2 to 255 or not in its canonical text (`1`, `+2`, `02`, `256`) and an x or y that is not 1 to 64 canonical base58 characters (an empty y, a leading `1`), each in `Invalid canonical share data in share <idx>` or the point's sentence (`PrivateKey.ts:76-88`, `Polynomial.ts:32-45`, its round trip), where this crate reads every one of those thresholds and the leading `1`, and refuses the empty field in `invalid base58 string: empty string`; its mismatch words are `Threshold mismatch in share <idx>` and `Integrity mismatch in share <idx>` (`:90-94`), this crate's `Threshold mismatch: share 0 has threshold 2, share 1 has threshold 3` and `Integrity mismatch: share 0 has integrity '<tag>', share 1 has integrity '<tag>'` (no share value). Porting the format is Calhooon/bsv-rs#854 (filed, blocks-cut), not this fold's.
 - Duplicate shares in recovery cause failure (Lagrange interpolation requires unique x-coordinates)
 - Providing more shares than threshold works (only first `threshold` points are used)
 

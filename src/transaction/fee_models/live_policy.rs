@@ -66,7 +66,7 @@ pub const DEFAULT_CACHE_TTL_SECS: u64 = 300;
 pub const DEFAULT_FALLBACK_RATE: u64 = 100;
 
 /// Live policy fee model configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug redacts the key (credential_debug.rs)
 pub struct LivePolicyConfig {
     /// URL of the policy endpoint (ARC's schema); empty in the `Default`,
     /// which `refresh` refuses

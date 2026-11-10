@@ -37,6 +37,7 @@
 //! See <https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki>
 
 mod mnemonic;
+mod redact;
 pub mod wordlists;
 
 pub use mnemonic::{Language, Mnemonic, WordCount};

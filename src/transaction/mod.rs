@@ -92,6 +92,7 @@ pub mod broadcaster;
 pub mod broadcasters;
 pub mod chain_tracker;
 pub mod chain_trackers;
+mod credential_debug;
 pub mod fee_model;
 pub mod fee_models;
 pub mod input;

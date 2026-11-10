@@ -12,6 +12,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `clients/` | #423 AuthFetch, owned Response, request/response framing, certificate queue and BRC-105 payments; core `auth`, native transport `http` | see below |
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 671 |
+| `header_debug.rs` | The secret Debug fold (2026-11-10): the redacting `Debug` of `transports::http::HttpRequest` and `HttpResponse`, `AuthFetchOptions` and `clients::Response`, every field as the derive printed it, every header name, every header value `<redacted>` save `crate::util::debug_redact::PUBLIC_HEADERS` (any case; `authorization` alone until the second fold), `HttpRequest`'s `search` `<redacted>` when not empty; pinned by `tests/secret_debug.rs` | 73 |
 | `requested_certificates_json.rs` | #426/#400: parsed certificate member preimages; ordered maps, JavaScript integer keys, UTF-16 escapes and ECMAScript numbers; no recursive parser stack | 258 |
 | `session_manager.rs` | Session management with dual indexing and nonce-claim API | 452 |
 | `session_nonces.rs` | #362: atomic signed claims (100,000 per session), initial-request window (100,000 total / 256 per identity / 30 minutes), expiry and removal | 156 |

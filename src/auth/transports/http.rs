@@ -82,7 +82,7 @@ pub mod headers {
 }
 
 /// Deserialized HTTP request from General message payload.
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug redacts every header value but the public names (auth/header_debug.rs)
 pub struct HttpRequest {
     /// Request ID (32 bytes, for correlation).
     pub request_id: [u8; 32],
@@ -283,7 +283,7 @@ impl HttpRequest {
 }
 
 /// HTTP response to be serialized as General message payload.
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug redacts every header value but the public names (auth/header_debug.rs)
 pub struct HttpResponse {
     /// Request ID (32 bytes, from response header).
     pub request_id: [u8; 32],

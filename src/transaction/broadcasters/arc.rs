@@ -289,7 +289,7 @@ mod verdict {
     since = "0.9.0",
     note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27)"
 )]
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug redacts the key (credential_debug.rs)
 pub struct ArcConfig {
     /// ARC API URL (e.g., `https://arc.taal.com`)
     pub url: String,

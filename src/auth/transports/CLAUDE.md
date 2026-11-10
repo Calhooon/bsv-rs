@@ -19,7 +19,7 @@ This module provides transport layer implementations for sending and receiving a
 | `http/general.rs` | General exchange moved from `http.rs`; applies response checks, preserves `certificateRequest`, omits an absent request ID; retains certificate header text for the Peer's JSON.stringify preimage (#426) | 138 |
 | `http/json_syntax.rs` | Node 22 JSON syntax diagnostics after serde refuses; iterative, input-bounded states, no fixed depth cutoff, 20-unit context (#410) | ~310 |
 | `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `head` (the status, the status line's own reason phrase from hyper's `ext::ReasonPhrase`, the headers), `refuse_unauthenticated`, `sender` (the answer's identity key), the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview, an unsigned 429, 502, 503 or 504 a transport fault by `status_fault` | ~226 |
-| `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
+| `websocket_transport.rs` | WebSocket transport (requires `websocket` feature); `WebSocketTransportOptions` and `WebSocketTransport` print `base_url` through `crate::util::debug_redact::Url` (the secret Debug lane's second fold) | ~599 |
 
 ## Key Exports
 

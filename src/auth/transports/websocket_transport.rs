@@ -27,7 +27,7 @@ use tokio_tungstenite::tungstenite::Message;
 use super::http::{Transport, TransportCallback};
 
 /// Configuration options for [`WebSocketTransport`].
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug prints the URL through `debug_redact::Url` (below)
 pub struct WebSocketTransportOptions {
     /// WebSocket URL to connect to (must start with `ws://` or `wss://`).
     pub base_url: String,
@@ -64,10 +64,19 @@ pub struct WebSocketTransport {
     read_deadline_secs: u64,
 }
 
+impl std::fmt::Debug for WebSocketTransportOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebSocketTransportOptions")
+            .field("base_url", &crate::util::debug_redact::Url(&self.base_url))
+            .field("read_deadline_secs", &self.read_deadline_secs)
+            .finish()
+    }
+}
+
 impl std::fmt::Debug for WebSocketTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WebSocketTransport")
-            .field("base_url", &self.base_url)
+            .field("base_url", &crate::util::debug_redact::Url(&self.base_url))
             .field("read_deadline_secs", &self.read_deadline_secs)
             .finish()
     }
