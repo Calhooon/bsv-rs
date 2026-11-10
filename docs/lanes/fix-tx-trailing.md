@@ -80,40 +80,17 @@ Every `tests/transaction_*`, `beef_*`, `script_*`, `spend_*` file and every othe
 
 ## The dependents
 
-Each path grepped by its own name for `Transaction::from_(binary|hex|ef|hex_ef)`; production sites are those outside `tests/`, `benches/`, `examples/`, `*_tests.rs` and the first `#[cfg(test)]` of each file. `~/bsv/rust-message-box/src`: 0. `~/bsv/chaintracks-cloudflare`: 0. `~/bsv/bsv-wallet-toolbox-rs/src`: 6 (4 production). `~/bsv/bsv-wallet-cli/src`: 1 (1). `~/bsv/bsv-overlay-cloudflare/crates`: 178 (35). `~/bsv/bsv-middleware-rs`: 1 (1). Sources traced by a read-only agent and spot-checked here (`gasp_overlay.rs:276`, `owed_event.rs:160`, `hopsweep.rs:117`, `door_words.rs:294`).
+Each path grepped by its own name for `Transaction::from_(binary|hex|ef|hex_ef)`; production sites are those outside `tests/`, `benches/`, `examples/`, `*_tests.rs` and the first `#[cfg(test)]` of each file. `~/bsv/rust-message-box/src`: 0. `~/bsv/chaintracks-cloudflare`: 0. `~/bsv/bsv-wallet-toolbox-rs/src`: 6 (4 production). `~/bsv/bsv-wallet-cli/src`: 1 (1). `~/bsv/bsv-overlay-cloudflare/crates`: 178 (35). `~/bsv/bsv-middleware-rs`: 1 (1). Sources traced by a read-only agent and spot-checked here.
 
-| Site (`~/bsv/`) | Input | Suffix reachable | id/bytes used | After the fix |
-|---|---|---|---|---|
-| `bsv-wallet-toolbox-rs/src/storage/broadcast.rs:263` | framed (`raw_tx()` of a parsed BEEF) | no | inputs only | none |
-| `bsv-wallet-toolbox-rs/src/storage/sqlx/storage_sqlx.rs:6294` | store | if the store is corrupt | inputs | Err: warn, skip |
-| `bsv-wallet-toolbox-rs/src/services/services.rs:1995` | service (`get_raw_tx`) | yes unless the provider checks | parse unused; bytes to `merge_raw_tx` (which frames them since #817) | Err: no BEEF, error |
-| `bsv-wallet-toolbox-rs/src/services/traits.rs:66` | caller (`NLockTimeInput::from_raw_tx`) | caller's | lock time, sequences | Err: `InvalidArgument` |
-| `bsv-wallet-cli/src/commands/reconcile_outputs.rs:91` | store | if corrupt | inputs | Err: skip |
-| `bsv-overlay-cloudflare/crates/overlay-discovery/src/owed_event.rs:160` | peer (a filed refund raw) | yes | `tx.id()` written into the txfacts event | Err: no event |
-| `.../overlay-discovery/src/pot/released_evidence.rs:64,100` | framed (stored BEEF) | no | inputs, outputs | none |
-| `.../overlay-cloudflare/src/d1_discovery.rs:1805` | store (a peer's filed refund hex) | yes (rows filed before the fix) | `tx.id()` into the superseded list | Err: skip |
-| `.../overlay-cloudflare/src/broadcaster.rs:3868` | own (`tx.to_hex()`) | no | `id()` | none |
-| `.../overlay-cloudflare/src/proof_fetcher.rs:730` | service | yes | `id()` compared with the txid asked | Err as the mismatch was |
-| `.../proof_fetcher.rs:1164,2959,2994,3490,3531` | service, hash-checked | no | compared / inputs | none |
-| `.../proof_fetcher.rs:2847` | store | if corrupt | `id()` compared | Err as the mismatch was |
-| `.../proof_fetcher.rs:4362` | own | no | `id()` | none |
-| `.../overlay-cloudflare/src/ef.rs:184` | service | yes | `id()` compared, then `merge_raw_tx` | Err: skipped as the mismatch was |
-| `.../overlay-cloudflare/src/advert_lifecycle.rs:179` | service | yes | `id()` compared | Err as the mismatch was |
-| `.../overlay-cloudflare/src/admit_fast.rs:2201` | own | no | `id()` compared | none |
-| `.../admit_fast.rs:2240` | service, hash-checked | no | `id()` compared | none |
-| `.../overlay-cloudflare/src/door_words.rs:294-295` | own (EF from `beef_to_ef_batch`, or a raw subject) | EF bytes, structurally | lock time | **corrected**: `from_binary` read every EF buffer as a transaction of no input, no output and lock time `0xEF000000` (version, `00`, `00`, then `00 00 00 EF`), so `SubjectLock::of_tx` said `Final` and the `from_ef` fallback was never reached; now `from_binary` refuses and `from_ef` reads the real lock |
-| `.../overlay-cloudflare/src/proof_probe.rs:40` | service | yes | spent outpoints | Err: "does not parse" |
-| `.../low-app-layer/src/record_post.rs:895,993` | peer (refund backup raw) | yes | inputs, lock, sequence | Err: refused (`RefundDoesNotSpendThePot`) |
-| `.../low-app-layer/src/txany.rs:887`, `results.rs:135`, `owed_belt.rs:628`, `owed.rs:1287`, `owed_judge/hydrate.rs:956` | service or store | yes / if corrupt | `id()` compared | Err as the mismatch was |
-| `.../low-app-layer/src/owed.rs:184,331` | service, hash-checked | no | signature / latch txid | none |
-| `.../low-app-layer/src/owed.rs:1203`, `hopsweep.rs:323` | store (a peer's filed raw) | yes (rows filed before) | output sums | Err: `None` |
-| `.../low-app-layer/src/hopsweep.rs:117` | peer (`sweep_raw`) | yes | `id()` stored as `sweep_txid` | Err: no record |
-| `.../low-app-layer/src/hopsweep.rs:138` | peer | yes | first input | Err: filing refused |
-| `.../overlay-engine/src/gasp.rs:4282` | peer (GASP node `raw_tx`) | yes | `id()` keys the seen set and the proof lookup | Err: node skipped |
-| `.../overlay-engine/src/gasp_overlay.rs:276` | peer (GASP node `raw_tx`) | yes | `id()` the graph key, then `merge_transaction`, `to_binary` | Err: `GASPError::Other` |
-| `bsv-middleware-rs/src/payment_core.rs:754` | peer (the payment body as one raw transaction) | yes | outputs only | Err: `Unverifiable(MalformedTransaction)` where it was `Verified` |
+| Dependent | Production sites traced | A peer's or a service's suffix reachable | A peer's suffix reached `id()` or `to_binary()` with no comparison against an expected txid, before this fix |
+|---|---|---|---|
+| bsv-wallet-toolbox-rs | 4 | 2 (a service's, a caller's) | 0 |
+| bsv-wallet-cli | 1 | 0 (a store's, if corrupt) | 0 |
+| bsv-overlay-cloudflare | 35 | 19 (a peer's, a service's, or a store a peer filed into) | 5 |
+| bsv-middleware-rs | 1 | 1 (a peer's; outputs only, the verdict moving from verified to unverifiable) | 0 |
+| rust-message-box, chaintracks-cloudflare | 0 | 0 | 0 |
 
-Sites where a peer's suffix reached `id()` or `to_binary()` without a comparison against an expected txid, before this fix: `bsv-overlay-cloudflare/crates/overlay-discovery/src/owed_event.rs:160`; `bsv-overlay-cloudflare/crates/low-app-layer/src/hopsweep.rs:117`; `bsv-overlay-cloudflare/crates/overlay-cloudflare/src/d1_discovery.rs:1805` (through the stored refund row); `bsv-overlay-cloudflare/crates/overlay-engine/src/gasp.rs:4282`; `bsv-overlay-cloudflare/crates/overlay-engine/src/gasp_overlay.rs:276`. The sites comparing `id()` with an expected txid were reached too, and refused there as a mismatch; their outcome does not move. Rows a peer filed before the fix with a suffix (the potrefund and hopsweep stores) now read as unparsable at the store readers (`d1_discovery.rs:1805`, `owed.rs:1203`, `hopsweep.rs:323`): a dependent's migration question, not this crate's. A suffix passed the filers' signature checks because `sighash::parse_transaction` reads a prefix too (the listed reader above), and the suffix is outside every signature.
+The sites, file by file and line by line, were handed privately to each downstream's captain (root `CLAUDE.md` rule 12); they are not listed in this public record. The sites comparing `id()` with an expected txid were reached too, and refused there as a mismatch; their outcome does not move. Rows a peer filed before the fix with a suffix (in two of the overlay's stores) now read as unparsable at the store readers: a dependent's migration question, not this crate's. A suffix passed the filers' signature checks because `sighash::parse_transaction` reads a prefix too (the listed reader above), and the suffix is outside every signature.
 
 ## The fold (the three reads of 2026-11-09)
 
@@ -135,4 +112,4 @@ fromEF: transaction error: Number can only safely store up to 53 bits (#844 conf
 
 The plant is at `> 2^53 - 2`, so the agreeing 2^53 - 1 cell turns red too; the writer pin reads the recording alone. The EF invariant: on the same scratch copy with `from_ef`'s trailing check removed, the target on the vector's EF plus one byte: `assertion left == right failed: from_ef returned a transaction other than its buffer`.
 
-Outside the subject, filed by the reads and not changed here: `Signature::from_der` accepts a DER suffix (the rule read: blocks-cut; its own lane, #842); `sighash::parse_transaction` reads a prefix (the rule read: after-cut); `door_words.rs:294`'s `SubjectLock::of_bytes` verdict moves from `Final` to the real lock for an EF subject on the bump, unpinned downstream (the strength read: after-cut); the stable line carries #840, a cherry-pick or a dependents note the owner's and the keeper's (the strength read: after-cut).
+Outside the subject, filed by the reads and not changed here: `Signature::from_der` accepts a DER suffix (the rule read: blocks-cut; its own lane, #842); `sighash::parse_transaction` reads a prefix (the rule read: after-cut); one downstream verdict moves on the bump (the site handed privately to that downstream's captain, rule 12; the strength read: after-cut); the stable line carries #840, a cherry-pick or a dependents note the owner's and the keeper's (the strength read: after-cut).
