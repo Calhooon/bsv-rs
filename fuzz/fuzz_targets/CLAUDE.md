@@ -11,7 +11,7 @@ This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte 
 |------|---------|
 | `fuzz_base58.rs` | Fuzzes Base58, Base58Check, hex, and Base64 decoding plus encode/decode roundtrips |
 | `fuzz_script_parser.rs` | Fuzzes `Script::from_binary` and `Script::from_hex`, exercises type detection and serialization |
-| `fuzz_transaction_parser.rs` | Fuzzes `Transaction::from_binary`, sighash `parse_transaction`, and `MerklePath::from_binary` |
+| `fuzz_transaction_parser.rs` | Fuzzes `Transaction::from_binary`, `from_hex`, `from_ef`, `from_hex_ef`, `from_reader`, sighash `parse_transaction`, and `MerklePath::from_binary`; a transaction `from_binary` returns serializes to exactly its buffer (#840) |
 | `fuzz_beef_parser.rs` | Fuzzes `Beef::from_binary` against the hinted parse and the streaming reader (`verify_stream_structure`: a verdict on any bytes, no root accepted without a header), links every subject (`find_atomic_transaction`), serializes, clones and drops it, then `verify_valid`, the round trip, `Transaction::from_beef` and `from_atomic_beef` |
 | `fuzz_wire_protocol.rs` | Fuzzes `WireReader` deserialization of varint, string, counterparty, protocol ID, and raw bytes |
 
@@ -36,7 +36,10 @@ Tests `bsv_rs::script::Script`:
 
 Tests transaction-level parsing:
 - `bsv_rs::primitives::bsv::sighash::parse_transaction` — low-level sighash transaction parser
-- `bsv_rs::transaction::Transaction::from_binary` — full transaction parsing with roundtrip via `to_binary`, `id()`, and `to_hex()`
+- `bsv_rs::transaction::Transaction::from_binary`: full transaction parsing; the transaction serializes to exactly the buffer and rebuilt from its fields to the same bytes and txid (#840: a byte after the lock time was kept and hashed until then)
+- `bsv_rs::transaction::Transaction::from_reader`: one transaction from the front; its bytes are the prefix read, and `from_binary` accepts the buffer exactly when nothing is left (#840)
+- `bsv_rs::transaction::Transaction::from_hex`: the buffer's hex, lower and upper case, reads to `from_binary`'s verdict and txid, the hex cache lower case (#840)
+- `bsv_rs::transaction::Transaction::from_ef`, `from_hex_ef`: an accepted EF buffer is exactly what `to_ef` writes back, its plain bytes read back to its txid, and the hex door agrees (#840)
 - `bsv_rs::transaction::MerklePath::from_binary` — Merkle path parsing with roundtrip via `to_binary()`
 
 ### fuzz_wire_protocol
