@@ -34,6 +34,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `transaction_reader.rs` | `Transaction::from_reader` (public since #840, the reference's `fromReader`: one transaction from the front, the rest unread, nothing cached) and the words the whole readers refuse a byte after the transaction in (`TRAILING_DATA`, `EF_TRAILING_DATA`, `refuse_trailing`); a child file on the stable line alone, so the fix does not raise `transaction.rs` over its ratchet ceiling (3,000 lines at 0.8.3) |
+| `amount.rs` | `add_amount`, a sum of a caller's amounts past `u64` refused in the reference's `addSatoshiAmount` words (`fee`, `get_fee`, #868, cherry-picked from beta, where the file also holds #844's judgment of an amount read from bytes) |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
 | `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, merging, and logging |
@@ -184,7 +185,7 @@ impl Transaction {
     pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>) -> Result<bool>
 }
 
-pub enum ChangeDistribution { Equal, Random }  // Random uses Benford's law
+pub enum ChangeDistribution { Equal, Random }  // Random the reference's #distributeChange (#868); Equal's remainder stated
 pub struct ScriptOffsets { pub inputs: Vec<ScriptOffset>, pub outputs: Vec<ScriptOffset> }
 pub struct ScriptOffset { pub index: usize, pub offset: usize, pub length: usize }
 ```
@@ -405,7 +406,7 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **Caching**: Transaction hash/serialization cached in RefCell; invalidates on modification via `add_input()`, `add_output()`, `sign()`, `fee()`. `from_binary` and `from_hex` cache the input, which is exactly the transaction since #840 (until then a byte after the lock time was cached and hashed into the txid); `from_reader`, `from_ef` and `with_params` cache nothing. Pinned by `tests/transaction_trailing_data_840.rs` on the reference's recording and by `fuzz_transaction_parser` (a transaction `from_binary` returns serializes to exactly its buffer, `from_hex` agrees with it, a transaction `from_ef` returns writes its buffer back through `to_ef`). Every reader reads an amount as a `u64`, where the reference refuses one of 2^53 or more (a stated row, #840's fold; #844 closes it)
 - **Inputs**: Must have `source_txid` or `source_transaction`; fee calc/signing need full source tx with satoshis/locking_script
 - **Convenience inputs**: `add_input_from_tx` sets template; `add_input_from` builds a minimal source tx; `add_inputs_from_utxos` does NOT set templates (caller must set them separately)
-- **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()` using Benford's law for Random distribution
+- **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()`: random, the reference's `#distributeChange` (`Transaction.ts:864-897`, #868), `floor(remaining * log10(1 + 1/d))` for a digit of 1 to 9 to each change output but the last, the rest to the last (an output may be 0); equal, `change / n` to each and one satoshi more to each of the first `change % n`, where the reference gives the remainder to the last (stated, the root row). `fee`'s and `get_fee`'s totals past `u64` refused in the reference's `addSatoshiAmount` words (`amount::add_amount`); `total_output_satoshis` saturates. Pinned by `tests/transaction_fee_random_change_868.rs`
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Debug**: `Transaction` and `TransactionInput` implement `Debug` by hand; a linked `source_transaction` prints as `Some("<txid>")`, never its ancestry (0.3.35, bsv-stack-lean #57 P0-5c)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
