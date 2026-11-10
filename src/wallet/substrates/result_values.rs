@@ -9,6 +9,8 @@ use serde_json::value::RawValue;
 mod action_binding;
 mod actions;
 mod beef;
+#[cfg(test)]
+mod beef_603_tests;
 mod boundary;
 mod bytes;
 mod certificate;
