@@ -480,3 +480,7 @@ fn integer_token(token: &str) -> Option<String> {
         .map(|n| n.to_string())
         .or_else(|| number.to_u64().map(|n| n.to_string()))
 }
+
+#[cfg(test)]
+#[path = "raw_tree_tests.rs"]
+mod tests;
