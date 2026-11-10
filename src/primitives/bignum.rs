@@ -633,17 +633,17 @@ impl BigNumber {
     // Curve Constants
     // ========================================================================
 
-    /// Returns the secp256k1 curve order (n).
-    ///
-    /// This is the order of the generator point G on the secp256k1 curve.
-    /// All private keys must be in the range [1, n-1].
+    /// The secp256k1 curve order (n), big-endian: the crate's one copy (#842's port).
+    pub(crate) const SECP256K1_ORDER_BYTES: [u8; 32] = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+        0x41, 0x41,
+    ];
+
+    /// Returns the secp256k1 curve order (n), the order of the generator point G;
+    /// all private keys must be in the range [1, n-1].
     pub fn secp256k1_order() -> BigNumber {
-        // 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
-        BigNumber::from_bytes_be(&[
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c,
-            0xd0, 0x36, 0x41, 0x41,
-        ])
+        BigNumber::from_bytes_be(&Self::SECP256K1_ORDER_BYTES)
     }
 
     /// Returns the secp256k1 field prime (p).

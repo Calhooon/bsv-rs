@@ -1,0 +1,507 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk (Spend.ts:376-386,606-629, Signature.ts:44-97,201-250, ECDSA.ts:236-239), Node v22.18.0",
+  "spend": [
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "canonical",
+      "der": "3045022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "true"
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "r_lone_zero",
+      "der": "302502010002200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "s_lone_zero",
+      "der": "3026022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda7020100",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "r_past_32_bytes",
+      "der": "3045022101e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The top stack element must be truthy after script evaluation."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "s_past_32_bytes",
+      "der": "3046022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda70221010bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "suffix_1",
+      "der": "3045022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f00",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "suffix_2",
+      "der": "3045022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f0001",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "suffix_33",
+      "der": "3045022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "sequence_length_short",
+      "der": "3044022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "sequence_length_long_over_a_byte",
+      "der": "3046022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f00",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "long_form_sequence",
+      "der": "308145022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "long_form_r",
+      "der": "304602812100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "long_form_s",
+      "der": "3046022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda70281200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "r_padded",
+      "der": "304602220000e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "s_padded",
+      "der": "3046022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda70221000bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig",
+      "name": "six_bytes",
+      "der": "300402000200",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "canonical",
+      "der": "30440220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The top stack element must be truthy after script evaluation."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "r_lone_zero",
+      "der": "30250201000220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "s_lone_zero",
+      "der": "30250220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc99020100",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "r_past_32_bytes",
+      "der": "3045022101147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "true"
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "s_past_32_bytes",
+      "der": "30450220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc99022101070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "suffix_1",
+      "der": "30440220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e00",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "suffix_2",
+      "der": "30440220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e0001",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "suffix_33",
+      "der": "30440220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "sequence_length_short",
+      "der": "30430220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "sequence_length_long_over_a_byte",
+      "der": "30450220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e00",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "long_form_sequence",
+      "der": "3081440220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "long_form_r",
+      "der": "3045028120147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "long_form_s",
+      "der": "30450220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc99028120070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "r_padded",
+      "der": "304602220000147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc990220070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "s_padded",
+      "der": "30450220147fd2162428013904189feba981220d3fc57b8126162cfccc0e0f950ac7fc99022100070e3399a8e91a395a5af9e599dd1b1a8c8c06196d9e0bba9b4b54f313fb4d4e",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 1,
+      "lock": "checksig_not",
+      "name": "six_bytes",
+      "der": "300402000200",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "canonical",
+      "der": "304402206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "true"
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "r_lone_zero",
+      "der": "30250201000220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "s_lone_zero",
+      "der": "302502206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd16020100",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "r_past_32_bytes",
+      "der": "30450221016fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The top stack element must be truthy after script evaluation."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "s_past_32_bytes",
+      "der": "304502206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd16022101771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The top stack element must be truthy after script evaluation."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "suffix_1",
+      "der": "304402206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea00",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "suffix_2",
+      "der": "304402206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea0001",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "suffix_33",
+      "der": "304402206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "sequence_length_short",
+      "der": "304302206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "sequence_length_long_over_a_byte",
+      "der": "304502206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea00",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "long_form_sequence",
+      "der": "30814402206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "long_form_r",
+      "der": "30450281206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "long_form_s",
+      "der": "304502206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd16028120771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "r_padded",
+      "der": "3046022200006fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd160220771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "s_padded",
+      "der": "304502206fc75e7c8e4387a8ebb28023c3b74c8c61e4c63b6cc1d3d6f1a858642effcd16022100771a9bff892a541c4587a1cf8d80d447efe45637eb28548b595277b9f3778cea",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig",
+      "name": "six_bytes",
+      "der": "300402000200",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "canonical",
+      "der": "3044022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The top stack element must be truthy after script evaluation."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "r_lone_zero",
+      "der": "302502010002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "s_lone_zero",
+      "der": "3025022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac360020100",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "r_past_32_bytes",
+      "der": "304502210104d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "true"
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "s_past_32_bytes",
+      "der": "3045022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac3600221013f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "true"
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "suffix_1",
+      "der": "3044022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c600",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "suffix_2",
+      "der": "3044022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c60001",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "suffix_33",
+      "der": "3044022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "sequence_length_short",
+      "der": "3043022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "sequence_length_long_over_a_byte",
+      "der": "3045022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c600",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "long_form_sequence",
+      "der": "308144022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "long_form_r",
+      "der": "304502812004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "long_form_s",
+      "der": "3045022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac3600281203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "r_padded",
+      "der": "30460222000004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac36002203f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "s_padded",
+      "der": "3045022004d6f469864d3f6ae23dc86769e6a86e622ac4716212c1ea5df433390cdac3600221003f807ac3708b4a88ee0e1fee5ce8a3908bc2fa2f32afc67db8be7ddb6586c0c6",
+      "default": "ERR:The signature format is invalid."
+    },
+    {
+      "version": 2,
+      "lock": "checksig_not",
+      "name": "six_bytes",
+      "der": "300402000200",
+      "default": "ERR:The signature format is invalid."
+    }
+  ],
+  "to_der": [
+    {
+      "name": "r_zero",
+      "der": "3006020100020105",
+      "from_der": "ERR:Invalid R-value in signature DER"
+    },
+    {
+      "name": "s_zero",
+      "der": "30050201050200",
+      "from_der": "ok 5 0"
+    },
+    {
+      "name": "both_zero",
+      "der": "30050201000200",
+      "from_der": "ERR:Invalid R-value in signature DER"
+    }
+  ],
+  "der_lengths": [
+    {
+      "name": "sequence_7f",
+      "der": "307f022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "from_der": "ERR:Signature DER invalid"
+    },
+    {
+      "name": "sequence_80",
+      "der": "3080022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "from_der": "ERR:Invalid DER entity length"
+    },
+    {
+      "name": "sequence_7f_129_bytes",
+      "der": "307f023d01111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111023e0122222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222",
+      "from_der": "ok 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111 122222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "name": "r_7f",
+      "der": "3045027f00e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "from_der": "ERR:Signature DER invalid"
+    },
+    {
+      "name": "r_80",
+      "der": "3045028000e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702200bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "from_der": "ERR:Invalid DER entity length"
+    },
+    {
+      "name": "s_7f",
+      "der": "3045022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda7027f0bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "from_der": "ERR:Invalid R-length in signature DER"
+    },
+    {
+      "name": "s_80",
+      "der": "3045022100e51b21e22e0ba66a43aea0b771dc89ccadcb34cfaf981875f439817afae0cda702800bc281ea612b7d800a266d81aab4cc589ac25ca4e81d192b793c809d3f9b224f",
+      "from_der": "ERR:Invalid DER entity length"
+    }
+  ]
+}

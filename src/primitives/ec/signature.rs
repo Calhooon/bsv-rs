@@ -44,17 +44,32 @@ impl Signature {
         Self { r, s }
     }
 
-    /// Parses a signature from DER format.
+    /// Parses a signature from DER format, as the reference's
+    /// `Signature.fromDER` reads it (`ts-stack@edf6e03`
+    /// `packages/sdk/src/primitives/Signature.ts:44-97`; #842).
     ///
-    /// DER format: `0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>`
+    /// DER format: `0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>`, every length
+    /// in the short form, the sequence's naming exactly the bytes after it and
+    /// S ending the input, each integer with no zero byte before it that its
+    /// next byte's high bit did not need. A refusal is
+    /// [`Error::InvalidSignature`] in the reference's words:
     ///
-    /// # Arguments
+    /// | The input | The words |
+    /// |---|---|
+    /// | not starting with `0x30` (the empty input included) | `Signature DER must start with 0x30` |
+    /// | a length byte with its high bit set | `Invalid DER entity length` |
+    /// | a sequence length other than the bytes after it, a missing integer tag or R length | `Signature DER invalid` |
+    /// | an S length that does not end the input | `Invalid R-length in signature DER` |
+    /// | an R or S padded with a zero it did not need, or a lone `00` | `Invalid R-value in signature DER`, `Invalid S-value in signature DER` |
     ///
-    /// * `der` - The DER-encoded signature bytes
+    /// One cell is this crate's: an integer longer than 32 bytes once its
+    /// sign byte is dropped (a value at or above 2^256, never a signature
+    /// component) is refused as `Integer component too large`, where the
+    /// reference holds a `BigNumber` of any length (a stated divergence, #842).
+    /// An empty integer is zero, as the reference reads it.
     ///
-    /// # Returns
-    ///
-    /// The parsed signature, or an error if the format is invalid
+    /// Until #842 bytes after the signature, a wrong sequence length, a
+    /// long-form length and an unneeded leading zero were accepted.
     ///
     /// # Example
     ///
@@ -65,70 +80,19 @@ impl Signature {
     ///     "3045022100b4d19cdc7e93c36f3b5d6f7e8a2a6c9e3c8f9a1b2c3d4e5f6a7b8c9d0e1f2a3b02207f8e9d0c1b2a3948576a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e"
     /// ).unwrap();
     /// let sig = Signature::from_der(&der).unwrap();
+    ///
+    /// // A byte after the sequence is refused, as the reference refuses it.
+    /// let mut padded = der.clone();
+    /// padded.push(0);
+    /// assert!(Signature::from_der(&padded).is_err());
     /// ```
     pub fn from_der(der: &[u8]) -> Result<Self> {
-        if der.len() < 8 {
-            return Err(Error::InvalidSignature("DER too short".to_string()));
-        }
-
-        // Check sequence tag
-        if der[0] != 0x30 {
-            return Err(Error::InvalidSignature(
-                "Expected sequence tag 0x30".to_string(),
-            ));
-        }
-
-        let total_len = der[1] as usize;
-        if der.len() < total_len + 2 {
-            return Err(Error::InvalidSignature("DER length mismatch".to_string()));
-        }
-
-        let mut pos = 2;
-
-        // Parse R
-        if der[pos] != 0x02 {
-            return Err(Error::InvalidSignature(
-                "Expected integer tag 0x02 for R".to_string(),
-            ));
-        }
-        pos += 1;
-
-        let r_len = der[pos] as usize;
-        pos += 1;
-
-        if pos + r_len > der.len() {
-            return Err(Error::InvalidSignature("R length overflow".to_string()));
-        }
-
-        let r_bytes = &der[pos..pos + r_len];
-        pos += r_len;
-
-        // Parse S
-        if pos >= der.len() || der[pos] != 0x02 {
-            return Err(Error::InvalidSignature(
-                "Expected integer tag 0x02 for S".to_string(),
-            ));
-        }
-        pos += 1;
-
-        if pos >= der.len() {
-            return Err(Error::InvalidSignature("S length missing".to_string()));
-        }
-
-        let s_len = der[pos] as usize;
-        pos += 1;
-
-        if pos + s_len > der.len() {
-            return Err(Error::InvalidSignature("S length overflow".to_string()));
-        }
-
-        let s_bytes = &der[pos..pos + s_len];
-
-        // Convert to fixed 32-byte arrays, handling leading zeros
-        let r = Self::der_int_to_fixed(r_bytes)?;
-        let s = Self::der_int_to_fixed(s_bytes)?;
-
-        Ok(Self { r, s })
+        let integers = super::signature_der::read(der)
+            .map_err(|words| Error::InvalidSignature(words.to_string()))?;
+        Ok(Self {
+            r: Self::der_int_to_fixed(integers.r)?,
+            s: Self::der_int_to_fixed(integers.s)?,
+        })
     }
 
     /// Parses a signature from compact format (64 bytes: R || S).
@@ -177,7 +141,11 @@ impl Signature {
 
     /// Encodes the signature in DER format.
     ///
-    /// DER format: `0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>`
+    /// DER format: `0x30 <len> 0x02 <rlen> <r> 0x02 <slen> <s>`, each integer
+    /// minimal, as the reference's `toDER` writes it (`ts-stack@edf6e03`
+    /// `Signature.ts:201-250`): a zero R as `02 01 00`, a zero S as `02 00`
+    /// (its S loop strips a zero no high bit follows; `02 01 00` until #842's
+    /// fold, which the strict reader refuses as an unneeded zero).
     ///
     /// # Returns
     ///
@@ -187,7 +155,11 @@ impl Signature {
         let sig = self.to_low_s();
 
         let r_bytes = Self::fixed_to_der_int(&sig.r);
-        let s_bytes = Self::fixed_to_der_int(&sig.s);
+        let s_bytes = if sig.s == [0u8; 32] {
+            Vec::new()
+        } else {
+            Self::fixed_to_der_int(&sig.s)
+        };
 
         let content_len = 2 + r_bytes.len() + 2 + s_bytes.len();
 
@@ -278,15 +250,10 @@ impl Signature {
     // Internal helpers
     // ========================================================================
 
-    /// Converts a DER integer (variable length, possibly with leading zero) to fixed 32 bytes.
+    /// An integer as the DER reader returned it (no sign byte left) in 32
+    /// bytes; longer is a value at or above 2^256, which this type does not
+    /// hold (the reference's `BigNumber` does; #842's stated cell).
     fn der_int_to_fixed(bytes: &[u8]) -> Result<[u8; 32]> {
-        // Skip leading zero if present (it's just for positive sign)
-        let bytes = if !bytes.is_empty() && bytes[0] == 0x00 {
-            &bytes[1..]
-        } else {
-            bytes
-        };
-
         if bytes.len() > 32 {
             return Err(Error::InvalidSignature(
                 "Integer component too large".to_string(),
@@ -450,11 +417,12 @@ mod tests {
     }
 
     #[test]
-    fn test_der_int_to_fixed_with_leading_zero() {
-        // DER integers have leading 0x00 when high bit is set
-        let bytes = vec![0x00, 0x80, 0x00, 0x00];
+    fn test_der_int_to_fixed_pads_on_the_left() {
+        // The reader has dropped the sign byte; the integer is right-aligned
+        let bytes = vec![0x80, 0x00, 0x00];
         let fixed = Signature::der_int_to_fixed(&bytes).unwrap();
         assert_eq!(&fixed[29..], &[0x80, 0x00, 0x00]);
+        assert_eq!(&fixed[..29], &[0u8; 29]);
     }
 
     #[test]

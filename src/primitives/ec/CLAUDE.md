@@ -13,6 +13,7 @@ This module provides secp256k1 elliptic curve operations for Bitcoin SV, includi
 | `private_key.rs` | secp256k1 private key: generation, WIF encoding, signing, ECDH, BRC-42 child derivation |
 | `public_key.rs` | secp256k1 public key: serialization, address generation, verification, point arithmetic, BRC-42 child derivation |
 | `signature.rs` | ECDSA signature: DER/compact encoding, low-S normalization (BIP 62) |
+| `signature_der.rs` | The reference's `Signature.fromDER` reading (`ts-stack@edf6e03` `Signature.ts:44-97`), crate-visible, the one copy of its checks (#842): `read` answers R and S without the sign byte or the reference's words; `Signature::from_der` reads through it, and so does the interpreter's default-mode reading (`script::spend::signature_read::by_default`), its two callers on the stable line; unit cells in `signature_der_tests.rs` |
 | `ecdsa.rs` | Standalone ECDSA functions: `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
 
 ## Key Exports
@@ -97,7 +98,7 @@ ECDSA signature with R and S components (32 bytes each).
 pub struct Signature {
     // Construction
     pub fn new(r: [u8; 32], s: [u8; 32]) -> Self
-    pub fn from_der(der: &[u8]) -> Result<Self>       // Variable length DER
+    pub fn from_der(der: &[u8]) -> Result<Self>       // The reference's fromDER (#842): exact length, short-form lengths, no unneeded zero; R or S past 32 bytes refused (stated)
     pub fn from_compact(data: &[u8; 64]) -> Result<Self>  // Fixed 64 bytes
     pub fn from_compact_slice(data: &[u8]) -> Result<Self>
 
@@ -106,7 +107,7 @@ pub struct Signature {
     pub fn s(&self) -> &[u8; 32]
 
     // Serialization
-    pub fn to_der(&self) -> Vec<u8>                   // Always outputs low-S
+    pub fn to_der(&self) -> Vec<u8>                   // Always outputs low-S; a zero S as `02 00`, the reference's toDER (#842's fold)
     pub fn to_compact(&self) -> [u8; 64]              // R || S
 
     // BIP 62 compliance

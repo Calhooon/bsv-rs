@@ -221,6 +221,7 @@ jobs:
           - fuzz_script_parser
           - fuzz_script_spend
           - fuzz_shamir_backup
+          - fuzz_signature_der
           - fuzz_transaction_parser
           - fuzz_wire_decoders
           - fuzz_wire_protocol
