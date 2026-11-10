@@ -187,11 +187,135 @@ pub fn materialize(root: &Path, revision: Option<&str>) -> Result<Tree> {
         working_copy(root, &tree.path)?;
     }
     // The library has no tracked lockfile. Keep measurement dependency resolution fixed.
+    // The lock pins the dependencies; the crate's own version is the manifest's, so a
+    // release commit (Cargo.toml and CHANGELOG.md alone) does not make the lock stale.
+    let manifest = std::fs::read_to_string(tree.path.join("Cargo.toml"))?;
     std::fs::write(
         tree.path.join("Cargo.lock"),
-        include_str!("../library.Cargo.lock"),
+        lock_for_manifest(LIBRARY_LOCK, &manifest)?,
     )?;
     Ok(tree)
+}
+
+const LIBRARY_LOCK: &str = include_str!("../library.Cargo.lock");
+
+/// Reads `key = "value"` from the manifest's `[package]` table.
+fn package_field(manifest: &str, key: &str) -> Result<String> {
+    let mut in_package = false;
+    let mut found = None;
+    for line in manifest.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_package = line == "[package]";
+            continue;
+        }
+        if !in_package {
+            continue;
+        }
+        let Some((name, value)) = line.split_once('=') else {
+            continue;
+        };
+        if name.trim() != key {
+            continue;
+        }
+        let value = value.trim();
+        let value = value
+            .strip_prefix('"')
+            .and_then(|rest| rest.split_once('"'))
+            .map(|(inner, _)| inner)
+            .filter(|inner| !inner.is_empty())
+            .ok_or_else(|| {
+                format!("Cargo.toml's [package] {key} is not a plain string: {value}")
+            })?;
+        if found.replace(value.to_string()).is_some() {
+            return Err(format!("Cargo.toml's [package] names {key} twice").into());
+        }
+    }
+    found.ok_or_else(|| format!("Cargo.toml has no [package] {key}").into())
+}
+
+/// The committed lock with the root package's `version` line set to the manifest's
+/// version: the `[[package]]` entry named as the manifest's package with no `source`
+/// line. Every other byte is the committed lock's.
+pub fn lock_for_manifest(lock: &str, manifest: &str) -> Result<String> {
+    let name = package_field(manifest, "name")?;
+    let version = package_field(manifest, "version")?;
+    let lines: Vec<&str> = lock.split_inclusive('\n').collect();
+    // Every table header's line, and whether it opens a `[[package]]` entry.
+    let headers: Vec<(usize, bool)> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.starts_with('['))
+        .map(|(index, line)| (index, line.trim_end() == "[[package]]"))
+        .collect();
+    // (the entry's header line, 1-based; the index of its `version` line)
+    let mut roots = Vec::new();
+    for (position, &(header, is_package)) in headers.iter().enumerate() {
+        if !is_package {
+            continue;
+        }
+        let end = headers
+            .get(position + 1)
+            .map_or(lines.len(), |&(next, _)| next);
+        let body = header + 1..end;
+        let field = |key: &str| {
+            body.clone().find(|&at| {
+                lines[at]
+                    .split_once('=')
+                    .is_some_and(|(field, _)| field.trim() == key)
+            })
+        };
+        let named =
+            field("name").is_some_and(|at| lines[at].trim_end() == format!("name = \"{name}\""));
+        if named && field("source").is_none() {
+            roots.push((header + 1, field("version")));
+        }
+    }
+    let version_line = match roots.as_slice() {
+        [(_, Some(at))] => *at,
+        [(start, None)] => {
+            return Err(format!(
+                "tools/ratchet/library.Cargo.lock's root package {name} (line {}) has no \
+                 version line; refresh the lock (docs/RATCHETS.md, \"When a dependency changes\")",
+                start
+            )
+            .into())
+        }
+        [] => {
+            return Err(format!(
+                "tools/ratchet/library.Cargo.lock has no root package {name} (a [[package]] \
+                 named {name} without a source line); refresh the lock (docs/RATCHETS.md, \
+                 \"When a dependency changes\")"
+            )
+            .into())
+        }
+        many => {
+            let starts: Vec<String> = many.iter().map(|(start, _)| start.to_string()).collect();
+            return Err(format!(
+                "tools/ratchet/library.Cargo.lock has {} root packages {name} (entries \
+                 without a source line at lines {}); exactly one is required",
+                many.len(),
+                starts.join(", ")
+            )
+            .into());
+        }
+    };
+    let ending = if lines[version_line].ends_with("\r\n") {
+        "\r\n"
+    } else if lines[version_line].ends_with('\n') {
+        "\n"
+    } else {
+        ""
+    };
+    let mut out = String::with_capacity(lock.len() + version.len());
+    for (index, line) in lines.iter().enumerate() {
+        if index == version_line {
+            out.push_str(&format!("version = \"{version}\"{ending}"));
+        } else {
+            out.push_str(line);
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -205,6 +329,138 @@ mod tests {
         assert!(outside_checkout(&rejected, &fixture.path).is_err());
         assert!(!rejected.try_exists()?);
         assert!(outside_checkout(Path::new("relative"), &fixture.path).is_err());
+        Ok(())
+    }
+
+    fn manifest(version: &str) -> String {
+        format!(
+            "[package]\nname = \"bsv-rs\"\nversion = \"{version}\"\nedition = \"2021\"\n\n\
+             [dependencies]\nversion_check = {{ version = \"0.9\" }}\n"
+        )
+    }
+
+    fn committed_version() -> Result<String> {
+        let mut roots = LIBRARY_LOCK.split("[[package]]").filter(|entry| {
+            entry.contains("\nname = \"bsv-rs\"\n") && !entry.contains("\nsource = ")
+        });
+        let entry = roots.next().ok_or("the committed lock has no root entry")?;
+        let line = entry
+            .lines()
+            .find(|line| line.starts_with("version = "))
+            .ok_or("the root entry has no version")?;
+        Ok(line["version = ".len()..].trim_matches('"').to_string())
+    }
+
+    /// The lines of `a` and `b` that differ, by index; both have the same line count.
+    fn differing_lines(a: &str, b: &str) -> Vec<(String, String)> {
+        assert_eq!(a.lines().count(), b.lines().count());
+        a.lines()
+            .zip(b.lines())
+            .filter(|(x, y)| x != y)
+            .map(|(x, y)| (x.to_string(), y.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn the_crates_own_version_moved_sets_the_root_entry_alone() -> Result<()> {
+        let committed = committed_version()?;
+        for version in ["0.8.4", "0.9.0-beta.8", "10.200.3000-rc.1+build.20261110"] {
+            assert_ne!(version, committed);
+            let lock = lock_for_manifest(LIBRARY_LOCK, &manifest(version))?;
+            assert_eq!(
+                differing_lines(LIBRARY_LOCK, &lock),
+                vec![(
+                    format!("version = \"{committed}\""),
+                    format!("version = \"{version}\"")
+                )],
+                "{version}"
+            );
+            assert_eq!(
+                lock.len() + committed.len(),
+                LIBRARY_LOCK.len() + version.len()
+            );
+        }
+        // The version the lock already names: the committed lock byte for byte.
+        assert_eq!(
+            lock_for_manifest(LIBRARY_LOCK, &manifest(&committed))?,
+            LIBRARY_LOCK
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_lock_with_no_root_entry_stops_and_names_it() -> Result<()> {
+        let lock = "version = 4\n\n[[package]]\nname = \"bsv-rs\"\nversion = \"1.0.0\"\n\
+                    source = \"registry+https://github.com/rust-lang/crates.io-index\"\n\n\
+                    [[package]]\nname = \"aes\"\nversion = \"0.8.4\"\n";
+        let Err(error) = lock_for_manifest(lock, &manifest("0.9.0")) else {
+            return Err("a lock without a root entry was accepted".into());
+        };
+        assert_eq!(
+            error.to_string(),
+            "tools/ratchet/library.Cargo.lock has no root package bsv-rs (a [[package]] named \
+             bsv-rs without a source line); refresh the lock (docs/RATCHETS.md, \
+             \"When a dependency changes\")"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_lock_with_two_root_entries_stops_and_names_them() -> Result<()> {
+        let lock = "version = 4\n\n[[package]]\nname = \"bsv-rs\"\nversion = \"0.8.3\"\n\n\
+                    [[package]]\nname = \"bsv-rs\"\nversion = \"0.8.2\"\n";
+        let Err(error) = lock_for_manifest(lock, &manifest("0.9.0")) else {
+            return Err("a lock with two root entries was accepted".into());
+        };
+        assert_eq!(
+            error.to_string(),
+            "tools/ratchet/library.Cargo.lock has 2 root packages bsv-rs (entries without a \
+             source line at lines 3, 7); exactly one is required"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_dependency_named_as_the_root_with_a_source_is_left_alone() -> Result<()> {
+        let dependency = "[[package]]\nname = \"bsv-rs\"\nversion = \"0.3.24\"\n\
+                          source = \"registry+https://github.com/rust-lang/crates.io-index\"\n\
+                          checksum = \"00\"\n";
+        let root =
+            "[[package]]\nname = \"bsv-rs\"\nversion = \"0.8.3\"\ndependencies = [\n \"aes\",\n]\n";
+        for lock in [
+            format!("version = 4\n\n{dependency}\n{root}"),
+            format!("version = 4\n\n{root}\n{dependency}"),
+        ] {
+            let pinned = lock_for_manifest(&lock, &manifest("0.8.4"))?;
+            assert_eq!(
+                pinned,
+                lock.replace("version = \"0.8.3\"", "version = \"0.8.4\"")
+            );
+            assert!(pinned.contains("version = \"0.3.24\""));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_dependency_moved_is_still_a_stale_lock() -> Result<()> {
+        // The tool touches the root's version line alone: a dependency the manifest
+        // gained is not added, so cargo --locked still refuses the scratch lock.
+        let mut planted = manifest("0.9.0-beta.8");
+        planted.push_str("semver = \"1\"\n");
+        let lock = lock_for_manifest(LIBRARY_LOCK, &planted)?;
+        assert_eq!(differing_lines(LIBRARY_LOCK, &lock).len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn the_manifests_version_is_read_from_its_package_table() -> Result<()> {
+        assert_eq!(package_field(&manifest("0.8.4"), "version")?, "0.8.4");
+        assert!(package_field(
+            "[package]\nname = \"bsv-rs\"\nversion.workspace = true\n",
+            "version"
+        )
+        .is_err());
+        assert!(package_field("[dependencies]\nversion = \"1\"\n", "version").is_err());
         Ok(())
     }
 }
