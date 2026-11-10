@@ -1,0 +1,1792 @@
+{
+  "description": "What the reference answers for a BEEF raw entry whose bytes are not exactly one transaction (#852, the stable line of #840): mergeRawTx, inputTxids, verifyValid, isValid and the end-to-end read of the BEEF it writes, per shape and state.",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "recorder": "tests/support/beef_held_entry_852.mjs",
+  "node": "v22.23.3",
+  "parent_raw": "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0134ffffffff0100f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+  "parent_height": 9,
+  "entry_height": 1000,
+  "cells": [
+    {
+      "shape": "exact",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": false
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": true,
+        "value": {
+          "verify_valid": false
+        }
+      },
+      "transaction_from_beef": {
+        "ok": true,
+        "value": {
+          "id": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+        }
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "exact",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": true,
+        "value": {
+          "verify_valid": true
+        }
+      },
+      "transaction_from_beef": {
+        "ok": true,
+        "value": {
+          "id": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+        }
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "exact",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": true,
+        "value": {
+          "verify_valid": true
+        }
+      },
+      "transaction_from_beef": {
+        "ok": true,
+        "value": {
+          "id": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+        }
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "exact",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": true,
+        "value": {
+          "verify_valid": true
+        }
+      },
+      "transaction_from_beef": {
+        "ok": true,
+        "value": {
+          "id": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+        }
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "exact",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "child_txid": "aca6bd69a44e7a0842ebc47d9ca546aa807de8defa00ff84d6de50995b2d450b",
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": true,
+        "value": {
+          "verify_valid": true
+        }
+      },
+      "transaction_from_beef": {
+        "ok": true,
+        "value": {
+          "id": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+        }
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "exact",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "merge_beef": {
+        "ok": true,
+        "value": null
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": true,
+        "value": {
+          "verify_valid": true
+        }
+      },
+      "transaction_from_beef": {
+        "ok": true,
+        "value": {
+          "id": "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+        }
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "plus_one_byte",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000000",
+      "entry_txid": "9529fd4a2da1eb59324757bf4d82ea2900f9b5a8ab9ae17a0a980bfbdf4d8356",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": false
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "plus_one_byte",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000000",
+      "entry_txid": "9529fd4a2da1eb59324757bf4d82ea2900f9b5a8ab9ae17a0a980bfbdf4d8356",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_one_byte",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000000",
+      "entry_txid": "9529fd4a2da1eb59324757bf4d82ea2900f9b5a8ab9ae17a0a980bfbdf4d8356",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_one_byte",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000000",
+      "entry_txid": "9529fd4a2da1eb59324757bf4d82ea2900f9b5a8ab9ae17a0a980bfbdf4d8356",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_one_byte",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000000",
+      "entry_txid": "9529fd4a2da1eb59324757bf4d82ea2900f9b5a8ab9ae17a0a980bfbdf4d8356",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "child_txid": "7f2a74c74f0307a08312a6077a30b6943207b10ac415b78f7eb14d46a4353fe9",
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_one_byte",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000000",
+      "entry_txid": "9529fd4a2da1eb59324757bf4d82ea2900f9b5a8ab9ae17a0a980bfbdf4d8356",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "merge_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "plus_four_bytes",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000001020304",
+      "entry_txid": "b5f0b327e4fb58e51ebf5d803898a55ed6072f61467965770bdd8a77d4250a1b",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": false
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "plus_four_bytes",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000001020304",
+      "entry_txid": "b5f0b327e4fb58e51ebf5d803898a55ed6072f61467965770bdd8a77d4250a1b",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_four_bytes",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000001020304",
+      "entry_txid": "b5f0b327e4fb58e51ebf5d803898a55ed6072f61467965770bdd8a77d4250a1b",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_four_bytes",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000001020304",
+      "entry_txid": "b5f0b327e4fb58e51ebf5d803898a55ed6072f61467965770bdd8a77d4250a1b",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_four_bytes",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000001020304",
+      "entry_txid": "b5f0b327e4fb58e51ebf5d803898a55ed6072f61467965770bdd8a77d4250a1b",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "child_txid": "6d45be1d3511214413df64e3d6cf1b5cfc2c87b99c96a2ba538cb8917bc466b1",
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_four_bytes",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000000001020304",
+      "entry_txid": "b5f0b327e4fb58e51ebf5d803898a55ed6072f61467965770bdd8a77d4250a1b",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "merge_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "plus_itself",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac000000000100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "ed99efe6388713461d13ca0ae3dd59c756179fdac634a3e7c010b5fc9b91c01c",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": false
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "plus_itself",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac000000000100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "ed99efe6388713461d13ca0ae3dd59c756179fdac634a3e7c010b5fc9b91c01c",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_itself",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac000000000100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "ed99efe6388713461d13ca0ae3dd59c756179fdac634a3e7c010b5fc9b91c01c",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_itself",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac000000000100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "ed99efe6388713461d13ca0ae3dd59c756179fdac634a3e7c010b5fc9b91c01c",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_itself",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac000000000100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "ed99efe6388713461d13ca0ae3dd59c756179fdac634a3e7c010b5fc9b91c01c",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "child_txid": "70b87b7b212ddd6b64e026c9253484d7e8630faf73b490514c7505b8c4c6972f",
+      "input_txids": [
+        "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+      ],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "plus_itself",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac000000000100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+      "entry_txid": "ed99efe6388713461d13ca0ae3dd59c756179fdac634a3e7c010b5fc9b91c01c",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": [
+            "0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9"
+          ]
+        }
+      },
+      "merge_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_inputs",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd9",
+      "entry_txid": "0934a07848b5e3b84133f199e74eb7cf2605f435563e5b7f50e1fd1dd65ae47a",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_inputs",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd9",
+      "entry_txid": "0934a07848b5e3b84133f199e74eb7cf2605f435563e5b7f50e1fd1dd65ae47a",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_inputs",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd9",
+      "entry_txid": "0934a07848b5e3b84133f199e74eb7cf2605f435563e5b7f50e1fd1dd65ae47a",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "cut_in_inputs",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd9",
+      "entry_txid": "0934a07848b5e3b84133f199e74eb7cf2605f435563e5b7f50e1fd1dd65ae47a",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_inputs",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd9",
+      "entry_txid": "0934a07848b5e3b84133f199e74eb7cf2605f435563e5b7f50e1fd1dd65ae47a",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_inputs",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd9",
+      "entry_txid": "0934a07848b5e3b84133f199e74eb7cf2605f435563e5b7f50e1fd1dd65ae47a",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_at_output_count",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff",
+      "entry_txid": "681deae5f08313635023636e72edc6d8d87a9aa595505d0ddba21fc97357f1da",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_at_output_count",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff",
+      "entry_txid": "681deae5f08313635023636e72edc6d8d87a9aa595505d0ddba21fc97357f1da",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_at_output_count",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff",
+      "entry_txid": "681deae5f08313635023636e72edc6d8d87a9aa595505d0ddba21fc97357f1da",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "cut_at_output_count",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff",
+      "entry_txid": "681deae5f08313635023636e72edc6d8d87a9aa595505d0ddba21fc97357f1da",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_at_output_count",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff",
+      "entry_txid": "681deae5f08313635023636e72edc6d8d87a9aa595505d0ddba21fc97357f1da",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_at_output_count",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff",
+      "entry_txid": "681deae5f08313635023636e72edc6d8d87a9aa595505d0ddba21fc97357f1da",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "ReaderUint8Array read exceeds available data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_output",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b22",
+      "entry_txid": "56135902ffe69c51068b538c5e499d8dfecf7a1b2c2a7088c4a71e9f0aa03fc7",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_output",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b22",
+      "entry_txid": "56135902ffe69c51068b538c5e499d8dfecf7a1b2c2a7088c4a71e9f0aa03fc7",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_output",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b22",
+      "entry_txid": "56135902ffe69c51068b538c5e499d8dfecf7a1b2c2a7088c4a71e9f0aa03fc7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "cut_in_output",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b22",
+      "entry_txid": "56135902ffe69c51068b538c5e499d8dfecf7a1b2c2a7088c4a71e9f0aa03fc7",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_output",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b22",
+      "entry_txid": "56135902ffe69c51068b538c5e499d8dfecf7a1b2c2a7088c4a71e9f0aa03fc7",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_output",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b22",
+      "entry_txid": "56135902ffe69c51068b538c5e499d8dfecf7a1b2c2a7088c4a71e9f0aa03fc7",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_lock_time",
+      "state": "parent_absent",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000",
+      "entry_txid": "f1a3ad2c4ce752b375d55751372e102517250d2b326ee01cd691844d68276ad3",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_lock_time",
+      "state": "parent_present_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000",
+      "entry_txid": "f1a3ad2c4ce752b375d55751372e102517250d2b326ee01cd691844d68276ad3",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_lock_time",
+      "state": "entry_proven",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000",
+      "entry_txid": "f1a3ad2c4ce752b375d55751372e102517250d2b326ee01cd691844d68276ad3",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "cut_in_lock_time",
+      "state": "atomic_subject",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000",
+      "entry_txid": "f1a3ad2c4ce752b375d55751372e102517250d2b326ee01cd691844d68276ad3",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_lock_time",
+      "state": "parent_of_child",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000",
+      "entry_txid": "f1a3ad2c4ce752b375d55751372e102517250d2b326ee01cd691844d68276ad3",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "cut_in_lock_time",
+      "state": "merged",
+      "raw": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0000",
+      "entry_txid": "f1a3ad2c4ce752b375d55751372e102517250d2b326ee01cd691844d68276ad3",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_3_bytes",
+      "state": "parent_absent",
+      "raw": "010000",
+      "entry_txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_3_bytes",
+      "state": "parent_present_proven",
+      "raw": "010000",
+      "entry_txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_3_bytes",
+      "state": "entry_proven",
+      "raw": "010000",
+      "entry_txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "no_transaction_3_bytes",
+      "state": "atomic_subject",
+      "raw": "010000",
+      "entry_txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_3_bytes",
+      "state": "parent_of_child",
+      "raw": "010000",
+      "entry_txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_3_bytes",
+      "state": "merged",
+      "raw": "010000",
+      "entry_txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_40_bytes",
+      "state": "parent_absent",
+      "raw": "01000000fd0100000000000000000000000000000000000000000000000000000000000000000000",
+      "entry_txid": "461c6740d99dfcd315e9d44a2a82d399244ab08b03ab0747f6b8188614e10cb1",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_40_bytes",
+      "state": "parent_present_proven",
+      "raw": "01000000fd0100000000000000000000000000000000000000000000000000000000000000000000",
+      "entry_txid": "461c6740d99dfcd315e9d44a2a82d399244ab08b03ab0747f6b8188614e10cb1",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_40_bytes",
+      "state": "entry_proven",
+      "raw": "01000000fd0100000000000000000000000000000000000000000000000000000000000000000000",
+      "entry_txid": "461c6740d99dfcd315e9d44a2a82d399244ab08b03ab0747f6b8188614e10cb1",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "no_transaction_40_bytes",
+      "state": "atomic_subject",
+      "raw": "01000000fd0100000000000000000000000000000000000000000000000000000000000000000000",
+      "entry_txid": "461c6740d99dfcd315e9d44a2a82d399244ab08b03ab0747f6b8188614e10cb1",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_40_bytes",
+      "state": "parent_of_child",
+      "raw": "01000000fd0100000000000000000000000000000000000000000000000000000000000000000000",
+      "entry_txid": "461c6740d99dfcd315e9d44a2a82d399244ab08b03ab0747f6b8188614e10cb1",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_transaction_40_bytes",
+      "state": "merged",
+      "raw": "01000000fd0100000000000000000000000000000000000000000000000000000000000000000000",
+      "entry_txid": "461c6740d99dfcd315e9d44a2a82d399244ab08b03ab0747f6b8188614e10cb1",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "non-canonical varInt"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_bytes",
+      "state": "parent_absent",
+      "raw": "",
+      "entry_txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_bytes",
+      "state": "parent_present_proven",
+      "raw": "",
+      "entry_txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_bytes",
+      "state": "entry_proven",
+      "raw": "",
+      "entry_txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "no_bytes",
+      "state": "atomic_subject",
+      "raw": "",
+      "entry_txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_bytes",
+      "state": "parent_of_child",
+      "raw": "",
+      "entry_txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "no_bytes",
+      "state": "merged",
+      "raw": "",
+      "entry_txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+      "merge_raw_tx": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "zero_inputs_plus_byte",
+      "state": "parent_absent",
+      "raw": "0100000000010000000000000000000000000000",
+      "entry_txid": "ca95531dc8c11129d9967b642e14510c49faef4d26e80c3554381a0cb2cdb1e7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "zero_inputs_plus_byte",
+      "state": "parent_present_proven",
+      "raw": "0100000000010000000000000000000000000000",
+      "entry_txid": "ca95531dc8c11129d9967b642e14510c49faef4d26e80c3554381a0cb2cdb1e7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "zero_inputs_plus_byte",
+      "state": "entry_proven",
+      "raw": "0100000000010000000000000000000000000000",
+      "entry_txid": "ca95531dc8c11129d9967b642e14510c49faef4d26e80c3554381a0cb2cdb1e7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "zero_inputs_plus_byte",
+      "state": "atomic_subject",
+      "raw": "0100000000010000000000000000000000000000",
+      "entry_txid": "ca95531dc8c11129d9967b642e14510c49faef4d26e80c3554381a0cb2cdb1e7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": false
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": false
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    },
+    {
+      "shape": "zero_inputs_plus_byte",
+      "state": "parent_of_child",
+      "raw": "0100000000010000000000000000000000000000",
+      "entry_txid": "ca95531dc8c11129d9967b642e14510c49faef4d26e80c3554381a0cb2cdb1e7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "child_txid": "e275b0be97dcf4b1f2327ac5eef9a0dc25263f5aae44a95e458dd99cc8db58cf",
+      "input_txids": [],
+      "verify_valid": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_false": {
+        "ok": true,
+        "value": true
+      },
+      "is_valid_true": {
+        "ok": true,
+        "value": true
+      },
+      "written": {
+        "ok": true
+      },
+      "from_binary_strict": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "transaction_from_beef": {
+        "ok": false,
+        "error": "Serialized transaction exceeds available BEEF data"
+      },
+      "stated_divergence": true
+    },
+    {
+      "shape": "zero_inputs_plus_byte",
+      "state": "merged",
+      "raw": "0100000000010000000000000000000000000000",
+      "entry_txid": "ca95531dc8c11129d9967b642e14510c49faef4d26e80c3554381a0cb2cdb1e7",
+      "merge_raw_tx": {
+        "ok": true,
+        "value": {
+          "input_txids": []
+        }
+      },
+      "merge_beef": {
+        "ok": false,
+        "error": "Serialized BEEF contains trailing data"
+      },
+      "stated_divergence": false
+    }
+  ]
+}

@@ -685,10 +685,10 @@ impl Beef {
     ///   0; at any other offset it is [`Kind::MissingSibling`] (NL-8 W2). Two
     ///   BUMPs at one height with different roots: [`Kind::RootNotCarried`]
     ///   (the headers carry one root per height).
-    /// - A raw transaction with no input: [`Kind::NoInputs`] (0.4.1); one with
-    ///   an input and no output: [`Kind::NoOutputs`] (0.4.3). The first such
-    ///   transaction in the order held when this is called, as the reader
-    ///   meets the first on the wire.
+    /// - No input: [`Kind::NoInputs`] (0.4.1); raw bytes not one transaction,
+    ///   proven or not: the reader's kind (`TrailingBytes`, `Truncated`,
+    ///   `BadVarint`; #852); an input and no output: [`Kind::NoOutputs`] (0.4.3).
+    ///   The earliest in the order held when this is called, as the reader meets it.
     /// - A txid-only entry no BUMP of this BEEF proves: [`Kind::StubNotProven`]
     ///   (NL-8 W5).
     /// - A BUMP index that names no BUMP, or a BUMP that does not carry the
@@ -713,18 +713,10 @@ impl Beef {
             Some(subject) => self.atomic_rule(&subject),
             None => Ok(()),
         };
-        // The first transaction that is no transaction, in the order held
-        // (the reader's), before the sort moves it.
-        let no_transaction = self.txs.iter().find_map(|tx| {
-            if tx.has_no_inputs() {
-                Some(Kind::NoInputs)
-            } else if tx.has_no_outputs() {
-                Some(Kind::NoOutputs)
-            } else {
-                None
-            }
-        });
-        let sr = self.sort_txs();
+        // The earliest entry that is no transaction, before the sort moves it.
+        let (kinds, held): (Vec<_>, Vec<_>) = self.txs.iter().map(BeefTx::structure_kind).unzip();
+        let no_transaction = kinds.into_iter().flatten().next();
+        let sr = self.sort_held(&held);
 
         // Each BUMP's root, by the streaming reader's walk: once per BUMP,
         // linear in its leaves (0.4.2). At 0.4.1 each flagged leaf computed
@@ -846,9 +838,14 @@ impl Beef {
     /// links (0.3.35, bsv-stack-lean #57). The reference sorts the same way
     /// (`@bsv/sdk` `Beef.#topoSort`, "preserve the legacy repeated-scan
     /// ordering without repeating scans").
+    /// Raw bytes not one transaction are `not_valid`, proven or not (#852).
     pub fn sort_txs(&mut self) -> SortResult {
-        use std::cmp::Reverse;
-        use std::collections::{BinaryHeap, HashSet};
+        let held: Vec<_> = self.txs.iter().map(|t| t.strict_read().is_err()).collect();
+        self.sort_held(&held)
+    }
+
+    fn sort_held(&mut self, held: &[bool]) -> SortResult {
+        use std::{cmp::Reverse, collections::BinaryHeap};
 
         let mut result = SortResult::default();
         let mut valid_txids: HashMap<String, bool> = HashMap::new();
@@ -859,10 +856,13 @@ impl Beef {
         let mut with_proof: Vec<usize> = Vec::new();
         let mut txid_only: Vec<usize> = Vec::new();
         let mut queue: Vec<usize> = Vec::new();
+        let mut not_valid: Vec<usize> = Vec::new();
 
         for (i, tx) in self.txs.iter_mut().enumerate() {
-            tx.is_valid = Some(tx.has_proof());
-            if tx.has_proof() {
+            tx.is_valid = Some(tx.has_proof() && !held[i]);
+            if held[i] {
+                not_valid.push(i);
+            } else if tx.has_proof() {
                 valid_txids.insert(txids[i].clone(), true);
                 with_proof.push(i);
             } else if tx.is_txid_only() && tx.input_txids.is_empty() {
@@ -938,7 +938,7 @@ impl Beef {
         }
 
         // Remaining are not valid
-        let not_valid: Vec<usize> = pending.into_iter().filter(|&i| !accepted[i]).collect();
+        not_valid.extend(pending.into_iter().filter(|&i| !accepted[i]));
         for &i in &not_valid {
             result.not_valid.push(txids[i].clone());
         }
