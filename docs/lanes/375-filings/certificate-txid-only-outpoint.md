@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [certificate-txid-only-outpoint-go-sdk.md](./certificate-txid-only-outpoint-go-sdk.md), queue row 46.
+
 # Read the default TypeScript certificate revocation outpoint consistently
 
 Repository: bsv-blockchain/go-sdk

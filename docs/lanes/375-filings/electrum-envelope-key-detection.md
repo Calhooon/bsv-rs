@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [electrum-envelope-key-detection-go-sdk.md](./electrum-envelope-key-detection-go-sdk.md), queue row 47.
+
 # Detect Electrum embedded keys from prefix and framing rather than envelope length
 
 Repository: bsv-blockchain/go-sdk

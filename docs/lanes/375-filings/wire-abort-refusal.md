@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [wire-false-verdicts-go-sdk.md](./wire-false-verdicts-go-sdk.md) (one serializer pattern), queue row 43.
+
 # Preserve an abortAction refusal over the wallet wire
 
 Repository: bsv-blockchain/go-sdk

@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): covered by bsv-blockchain/BRCs#360 (open, filed 2026-10-27 from this crate's #280 vector: "BRC-103: name the bytes an auth message signature covers"); not to be filed again.
+
 # Specify certificate-message JSON signature preimages across SDKs
 
 Repository: bsv-blockchain/BRCs

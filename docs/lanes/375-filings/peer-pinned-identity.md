@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [peer-pinned-identity-go-sdk.md](./peer-pinned-identity-go-sdk.md), queue row 41.
+
 # Reject an initial response signed by a different identity than the pinned peer
 
 Repository: bsv-blockchain/go-sdk

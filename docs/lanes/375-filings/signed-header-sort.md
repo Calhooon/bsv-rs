@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [signed-header-comparator-brcs.md](./signed-header-comparator-brcs.md), queue row 57.
+
 # Specify an unambiguous signed-header comparator for HTTP token punctuation
 
 Repository: bsv-blockchain/BRCs

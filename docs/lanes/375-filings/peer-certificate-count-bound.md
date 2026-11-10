@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): held as a stated row (ours) by the keeper's 2026-10-30 08:1xZ line: the 100-certificate cap is the reference's safeguard, no BRC number; not queued.
+
 # Bound inbound and outbound authentication certificate lists
 
 Repository: bsv-blockchain/go-sdk

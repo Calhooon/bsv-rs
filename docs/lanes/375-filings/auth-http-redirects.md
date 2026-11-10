@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [auth-transport-redirects-go-sdk.md](./auth-transport-redirects-go-sdk.md), queue row 49.
+
 # Refuse redirects by default for authenticated HTTP requests
 
 Repository: bsv-blockchain/go-sdk

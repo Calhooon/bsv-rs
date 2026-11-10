@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): held as a stated row (ours) by the keeper's 2026-10-30 08:1xZ line: the reference's own input safeguards, no BRC or node rule; not queued.
+
 # Validate requested certificate policies before signing and on receipt
 
 Repository: bsv-blockchain/go-sdk

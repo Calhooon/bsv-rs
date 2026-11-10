@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [arithmetic-range-error-verdict-ts-stack.md](./arithmetic-range-error-verdict-ts-stack.md), queue row 55.
+
 # Return a script verdict or a typed resource refusal for arithmetic engine limits
 
 Repository: bsv-blockchain/ts-stack
