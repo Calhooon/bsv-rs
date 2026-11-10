@@ -634,9 +634,15 @@ fn test_malformed_der_valid_signature_parses_ok() {
 }
 
 #[test]
-fn test_malformed_der_trailing_data_accepted() {
+fn test_malformed_der_trailing_data_refused_842() {
     use bsv_rs::primitives::ec::Signature;
-    // Valid DER with trailing byte -- blockchain signatures sometimes have trailing hashtype
+    use bsv_rs::Error;
+    // Valid DER with a trailing byte (a hash type left on): refused, as the
+    // reference's `Signature.fromDER` refuses it (`ts-stack@edf6e03`
+    // `Signature.ts:64-66`), in its words (#842). Until #842 this crate
+    // accepted it and ignored the byte (this test was
+    // `test_malformed_der_trailing_data_accepted`). A checksig signature's hash type is read by
+    // `TransactionSignature::from_checksig_format`, which takes it off before the DER is read.
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
         0xd3, 0xa1, 0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6, 0x24, 0xc6, 0xc6, 0x15,
@@ -645,13 +651,14 @@ fn test_malformed_der_trailing_data_accepted() {
         0x46, 0x22, 0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09,
         0x01, // trailing byte (hashtype)
     ];
-    // Like the Go SDK, trailing data after the valid DER structure is accepted
-    // because blockchain signatures can have trailing hashtype bytes
-    let parsed = Signature::from_der(&sig);
-    assert!(
-        parsed.is_ok(),
-        "Trailing data should be accepted (blockchain compat)"
+    assert_eq!(
+        Signature::from_der(&sig),
+        Err(Error::InvalidSignature("Signature DER invalid".into()))
     );
+    let checksig =
+        bsv_rs::primitives::bsv::tx_signature::TransactionSignature::from_checksig_format(&sig)
+            .expect("the hash type taken off, the DER reads");
+    assert_eq!(checksig.scope(), 0x01);
 }
 
 // =============================================================================

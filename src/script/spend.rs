@@ -104,10 +104,12 @@ use crate::primitives::bsv::sighash::{
     TxInput, TxOutput, TxSighashCache, SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE,
     SIGHASH_FORKID, SIGHASH_SINGLE,
 };
-use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::primitives::ec::PublicKey;
 use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, to_hex, BigNumber};
 use std::sync::Arc;
+
+/// The interpreter's one reading of a signature (#842's fold, #847).
+mod signature_read;
 
 // ============================================================================
 // Configuration Constants
@@ -2032,16 +2034,19 @@ impl Spend {
             return Err(self.error("The signature format is invalid."));
         }
 
-        // Parse and check additional requirements
-        let tx_sig = TransactionSignature::from_checksig_format(sig)
-            .map_err(|_| self.error("The signature format is invalid."))?;
+        // The signature as the mode's judge reads it (`signature_read.rs`, #842's
+        // fold): under a word the node's lax parse, without one the reference's
+        // `fromDER`; the same reading the signature check verifies.
+        let tx_sig = self
+            .read_signature(sig)
+            .ok_or_else(|| self.error("The signature format is invalid."))?;
 
-        // LOW_S as the reference checks it (`CPubKey::CheckLowS`, pubkey.cpp:356-365):
-        // the lax parser (146-173) turns an `r` or `s` at or above the curve order
-        // into the zero signature, which is low, so the check passes and the
-        // signature fails to verify afterwards (NULLFAIL under the flag, else a
-        // false top). Only n/2 < s < n is a high-S refusal.
-        if self.require_low_s && !tx_sig.has_low_s() && !signature_overflows_the_order(&tx_sig) {
+        // LOW_S, the reading's predicate: under a word the node's on the lax
+        // parse, where r or s at or above the order, or past 32 bytes, is the
+        // all-zero signature, which is low (pubkey.cpp:32-175, :353-363; #14 and
+        // #847 by one reading); in the default mode the reference's, #14's order
+        // exception kept. Only n/2 < s < n is a high-S refusal.
+        if self.require_low_s && !tx_sig.low_s {
             return Err(self.error("The signature must have a low S value."));
         }
 
@@ -2055,12 +2060,11 @@ impl Spend {
             .flags
             .is_none_or(|word| word.contains(ScriptFlags::STRICTENC))
         {
-            let base =
-                tx_sig.scope() & !(SIGHASH_CHRONICLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY);
+            let base = tx_sig.scope & !(SIGHASH_CHRONICLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY);
             if !(SIGHASH_ALL..=SIGHASH_SINGLE).contains(&base) {
                 return Err(self.error(&format!(
                     "The signature's hash type (0x{:02x}) has no defined base type.",
-                    tx_sig.scope()
+                    tx_sig.scope
                 )));
             }
         }
@@ -2072,7 +2076,7 @@ impl Spend {
         if let Some(word) = self.flags {
             if word.contains(ScriptFlags::STRICTENC)
                 && !word.contains(ScriptFlags::CHRONICLE)
-                && (tx_sig.scope() & SIGHASH_CHRONICLE) != 0
+                && (tx_sig.scope & SIGHASH_CHRONICLE) != 0
             {
                 return Err(
                     self.error("The signature must not use SIGHASH_CHRONICLE before Chronicle.")
@@ -2080,7 +2084,7 @@ impl Spend {
             }
         }
 
-        if (tx_sig.scope() & SIGHASH_FORKID) == 0 {
+        if !tx_sig.has_forkid() {
             return Err(self.error("The signature must use SIGHASH_FORKID."));
         }
 
@@ -2363,10 +2367,12 @@ impl Spend {
         pubkey_bytes: &[u8],
         subscript: &Script,
     ) -> Result<bool, ScriptEvaluationError> {
-        // Parse signature and public key
-        let tx_sig = match TransactionSignature::from_checksig_format(sig_bytes) {
-            Ok(s) => s,
-            Err(_) => return Ok(false),
+        // The signature as the encoding check read it (`signature_read.rs`):
+        // under a word the node's lax parse, whose overflow is the all-zero
+        // signature that verifies nothing (`CPubKey::Verify`,
+        // pubkey.cpp:183-214); without one the reference's `fromDER`.
+        let Some(tx_sig) = self.read_signature(sig_bytes) else {
+            return Ok(false);
         };
 
         let pubkey = match PublicKey::from_bytes(pubkey_bytes) {
@@ -2381,20 +2387,20 @@ impl Spend {
         // transaction's, shared by every input's spend (bsv-low #591).
         let script_bytes = subscript.to_binary();
         if self.work_limit.is_some() {
-            let cost =
-                self.transaction
-                    .hashing_work(self.input_index, &script_bytes, tx_sig.scope());
+            let cost = self
+                .transaction
+                .hashing_work(self.input_index, &script_bytes, tx_sig.scope);
             self.charge_work(cost)?;
         }
         let sighash = self.transaction.sighash_dispatched_for_signing(
             self.input_index,
             &script_bytes,
             self.source_satoshis,
-            tx_sig.scope(),
+            tx_sig.scope,
         );
 
         // Verify
-        Ok(pubkey.verify(&sighash, tx_sig.signature()))
+        Ok(pubkey.verify(&sighash, &tx_sig.signature))
     }
 
     // ========================================================================
@@ -2684,15 +2690,6 @@ impl Spend {
 /// before Chronicle, handled in their arms.
 fn is_opcode_disabled(op: u8, utxo_after_chronicle: bool) -> bool {
     !utxo_after_chronicle && matches!(op, OP_2MUL | OP_2DIV)
-}
-
-/// Whether the signature's `r` or `s` is at or above the curve order: the
-/// reference's lax DER parse (`ecdsa_signature_parse_der_lax`, pubkey.cpp:146-173)
-/// overwrites such a signature with the all-zero one, which is low for
-/// `CheckLowS` (356-365) and never verifies.
-fn signature_overflows_the_order(sig: &TransactionSignature) -> bool {
-    let n = BigNumber::secp256k1_order();
-    BigNumber::from_bytes_be(sig.r()) >= n || BigNumber::from_bytes_be(sig.s()) >= n
 }
 
 /// Whether a signature's hash type carries `SIGHASH_FORKID`; an empty
@@ -3673,9 +3670,8 @@ mod chronicle_tests {
     }
 }
 
-/// The low-S check at the curve order (Calhooon/bsv-rs#14): an `r` or `s` at or
-/// above the order is the zero signature for the reference's lax parse, which
-/// is low; only n/2 < s < n is a high-S refusal.
+/// The low-S check at the order (#14): `r` or `s` at or above it is the all-zero
+/// signature for the node's lax parse (`der_lax.rs`), low; n/2 < s < n is high.
 #[cfg(test)]
 mod low_s_order_tests {
     use super::*;

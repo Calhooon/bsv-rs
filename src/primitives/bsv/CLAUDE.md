@@ -154,6 +154,8 @@ impl Debug for TransactionSignature { ... }
 
 **Blank signature handling**: `from_checksig_format(&[])` creates a placeholder signature with R=1, S=1, scope=1. This is used for unsigned inputs during transaction construction.
 
+**The DER before the scope byte (#842)**: `from_checksig_format` takes the last byte as the scope and reads the rest through `Signature::from_der`, the reference's `fromDER` (`TransactionSignature.ts:460-472` at `ts-stack@edf6e03`): a DER with other bytes before the scope byte is refused in its words; one byte alone is an empty DER, `Signature DER must start with 0x30` (`Checksig format too short` until #842). Pinned by `tests/signature_der_842.rs`.
+
 ### Schnorr ZK Proofs
 
 ```rust

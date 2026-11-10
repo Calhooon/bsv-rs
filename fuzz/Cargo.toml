@@ -49,3 +49,9 @@ name = "fuzz_chain_primitives"
 path = "fuzz_targets/fuzz_chain_primitives.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_signature_der"
+path = "fuzz_targets/fuzz_signature_der.rs"
+test = false
+doc = false
