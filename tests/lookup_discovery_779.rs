@@ -16,6 +16,7 @@ mod lock_position;
 use bsv_rs::overlay::{
     create_signed_overlay_admin_token, LookupAnswer, LookupQuestion, LookupResolver,
     LookupResolverConfig, NetworkPreset, OverlayLookupFacilitator, Protocol,
+    MAX_TRACKER_WAIT_TIME_MS,
 };
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::Error;
@@ -26,10 +27,14 @@ use std::sync::{Arc, Mutex};
 /// The URL, the question's service and its query of each question asked.
 type Asked = Arc<Mutex<Vec<(String, String, serde_json::Value)>>>;
 
-/// A facilitator answering by URL from its script, recording each question;
-/// a URL outside the script is refused in words of its own.
+/// The wait each question was asked with, in the order asked (#787).
+type Waits = Arc<Mutex<Vec<Option<u64>>>>;
+
+/// A facilitator answering by URL from its script, recording each question
+/// and its wait; a URL outside the script is refused in words of its own.
 struct Scripted {
     asked: Asked,
+    waits: Waits,
     script: HashMap<String, bsv_rs::Result<LookupAnswer>>,
 }
 
@@ -39,8 +44,9 @@ impl OverlayLookupFacilitator for Scripted {
         &self,
         url: &str,
         question: &LookupQuestion,
-        _timeout_ms: Option<u64>,
+        timeout_ms: Option<u64>,
     ) -> bsv_rs::Result<LookupAnswer> {
+        self.waits.lock().unwrap().push(timeout_ms);
         self.asked.lock().unwrap().push((
             url.to_string(),
             question.service.clone(),
@@ -57,10 +63,21 @@ fn resolver(
     config: LookupResolverConfig,
     script: Vec<(&str, bsv_rs::Result<LookupAnswer>)>,
 ) -> (LookupResolver, Asked) {
+    let (resolver, asked, _waits) = resolver_with_waits(config, script);
+    (resolver, asked)
+}
+
+/// `resolver`, handing the test the record of the waits too (#787).
+fn resolver_with_waits(
+    config: LookupResolverConfig,
+    script: Vec<(&str, bsv_rs::Result<LookupAnswer>)>,
+) -> (LookupResolver, Asked, Waits) {
     let asked = Asked::default();
+    let waits = Waits::default();
     let resolver = LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Scripted {
             asked: asked.clone(),
+            waits: waits.clone(),
             script: script
                 .into_iter()
                 .map(|(url, answer)| (url.to_string(), answer))
@@ -68,7 +85,7 @@ fn resolver(
         })),
         ..config
     });
-    (resolver, asked)
+    (resolver, asked, waits)
 }
 
 fn trackers(urls: &[&str]) -> LookupResolverConfig {
@@ -235,4 +252,60 @@ async fn find_competent_hosts_does_not_apply_a_host_override() {
             json!({})
         )]
     );
+}
+
+/// #787: discovery on the default config asks the four Mainnet trackers of
+/// the reference (`ts-stack@edf6e03` `LookupResolver.ts:216-223`, the
+/// `mainnet` preset at `:1333-1335`), each once with `ls_slap` and the
+/// reference's tracker wait, `MAX_TRACKER_WAIT_TIME = 5000` (`:248`, passed at
+/// `:1975-1977`; go-sdk@2ca481c waits 30 s, `resolver.go:18`, not followed).
+/// The URLs and the wait are literals, not `NetworkPreset::slap_trackers()`,
+/// so a change to the default list or the wait is seen. The four URLs are
+/// strings in the script: recorded, never dialled.
+#[tokio::test]
+async fn discovery_on_the_default_config_asks_the_four_mainnet_trackers_with_the_reference_wait_787(
+) {
+    const US: &str = "https://overlay-us-1.bsvb.tech";
+    const EU: &str = "https://overlay-eu-1.bsvb.tech";
+    const AP: &str = "https://overlay-ap-1.bsvb.tech";
+    const BAPP: &str = "https://users.bapp.dev";
+    // A name of its own; letters and underscores only, as the admin token's
+    // canonical name pattern asks (`OverlayAdminTokenTemplate.ts:31-34`).
+    const SERVICE: &str = "ls_default_config_discovery";
+    const FOUND: &str = "https://found.discovery-787.invalid";
+
+    // The default config, not a hand-built list.
+    let config = LookupResolverConfig::default();
+    assert_eq!(config.network_preset, NetworkPreset::Mainnet);
+    assert!(config.slap_trackers.is_none());
+
+    let empty = || Ok(LookupAnswer::OutputList { outputs: vec![] });
+    let (resolver, asked, waits) = resolver_with_waits(
+        config,
+        vec![
+            (US, advertising(SERVICE, &[FOUND])),
+            (EU, empty()),
+            (AP, empty()),
+            (BAPP, empty()),
+        ],
+    );
+
+    let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
+    assert_eq!(hosts, [FOUND]);
+    // The order is the list's: the global reputation tracker is keyed by URL
+    // and no other test in this binary names a Mainnet URL, so the four have
+    // no history and rank tied, the tie broken by their original order
+    // (`src/overlay/host_reputation_tracker.rs`, `rank_hosts_at`), and the
+    // questions are polled in rank order.
+    assert_eq!(
+        *asked.lock().unwrap(),
+        [
+            slap(US, SERVICE),
+            slap(EU, SERVICE),
+            slap(AP, SERVICE),
+            slap(BAPP, SERVICE)
+        ]
+    );
+    assert_eq!(*waits.lock().unwrap(), [Some(5000); 4]);
+    assert_eq!(MAX_TRACKER_WAIT_TIME_MS, 5000);
 }
