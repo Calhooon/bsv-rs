@@ -860,6 +860,93 @@ jobs:
             exit 1
           fi
 
+  # The node's oracle (#97, S1; the owner's decision of 2026-11-10, the captain's ruling on
+  # Q97.5): the sibling's harness (bsv-script-lean) run against this tree over its nine corpora,
+  # judged in two parts by .github/scripts/sibling_harness.py: VERDICTS, every applicable entry's
+  # verdict the node's specification column's, a divergence the sibling's rules table explains
+  # refused as an unexplained one is (no waiver, no explained row); REASONS, this crate's words
+  # per entry against tests/sibling/column.json, recorded from this tree (a reason changed on
+  # purpose changes the column in the same commit). Beta's line and every dispatch and tag; a
+  # pull request into main and a push to main do not run it (fixes are born on beta). It builds
+  # and judges on every such event, with no reach filter (a path list cannot see a dependency's
+  # release, and no Cargo.lock is tracked): about 1m7s on GitHub, its step 46 s cold.
+  # The manual: tests/sibling/CLAUDE.md.
+  sibling:
+    name: sibling
+    if: >-
+      (github.event_name != 'pull_request' || github.base_ref == 'beta') &&
+      (github.event_name != 'push' || github.ref != 'refs/heads/main')
+    runs-on: ubuntu-latest
+    env:
+      # THE PIN, in this one place. The sibling's public edition (bsv-script-lean's home since
+      # 2026-10-27; the private Calgooon repository is archived): no token is read. To move it:
+      # set SIBLING_PIN to the new commit, run tests/sibling/CLAUDE.md's one command against a
+      # checkout at it with `--record`, and commit the pin and the re-recorded column together
+      # (a commit of its own, Q97.6). The script refuses a column read at another commit (exit 2).
+      SIBLING_REPOSITORY: Calhooon/bsv-script-lean
+      SIBLING_PIN: 1c051eaef1077cc95e5d1618686d5efacc4aa097
+      CARGO_TARGET_DIR: ${{ github.workspace }}/sibling-target
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: The command's unit tests
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_sibling_harness.py'
+
+      # the harness, the pins it reads and the nine corpora (`harness/run:32`), nothing else
+      - name: Check out the sibling at the pin
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ env.SIBLING_REPOSITORY }}
+          ref: ${{ env.SIBLING_PIN }}
+          path: sibling
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /harness/
+            /docs/PROVENANCE.md
+            /corpus/seed/
+            /corpus/flow/
+            /corpus/arith/
+            /corpus/stack/
+            /corpus/crypto/
+            /corpus/bytes/
+            /corpus/eras/
+            /corpus/gen/
+            /corpus/tx/
+
+      # the harness's own toolchain file (`harness/rust-toolchain.toml`) names 1.95.0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: 1.95.0
+
+      - name: Cache the harness's build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: sibling
+          workspaces: sibling/harness -> ../../sibling-target
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/beta' }}
+
+      - name: sibling
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C sibling rev-parse HEAD)" = "$SIBLING_PIN"
+          set +e
+          python3 -B .github/scripts/sibling_harness.py run --tree . --sibling sibling \
+            --corpus all --scratch "$RUNNER_TEMP/sibling-scratch" --out "$RUNNER_TEMP/sibling-out" \
+            --column tests/sibling/column.json 2>&1 | tee "$RUNNER_TEMP/sibling.log"
+          rc="${PIPESTATUS[0]}"
+          set -e
+          {
+            echo '```'
+            grep -E '^(VERDICTS|REASONS|sibling_harness: (GREEN|RED|SETUP))|^  ' "$RUNNER_TEMP/sibling.log" | head -200 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
   # nothing sits on main that beta lacks (RELEASING.md, "The direction rule"): every commit of
   # origin/main is on the tree (the PR's merge commit, beta's tip after a push, the sync branch on
   # a dispatch) by sha, by patch (git cherry), or by a cherry-pick link in either direction: main's

@@ -20,7 +20,7 @@ is a current mutation floor only when its producing run covers that commit.
 
 | Area | What the producer must measure or prove | CI producer and JSON input | Current measurement |
 |---|---|---|---|
-| Script interpreter | Throughput on the sibling's seed corpus; identical conformance verdicts | `benchmarks`, `benches/baseline.json` and run artifact ([#77](https://github.com/Calhooon/bsv-rs/issues/77)); conformance job and artifact pending [#97](https://github.com/Calhooon/bsv-rs/issues/97) | not yet measured |
+| Script interpreter | Throughput on the sibling's seed corpus; identical conformance verdicts | `benchmarks`, `benches/baseline.json` and run artifact ([#77](https://github.com/Calhooon/bsv-rs/issues/77)); conformance: `ci.yml`'s `sibling` job ([#97](https://github.com/Calhooon/bsv-rs/issues/97), S1), `tests/sibling/column.json` at `bsv-script-lean@1c051eae`; its artifact and the collector input are S3 and S4 | throughput not yet measured; verdicts: 13,765 entries of nine corpora (73 `undecided`: pre-Genesis, outside the crate's rule set), 0 divergences from the node's column (2026-11-10, `7df16cf6`) |
 | BEEF streaming reader | Throughput and memory high-water by body size, with the element/index bound identified | `benchmarks`, `benches/baseline.json` and run artifact ([#77](https://github.com/Calhooon/bsv-rs/issues/77), [#91](https://github.com/Calhooon/bsv-rs/issues/91)) | not yet measured |
 | Merkle path verification | Shared-block paths at the workload specified in #77 and #93 | `benchmarks`, `benches/baseline.json` and run artifact ([#77](https://github.com/Calhooon/bsv-rs/issues/77)) | not yet measured |
 | Signing and verification | Multi-input signing and batch verification | `benchmarks`, `benches/baseline.json` and run artifact ([#77](https://github.com/Calhooon/bsv-rs/issues/77), [#92](https://github.com/Calhooon/bsv-rs/issues/92)) | not yet measured |
@@ -124,9 +124,12 @@ Neither this page nor a green collector authorizes a release or a pin move.
    intended behavior change updates its fixture in its own commit.
 3. Merge cold-path work on green CI. A hot-path change also needs the pinned
    conformance run, the mutation floor, and adversarial review. Any change under
-   `src/script/` or `src/transaction/` carries identical before/after
-   `harness/run --impl bsv-rs --corpus seed` results from the sibling; a reviewed
-   behavior change needs a witness and the applicable owner's ruling.
+   `src/script/`, `src/primitives/` or `src/transaction/` is judged by the
+   sibling's harness on every pull request into beta (`ci.yml`'s `sibling`,
+   `.github/scripts/sibling_harness.py run ... --corpus all`, #97): the node's
+   verdicts with no waiver, this crate's words against `tests/sibling/column.json`;
+   a reviewed behavior change re-records the column in its commit with a witness
+   and the applicable owner's ruling.
 4. Run mutation, fuzz and benchmarks nightly. A survivor, crash or regression
    becomes a ranked issue and a replayable witness. The CLI beta is the canary;
    LOW and the stack's witness wallet supply the soak through their captains.

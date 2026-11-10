@@ -54,6 +54,9 @@ const REQUIRED_ON_BETA: &[&str] = &[
     "checks",
     "main-in-beta",
     "semver",
+    // the node's oracle (#97, S1; the owner's decision of 2026-11-10): beta's line alone, as
+    // `main-in-beta`; the captain PATCHes beta's protection after the job runs green on its tip
+    "sibling",
 ];
 
 /// `main`'s required contexts once `main`'s `ci.yml` carries `lint` and `checks`, not a live
@@ -1127,5 +1130,649 @@ fn the_evaluator_reads_the_files_idioms() {
             &push
         ),
         Some(vec!["a".to_string(), "b".to_string()])
+    );
+}
+
+/// The `sibling` job, byte for byte, from its key line to its last line (#853's third fold, the
+/// scoped re-read of the second: a pin of the judging step alone left the job's other lines
+/// open). A step inserted before the judging step (one rewriting `tests/sibling/column.json` or
+/// `.github/scripts/sibling_harness.py`, or appending `BASH_ENV` to `$GITHUB_ENV`), a job `env:`
+/// key (`BASH_ENV`, `PATH`, `PYTHONPATH`, `RUNNER_TEMP`), a `container:`, a `strategy:`, a
+/// `timeout-minutes:`, another `runs-on:`, another action or `ref:` for the sibling's checkout,
+/// a step after the judging one, and every change to the judging step itself (a
+/// `continue-on-error`, a `|| true`, an `exit 0` or an `echo` before the harness, `exit "$rc"`
+/// changed to `exit 0`, `--corpus all` narrowed, another shell) each change these bytes, so a
+/// change to the job is a change to this constant in the same diff. `shell: bash` is GitHub's
+/// `bash --noprofile --norc -eo pipefail {0}` (the runner's documented template for `bash`): the
+/// block stops at the first failing command and a pipeline fails with its last failing member;
+/// `set -euo pipefail` repeats it in the block, and the harness's own status is taken from
+/// `PIPESTATUS[0]` between `set +e` and `set -e`. The constant is data: the YAML as it stands.
+const SIBLING_JOB: &str = r##"  sibling:
+    name: sibling
+    if: >-
+      (github.event_name != 'pull_request' || github.base_ref == 'beta') &&
+      (github.event_name != 'push' || github.ref != 'refs/heads/main')
+    runs-on: ubuntu-latest
+    env:
+      # THE PIN, in this one place. The sibling's public edition (bsv-script-lean's home since
+      # 2026-10-27; the private Calgooon repository is archived): no token is read. To move it:
+      # set SIBLING_PIN to the new commit, run tests/sibling/CLAUDE.md's one command against a
+      # checkout at it with `--record`, and commit the pin and the re-recorded column together
+      # (a commit of its own, Q97.6). The script refuses a column read at another commit (exit 2).
+      SIBLING_REPOSITORY: Calhooon/bsv-script-lean
+      SIBLING_PIN: 1c051eaef1077cc95e5d1618686d5efacc4aa097
+      CARGO_TARGET_DIR: ${{ github.workspace }}/sibling-target
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: The command's unit tests
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_sibling_harness.py'
+
+      # the harness, the pins it reads and the nine corpora (`harness/run:32`), nothing else
+      - name: Check out the sibling at the pin
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ env.SIBLING_REPOSITORY }}
+          ref: ${{ env.SIBLING_PIN }}
+          path: sibling
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /harness/
+            /docs/PROVENANCE.md
+            /corpus/seed/
+            /corpus/flow/
+            /corpus/arith/
+            /corpus/stack/
+            /corpus/crypto/
+            /corpus/bytes/
+            /corpus/eras/
+            /corpus/gen/
+            /corpus/tx/
+
+      # the harness's own toolchain file (`harness/rust-toolchain.toml`) names 1.95.0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: 1.95.0
+
+      - name: Cache the harness's build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: sibling
+          workspaces: sibling/harness -> ../../sibling-target
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/beta' }}
+
+      - name: sibling
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C sibling rev-parse HEAD)" = "$SIBLING_PIN"
+          set +e
+          python3 -B .github/scripts/sibling_harness.py run --tree . --sibling sibling \
+            --corpus all --scratch "$RUNNER_TEMP/sibling-scratch" --out "$RUNNER_TEMP/sibling-out" \
+            --column tests/sibling/column.json 2>&1 | tee "$RUNNER_TEMP/sibling.log"
+          rc="${PIPESTATUS[0]}"
+          set -e
+          {
+            echo '```'
+            grep -E '^(VERDICTS|REASONS|sibling_harness: (GREEN|RED|SETUP))|^  ' "$RUNNER_TEMP/sibling.log" | head -200 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+"##;
+
+/// What every job of ci.yml inherits from the workflow, each block byte for byte (#853's third
+/// fold): a workflow `env:` key (`BASH_ENV` among them) reaches the judging step's shell, the
+/// `permissions:` its token, the `concurrency:` whether it is cancelled. ci.yml's workflow-level
+/// keys are [`WORKFLOW_KEYS`] alone, so a `defaults:` (or any other key) is refused wherever it
+/// sits in the file; a workflow `env:` that gains a key is a change to this test in the same diff.
+const SIBLING_INHERITS: &[(&str, &str)] = &[
+    (
+        "permissions",
+        r##"permissions:
+  contents: read
+"##,
+    ),
+    (
+        "concurrency",
+        r##"concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+"##,
+    ),
+    (
+        "env",
+        r##"env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+"##,
+    ),
+];
+
+/// ci.yml's workflow-level keys, each once: the three [`SIBLING_INHERITS`] pins, the name, the
+/// triggers (their path filters refused apart) and the jobs.
+const WORKFLOW_KEYS: &[&str] = &["name", "on", "permissions", "concurrency", "env", "jobs"];
+
+/// The block a key line opens: the line and every line under it, to the next line at the key's
+/// indent or less that is neither blank nor a comment (a comment ends no YAML block, so a key
+/// after a comment at the key's own indent is still inside), less the trailing blanks and the
+/// trailing comments at that indent (the next key's preamble).
+fn block<'a>(lines: &[&'a str], start: usize, depth: usize) -> Vec<&'a str> {
+    let ends =
+        |l: &&str| !l.trim().is_empty() && !l.trim_start().starts_with('#') && indent(l) <= depth;
+    let rest = &lines[start + 1..];
+    let end = rest.iter().position(ends).unwrap_or(rest.len());
+    let mut out: Vec<&str> = std::iter::once(lines[start])
+        .chain(rest[..end].iter().copied())
+        .collect();
+    while out.len() > 1
+        && out.last().is_some_and(|l| {
+            l.trim().is_empty() || (l.trim_start().starts_with('#') && indent(l) <= depth)
+        })
+    {
+        out.pop();
+    }
+    out
+}
+
+/// The first difference of `found` (whose first line is ci.yml's line `line`) from `pinned`,
+/// or `None` when they are equal byte for byte: the line number in ci.yml, the pinned line and
+/// the line found, each quoted so that a space or a tab shows.
+fn first_difference(
+    what: &str,
+    name: &str,
+    found: &[&str],
+    pinned: &str,
+    line: usize,
+) -> Option<String> {
+    let text: String = found.iter().map(|l| format!("{l}\n")).collect();
+    if text == pinned {
+        return None;
+    }
+    let expected: Vec<&str> = pinned.lines().collect();
+    let at = found
+        .iter()
+        .zip(&expected)
+        .position(|(a, b)| a != b)
+        .unwrap_or_else(|| found.len().min(expected.len()));
+    let shown = |l: Option<&&str>| l.map_or("<end>".to_string(), |l| format!("{l:?}"));
+    Some(format!(
+        "{what} is not {name} byte for byte (a change to it is a change to this test in the same diff): ci.yml line {}\n  expected: {}\n  found:    {}",
+        line + at,
+        shown(expected.get(at)),
+        shown(found.get(at))
+    ))
+}
+
+/// ci.yml's triggers carry no `paths` or `paths-ignore`.
+fn trigger_refusals(ci: &str) -> Vec<String> {
+    let head = ci.split("\njobs:\n").next().unwrap_or_default();
+    head.lines()
+        .filter(|line| {
+            let key = line.trim_start();
+            key.starts_with("paths:") || key.starts_with("paths-ignore:")
+        })
+        .map(|line| format!("ci.yml's triggers carry a path filter: `{}`", line.trim()))
+        .collect()
+}
+
+/// ci.yml's workflow-level keys are [`WORKFLOW_KEYS`], each once, wherever they sit in the file,
+/// and each block of [`SIBLING_INHERITS`] is its pin byte for byte.
+fn inherited_refusals(ci: &str) -> Vec<String> {
+    let lines: Vec<&str> = ci.lines().collect();
+    let mut seen: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (at, line) in lines.iter().enumerate() {
+        if line.trim().is_empty() || line.starts_with('#') || indent(line) > 0 {
+            continue;
+        }
+        let key = line.split(':').next().unwrap_or(line);
+        seen.entry(key).or_default().push(at);
+    }
+    let mut errors = Vec::new();
+    for (key, at) in &seen {
+        let numbers: Vec<String> = at.iter().map(|n| (n + 1).to_string()).collect();
+        if !WORKFLOW_KEYS.contains(key) {
+            errors.push(format!(
+                "ci.yml carries a workflow-level `{key}:` the `sibling` job would inherit (line {}; the workflow's keys are WORKFLOW_KEYS alone)",
+                numbers.join(", ")
+            ));
+        } else if at.len() > 1 {
+            errors.push(format!(
+                "ci.yml carries a workflow-level `{key}:` more than once (lines {})",
+                numbers.join(", ")
+            ));
+        }
+    }
+    for (key, pinned) in SIBLING_INHERITS {
+        let Some(&start) = seen.get(key).and_then(|at| at.first()) else {
+            errors.push(format!(
+                "ci.yml has no workflow-level `{key}:`, which SIBLING_INHERITS pins"
+            ));
+            continue;
+        };
+        let found = block(&lines, start, 0);
+        let what = format!("the workflow's `{key}:` (every job inherits it)");
+        let name = format!("SIBLING_INHERITS' `{key}`");
+        errors.extend(first_difference(&what, &name, &found, pinned, start + 1));
+    }
+    errors
+}
+
+/// The `sibling` context is reported by ci.yml's `sibling` job alone: no second job of ci.yml
+/// (a twin key, or another id with `name: sibling`) and no job of another workflow carries it, so
+/// a green twin cannot stand beside the judging job. A name written as an expression is not read.
+fn sibling_context_refusals(ci: &str, others: &[(String, String)]) -> Vec<String> {
+    let reports = |job: &Job| {
+        job.name.as_deref().map_or(job.id.as_str(), |n| {
+            n.trim_matches(|c| c == '\'' || c == '"')
+        }) == "sibling"
+    };
+    let mut errors = Vec::new();
+    let ids: Vec<String> = jobs(ci)
+        .iter()
+        .filter(|j| reports(j))
+        .map(|j| j.id.clone())
+        .collect();
+    if ids != ["sibling"] {
+        errors.push(format!(
+            "the `sibling` context is reported by ci.yml's jobs {ids:?}: by the `sibling` job alone"
+        ));
+    }
+    for (file, text) in others {
+        for job in jobs(text)
+            .iter()
+            .filter(|j| reports(j) || j.id == "sibling")
+        {
+            errors.push(format!(
+                "{file}'s job `{}` reports `sibling`: ci.yml's `sibling` job alone may",
+                job.id
+            ));
+        }
+    }
+    errors
+}
+
+/// The named rules over the job's lines: what each change would do, beside the pin's bytes.
+/// The job's own `if:` reads only the event (`github.event_name`, `github.base_ref`,
+/// `github.ref`), the job has no `needs:` (a skipped plan job would skip it), no step of it
+/// carries an `if:`, no line carries `continue-on-error`, the job carries no `defaults:` or
+/// `shell:` (the step names its shell), and its `sibling` step runs the harness.
+fn job_rule_refusals(ci: &str, job: &[&str]) -> Vec<String> {
+    let mut errors = Vec::new();
+    if let Some(job) = jobs(ci).into_iter().find(|j| j.id == "sibling") {
+        if !job.needs.is_empty() {
+            errors.push(format!(
+                "job `sibling` needs {:?}: a skipped job would skip it",
+                job.needs
+            ));
+        }
+        let condition = job.condition.unwrap_or_default();
+        let unquoted: String = condition
+            .split('\'')
+            .step_by(2)
+            .collect::<Vec<_>>()
+            .join(" ");
+        let read: Vec<&str> = unquoted
+            .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '.'))
+            .filter(|word| word.contains('.'))
+            .filter(|word| !["github.event_name", "github.base_ref", "github.ref"].contains(word))
+            .collect();
+        if !read.is_empty() {
+            errors.push(format!(
+                "job `sibling`'s `if:` reads more than the event ({}): `{condition}`",
+                read.join(", ")
+            ));
+        }
+    }
+    for line in &job[1..] {
+        let text = line.trim_start().trim_start_matches("- ");
+        if text.starts_with('#') {
+            continue;
+        }
+        if text.starts_with("continue-on-error:") {
+            errors.push(format!(
+                "job `sibling` carries `continue-on-error`: `{}`",
+                line.trim()
+            ));
+        }
+        if indent(line) == 4 && (text.starts_with("defaults:") || text.starts_with("shell:")) {
+            errors.push(format!(
+                "job `sibling` carries `{}`: the judging step's shell is its own",
+                line.trim()
+            ));
+        }
+        if indent(line) > 4 && text.starts_with("if:") {
+            errors.push(format!(
+                "a step of `sibling` carries a condition: `{}`",
+                line.trim()
+            ));
+        }
+    }
+    match job.iter().position(|l| l.trim() == "- name: sibling") {
+        None => errors.push("job `sibling` has no step named `sibling`".to_string()),
+        Some(at) => {
+            let mut step = job[at + 1..]
+                .iter()
+                .take_while(|l| !l.trim_start().starts_with("- "));
+            if !step.any(|l| l.contains("sibling_harness.py run")) {
+                errors.push("the `sibling` step does not run `sibling_harness.py run`".to_string());
+            }
+        }
+    }
+    errors
+}
+
+/// The `sibling` job judges on every event it runs on (#97's fold, the captain's ruling of
+/// 2026-11-10), and nothing in ci.yml can turn it green without judging (#853's second and third
+/// folds): its triggers carry no path filter, what it inherits from the workflow is
+/// [`SIBLING_INHERITS`] and [`WORKFLOW_KEYS`], its whole text is [`SIBLING_JOB`] byte for byte,
+/// and the named rules of [`job_rule_refusals`] say why a change would matter. A required context
+/// whose job or judging step is skipped by a path test reports success without a judgment.
+fn sibling_refusals(ci: &str) -> Vec<String> {
+    let mut errors = trigger_refusals(ci);
+    errors.extend(inherited_refusals(ci));
+    let lines: Vec<&str> = ci.lines().collect();
+    let Some(start) = lines.iter().position(|l| *l == "  sibling:") else {
+        errors.push("no `sibling` job in ci.yml".to_string());
+        return errors;
+    };
+    let job = block(&lines, start, 2);
+    errors.extend(job_rule_refusals(ci, &job));
+    errors.extend(first_difference(
+        "the `sibling` job",
+        "SIBLING_JOB",
+        &job,
+        SIBLING_JOB,
+        start + 1,
+    ));
+    errors
+}
+
+/// The workflows other than ci.yml, by file name.
+fn other_workflows() -> Vec<(String, String)> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".github/workflows");
+    let mut out: Vec<(String, String)> = fs::read_dir(&root)
+        .expect("the workflows")
+        .map(|e| {
+            e.expect("an entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .filter(|n| n.ends_with(".yml") && n != "ci.yml")
+        .map(|n| {
+            let text = read(&format!(".github/workflows/{n}"));
+            (n, text)
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+const JOB_PINNED: &str = "the `sibling` job is not SIBLING_JOB byte for byte";
+
+#[test]
+fn the_sibling_job_judges_on_every_event_it_runs_on_with_no_reach_filter_97() {
+    let ci = read(".github/workflows/ci.yml");
+    let errors = sibling_refusals(&ci);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let errors = sibling_context_refusals(&ci, &other_workflows());
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    // the judging step behind a path output, as at 4d81e9da
+    let step = edited(
+        &ci,
+        "      - name: sibling\n        shell: bash\n",
+        "      - name: sibling\n        if: steps.plan.outputs.reached == 'true'\n        shell: bash\n",
+    );
+    let errors = sibling_refusals(&step);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(
+        errors[0],
+        "a step of `sibling` carries a condition: `if: steps.plan.outputs.reached == 'true'`"
+    );
+    assert!(errors[1].starts_with(JOB_PINNED), "{errors:?}");
+    // the job behind a plan job's output
+    let job = edited(
+        &ci,
+        "      (github.event_name != 'push' || github.ref != 'refs/heads/main')\n    runs-on: ubuntu-latest\n    env:\n      # THE PIN",
+        "      (github.event_name != 'push' || github.ref != 'refs/heads/main') &&\n      needs.plan.outputs.reached == 'true'\n    needs: plan\n    runs-on: ubuntu-latest\n    env:\n      # THE PIN",
+    );
+    let errors = sibling_refusals(&job);
+    assert_eq!(errors.len(), 3, "{errors:?}");
+    assert!(
+        errors[0].starts_with("job `sibling` needs [\"plan\"]"),
+        "{errors:?}"
+    );
+    assert!(
+        errors[1].starts_with("job `sibling`'s `if:` reads more than the event"),
+        "{errors:?}"
+    );
+    assert!(errors[2].starts_with(JOB_PINNED), "{errors:?}");
+    // a path filter on the trigger
+    let paths = edited(
+        &ci,
+        "  pull_request:\n    branches: [main, beta]\n",
+        "  pull_request:\n    branches: [main, beta]\n    paths: ['src/script/**']\n",
+    );
+    assert_eq!(
+        sibling_refusals(&paths),
+        ["ci.yml's triggers carry a path filter: `paths: ['src/script/**']`"]
+    );
+    // the harness taken out of the judging step
+    let gone = edited(
+        &ci,
+        "python3 -B .github/scripts/sibling_harness.py run --tree .",
+        "echo skipped --tree .",
+    );
+    let errors = sibling_refusals(&gone);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(
+        errors[0],
+        "the `sibling` step does not run `sibling_harness.py run`"
+    );
+    assert!(errors[1].starts_with(JOB_PINNED), "{errors:?}");
+}
+
+/// The seven ways the cold and rule re-reads of #853's fold ended green without judging, each
+/// planted alone in ci.yml and each refused, plus a job `defaults:` and a workflow `defaults:`.
+#[test]
+fn the_sibling_step_is_pinned_and_no_failure_of_it_is_absorbed_97() {
+    let ci = read(".github/workflows/ci.yml");
+    let harness = "python3 -B .github/scripts/sibling_harness.py run --tree . --sibling sibling";
+    let plants: [(&str, &str, String, &str); 7] = [
+        (
+            "continue-on-error on the step",
+            "      - name: sibling\n        shell: bash\n",
+            "      - name: sibling\n        continue-on-error: true\n        shell: bash\n".into(),
+            "job `sibling` carries `continue-on-error`: `continue-on-error: true`",
+        ),
+        (
+            "`|| true` after the harness",
+            "--column tests/sibling/column.json 2>&1 | tee \"$RUNNER_TEMP/sibling.log\"\n",
+            "--column tests/sibling/column.json 2>&1 | tee \"$RUNNER_TEMP/sibling.log\" || true\n"
+                .into(),
+            JOB_PINNED,
+        ),
+        (
+            "an `exit 0` before the harness",
+            &format!("          set +e\n          {harness}"),
+            format!("          set +e\n          exit 0\n          {harness}"),
+            JOB_PINNED,
+        ),
+        (
+            "an `echo` before the harness",
+            harness,
+            format!("echo {harness}"),
+            JOB_PINNED,
+        ),
+        (
+            "`exit \"$rc\"` changed to `exit 0`",
+            "          exit \"$rc\"\n",
+            "          exit 0\n".into(),
+            JOB_PINNED,
+        ),
+        (
+            "`--corpus all` narrowed to one corpus",
+            "            --corpus all --scratch",
+            "            --corpus seed --scratch".into(),
+            JOB_PINNED,
+        ),
+        (
+            "the step's shell changed",
+            "      - name: sibling\n        shell: bash\n",
+            "      - name: sibling\n        shell: sh\n".into(),
+            JOB_PINNED,
+        ),
+    ];
+    for (what, old, new, refusal) in &plants {
+        let errors = sibling_refusals(&edited(&ci, old, new));
+        assert!(
+            errors.iter().any(|e| e.starts_with(refusal)),
+            "{what}: not refused: {errors:?}"
+        );
+    }
+    // continue-on-error on the job: its line named, the job's bytes changed
+    let site = "      (github.event_name != 'push' || github.ref != 'refs/heads/main')\n    runs-on: ubuntu-latest\n    env:\n      # THE PIN";
+    let job = edited(
+        &ci,
+        site,
+        &site.replace(
+            "    runs-on: ubuntu-latest\n",
+            "    runs-on: ubuntu-latest\n    continue-on-error: true\n",
+        ),
+    );
+    let errors = sibling_refusals(&job);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(
+        errors[0],
+        "job `sibling` carries `continue-on-error`: `continue-on-error: true`"
+    );
+    assert!(errors[1].starts_with(JOB_PINNED), "{errors:?}");
+    // a job `defaults:` naming another shell
+    let defaults = edited(
+        &ci,
+        site,
+        &site.replace(
+            "    runs-on: ubuntu-latest\n",
+            "    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: sh {0}\n",
+        ),
+    );
+    let errors = sibling_refusals(&defaults);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(
+        errors[0],
+        "job `sibling` carries `defaults:`: the judging step's shell is its own"
+    );
+    assert!(errors[1].starts_with(JOB_PINNED), "{errors:?}");
+    // a workflow `defaults:`
+    let workflow = edited(
+        &ci,
+        "\npermissions:\n",
+        "\ndefaults:\n  run:\n    shell: sh {0}\npermissions:\n",
+    );
+    let errors = sibling_refusals(&workflow);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].starts_with(
+            "ci.yml carries a workflow-level `defaults:` the `sibling` job would inherit"
+        ),
+        "{errors:?}"
+    );
+}
+
+/// The ways a pin of the judging step alone left the job green without judging (#853's third
+/// fold, the second fold's scoped re-read), each planted alone in ci.yml and each refused by the
+/// pin of the whole job or of what it inherits, and the failure's form: the line in ci.yml, the
+/// pinned line, the line found.
+#[test]
+fn the_sibling_job_and_what_it_inherits_are_pinned_whole_97() {
+    let ci = read(".github/workflows/ci.yml");
+    let judging = "      - name: sibling\n        shell: bash\n";
+    let before = |run: &str| format!("      - name: prepare\n        run: {run}\n\n{judging}");
+    let at_runs_on = "    runs-on: ubuntu-latest\n    env:\n      # THE PIN";
+    let job_key = |key: &str| format!("    runs-on: ubuntu-latest\n{key}    env:\n      # THE PIN");
+    let pin = "      SIBLING_PIN: 1c051eaef1077cc95e5d1618686d5efacc4aa097\n";
+    let job_env = |key: &str| format!("{pin}      {key}\n");
+    let checkout = "      - name: Check out the sibling at the pin\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n";
+    let job_plants: Vec<(&str, &str, String)> = vec![
+        ("a step before the judging one rewriting the column", judging, before("echo '{}' > tests/sibling/column.json")),
+        ("a step before the judging one rewriting the judge", judging, before("echo 'print(\"GREEN\")' > .github/scripts/sibling_harness.py")),
+        ("a step before the judging one writing BASH_ENV", judging, before("echo BASH_ENV=./evil.sh >> \"$GITHUB_ENV\"")),
+        ("a job env: BASH_ENV", pin, job_env("BASH_ENV: ./evil.sh")),
+        ("a job env: PATH", pin, job_env("PATH: ./bin")),
+        ("a job env: PYTHONPATH", pin, job_env("PYTHONPATH: ./shadow")),
+        ("a job env: RUNNER_TEMP", pin, job_env("RUNNER_TEMP: ./shadow")),
+        ("a job container:", at_runs_on, job_key("    container: python:3\n")),
+        ("another action for the sibling's checkout", checkout, checkout.replace("actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0", "someone/checkout@v4")),
+        ("the sibling checkout's ref changed", "          ref: ${{ env.SIBLING_PIN }}\n", "          ref: main\n".into()),
+        ("a step after the judging one on failure()", "          exit \"$rc\"\n", "          exit \"$rc\"\n\n      - name: rescue\n        if: failure()\n        run: exit 0\n".into()),
+        ("timeout-minutes: 0", at_runs_on, job_key("    timeout-minutes: 0\n")),
+        ("runs-on changed", at_runs_on, at_runs_on.replace("ubuntu-latest", "self-hosted")),
+        ("a strategy: added", at_runs_on, job_key("    strategy:\n      matrix:\n        os: [ubuntu-latest]\n")),
+        ("a job key behind a comment at the job's indent", "          exit \"$rc\"\n", "          exit \"$rc\"\n  # an aside\n    continue-on-error: true\n".into()),
+        ("one byte changed in a comment of the job", "set SIBLING_PIN to the new commit", "set SIBLING_PIN to the new commits".into()),
+    ];
+    for (what, old, new) in &job_plants {
+        let errors = sibling_refusals(&edited(&ci, old, new));
+        assert!(
+            errors.iter().any(|e| e.starts_with(JOB_PINNED)),
+            "{what}: not refused: {errors:?}"
+        );
+    }
+    let env = "env:\n  CARGO_TERM_COLOR: always\n  RUSTFLAGS: -Dwarnings\n";
+    let workflow_plants: Vec<(&str, &str, String, &str)> = vec![
+        ("a workflow env: BASH_ENV", env, format!("{env}  BASH_ENV: ./evil.sh\n"), "the workflow's `env:` (every job inherits it) is not SIBLING_INHERITS' `env`"),
+        ("a workflow env: key behind a column-0 comment", env, format!("{env}# an aside\n  BASH_ENV: ./evil.sh\n"), "the workflow's `env:` (every job inherits it) is not SIBLING_INHERITS' `env`"),
+        ("the permissions widened", "permissions:\n  contents: read\n", "permissions:\n  contents: write\n".into(), "the workflow's `permissions:` (every job inherits it) is not SIBLING_INHERITS' `permissions`"),
+        ("the concurrency changed", "  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}\n", "  cancel-in-progress: true\n".into(), "the workflow's `concurrency:` (every job inherits it) is not SIBLING_INHERITS' `concurrency`"),
+        ("a second workflow env:", "\njobs:\n", "\nenv:\n  BASH_ENV: ./evil.sh\n\njobs:\n".into(), "ci.yml carries a workflow-level `env:` more than once"),
+    ];
+    for (what, old, new, refusal) in &workflow_plants {
+        let errors = sibling_refusals(&edited(&ci, old, new));
+        assert!(
+            errors.iter().any(|e| e.starts_with(refusal)),
+            "{what}: not refused: {errors:?}"
+        );
+    }
+    // a workflow `defaults:` after the jobs, at the file's end
+    let late = format!("{ci}defaults:\n  run:\n    shell: sh {{0}}\n");
+    assert!(
+        sibling_refusals(&late)
+            .iter()
+            .any(|e| e.starts_with("ci.yml carries a workflow-level `defaults:`")),
+        "a late defaults: not refused"
+    );
+    // the failure's form: the line in ci.yml, the pinned line, the line found
+    let exit = ci
+        .lines()
+        .position(|l| l == "          exit \"$rc\"")
+        .expect("the exit line")
+        + 1;
+    let errors = sibling_refusals(&edited(
+        &ci,
+        "          exit \"$rc\"\n",
+        "          exit 0\n",
+    ));
+    assert_eq!(
+        errors,
+        [format!("{JOB_PINNED} (a change to it is a change to this test in the same diff): ci.yml line {exit}\n  expected: \"          exit \\\"$rc\\\"\"\n  found:    \"          exit 0\"")]
+    );
+    // a green twin of the context, in ci.yml and in another workflow
+    let twin = format!("{ci}  sibling-twin:\n    name: sibling\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n");
+    assert_eq!(
+        sibling_context_refusals(&twin, &[]),
+        ["the `sibling` context is reported by ci.yml's jobs [\"sibling\", \"sibling-twin\"]: by the `sibling` job alone"]
+    );
+    let other = (
+        "other.yml".to_string(),
+        "on: pull_request\njobs:\n  green:\n    name: 'sibling'\n    runs-on: ubuntu-latest\n"
+            .to_string(),
+    );
+    assert_eq!(
+        sibling_context_refusals(&ci, &[other]),
+        ["other.yml's job `green` reports `sibling`: ci.yml's `sibling` job alone may"]
     );
 }
