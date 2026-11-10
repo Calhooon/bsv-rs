@@ -481,7 +481,7 @@ async fn a_specific_host_key_matches_its_discovered_origin_804() {
     }
     assert_eq!(
         broadcast_under(&["https://other.ship-discovery-804.invalid"]).await,
-        Ok(Err("ERR_REQUIRE_ACK_FAILED".into()))
+        Ok(Err("ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED".into()))
     );
 }
 
@@ -596,9 +596,8 @@ async fn the_reference_recorded_ship_admissions_are_this_crates_804() {
         assert_eq!(ours, theirs, "{name}");
     }
     // The constructor's keys: refused in the reference's words, or the
-    // broadcast's verdict under them (the reference's failure code is its
-    // own, `ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED`, this crate's
-    // `ERR_REQUIRE_ACK_FAILED`, older than #804).
+    // broadcast's verdict under them, the failure code the reference's
+    // (`ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED` since lane fix-tb-acks).
     let specific = recorded["specific"].as_array().unwrap();
     assert_eq!(specific.len(), 8);
     for case in specific {
@@ -610,8 +609,11 @@ async fn the_reference_recorded_ship_admissions_are_this_crates_804() {
             Some(words) => assert_eq!(ours, Err(Error::OverlayError(words.into())), "{name}"),
             None => {
                 assert_eq!(strings(&case["hosts"]), [host("host")], "{name}");
-                let passed = case["status"] == "success";
-                assert_eq!(ours.unwrap().is_ok(), passed, "{name}");
+                let theirs = match case["code"].as_str() {
+                    Some(code) => Err(code.to_string()),
+                    None => Ok(()),
+                };
+                assert_eq!(ours, Ok(theirs), "{name}");
             }
         }
     }

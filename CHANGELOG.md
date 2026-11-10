@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the topic broadcaster's acknowledgment requirements as the reference has them: the requirement topics checked at construction, every interested host seeded, the three failure codes
+
+The overlay bucket's blocking lines 3, 4 and 5 of 2026-11-09 (the reads of
+PR #813). `TopicBroadcaster` now reads its acknowledgment requirements as
+`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/SHIPBroadcaster.ts` does
+(`src/overlay/topic_broadcaster/requirements.rs`):
+
+- **The requirement topics checked at construction** (`:182-193`, called at
+  `:430-444` and per specific host at `:212-216`). A topic list in
+  `require_ack_from_all_hosts`, `require_ack_from_any_host` or a specific
+  host's requirement that names a topic outside the broadcast's, repeats
+  one, holds a name that is not a canonical `tm_` topic, or names more than
+  64, now refuses `TopicBroadcaster::new` in the reference's words
+  (`All-host acknowledgment requirement may only reference topics included in
+  this broadcast.`; `Any-host ...`; `Acknowledgment requirement for <origin>
+  ...`; the canonical and bounded refusals `... must contain unique canonical
+  tm_ topic names.`, `... must be a bounded array of canonical topic names.`),
+  all-host, then any-host, then each specific host after its key. It
+  was wrong because `new` accepted the requirement, the transaction was then
+  sent to every interested host and the broadcast reported it failed: a
+  transaction sent under a configuration the reference never sends under.
+  `All`, `Any` and `None` carry no list and are not checked (the reference's
+  `'all'` and `'any'` return as given; `None` has no reference form and reads
+  as its empty list, which passes).
+- **Every interested host seeded** (`:511-512`). The acknowledgment map holds
+  every interested host, an empty set before any answer is read, so a host
+  that failed or answered no topic acknowledged nothing. It was wrong because
+  only the successful hosts entered the map: an all-hosts requirement passed
+  with an interested host failing (a false success at a public door), and a
+  specific host that failed under an empty list failed where the reference
+  passes it.
+- **The three failure codes** (`:572`, `:596`, `:615`), checked in the
+  reference's order: `ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED` (`Not all hosts
+  acknowledged the required topics.`), `ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED`
+  (`No host acknowledged the required topics.`) and
+  `ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED` (`Specific hosts did not
+  acknowledge the required topics.`), where this crate answered one code,
+  `ERR_REQUIRE_ACK_FAILED`, with its own words behind the `overlay error: `
+  prefix. Two readings in the same checks follow the reference with them: an
+  any-host topic list asks one host for every listed topic (`require: 'all'`,
+  `:584`; it asked any one topic here), and an empty any-host list is no check
+  (`:592`; it failed every broadcast here).
+
+On the reference's recording of 120 broadcasts the base differed in 27
+verdicts (7 false successes, 20 false failures) and 45 more in words; none
+differs now. Pinned by `tests/overlay_ship_requirements_tb.rs` (five tests,
+each RED on a scratch copy of `c96f3c7e`) against
+`tests/vectors/ship_requirements_tb_acks.json`, recorded by
+`tests/support/ship_requirements_tb_acks.mjs` from the reference's own
+`TopicBroadcaster` under Node v22.18.0 (20 constructions, 120 broadcasts; two
+runs byte-identical); `tests/overlay_ship_discovery_804.rs` now asserts the
+recorded code. The #804 row's two stated residues are closed.
+
+**Migration.**
+- `TopicBroadcaster::new` (and `SHIPBroadcaster::new`, `SHIPCast::new`) now
+  returns `Err(Error::OverlayError(..))` for a `RequireAck::Some` list naming
+  a topic outside the broadcaster's topics, a repeated or non-canonical topic,
+  or more than 64; a configuration that broadcast and then failed is now
+  refused before anything is sent. Name only the broadcast's topics.
+- The failure code `ERR_REQUIRE_ACK_FAILED` is replaced by
+  `ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED`,
+  `ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED` and
+  `ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED`, the description the
+  reference's words without the `overlay error: ` prefix. A caller matching
+  the old code matches the three (`code.starts_with("ERR_REQUIRE_ACK_")`
+  holds for both). No dependent read here matches it: `bsv-overlay-cloudflare`
+  names `TopicBroadcaster::broadcast_tx` in one doc comment
+  (`crates/overlay-cloudflare/src/mainnet_fanout.rs:19`);
+  `bsv-wallet-toolbox-rs` and `bsv-wallet-cli` name neither.
+- A broadcast with an interested host failing now fails an all-hosts
+  requirement, and an any-host topic list now asks one host for every topic.
+
+### Notes: cross-SDK parity
+
+go-sdk@2ca481c answers the reference's three codes and descriptions
+(`overlay/topic/broadcaster.go:205-244`) but checks no requirement topic at
+construction (`NewBroadcaster`, `:64-75`, the `tm_` prefix alone) and keys its
+acknowledgment map by the successful hosts alone (`:174-182`), so an
+all-hosts requirement passes there with a failed host; this crate follows the
+reference. Theirs: go-sdk, not filed.
+
 ### Fixed: a freeform answer from one host no longer blanks a lookup; LookupResolver::query answers the merged output list, as the reference does (#815)
 
 From the overlay bucket's blocking line 2 (review-strength-fix-804, PR #813,

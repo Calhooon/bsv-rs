@@ -1,0 +1,2231 @@
+{
+  "description": "Lane fix-tb-acks: the reference's acknowledgment requirements, recorded by tests/support/ship_requirements_tb_acks.mjs under ts-stack@edf6e03 (SHIPBroadcaster.ts:182-193,214-218,430-444,510-511,536-543,555-684): the construction check of each requirement's topic list, and the broadcast's status, code, description and message with two interested hosts by their behaviour under each requirement. A requirement is in the reference's config form (absent: the default; 'all', 'any' or a topic list); a specific host's key is the host's URL.",
+  "reference": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "topics": [
+    "tm_alpha",
+    "tm_beta"
+  ],
+  "hosts": {
+    "a": "https://a.ship-requirements-tb-acks.invalid",
+    "b": "https://b.ship-requirements-tb-acks.invalid",
+    "c": "https://c.ship-requirements-tb-acks.invalid"
+  },
+  "advertisements": [
+    {
+      "domain": "https://a.ship-requirements-tb-acks.invalid",
+      "topic": "tm_alpha",
+      "txid": "20c99e1fdc5d18cc69e75dc50be84feec497176c67c304e4af305fe44f953c8f",
+      "beef": "0200beef01fd8403010100028f3c954fe45f30afe404c3676c1797c4ee4fe80bc55de769cc185ddc1f9ec92001010001000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000ca2103b314168d2289c87ad524d7ecee2b29b8c71daa41081a4f00dde087d24507cb9aac045348495021025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc2b68747470733a2f2f612e736869702d726571756972656d656e74732d74622d61636b732e696e76616c696408746d5f616c706861473045022100d8c2fae67c315db1061fd4b29da0aab2e6ae1e7c84787ca964aef6b205db66c9022051b8dce8b526a6a84094d91d486298c8d7d649bc1830aa32a60f79358748ff636d6d7500000000"
+    },
+    {
+      "domain": "https://a.ship-requirements-tb-acks.invalid",
+      "topic": "tm_beta",
+      "txid": "5e82b6af0b0c7a9b87eeec6978bf9361b37bdfa89b09982205137e4a543e4e45",
+      "beef": "0200beef01fd840301010002454e3e544a7e13052298099ba8df7bb36193bf7869ecee879b7a0c0bafb6825e01010001000000011111111111111111111111111111111111111111111111111111111111111111010000000151ffffffff010100000000000000c82103b314168d2289c87ad524d7ecee2b29b8c71daa41081a4f00dde087d24507cb9aac045348495021025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc2b68747470733a2f2f612e736869702d726571756972656d656e74732d74622d61636b732e696e76616c696407746d5f62657461463044022029a02f5fd642bef0db0797c7589e0aa7c603be057aa8dffac9c6b644da5f1e76022059dbe6d2c01776e81568401f93e12c250924cb60264f770a28efee7d196126456d6d7500000000"
+    },
+    {
+      "domain": "https://b.ship-requirements-tb-acks.invalid",
+      "topic": "tm_alpha",
+      "txid": "681b3f1405eae61b65b6343c0d292eea784094bde86669736238021fb0c8ba2b",
+      "beef": "0200beef01fd8403010100022bbac8b01f023862736966e8bd944078ea2e290d3c34b6651be6ea05143f1b6801010001000000011111111111111111111111111111111111111111111111111111111111111111020000000151ffffffff010100000000000000ca2103b314168d2289c87ad524d7ecee2b29b8c71daa41081a4f00dde087d24507cb9aac045348495021025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc2b68747470733a2f2f622e736869702d726571756972656d656e74732d74622d61636b732e696e76616c696408746d5f616c706861473045022100c2fc99c518bbb9e6c864e84ddf2a4f3832be85c54b89b91744de9e5a287a8b29022036c22b76beb74b74f0ba5ce90b2a5d94508656a77e12b92115d017e463de9a276d6d7500000000"
+    },
+    {
+      "domain": "https://b.ship-requirements-tb-acks.invalid",
+      "topic": "tm_beta",
+      "txid": "c7bb04cccc65748cbb2ae9d2cb857453351c69ac0851da78ce3101b612a602dc",
+      "beef": "0200beef01fd840301010002dc02a612b60131ce78da5108ac691c35537485cbd2e92abb8c7465cccc04bbc701010001000000011111111111111111111111111111111111111111111111111111111111111111030000000151ffffffff010100000000000000c92103b314168d2289c87ad524d7ecee2b29b8c71daa41081a4f00dde087d24507cb9aac045348495021025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc2b68747470733a2f2f622e736869702d726571756972656d656e74732d74622d61636b732e696e76616c696407746d5f62657461473045022100815f6140154834aa4847905390afee6b9fc05172c4f244cf731bd450ecb5fa490220623286a3cafdb2c8bad280b376753a729943da624fef8390cbf2e4292903272f6d6d7500000000"
+    }
+  ],
+  "construction": [
+    {
+      "name": "all_hosts_outside",
+      "requirement": {
+        "all": [
+          "tm_other"
+        ]
+      },
+      "constructor_refusal": "All-host acknowledgment requirement may only reference topics included in this broadcast."
+    },
+    {
+      "name": "all_hosts_one_outside",
+      "requirement": {
+        "all": [
+          "tm_alpha",
+          "tm_other"
+        ]
+      },
+      "constructor_refusal": "All-host acknowledgment requirement may only reference topics included in this broadcast."
+    },
+    {
+      "name": "any_host_outside",
+      "requirement": {
+        "any": [
+          "tm_other"
+        ]
+      },
+      "constructor_refusal": "Any-host acknowledgment requirement may only reference topics included in this broadcast."
+    },
+    {
+      "name": "specific_host_outside",
+      "requirement": {
+        "specific": {
+          "https://a.ship-requirements-tb-acks.invalid": [
+            "tm_other"
+          ]
+        }
+      },
+      "constructor_refusal": "Acknowledgment requirement for https://a.ship-requirements-tb-acks.invalid may only reference topics included in this broadcast."
+    },
+    {
+      "name": "specific_host_outside_key_normalized",
+      "requirement": {
+        "specific": {
+          "https://a.ship-requirements-tb-acks.invalid/": [
+            "tm_other"
+          ]
+        }
+      },
+      "constructor_refusal": "Acknowledgment requirement for https://a.ship-requirements-tb-acks.invalid may only reference topics included in this broadcast."
+    },
+    {
+      "name": "all_and_any_outside",
+      "requirement": {
+        "all": [
+          "tm_other"
+        ],
+        "any": [
+          "tm_gamma"
+        ]
+      },
+      "constructor_refusal": "All-host acknowledgment requirement may only reference topics included in this broadcast."
+    },
+    {
+      "name": "any_and_specific_outside",
+      "requirement": {
+        "any": [
+          "tm_other"
+        ],
+        "specific": {
+          "https://a.ship-requirements-tb-acks.invalid": [
+            "tm_other"
+          ]
+        }
+      },
+      "constructor_refusal": "Any-host acknowledgment requirement may only reference topics included in this broadcast."
+    },
+    {
+      "name": "all_hosts_not_canonical",
+      "requirement": {
+        "all": [
+          "tm_Alpha"
+        ]
+      },
+      "constructor_refusal": "All-host acknowledgment requirement must contain unique canonical tm_ topic names."
+    },
+    {
+      "name": "any_host_duplicate",
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_alpha"
+        ]
+      },
+      "constructor_refusal": "Any-host acknowledgment requirement must contain unique canonical tm_ topic names."
+    },
+    {
+      "name": "specific_host_not_canonical",
+      "requirement": {
+        "specific": {
+          "https://a.ship-requirements-tb-acks.invalid": [
+            "ls_alpha"
+          ]
+        }
+      },
+      "constructor_refusal": "Acknowledgment requirement for https://a.ship-requirements-tb-acks.invalid must contain unique canonical tm_ topic names."
+    },
+    {
+      "name": "all_hosts_65",
+      "requirement": {
+        "all": [
+          "tm_ta",
+          "tm_tb",
+          "tm_tc",
+          "tm_td",
+          "tm_te",
+          "tm_tf",
+          "tm_tg",
+          "tm_th",
+          "tm_ti",
+          "tm_tj",
+          "tm_tk",
+          "tm_tl",
+          "tm_tm",
+          "tm_tn",
+          "tm_to",
+          "tm_tp",
+          "tm_tq",
+          "tm_tr",
+          "tm_ts",
+          "tm_tt",
+          "tm_tu",
+          "tm_tv",
+          "tm_tw",
+          "tm_tx",
+          "tm_ty",
+          "tm_tz",
+          "tm_tax",
+          "tm_tbx",
+          "tm_tcx",
+          "tm_tdx",
+          "tm_tex",
+          "tm_tfx",
+          "tm_tgx",
+          "tm_thx",
+          "tm_tix",
+          "tm_tjx",
+          "tm_tkx",
+          "tm_tlx",
+          "tm_tmx",
+          "tm_tnx",
+          "tm_tox",
+          "tm_tpx",
+          "tm_tqx",
+          "tm_trx",
+          "tm_tsx",
+          "tm_ttx",
+          "tm_tux",
+          "tm_tvx",
+          "tm_twx",
+          "tm_txx",
+          "tm_tyx",
+          "tm_tzx",
+          "tm_taxx",
+          "tm_tbxx",
+          "tm_tcxx",
+          "tm_tdxx",
+          "tm_texx",
+          "tm_tfxx",
+          "tm_tgxx",
+          "tm_thxx",
+          "tm_tixx",
+          "tm_tjxx",
+          "tm_tkxx",
+          "tm_tlxx",
+          "tm_tmxx"
+        ]
+      },
+      "constructor_refusal": "All-host acknowledgment requirement must be a bounded array of canonical topic names."
+    },
+    {
+      "name": "all_hosts_inside",
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "constructed": true
+    },
+    {
+      "name": "any_host_both",
+      "requirement": {
+        "any": [
+          "tm_beta",
+          "tm_alpha"
+        ]
+      },
+      "constructed": true
+    },
+    {
+      "name": "all_hosts_empty",
+      "requirement": {
+        "all": []
+      },
+      "constructed": true
+    },
+    {
+      "name": "any_host_empty",
+      "requirement": {
+        "any": []
+      },
+      "constructed": true
+    },
+    {
+      "name": "specific_host_empty",
+      "requirement": {
+        "specific": {
+          "https://a.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "constructed": true
+    },
+    {
+      "name": "all_hosts_all",
+      "requirement": {
+        "all": "all"
+      },
+      "constructed": true
+    },
+    {
+      "name": "all_hosts_any",
+      "requirement": {
+        "all": "any"
+      },
+      "constructed": true
+    },
+    {
+      "name": "any_host_any",
+      "requirement": {
+        "any": "any"
+      },
+      "constructed": true
+    },
+    {
+      "name": "specific_host_all_of_uninterested",
+      "requirement": {
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "constructed": true
+    }
+  ],
+  "broadcasts": [
+    {
+      "name": "ack_ack__default",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {},
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__all_hosts_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__all_hosts_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__all_hosts_alpha",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__all_hosts_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__any_host_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__any_host_both",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__any_host_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__any_host_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__specific_b_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__specific_b_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__specific_b_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__specific_b_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_ack__specific_c_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_ack__all_any_and_specific",
+      "behaviours": {
+        "a": "ack",
+        "b": "ack"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_fail__default",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {},
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__all_hosts_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__all_hosts_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__all_hosts_alpha",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__all_hosts_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__any_host_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__any_host_both",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__any_host_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__any_host_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__specific_b_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__specific_b_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__specific_b_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__specific_b_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_fail__specific_c_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_fail__all_any_and_specific",
+      "behaviours": {
+        "a": "ack",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__default",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {},
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__all_hosts_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__all_hosts_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__all_hosts_alpha",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__all_hosts_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__any_host_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__any_host_both",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__any_host_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__any_host_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__specific_b_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__specific_b_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__specific_b_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__specific_b_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 1 Overlay Services host."
+    },
+    {
+      "name": "ack_empty__specific_c_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_empty__all_any_and_specific",
+      "behaviours": {
+        "a": "ack",
+        "b": "empty"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__default",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {},
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__all_hosts_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__all_hosts_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__all_hosts_alpha",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__all_hosts_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__any_host_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__any_host_both",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__any_host_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__any_host_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__specific_b_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__specific_b_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__specific_b_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__specific_b_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_idle__specific_c_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_idle__all_any_and_specific",
+      "behaviours": {
+        "a": "ack",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_alpha_only__default",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {},
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__all_hosts_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_alpha_only__all_hosts_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__all_hosts_alpha",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__all_hosts_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__any_host_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__any_host_both",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__any_host_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__any_host_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__specific_b_all",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_alpha_only__specific_b_any",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__specific_b_beta",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_alpha_only__specific_b_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "ack_alpha_only__specific_c_empty",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "ack_alpha_only__all_any_and_specific",
+      "behaviours": {
+        "a": "ack",
+        "b": "alpha_only"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__default",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {},
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__all_hosts_all",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__all_hosts_any",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__all_hosts_alpha",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__all_hosts_empty",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__any_host_any",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "alpha_only_beta_only__any_host_both",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__any_host_beta",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "alpha_only_beta_only__any_host_empty",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "alpha_only_beta_only__specific_b_all",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__specific_b_any",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "alpha_only_beta_only__specific_b_beta",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "alpha_only_beta_only__specific_b_empty",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "alpha_only_beta_only__specific_c_empty",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "alpha_only_beta_only__all_any_and_specific",
+      "behaviours": {
+        "a": "alpha_only",
+        "b": "beta_only"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__default",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {},
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__all_hosts_all",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__all_hosts_any",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__all_hosts_alpha",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__all_hosts_empty",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__any_host_any",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__any_host_both",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__any_host_beta",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+      "description": "No host acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__any_host_empty",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "idle_idle__specific_b_all",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__specific_b_any",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__specific_b_beta",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__specific_b_empty",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "success",
+      "code": null,
+      "description": null,
+      "message": "Sent to 2 Overlay Services hosts."
+    },
+    {
+      "name": "idle_idle__specific_c_empty",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+      "description": "Specific hosts did not acknowledge the required topics.",
+      "message": null
+    },
+    {
+      "name": "idle_idle__all_any_and_specific",
+      "behaviours": {
+        "a": "idle",
+        "b": "idle"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+      "description": "Not all hosts acknowledged the required topics.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__default",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {},
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__all_hosts_all",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": "all"
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__all_hosts_any",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": "any"
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__all_hosts_alpha",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__all_hosts_empty",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": []
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__any_host_any",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": "any"
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__any_host_both",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [
+          "tm_alpha",
+          "tm_beta"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__any_host_beta",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [
+          "tm_beta"
+        ]
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__any_host_empty",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": []
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__specific_b_all",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "all"
+        }
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__specific_b_any",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": "any"
+        }
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__specific_b_beta",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__specific_b_empty",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__specific_c_empty",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "any": [],
+        "specific": {
+          "https://c.ship-requirements-tb-acks.invalid": []
+        }
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    },
+    {
+      "name": "fail_fail__all_any_and_specific",
+      "behaviours": {
+        "a": "fail",
+        "b": "fail"
+      },
+      "requirement": {
+        "all": [
+          "tm_alpha"
+        ],
+        "any": [
+          "tm_beta"
+        ],
+        "specific": {
+          "https://b.ship-requirements-tb-acks.invalid": [
+            "tm_beta"
+          ]
+        }
+      },
+      "status": "error",
+      "code": "ERR_ALL_HOSTS_REJECTED",
+      "description": "All mainnet topical hosts have rejected the transaction.",
+      "message": null
+    }
+  ]
+}
