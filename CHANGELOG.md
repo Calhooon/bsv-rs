@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-10
+
 ### Fixed: the ratchet's library lock no longer goes stale when the crate's own version moves; a release commit is Cargo.toml and CHANGELOG.md alone on both lines
 
 - What contradicted what. `RELEASING.md` steps 3 and 11 (3 and 17 on `beta`) and the `beta-born` job (`release_commit()` in `ci.yml`) admit a release commit of `Cargo.toml` and `CHANGELOG.md` alone. The ratchet's compiler counters build a scratch copy of the library with `tools/ratchet/library.Cargo.lock` in place and run cargo `--locked`; that lock records the crate's own version (`0.8.3` on `main`, `0.9.0-beta.7` on `beta`), so the version line of a release made it stale and the `ratchet` step stopped (`cargo clippy (pedantic, cognitive complexity >25) failed (exit status: 101); no measurement was recorded ... the library lock is stale`), and `docs/RATCHETS.md` asked for the lock's refresh in the same pull request, which the release-commit rule forbids. Met on PR #858, the 0.8.4 release commit on `main` (2026-11-10 18:49Z); beta's prerelease commits had touched the lock as a third file for the same reason, where `beta-born` does not run.
