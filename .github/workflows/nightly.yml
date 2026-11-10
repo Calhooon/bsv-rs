@@ -802,6 +802,7 @@ jobs:
           - fuzz_shamir_backup
           - fuzz_signature_der
           - fuzz_transaction_parser
+          - fuzz_verify_input
           - fuzz_wire_decoders
           - fuzz_wire_protocol
         # The default-mode spend target is built without a sanitizer

@@ -139,3 +139,9 @@ name = "fuzz_signature_der"
 path = "fuzz_targets/fuzz_signature_der.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_verify_input"
+path = "fuzz_targets/fuzz_verify_input.rs"
+test = false
+doc = false

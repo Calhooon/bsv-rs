@@ -104,6 +104,7 @@ mod merkle_path_legal;
 mod merkle_path_verify;
 mod merkle_path_walk;
 pub mod output;
+mod spending;
 #[allow(clippy::module_inception)]
 pub mod transaction;
 pub mod tx_json;
@@ -147,6 +148,10 @@ pub use fee_models::{
 pub use input::{TransactionInput, Utxo};
 pub use merkle_path::{MerklePath, MerklePathLeaf};
 pub use output::TransactionOutput;
+pub use spending::{
+    verify_input, DefaultMode, InputRefusal, InputRules, InputVerified, NodeFigures,
+    SpendingTransaction,
+};
 pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};
 pub use work_budget::WorkBudget;
 

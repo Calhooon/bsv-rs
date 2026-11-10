@@ -251,6 +251,10 @@ name = "transaction"
 required-features = ["transaction"]
 
 [[example]]
+name = "verify_input"
+required-features = ["transaction"]
+
+[[example]]
 name = "brc42"
 required-features = ["wallet"]
 

@@ -4,10 +4,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::block::ChainParams;
-use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
+use crate::primitives::bsv::sighash::TxSighashCache;
 use crate::{Error, Result};
 
+use super::spending::{judge_input, sighash_of, InputRules};
 use super::transaction::refuse_no_transaction;
 use super::{ChainTracker, FeeModel, Transaction, TransactionOutput, WorkBudget};
 
@@ -276,7 +276,7 @@ impl Evaluation<'_> {
                 return Err(Error::TransactionError("Fee is too low".to_string()));
             }
         }
-        let shared = shared_sighash(tx)?;
+        let shared = sighash_of(tx)?;
         let mut work_spent = 0;
         for (vin, source) in sources.into_iter().enumerate() {
             let work = self.input(tx, vin, &source, shared.clone())?;
@@ -315,54 +315,21 @@ impl Evaluation<'_> {
         let unlocking = tx.inputs[vin].unlocking_script.as_ref().ok_or_else(|| {
             Error::TransactionError(format!("Input {vin} is missing unlocking script"))
         })?;
-        let mut spend = Spend::with_transaction(TxSpendParams {
-            transaction: shared,
-            input_index: vin,
-            source_satoshis: source.output.satoshis.unwrap_or(0),
-            locking_script: LockingScript::from_binary(&source.output.locking_script.to_binary())?,
-            unlocking_script: UnlockingScript::from_binary(&unlocking.to_binary())?,
-            memory_limit: self.memory_limit,
-            work_limit: self.work.input_limit(),
-        })?;
-        if let Some(flags) = flags {
-            spend.set_flags(flags);
+        let rules = InputRules::for_verifier(flags, self.memory_limit, self.work.input_limit());
+        let judged = judge_input(
+            &shared,
+            vin,
+            &source.output.locking_script.to_binary(),
+            &unlocking.to_binary(),
+            source.output.satoshis.unwrap_or(0),
+            &rules,
+        );
+        match judged.result {
+            Ok(verified) => Ok(verified.work_spent),
+            Err(refusal) => {
+                let error = refusal.before_evaluation()?;
+                Err(super::verify_refusal::script_refusal(&tx.id(), vin, error))
+            }
         }
-        spend
-            .validate()
-            .map_err(|e| super::verify_refusal::script_refusal(&tx.id(), vin, e))?;
-        Ok(spend.work_spent())
     }
-}
-
-fn shared_sighash(tx: &Transaction) -> Result<Arc<TxSighashCache>> {
-    let outputs = tx
-        .outputs
-        .iter()
-        .map(|o| TxOutput {
-            satoshis: o.satoshis.unwrap_or(0),
-            script: o.locking_script.to_binary(),
-        })
-        .collect();
-    let inputs = tx
-        .inputs
-        .iter()
-        .map(|i| {
-            Ok(TxInput {
-                txid: i.get_source_txid_bytes()?,
-                output_index: i.source_output_index,
-                script: i
-                    .unlocking_script
-                    .as_ref()
-                    .map(|s| s.to_binary())
-                    .unwrap_or_default(),
-                sequence: i.sequence,
-            })
-        })
-        .collect::<Result<_>>()?;
-    Ok(Arc::new(TxSighashCache::new(
-        tx.version as i32,
-        inputs,
-        outputs,
-        tx.lock_time,
-    )))
 }

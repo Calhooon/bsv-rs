@@ -7,6 +7,186 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: a door that verifies one input of a transaction held as bytes; Transaction::verify and the streaming reader judge every input through the same core (#855)
+
+**What it is.** `bsv_rs::transaction` (feature `transaction`,
+`src/transaction/spending.rs`) gains the node's consensus-library shape for one
+input: `SpendingTransaction::from_bytes(&[u8]) -> Result<SpendingTransaction>`
+reads exactly one transaction, by `Transaction::from_binary`'s strict reader
+(#840) and no second reader, once, and keeps it with its sighash midstates;
+`input_count()`; `verify_input(&self, input_index, locking_script: &[u8],
+source_satoshis: u64, rules: &InputRules) -> Result<InputVerified,
+InputRefusal>` judges one input against the output it spends. One parse and one
+set of midstates serve every input; the type is `Send + Sync` (a static
+assertion) and holds no `RefCell`. The one-shot
+`transaction::verify_input(locking_script, source_satoshis, spending_tx,
+input_index, rules)` takes the node's argument order and is `from_bytes` then
+the method, nothing else; its rustdoc sends a caller with more than one input to
+the prepared form.
+
+**The rules.** `InputRules` has private fields and a constructor per mode:
+`reference_default()` (also `Default`), the reference SDK's `Spend` without
+flags exactly as `Transaction::verify` runs it when no chain parameters are
+given; `reference_default_with(DefaultMode)`, the default mode with its three
+overrides (`with_require_push_only`, `with_require_minimal`,
+`with_utxo_after_chronicle`; an overlay that refuses a non-push unlocking script
+at every version passes the first); `under(ScriptFlags) -> Result<InputRules,
+ScriptFlagsError>`, a node's word, typed (go-sdk's flag bits are btcd's layout,
+the node's another: a bare number means two things), refused when the rules are
+built if `ScriptFlags::check` refuses it, before any input is judged, as the
+node refuses invalid flags before it reads the transaction; a judge holding a
+number writes `InputRules::under(ScriptFlags::from_bits(n)?)?`, which refuses an
+unknown bit first. Under a word the word alone decides: the overrides live on
+`DefaultMode`, which only `reference_default_with` takes, so a word with an
+override does not compile (a `compile_fail` doc test on `DefaultMode`). The
+budgets are setters on the rules, `with_memory_limit(usize)` and
+`with_work_limit(u64)`, each a LOCAL budget; every setter commutes (a test).
+A node operator's own figures are a value of their own, `NodeFigures`
+(`with_stack_memory_policy`, `with_stack_memory_consensus`,
+`with_script_num_length_policy`, the three `Spend` setters of those names;
+`new()` the node's defaults: 100,000,000, 0, 10,000), taken only by
+`under_with(word, figures)`, so by type never by the default mode, which reads
+none of them; `under(word)` is `under_with(word, NodeFigures::new())`. Under the
+block word a stack past 100,000,000 bytes is a decline with the defaults and
+judged by a node run with a consensus figure of 0 (`with_memory_limit(
+usize::MAX)` beside it); a figure of `X` is a verdict past `X`.
+Getters: `word()`, `default_mode()`, `node_figures()`, `memory_limit()`,
+`work_limit()`, `DefaultMode`'s three and `NodeFigures`' three.
+
+**The answer.** `Spend::validate` never answers `Ok(false)`, so the door returns
+no `bool`: `InputVerified { work_spent }` (`#[non_exhaustive]`; the work the
+evaluation spent, always counted, with or without a work limit: one unit per
+opcode reached and per byte hashed, the work budget's unit, a preparation's
+BIP143 midstates charged once, to the input that computes them; for a caller
+charging a transaction's inputs to one total through `WorkBudget::charge`) or `InputRefusal` (`#[non_exhaustive]`): `Invalid`
+(a verdict, the `ScriptEvaluationError` in the interpreter's words), `Declined`
+(a local budget stopped it, the same error with its `resource_limit`: a caller
+cannot read a decline as invalid without writing that arm), `InputIndex {
+index, inputs }` (refused before evaluation, in `Spend::with_transaction`'s
+words, `input index N out of range (transaction has M inputs)`) and
+`Transaction(Error)` (the one-shot's bytes that are not exactly one transaction:
+the reader's own error, before the index is read). `InputRefusal` implements
+`std::error::Error` (its `Display` the interpreter's message, the index
+sentence or the reader's error) and `PartialEq`/`Eq` by every field of the
+interpreter's error (an exhaustive destructure, so a field added to
+`ScriptEvaluationError` fails to compile there; `ScriptEvaluationError` itself
+is unchanged); `evaluation()` and `resource_limit()` read it. It converts into
+no `crate::Error` variant: the mapping into the crate's error is
+`Transaction::verify`'s, with the txid and the input, and a generic `From` would
+fold a decline into a verdict's variant. `InputRules`, `DefaultMode` and
+`InputVerified` are `Copy`, `Eq` and `Hash`.
+
+**One core.** `spending::judge_input` (crate-private) is the only place outside
+`src/script/` that builds a `Spend` for an input: the door,
+`Transaction::verify`'s per-input code (`src/transaction/verify.rs`) and the
+streaming reader's (`src/transaction/beef_stream/spends.rs`) call it, and
+`tests/arch_one_input_core.rs` refuses a third site by its `file:line` (RED on
+`842e5cc4`, naming `verify.rs:318` and `beef_stream/spends.rs:176`).
+`Transaction::verify`'s and the stream's public errors, verdicts and words do
+not move: each maps the core's answer through its own code as before
+(`verify_refusal::script_refusal`, `execution_result`), a word left for
+`Spend::validate` to check on those paths so its refusal keeps their words, and
+the stream still charges a refused input's work to its total.
+
+**What does not move.** `Spend`, `SpendParams`, `TxSpendParams`,
+`Spend::with_transaction` and `SpendValidation` keep their shape and stay
+undeprecated (what becomes of them is the break program's, #843).
+
+**The tests.** `tests/verify_input_door.rs` (14): the door equals a `Spend::new`
+built by hand, verdict, words and resource fields, on all 1,488 spends of
+`vectors/spend_valid.json`, `script_valid.json` and `script_invalid.json` at
+versions 1 and 2, in the default mode and under `ScriptFlags::block(era)` and
+`standard(era)` of both eras (14,880 runs, the one-shot equal to the prepared
+form on each), and again under a 48-byte memory and 12-unit work budget; the
+door equals `Transaction::verify`'s class on every input of every vector BEEF's
+unproven transaction whose sources the BEEF carries and of signed P2PKH spends
+of 1, 3 and 10 inputs (two with a broken signature), in the default mode and
+under the chain parameters' word (56 transactions, 78 inputs, both modes);
+`from_bytes` agrees with `Transaction::from_binary` on 556 transactions and
+their single-byte changes, truncations and extensions (268,708 inputs); each
+refusal before evaluation (an index at and past the count, a byte after the
+transaction, a truncated transaction, no bytes, an unknown flag bit, a word
+without SIGHASH_FORKID, GENESIS or UTXO_AFTER_GENESIS, the zero word); a memory
+and a work decline `Declined` in every mode, judged under a larger budget; the
+three overrides; a word carrying no default mode; the setters commuting; a
+prepared transaction judged on four threads. `tests/conformance_scripts.rs`
+gains the door as a second runner over the evaluation corpus
+(`conformance_scripts_through_the_door_855`: 2,922 `node-script` vectors and
+134 `node-transaction` inputs answer what the `Spend` runner answers, the
+pinned totals unmoved). Seven faults planted in a scratch copy each turn a test
+RED (a decline read as invalid, the Chronicle override dropped, the version
+forced to 1, the unlocking script of input 0 for every input, a prefix reader
+for `from_bytes`, an override under a word, the one-shot dropping the word);
+the API is absent on the base (compile-RED). `fuzz_verify_input` (in the
+nightly's matrix, 653 seeds from `fuzz/corpus-gen --door-only`): arbitrary
+transaction bytes, locking script, amount, index and flag bits, never a panic;
+`from_bytes` accepts exactly what `from_binary` accepts; the prepared form
+answers what the one-shot answers; a refusal before evaluation never reaches
+the interpreter; two runs of 60 s, 983,154 and 826,155 executions, no failure.
+`examples/verify_input.rs` is a README block (`tests/readme_examples.rs`).
+`tests/verify_input_door_fold_855.rs` (11, the fold of the three reads): a
+valid input reports its work with no limit set; the count with no limit equal
+to the count under `u64::MAX` on every vector spend in every mode and on
+signed P2PKH inputs; a work decline's count; `NodeFigures` through the door
+equal to a hand-built `Spend` with the same setters on every vector spend
+under the four words and three figure sets (35,712 runs), and on a script
+crossing each bound (a verdict past the policy and the consensus figure, a
+decline below them, a node run with 0 judging a 100,000,001-byte element, the
+number length policy on an operand); `InputRefusal`s differing in the index,
+the input count, the message, each resource field, the arm and the reader's
+error unequal. `tests/arch_door_says_what_spend_says_855.rs` (2): every public
+`set_*` of `Spend` and field of `SpendParams` has a counterpart on
+`InputRules`, `DefaultMode` or `NodeFigures`, or an allowance with its reason.
+RED on `458914f1` (compile, and the counterparts undeclared) and under nine
+faults planted in a scratch copy of the tip.
+
+**Cost.** Release, five runs each after a warm-up, base `842e5cc4` against the
+tip, run twice interleaved: `Transaction::verify` of 1, 10 and 1,000 P2PKH
+inputs 0.034-0.036, 0.305-0.326 and 30.4-33.0 ms on the base against 0.034,
+0.311-0.317 and 30.5-32.4 ms on the tip; the streaming reader on the largest
+vector BEEF (713 bytes) 0.037 against 0.034-0.036 ms and on a 1,000-input BEEF
+32.0-32.2 against 30.2-32.0 ms: within the runs' noise. The door's prepared form
+judges 1,000 inputs in 30.0-30.8 ms where a `Spend::new` built per input, as both
+callers build it, takes 158-173 ms. Counting the work without a limit, at the
+door alone: 32.24-32.71 ms without the count against 32.25-32.85 ms with it
+over the same 1,000 inputs, five interleaved rounds, within the noise.
+
+### Notes: cross-SDK parity (#855)
+
+The node's library gives the call's shape and its refusals before evaluation:
+bitcoin-sv v1.2.2 `bitcoinconsensus_verify_script_with_amount`
+(`src/script/bitcoinconsensus.h:90-98`) takes the locking script, the amount,
+the transaction's bytes, the index and a flag word, and refuses invalid flags,
+then a transaction that does not deserialize, then an index past its inputs,
+then bytes after it (`bitcoinconsensus.cpp:88-97`; its codes
+`bitcoinconsensus.h:41-49`), a failed script a return of 0, never an error code.
+Three cells differ, stated: its flag mask (`VERIFY_ALL`, `bitcoinconsensus.h:
+69-74`) excludes SIGHASH_FORKID and GENESIS, so it refuses every post-Genesis BSV
+word, where this door takes the interpreter's full word and refuses what
+`ScriptFlags::check` refuses; an index past the inputs with bytes after the
+transaction is the reader's refusal here (`Transaction`), the node's
+`TX_INDEX` there (both refuse); and its budgets come from its `Config`, not the
+word, where this door's are the rules' local budgets. The reference has no
+public twin (`ts-stack@edf6e03`): its `Spend` gives the default mode
+(`packages/sdk/src/script/Spend.ts:296`, `memoryLimit` uncapped by default),
+the words and the split of a verdict from a budget refusal (`validate` throws
+`ScriptEvaluationError` or `ScriptResourceLimitError`, `Spend.ts:2017-2026`), and
+its `Transaction.verify` builds one `Spend` per input (`Transaction.ts:1441-1456`);
+its index refusal reads `Spend input index is out of range` (`Spend.ts:2214`),
+where this door keeps `Spend::with_transaction`'s sentence. go-sdk@2ca481c's
+`Execute(WithTx(tx, idx, prevOut), WithFlags(f))` (`script/interpreter/options.go:15,168`)
+refuses an index past the inputs before running (`ErrInvalidIndex`,
+`thread.go:135-145`), its flag bits btcd's layout (`script/interpreter/scriptflag`),
+which is why the word here is typed. A fourth cell, the fold's: `NodeFigures` takes
+any three figures, where the node's configuration refuses a stack memory policy
+above its consensus figure (`configscriptpolicy.cpp:269-305` at v1.2.2, 0 read as
+`INT64_MAX` for either, `consensus/consensus.h:82`) and a script number length
+policy of 1 to 3 (`:192-214`, under `MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS`, 4,
+`consensus/consensus.h:62`); here each figure is read on its own path (the policy
+under a mempool word, the consensus figure under a block word), so such a pair
+judges as the two `Spend` setters do. Ours: the typed word, the default mode as a
+mode, the decline as its own arm, the figures unchecked against each other.
+
 ### Fixed: the ratchet's library lock no longer goes stale when the crate's own version moves; a release commit is Cargo.toml and CHANGELOG.md alone on both lines
 
 - What contradicted what. `RELEASING.md` steps 3 and 17 and the `beta-born` job (`release_commit()` in `ci.yml`) admit a release commit of `Cargo.toml` and `CHANGELOG.md` alone. The ratchet's compiler counters build a scratch copy of the library with `tools/ratchet/library.Cargo.lock` in place and run cargo `--locked`; that lock records the crate's own version (`0.8.3` on `main`, `0.9.0-beta.7` on `beta`), so the version line of a release made it stale and the `ratchet` step stopped (`cargo clippy (pedantic, cognitive complexity >25) failed (exit status: 101); no measurement was recorded ... the library lock is stale`), and `docs/RATCHETS.md` asked for the lock's refresh in the same pull request, which the release-commit rule forbids. Met on PR #858, the 0.8.4 release commit on `main` (2026-11-10 18:49Z); beta's prerelease commits had touched the lock as a third file for the same reason, where `beta-born` does not run.
