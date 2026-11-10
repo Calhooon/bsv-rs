@@ -22,6 +22,14 @@ These are proposals. They change no source, no fixture and no public shape; a la
 
 The hot-path designs (#90 to #93) each open with a measurement on a quiet host, because no figure at the tip is on record (the baselines date from October); the measurement confirms or reorders the ranked steps before any source moves.
 
+## Decision records
+
+A record writes down what an ensemble of design reads decided, why, and what is built, for whoever works here next. It changes no source either.
+
+| Issue | Record | State |
+|---|---|---|
+| [#843](https://github.com/Calhooon/bsv-rs/issues/843) | [Identity and framing: the class of #840, the two laws, the decisions of three ensembles and a tie-break, the stable-line path](843-identity-and-framing.md) | decided 2026-11-10 with the owner's word, and more after it (the record's section 9: one id type, the wallet included; the API read's breaks; the node's oracle required); #840's reader fix merged (PR #841, `7df16cf6`), #842's open (PR #846), the ownership break and the id type not built; the record's state lines are kept by the PR that lands what it names |
+
 ## The owner's questions
 
 Each design's section 6 carries the options, the reference-shaped default with its line, and what each option costs the dependents. Condensed here, each with the lane's recommendation. Where a question only fixes a measurement, a gate or a record, the captain proceeds on the recommendation and says so on the issue; where it fixes a public shape, a resource semantic, a secret, a pin, a release or a policy, the lanes that wait on it stay closed until the owner answers.
