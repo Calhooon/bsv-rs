@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the upstream filing queue brought up to date (#375)
+
+The owner asked on 2026-11-09 whether the references need upstream issues; the
+standing answer is #375's main-merge gate (RELEASING.md point 16). The
+filings-1109 lane read every divergence row and parity note since 0.9.0-beta.6
+and the open pull requests' notes, 51 rows, and classified each in
+`docs/lanes/filings-1109.md`: 26 carry a finding against another SDK, 12 of
+them filed (14 numbers), 15 unfiled (one row both). Eleven new drafts are
+queue rows 30 to 40 of `docs/lanes/375-filings/QUEUE.md`, each opening
+`keeper's word first`: three against ts-stack (the encoding check's point
+parse against the node's length-and-prefix read, #660; `MerklePath.verify`'s
+coinbase depth one block stricter than the node and applied to a proof no
+spend judges, #734; `toASM` dropping the `OP_RETURN` opcode, #603 shard B and
+#634) and eight against go-sdk (a SHIP discovery panic on an out-of-range
+output index, #804; the binary lookup answer's unbounded count and truncated
+index, #775; SLAP and SHIP admission without the value, signature or hint
+checks, #786, #804, #544; the all-hosts acknowledgment requirement judged over
+the successful hosts, PR #820; `LookupResolver.Query`'s freeform precedence,
+later-copy and map-order merge, #796, #815; `MergeTransaction` ignoring a held
+BUMP, #764; the JSON lookup answer's base64 BEEF, #768; the PushDrop lock
+re-encoding the wallet's key and signature, #782). Row 29 is PR #812's draft
+(#418) and is not repeated. Rows 26 to 28 still wait, unfiled. Seven
+candidates were dropped with their reasons in the lane record, and the record
+lists the older rows outside the window still marked "filing pending". Nothing
+was filed; no source, test or vector changed.
+
 ### Docs: the duplicate dependency families on beta, each one's constraint (#104)
 
 Re-measured the duplicate versions the `deny` step warns about (#104, part
