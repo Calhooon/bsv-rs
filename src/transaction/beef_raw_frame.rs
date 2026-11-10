@@ -11,6 +11,8 @@
 //! `ReaderUint8Array` reads), varints and lengths only, linear in the bytes
 //! and allocating nothing; this crate's transaction reader takes exactly the
 //! bytes it accepts (`a_frame_the_scan_accepts_is_the_one_the_parser_reads_817`).
+//! An output amount of 2^53 or more is refused in the transaction reader's
+//! words (#844), where the reference's scan skips it.
 //! Bytes after the lock time are refused in this crate's words: the
 //! reference's scan reads a prefix and its door keeps the whole buffer, which
 //! its writer then writes as a frame no reader reads back (a stated row).
@@ -54,6 +56,18 @@ impl Scan<'_> {
         Ok(read)
     }
 
+    /// An output's amount: `skipBytes(8)`, then this crate's reader's
+    /// refusal of an amount of 2^53 or more in its words (#844; the
+    /// reference's scan skips the bytes unread, `BeefTx.ts:39`, a stated row),
+    /// so the scan and `Transaction::from_binary` take the same bytes.
+    fn amount(&mut self) -> Result<(), &'static str> {
+        let at = self.pos;
+        self.skip(8)?;
+        let mut le = [0u8; 8];
+        le.copy_from_slice(&self.bytes[at..self.pos]);
+        super::amount::safe_amount(u64::from_le_bytes(le)).map(|_| ())
+    }
+
     /// `readVarIntNumStrict(false)`.
     fn var_int(&mut self) -> Result<u64, &'static str> {
         let little = |b: &[u8]| b.iter().rev().fold(0u64, |v, &x| (v << 8) | u64::from(x));
@@ -88,7 +102,7 @@ pub(crate) fn one_transaction(bytes: &[u8]) -> Result<(), String> {
             scan.skip(script.saturating_add(4))?;
         }
         for _ in 0..scan.var_int()? {
-            scan.skip(8)?;
+            scan.amount()?;
             let script = scan.var_int()?;
             scan.skip(script)?;
         }

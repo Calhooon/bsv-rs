@@ -4,9 +4,9 @@
 //! reader's decoder at its place in the frame) proven equal to the literal
 //! round trip it replaced (`Beef::snapshot_round_trip`, the oracle: the
 //! source written in its merge order and read back by `Beef::from_binary`).
-//! On every BEEF this tree's vectors hold, each under fourteen states (the
-//! six of #817's differential and eight more a reader refuses or the merge
-//! reads differently), and on every `writers` and `merge_door` state of
+//! On every BEEF this tree's vectors hold, each under seventeen states (the
+//! six of #817's differential, eight more a reader refuses or the merge
+//! reads differently, and three holding an output of 2^53 satoshis, #844), and on every `writers` and `merge_door` state of
 //! #817's recording: the same `Ok`, or the same `Err` (variant and words);
 //! after an `Ok`, the target's written bytes equal those of merging the
 //! oracle's snapshot, into an empty target and into one holding a raw entry.
@@ -85,7 +85,23 @@ fn compare(name: &str, source: &Beef, targets: &[Beef], counts: &mut Counts) {
     }
 }
 
-/// The fourteen states of a source: as read, and each change below.
+/// A transaction with one output of 2^53 satoshis, built by hand (#844).
+fn by_hand_53() -> Transaction {
+    Transaction::with_params(
+        1,
+        vec![crate::transaction::TransactionInput::new(
+            FRESH.to_string(),
+            0,
+        )],
+        vec![crate::transaction::TransactionOutput::new(
+            1 << 53,
+            crate::script::LockingScript::new(),
+        )],
+        0,
+    )
+}
+
+/// The seventeen states of a source: as read, and each change below.
 fn changes() -> Vec<Change> {
     vec![
         Box::new(|_| {}),
@@ -204,6 +220,29 @@ fn changes() -> Vec<Change> {
                 }
             }
         }),
+        // An output of 2^53 satoshis in each entry shape that can hold one
+        // (#844): the last read entry edited through `edit_tx` (its bytes
+        // rewritten from the fields) ...
+        Box::new(|b| {
+            let last = b
+                .txs
+                .iter()
+                .rev()
+                .find(|t| t.tx().is_some_and(|tx| !tx.outputs.is_empty()));
+            if let Some(txid) = last.map(BeefTx::txid) {
+                let _ = b.edit_tx(&txid, |tx| tx.outputs[0].satoshis = Some(1 << 53));
+            }
+        }),
+        // ... a transaction built by hand merged by `merge_transaction` (its
+        // txid computed, its bytes cached and scanned) ...
+        Box::new(|b| {
+            b.merge_transaction(by_hand_53());
+        }),
+        // ... and pushed by hand never hashed, so no bytes are cached: an
+        // entry the writers' check takes from its fields (the state
+        // `fuzz_beef_parser` found, where the check took the fields on
+        // trust and the round trip refused it).
+        Box::new(|b| b.txs.push(BeefTx::from_tx(by_hand_53(), None))),
     ]
 }
 
@@ -235,7 +274,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
     // `src/transaction/CLAUDE.md`'s `beef/prepass_621_tests.rs` row,
     // `docs/lanes/fix-621.md`). A split that moves with no new vector is a
     // finding. The totals are derived, never pinned.
-    assert_eq!(read, 338, "every BEEF the vectors hold that reads");
+    assert_eq!(read, 356, "every BEEF the vectors hold that reads");
     assert_eq!(
         counts.ok + counts.refused,
         changes.len() * read,
@@ -249,7 +288,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
             counts.by_reader,
             counts.root_not_carried
         ),
-        (2215, 2517, 1726, 243)
+        (2416, 3636, 1761, 248)
     );
 }
 

@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
+use super::amount::read_amount;
 use super::beef::Beef;
 use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
@@ -192,7 +193,9 @@ impl Transaction {
     /// the reference's words (`ts-stack@edf6e03` `Transaction.ts:532-535`);
     /// until #840 such bytes were kept as the cached serialization and hashed
     /// into the txid. To read one transaction from the front of a longer
-    /// buffer, use [`from_reader`](Self::from_reader).
+    /// buffer, use [`from_reader`](Self::from_reader). An output amount of
+    /// 2^53 satoshis or more is refused as `TransactionError("Number can only
+    /// safely store up to 53 bits")`, the reference's words (#844).
     ///
     /// ```
     /// use bsv_rs::transaction::Transaction;
@@ -239,7 +242,9 @@ impl Transaction {
     ///
     /// # Returns
     ///
-    /// The parsed transaction with source transaction data populated.
+    /// The parsed transaction with source transaction data populated. A
+    /// source or output amount of 2^53 satoshis or more is refused in the
+    /// reference's words, as [`from_binary`](Self::from_binary) refuses one (#844).
     pub fn from_ef(ef: &[u8]) -> Result<Self> {
         let mut reader = Reader::new(ef);
 
@@ -280,7 +285,7 @@ impl Transaction {
             let sequence = reader.read_u32_le()?;
 
             // Read source satoshis
-            let source_satoshis = reader.read_u64_le()?;
+            let source_satoshis = read_amount(&mut reader)?;
 
             // Read source locking script
             let locking_script_len = reader.read_var_int_num()?;
@@ -326,7 +331,7 @@ impl Transaction {
         let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
 
         for _ in 0..output_count {
-            let satoshis = reader.read_u64_le()?;
+            let satoshis = read_amount(&mut reader)?;
             let script_len = reader.read_var_int_num()?;
             let script_bytes = reader.read_bytes(script_len)?;
             let locking_script = LockingScript::from_binary(script_bytes)?;
@@ -366,10 +371,10 @@ impl Transaction {
     /// The door for a transaction at the front of a longer buffer, where
     /// [`from_binary`](Self::from_binary) refuses the bytes after it (#840).
     /// The transaction holds no copy of the reader's bytes: its serialization
-    /// and txid are computed from its fields. One cell reads what `fromReader`
-    /// refuses: an output amount of 2^53 satoshis or more is read as its `u64`,
-    /// where the reference throws `Number can only safely store up to 53 bits`
-    /// (`Transaction.ts:497`; a stated row, closed by #844).
+    /// and txid are computed from its fields. An output amount of 2^53
+    /// satoshis or more is refused in the reference's words, `Number can only
+    /// safely store up to 53 bits` (`Transaction.ts:497`, #844), as every
+    /// reader of a transaction refuses it.
     ///
     /// ```
     /// use bsv_rs::{primitives::Reader, transaction::Transaction};
@@ -425,7 +430,7 @@ impl Transaction {
         let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
 
         for _ in 0..output_count {
-            let satoshis = reader.read_u64_le()?;
+            let satoshis = read_amount(reader)?;
             let script_len = reader.read_var_int_num()?;
             let script_bytes = reader.read_bytes(script_len)?;
             let locking_script = LockingScript::from_binary(script_bytes)?;
@@ -487,7 +492,8 @@ impl Transaction {
         // Parse output offsets
         let output_count = reader.read_var_int_num()?;
         for i in 0..output_count {
-            // Skip satoshis
+            // Skip satoshis, unread as the reference's `br.read(8)` skips
+            // them (`Transaction.ts:456`): no amount refused here (#844).
             reader.read_u64_le()?;
 
             let script_len = reader.read_var_int_num()?;

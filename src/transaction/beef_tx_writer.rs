@@ -40,8 +40,33 @@ impl BeefTx {
     /// reference meets them, read-only: [`reference_refusal`](Self::reference_refusal),
     /// then [`own_refusal`](Self::own_refusal).
     pub(crate) fn writable(&self, version: u32) -> Result<()> {
+        self.amount_refusal()?;
         self.reference_refusal(version)?;
         self.own_refusal()
+    }
+
+    /// An entry holding a transaction (parsed, edited, or built by hand and
+    /// pushed) with an output amount of 2^53 or more, refused in the
+    /// reference's writer's words, `The number is larger than 2 ^ 53
+    /// (unsafe)` (#844's fold; `BigNumber.ts:462`, recorded), as its writer
+    /// throws serializing the entry's `Transaction` before any other check
+    /// (`Beef.ts:360-373`, `BeefTx.ts:255-262`). Every output is read, the
+    /// first, a middle and the last alike. A transaction a reader built holds
+    /// no such amount (the readers refuse it in theirs, #844), so the state
+    /// is a field-built one; an entry held as bytes alone is the raw-entry
+    /// scan's, in the reader's words (`own_refusal`), and no door builds
+    /// such bytes.
+    pub(crate) fn amount_refusal(&self) -> Result<()> {
+        if let Some(ref tx) = self.tx {
+            for output in &tx.outputs {
+                if super::super::amount::safe_amount(output.satoshis.unwrap_or(0)).is_err() {
+                    return Err(crate::Error::BeefError(
+                        super::super::amount::UNSAFE_WRITE.to_string(),
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// What the reference's writer throws for this entry (#817): a txid-only
@@ -79,9 +104,16 @@ impl BeefTx {
     /// transaction from every door that sets it; until then
     /// `Transaction::from_binary` and `from_hex` set it to the whole buffer
     /// they read a prefix of, the check holding without that fix), else
-    /// none to scan (a serialization
-    /// built from the fields is one transaction by construction, and an
-    /// entry mutated through `tx_mut` is written from its fields). Until the
+    /// the fields the bytes are written from (an entry mutated through
+    /// `tx_mut` is written from its fields too): a serialization built from
+    /// them is one transaction by construction save an output amount of
+    /// 2^53 or more, which the reader refuses since #844 and
+    /// [`amount_refusal`](Self::amount_refusal) refuses ahead of every check,
+    /// in the reference's writer's words (`fuzz_beef_parser` found the
+    /// state on its seeds, a hand-built transaction merged by
+    /// `merge_transaction`, which the round trip refused and the pre-pass
+    /// passed to the merge; refused here in the scan's words until #844's
+    /// fold). Until the
     /// fold a parsed entry was not scanned, so one holding a transaction
     /// followed by more bytes was written as a frame the reader refuses and
     /// merged by `merge_beef`. Linear, no allocation.
@@ -96,11 +128,20 @@ impl BeefTx {
         } else if let Some(ref raw_tx) = self.raw_tx {
             super::super::beef_raw_frame::one_transaction(raw_tx)
                 .map_err(crate::Error::BeefError)?;
-        } else if let (Some(ref tx), false) = (&self.tx, self.mutated) {
-            tx.with_cached_bytes(|bytes| {
-                bytes.map_or(Ok(()), super::super::beef_raw_frame::one_transaction)
-            })
-            .map_err(crate::Error::BeefError)?;
+        } else if let Some(ref tx) = self.tx {
+            let cached = if self.mutated {
+                None
+            } else {
+                tx.with_cached_bytes(|bytes| {
+                    bytes.map(super::super::beef_raw_frame::one_transaction)
+                })
+            };
+            // Written from the fields: one transaction by construction save
+            // an amount of 2^53 or more, which `amount_refusal` refuses ahead
+            // of this check, in the reference's writer's words (#844's fold).
+            if let Some(scanned) = cached {
+                scanned.map_err(crate::Error::BeefError)?;
+            }
         }
         Ok(())
     }

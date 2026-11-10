@@ -880,6 +880,12 @@ impl Beef {
         // first, which moved the closure's order where entries with inputs
         // outside lead.
         self.refresh_mutated();
+        // Every held transaction is serialized first, an output of 2^53 or
+        // more refused in the writer's words before the subject is looked
+        // for, even outside the closure, as the reference's
+        // `#getAtomicSerializedBytes` synchronizes every entry before
+        // `#getBeefForAtomic` (`Beef.ts:392-404`; #844's fold).
+        self.refuse_unsafe_amount()?;
 
         if self.find_txid(txid).is_none() {
             return Err(crate::Error::BeefError(format!(

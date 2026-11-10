@@ -268,16 +268,15 @@ fn every_recorded_cell_is_asserted_or_stated_840() {
     }
 }
 
-// The 53-bit cells (the cold read's item 7; older than #840, stated, #844
-// conforms). The reference reads an amount through
-// `readUInt64LEBn().toNumber()` (`ts-stack@edf6e03` `Transaction.ts:388,409,497`)
-// and refuses one of 2^53 or more in `Number can only safely store up to 53
-// bits` (`BigNumber.ts:628`); this crate reads a `u64` at every reader, as
-// go-sdk@2ca481c does (`transaction/output.go:29,53`). No such output is valid
-// at the node (`MAX_MONEY`, bitcoin-sv v1.2.2 `amount.h:130`,
-// `validation.cpp:543-551`). Each test asserts the recording's refusal on the
-// reference's side and this crate's reading on ours, so the day #844 lands it
-// turns red and says so.
+// The 53-bit cells (the cold read's item 7, older than #840; #844 conformed
+// them). The reference reads an amount through `readUInt64LEBn().toNumber()`
+// (`ts-stack@edf6e03` `Transaction.ts:388,409,497`) and refuses one of 2^53 or
+// more in `Number can only safely store up to 53 bits` (`BigNumber.ts:628`);
+// since #844 this crate's readers refuse it in those words (until then each
+// read a `u64`, as go-sdk@2ca481c does, `transaction/output.go:29,53`). No such
+// output is valid at the node (`MAX_MONEY`, bitcoin-sv v1.2.2 `amount.h:130`,
+// `validation.cpp:543-551`). The edges of every numeric field are
+// `transaction_numbers_844.rs`'s.
 
 /// The recorded 53-bit cell of `reader` named `name`.
 fn cell_53(reader: &str, name: &str) -> (String, Value) {
@@ -302,69 +301,63 @@ fn id_of(bytes: &[u8]) -> String {
     bsv_rs::primitives::to_hex(&h)
 }
 
-/// The output amount at the three readers: `Ok` here, the amount and the id
-/// the hash of the bytes; the recording's answer on the reference's side.
-fn assert_amount_read_here(name: &str, amount: u64, reference_refuses: bool) {
+/// The output amount at the three readers against the recording: read on
+/// both sides, the id the hash of the bytes, or refused on both in the
+/// reference's words (#844).
+fn assert_amount_as_recorded(name: &str, amount: u64, reference_refuses: bool) {
     for reader in ["fromBinary", "fromHex", "fromReader"] {
         let (input, answer) = cell_53(reader, name);
+        let bytes = from_hex(&input).unwrap();
+        let mut reader_bytes = Reader::new(&bytes);
+        let got = match reader {
+            "fromBinary" => Transaction::from_binary(&bytes),
+            "fromHex" => Transaction::from_hex(&input),
+            _ => Transaction::from_reader(&mut reader_bytes),
+        };
         if reference_refuses {
-            assert_eq!(answer["ok"], false, "{reader} {name}");
+            assert_refused(reader, name, got, &answer);
             assert_eq!(
                 answer["error"], "Number can only safely store up to 53 bits",
                 "{reader} {name}"
             );
-        } else {
-            assert_eq!(answer["ok"], true, "{reader} {name}");
+            continue;
         }
-        let bytes = from_hex(&input).unwrap();
-        let mut reader_bytes = Reader::new(&bytes);
-        let tx = match reader {
-            "fromBinary" => Transaction::from_binary(&bytes),
-            "fromHex" => Transaction::from_hex(&input),
-            _ => Transaction::from_reader(&mut reader_bytes),
-        }
-        .unwrap_or_else(|e| {
-            panic!("{reader} {name}: {e} (#844 conformed? the cell's test moves with it)")
-        });
+        assert_eq!(answer["ok"], true, "{reader} {name}");
+        let tx = got.unwrap_or_else(|e| panic!("{reader} {name}: {e}"));
         assert_eq!(tx.outputs[0].satoshis, Some(amount), "{reader} {name}");
         assert_eq!(tx.id(), id_of(&bytes), "{reader} {name}");
+        assert_eq!(tx.id(), answer["id"].as_str().unwrap(), "{reader} {name}");
         assert_eq!(tx.to_hex(), input, "{reader} {name}");
-        if !reference_refuses {
-            assert_eq!(tx.id(), answer["id"].as_str().unwrap(), "{reader} {name}");
-        }
     }
 }
 
 #[test]
 fn an_output_of_two_to_the_53_minus_1_satoshis_is_read_on_both_sides_840() {
-    assert_amount_read_here("output_two_to_the_53_minus_1", (1 << 53) - 1, false);
+    assert_amount_as_recorded("output_two_to_the_53_minus_1", (1 << 53) - 1, false);
 }
 
 #[test]
-fn an_output_of_two_to_the_53_satoshis_is_read_where_the_reference_refuses_840() {
-    assert_amount_read_here("output_two_to_the_53", 1 << 53, true);
+fn an_output_of_two_to_the_53_satoshis_is_refused_as_the_reference_refuses_840() {
+    assert_amount_as_recorded("output_two_to_the_53", 1 << 53, true);
 }
 
 #[test]
-fn an_output_of_two_to_the_64_minus_1_satoshis_is_read_where_the_reference_refuses_840() {
-    assert_amount_read_here("output_two_to_the_64_minus_1", u64::MAX, true);
+fn an_output_of_two_to_the_64_minus_1_satoshis_is_refused_as_the_reference_refuses_840() {
+    assert_amount_as_recorded("output_two_to_the_64_minus_1", u64::MAX, true);
 }
 
 #[test]
-fn an_ef_source_of_two_to_the_53_satoshis_is_read_where_the_reference_refuses_840() {
+fn an_ef_source_of_two_to_the_53_satoshis_is_refused_as_the_reference_refuses_840() {
     let (input, answer) = cell_53("fromEF", "source_two_to_the_53");
-    assert_eq!(answer["ok"], false);
     assert_eq!(
         answer["error"],
         "Number can only safely store up to 53 bits"
     );
-    let tx = Transaction::from_ef(&from_hex(&input).unwrap())
-        .unwrap_or_else(|e| panic!("fromEF: {e} (#844 conformed? the cell's test moves with it)"));
-    assert_eq!(tx.inputs[0].source_satoshis(), Some(1 << 53));
-    // The EF's own transaction is block 170's, its id unchanged by the amount.
-    assert_eq!(
-        tx.id(),
-        "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"
+    assert_refused(
+        "fromEF",
+        "source_two_to_the_53",
+        Transaction::from_ef(&from_hex(&input).unwrap()),
+        &answer,
     );
 }
 

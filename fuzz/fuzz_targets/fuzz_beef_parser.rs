@@ -135,7 +135,8 @@ fn the_pre_pass_is_the_round_trip(source: &Beef) {
 /// fold: the state `Transaction::from_binary` of such a buffer left until
 /// #840, built since through `Transaction::with_cached_bytes_for_test`,
 /// under `cfg(fuzzing)` alone; put in by `merge_transaction` and by a hand
-/// push).
+/// push), and an output of 2^53 satoshis or more in an entry edited through
+/// `edit_tx`, merged by `merge_transaction` and pushed by hand (#844).
 fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
     let pick = |i: usize| data.get(i).copied().unwrap_or(0) as usize;
     let mut states = Vec::new();
@@ -229,6 +230,38 @@ fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
             }
             states.push(b);
         }
+    }
+    // An output of 2^53 satoshis or more (#844), its amount from the input's
+    // bytes: a read entry edited through `edit_tx`, and a transaction built
+    // by hand merged as a parsed entry and pushed by hand.
+    let amount = (1u64 << 53) + (pick(6) as u64) * (pick(7) as u64 + 1);
+    let mut b = beef.clone();
+    let edited = b
+        .txs
+        .iter()
+        .find(|t| t.tx().is_some_and(|tx| !tx.outputs.is_empty()))
+        .map(BeefTx::txid);
+    if let Some(txid) = edited {
+        if b.edit_tx(&txid, |tx| tx.outputs[0].satoshis = Some(amount))
+            .is_ok()
+        {
+            states.push(b);
+        }
+    }
+    if let Some(tx) = beef.txs.iter().find_map(|t| t.tx()) {
+        let mut outputs = tx.outputs.clone();
+        outputs.push(bsv_rs::transaction::TransactionOutput::new(
+            amount,
+            bsv_rs::script::LockingScript::new(),
+        ));
+        let by_hand =
+            Transaction::with_params(tx.version, tx.inputs.clone(), outputs, tx.lock_time);
+        let mut b = beef.clone();
+        b.merge_transaction(by_hand.clone());
+        states.push(b);
+        let mut b = beef.clone();
+        b.txs.push(BeefTx::from_tx(by_hand, None));
+        states.push(b);
     }
     states
 }
