@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: src/wallet/substrates/http_json/review_actions.rs's survivors killed from the reference, eight named as equivalent candidates (#603)
+
+The run of 2026-11-04 scored `src/wallet/substrates/http_json/review_actions.rs`
+65 caught, 20 missed, 12 unviable (76.47%, floor 76). They survived because
+`read_members` runs the shared result validator (`result_values::review`,
+`review_actions.rs:121`) before the module's own decoding (`action_result`,
+`:122`), and that validator refuses every txid, send result and `noSendChange`
+outpoint that `hex32` and `outpoint` would refuse, in the same words, and
+bounds send results at 1001 and `noSendChange` at 100000. A mutant shows only
+at an accepting edge, and the #339 vector had none (its `competing_txs_not_hex`
+uses `"zz"`, which fails both halves of `is_txid_hex`).
+
+Twelve are killed by `tests/wallet_http_json_review_actions_603.rs`, against
+`tests/vectors/wallet_http_json_review_actions_603.json` (nine bodies recorded
+from `ts-stack@edf6e03` `HTTPWalletJSON` under Node v22.18.0 by
+`tests/support/wallet_http_json_review_actions_603.mjs`, two runs
+byte-identical; large lists are markers both sides expand, each outcome array
+past four entries compared as `{length, head, tail}`); each RED on its mutant
+in a scratch copy:
+
+- `:247:20` `>` to `==` and `>=`, `:247:53` `+` to `*` and `-`: 1001 send
+  results read (`WalletResultValidation.ts:1013-1031`), 1002 refused in
+  `Invalid createAction result sendWithResults: expected at most 1001 transaction results`
+  (`a_page_of_1001_send_with_results_is_read_and_1002_refused_603`).
+- `:292:20` `>` to `==` and `>=`, `:292:53` `+` to `*` and `-`: 1001 review
+  results read (`HTTPWalletJSON.ts:128`), 1002 refused in
+  `Invalid wallet error reviewActionResults`
+  (`a_page_of_1001_review_results_is_read_and_1002_refused_603`).
+- `:269:13` the `unproven` arm deleted: a send result `unproven` read
+  (`WalletResultValidation.ts:211-214`, BRC-100 `0100.md:1726`;
+  `a_send_with_result_unproven_is_read_603`).
+- `:180:20` `>` to `==` and `>=`: 100000 change outpoints read, 100001
+  refused in `Invalid createAction result noSendChange: expected at most 100000 entries`
+  (`a_no_send_change_of_100000_outpoints_is_read_and_100001_refused_603`).
+- `:385:22` `&&` to `||`: a competing txid of 64 non-hex characters, and one of
+  two hex digits, refused in `Invalid wallet error reviewActionResults[0].competingTxs[0]`
+  (`HTTPWalletJSON.ts:166-170`;
+  `a_competing_txid_of_64_non_hex_or_short_hex_is_refused_at_its_index_603`).
+
+The 1001-result pages ride a createAction with 1000 `sendWith` txids and no
+input or output: the reference refuses 1000 on a signAction and on a
+createAction that builds a transaction (`validationHelpers.ts:792-799`,
+`:871-874`, at most 999), and admits 1000 where none is built, its result's
+txid the 1001st.
+
+Eight are named as equivalent candidates, each reason resting on `:121`
+preceding `:122`, left for three reads to judge (no `.cargo/mutants.toml`
+entry here):
+
+- `:137:5` `safe_integer` to `true`, `:140:43` `&&` to `||`: `read`'s one
+  caller (`answer.rs:42-43`) is behind `is_review_body` (`:78-81`: status 400,
+  `code` read as `5.0`), so the code is 5 for the tree and both mutants; a code
+  absent, `"5"` or `5.5` never reaches `read` (#137's stated divergence,
+  `tests/wallet_http_json_review_actions_339.rs:377-406`).
+- `:155:28` `||` to `&&` in `hex32`: both inputs (`:218`, `:263`) passed
+  `scalars::hex(.., Some(32))` (`result_values/actions.rs:40-42,116-121`), so
+  the text is 64 hex digits and both operands are false either way.
+- `:195:9`, `:196:9`, `:197:9`, `:198:9` `||` to `&&` and `:198:25` `>` to `<`
+  in `outpoint`: each entry passed `parse_outpoint` (`scalars.rs:91-104`, the
+  same five predicates and the `u32` parse) at `actions.rs:52-60`; on an
+  admitted text every operand is false.
+
+Re-measured with the oracle's command (`mutation_args('substrates', 'k/48', ...)`,
+`--jobs 1`, 150 test targets): 97 mutants, 77 caught, 8 missed (the eight
+above), 0 timeouts, 12 unviable: 77 of 85 viable, 90.6%. No `src/` change.
+
 ### Added: src/wallet/substrates/result_values/raw_tree.rs's survivors of the complete run killed from the reference's recordings (#603)
 
 - The complete run of 2026-11-04 (at `2ff81a44`; the file unchanged since) measured `raw_tree.rs` at 57.01%
