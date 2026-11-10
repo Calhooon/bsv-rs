@@ -102,8 +102,11 @@ impl Transaction {
     /// Deserializes a transaction from a JSON string.
     ///
     /// If the JSON contains a `hex` field, the transaction is parsed from the hex
-    /// representation (matching Go SDK behavior). Otherwise, the transaction is
-    /// reconstructed from the individual fields.
+    /// representation (matching Go SDK behavior), any `txid` member unread.
+    /// Otherwise, the transaction is reconstructed from the individual fields;
+    /// an input's `txid` member that is not exactly 64 hex digits is refused
+    /// as `TransactionError("Invalid txid of input N: expected 64 hex digits")`,
+    /// and one in upper or mixed case is held in lower case (#845).
     ///
     /// # Example
     ///
@@ -132,8 +135,8 @@ impl Transaction {
         let inputs = match parsed.inputs {
             Some(input_jsons) => {
                 let mut inputs = Vec::with_capacity(input_jsons.len());
-                for ij in input_jsons {
-                    inputs.push(input_from_json(&ij)?);
+                for (index, ij) in input_jsons.iter().enumerate() {
+                    inputs.push(input_from_json(index, ij)?);
                 }
                 inputs
             }
@@ -198,7 +201,19 @@ impl Transaction {
 }
 
 /// Converts a JSON input representation to a TransactionInput.
-fn input_from_json(ij: &InputJson) -> Result<TransactionInput> {
+///
+/// The input's `txid` member is exactly 64 hex digits, held in lower case
+/// (one txid, one string: a BEEF's index keys on the text), else refused
+/// naming the input's index and none of the text (#845): until #845 it was
+/// held as given and a text the writer could not read was written as 32 zero
+/// bytes, so `"zz"`, `"abcd"` and `""` were one transaction.
+fn input_from_json(index: usize, ij: &InputJson) -> Result<TransactionInput> {
+    let txid = &ij.txid;
+    if txid.len() != 64 || !txid.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(crate::Error::TransactionError(format!(
+            "Invalid txid of input {index}: expected 64 hex digits"
+        )));
+    }
     let unlocking_script = if ij.unlocking_script.is_empty() {
         None
     } else {
@@ -207,7 +222,7 @@ fn input_from_json(ij: &InputJson) -> Result<TransactionInput> {
 
     Ok(TransactionInput {
         source_transaction: None,
-        source_txid: Some(ij.txid.clone()),
+        source_txid: Some(txid.to_ascii_lowercase()),
         source_output_index: ij.vout,
         unlocking_script,
         unlocking_script_template: None,
