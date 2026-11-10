@@ -27,9 +27,8 @@
 //! let encoded = tx_sig.to_checksig_format();
 //! ```
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::primitives::ec::Signature;
-use crate::primitives::BigNumber;
 
 pub use crate::primitives::bsv::sighash::{
     SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
@@ -75,7 +74,11 @@ impl TransactionSignature {
 
     /// Parses a transaction signature from checksig format.
     ///
-    /// Checksig format: `DER_signature || sighash_byte`
+    /// Checksig format: `DER_signature || sighash_byte`, the DER read by
+    /// [`Signature::from_der`], the reference's `fromDER` (#842): a DER
+    /// followed by other bytes before the sighash byte is refused. An empty
+    /// input is the blank signature (R = S = 1, scope 1), as the reference's
+    /// `fromChecksigFormat` gives it.
     ///
     /// # Arguments
     ///
@@ -95,34 +98,25 @@ impl TransactionSignature {
     /// assert_eq!(sig.scope() & 0xff, 0x41); // SIGHASH_ALL | SIGHASH_FORKID
     /// ```
     pub fn from_checksig_format(data: &[u8]) -> Result<Self> {
-        if data.is_empty() {
+        // The last byte is the sighash type, the rest the DER signature read
+        // as the reference's `fromChecksigFormat` reads it
+        // (`TransactionSignature.ts:460-472`): one byte alone is an empty DER,
+        // refused in `fromDER`'s words (#842; `Checksig format too short`
+        // until then).
+        let Some((&scope, der_bytes)) = data.split_last() else {
             // Allow "blank" signatures (used for unsigned inputs)
-            let r = BigNumber::one().to_bytes_be(32);
-            let s = BigNumber::one().to_bytes_be(32);
-            let mut r_arr = [0u8; 32];
-            let mut s_arr = [0u8; 32];
-            r_arr.copy_from_slice(&r);
-            s_arr.copy_from_slice(&s);
+            let mut one = [0u8; 32];
+            one[31] = 1;
             return Ok(Self {
-                signature: Signature::new(r_arr, s_arr),
+                signature: Signature::new(one, one),
                 scope: 1,
             });
-        }
-
-        if data.len() < 2 {
-            return Err(Error::InvalidSignature(
-                "Checksig format too short".to_string(),
-            ));
-        }
-
-        // The last byte is the sighash type
-        let scope = data[data.len() - 1] as u32;
-
-        // The rest is the DER-encoded signature
-        let der_bytes = &data[..data.len() - 1];
+        };
         let signature = Signature::from_der(der_bytes)?;
-
-        Ok(Self { signature, scope })
+        Ok(Self {
+            signature,
+            scope: u32::from(scope),
+        })
     }
 
     /// Returns the underlying ECDSA signature.

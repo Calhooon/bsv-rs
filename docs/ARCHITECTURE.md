@@ -89,7 +89,7 @@ Across every module: one `Error` enum ([`src/error.rs`](../src/error.rs),
 variant is additive); `TransportFault` and `WalletRefusalClass` (#137) re-exported at the crate root; the
 `http` feature for reqwest (ARC, WhatsOnChain, the headers service, the HTTP
 substrates, the overlay hosts), `websocket` opt-in and outside `full`, `wasm`
-for the JS RNG and timers; the 19 fuzz targets of
+for the JS RNG and timers; the 20 fuzz targets of
 [`fuzz/fuzz_targets/CLAUDE.md`](../fuzz/fuzz_targets/CLAUDE.md).
 
 ## 3. The invariants

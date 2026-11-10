@@ -448,54 +448,27 @@ fn utf8(bytes: &[u8]) -> Result<String, Error> {
 /// reference's checks, in its order and words, and its re-encoding (an
 /// integer minimal, a zero byte before a high bit). The refusal is the words
 /// alone, each caller's error class its own: the wire's `WalletError`,
-/// `Certificate`'s `CertificateValidationError` (bsv-rs#305).
+/// `Certificate`'s `CertificateValidationError` (bsv-rs#305). The checks are
+/// the crate's one reading, `primitives::ec::signature_der::read`, which
+/// `Signature::from_der` reads through too (#842); the re-encoding is here.
 pub(crate) fn reference_der(der: &[u8]) -> Result<Vec<u8>, String> {
-    let invalid = || "Signature DER invalid".to_string();
-    // `getLength`: a short-form length; a missing byte fails the next check.
-    let length = |at: usize| match der.get(at) {
-        Some(b) if b & 0x80 == 0 => Ok(*b as usize),
-        Some(_) => Err("Invalid DER entity length".to_string()),
-        None => Err(invalid()),
-    };
-    if der.first() != Some(&0x30) {
-        return Err("Signature DER must start with 0x30".to_string());
-    }
-    if length(1)? + 2 != der.len() || der.get(2) != Some(&0x02) {
-        return Err(invalid());
-    }
-    let r_end = 4 + length(3)?;
-    if der.get(r_end) != Some(&0x02) {
-        return Err(invalid());
-    }
-    // `getLength` past the end reads `undefined`, and the length check that
-    // follows throws its own words (`Signature.ts:76-78`).
-    let s_len = match der.get(r_end + 1) {
-        Some(b) if b & 0x80 == 0 => *b as usize,
-        Some(_) => return Err("Invalid DER entity length".to_string()),
-        None => return Err("Invalid R-length in signature DER".to_string()),
-    };
-    if der.len() != r_end + 2 + s_len {
-        return Err("Invalid R-length in signature DER".to_string());
-    }
+    let integers = crate::primitives::ec::signature_der::read(der).map_err(str::to_string)?;
     // `toDER` (`Signature.ts:225-239`): R is written through `toArray`, which
     // gives a zero one byte `00`; S's leading zeros are dropped by a trailing
-    // `while` loop that leaves a zero S empty, `02 00`.
-    let integer = |bytes: &[u8], which: &str, zero_is_empty: bool| -> Result<Vec<u8>, String> {
-        if bytes.first() == Some(&0) && bytes.get(1).map_or(0, |b| b & 0x80) == 0 {
-            return Err(format!("Invalid {which}-value in signature DER"));
-        }
-        let start = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
-        let mut minimal = bytes[start..].to_vec();
+    // `while` loop that leaves a zero S empty, `02 00`. The reader returns
+    // each integer with no zero byte leading it.
+    let integer = |bytes: &[u8], zero_is_empty: bool| -> Vec<u8> {
+        let mut minimal = bytes.to_vec();
         if minimal.is_empty() && zero_is_empty {
-            return Ok(minimal);
+            return minimal;
         }
         if minimal.first().is_none_or(|b| b & 0x80 != 0) {
             minimal.insert(0, 0);
         }
-        Ok(minimal)
+        minimal
     };
-    let r = integer(&der[4..r_end], "R", false)?;
-    let s = integer(&der[r_end + 2..], "S", true)?;
+    let r = integer(integers.r, false);
+    let s = integer(integers.s, true);
     let mut out = vec![0x30, (4 + r.len() + s.len()) as u8, 0x02, r.len() as u8];
     out.extend_from_slice(&r);
     out.extend_from_slice(&[0x02, s.len() as u8]);

@@ -38,7 +38,7 @@ use bsv_rs::compat::{bsm, ecies};
 use bsv_rs::messages;
 use bsv_rs::primitives::bsv::shamir::split_private_key_with;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
-use bsv_rs::primitives::{from_base64, from_hex, to_base64, PrivateKey};
+use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, PrivateKey};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_structure, Beef, Headers, Kind, MerklePath, MerklePathLeaf,
     Verdict,
@@ -237,7 +237,10 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
             vec![],
         ],
     });
-    out.push(("door-LeftDuplicateBelow-hand".into(), beef.to_binary()));
+    out.push((
+        "door-LeftDuplicateBelow-hand".into(),
+        beef.to_binary().unwrap(),
+    ));
     out
 }
 
@@ -271,7 +274,7 @@ fn beef_corpora(base: &Path) {
         }
         if let Ok(parsed) = Beef::from_binary(data) {
             for (i, path) in parsed.bumps.iter().enumerate() {
-                bump.add(&format!("lean-{name}-bump{i}"), &path.to_binary());
+                bump.add(&format!("lean-{name}-bump{i}"), &path.to_binary().unwrap());
             }
         }
     }
@@ -710,6 +713,55 @@ fn main() {
     script_corpus(&base, rest.as_deref());
     parser_corpora(&base);
     reader_corpora(&base);
+    signature_corpus(&base);
+}
+
+/// The DER reader's seeds (#842): every DER of `signature_der_842.json` (the
+/// six shapes on three of the reference's signatures, the short inputs) and of
+/// `auth_certificate_signature_der_305.json`, each also with a scope byte
+/// after it, and this crate's signer's DER over a few digests.
+fn signature_corpus(base: &Path) {
+    let mut der = Corpus::new(base, "fuzz_signature_der");
+    let vector: Value =
+        serde_json::from_str(&read("tests/vectors/signature_der_842.json")).unwrap();
+    for door in ["signed_message", "bsm", "proto_wallet"] {
+        for case in vector[door]["cases"].as_array().unwrap() {
+            let bytes = from_hex(case["der"].as_str().unwrap()).unwrap();
+            let name = case["name"].as_str().unwrap();
+            der.add(&format!("842-{door}-{name}"), &bytes);
+            der.add(
+                &format!("842-{door}-{name}-checksig"),
+                &[&bytes[..], &[0x41]].concat(),
+            );
+        }
+    }
+    for case in vector["reader"].as_array().unwrap() {
+        let bytes = from_hex(case["der"].as_str().unwrap()).unwrap();
+        der.add(
+            &format!("842-reader-{}", case["name"].as_str().unwrap()),
+            &bytes,
+        );
+    }
+    let certificate: Value = serde_json::from_str(&read(
+        "tests/vectors/auth_certificate_signature_der_305.json",
+    ))
+    .unwrap();
+    for (i, case) in certificate["cases"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        if let Some(Ok(bytes)) = case["signature"].as_str().map(from_hex) {
+            der.add(&format!("305-{i}"), &bytes);
+        }
+    }
+    let key = PrivateKey::from_bytes(&[9; 32]).unwrap();
+    for i in 0u8..8 {
+        let sig = key.sign(&sha256(&[i])).unwrap();
+        der.add(&format!("signer-{i}"), &sig.to_der());
+    }
+    der.report("fuzz_signature_der");
 }
 
 /// The six targets that predate this corpus: the parsers' inputs as the

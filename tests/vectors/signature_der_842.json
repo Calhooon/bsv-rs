@@ -1,0 +1,260 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk (Signature.ts:44-97, TransactionSignature.ts:460-472, SignedMessage.ts:65-105, BSM.ts:71-74, ProtoWallet.ts:358-394), Node v22.18.0",
+  "signed_message": {
+    "prefix": "4242330102bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2000101010101010101010101010101010101010101010101010101010101010101",
+    "der": "304402205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+    "cases": [
+      {
+        "name": "canonical",
+        "der": "304402205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ok 5e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d9 6491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_checksig_format": "ok 5e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d9 6491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470 65",
+        "verify": "true"
+      },
+      {
+        "name": "suffix_1",
+        "der": "304402205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee47000",
+        "from_der": "ERR:Signature DER invalid",
+        "from_checksig_format": "ERR:Signature DER invalid",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "suffix_2",
+        "der": "304402205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee4700001",
+        "from_der": "ERR:Signature DER invalid",
+        "from_checksig_format": "ERR:Signature DER invalid",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "suffix_33",
+        "der": "304402205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        "from_der": "ERR:Signature DER invalid",
+        "from_checksig_format": "ERR:Signature DER invalid",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "sequence_length_short",
+        "der": "304302205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ERR:Signature DER invalid",
+        "from_checksig_format": "ERR:Signature DER invalid",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "sequence_length_long_over_a_byte",
+        "der": "304502205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee47000",
+        "from_der": "ERR:Invalid R-length in signature DER",
+        "from_checksig_format": "ERR:Invalid R-length in signature DER",
+        "verify": "ERR:Invalid R-length in signature DER"
+      },
+      {
+        "name": "long_form_sequence",
+        "der": "30814402205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ERR:Invalid DER entity length",
+        "from_checksig_format": "ERR:Invalid DER entity length",
+        "verify": "ERR:Invalid DER entity length"
+      },
+      {
+        "name": "long_form_r",
+        "der": "30450281205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ERR:Invalid DER entity length",
+        "from_checksig_format": "ERR:Invalid DER entity length",
+        "verify": "ERR:Invalid DER entity length"
+      },
+      {
+        "name": "long_form_s",
+        "der": "304502205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d90281206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ERR:Invalid DER entity length",
+        "from_checksig_format": "ERR:Invalid DER entity length",
+        "verify": "ERR:Invalid DER entity length"
+      },
+      {
+        "name": "r_padded",
+        "der": "3046022200005e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ERR:Invalid R-value in signature DER",
+        "from_checksig_format": "ERR:Invalid R-value in signature DER",
+        "verify": "ERR:Invalid R-value in signature DER"
+      },
+      {
+        "name": "s_padded",
+        "der": "304502205e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d90221006491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ERR:Invalid S-value in signature DER",
+        "from_checksig_format": "ERR:Invalid S-value in signature DER",
+        "verify": "ERR:Invalid S-value in signature DER"
+      },
+      {
+        "name": "r_past_32_bytes",
+        "der": "30450221015e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d902206491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_der": "ok 15e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d9 6491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470",
+        "from_checksig_format": "ok 15e2163c3753fe49391384630d1a1c282c1d2dda7b88a47a75f65f4b23f0da4d9 6491bb1dbbc8d4ebc7879eb9c86ebc3e03cd500a90f8d7ca0e4c5f8d1feee470 65",
+        "verify": "false"
+      }
+    ]
+  },
+  "bsm": {
+    "der": "304402200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+    "cases": [
+      {
+        "name": "canonical",
+        "der": "304402200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "true"
+      },
+      {
+        "name": "suffix_1",
+        "der": "304402200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a00",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "suffix_2",
+        "der": "304402200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a0001",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "suffix_33",
+        "der": "304402200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "sequence_length_short",
+        "der": "304302200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "ERR:Signature DER invalid"
+      },
+      {
+        "name": "sequence_length_long_over_a_byte",
+        "der": "304502200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a00",
+        "verify": "ERR:Invalid R-length in signature DER"
+      },
+      {
+        "name": "long_form_sequence",
+        "der": "30814402200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "ERR:Invalid DER entity length"
+      },
+      {
+        "name": "long_form_r",
+        "der": "30450281200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "ERR:Invalid DER entity length"
+      },
+      {
+        "name": "long_form_s",
+        "der": "304502200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d0281203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "ERR:Invalid DER entity length"
+      },
+      {
+        "name": "r_padded",
+        "der": "3046022200000c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "ERR:Invalid R-value in signature DER"
+      },
+      {
+        "name": "s_padded",
+        "der": "304502200c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d0221003b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "ERR:Invalid S-value in signature DER"
+      },
+      {
+        "name": "r_past_32_bytes",
+        "der": "30450221010c80fa09afb008cc8ca0ccd180da285faa1ffd12b8af7c660c675f586995db9d02203b66a3097b2f33e9fbe0a9543f5887713c9a760ba19a945d1dcddca8f83f049a",
+        "verify": "false"
+      }
+    ]
+  },
+  "proto_wallet": {
+    "der": "304402201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+    "cases": [
+      {
+        "name": "canonical",
+        "der": "304402201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "true"
+      },
+      {
+        "name": "suffix_1",
+        "der": "304402201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef183200",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "suffix_2",
+        "der": "304402201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef18320001",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "suffix_33",
+        "der": "304402201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        "verify": "ERR:The signature parameter must be at most 72 bytes"
+      },
+      {
+        "name": "sequence_length_short",
+        "der": "304302201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "sequence_length_long_over_a_byte",
+        "der": "304502201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef183200",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "long_form_sequence",
+        "der": "30814402201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "long_form_r",
+        "der": "30450281201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "long_form_s",
+        "der": "304502201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac5272028120034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "r_padded",
+        "der": "3046022200001cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "s_padded",
+        "der": "304502201cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac5272022100034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      },
+      {
+        "name": "r_past_32_bytes",
+        "der": "30450221011cceccae9bf40962a9691be71ee3d6ef3088f91680d7108f32bf502fc7ac52720220034a6d65130388a09cb20f75e600e74fa80f1328b0a514a8518967943aef1832",
+        "verify": "ERR:The signature parameter must be a canonical DER-encoded ECDSA signature"
+      }
+    ]
+  },
+  "reader": [
+    {
+      "name": "empty",
+      "der": "",
+      "from_der": "ERR:Signature DER must start with 0x30",
+      "from_checksig_format": "ERR:Signature DER must start with 0x30"
+    },
+    {
+      "name": "lone_sequence_tag",
+      "der": "30",
+      "from_der": "ERR:Signature DER invalid",
+      "from_checksig_format": "ERR:Signature DER invalid"
+    },
+    {
+      "name": "six_bytes",
+      "der": "300402000200",
+      "from_der": "ok 0 0",
+      "from_checksig_format": "ok 0 0 65"
+    },
+    {
+      "name": "seven_bytes",
+      "der": "30050200020100",
+      "from_der": "ERR:Invalid S-value in signature DER",
+      "from_checksig_format": "ERR:Invalid S-value in signature DER"
+    },
+    {
+      "name": "seven_bytes_s_one",
+      "der": "30050200020101",
+      "from_der": "ok 0 1",
+      "from_checksig_format": "ok 0 1 65"
+    },
+    {
+      "name": "checksig_empty",
+      "der": "",
+      "from_checksig_format": "ok 1 1 1"
+    }
+  ]
+}

@@ -4,23 +4,13 @@
 //! against.
 
 use crate::primitives::bsv::sighash::SIGHASH_FORKID;
-use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, BigNumber};
+use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d};
 use crate::script::evaluation_error::ScriptEvaluationError;
 use crate::script::op::{opcode_to_name, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY};
 use crate::script::Script;
 
 use super::limits::MAX_MULTISIG_KEY_COUNT;
 use super::Spend;
-
-/// Whether the signature's `r` or `s` is at or above the curve order: the
-/// reference's lax DER parse (`ecdsa_signature_parse_der_lax`, pubkey.cpp:146-173)
-/// overwrites such a signature with the all-zero one, which is low for
-/// `CheckLowS` (356-365) and never verifies.
-pub(super) fn signature_overflows_the_order(sig: &TransactionSignature) -> bool {
-    let n = BigNumber::secp256k1_order();
-    BigNumber::from_bytes_be(sig.r()) >= n || BigNumber::from_bytes_be(sig.s()) >= n
-}
 
 /// Whether a signature's hash type carries `SIGHASH_FORKID`; an empty
 /// signature has no hash type (`GetHashType`, interpreter.cpp:246-252).
@@ -397,10 +387,12 @@ impl Spend {
         pubkey_bytes: &[u8],
         subscript: &Script,
     ) -> Result<bool, ScriptEvaluationError> {
-        // Parse signature and public key
-        let tx_sig = match TransactionSignature::from_checksig_format(sig_bytes) {
-            Ok(s) => s,
-            Err(_) => return Ok(false),
+        // The signature as the encoding check read it (`signature_read.rs`):
+        // under a word the node's lax parse, whose overflow is the all-zero
+        // signature that verifies nothing (`CPubKey::Verify`,
+        // pubkey.cpp:183-214); without one the reference's `fromDER`.
+        let Some(tx_sig) = self.read_signature(sig_bytes) else {
+            return Ok(false);
         };
 
         let pubkey = match self.signature_key(pubkey_bytes) {
@@ -415,19 +407,19 @@ impl Spend {
         // transaction's, shared by every input's spend (bsv-low #591).
         let script_bytes = subscript.to_binary();
         if self.work_limit.is_some() {
-            let cost =
-                self.transaction
-                    .hashing_work(self.input_index, &script_bytes, tx_sig.scope());
+            let cost = self
+                .transaction
+                .hashing_work(self.input_index, &script_bytes, tx_sig.scope);
             self.charge_work(cost)?;
         }
         let sighash = self.transaction.sighash_dispatched_for_signing(
             self.input_index,
             &script_bytes,
             self.source_satoshis,
-            tx_sig.scope(),
+            tx_sig.scope,
         );
 
         // Verify
-        Ok(pubkey.verify(&sighash, tx_sig.signature()))
+        Ok(pubkey.verify(&sighash, &tx_sig.signature))
     }
 }
