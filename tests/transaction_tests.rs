@@ -322,7 +322,9 @@ mod transaction_tests {
     fn test_merkle_path_roundtrip() {
         for bump_hex in BUMP_VALID_VECTORS {
             let bump = MerklePath::from_hex(bump_hex).expect("Should parse");
-            let result = bump.to_hex();
+            let result = bump
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)");
             assert_eq!(
                 result.to_lowercase(),
                 bump_hex.to_lowercase(),
@@ -1377,7 +1379,9 @@ mod transaction_tests {
         #[test]
         fn test_brc74_merkle_path_hex_roundtrip() {
             let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
-            let result = mp.to_hex();
+            let result = mp
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)");
             assert_eq!(
                 result.to_lowercase(),
                 BRC74_HEX.to_lowercase(),
@@ -2321,7 +2325,9 @@ mod transaction_tests {
         #[test]
         fn test_merkle_path_binary_roundtrip() {
             let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
-            let binary = mp.to_binary();
+            let binary = mp
+                .to_binary()
+                .expect("the path holds only states a BUMP writes (#817)");
             let parsed = MerklePath::from_binary(&binary).expect("Should parse binary");
 
             assert_eq!(mp.block_height, parsed.block_height);

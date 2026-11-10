@@ -98,7 +98,12 @@ fn build(v: &Value, cell: &Value) -> (Transaction, Transaction) {
     );
     let hex = v["bumps"][&name].as_str().unwrap();
     let path = MerklePath::from_hex(hex).unwrap();
-    assert_eq!(path.to_hex(), hex, "{name}");
+    assert_eq!(
+        path.to_hex()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        hex,
+        "{name}"
+    );
     parent.merkle_path = Some(path);
     let mut child = Transaction::new();
     let mut input = TransactionInput::with_source_transaction(parent.clone(), 0);

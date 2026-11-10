@@ -124,7 +124,7 @@ impl<'a> RootWalker<'a> {
                 .find_or_compute(height, offset)
                 .map_err(crate::Error::MerklePathError)?;
 
-            working_hash = if leaf.duplicate {
+            let paired = if leaf.duplicate {
                 hash_pair(&working_hash, &working_hash)
             } else if offset % 2 != 0 {
                 // Odd offset means sibling is on the RIGHT, working_hash is on the LEFT
@@ -133,6 +133,7 @@ impl<'a> RootWalker<'a> {
                 // Even offset means sibling is on the LEFT, working_hash is on the RIGHT
                 hash_pair(leaf.hash.as_deref().unwrap_or(""), &working_hash)
             };
+            working_hash = paired.map_err(crate::Error::MerklePathError)?;
         }
 
         // Only a finished walk that agrees with the first marks its nodes.
@@ -194,12 +195,12 @@ impl<'a> RootWalker<'a> {
 
         let working_hash = if leaf1.duplicate {
             let h0 = leaf0.hash.as_deref().unwrap_or("");
-            hash_pair(h0, h0)
+            hash_pair(h0, h0)?
         } else {
             // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             let h1 = leaf1.hash.as_deref().unwrap_or("");
-            hash_pair(h0, h1)
+            hash_pair(h0, h1)?
         };
 
         Ok(Node {
@@ -209,8 +210,28 @@ impl<'a> RootWalker<'a> {
     }
 }
 
+/// The reference's refusal of a hash text that is not hex, `assertValidHex`'s
+/// words (`ts-stack@edf6e03` `primitives/hex.ts:6-17`, the pattern
+/// `/^[0-9a-fA-F]*$/`, the empty text allowed), thrown by its `hashPair`
+/// (`MerklePath.ts:30-32`) and by its writer (`:289`) (#817).
+pub(super) const INVALID_HEX: &str = "Invalid hex string";
+
+/// Whether `text` is hex as the reference's `assertValidHex` reads it: ASCII
+/// hex digits of either case, any length, the empty text included (#817).
+pub(super) fn is_reference_hex(text: &str) -> bool {
+    text.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 /// Computes the double SHA-256 of concatenated hashes (for merkle tree).
-pub(super) fn hash_pair(left: &str, right: &str) -> String {
+///
+/// A text with a character that is not a hex digit is refused in the
+/// reference's words, as its `hashPair` throws on the concatenation
+/// (`MerklePath.ts:30-32`, `utils.ts:113-118`); through #817 it was dropped and
+/// the rest hashed. Every other text keeps the legacy reading below.
+pub(super) fn hash_pair(left: &str, right: &str) -> std::result::Result<String, String> {
+    if !is_reference_hex(left) || !is_reference_hex(right) {
+        return Err(INVALID_HEX.to_string());
+    }
     let mut data = Vec::with_capacity(64);
 
     // Parse hashes from hex and reverse to internal byte order
@@ -240,5 +261,5 @@ pub(super) fn hash_pair(left: &str, right: &str) -> String {
     // Reverse back to display format
     let mut result = hash.to_vec();
     result.reverse();
-    to_hex(&result)
+    Ok(to_hex(&result))
 }

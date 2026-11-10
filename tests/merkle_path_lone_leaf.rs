@@ -45,10 +45,19 @@ fn lone_parsers_accept_offset_zero() {
         MerklePath::from_reader(&mut Reader::new(&bytes)),
     ] {
         let path = path.unwrap();
-        assert_eq!(path.to_hex(), LONE);
+        assert_eq!(
+            path.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            LONE
+        );
         assert_eq!(path.compute_root(None).unwrap(), TXID);
     }
-    assert_eq!(MerklePath::from_coinbase_txid(TXID, 800_005).to_hex(), LONE);
+    assert_eq!(
+        MerklePath::from_coinbase_txid(TXID, 800_005)
+            .to_hex()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        LONE
+    );
 }
 
 #[test]
@@ -90,7 +99,9 @@ fn lone_compute_root_refuses_every_nonzero_offset_class() {
         }
         // The parse refuses an offset outside the one-level tree before the
         // walk, as the BEEF reader does (bsv-rs#167).
-        let bytes = in_memory(offset).to_binary();
+        let bytes = in_memory(offset)
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)");
         let reason = if offset == 1 {
             "MissingSibling { level: 0, offset: 0 }".to_string()
         } else {
@@ -109,18 +120,36 @@ fn combine_valid_paths_preserves_lone_offset_zero_and_refuses_forgery() {
     let built = MerklePath::from_coinbase_txid(TXID, 800_005);
     for (mut left, right) in [(parsed.clone(), built.clone()), (built, parsed.clone())] {
         left.combine(&right).unwrap();
-        assert_eq!(left.to_hex(), LONE);
+        assert_eq!(
+            left.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            LONE
+        );
         assert_eq!(left.compute_root(None).unwrap(), TXID);
         assert_eq!(
-            MerklePath::from_binary(&left.to_binary()).unwrap().to_hex(),
+            MerklePath::from_binary(
+                &left
+                    .to_binary()
+                    .expect("the path holds only states a BUMP writes (#817)")
+            )
+            .unwrap()
+            .to_hex()
+            .expect("the path holds only states a BUMP writes (#817)"),
             left.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)")
         );
     }
     // Neither argument order may merge the old reference's same-root forgery.
     for (mut left, right) in [(parsed.clone(), in_memory(1)), (in_memory(1), parsed)] {
         let before = left.clone();
         assert_eq!(left.combine(&right).unwrap_err(), missing(1));
-        assert_eq!(left.to_hex(), before.to_hex());
+        assert_eq!(
+            left.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            before
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)")
+        );
     }
     // Valid two-leaf paths stay a pair, even when their txid flags differ.
     let mut left = MerklePath::new(

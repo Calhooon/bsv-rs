@@ -245,7 +245,9 @@ fn conformance_merkle_path() {
             }
             "mp-serialize-001" => {
                 let mp = MerklePath::from_hex(s(input, "bump_hex")).expect(id);
-                let got = mp.to_hex();
+                let got = mp
+                    .to_hex()
+                    .expect("the path holds only states a BUMP writes (#817)");
                 suite.check(id, got == s(expected, "toHex"), format!("to_hex={}", got));
             }
             "mp-computeroot-001" | "mp-computeroot-002" | "mp-computeroot-003"
@@ -265,7 +267,10 @@ fn conformance_merkle_path() {
                 let mut detail = String::new();
                 match MerklePath::from_hex(s(input, "bump_hex")) {
                     Ok(mp) => {
-                        ok &= mp.to_hex() == s(expected, "serialized_bump_hex");
+                        ok &= mp
+                            .to_hex()
+                            .expect("the path holds only states a BUMP writes (#817)")
+                            == s(expected, "serialized_bump_hex");
                         let txids: Vec<&str> = input["txids_at_level_0"]
                             .as_array()
                             .unwrap()
@@ -309,12 +314,15 @@ fn conformance_merkle_path() {
                 let root = mp.compute_root(Some(s(input, "txid"))).expect(id);
                 suite.check(
                     id,
-                    mp.to_hex() == s(expected, "bump_hex")
+                    mp.to_hex()
+                        .expect("the path holds only states a BUMP writes (#817)")
+                        == s(expected, "bump_hex")
                         && mp.block_height as i64 == n(expected, "block_height")
                         && root == s(expected, "merkle_root"),
                     format!(
                         "hex={} height={} root={}",
-                        mp.to_hex(),
+                        mp.to_hex()
+                            .expect("the path holds only states a BUMP writes (#817)"),
                         mp.block_height,
                         root
                     ),
@@ -361,8 +369,15 @@ fn conformance_merkle_path() {
             }
             "mp-combine-001" => {
                 let mut mp = MerklePath::from_hex(s(input, "combined_bump_hex")).expect(id);
-                let mut ok = mp.to_hex() == s(expected, "serialized_bump_hex");
-                let mut detail = format!("to_hex={}", mp.to_hex());
+                let mut ok = mp
+                    .to_hex()
+                    .expect("the path holds only states a BUMP writes (#817)")
+                    == s(expected, "serialized_bump_hex");
+                let mut detail = format!(
+                    "to_hex={}",
+                    mp.to_hex()
+                        .expect("the path holds only states a BUMP writes (#817)")
+                );
                 for key in ["txid_tx2", "txid_tx5", "txid_tx8"] {
                     match mp.compute_root(Some(s(input, key))) {
                         Ok(root) if root == s(expected, "merkle_root") => {}
@@ -379,9 +394,18 @@ fn conformance_merkle_path() {
                 // combine() round-trip: combining with itself must not change
                 // the serialized form.
                 let clone = mp.clone();
-                if mp.combine(&clone).is_ok() && mp.to_hex() != s(expected, "serialized_bump_hex") {
+                if mp.combine(&clone).is_ok()
+                    && mp
+                        .to_hex()
+                        .expect("the path holds only states a BUMP writes (#817)")
+                        != s(expected, "serialized_bump_hex")
+                {
                     ok = false;
-                    detail = format!("post-combine to_hex={}", mp.to_hex());
+                    detail = format!(
+                        "post-combine to_hex={}",
+                        mp.to_hex()
+                            .expect("the path holds only states a BUMP writes (#817)")
+                    );
                 }
                 suite.check(id, ok, detail);
             }

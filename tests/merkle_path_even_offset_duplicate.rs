@@ -274,7 +274,8 @@ fn each_shape_is_the_bytes_this_crates_writer_and_the_reference_write() {
             block_height: shape.block_height,
             path: path_of(shape),
         }
-        .to_hex();
+        .to_hex()
+        .expect("the path holds only states a BUMP writes (#817)");
         assert_eq!(written, shape.hex, "{}", shape.name);
     }
 }

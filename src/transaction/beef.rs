@@ -914,7 +914,7 @@ impl Beef {
 
         writer.write_var_int(self.bumps.len() as u64);
         for bump in &self.bumps {
-            bump.to_writer(writer);
+            bump.to_writer_lenient_until_beef_817(writer);
         }
 
         writer.write_var_int(self.txs.len() as u64);

@@ -147,7 +147,14 @@ impl Headers for NoRoot {
 #[test]
 fn the_shapes_bytes_are_this_crates_writers() {
     for shape in vectors().shapes {
-        assert_eq!(held(&shape).to_hex(), shape.hex, "{}", shape.name);
+        assert_eq!(
+            held(&shape)
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            shape.hex,
+            "{}",
+            shape.name
+        );
     }
 }
 
@@ -263,7 +270,15 @@ fn an_empty_path_is_refused_at_combine() {
         assert!(empty.path.is_empty(), "{}", shape.name);
         let mut one = one_leaf(&shape);
         assert_eq!(one.combine(&held(&shape)).err(), Some(no_leaf()));
-        assert_eq!(one.to_hex(), one_leaf(&shape).to_hex(), "{}", shape.name);
+        assert_eq!(
+            one.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            one_leaf(&shape)
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            "{}",
+            shape.name
+        );
     }
 }
 
@@ -279,7 +294,13 @@ fn an_empty_path_does_not_panic_at_trim_or_the_leaf_queries() {
         assert!(!path.contains(&shape.txid), "{}", shape.name);
         assert!(!path.contains_and_mark(&shape.txid), "{}", shape.name);
         assert!(path.txids().is_empty(), "{}", shape.name);
-        assert_eq!(path.to_hex(), shape.hex, "{}", shape.name);
+        assert_eq!(
+            path.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            shape.hex,
+            "{}",
+            shape.name
+        );
     }
 }
 

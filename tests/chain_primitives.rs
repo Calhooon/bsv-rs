@@ -460,7 +460,12 @@ mod merkle_paths {
                         path.compute_root(Some(&display(leaf))).unwrap(),
                         display(&root.root)
                     );
-                    let parsed = MerklePath::from_binary(&path.to_binary()).unwrap();
+                    let parsed = MerklePath::from_binary(
+                        &path
+                            .to_binary()
+                            .expect("the path holds only states a BUMP writes (#817)"),
+                    )
+                    .unwrap();
                     assert_eq!(
                         parsed.compute_root(Some(&display(leaf))).unwrap(),
                         display(&root.root)

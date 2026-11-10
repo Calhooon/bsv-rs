@@ -90,13 +90,27 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    let bytes = path.to_binary();
+    let bytes = path
+        .to_binary()
+        .expect("the path holds only states a BUMP writes (#817)");
     let again = MerklePath::from_binary(&bytes).expect("a path's own bytes parse");
-    assert_eq!(again.to_binary(), bytes, "the bytes are not a fixed point");
     assert_eq!(
-        MerklePath::from_hex(&path.to_hex())
-            .map(|p| p.to_binary())
-            .ok(),
+        again
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        bytes,
+        "the bytes are not a fixed point"
+    );
+    assert_eq!(
+        MerklePath::from_hex(
+            &path
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)")
+        )
+        .map(|p| p
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"))
+        .ok(),
         Some(bytes)
     );
 

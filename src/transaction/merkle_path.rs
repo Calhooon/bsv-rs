@@ -289,15 +289,134 @@ impl MerklePath {
         }
     }
 
-    /// Serializes the MerklePath to binary format.
-    pub fn to_binary(&self) -> Vec<u8> {
+    /// Serializes the MerklePath to binary format (BRC-74).
+    ///
+    /// # Errors
+    ///
+    /// Refuses, as [`to_writer`](Self::to_writer) refuses, a path its bytes
+    /// cannot carry faithfully (#817).
+    pub fn to_binary(&self) -> Result<Vec<u8>> {
         let mut writer = Writer::new();
-        self.to_writer(&mut writer);
-        writer.into_bytes()
+        self.to_writer(&mut writer)?;
+        Ok(writer.into_bytes())
     }
 
-    /// Writes the MerklePath to a Writer.
-    pub fn to_writer(&self, writer: &mut Writer) {
+    /// Writes the MerklePath to a Writer (BRC-74), as the reference's
+    /// `toWriter` writes it (`ts-stack@edf6e03` `MerklePath.ts:271-293`).
+    ///
+    /// Every state the format can carry is written, valid or not (validity is
+    /// the readers' and [`verify`](Self::verify)'s): no level, more than 64
+    /// levels, an empty level 0, a repeated or illegal offset, roots that do
+    /// not agree.
+    ///
+    /// # Errors
+    ///
+    /// `Error::MerklePathError` for a path whose bytes would not frame or would
+    /// read back as another path (#817), judged before any byte is written, so
+    /// `writer` is untouched on `Err`:
+    ///
+    /// - a leaf not flagged duplicate whose hash has a character that is not a
+    ///   hex digit, anywhere in the path and whatever else the path holds:
+    ///   `Invalid hex string`, the reference's words, as its writer throws at
+    ///   that leaf whatever it wrote before (`:289`, `hex.ts:6-17`); then, in
+    ///   written order:
+    /// - more than 255 levels (the one-byte tree height):
+    ///   `Invalid tree height: N, over the 255 levels a BUMP's tree height byte writes`;
+    /// - a leaf not flagged duplicate with no hash:
+    ///   `Missing hash at height H, offset O`;
+    /// - such a leaf's hash of other than 64 hex digits:
+    ///   `Invalid hash at height H, offset O: expected 64 hex digits, got N`;
+    /// - a leaf flagged duplicate that carries a hash:
+    ///   `Duplicate leaf at height H, offset O carries a hash, which a BUMP's duplicate flag cannot write`;
+    /// - a leaf flagged duplicate and txid (the flag byte `03`, which the
+    ///   reference reads back as a plain duplicate and this crate's readers
+    ///   refuse): `Duplicate leaf at height H, offset O is flagged txid, which a BUMP's duplicate flag cannot write`.
+    ///
+    /// Through 0.9.0-beta the first three were written as a truncated height
+    /// byte or as nothing, a hash of another length at its length, a
+    /// duplicate's hash dropped and a duplicate flagged txid as `03`.
+    pub fn to_writer(&self, writer: &mut Writer) -> Result<()> {
+        self.check_writable()?;
+        self.write_unchecked(writer);
+        Ok(())
+    }
+
+    /// Serializes the MerklePath to a hex string.
+    ///
+    /// # Errors
+    ///
+    /// Refuses what [`to_writer`](Self::to_writer) refuses (#817).
+    pub fn to_hex(&self) -> Result<String> {
+        Ok(to_hex(&self.to_binary()?))
+    }
+
+    /// The writer's check (#817): a non-hex hash anywhere first (the
+    /// reference's throw), then the earliest state, in written order, whose
+    /// bytes would not frame or would read back as another path. Read-only.
+    fn check_writable(&self) -> Result<()> {
+        // The reference's writer throws at a non-hex hash wherever it sits,
+        // before or after any state it writes without a word, so this one
+        // scan comes ahead of every other check (#817's fold).
+        let non_hex = self.path.iter().flatten().any(|leaf| {
+            !leaf.duplicate
+                && leaf
+                    .hash
+                    .as_deref()
+                    .is_some_and(|hash| !super::merkle_path_walk::is_reference_hex(hash))
+        });
+        if non_hex {
+            return Err(crate::Error::MerklePathError(
+                super::merkle_path_walk::INVALID_HEX.to_string(),
+            ));
+        }
+        if self.path.len() > usize::from(u8::MAX) {
+            return Err(crate::Error::MerklePathError(format!(
+                "Invalid tree height: {}, over the 255 levels a BUMP's tree height byte writes",
+                self.path.len()
+            )));
+        }
+        for (height, level) in self.path.iter().enumerate() {
+            for leaf in level {
+                let offset = leaf.offset;
+                match (&leaf.hash, leaf.duplicate) {
+                    (None, false) => {
+                        return Err(crate::Error::MerklePathError(format!(
+                            "Missing hash at height {height}, offset {offset}"
+                        )))
+                    }
+                    (Some(hash), false) if hash.len() != 64 => {
+                        return Err(crate::Error::MerklePathError(format!(
+                            "Invalid hash at height {height}, offset {offset}: expected 64 hex digits, got {}",
+                            hash.len()
+                        )))
+                    }
+                    (Some(_), true) => {
+                        return Err(crate::Error::MerklePathError(format!(
+                            "Duplicate leaf at height {height}, offset {offset} carries a hash, which a BUMP's duplicate flag cannot write"
+                        )))
+                    }
+                    (None, true) if leaf.txid => {
+                        return Err(crate::Error::MerklePathError(format!(
+                            "Duplicate leaf at height {height}, offset {offset} is flagged txid, which a BUMP's duplicate flag cannot write"
+                        )))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The bytes 0.9.0-beta wrote for any path, unchecked: the tree height cut
+    /// to a byte, a missing or undecodable hash written as nothing.
+    ///
+    /// For `Beef`'s writers alone, which stay infallible until the second lane
+    /// of #817 makes them fallible with `merge_beef`; that lane removes this.
+    pub(crate) fn to_writer_lenient_until_beef_817(&self, writer: &mut Writer) {
+        self.write_unchecked(writer);
+    }
+
+    fn write_unchecked(&self, writer: &mut Writer) {
         writer.write_var_int(self.block_height as u64);
         writer.write_u8(self.path.len() as u8);
 
@@ -326,11 +445,6 @@ impl MerklePath {
                 }
             }
         }
-    }
-
-    /// Serializes the MerklePath to a hex string.
-    pub fn to_hex(&self) -> String {
-        to_hex(&self.to_binary())
     }
 
     /// Returns the index (offset) of a transaction in the path.
@@ -541,7 +655,9 @@ mod tests {
     #[test]
     fn test_roundtrip() {
         let path = MerklePath::from_hex(BUMP_HEX_1).unwrap();
-        let hex = path.to_hex();
+        let hex = path
+            .to_hex()
+            .expect("the path holds only states a BUMP writes (#817)");
         let path2 = MerklePath::from_hex(&hex).unwrap();
         assert_eq!(path.block_height, path2.block_height);
         assert_eq!(path.path.len(), path2.path.len());
@@ -575,7 +691,9 @@ mod tests {
     #[test]
     fn test_to_binary_from_binary() {
         let path = MerklePath::from_hex(BUMP_HEX_1).unwrap();
-        let binary = path.to_binary();
+        let binary = path
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)");
         let path2 = MerklePath::from_binary(&binary).unwrap();
         assert_eq!(path.block_height, path2.block_height);
     }
@@ -674,11 +792,18 @@ mod tests {
 /// 2^40. Same answers, same errors.
 #[cfg(test)]
 mod linear_root_equivalence_tests {
-    use super::super::merkle_path_walk::hash_pair;
     use super::*;
     use rand::rngs::StdRng;
     use rand::seq::SliceRandom;
     use rand::{Rng, SeedableRng};
+
+    /// The 0.3.34 `hash_pair`, infallible: every text these generators and
+    /// damages make is hex (a random hash or the empty text), which the
+    /// refusal of #817 never reaches.
+    fn hash_pair(left: &str, right: &str) -> String {
+        super::super::merkle_path_walk::hash_pair(left, right)
+            .expect("the generators make hex texts alone")
+    }
 
     // ---- the 0.3.34 forms, verbatim but for being free functions ----
 
@@ -1162,11 +1287,16 @@ mod linear_root_equivalence_tests {
         let (mut parsed, mut stricter) = (0, 0usize);
         for round in 0..1000 {
             let path = random_path(&mut rng);
-            let bytes = MerklePath {
+            // The 0.9.0-beta bytes, damaged paths included (a hashless leaf
+            // written as nothing): the writer's check of #817 is not this
+            // test's subject.
+            let mut writer = Writer::new();
+            MerklePath {
                 block_height: 800_000,
                 path,
             }
-            .to_binary();
+            .write_unchecked(&mut writer);
+            let bytes = writer.into_bytes();
             let new = MerklePath::from_binary(&bytes);
             // The 0.3.34 parse: read, sort each level, the unchecked check.
             let legacy_read = || -> Result<Vec<Vec<MerklePathLeaf>>> {
@@ -1210,7 +1340,12 @@ mod linear_root_equivalence_tests {
                         roots(new, |mp, t| mp.compute_root(t)),
                         roots(old, legacy_compute_root)
                     );
-                    assert_eq!(new.to_binary(), old.to_binary());
+                    assert_eq!(
+                        new.to_binary()
+                            .expect("the path holds only states a BUMP writes (#817)"),
+                        old.to_binary()
+                            .expect("the path holds only states a BUMP writes (#817)")
+                    );
                     parsed += 1;
                 }
                 (Ok(_), Err(e)) => panic!("round {round}: accepted what 0.3.34 refused: {e}"),

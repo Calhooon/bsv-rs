@@ -59,7 +59,7 @@ fn bump(v: &Value, name: &str) -> MerklePath {
             })
             .collect();
         let mp = MerklePath::new(u["height"].as_u64().unwrap() as u32, path).unwrap();
-        assert_eq!(mp.to_hex(), v["bumps"][name].as_str().unwrap());
+        assert_eq!(mp.to_hex().unwrap(), v["bumps"][name].as_str().unwrap());
         return mp;
     }
     MerklePath::from_hex(v["bumps"][name].as_str().unwrap()).unwrap()

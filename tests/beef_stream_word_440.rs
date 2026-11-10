@@ -260,7 +260,11 @@ fn reversed(tx: &Transaction, duplicate: bool) -> Vec<u8> {
     let mut w = Writer::new();
     w.write_u32_le(BEEF_V1);
     w.write_var_int(1);
-    w.write_bytes(&proof.to_binary());
+    w.write_bytes(
+        &proof
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+    );
     w.write_var_int(if duplicate { 3 } else { 2 });
     for (tx, proven) in [(tx, false), (source.as_ref(), true)]
         .into_iter()

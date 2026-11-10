@@ -56,13 +56,32 @@ fn tx_entry(name: &str, input: Value, transaction: &Transaction) -> Value {
 }
 
 fn merkle_entry(name: &str, input: Value, merkle: &MerklePath) -> Value {
-    let bytes = merkle.to_binary();
+    let bytes = merkle
+        .to_binary()
+        .expect("the path holds only states a BUMP writes (#817)");
     let parsed = MerklePath::from_binary(&bytes).unwrap();
-    let parsed_hex = MerklePath::from_hex(&merkle.to_hex()).unwrap();
-    assert_eq!(parsed.to_binary(), bytes, "{name}: binary round trip");
-    assert_eq!(parsed_hex.to_binary(), bytes, "{name}: hex round trip");
+    let parsed_hex = MerklePath::from_hex(
+        &merkle
+            .to_hex()
+            .expect("the path holds only states a BUMP writes (#817)"),
+    )
+    .unwrap();
+    assert_eq!(
+        parsed
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        bytes,
+        "{name}: binary round trip"
+    );
+    assert_eq!(
+        parsed_hex
+            .to_binary()
+            .expect("the path holds only states a BUMP writes (#817)"),
+        bytes,
+        "{name}: hex round trip"
+    );
     json!({"name": name, "input": input, "expected": {"binary_hex": hex::encode(bytes),
-        "hex": merkle.to_hex(), "block_height": merkle.block_height, "root": merkle.compute_root(None).unwrap()}})
+        "hex": merkle.to_hex().expect("the path holds only states a BUMP writes (#817)"), "block_height": merkle.block_height, "root": merkle.compute_root(None).unwrap()}})
 }
 
 struct Chunks<'a> {
@@ -87,7 +106,7 @@ fn stream(bytes: &[u8], chunk_size: usize) -> Value {
     while let Some(element) = stream.next_element().unwrap() {
         let value = match element {
             Element::Bump(bump) => json!({"kind": "bump", "offset": bump.offset,
-                "hex": bump.to_merkle_path().unwrap().to_hex(), "root": display_hex(&bump.root)}),
+                "hex": bump.to_merkle_path().unwrap().to_hex().expect("the path holds only states a BUMP writes (#817)"), "root": display_hex(&bump.root)}),
             Element::Tx {
                 offset,
                 txid,
@@ -136,7 +155,8 @@ fn beef_entry(name: &str, input: Value, mut beef: Beef, atomic: bool) -> Value {
     for (i, bump) in parsed.bumps.iter().enumerate() {
         assert_eq!(
             expected_stream["elements"][i]["hex"],
-            bump.to_hex(),
+            bump.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
             "{name}: bump {i}"
         );
     }
@@ -250,7 +270,12 @@ pub fn record(suite: &mut Suite) {
             "tests/transaction/vectors/beef_cross_sdk.rs"
         };
         let path = MerklePath::from_hex(hex).unwrap();
-        assert_eq!(path.to_hex(), hex, "{name}: source bytes");
+        assert_eq!(
+            path.to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            hex,
+            "{name}: source bytes"
+        );
         merkle.push(merkle_entry(
             name,
             json!({"source": source, "constant": name}),

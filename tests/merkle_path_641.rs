@@ -123,7 +123,14 @@ impl Headers for NoRoot {
 #[test]
 fn the_shapes_bytes_are_this_crates_writers() {
     for shape in vectors().shapes {
-        assert_eq!(held(&shape).to_hex(), shape.hex, "{}", shape.name);
+        assert_eq!(
+            held(&shape)
+                .to_hex()
+                .expect("the path holds only states a BUMP writes (#817)"),
+            shape.hex,
+            "{}",
+            shape.name
+        );
     }
 }
 
