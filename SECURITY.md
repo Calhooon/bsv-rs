@@ -36,3 +36,11 @@ Out of scope: a difference from another SDK that the root `CLAUDE.md` already st
 2. The fix is made off the public repository, on the advisory's temporary private fork, with a test that fails before it, for `beta` and for the stable line as a patch under `RELEASING.md`'s direction rule (the security-advisory class; the procedure is `RELEASING.md` step 23). The public pull requests are opened only when the release can follow in the same sitting, their two public CI runs (on `beta` and on the stable line) included.
 3. The patch lands, is tagged and is published to crates.io in one sitting, and the advisory is published then, on GitHub (with a CVE requested) and in the RustSec advisory database: the affected range, the patched versions, and the migration if there is one.
 4. The advisory is what reaches users, through `cargo audit` and `cargo deny`. A defect that every published release carries is answered by the patch and the advisory, and nothing is yanked: a yank reaches no lockfile and leaves a build with nothing to resolve to. A release that is wrong against its predecessor is yanked and superseded (`RELEASING.md` step 9).
+
+## Published advisories
+
+| Advisory | Patched in | Affected, as published | RustSec |
+|---|---|---|---|
+| [GHSA-j8hr-pjhm-6h27](https://github.com/Calhooon/bsv-rs/security/advisories/GHSA-j8hr-pjhm-6h27) (published 2026-11-10 20:53Z; High, CVSS 3.1 7.5; a CVE requested, none assigned when this line was written): the transaction readers accepted bytes after the transaction, and the BEEF verdict doors answered valid for a raw entry that is not exactly one transaction | 0.8.5 | `< 0.8.5`, and `>= 0.9.0-beta.1, <= 0.9.0-beta.7` (no patched prerelease yet: the next one that carries the fix is added to both records, `RELEASING.md` step 14) | [rustsec/advisory-db#3539](https://github.com/rustsec/advisory-db/pull/3539) (open when this line was written) |
+
+The advisory carries its own corrections, each dated inside it. Read the advisory, not this table, for the doors, the workaround and the current state.

@@ -1,12 +1,45 @@
 # bsv-rs dependents
 
-Snapshot: 2026-10-23; the Rust consumers' pin table refreshed on 2026-11-10 (below). `[X]` means read from the named remote commit or run;
+Snapshot: 2026-10-23 for the features, targets, production cells and app trees; the Rust consumers' pins refreshed on 2026-11-10 twice: from the dependents' live branch tips (the #843 dependents read) and from crates.io's reverse-dependency list after 0.8.5 was published (the ledger below). `[X]` means read from the named remote commit or run;
 `[D]` means reported, including historical production records. A manifest
 version is not evidence of the version running in production. The source of
 the build matrix is [dependents.lock](dependents.lock); all its revisions were
 default-branch heads when read. Consumer captains refresh the lock in each
 pin-move PR. The map and scope come from [#83](https://github.com/Calhooon/bsv-rs/issues/83)
 and [#101](https://github.com/Calhooon/bsv-rs/issues/101).
+
+## The ledger on crates.io (2026-11-10)
+
+Read on 2026-11-10 after 0.8.5 was on crates.io (20:51:59Z), with
+`curl -s -A <client> "https://crates.io/api/v1/crates/bsv-rs/reverse_dependencies?per_page=50"`
+(13 crates, `meta.total` 13), each crate's newest version from
+`https://crates.io/api/v1/crates/<crate>` (`max_version`, `max_stable_version`)
+and a prerelease's requirement from
+`https://crates.io/api/v1/crates/<crate>/<version>/dependencies`. These are the
+published crates' requirements, not their branch tips (the table after this one).
+Pins and actions only. `RELEASING.md` step 23 (g) makes this list, read that
+day, the list of who is told.
+
+| Crate on crates.io | Newest stable: requirement | Does 0.8.5 satisfy it? | Newest prerelease: requirement | Action |
+|---|---|---|---|---|
+| bsv-wallet-toolbox-rs | 0.13.1: `^0.8.0` | yes | 0.14.0-beta.6: `=0.9.0-beta.6` (inside the advisory's prerelease range) | stable: `cargo update -p bsv-rs`; beta: a pin edit to the bsv-rs prerelease that carries the fix, when published |
+| bsv-tracker | 0.8.0: `^0.8.0` | yes | 0.9.0-beta.7: `=0.9.0-beta.7` (inside the advisory's prerelease range) | stable: `cargo update -p bsv-rs`; beta: a pin edit, as above |
+| bsv-wallet-cli | 0.18.2: `=0.8.3` | no: an exact pin | 0.19.0-beta.7: `=0.9.0-beta.6` (inside the advisory's prerelease range) | stable: a pin edit to `=0.8.5`; beta: a pin edit, as above |
+| bsv-middleware-cloudflare | 0.7.2: `^0.8` | yes | none | `cargo update -p bsv-rs` |
+| bsv-middleware-core | 0.4.1: `^0.8` | yes | none | `cargo update -p bsv-rs` |
+| bsv-middleware-rs | 0.6.2: `^0.8.0` | yes | none | `cargo update -p bsv-rs` |
+| bsv-messagebox-cloudflare | 0.8.4: `^0.8.2` | yes | none | `cargo update -p bsv-rs` |
+| bsv-chaintracks-cloudflare | 0.7.3: `^0.8.1` | yes | none | `cargo update -p bsv-rs` |
+| bsv-wallet-infra-cloudflare | 0.6.0: `^0.8.1` | yes | none | `cargo update -p bsv-rs` |
+| bsv-overlay-engine | 0.3.1: `=0.7.0` | no: an exact pin on the 0.7 line | none | a port onto the 0.8 line (no 0.7 patch is published); its repository's `main` pins `=0.7.2` (the table below) |
+| bsv-overlay-discovery | 0.3.1: `=0.7.0` | no, as above | none | as above |
+| bsv-overlay-cloudflare | 0.3.1: `=0.7.0` | no, as above | none | as above |
+| bsv-storage-cloudflare | 0.2.3: `=0.4.5` | no: an exact pin on the 0.4 line | none | a port onto the 0.8 line (no 0.4 patch is published) |
+
+Eight of the thirteen take 0.8.5 on `cargo update -p bsv-rs`; five need a pin
+edit or a port; three prereleases pin a `=0.9.0-beta.N` inside the advisory's prerelease range. Two rows of
+the table below are not on crates.io's list that day (rust-message-box and
+bsv-agent-template): they keep their earlier cells.
 
 ## Rust consumers
 
@@ -40,14 +73,14 @@ snapshot's unless a cell says otherwise.
 | [bsv-wallet-toolbox-rs](https://github.com/Calhooon/bsv-wallet-toolbox-rs) | `origin/main`, 2026-11-10 `[X]` | `^0.8.0` `[X]` | 0.8.3 (resolves; no lock committed) `[X]` | default + `full,http` | Native, `sqlite`; library and integration tests | [D] Unknown | Toolbox captain, stack keeper |
 | bsv-wallet-toolbox-rs, beta line | `origin/beta` `184c4182`, 2026-11-10 `[X]` | `=0.9.0-beta.7` `[X]` | no lock committed `[X]` | as above | as above | [D] Unknown | Toolbox captain, stack keeper |
 | [bsv-overlay-cloudflare](https://github.com/Calhooon/bsv-overlay-cloudflare) | `origin/main` `2efad2f0`, 2026-11-10 `[X]` | `=0.7.2` in the root and in `workers/` `[X]` | 0.7.2 (lock); its registry dependencies `bsv-middleware-core 0.4.0`, `bsv-middleware-cloudflare 0.7.1` and `bsv-tracker 0.7.0` pin `0.7.2` too (`workers/Cargo.lock`) `[X]` | default + `overlay`; overlay worker adds `wasm`, app-layer tests add `auth` | Native engine workspace and wasm32 worker workspace; no 0.8 patch reaches it until the whole graph moves to the 0.8 line | `[D]` 0.5.0 with worker 0.1.3 on 2026-10-13; current unknown | Stack keeper until named |
-| rust-message-box (the relay) | `origin/main` `44a6320`, 2026-11-10 `[X]` | `=0.6.0` `[X]` | 0.6.0 (lock) `[X]` | not read on 2026-10-23 or 2026-11-10 | not read | [D] Unknown | Stack keeper until named |
+| rust-message-box (the relay); not on crates.io's reverse-dependency list on 2026-11-10 | `origin/main` `44a6320`, 2026-11-10 `[X]` | `=0.6.0` `[X]` | 0.6.0 (lock) `[X]` | not read on 2026-10-23 or 2026-11-10 | not read | [D] Unknown | Stack keeper until named |
 | [bsv-middleware-rs](https://github.com/Calhooon/bsv-middleware-rs) | `origin/main` `5a1fd27`, 2026-11-10 `[X]` | `^0.8.0` `[X]` | no lock committed `[X]` | default + `auth,wallet,transaction` | Native with consumer feature `axum`; library and integration tests | [D] Unknown | Stack keeper until named |
 | [chaintracks-cloudflare](https://github.com/Calhooon/chaintracks-cloudflare), crate `bsv-chaintracks-cloudflare` | `origin/main` `af5a480`, 2026-11-10 `[X]` | `^0.8.1` `[X]` | not recorded | `block`, no defaults `[X]` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-tracker](https://github.com/Calhooon/bsv-tracker/blob/c127bccd983a1f4c32f92c1ef637c1ac0d24c838/Cargo.toml) | the linked 2026-10-23 commit | `0.8.0` (NM) | not measured on 2026-11-10 | `transaction`, no defaults; wasm adds `wasm` | Native and wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-wallet-infra-cloudflare](https://github.com/Calhooon/bsv-wallet-infra-cloudflare/blob/d0dba8d2ef4d956614a7cf99787dec951dadb813/Cargo.toml), alias `bsv-sdk` | the linked 2026-10-23 commit | `0.8.1` (NM) | not measured on 2026-11-10 | default + `auth,wallet,transaction,wasm` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-messagebox-cloudflare](https://github.com/Calhooon/bsv-messagebox-cloudflare/blob/190a8a78f99733af47b3c789e88112257f13c8ed/Cargo.toml) | the linked 2026-10-23 commit | `0.8.1` (NM) | not measured on 2026-11-10 | default + `auth,wallet,transaction,wasm` | wasm32; native library tests; the integration suite's version guard pins bsv-rs 0.8.1 in the lock and is excluded until the row re-pins; `tests/load_gen` is a separate live client, excluded | [D] Unknown | Stack keeper until named |
 | [bsv-middleware-cloudflare](https://github.com/Calhooon/bsv-middleware-cloudflare/blob/d7ccb6c1a56708687c6d044989f9ff06ea024823/Cargo.toml), alias `bsv-sdk` | the linked 2026-10-23 commit | `0.8` (NM); its registry release 0.7.1 pins `0.7.2` (read through the overlay's lock on 2026-11-10) | not measured on 2026-11-10 | default + `auth,wallet,transaction,wasm`; workspace `core` takes the same slice without `wasm` | wasm32 with consumer features `refund,d1-claims`; native workspace library and integration tests | [D] Unknown; see Zanaadu's historical embedded worker below | Stack keeper until named |
-| [bsv-agent-template](https://github.com/Calhooon/bsv-agent-template/blob/b1dcbdbfa9d8beab6783dc515789f5690968f462/Cargo.toml), alias `bsv-sdk` | the linked 2026-10-23 commit | `0.6.0` (NM) | not measured on 2026-11-10 | default + `auth,wallet,transaction,wasm` | wasm32 | [D] Unknown | Stack keeper until named |
+| [bsv-agent-template](https://github.com/Calhooon/bsv-agent-template/blob/b1dcbdbfa9d8beab6783dc515789f5690968f462/Cargo.toml), alias `bsv-sdk`; not on crates.io's reverse-dependency list on 2026-11-10 | the linked 2026-10-23 commit | `0.6.0` (NM) | not measured on 2026-11-10 | default + `auth,wallet,transaction,wasm` | wasm32 | [D] Unknown | Stack keeper until named |
 | [bsv-storage-cloudflare](https://github.com/Calhooon/bsv-storage-cloudflare/blob/2563293557849a29007fa1c1b5d2001a3fc8a17d/Cargo.toml) | the linked 2026-10-23 commit | `=0.4.5` (NM) | not measured on 2026-11-10 | default + `auth,wallet,transaction,script,wasm`; parity member adds `auth,http,overlay` | wasm32 worker; native parity client is live and excluded | `[D]` 0.4.5 with worker 0.2.1 on 2026-10-13; current unknown | Stack keeper until named |
 
 (NM): the 2026-10-23 snapshot's requirement, not measured on 2026-11-10.
@@ -60,7 +93,7 @@ checks exclude host-only dev dependencies such as SQLite.
 
 The CLI's exact pin does **not** admit a patch (on 2026-10-23 it was `=0.8.1`
 and did not admit 0.8.2; on 2026-11-10 it is `=0.8.3` and does not admit
-0.8.4). It is recorded and reported as skipped, rather than silently compiled
+0.8.4 or 0.8.5; 0.8.4 was tagged and never published). It is recorded and reported as skipped, rather than silently compiled
 against its registry copy. On 2026-10-23 seven public Rust repositories
 admitted that tree. A stable caret does not admit a
 beta prerelease either. The planner prints every exclusion and builds all
