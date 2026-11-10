@@ -16,7 +16,7 @@
 mod fixtures;
 
 use bsv_rs::wallet::wire::{WalletCall, WalletWireProcessor};
-use bsv_rs::{Error, WalletRefusalClass};
+use bsv_rs::{AbortAcceptance, Error, WalletRefusalClass};
 use fixtures::wallet::Stub;
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -110,6 +110,15 @@ fn refusing(error: Error) -> Stub {
 
 /// #212: an un-coded wallet error raises exactly one `warn` event carrying
 /// the call's name and the wallet's `Display`, the words the frame drops.
+///
+/// A crate-contract pin (#603), counted apart: the reference logs nothing at
+/// `#invokeWallet` (`ts-stack@edf6e03` `WalletWireProcessor.ts:2402-2419`) and
+/// BRC-100 names no logging. The line it pins, `src/wallet/wire/CLAUDE.md:85`:
+/// "with the `tracing` feature (off by default, not in `full`, #212)
+/// `invoke_wallet` emits one `warn` event where it chooses the constant:
+/// `call` ..., `error` (... a refusal's or accepted-abort record's words, with
+/// `class` its name beside them ...), ... and for a `WalletRefusal` or
+/// `AbortAccepted` one `warn` event with `call` and `class`".
 #[tokio::test]
 async fn an_uncoded_wallet_error_raises_one_event_with_the_call_and_the_wallets_words() {
     let error = Error::WalletError("store at /home/wallet/keys.db is locked".into());
@@ -129,6 +138,15 @@ async fn an_uncoded_wallet_error_raises_one_event_with_the_call_and_the_wallets_
 }
 
 /// #212: the call named is the call made (a second call, a second variant).
+///
+/// A crate-contract pin (#603), counted apart: the reference logs nothing at
+/// `#invokeWallet` (`ts-stack@edf6e03` `WalletWireProcessor.ts:2402-2419`) and
+/// BRC-100 names no logging. The line it pins, `src/wallet/wire/CLAUDE.md:85`:
+/// "with the `tracing` feature (off by default, not in `full`, #212)
+/// `invoke_wallet` emits one `warn` event where it chooses the constant:
+/// `call` ..., `error` (... a refusal's or accepted-abort record's words, with
+/// `class` its name beside them ...), ... and for a `WalletRefusal` or
+/// `AbortAccepted` one `warn` event with `call` and `class`".
 #[tokio::test]
 async fn the_event_names_the_call_whose_wallet_refused() {
     let error = Error::WalletBusy {
@@ -189,6 +207,15 @@ async fn the_frame_is_the_same_with_and_without_a_listener() {
 /// #137: a wallet's refusal keeps its words and its class's code on the wire,
 /// so the event carries no words: the call's name and the class's reference
 /// name, one `warn` event; the frame the coded one (`07`, the words, `00`).
+///
+/// A crate-contract pin (#603), counted apart: the reference logs nothing at
+/// `#invokeWallet` (`ts-stack@edf6e03` `WalletWireProcessor.ts:2402-2419`) and
+/// BRC-100 names no logging. The line it pins, `src/wallet/wire/CLAUDE.md:85`:
+/// "with the `tracing` feature (off by default, not in `full`, #212)
+/// `invoke_wallet` emits one `warn` event where it chooses the constant:
+/// `call` ..., `error` (... a refusal's or accepted-abort record's words, with
+/// `class` its name beside them ...), ... and for a `WalletRefusal` or
+/// `AbortAccepted` one `warn` event with `call` and `class`".
 #[tokio::test]
 async fn a_wallet_refusal_raises_one_event_with_the_call_and_its_class() {
     let error = Error::WalletRefusal {
@@ -212,12 +239,84 @@ async fn a_wallet_refusal_raises_one_event_with_the_call_and_its_class() {
 /// #137: a refusal whose class has no SDK code is framed as `Wallet operation
 /// failed` (`:2417`), so its class and its words go to the one `warn` event
 /// beside the call's name.
+///
+/// A crate-contract pin (#603), counted apart: the reference logs nothing at
+/// `#invokeWallet` (`ts-stack@edf6e03` `WalletWireProcessor.ts:2402-2419`) and
+/// BRC-100 names no logging. The line it pins, `src/wallet/wire/CLAUDE.md:85`:
+/// "with the `tracing` feature (off by default, not in `full`, #212)
+/// `invoke_wallet` emits one `warn` event where it chooses the constant:
+/// `call` ..., `error` (... a refusal's or accepted-abort record's words, with
+/// `class` its name beside them ...), ... and for a `WalletRefusal` or
+/// `AbortAccepted` one `warn` event with `call` and `class`".
 #[tokio::test]
 async fn an_uncoded_refusal_raises_one_event_with_its_class_and_words() {
     let error = Error::WalletRefusal {
         class: WalletRefusalClass::Unauthorized,
         message: "Access is denied due to an authorization error.".into(),
     };
+    let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
+    assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.level, Level::WARN);
+    assert_eq!(event.fields["call"], "getHeight");
+    assert_eq!(event.fields["class"], "WERR_UNAUTHORIZED");
+    assert_eq!(
+        event.fields["error"],
+        "Access is denied due to an authorization error."
+    );
+    assert_eq!(
+        event.fields["message"],
+        "wallet error framed as Wallet operation failed"
+    );
+    assert_eq!(event.fields.len(), 4, "{:?}", event.fields);
+}
+
+/// #439: an accepted abort whose guard's class has an SDK code keeps its
+/// class's code and words on the wire, as a `WalletRefusal` of the class does,
+/// so its event is the kept one: the call's name and the class's reference
+/// name, no words. Kills the deletion of the `Error::AbortAccepted(a)` arm of
+/// the kept match (`src/wallet/wire/processor.rs:253`), which falls to no event.
+///
+/// A crate-contract pin (#603, #439), counted apart, on the line quoted above
+/// (`src/wallet/wire/CLAUDE.md:85`).
+#[tokio::test]
+async fn an_accepted_abort_of_a_coded_class_raises_the_kept_event_with_its_class_439() {
+    let error = Error::AbortAccepted(Box::new(AbortAcceptance::new(
+        "cmVmZXJlbmNl",
+        WalletRefusalClass::InsufficientFunds,
+        "short",
+    )));
+    let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
+    assert_eq!(hex::encode(&frame), "070573686f727400");
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.level, Level::WARN);
+    assert_eq!(event.fields["call"], "getHeight");
+    assert_eq!(event.fields["class"], "WERR_INSUFFICIENT_FUNDS");
+    assert_eq!(
+        event.fields["message"],
+        "wallet refusal framed with its code"
+    );
+    assert_eq!(event.fields.len(), 3, "{:?}", event.fields);
+}
+
+/// #439: an accepted abort whose guard's class has no SDK code is framed as
+/// `Wallet operation failed` (`:2417`), so the record's class and its message go
+/// to the one replaced event beside the call's name. Kills the deletion of the
+/// `Error::AbortAccepted(a)` arm of the replaced match
+/// (`src/wallet/wire/processor.rs:266`), which falls to the event with no class.
+///
+/// A crate-contract pin (#603, #439), counted apart, on the line quoted above
+/// (`src/wallet/wire/CLAUDE.md:85`).
+#[tokio::test]
+async fn an_accepted_abort_of_an_uncoded_class_raises_the_replaced_event_with_its_class_and_words_439(
+) {
+    let error = Error::AbortAccepted(Box::new(AbortAcceptance::new(
+        "cmVmZXJlbmNl",
+        WalletRefusalClass::Unauthorized,
+        "Access is denied due to an authorization error.",
+    )));
     let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
     assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
     assert_eq!(events.len(), 1, "{events:?}");

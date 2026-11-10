@@ -197,6 +197,30 @@ class ScoreTests(unittest.TestCase):
             self.assertIn("--cargo-arg=--test=beef_stream_603_s1", args)
             self.assertIn("--cargo-arg=--test=beef_stream", args)
 
+    def test_603_the_wire_surface_compiles_the_tracing_gated_diagnostics_and_runs_its_sink(self):
+        # #603: `src/wallet/wire/diagnostics.rs` is `mod diagnostics;` under
+        # `#[cfg(feature = "tracing")]` and `tracing` is outside `full`, so under
+        # `full,http` every mutant of it rewrote unbuilt text and read `missed`; its
+        # kills live in `tests/wire_tracing_sink.rs`, a binary run apart (`APART`).
+        def word(args):
+            return args[args.index("--features") + 1]
+        diagnostics = ["src/wallet/wire/diagnostics.rs"]
+        for args in (nightly.mutation_args("wire", "0/1", diagnostics),
+                     nightly.mutation_args("wire", "0/3"),
+                     nightly.mutation_args("wire", "0/1", diagnostics, [])):
+            self.assertEqual(word(args).split(","), ["full", "http", "tracing"])
+            self.assertEqual(args.count("--cargo-arg=--test=wire_tracing_sink"), 1)
+        for surface in ("substrates", "script", "beef", "merkle"):
+            args = nightly.mutation_args(surface, "0/4")
+            self.assertEqual(word(args), "full,http", surface)
+            self.assertNotIn("--cargo-arg=--test=wire_tracing_sink", args, surface)
+        # The selection keys by module and the wire and substrates surfaces are both
+        # `wallet`'s: the sink rides on the surface, never in a file's set.
+        import affected_tests
+        self.assertIn("wire_tracing_sink", affected_tests.APART)
+        chosen = nightly.selection(nightly.measured_files())
+        self.assertFalse([f for f, t in chosen.items() if "wire_tracing_sink" in t])
+
     def test_a_file_whose_mutants_are_all_unviable_has_no_score(self):
         path = self.fixture(["CaughtMutant", "Unviable"])
         other = "src/transaction/merkle_path_extra.rs"
@@ -1482,6 +1506,10 @@ class ReachRuleFixture(unittest.TestCase):
                       nightly.selection_line(planned))
         args = nightly.mutation_args("wire", "0/1", wallet[1:], [])
         self.assertIn("--cargo-arg=--lib", args)
+        # #603: the wire surface runs its tracing sink beside an empty selection.
+        self.assertEqual([a for a in args if a.startswith("--cargo-arg=--test=")],
+                         ["--cargo-arg=--test=wire_tracing_sink"])
+        args = nightly.mutation_args("substrates", "0/1", wallet[:1], [])
         self.assertFalse([a for a in args if a.startswith("--cargo-arg=--test=")])
 
     def test_685_a_source_text_walker_a_cost_check_and_an_apart_binary_are_never_selected(self):
@@ -1496,6 +1524,12 @@ class ReachRuleFixture(unittest.TestCase):
         for stem in ("arch_walk", "beef_deep_chain", "memory_profiling"):
             self.assertFalse([f for f, t in chosen.items() if stem in t], stem)
             self.assertEqual(self.files(f"tests/{stem}.rs"), set())
+        # #603: the tracing sink, run apart and in no file's set, rides on the wire
+        # surface: a change to it re-measures the wire files alone.
+        self.put("tests/wire_tracing_sink.rs", "use bsv_rs::wallet::Wallet;\n")
+        chosen = nightly.selection(nightly.measured_files(self.repo), self.repo)
+        self.assertFalse([f for f, t in chosen.items() if "wire_tracing_sink" in t])
+        self.assertEqual(self.files("tests/wire_tracing_sink.rs"), {"src/wallet/wire/mod.rs"})
 
     def test_685_a_row_whose_modules_change_re_measures_the_files_they_select(self):
         self.land("tests/CLAUDE.md", self.FILES["tests/CLAUDE.md"].replace(

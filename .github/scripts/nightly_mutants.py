@@ -128,7 +128,8 @@ def write_json(path, value):
 # Two of the pull request's readings are left out: a binary that reads a source's
 # text (an `arch_*` walk of `src/`, a literal naming the file), since a mutant
 # rewrites the text it reads and its verdict on the text tests no behaviour; and the
-# binaries run apart (`APART`: the memory profile, the tracing sink); and the cost
+# binaries run apart (`APART`: the memory profile, the tracing sink, which the wire
+# surface runs beside its selection since #603, `SURFACE_TESTS`); and the cost
 # checks (`COST_CHECKS`). Every source of
 # a module reaches the same binaries, so the sets differ by module alone. cargo-mutants
 # runs one test command per shard, so a shard runs the union of its files' sets.
@@ -139,6 +140,23 @@ def write_json(path, value):
 # brought it into the wallet surfaces' reach.
 COST_CHECKS = {"merkle_path_cost", "beef_deep_chain", "beef_stream_deep", "beef_stream_pause",
                "beef_stream_linear_spend", "wallet_http_json_linear_432"}
+
+
+# #603: a surface's feature word and the binaries it runs whatever its selection. The wire
+# surface builds `tracing` (outside `full`, #212): `src/wallet/wire/diagnostics.rs` is
+# `mod diagnostics;` under `#[cfg(feature = "tracing")]`, so under `full,http` each of its
+# mutants rewrote unbuilt text and read `missed` (the complete run of 2026-11-04: 0 of 2),
+# and the four `tracing`-gated arms of `processor.rs`'s `invoke_wallet` met no test. Its
+# kills are `tests/wire_tracing_sink.rs`, run apart by the Test Suite (`APART`), which the
+# selection keeps out: `selection` keys by module and the wire and substrates surfaces are
+# both `wallet`'s, so the sink rides on the surface here, never in a file's set.
+SURFACE_FEATURES = {"wire": "full,http,tracing"}
+SURFACE_TESTS = {"wire": ["wire_tracing_sink"]}
+
+
+def surface_features(surface):
+    """The surface's `--features` word: `full,http` unless it names its own (#603)."""
+    return SURFACE_FEATURES.get(surface, "full,http")
 
 
 def selection(files, root=Path("."), tree=None):
@@ -168,8 +186,9 @@ def mutation_args(surface, shard, files=(), tests=None):
         measured = [f for f, s in measured_files().items()
                     if s == surface and (not files or f in named)]
         tests = shard_tests(selection(measured), measured)
+    tests = sorted({*tests, *SURFACE_TESTS.get(surface, ())})
     args = ["cargo", "mutants", "--no-shuffle", "--sharding", "round-robin", "--shard", shard,
-            "--features", "full,http"]
+            "--features", surface_features(surface)]
     for pattern in files or patterns:
         args += ["--file", pattern]
     # These apply to both `cargo test --no-run` and `cargo test`. Arguments
@@ -1101,6 +1120,10 @@ def reach(changed, root=Path("."), base_mutants="", head_mutants=None, base_rows
     def reach_test(path):
         stem = Path(path).stem
         base_table = test_rows(root, base_rows) if base_rows is not None else {}
+        riding = {f for f, s in measured.items() if stem in SURFACE_TESTS.get(s, ())}
+        if riding:
+            # #603: a binary a surface runs beside its selection meets every mutant of it.
+            return riding, "a binary its surface runs beside the selection (#603)"
         if stem in affected_tests.APART or stem in COST_CHECKS:
             return set(), "a binary run apart or a cost check: no selection runs it"
         if (root / path).exists():
