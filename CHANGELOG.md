@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the default mode requires a push-only unlocking script only where the reference's default does (a version of 1 or below); a version above 1 runs it, as the reference and the node do (#816; the owner's word)
+
+Without a flag word, `Spend` required a push-only unlocking script at every
+transaction version (`REQUIRE_PUSH_ONLY_UNLOCKING`, the check at the head of
+`Spend::validate`), an older choice of this crate (the 0.3.16 entry's "the
+default remains enforced"), while the contract named the default mode the
+TypeScript default and so was stricter than it. `ts-stack@edf6e03`'s default
+requires it at version 1 alone: `Spend.ts:319-321`, `#isRelaxed()` is
+`this.isRelaxedOverride || this.transactionVersion > 1`; `:365-369`,
+`#shouldEnforceSigPushOnly()` is `!this.#isRelaxed()` without flags; the check
+at `:2059-2063`. bitcoin-sv v1.2.2 under `SIGPUSHONLY` requires it before
+Chronicle at every version and after Chronicle at a non-malleable version
+alone (`interpreter.cpp:2321-2334`: `(IsGenesis(flags) && !IsChronicle(flags))
+|| (IsChronicle(flags) && !IsMalleableTxnVersion(checker.Version()))`), the
+reading this crate's words already follow (`ScriptFlags::requires_push_only`,
+unchanged). The owner, 2026-11-09 23:5xZ, on the question the stated lane put
+(PR #822): "yeah relax it".
+
+Now `Spend::new` derives the switch from the version as the reference does
+(`src/script/spend/mod.rs`, `require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING &&
+!relaxed_by_default(transaction_version)`): the four bytes read unsigned, as the
+reference's `readUInt32LE` number is, so version 0 is strict and 2^31 and
+2^32 - 1 are relaxed (#418's `relaxed_by_default`, now the one reading of the
+version at `Spend::new`'s five rules). `Transaction::verify` and the streaming
+readers build their spends through `Spend` and move with it. Under a word
+nothing moves: `set_flags` re-derives the rule from the word, the node's
+`int32_t` reading kept.
+
+Scenario: `<sig> OP_DUP OP_DROP` (or `OP_1 OP_DROP <sig>`) over a lock that
+succeeds, at version 2: refused until now in `Unlocking scripts can only
+contain push operations, and no other opcodes.` by `Spend`, by
+`Transaction::verify` (`Script validation failed for input 0: ...`) and by the
+stream (`SpendRefused`, `SpendRefusal::Script`); now valid at all three, as
+the reference's default and the node under Chronicle judge it. At version 1
+(and 0) all refuse it in the same words, as before. At a version at or above
+2^31 the default mode runs it, as the reference's default does, where the
+node under Chronicle refuses it (its `int32_t` version is negative, so not
+malleable: bitcoin-sv v1.2.2 `interpreter.cpp:34-44,2321-2334`); under a word
+this crate keeps the node's reading and refuses it (#418's stated reading,
+now reaching this rule too).
+
+Pinned by `tests/script_push_only_default_816.rs` (7 tests) against
+`tests/vectors/script_push_only_default_816.json`: the stated lane's 24 cases
+unchanged and 9 `version_edges` added (the default mode at versions 0, 2^31
+and 2^32 - 1, recorded by `tests/support/script_push_only_default_816.mjs` at
+ts-stack@edf6e03 under Node v22.18.0, two runs byte-identical). Every
+default-mode cell is the reference's verdict at `Spend`, `Transaction::verify`
+and the stream; `set_require_push_only` overrides both ways; the words' cells
+unchanged. RED on `e19fec98` with the test overlaid: 3 of 7 (`v2
+op1-drop-then-push`, `left: Err("Unlocking scripts can only contain push
+operations, and no other opcodes.")`, `right: Ok(true)`; the same at
+`Transaction::verify` and the stream); with the version read signed, 3 of 7 at
+`v2147483648`. Moved with the rule: `spend::flag_tests::push_only_is_derived_from_the_word_and_the_version`
+(the default at version 2 now valid, at version 1 refused); the
+`sighash_scriptcode_654.json` vector's `default` column at version 2 (nine
+cells: U1, U2 ×3, U3, M2 ×2, P1 ×2, now equal to its `default_no_push_only`
+column, written by the file's own recorder; the TypeScript and Lean columns
+unchanged; seven of the nine now differ from its `ts_default` column, P1's two
+agreeing, and with L1, which did not move, eight of the ten version-2 cells
+differ); the conformance census: `node.tx-valid.shared.0168` (version 2,
+unlocking script `51 b2`, `OP_1 OP_NOP3`, expected valid) leaves the
+unsupported class "bsv-rs always enforces SIGPUSHONLY" (319 to 318, renamed
+"the default mode enforces SIGPUSHONLY at version <= 1") and runs and passes:
+4,120 run, 4,109 passed, 959 unsupported before; 4,121, 4,110, 958 after;
+37 skipped, 11 known failures, 0 unexplained, 0 panics both.
+
+Migration: a caller of the default mode (`Spend` without a flag word,
+`Transaction::verify`, `verify_stream` and the asynchronous and two-pass
+readers without chain parameters) now accepts a spend whose unlocking script
+is not push-only at a version above 1 when the scripts succeed. The overlay
+engine's submit door is not such a caller, and nothing moves there: it builds
+a `Spend` per input itself and refuses a non-push-only unlocking script at
+every version in its own static checks before any `Spend` runs
+(`bsv-overlay-cloudflare` `crates/overlay-engine/src/script_door.rs:557,649,857`,
+read at `9a0f3c29`), so that door is now stricter than the default mode above
+version 1. A caller that
+wants the old refusal sets a flag word (`ScriptFlags::block(era)` or
+`standard(era)`, which require it before Chronicle, and after Chronicle at
+version 1), or calls `Spend::set_require_push_only(true)`. No public type or
+error text changes.
+
+### Notes: cross-SDK parity (#816)
+
+The default mode now reads the reference's default (`ts-stack@edf6e03`
+`Spend.ts:319-321,365-369,2059-2063`), version read unsigned; the stated
+divergence row (#816, PR #822) is removed. Under a word this crate reads as
+bitcoin-sv v1.2.2 (`interpreter.cpp:2321-2334`), unchanged. One consequence
+of the move, already stated: the #654 row's unlocking-script scriptCode cells
+(U1, U2, U3, M2), where this crate signs the node's bytes and the reference's
+writer stops at an `OP_RETURN`, are now reached in the default mode at
+version 2 without `set_require_push_only(false)`; no verdict of that row
+changes, only its reach. Go is not compared here. Theirs: none.
+
 ### Docs: the upstream filing queue brought up to date (#375)
 
 The owner asked on 2026-11-09 whether the references need upstream issues; the

@@ -557,8 +557,9 @@ fn an_undefined_hash_type_at_or_above_2_31_is_refused_in_the_version_2_words_418
 /// 2^31 on its unsigned number (`Spend.ts:364-368`), the stated divergence.
 /// A pin of `ScriptFlags::requires_push_only`'s signed comparison
 /// (`flags.rs`): RED with it planted as `tx_version as u32 <= 1` in a scratch
-/// copy of the tip. The default mode's push-only rule is outside #418 (a row
-/// the reads filed) and not asserted here.
+/// copy of the tip. The default mode's push-only rule is outside #418 (#816
+/// relaxed it above version 1, pinned by `script_push_only_default_816.rs`)
+/// and not asserted here.
 #[test]
 fn a_non_push_only_unlocking_script_at_or_above_2_31_is_refused_under_a_word_418() {
     let r = recording();

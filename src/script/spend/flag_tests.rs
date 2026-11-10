@@ -186,9 +186,16 @@ fn push_only_is_derived_from_the_word_and_the_version() {
     // A non-push opcode in the unlocking script.
     let lock = "OP_1 OP_EQUAL";
     let unlock = "OP_0 OP_1ADD";
+    // The default mode reads the reference's `#shouldEnforceSigPushOnly()`:
+    // required at version 1, not above (#816, the owner's word of
+    // 2026-11-09 23:5xZ; required at every version until then).
     assert!(
-        spend(lock, unlock, 2).validate().is_err(),
-        "the default mode requires push-only at every version"
+        spend(lock, unlock, 1).validate().is_err(),
+        "the default mode requires push-only at version 1"
+    );
+    assert!(
+        valid(spend(lock, unlock, 2).validate()),
+        "the default mode, version 2: not required"
     );
     assert!(
         valid(with_flags(lock, unlock, 2, block()).validate()),

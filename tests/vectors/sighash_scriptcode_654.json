@@ -481,7 +481,7 @@
         "block_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Err(The signature must use SIGHASH_FORKID.)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Ok(true)",
         "default_no_push_only": "Ok(true)",
         "standard_post_chronicle": "Err(The signature must use SIGHASH_FORKID.)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -522,7 +522,7 @@
         "block_post_chronicle": "Ok(true)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Ok(true)",
         "default_no_push_only": "Ok(true)",
         "standard_post_chronicle": "Ok(true)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -563,7 +563,7 @@
         "block_post_chronicle": "Ok(true)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Err(The signature must not use SIGHASH_CHRONICLE before Chronicle.)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Ok(true)",
         "default_no_push_only": "Ok(true)",
         "standard_post_chronicle": "Ok(true)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -604,7 +604,7 @@
         "block_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Ok(true)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "standard_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -645,7 +645,7 @@
         "block_post_chronicle": "Ok(true)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Ok(true)",
         "default_no_push_only": "Ok(true)",
         "standard_post_chronicle": "Ok(true)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -686,7 +686,7 @@
         "block_post_chronicle": "Ok(true)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Err(OP_CHECKMULTISIG requires failing signatures to be empty.)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Ok(true)",
         "default_no_push_only": "Ok(true)",
         "standard_post_chronicle": "Ok(true)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -727,7 +727,7 @@
         "block_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Ok(true)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "standard_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -768,7 +768,7 @@
         "block_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Ok(true)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "default_no_push_only": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "standard_post_chronicle": "Err(OP_VERIFY requires the top stack value to be truthy.)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"
@@ -809,7 +809,7 @@
         "block_post_chronicle": "Ok(true)",
         "block_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
         "block_post_genesis_no_sigpushonly": "Err(OP_CHECKSIG requires failing signatures to be empty.)",
-        "default": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)",
+        "default": "Ok(true)",
         "default_no_push_only": "Ok(true)",
         "standard_post_chronicle": "Ok(true)",
         "standard_post_genesis": "Err(Unlocking scripts can only contain push operations, and no other opcodes.)"

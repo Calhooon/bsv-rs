@@ -55,10 +55,12 @@ pub(super) const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)", 11),
     ("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)", 181),
     ("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)", 8),
-    (
-        "bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)",
-        319,
-    ),
+    // #816 repin (319 -> 318; the owner's word of 2026-11-09 23:5xZ): the
+    // default mode requires a push-only unlocking script at version <= 1
+    // alone, as the reference's `#shouldEnforceSigPushOnly()` does, so
+    // `node.tx-valid.shared.0168` (version 2, `OP_1 OP_NOP3`, expected valid)
+    // leaves this class and runs and passes. Zero new mismatches.
+    ("the default mode enforces SIGPUSHONLY at version <= 1 (a word would express the fixture)", 318),
     (
         "strict DER/pubkey encodings are always enforced (SIGHASH_FORKID implies STRICTENC on the reference too)",
         47,

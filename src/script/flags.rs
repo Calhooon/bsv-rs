@@ -171,10 +171,10 @@ impl ProtocolEra {
 ///
 /// **The TypeScript SDK's default mode is not a word.** Without `set_flags`,
 /// `Spend` enforces `MINIMALDATA`, `LOW_S`, `CLEANSTACK` and `NULLDUMMY` for
-/// version <= 1 only and push-only unlocking scripts at every version, never
-/// `NULLFAIL`, `MINIMALIF` or `DISCOURAGE_UPGRADABLE_NOPS`: stricter than the
-/// block word at version <= 1 (the standard-only rules) and looser than it
-/// (no `NULLFAIL`), stricter than both words at version >= 2 (push-only).
+/// version <= 1 only, push-only unlocking scripts at version <= 1 only (the
+/// TypeScript default's `#isRelaxed()`, #816), never `NULLFAIL`, `MINIMALIF` or
+/// `DISCOURAGE_UPGRADABLE_NOPS`: stricter than the block word at version <= 1,
+/// looser (no `NULLFAIL`) than post-Chronicle words at v >= 2.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ScriptFlags(u32);
 

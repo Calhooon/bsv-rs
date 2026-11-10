@@ -1,0 +1,305 @@
+{
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "mode": "default",
+      "version": 1,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 1,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "default",
+      "version": 1,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "default",
+      "version": 2,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 2,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 2,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "SIGPUSHONLY",
+      "version": 1,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "SIGPUSHONLY",
+      "version": 1,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "SIGPUSHONLY",
+      "version": 1,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "SIGPUSHONLY",
+      "version": 2,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "SIGPUSHONLY",
+      "version": 2,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "SIGPUSHONLY",
+      "version": 2,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "SIGPUSHONLY,CHRONICLE",
+      "version": 1,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "SIGPUSHONLY,CHRONICLE",
+      "version": 1,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "SIGPUSHONLY,CHRONICLE",
+      "version": 1,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "SIGPUSHONLY,CHRONICLE",
+      "version": 2,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "SIGPUSHONLY,CHRONICLE",
+      "version": 2,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "SIGPUSHONLY,CHRONICLE",
+      "version": 2,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "CHRONICLE",
+      "version": 1,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "CHRONICLE",
+      "version": 1,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "CHRONICLE",
+      "version": 1,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "CHRONICLE",
+      "version": 2,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "CHRONICLE",
+      "version": 2,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "CHRONICLE",
+      "version": 2,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    }
+  ],
+  "version_edges": [
+    {
+      "mode": "default",
+      "version": 0,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 0,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "default",
+      "version": 0,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "error": "Script evaluation error: Unlocking scripts can only contain push operations, and no other opcodes."
+    },
+    {
+      "mode": "default",
+      "version": 2147483648,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 2147483648,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 2147483648,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 4294967295,
+      "unlock_name": "push-only",
+      "unlock": "473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": true,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 4294967295,
+      "unlock_name": "op1-drop-then-push",
+      "unlock": "5175473044010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    },
+    {
+      "mode": "default",
+      "version": 4294967295,
+      "unlock_name": "push-dup-drop",
+      "unlock": "4730440101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101017675",
+      "lock": "7551",
+      "push_only": false,
+      "valid": true
+    }
+  ]
+}

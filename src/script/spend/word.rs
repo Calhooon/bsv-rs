@@ -15,14 +15,17 @@ impl Spend {
         self.require_minimal = require;
     }
 
-    /// Allows opting out of the push-only unlocking-script check.
+    /// Overrides the push-only unlocking-script check.
     ///
-    /// The TypeScript `@bsv/sdk` Spend engine does not enforce push-only
-    /// unlocking scripts; some OP_PUSH_TX-style covenant designs place
-    /// executable code in the unlocking script and verify under that engine.
-    /// Default remains `true` (enforced). Called after [`set_flags`](Self::set_flags),
-    /// it overrides the rule the word derived (the reference requires push-only
-    /// unlocking scripts post-Chronicle only for version <= 1).
+    /// Default follows ts-sdk: enforced for version <= 1 transactions, relaxed
+    /// for version > 1, the version read unsigned (`#shouldEnforceSigPushOnly()`
+    /// is `!#isRelaxed()`, `Spend.ts:319-321,365-369` at `ts-stack@edf6e03`;
+    /// #816, the owner's word of 2026-11-09 23:5xZ: every version until then).
+    /// `true` restores the older refusal at every version; `false` runs a
+    /// non-push-only unlocking script at version 1 too. Called after
+    /// [`set_flags`](Self::set_flags), it overrides the rule the word derived
+    /// (the node requires push-only unlocking scripts post-Chronicle only for
+    /// version <= 1).
     pub fn set_require_push_only(&mut self, require: bool) {
         self.require_push_only = require;
     }
