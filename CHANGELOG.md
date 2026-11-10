@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the HTTP JSON and request bounds of `result_values/boundary.rs` pinned at the reference's edges, ten survivors killed (#603)
+
+The complete mutation run of 2026-11-04 scored
+`src/wallet/substrates/result_values/boundary.rs` 39 of 50 (78.00%, floor 78;
+`docs/census/mutants-2026-11-04.md:517-529`). Ten of its eleven survivors are
+killed by tests against the reference's own recordings
+(`tests/vectors/http_json_boundary_603.json`, written by
+`tests/support/http_json_boundary_603.mjs` from the SDK built at
+`ts-stack@edf6e03` under Node v22.18.0; two runs byte-identical); no
+crate-contract pin was needed (0 counted apart):
+
+- `137:39` (`&&` to `||` in the Content-Length grammar) by
+  `a_content_length_list_is_refused_as_invalid_603`: a 200 answer with
+  `Content-Length: 12, 12`, which hyper 1.12.0 passes through
+  (`src/headers.rs:76-99`), refused in `HTTPWalletJSON response has an invalid
+  Content-Length` as `HTTPWalletJSON.ts:65-66` refuses it, not as too large.
+- `141:53` (`>` to `>=`) and `151:24` (`>` to `>=`, `>` to `==`) by
+  `a_body_of_exactly_the_cap_is_read_603` and
+  `a_chunked_body_of_exactly_the_cap_is_read_603`: a body of exactly
+  268,435,456 bytes, declared and chunked, read to height 1, as
+  `HTTPWalletJSON.ts:69` and `:84` read it.
+- `151:36` (`-` to `+`) by `a_chunked_body_one_past_the_cap_is_refused_603`:
+  268,435,457 bytes chunked refused in `HTTPWalletJSON response exceeds the
+  maximum permitted size` (`HTTPWalletJSON.ts:83-86`).
+- `113:13` (the array arm of the request key walk) by
+  `an_unsafe_key_inside_a_request_array_is_refused_603`: createAction's
+  `outputs` holding `{"constructor":1}` refused in `Wallet result request
+  records must contain only safe string keys` (`WalletResultValidation.ts:363-372`,
+  `:1560-1561`).
+- `121:5`, `121:49` (`>` to `==`, `>` to `>=`) by
+  `a_request_array_is_bounded_at_one_million_entries_603`: 1,000,000 labels
+  accepted, 1,000,001 refused in `Wallet request arrays must have a bounded
+  own length` (`WalletResultValidation.ts:215,241-244`).
+- `213:15` (`>` to `>=`) by
+  `a_wire_response_of_exactly_the_cap_passes_and_one_more_is_refused_603`
+  (`WalletWireTransceiver.ts:111-112,126-131`, `WalletWire.ts:9`).
+
+Each RED on its mutant in a scratch copy, then green on the tree. The
+eleventh, `185:33` (the guard `n.is_f64()` to `true` in `normalize_numbers`),
+is the equivalent candidate, stated and not declared in `.cargo/mutants.toml`:
+the mutant differs only on an integer above 2^53, and the function runs only
+on the fallback after `result_values::validate` (`http_json/answer.rs:88`,
+`:94-106`), which bounds every integer field a typed result can read below it
+(`scalars.rs:51-64` reads through `f64`; the satoshis to 2,100,000,000,000,000
+at `lists.rs:70-75,180-184,251-255,357-361`, the totals to 2^53 - 1 at
+`lists.rs:17` and `u32` by type, `version`, `lockTime`, `sequenceNumber` and
+`outputIndex` to `u32::MAX`, the height 1 to `u32::MAX` at `scalars.rs:154`,
+`proofType` and the protocol level at `scalars.rs:244-247`); an extra member
+is dropped by the typed read, and the reference's `JSON.parse` rounds such a
+number as the mutant does. Re-measured with the oracle's selection
+(`mutation_args("substrates", "k/17", [the file])`, 152 binaries): 49
+caught, 1 missed (`185:33`), 0 timeout, 1 unviable, 98.00%.
+`docs/ratchets.json` is untouched: the next complete run records the floor.
+No public API, wire byte or behaviour changes; no parity note (every case
+agrees with the reference).
+
 ### Tests: `result_values/wire.rs`'s four survivors of the complete run killed (#603)
 
 The complete mutation run of 2026-11-04 scored
