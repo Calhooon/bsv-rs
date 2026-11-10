@@ -89,11 +89,9 @@ fn build(v: &Value, case: &Value) -> Beef {
                 // The held entry mutated in place, as the recorder sets
                 // `findTxid(..).tx.lockTime` (#798's second fold).
                 let (name, lock_time) = name.split_once('=').unwrap();
-                beef.find_txid_mut(&tx(v, name).id())
-                    .unwrap()
-                    .tx_mut()
-                    .unwrap()
-                    .lock_time = lock_time.parse().unwrap();
+                let lock_time = lock_time.parse().unwrap();
+                beef.edit_tx(&tx(v, name).id(), |t| t.lock_time = lock_time)
+                    .unwrap();
             }
             "index" => {
                 let (name, index) = name.split_once('=').unwrap();
@@ -371,11 +369,9 @@ fn path_case_walk(v: &Value, name: &str) -> (Vec<Value>, Value) {
     let set_on = v["txs"][case["set_on"].as_str().unwrap()]["txid"]
         .as_str()
         .unwrap();
-    read.find_txid_mut(set_on)
-        .unwrap()
-        .tx_mut()
-        .unwrap()
-        .merkle_path = Some(bump(v, case["set"].as_str().unwrap()));
+    let path = bump(v, case["set"].as_str().unwrap());
+    read.edit_tx(set_on, |t| t.merkle_path = Some(path))
+        .unwrap();
     let subject = v["txs"][case["subject"].as_str().unwrap()]["txid"]
         .as_str()
         .unwrap();

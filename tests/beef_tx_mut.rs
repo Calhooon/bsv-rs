@@ -1,5 +1,6 @@
-//! An entry mutated through `BeefTx::tx_mut` is one thing to every reader
-//! (#171).
+//! An entry edited in place is one thing to every reader (#171), through
+//! `Beef::edit_tx` since #817 (the deprecated `BeefTx::tx_mut`'s window
+//! pinned by the last test).
 //!
 //! `BeefTx` caches the txids its inputs spend (`input_txids`) and keeps the
 //! bytes and the txid it was read with. Until #171 `tx_mut` refreshed none of
@@ -64,8 +65,8 @@ fn write(bumps: &[MerklePath], entries: &[&[u8]], proven: &[(usize, u64)]) -> Ve
 
 /// `P` and `Q` spend two placeholders, each proven by a BUMP of its own;
 /// `C` spends `P`. Read from bytes in the order `P, C, Q`, then `C`'s input
-/// pointed at `Q` through `tx_mut`. Returns the BEEF, `P`, `Q`, `C` as read,
-/// and `C` as mutated.
+/// pointed at `Q` through `edit_tx`. Returns the BEEF, `P`, `Q`, `C` as
+/// read, and `C` as mutated.
 fn repointed() -> (Beef, Transaction, Transaction, Transaction, Transaction) {
     let p = tx(&"e5".repeat(32));
     let q = tx(&"e6".repeat(32));
@@ -78,8 +79,8 @@ fn repointed() -> (Beef, Transaction, Transaction, Transaction, Transaction) {
     ];
     let mut beef = Beef::from_binary(&write(&bumps, &entries, &[(0, 0), (2, 1)])).unwrap();
     assert!(beef.clone().verify_structure().is_ok());
-    let entry = beef.find_txid_mut(&c.id()).unwrap();
-    entry.tx_mut().unwrap().inputs[0].source_txid = Some(q.id());
+    beef.edit_tx(&c.id(), |t| t.inputs[0].source_txid = Some(q.id()))
+        .unwrap();
     let mut mutated = c.clone();
     mutated.inputs[0].source_txid = Some(q.id());
     // `Transaction` caches its hash; a direct field edit asks for this.
@@ -88,7 +89,7 @@ fn repointed() -> (Beef, Transaction, Transaction, Transaction, Transaction) {
 }
 
 #[test]
-fn an_input_repointed_through_tx_mut_is_what_every_reader_reads() {
+fn an_input_repointed_through_edit_tx_is_what_every_reader_reads() {
     let (beef, p, q, c, mutated) = repointed();
     assert_ne!(mutated.id(), c.id());
 
@@ -146,17 +147,23 @@ fn an_input_repointed_through_tx_mut_is_what_every_reader_reads() {
 }
 
 #[test]
-fn an_input_repointed_outside_the_beef_through_tx_mut_is_missing() {
-    let (mut beef, _, _, c, mutated) = repointed();
-    // The old name finds nothing; the new one is indexed by the next
-    // whole-BEEF reader.
+fn an_input_repointed_outside_the_beef_through_edit_tx_is_missing() {
+    let (mut beef, _, q, c, mutated) = repointed();
+    // The old name finds nothing; the new one is found at once, its inputs
+    // read already (`edit_tx` re-keys eagerly, #817; through `tx_mut` not
+    // before the next whole-BEEF reader).
     assert!(beef.find_txid(&c.id()).is_none());
-    assert!(beef.find_txid(&mutated.id()).is_none());
+    assert_eq!(
+        beef.find_txid(&mutated.id()).unwrap().input_txids,
+        vec![q.id()]
+    );
     assert!(beef.sort_txs().missing_inputs.is_empty());
-    // A second mutation of the same entry, found by its new name.
+    // A second edit of the same entry, found by its new name.
     let outside = "f0".repeat(32);
-    let entry = beef.find_txid_mut(&mutated.id()).unwrap();
-    entry.tx_mut().unwrap().inputs[0].source_txid = Some(outside.clone());
+    beef.edit_tx(&mutated.id(), |t| {
+        t.inputs[0].source_txid = Some(outside.clone())
+    })
+    .unwrap();
     let sr = beef.clone().sort_txs();
     assert_eq!(sr.missing_inputs, vec![outside]);
     assert_eq!(
@@ -166,7 +173,7 @@ fn an_input_repointed_outside_the_beef_through_tx_mut_is_missing() {
 }
 
 #[test]
-fn a_proven_entry_mutated_through_tx_mut_keeps_its_bump_index_and_is_not_proven() {
+fn a_proven_entry_edited_keeps_its_bump_index_and_is_not_proven() {
     // `P` proven by BUMP 0; mutated, its hash leaves the BUMP's leaf, and
     // the pinned index names a BUMP that does not carry it.
     let p = tx(&"e5".repeat(32));
@@ -174,9 +181,13 @@ fn a_proven_entry_mutated_through_tx_mut_keeps_its_bump_index_and_is_not_proven(
     let raw = p.to_binary();
     let mut beef = Beef::from_binary(&write(&[bump], &[raw.as_slice()], &[(0, 0)])).unwrap();
     assert!(beef.clone().verify_structure().is_ok());
-    let entry = beef.find_txid_mut(&p.id()).unwrap();
-    entry.tx_mut().unwrap().outputs[0].satoshis = Some(999);
-    assert_eq!(entry.bump_index(), Some(0));
+    let edited = beef
+        .edit_tx(&p.id(), |t| {
+            t.outputs[0].satoshis = Some(999);
+            t.id()
+        })
+        .unwrap();
+    assert_eq!(beef.find_txid(&edited).unwrap().bump_index(), Some(0));
     assert_eq!(
         beef.clone().verify_structure().err(),
         Some(Kind::TxidNotInBump)
@@ -187,4 +198,35 @@ fn a_proven_entry_mutated_through_tx_mut_keeps_its_bump_index_and_is_not_proven(
         Some(Kind::TxidNotInBump),
         "the wire carries the mutated bytes under the same BUMP index"
     );
+}
+
+/// The deprecated `BeefTx::tx_mut` keeps beta's #171 window, stated: its
+/// edit is seen by the writers and the whole-BEEF doors, never by the
+/// per-entry doors, so until one of those runs the new txid is not found and
+/// a `merge_raw_tx` of it stores it a second time; `Beef::edit_tx` closes it
+/// (#817). `reindex` re-keys the entry, and the twice-held txid stays.
+#[test]
+#[allow(deprecated)] // the deprecated path itself is what this pins
+fn a_tx_mut_edit_is_unseen_by_the_per_entry_doors_stated_171() {
+    let (mut beef, _, q, c, _) = repointed();
+    let mut moved = tx(&q.id());
+    moved.lock_time = 3;
+    beef.merge_raw_tx(moved.to_binary(), None);
+    let entry = beef.find_txid_mut(&moved.id()).unwrap();
+    entry.tx_mut().unwrap().lock_time = 4;
+    let renamed = entry.txid();
+    assert!(beef.find_txid(&renamed).is_none(), "the window: not found");
+    assert!(beef.find_txid(&moved.id()).is_none(), "nor by its old txid");
+    let mut again = moved.clone();
+    again.lock_time = 4;
+    again.invalidate_caches();
+    assert_eq!(again.id(), renamed);
+    let held = beef.txs.len();
+    beef.merge_raw_tx(again.to_binary(), None);
+    assert_eq!(beef.txs.len(), held + 1, "stored a second time");
+    beef.reindex();
+    assert!(beef.find_txid(&renamed).is_some());
+    let twice = beef.txs.iter().filter(|t| t.txid() == renamed).count();
+    assert_eq!(twice, 2, "reindex re-keys; it merges nothing");
+    assert!(beef.find_txid(&c.id()).is_none());
 }

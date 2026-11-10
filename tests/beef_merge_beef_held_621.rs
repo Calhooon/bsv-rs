@@ -90,15 +90,16 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
             "edit" => {
                 assert_eq!(what, "u_to_v");
                 let u = tx(v, "u").id();
-                beef.find_txid_mut(&u).unwrap().tx_mut().unwrap().lock_time = 1;
+                beef.edit_tx(&u, |t| t.lock_time = 1).unwrap();
             }
             "link" => {
                 // The held C given T as its input's source, in memory, T no
                 // entry of the BEEF (#621's second fold).
                 assert_eq!(what, "c_to_t");
                 let c = tx(v, "c").id();
-                beef.find_txid_mut(&c).unwrap().tx_mut().unwrap().inputs[0].source_transaction =
-                    Some(Box::new(tx(v, "t")));
+                let t = tx(v, "t");
+                beef.edit_tx(&c, |c| c.inputs[0].source_transaction = Some(Box::new(t)))
+                    .unwrap();
             }
             "graph" => {
                 assert_eq!(what, "c_of_t");

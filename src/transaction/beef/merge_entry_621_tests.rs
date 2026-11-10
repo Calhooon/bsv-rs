@@ -63,6 +63,7 @@ fn merge_beef_keeps_the_source_entrys_txid_621() {
 /// merged entry's bytes did not hash to the txid it was filed under; the
 /// merge hashes the bytes of an entry that holds no txid.
 #[test]
+#[allow(deprecated)] // the stale cache is a state of the deprecated `tx_mut` alone
 fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
     let bytes = raw();
     let old = hash_of(&bytes);

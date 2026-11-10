@@ -246,6 +246,7 @@ fn a_source_entry_built_from_raw_bytes_without_a_txid_merges_under_its_hash_621(
 /// An entry mutated through `tx_mut` has dropped its bytes and merges on the
 /// parsed branch under its new txid, unchanged by #621.
 #[test]
+#[allow(deprecated)] // pins the deprecated `tx_mut` path: an entry that dropped its bytes
 fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
     let (_, mut source) = sources()
         .into_iter()

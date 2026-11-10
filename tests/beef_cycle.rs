@@ -344,9 +344,12 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
     for n in [1, 2, 3] {
         let (mut beef, ids) = in_memory_chain(n);
         let last = ids[n - 1].clone();
-        let entry = beef.find_txid_mut(&ids[0]).unwrap();
-        entry.tx_mut().unwrap().inputs[0].source_txid = Some(last.clone());
-        let renamed = entry.txid();
+        let renamed = beef
+            .edit_tx(&ids[0], |tx| {
+                tx.inputs[0].source_txid = Some(last.clone());
+                tx.id()
+            })
+            .unwrap();
         assert_ne!(renamed, ids[0], "chain of {n}: the entry is renamed");
         assert!(beef.find_txid(&ids[0]).is_none(), "chain of {n}");
         // The linker walks the chain under the new name and stops at the

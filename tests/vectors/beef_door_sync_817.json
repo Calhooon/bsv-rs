@@ -1,0 +1,1211 @@
+{
+  "comment": "bsv-rs#817: doors after an edit in place and the BUMP index after a combine, recorded from ts-stack@edf6e03 packages/sdk by tests/support/beef_door_sync_817.mjs",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "node": "v22.23.3",
+  "txs": {
+    "u": {
+      "txid": "ba051c66362199d5ec932c68bd29f7e1e07620de7743bad649e39d7a5ae6a7f0",
+      "raw": "0100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000"
+    },
+    "v": {
+      "txid": "b4e610e8559df36f74a028b51d00a54c9b9deba6f1d380af8d1ef8fb5682b280",
+      "raw": "0100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000"
+    },
+    "x": {
+      "txid": "0a6d64c859b2fbca4f4f0ad634ded46ad660be6d64cdaeb88afa208845491385",
+      "raw": "0100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000"
+    },
+    "w": {
+      "txid": "1f9f76309a1518f7bcf8aac011f5b79cf2d8e1d0c95550677c9896cd64bed304",
+      "raw": "0100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000"
+    },
+    "y": {
+      "txid": "f3b199b831551da6e671dd8490039548c5691ec77855575bc989ee2e2c65833f",
+      "raw": "0100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01d007000000000000015100000000"
+    },
+    "p": {
+      "txid": "477fe6e6a6301e06b18ead509b0a8150207b8ee6ae069c93a9eafc8cd0f040ee",
+      "raw": "0100000001abababababababababababababababababababababababababababababababab000000000151ffffffff01a00f000000000000015100000000"
+    },
+    "c": {
+      "txid": "6839ce2abb376770031ce53e8fd479f91795509da57f8207375a2587e30f1670",
+      "raw": "0100000001ee40f0d08cfceaa9939c06aee68e7b2050810a9b50ad8eb1061e30a6e6e67f47000000000151ffffffff01ac0d000000000000015100000000"
+    }
+  },
+  "bumps": {
+    "b0": "fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010004d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1f",
+    "b0w": "fea0bb0d0001020000851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1f",
+    "b1": "fea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a",
+    "v_alone": "fea2bb0d000101000280b28256fbf81e8daf80d3f1a6eb9d9b4ca5001db528a0746ff39d55e810e6b4",
+    "b2": "fea3bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a",
+    "bz": "fea0bb0d0001010002abababababababababababababababababababababababababababababababab"
+  },
+  "cases": [
+    {
+      "name": "an_edit_then_merge_raw_tx_finds_the_edited_entry_held",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "raw:v"
+      ],
+      "answers": [],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_merge_transaction_finds_the_edited_entry_held",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "tx:v"
+      ],
+      "answers": [],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_merge_txid_only_finds_the_edited_entry_held",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "txid:v"
+      ],
+      "answers": [],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_find_txid_answers_the_edited_txid",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "find:v",
+        "find:u"
+      ],
+      "answers": [
+        {
+          "step": "find:v",
+          "answer": "v"
+        },
+        {
+          "step": "find:u",
+          "answer": null
+        }
+      ],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_merge_bump_proves_the_edited_entry",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "bump:v_alone",
+        "find:v"
+      ],
+      "answers": [
+        {
+          "step": "find:v",
+          "answer": "v"
+        }
+      ],
+      "beef": "0200beef01fea2bb0d000101000280b28256fbf81e8daf80d3f1a6eb9d9b4ca5001db528a0746ff39d55e810e6b40101000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_the_signing_lookups_answer_the_edited_txid",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "sign:v",
+        "atomic:v"
+      ],
+      "answers": [
+        {
+          "step": "sign:v",
+          "answer": "v"
+        },
+        {
+          "step": "atomic:v",
+          "answer": "v"
+        }
+      ],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_make_txid_only_of_the_old_txid",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "make:u"
+      ],
+      "answers": [
+        {
+          "step": "make:u",
+          "answer": "u"
+        }
+      ],
+      "beef": "0200beef000102f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "txid"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_make_txid_only_of_the_new_txid",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "make:v"
+      ],
+      "answers": [
+        {
+          "step": "make:v",
+          "answer": null
+        }
+      ],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_into_the_earlier_bump_gives_its_txids_that_index",
+      "target": [
+        "bump:b0",
+        "bump:b1"
+      ],
+      "source": [
+        "bump:b0w",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_into_the_later_bump_gives_its_txids_that_index",
+      "target": [
+        "bump:b0",
+        "bump:b1"
+      ],
+      "source": [
+        "bump:b1",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010004d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_gives_a_txid_only_entry_that_index",
+      "target": [
+        "bump:b0",
+        "bump:b1"
+      ],
+      "source": [
+        "bump:b0w",
+        "txid:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0102851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 0,
+          "form": "txid"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_through_merge_bump_survives_merge_raw_tx",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_the_next_bump_sync",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w",
+        "sort:",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_find_bump",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w",
+        "findbump:x",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 1
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_before_any_bump_sync_survives_the_first",
+      "target": [
+        "graph:x@b0",
+        "graph:x@b1",
+        "graph:w@b0w",
+        "findbump:x",
+        "make:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 0
+        },
+        {
+          "step": "make:x",
+          "answer": "x"
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0202851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a01000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 0,
+          "form": "txid"
+        },
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_before_any_bump_sync_survives_a_sort",
+      "target": [
+        "graph:x@b0",
+        "graph:x@b1",
+        "graph:w@b0w",
+        "sort:",
+        "findbump:x",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 0
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000001000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 0,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_after_a_read_is_forgotten_at_find_bump",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "reread:",
+        "graph:w@b0w",
+        "findbump:x",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 1
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff01881300000000000001510000000001010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid",
+      "target": [
+        "raw:x",
+        "raw:u",
+        "find:u",
+        "editpub:u_to_v",
+        "find:v",
+        "find:u",
+        "raw:v"
+      ],
+      "answers": [
+        {
+          "step": "find:u",
+          "answer": "u"
+        },
+        {
+          "step": "find:v",
+          "answer": "v"
+        },
+        {
+          "step": "find:u",
+          "answer": null
+        }
+      ],
+      "beef": "0200beef0002000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_merge_bump_then_make_txid_only_of_the_new_txid",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "bump:v_alone",
+        "make:v"
+      ],
+      "answers": [
+        {
+          "step": "make:v",
+          "answer": "v"
+        }
+      ],
+      "beef": "0200beef01fea2bb0d000101000280b28256fbf81e8daf80d3f1a6eb9d9b4ca5001db528a0746ff39d55e810e6b4010280b28256fbf81e8daf80d3f1a6eb9d9b4ca5001db528a0746ff39d55e810e6b4",
+      "bumps": 1,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": 0,
+          "form": "txid"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_find_txid_mut_answers_the_edited_txid",
+      "target": [
+        "raw:u",
+        "edit:u_to_v",
+        "mut:v",
+        "mut:u"
+      ],
+      "answers": [
+        {
+          "step": "mut:v",
+          "answer": "v"
+        },
+        {
+          "step": "mut:u",
+          "answer": null
+        }
+      ],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_of_an_input_then_find_txid_reads_the_new_input_list",
+      "target": [
+        "raw:u",
+        "edit:u_input_to_y",
+        "inputs:y"
+      ],
+      "answers": [
+        {
+          "step": "inputs:y",
+          "answer": [
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          ]
+        }
+      ],
+      "beef": "0200beef0001000100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01d007000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "y",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_push_after_an_unsynced_combine_takes_the_pushed_index",
+      "target": [
+        "graph:x@b0",
+        "graph:x@b1",
+        "graph:w@b0w",
+        "graph:x@b2",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef03fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afea3bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201020100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000001000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 3,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 2,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_unsynced_combine_is_the_atomic_paths_index",
+      "target": [
+        "graph:x@b0",
+        "graph:x@b1",
+        "graph:w@b0w",
+        "atomicpath:x"
+      ],
+      "answers": [
+        {
+          "step": "atomicpath:x",
+          "answer": 900000
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000001000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_find_atomic_transaction",
+      "target": [
+        "raw:u",
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w",
+        "atomic:u",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "atomic:u",
+          "answer": "u"
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a02000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510000000001010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_merge_beef",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w"
+      ],
+      "source": [
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_verify_valid",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w",
+        "valid:",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_verify_valid_refusing_before_its_sort",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "bump:bz",
+        "bump:b0w",
+        "valid:",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef03fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afea0bb0d0001010002abababababababababababababababababababababababababababababababab0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 3,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_after_a_sort_is_forgotten_at_to_hex",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "sort:",
+        "bump:b0w",
+        "hex:",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0101010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_is_forgotten_at_to_binary_atomic",
+      "target": [
+        "raw:u",
+        "bump:b0",
+        "bump:b1",
+        "bump:b0w",
+        "atomicbin:u",
+        "raw:x"
+      ],
+      "answers": [],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a02000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510000000001010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_changing_no_leaf_is_forgotten_at_the_next_sync",
+      "target": [
+        "graph:x@b0",
+        "graph:x@b1",
+        "graph:w@b0w",
+        "bump:b0",
+        "sort:",
+        "findbump:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 1
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000001000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_on_a_clone_of_a_read_beef_is_forgotten_at_find_bump",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "reread:",
+        "clone:",
+        "graph:w@b0w",
+        "findbump:x",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 1
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff01881300000000000001510000000001010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_on_a_clone_of_an_unread_beef_survives_find_bump",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "clone:",
+        "graph:w@b0w",
+        "findbump:x",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 0
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff01881300000000000001510000000001000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": 0,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_combine_on_a_clone_of_a_serialized_beef",
+      "target": [
+        "bump:b0",
+        "bump:b1",
+        "hex:",
+        "clone:",
+        "graph:w@b0w",
+        "findbump:x",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "findbump:x",
+          "answer": 1
+        }
+      ],
+      "beef": "0200beef02fea0bb0d0001020002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a010204d3be64cd96987c675055c9d0e1d8f29cb7f511c0aaf8bcf718159a30769f1ffea1bb0d0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0201000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff01881300000000000001510000000001010100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "name": "w",
+          "bump_index": 0,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": 1,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_to_hex_writes_the_edited_entry_once",
+      "target": [
+        "raw:x",
+        "raw:u",
+        "edit:u_to_v"
+      ],
+      "answers": [],
+      "beef": "0200beef0002000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_then_merge_beef_finds_the_edited_entry_held",
+      "target": [
+        "raw:u",
+        "edit:u_to_v"
+      ],
+      "source": [
+        "raw:v"
+      ],
+      "answers": [],
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "an_edit_onto_a_txid_another_entry_holds",
+      "target": [
+        "raw:u",
+        "raw:v",
+        "edit:u_to_v",
+        "find:v"
+      ],
+      "answers": [
+        {
+          "step": "find:v",
+          "answer": "v"
+        }
+      ],
+      "beef": "0200beef0002000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_hand_drop_then_the_lookups_and_merge_raw_tx",
+      "target": [
+        "raw:x",
+        "raw:u",
+        "raw:w",
+        "drop:x",
+        "find:w",
+        "find:u",
+        "find:x",
+        "raw:w"
+      ],
+      "answers": [
+        {
+          "step": "find:w",
+          "answer": "w"
+        },
+        {
+          "step": "find:u",
+          "answer": "u"
+        },
+        {
+          "step": "find:x",
+          "answer": "x"
+        }
+      ],
+      "beef": "0200beef0003000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_hand_push_then_find_txid_and_merge_raw_tx",
+      "target": [
+        "raw:x",
+        "push:w",
+        "find:w",
+        "raw:w"
+      ],
+      "answers": [
+        {
+          "step": "find:w",
+          "answer": null
+        }
+      ],
+      "beef": "0200beef0003000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_hand_swap_then_find_each_and_merge_raw_tx",
+      "target": [
+        "raw:x",
+        "raw:u",
+        "swap:",
+        "find:x",
+        "find:u",
+        "raw:x"
+      ],
+      "answers": [
+        {
+          "step": "find:x",
+          "answer": "x"
+        },
+        {
+          "step": "find:u",
+          "answer": "u"
+        }
+      ],
+      "beef": "0200beef0002000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "x",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "x",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_hand_replace_keeping_the_count_then_find_and_merge_raw_tx",
+      "target": [
+        "raw:x",
+        "raw:u",
+        "replace:x_w",
+        "find:w",
+        "find:x",
+        "raw:w"
+      ],
+      "answers": [
+        {
+          "step": "find:w",
+          "answer": null
+        },
+        {
+          "step": "find:x",
+          "answer": "x"
+        }
+      ],
+      "beef": "0200beef0003000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000000100000001eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000151ffffffff018813000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "w",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "w",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_children_first_beef_read_then_an_edit_keeping_the_txid_merged_into_an_empty_beef",
+      "target": [],
+      "source": [
+        "raw:c",
+        "raw:p",
+        "wire:",
+        "noop:c"
+      ],
+      "after": [
+        "order:"
+      ],
+      "answers": [
+        {
+          "step": "order:",
+          "answer": [
+            "c",
+            "p"
+          ]
+        }
+      ],
+      "beef": "0200beef0002000100000001abababababababababababababababababababababababababababababababab000000000151ffffffff01a00f000000000000015100000000000100000001ee40f0d08cfceaa9939c06aee68e7b2050810a9b50ad8eb1061e30a6e6e67f47000000000151ffffffff01ac0d000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "p",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "c",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_write_then_an_input_moved_to_a_later_entry_writes_the_parent_first",
+      "target": [
+        "raw:y",
+        "raw:u",
+        "hex:",
+        "edit:y_input_to_u"
+      ],
+      "answers": [],
+      "beef": "0200beef0002000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000000100000001f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba000000000151ffffffff01d007000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "75c3915e0a602ddcee83a4e08cc8659631eb98e3403d2e4db340bd31d369bcdb",
+          "bump_index": null,
+          "form": "raw"
+        }
+      ]
+    },
+    {
+      "name": "a_twin_read_from_bytes_then_an_edit_keeps_the_other_entry_found",
+      "target": [
+        "twin:u",
+        "edit:u_to_v",
+        "find:u",
+        "find:v",
+        "txid:u",
+        "find:u"
+      ],
+      "answers": [
+        {
+          "step": "find:u",
+          "answer": "u"
+        },
+        {
+          "step": "find:v",
+          "answer": "v"
+        },
+        {
+          "step": "find:u",
+          "answer": "u"
+        }
+      ],
+      "beef": "0200beef0002000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510100000002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba",
+      "bumps": 0,
+      "entries": [
+        {
+          "name": "v",
+          "bump_index": null,
+          "form": "raw"
+        },
+        {
+          "name": "u",
+          "bump_index": null,
+          "form": "txid"
+        }
+      ]
+    }
+  ]
+}
