@@ -128,8 +128,8 @@ impl Language {
 /// A BIP-39 mnemonic phrase.
 ///
 /// This struct represents a validated mnemonic phrase that can be used to
-/// generate deterministic seeds for wallet derivation.
-#[derive(Debug, Clone)]
+/// generate deterministic seeds for wallet derivation. Its `Debug` prints no word.
+#[derive(Clone)]
 pub struct Mnemonic {
     /// The individual words of the mnemonic.
     words: Vec<String>,
@@ -306,10 +306,10 @@ impl Mnemonic {
 
         // Validate each word exists in wordlist and get indices
         let mut indices = Vec::with_capacity(word_count);
-        for word in &words {
+        for (position, word) in words.iter().enumerate() {
             match language.word_index(word) {
                 Some(idx) => indices.push(idx),
-                None => return Err(Error::InvalidMnemonicWord(word.clone())),
+                None => return Err(super::redact::unknown_word(position, word_count, language)),
             }
         }
         let wordlist = language.wordlist();
@@ -607,12 +607,6 @@ impl Mnemonic {
         let phrase = std::str::from_utf8(data)
             .map_err(|e| Error::InvalidMnemonic(format!("invalid UTF-8: {}", e)))?;
         Self::from_phrase(phrase)
-    }
-}
-
-impl std::fmt::Display for Mnemonic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.phrase())
     }
 }
 

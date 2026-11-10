@@ -22,7 +22,7 @@ use tokio::sync::{oneshot, Mutex as AsyncMutex, RwLock};
 type TransportFactory<T> = dyn Fn(&str, usize) -> Result<T> + Send + Sync;
 
 /// Options for one authenticated HTTP request.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)] // Debug redacts every header value but the public names (auth/header_debug.rs)
 pub struct AuthFetchOptions {
     /// Method as supplied; defaults to `GET` (its case is signed unchanged).
     pub method: Option<String>,

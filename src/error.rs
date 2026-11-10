@@ -390,7 +390,8 @@ pub enum Error {
         actual: usize,
     },
 
-    /// Invalid word in mnemonic phrase.
+    /// Invalid word in mnemonic phrase: its position and the wordlist, never
+    /// the word (a mistyped word of a phrase is most of a secret word).
     #[cfg(feature = "compat")]
     #[error("invalid word in mnemonic: {0}")]
     InvalidMnemonicWord(String),

@@ -9,7 +9,7 @@ pub(super) const MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 /// An owned, buffered equivalent of the reference's Fetch `Response`.
 /// Headers use lowercase names; the body can be read repeatedly as bytes.
 /// No browser stream, status text, response URL or redirect metadata is implied.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)] // Debug redacts every header value but the public names (header_debug.rs)
 pub struct Response {
     /// HTTP status code.
     pub status: u16,

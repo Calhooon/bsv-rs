@@ -39,7 +39,7 @@ use crate::transaction::{ChainTracker, ChainTrackerError};
 pub const DEFAULT_HEADERS_URL: &str = "https://headers.spv.money";
 
 /// Block Headers Service chain tracker configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug redacts the token (credential_debug.rs)
 pub struct BlockHeadersServiceConfig {
     /// Base URL for the headers service
     pub base_url: String,

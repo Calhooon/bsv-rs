@@ -12,7 +12,8 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module declaration, documentation, and public re-exports |
-| `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, `NfkdNormalize` trait, and `Display` impl (~963 lines) |
+| `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, `NfkdNormalize` trait (~955 lines) |
+| `redact.rs` | `Mnemonic`'s two formatters side by side, the redacting `Debug` and the `Display` documented as the phrase (moved here by the fold of 2026-11-10), and the unknown-word refusal by position, never the word (the secret Debug lane, 2026-11-10; `tests/secret_debug.rs`) |
 | `wordlists/mod.rs` | The compile-time parser, the nine `pub static` arrays, and `verify_english_wordlist()` |
 | `wordlists/<language>.txt` | The nine wordlists as text (one word per line, 2048 lines), parsed into `pub static [&str; 2048]` arrays at compile time (#89) |
 | `wordlists/CLAUDE.md` | Wordlist submodule documentation |
@@ -22,8 +23,8 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 ### Structs
 
 ```rust
-/// A validated BIP-39 mnemonic phrase
-#[derive(Debug, Clone)]
+/// A validated BIP-39 mnemonic phrase; Debug hand-written and redacted
+#[derive(Clone)]
 pub struct Mnemonic {
     words: Vec<String>,
     language: Language,
@@ -100,7 +101,8 @@ pub enum Language {
 - `verify_english_wordlist() -> bool` - Verify wordlist integrity (first/last words, 2048 count; `#[inline]`)
 
 **Trait Implementations:**
-- `Display` for `Mnemonic` - Displays the phrase via `phrase()` method
+- `Display` for `Mnemonic` - Displays the phrase via `phrase()` method (the explicit conversion)
+- `Debug` for `Mnemonic` - `Mnemonic(<redacted, 12 words, English>)`: the count and language, never a word (secret Debug lane, 2026-11-10; `tests/secret_debug.rs`)
 - `Clone` for `Mnemonic` - Enables cloning mnemonic instances
 - `NfkdNormalize` for `str` and `String` (private) - NFKD via `unicode-normalization` (#163)
 
@@ -285,7 +287,8 @@ Error::InvalidMnemonic(String)
 // Entropy length not 128, 160, 192, 224, or 256 bits
 Error::InvalidEntropyLength { expected: String, actual: usize }
 
-// Word not found in wordlist
+// Word not found in wordlist: names its position, never the word
+// ("word 3 of 12 is not in the English wordlist")
 Error::InvalidMnemonicWord(String)
 
 // Random number generation failed

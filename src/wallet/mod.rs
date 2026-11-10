@@ -121,6 +121,7 @@ pub(crate) mod pushdrop;
 mod review_actions;
 pub mod substrates;
 pub mod types;
+mod url_debug;
 pub mod validation;
 pub mod wire;
 

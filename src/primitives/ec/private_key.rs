@@ -218,6 +218,9 @@ impl PrivateKey {
     }
 
     /// Exports the private key as raw 32 bytes.
+    ///
+    /// Reveals the secret scalar: `Debug` prints only the public key, and this
+    /// is the explicit conversion to the secret.
     pub fn to_bytes(&self) -> [u8; 32] {
         let bytes = self.inner.to_bytes();
         let mut result = [0u8; 32];
@@ -226,6 +229,8 @@ impl PrivateKey {
     }
 
     /// Exports the private key as a hex string.
+    ///
+    /// Reveals the secret scalar, as [`to_bytes`](Self::to_bytes) does.
     pub fn to_hex(&self) -> String {
         to_hex(&self.to_bytes())
     }
@@ -233,11 +238,13 @@ impl PrivateKey {
     /// Exports the private key as WIF (mainnet, compressed).
     ///
     /// Uses version byte 0x80 and includes the compression flag 0x01.
+    /// Reveals the secret scalar, as [`to_bytes`](Self::to_bytes) does.
     pub fn to_wif(&self) -> String {
         self.to_wif_with_prefix(0x80)
     }
 
     /// Exports the private key as WIF with a custom version prefix.
+    /// Reveals the secret scalar, as [`to_bytes`](Self::to_bytes) does.
     ///
     /// Common prefixes:
     /// - `0x80` - Mainnet

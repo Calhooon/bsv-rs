@@ -629,21 +629,8 @@ impl ExtendedKey {
     }
 }
 
-impl std::fmt::Debug for ExtendedKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ExtendedKey")
-            .field("depth", &self.depth)
-            .field("child_number", &self.child_number)
-            .field("is_private", &self.is_private)
-            .finish_non_exhaustive()
-    }
-}
-
-impl std::fmt::Display for ExtendedKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.serialize())
-    }
-}
+#[path = "bip32_format.rs"]
+mod format;
 
 /// Generates a random seed and creates a master extended key.
 ///

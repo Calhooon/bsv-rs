@@ -27,7 +27,11 @@ use crate::primitives::BigNumber;
 /// A point in a finite field, representing a share in Shamir's Secret Sharing.
 ///
 /// Both coordinates are reduced modulo the secp256k1 field prime.
-#[derive(Clone, Debug, PartialEq, Eq)]
+///
+/// Its `Debug` shows `x` (the share's index) and redacts `y` (the share's
+/// value); `Display` and [`to_point_string`](Self::to_point_string) are the
+/// explicit conversions to the share's text.
+#[derive(Clone, PartialEq, Eq)]
 pub struct PointInFiniteField {
     /// The x-coordinate of the point.
     pub x: BigNumber,
@@ -82,10 +86,11 @@ impl PointInFiniteField {
     pub fn from_string(s: &str) -> Result<Self> {
         let parts: Vec<&str> = s.split('.').collect();
         if parts.len() != 2 {
-            return Err(Error::InvalidBase58(format!(
-                "Invalid point string format: expected 'base58(x).base58(y)', got '{}'",
-                s
-            )));
+            // The reference's words, never the text, which carries `y`
+            // (`ts-stack@edf6e03` `Polynomial.ts:32-45`).
+            return Err(Error::InvalidBase58(
+                "Finite-field point must use a bounded canonical Base58 representation".into(),
+            ));
         }
 
         let x_bytes = from_base58(parts[0])?;
@@ -98,6 +103,7 @@ impl PointInFiniteField {
     }
 
     /// Converts the point to a string in the format "base58(x).base58(y)".
+    /// Reveals the share's value, which `Debug` redacts.
     ///
     /// # Returns
     ///
@@ -137,6 +143,15 @@ impl PointInFiniteField {
     }
 }
 
+impl std::fmt::Debug for PointInFiniteField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PointInFiniteField")
+            .field("x", &self.x)
+            .field("y", &format_args!("<redacted>"))
+            .finish()
+    }
+}
+
 impl std::fmt::Display for PointInFiniteField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_point_string())
@@ -147,12 +162,23 @@ impl std::fmt::Display for PointInFiniteField {
 ///
 /// Given a set of points, this structure can evaluate the unique polynomial
 /// of degree (threshold - 1) that passes through those points.
-#[derive(Clone, Debug)]
+///
+/// Its `Debug` shows the threshold and the point count, never a point.
+#[derive(Clone)]
 pub struct Polynomial {
     /// The points that define the polynomial.
     pub points: Vec<PointInFiniteField>,
     /// The threshold (degree + 1) of the polynomial.
     pub threshold: usize,
+}
+
+impl std::fmt::Debug for Polynomial {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Polynomial")
+            .field("points", &self.points.len())
+            .field("threshold", &self.threshold)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Polynomial {

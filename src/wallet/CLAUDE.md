@@ -11,6 +11,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 |------|---------|-------|
 | `../error/wallet_fault.rs` | `WalletFaultFamily`, `WalletFault`, `AbortAcceptance` (#439), `AbortKind` (#604): port extensions beyond the reference, re-exported from `error` and the crate root; unchanged strings, original abort refusal class, typed abort-guard refusal and optional context; `AbortAccepted` boxes the record to keep `Error` compact and frames as the corresponding refusal; no existing emissions changed | ~147 |
 | `mod.rs` | Module root with feature-gated exports and re-exports | ~253 |
+| `url_debug.rs` | `AcquireCertificateArgs`' hand-written `Debug`, `certifier_url` through `crate::util::debug_redact::OptionUrl` (the secret Debug lane's second fold; beside `types.rs` at its ratchet line) | 29 |
 | `types.rs` | Core wallet type definitions (70+ types, hex serde helpers); `InternalizeOutput` re-exported from its JSON reader module (#393) | 1899 |
 | `types/internalize_output.rs` | `InternalizeOutput` and its JSON reader (#393): missing and null remittances distinguished during intake, null refused in the reference's protocol/presence/object-check order; public fields and serialized shape unchanged | 75 |
 | `types/json_forms.rs` | The JSON forms of #105 that are neither serde's default nor the hex helpers: `hex_txid_option`, `base64_bytes` (the signable reference) and `KeyringRevealer`'s serde (`"certifier"` or the key's hex) | ~95 |

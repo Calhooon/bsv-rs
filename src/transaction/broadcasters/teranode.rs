@@ -33,7 +33,7 @@ use crate::transaction::{
 };
 
 /// Teranode broadcaster configuration.
-#[derive(Debug, Clone)]
+#[derive(Clone)] // Debug redacts the key (credential_debug.rs)
 pub struct TeranodeConfig {
     /// Teranode API URL (no default - must be provided)
     pub url: String,

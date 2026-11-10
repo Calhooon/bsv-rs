@@ -46,7 +46,11 @@ use crate::primitives::PrivateKey;
 ///
 /// Contains the share points, the threshold needed for recovery, and an
 /// integrity checksum to verify successful recovery.
-#[derive(Clone, Debug)]
+///
+/// Its `Debug` shows the threshold, the share count and the integrity tag
+/// (which every backup string carries), never a share's value;
+/// [`to_backup_format`](Self::to_backup_format) is the explicit conversion.
+#[derive(Clone)]
 pub struct KeyShares {
     /// The share points (x, y coordinates in the finite field).
     pub points: Vec<PointInFiniteField>,
@@ -54,6 +58,16 @@ pub struct KeyShares {
     pub threshold: usize,
     /// Integrity check: first 4 characters of base58(sha256(secret)).
     pub integrity: String,
+}
+
+impl std::fmt::Debug for KeyShares {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyShares")
+            .field("shares", &self.points.len())
+            .field("threshold", &self.threshold)
+            .field("integrity", &self.integrity)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KeyShares {
@@ -116,7 +130,7 @@ impl KeyShares {
         let mut integrity: Option<String> = None;
 
         for (idx, share) in shares.iter().enumerate() {
-            let (point, t, i) = decode_share(share)?;
+            let (point, t, i) = decode_share(share, idx)?;
 
             // Validate consistency
             if let Some(existing_threshold) = threshold {
@@ -156,7 +170,8 @@ impl KeyShares {
 
     /// Converts the key shares to backup format strings.
     ///
-    /// Each share is serialized as: `base58(x).base58(y).threshold.integrity`
+    /// Each share is serialized as: `base58(x).base58(y).threshold.integrity`.
+    /// Reveals every share's value, which `Debug` redacts.
     ///
     /// # Returns
     ///
@@ -401,14 +416,15 @@ fn compute_integrity(key: &PrivateKey) -> String {
 ///
 /// Format: `base58(x).base58(y).threshold.integrity`
 ///
-/// Returns the point, threshold, and integrity string.
-fn decode_share(share: &str) -> Result<(PointInFiniteField, usize, String)> {
+/// Returns the point, threshold, and integrity string. A refusal names the
+/// share by its index, never its text, which carries `y` (the reference's
+/// words, `ts-stack@edf6e03` `PrivateKey.ts:69-75`).
+fn decode_share(share: &str, idx: usize) -> Result<(PointInFiniteField, usize, String)> {
     let components: Vec<&str> = share.split('.').collect();
 
     if components.len() != 4 {
         return Err(Error::CryptoError(format!(
-            "Invalid share format: expected 'base58(x).base58(y).threshold.integrity', got '{}'",
-            share
+            "Invalid share format in share {idx}. Expected format: \"x.y.t.i\""
         )));
     }
 
@@ -422,12 +438,9 @@ fn decode_share(share: &str) -> Result<(PointInFiniteField, usize, String)> {
     let point = PointInFiniteField::new(x, y);
 
     // Parse threshold
-    let threshold: usize = components[2].parse().map_err(|e| {
-        Error::CryptoError(format!(
-            "Invalid threshold in share: {} ({})",
-            components[2], e
-        ))
-    })?;
+    let threshold: usize = components[2]
+        .parse()
+        .map_err(|_| Error::CryptoError(format!("Invalid canonical share data in share {idx}")))?;
 
     // Integrity is the last component
     let integrity = components[3].to_string();

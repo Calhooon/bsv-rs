@@ -261,7 +261,7 @@ fn test_decode_share() {
     let shares = split_private_key(&key, 2, 3).unwrap();
     let backup = shares.to_backup_format();
 
-    let (point, threshold, integrity) = decode_share(&backup[0]).unwrap();
+    let (point, threshold, integrity) = decode_share(&backup[0], 0).unwrap();
     assert_eq!(threshold, 2);
     assert_eq!(integrity, shares.integrity);
     assert_eq!(point.x, shares.points[0].x);
@@ -271,17 +271,20 @@ fn test_decode_share() {
 #[test]
 fn test_decode_share_invalid_format() {
     // Too few parts
-    assert!(matches!(decode_share("a.b.c"), Err(Error::CryptoError(_))));
+    assert!(matches!(
+        decode_share("a.b.c", 0),
+        Err(Error::CryptoError(_))
+    ));
 
     // Too many parts
     assert!(matches!(
-        decode_share("a.b.c.d.e"),
+        decode_share("a.b.c.d.e", 0),
         Err(Error::CryptoError(_))
     ));
 
     // Invalid threshold
     assert!(matches!(
-        decode_share("2.abc.notanumber.XXXX"),
+        decode_share("2.abc.notanumber.XXXX", 0),
         Err(Error::CryptoError(_))
     ));
 }
