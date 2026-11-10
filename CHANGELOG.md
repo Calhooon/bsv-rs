@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: discovery on the default config asks the four Mainnet trackers, each once with ls_slap and a 5000 ms wait (#787)
+
+No test ran `find_competent_hosts` on `LookupResolverConfig::default()`, so a
+change to the default tracker list or to the tracker wait would have passed
+every test. `discovery_on_the_default_config_asks_the_four_mainnet_trackers_with_the_reference_wait_787`
+(`tests/lookup_discovery_779.rs`, whose scripted facilitator now records the
+wait each question is asked with) builds the resolver from the default config
+(asserting `NetworkPreset::Mainnet` and no `slap_trackers`), scripts the four
+URLs as literals, and pins the advertised host, the four questions in the
+reference's order (`https://overlay-us-1.bsvb.tech`, `-eu-1`, `-ap-1`,
+`https://users.bapp.dev`), each once with `ls_slap` and the service, and
+`Some(5000)` for each wait, as `ts-stack@edf6e03` `LookupResolver.ts:216-223`
+(the list), `:248` (`MAX_TRACKER_WAIT_TIME = 5000`), `:1333-1335` (the
+`mainnet` preset) and `:1975-1977` (the tracker's tracked call) have them.
+Nothing is dialled: the four URLs are strings in the script. RED on a scratch
+copy of the base under four planted mutations, one at a time: the
+`users.bapp.dev` entry dropped (three questions), the `eu-1` and `ap-1` lines
+swapped (the order), `Some(MAX_TRACKER_WAIT_TIME_MS)` to `None` and the
+constant to `30000` (the waits). No behaviour change.
+
+### Notes: cross-SDK parity (#787)
+
+The default list matches the reference and Go (`go-sdk@2ca481c`
+`overlay/lookup/resolver.go:20-27`, the same four URLs in the same order). The
+wait matches the reference's 5000 ms; Go's is 30 s (`resolver.go:18`), not
+followed. No divergence row moves.
+
 ### Docs: the older divergence rows traced for the main-merge gate (#375)
 
 The filings-1109 lane left the divergence rows older than 0.9.0-beta.6 that
