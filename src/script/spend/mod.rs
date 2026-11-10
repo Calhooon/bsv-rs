@@ -113,6 +113,7 @@ mod push;
 mod reference_read;
 mod script_code;
 mod signature_encoding;
+mod signature_read;
 mod splice;
 mod stack;
 mod stack_ops;
@@ -788,9 +789,8 @@ mod flag_tests;
 #[cfg(test)]
 mod chronicle_tests;
 
-/// The low-S check at the curve order (Calhooon/bsv-rs#14): an `r` or `s` at or
-/// above the order is the zero signature for the reference's lax parse, which
-/// is low; only n/2 < s < n is a high-S refusal.
+/// The low-S check at the order (#14): `r` or `s` at or above it is the all-zero
+/// signature for the node's lax parse (`der_lax.rs`), low; n/2 < s < n is high.
 #[cfg(test)]
 mod low_s_order_tests;
 

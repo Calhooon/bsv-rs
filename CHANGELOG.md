@@ -7,6 +7,227 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: Signature::from_der reads a DER signature as the reference does; bytes after it, a wrong sequence length, a long-form length and an unneeded leading zero were accepted (#842)
+
+**What was wrong.** `Signature::from_der` checked only that its input was not
+shorter than the sequence's length byte said, read every length byte as a
+number whatever its high bit, and dropped a leading zero byte whether or not
+the next byte needed it. So a DER signature followed by other bytes, one whose
+sequence length was not its contents' length and one padded with an unneeded
+zero read as the signature alone, and one signature had many byte forms that
+verified here and one in the reference. The reference's `Signature.fromDER`
+(`ts-stack@edf6e03` `packages/sdk/src/primitives/Signature.ts:44-97`) refuses
+each: the sequence's short-form length must name exactly the bytes after it
+(`Signature DER invalid`), S must end the input (`Invalid R-length in signature
+DER`), a length byte with its high bit set is `Invalid DER entity length`, and a
+zero byte before an integer whose next byte's high bit is clear is `Invalid
+R-value in signature DER` or `Invalid S-value in signature DER`. It reads an
+input of any length by those checks alone (`30 04 02 00 02 00`, six bytes, is
+R = S = 0; this crate refused anything under 8 bytes as `DER too short`).
+
+**The reach.** Every door that reads a DER signature through this reader:
+`messages::verify` and `compat::bsm::verify_message_der` verified a signature
+with bytes after it, with either wrong sequence length or with S padded by an
+unneeded zero as `true`;
+`TransactionSignature::from_checksig_format` read a DER followed by other bytes
+before the hash type; `Certificate::verify`, the overlay admin token and
+`ProtoWallet::verify_signature` sat behind a canonical check already and do not
+move; `auth::validate_certificate_encoding` now refuses what the certificate's
+`toBinary` refuses.
+
+**The fix.** One reading of the reference's checks for the crate,
+`primitives::ec::signature_der::read` (crate-visible), every byte read with
+`get`: `Signature::from_der` reads through it and refuses in its words as
+`Error::InvalidSignature`; the wire's and the certificate's re-encoding,
+`wallet::wire::reference_der` (#305), which carried its own copy of the same
+checks, now reads through it and keeps only the reference's `toDER`
+re-encoding, so the two cannot drift. `from_checksig_format` takes the last
+byte as the scope and reads the rest as the reference's `fromChecksigFormat`
+does: one byte alone is an empty DER, `Signature DER must start with 0x30`
+(`Checksig format too short` until now); the empty input is the blank
+signature, unchanged. One cell is this crate's, stated: an integer longer than
+32 bytes past its sign byte (a value at or above 2^256, never a signature
+component) stays `Integer component too large`, where the reference holds a
+`BigNumber` of any length and its verify answers false; `Signature` holds 32
+bytes.
+
+**The interpreter reads a signature as its judge does (#847, fixed here).**
+`Spend` no longer reads a signature through `from_checksig_format`. After the
+strict encoding check (the node's `IsValidSignatureEncoding`, BIP 66, which
+this crate runs in every mode: the reference's default enforces DER,
+`Spend.ts:376-386,606-629`, and every word carries SIGHASH_FORKID, under which
+the node forces STRICTENC, bitcoin-sv v1.2.2 `interpreter.cpp:2315-2318`), one
+crate-private reading (`src/script/spend/signature_read.rs`) gives the
+signature to the low-S rule and to the signature check alike. Under a word it
+is the node's: `ecdsa_signature_parse_der_lax` ported whole
+(`src/script/spend/der_lax.rs`, `pubkey.cpp:32-175`, each branch cited, every
+byte by `get`), the reading `CheckLowS` (`:353-363`) and `CPubKey::Verify`
+(`:183-214`) give it. Without a word it is the reference's `fromDER`.
+`Signature::from_der` and `TransactionSignature::from_checksig_format` stay
+the reference's strict readers.
+
+Two cells pass BIP 66 and are read differently by the node and by the strict
+reader: an R or S that is a lone `00` (BIP 66 forbids a leading zero only when
+the length is above 1, `interpreter.cpp:225-227,238-242`), and an R or S longer
+than 32 bytes. The node's lax parse reads the lone zero as zero and the long
+value as the all-zero signature (`pubkey.cpp:139-173`). Both are low, and both
+fail the check (`interpreter.cpp:2133-2163`). So under a word each is now a failed check:
+`<op> requires failing signatures to be empty.` where NULLFAIL applies, and
+otherwise the false. In particular `<sig> <key> OP_CHECKSIG OP_NOT` is valid
+under the three post-Chronicle words at version 2 (NULLFAIL not enforced,
+`:34-44,1489-1497`), at `OP_CHECKSIG`, `OP_CHECKSIGVERIFY`, `OP_CHECKMULTISIG`
+and `OP_CHECKMULTISIGVERIFY` alike.
+
+- **The lone zero.** On the base it was read leniently as zero, the node's
+  verdict. #842 before this fold refused it as `The signature format is
+  invalid.` in every mode, which moved a consensus verdict away from the node
+  (the three reads of 2026-11-09). That verdict is restored.
+- **The long value (#847).** The base refused it in every mode, a finding
+  older than #842. It now follows the node.
+- **#14's order exception.** The low-S check's special case for R or S at or
+  above the order (`signature_overflows_the_order`) is subsumed by the lax
+  parse, which reads such a signature as the all-zero one, and is removed.
+
+The table, against the node and the base: under every word (both words of
+both eras and each block word with DERSIG, STRICTENC and LOW_S cleared), at
+versions 1 and 2, under the five locks, no verdict or word differs from the
+base save the long values, where the base was wrong against the node.
+
+**The default mode moved, toward the reference.** The default mode's judge is
+the reference's `Spend`, recorded (`tests/vectors/script_signature_der_842.json`,
+`tests/support/script_signature_der_842.mjs`, Node v22.18.0, two runs
+byte-identical). 14 of its 64 cells moved against the base:
+
+- **A lone-zero R or S, at versions 1 and 2.** It is refused in the
+  reference's words, `The signature format is invalid.` (`fromDER` throws
+  inside `#checkSignatureEncoding`, `Spend.ts:606-629`). On the base it was
+  valid under `OP_NOT` (8 cells).
+- **An R past 32 bytes, at both versions.** It verifies false, so it is valid
+  under `OP_NOT` and the plain lock's top is false (`ECDSA.ts:236-239`). The
+  base refused it as the format.
+- **An S past 32 bytes, at version 2.** The same: it verifies false.
+- **An S past 32 bytes, at version 1.** It stays refused. The reference's
+  `hasLowS` reads it as high, inside its wrapper's words.
+
+#14's order exception (a 32-byte R or S at or above the order makes the
+signature low, a stated row) is kept in the default mode for the values a
+32-byte slot holds. A value past 32 bytes takes the reference's S predicate,
+as recorded.
+
+**The writer.** `Signature::to_der` writes a zero S as the reference's
+`toDER` does, `02 00` (`Signature.ts:201-250`: its S loop strips a zero no high
+bit follows). It wrote `02 01 00` until this fold, which the strict reader
+refuses as an unneeded zero, so the round trip broke. A zero R is `02 01 00` on
+both sides, refused by both readers (recorded).
+
+**The tests.** `tests/signature_der_842.rs` (13) against
+`tests/vectors/signature_der_842.json` (42 cells, `tests/support/signature_der_842.mjs`,
+Node v22.18.0, two runs byte-identical): the six shapes on three of the
+reference's signatures (a BRC-77 signed message, a BSM signature, a ProtoWallet
+signature, each this crate's signer's bytes) through `from_der`,
+`from_checksig_format`, `messages::verify`, `verify_message_der` and
+`ProtoWallet::verify_signature`, each the recording's verdict and words save the
+stated cell; the reader's short inputs; 2,000 signatures this crate writes read
+back and written back byte for byte. 8 of 11 RED on `2c464e81`
+(`left: "true"`, `right: "ERR:Signature DER invalid"` for the suffixed signed
+message and BSM signature); the three agreement pins green on both. The fold
+added two tests against `tests/vectors/script_signature_der_842.json`:
+
+- `a_zero_s_is_written_as_the_reference_writes_it_and_reads_back_842`: RED on
+  `4b3fe10d`, `left: "3006020105020100"`, `right: "30050201050200"`.
+- `a_length_byte_at_0x7f_and_0x80_is_read_as_the_reference_reads_it_842`: the
+  `0x7f` and `0x80` length bytes at the sequence, at R and at S. It is green on
+  `4b3fe10d` (the behaviour is shared). Each of the two surviving `length()`
+  mutants (`*b <= 0x80`, `*b < 0x7f`), planted in a scratch copy, turns it RED,
+  together with its unit twin in `signature_der_tests.rs`.
+
+The unit cells of the reader's branches are
+`src/primitives/ec/signature_der_tests.rs`, and the lax parse's branch by branch
+are `src/script/spend/der_lax_tests.rs`. `tests/ec_tests.rs`'
+`test_malformed_der_trailing_data_accepted`, which pinned the acceptance, is
+`test_malformed_der_trailing_data_refused_842`.
+
+`tests/script_signature_der_842.rs` (5): every cell under every word at
+versions 1 and 2, under the five locks, against the node's verdict and words
+(each justified by its lines in the file's header) and against the base's; and
+the default mode's 64 recorded cells. The signature is this crate's signer's,
+equal to the recording's.
+
+- On `4b3fe10d`, 3 of 5 RED: the lone zero (120 cells, for example
+  `r_lone_zero CheckSig post-genesis 0xd462f v1: got Err("The signature format
+  is invalid."), node Err("OP_CHECKSIG requires failing signatures to be
+  empty.")`), the long value (120 cells) and the default mode (6 cells).
+- On `2c464e81`, 2 of 5 RED: the long value (120 cells) and the default mode
+  (14 cells). The lone zero is green there: the base's verdict was the node's.
+- The pin `an_integer_past_32_bytes_is_refused_in_every_mode_stated_842` is
+  replaced by these witnesses.
+
+**The oracles.** bsv-script-lean@5dc337e1's `harness/run --impl bsv-rs --corpus
+all`, run in a scratch copy linked to this tree, finds 1 recorded-verdict
+disagreement, as on the base. It is `crypto-00079`, CHECKMULTISIG's encoding
+words, which #657 moved; the recorded column is bsv-rs 0.7.0's. On `4b3fe10d`
+the cold read counted 3: `crypto-00035` and `crypto-00077` were this cell. The
+node's own verdicts could not be run on this host: `--impl gobdk` stops for
+want of Go, and `--impl sv-node` needs a regtest node, which this host cannot
+run. The node's verdicts here are read from its lines.
+
+**The differential.** The fold's own generator, written because the #305
+harness sits in another lane's folder: 6,843 distinct inputs (four signatures'
+prefixes, every byte set to nine values, suffixes, length bytes moved, the long
+forms, padding, lone zeros, past-32 values and 4,000 seeded random strings),
+`Signature.fromDER` at the pin against `Signature::from_der`, line by line.
+The method and logs are in the lane's out folder.
+
+| Tree | Differing lines | Read here, refused there |
+|---|---|---|
+| base | 4,559 | 82 |
+| `4b3fe10d` | 15 | none |
+| the fold | 15 | none |
+
+On `4b3fe10d` and on the fold every differing line is the stated cell. The
+scoped cold re-read ran the 11,039-input set the cold reads used (9,562
+distinct) against the fold: 347 differing lines, every one the stated cell,
+and 7,779 on beta `7df16cf6`. The earlier base counts stand beside it as
+measured and are not reconciled: the first cold read's 7,771 inside the same
+set, the lane's 8,133 on `2c464e81` over its own 11,393 inputs. On beta
+`7df16cf6` the re-read counted 2 of 5 interpreter witnesses and 10 of 13
+reader tests RED.
+
+A fuzz target, `fuzz_signature_der` (98 seeds), asserts that an accepted input
+has exactly the length its header names and that every signature this crate
+writes reads back.
+
+**Migration.** A caller that handed `Signature::from_der` a signature with
+other bytes after it now gets an `Err`: slice the signature (a checksig
+signature's hash type is `from_checksig_format`'s to take off). The error words
+changed to the reference's (`DER too short`, `Expected sequence tag 0x30`,
+`DER length mismatch`, `Expected integer tag 0x02 for R`/`S`, `R length
+overflow`, `S length missing`, `S length overflow` and `Checksig format too
+short` are gone): a caller that matched on the old words reads the new ones.
+No public type or signature changes.
+
+### Notes: cross-SDK parity (#842)
+
+The reference (`ts-stack@edf6e03`) is followed verdict for verdict and word for
+word at `Signature.fromDER`, `TransactionSignature.fromChecksigFormat`
+(`TransactionSignature.ts:460-472`), `SignedMessage.verify`
+(`SignedMessage.ts:65-105`) and, after `fromDER`, `BSM.verify` (`BSM.ts:71-74`);
+`ProtoWallet.verifySignature` refuses every shape at its argument check
+(`validationHelpers.ts:1795-1801`, `isCanonicalDERSignature`) as this crate's
+does. Stated: R or S past 32 bytes (the row in the root `CLAUDE.md`). go-sdk at
+`2ca481c` reads otherwise: `ParseDERSignature` and `ParseSignature`
+(`primitives/ec/signature.go:177-311`) cut the input to the sequence's length,
+so bytes after it are ignored, read the length bytes as numbers (a long form
+fails their length checks), refuse an unneeded zero under `ParseDERSignature`
+alone and an R or S outside 1 to n - 1; `FromDER` (`:47-54`, `encoding/asn1`)
+ignores the bytes after the sequence; `message/signed.go:102` reads through
+`FromDER` and `compat/bsm/verify.go:62` through `ParseDERSignature`, so a
+signed message or a BSM signature with bytes after its DER verifies there.
+Theirs: go-sdk, not filed. The interpreter's judge under a word is bitcoin-sv
+v1.2.2, its lax parse now ported (#847); its default the reference's `Spend`,
+whose verdicts on the lone zero and the long values it now gives (recorded).
+`Signature.toDER` is followed for a zero S (`02 00`).
+
 ### Fixed: Transaction::from_binary and from_hex refuse bytes after the transaction, as the reference does; they were kept and hashed into the txid (#840)
 
 - What was wrong. `Transaction::from_binary(bytes)` and `Transaction::from_hex(hex)` read one transaction from the front of the input, never checked that the input ended there, and kept the WHOLE input as the cached serialization. For block 170's transaction (275 bytes) followed by four bytes: `Ok`, the inputs and outputs read correctly; `to_binary()` 279 bytes and `to_hex()` 558 digits; `hash()` and `id()` the hash of all 279 bytes (`a10aefc1...` on the issue's probe, where the transaction is `f4184fc5...`). `from_ef`, `from_hex_ef` and `parse_script_offsets` read a prefix too (no cache: the EF transaction's id was its own; `parse_script_offsets` never read the lock time, so it accepted a transaction without one).

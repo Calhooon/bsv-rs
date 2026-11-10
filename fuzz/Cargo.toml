@@ -133,3 +133,9 @@ name = "fuzz_script_spend_default"
 path = "fuzz_targets/fuzz_script_spend_default.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_signature_der"
+path = "fuzz_targets/fuzz_signature_der.rs"
+test = false
+doc = false
