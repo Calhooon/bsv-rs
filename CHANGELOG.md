@@ -4013,9 +4013,301 @@ the same under `overlay` alone and under `full,http`, and
 `cargo test --features "full,http" --lib overlay` runs whole without
 `--skip test_find_competent_hosts`.
 
+## [0.8.5] - 2026-11-10
+
+### Fixed: the ratchet's library lock no longer goes stale when the crate's own version moves; a release commit is Cargo.toml and CHANGELOG.md alone on both lines
+
+- What contradicted what. `RELEASING.md` steps 3 and 11 (3 and 17 on `beta`) and the `beta-born` job (`release_commit()` in `ci.yml`) admit a release commit of `Cargo.toml` and `CHANGELOG.md` alone. The ratchet's compiler counters build a scratch copy of the library with `tools/ratchet/library.Cargo.lock` in place and run cargo `--locked`; that lock records the crate's own version (`0.8.3` on `main`, `0.9.0-beta.7` on `beta`), so the version line of a release made it stale and the `ratchet` step stopped (`cargo clippy (pedantic, cognitive complexity >25) failed (exit status: 101); no measurement was recorded ... the library lock is stale`), and `docs/RATCHETS.md` asked for the lock's refresh in the same pull request, which the release-commit rule forbids. Met on PR #858, the 0.8.4 release commit on `main` (2026-11-10 18:49Z); beta's prerelease commits had touched the lock as a third file for the same reason, where `beta-born` does not run.
+- The fix, in the tool. Where the scratch copy receives the lock (`tools/ratchet/src/tree.rs`, `lock_for_manifest`), the root package's `version` line is set to the version the scratch copy's `Cargo.toml` declares: the one `[[package]]` entry whose `name` is the manifest's package name and that carries no `source` line. None, or more than one, and the run stops naming what it found (`... has no root package bsv-rs (a [[package]] named bsv-rs without a source line) ...`; `... has 2 root packages bsv-rs (entries without a source line at lines 3, 7); exactly one is required`). Every other byte is the committed lock's, which this change does not edit; its own-version line is whatever it was at the last dependency refresh and is not read. A dependency added, removed or bumped still makes the lock stale and still stops with the message it did.
+- The tests. Six in `tools/ratchet/src/tree.rs`: the own version moved (a patch, a prerelease, a longer string with build metadata) differs from the committed lock in that one line alone; no root entry and two root entries stop in the words above; an entry named `bsv-rs` with a `source` line is left alone (either order); a planted dependency moves no other line; the manifest's version read from its `[package]` table alone. Five RED with the change removed (the committed lock written as is), two RED with the `source` condition dropped. Live, from `git archive` copies: `0.9.0-beta.8` in `Cargo.toml` on the base stops stale and on the tip passes and records what the unedited tip records; a planted `semver = "1"` on the tip still stops stale.
+- Nothing under `src/` moved.
+
+### Fixed: Transaction::from_binary and from_hex refuse bytes after the transaction, as the reference does; they were kept and hashed into the txid (cherry-picked from beta `7df16cf6`, PR #841, issue #840)
+
+- What was wrong. `Transaction::from_binary(bytes)` and `Transaction::from_hex(hex)` read one transaction from the front of the input, never checked that the input ended there, and kept the WHOLE input as the cached serialization. For block 170's transaction (275 bytes) followed by four bytes: `Ok`, the inputs and outputs read correctly; `to_binary()` 279 bytes and `to_hex()` 558 digits; `hash()` and `id()` the hash of all 279 bytes (`a10aefc1...` on the issue's probe, where the transaction is `f4184fc5...`; the captain's run on this line's `8729f8a5`, 0.8.3, the same). `from_ef`, `from_hex_ef` and `parse_script_offsets` read a prefix too (no cache: the EF transaction's id was its own; `parse_script_offsets` never read the lock time, so it accepted a transaction without one). The reader's lines are the original implementation's: every published version carries them.
+- The reach. Any door handing bytes or hex it did not frame itself to these readers and then using `id()`, `to_binary()` or `to_hex()`, `Transaction::from_json`'s `hex` member among them; no `src/` door outside `transaction` calls them, and the BEEF readers frame each transaction before they parse it (`BeefTx::from_reader` reads through `Transaction::from_reader` and keeps the bytes it consumed). One crate-only state moves: a `BeefTx::from_raw_tx` (or `Beef::merge_raw_tx`) handed raw bytes with a byte after the transaction was parsed, its txid the hash of all the bytes; it is now held unparsed (no `tx()`, no input txids), its txid still the hash of the bytes given, as before. The reference's `BeefTx` does not refuse such bytes at construction either: it keeps them, reads its input txids from the prefix (`BeefTx.ts:24-54`) and hashes all of them into its txid (`:110-113`); only its lazy `tx` getter refuses them (`:118-121`, `fromBinaryView`). This line's `from_raw_tx` returns no `Result`, so it cannot refuse without a break (beta refuses at its doors since #817). Every verdict door refuses such an entry since #852's fold (the next section); `to_binary` writes the bytes as given, the byte after the transaction included, as 0.8.3 did.
+- The fix. `from_binary` and `from_hex` refuse a byte after the lock time as `Error::TransactionError("Serialized transaction contains trailing data")`, the reference's words (`ts-stack@edf6e03` `Transaction.ts:532-535`, `fromBinaryView`; `fromHex` through it, `:548-553`); the cached serialization is the transaction's bytes alone, the hex cache its hex. `from_ef` and `from_hex_ef` refuse in `Serialized EF transaction contains trailing data` (`:419`); `parse_script_offsets` reads the lock time and refuses what follows in the transaction words (`:460-462`). `Transaction::from_reader(&mut Reader)` is public, the reference's `fromReader` (`:466-468`): one transaction from the front of the reader, the rest left unread, the transaction holding no copy of the reader's bytes (its serialization and txid computed from its fields). The crate-private `from_reader_internal` is gone; `BeefTx::from_reader` calls `from_reader`. On this line `from_reader`, the two refusal texts and `refuse_trailing` live in `src/transaction/transaction_reader.rs`, a child file, because the ratchet holds `transaction.rs` at its 3,000 lines of 0.8.3 (beta keeps them in `transaction.rs`); its rustdoc gains an `# Errors` section, so the pedantic count holds at 2,722.
+- The tests. `tests/transaction_trailing_data_840.rs` (15) against `tests/vectors/transaction_trailing_data_840.json` (30 cells, ten 53-bit cells and two writer cells; `tests/support/transaction_trailing_data_840.mjs`, the reference under Node v22.18.0, two runs byte-identical), taken from beta unchanged: `a_transaction_followed_by_bytes_is_refused_840` and its siblings for hex, EF, JSON and the script offsets; the clean transaction's id, bytes and hex unchanged; the reader form; three cells refused on both sides in other words, stated. On a scratch copy of this line's `8729f8a5` with the test, the vector and a `pub` on `from_reader` overlaid, 5 of 15 RED: `fromBinary plus_one_byte: Ok with id 9529fd4a...`, `fromHex plus_one_byte` the same, `fromJson plus_four_bytes: Ok with id b5f0b327...`, `fromEF plus_one_byte: Ok with id f4184fc5...`, the offsets `Ok`; the five 53-bit pins and the other five green there, as on beta's base. `fuzz_transaction_parser` asserts that a transaction `from_binary` returns serializes to exactly its buffer, its fields to the same bytes and txid, that the reader form's bytes are the prefix it read, that `from_hex` of the buffer's hex in either case agrees with `from_binary`, that a transaction `from_ef` returns writes the buffer back through `to_ef` and its plain bytes read back to its txid, and that `from_hex_ef` agrees with `from_ef`.
+- Not in this patch. The stable line keeps its documented `invalidate_caches` contract (#843): a hand edit of a public field (`version`, `inputs`, `outputs`, `lock_time`) of a transaction `from_binary` or `from_hex` returned still answers the parsed bytes from `id()`, `to_binary()` and `to_hex()` until `invalidate_caches()` is called, where the reference checks its cache against the fields at every read; the cache this patch writes is the transaction's bytes alone, so the read is true until such an edit. `Signature::from_der`'s lenient reader (#842) and the input txid text `from_json` takes (#845) are 0.8.5's (#849).
+- Migration. A caller that passed a transaction followed by other bytes to `from_binary`, `from_hex`, `from_ef`, `from_hex_ef`, `from_json` or `parse_script_offsets` now gets an `Err` and must pass the transaction alone; to read a transaction from the front of a longer buffer, use `Transaction::from_reader(&mut bsv_rs::primitives::Reader::new(bytes))` and read `reader.remaining()` after it. A caller that tried `from_binary` first and fell back to `from_ef` for EF bytes now reaches the fallback. `from_reader` is an addition (no signature changes).
+
+### Fixed: a BEEF entry whose raw bytes are not exactly one transaction is never answered valid (#852's fold of #840 on the stable line)
+
+- What was wrong, in two parts. Through 0.8.3, an entry built by `Beef::merge_raw_tx` (or `BeefTx::from_raw_tx`) from raw bytes that are not one transaction was answered valid by `sort_txs`, `verify_structure`, `verify_valid` and `is_valid` in two ways. When no transaction could be read from the bytes at all (a transaction cut short, bytes that are no transaction, no bytes), the entry listed no input, so its parents were never asked about. When the bytes began with a transaction, they were read as that prefix under the hash of all the bytes, so the entry was valid whenever the prefix's parents were present and proven, and always when it carried a BUMP index. #840's port as built at `649d746f` held the suffixed bytes unparsed with no input, and so answered them valid with their parents absent too. On `8729f8a5` and `649d746f` the table below answers 50 of its 66 non-exact cells valid.
+- The invariant. On this line, an entry of a BEEF built from raw bytes is a transaction only if its bytes are exactly one transaction by the strict parse (`Transaction::from_binary`). An entry held unparsed is never answered valid by `sort_txs`, `verify_structure`, `verify_valid` or `is_valid` (with either argument), whatever its shape and whether or not it carries a BUMP index, nor by anything that stands on them. This is the verdict 0.9.0 gives by refusing such bytes at construction (#817); a patch line cannot change `from_raw_tx`'s signature, so here the refusal is at the verdict.
+- The kinds. `verify_structure` names the streaming reader's kind for the same bytes: `Kind::TrailingBytes` for a transaction followed by more; `Kind::BadVarint` when the bytes end inside a varint or hold a non-canonical one; `Kind::Truncated` when they end inside a fixed field or a script (pinned at every cut of block 170's transaction against `verify_stream_structure`, `the_held_kind_is_the_stream_kind_at_every_cut_852`). It is answered in the pass that answers `NoInputs` and `NoOutputs`, in the order `NoInputs`, the held kind, `NoOutputs`: a held entry whose version is followed by an input count of 0 stays `NoInputs`, as 0.8.3 named it. `sort_txs` puts a held entry in `not_valid` before its proof is asked, so one with a BUMP index never enters the valid set, and a child that names it falls to `not_valid` through the existing walk. Under an atomic subject the held kind wins over the atomic rule's refusal (`verify_structure` answers it before the atomic rule's verdict). `merge_beef` carries the held bytes forward, and the merged BEEF is refused alike. On 0.8.3 (`8729f8a5`) `tx()`, `tx_mut()` and `find_atomic_transaction` returned the prefix's transaction in the cells with bytes after a transaction (`tx()` and `find_atomic_transaction` in the 20 of them without the entry's own BUMP, which left the bytes unparsed until `tx_mut()`); since #840's port they return `None`. `Transaction::from_beef`, `from_atomic_beef` and `verify_stream` refused on both trees. Each keeps a cell.
+- The tests. `tests/beef_held_entry_852.rs` (6) holds a table of 72 cells: twelve shapes by six states, every door asserted. The shapes are the control (exactly one transaction, whose verdicts equal 0.8.3's in every state), a transaction followed by one byte, four bytes and itself, four cuts, 3 and 40 bytes that are no transaction, no bytes, and a transaction of no input followed by a byte. The states are parent absent, parent present and proven, the entry's own BUMP, the atomic subject, the parent of a child, and merged into another BEEF. The doors are `sort_txs` for the entry and its child, `verify_structure`, `verify_valid`, `is_valid(false)`, `is_valid(true)`, `to_binary` then `Beef::from_binary`, `to_binary` then `Transaction::from_beef`, `verify_stream_structure`, `verify_stream` and `find_atomic_transaction`. The fixtures are block 170's transaction and block 9's coinbase, written by this crate's writer. The table runs against `tests/vectors/beef_held_entry_852.json` (`tests/support/beef_held_entry_852.mjs`, the reference at `ts-stack@edf6e03` under Node v22.23.3, two runs byte-identical): for every cell that is not one transaction, the reference's end-to-end answer is a refusal too (`mergeRawTx` or `mergeBeef` throws, or `fromBinaryStrict` refuses the BEEF it writes), so this crate's structural verdict is the reference's round-trip verdict. On a scratch copy of `649d746f` four of the six tests fail (the table's, the stated cells', the `is_valid` field's and the order's) and 66 of the 72 cells; on `8729f8a5` five of the six tests fail and the same 66 cells; the six controls pass on both. The table's state of the entry's own BUMP index is the witness of a held entry under a BUMP index: on this patch, `verify_structure` made to skip the held kind under a BUMP index turns 10 cells red, every shape of that state that is not one transaction, the transaction of no input aside. Three more pin a held entry's `is_valid` field after `sort_txs` (`Some(false)`), the order and fields `verify_structure` leaves (those of `sort_txs`), and a BUMP whose root does not compute refused ahead of a held entry (`MissingSibling`, as the stream meets the BUMPs before the transactions). A unit test, `the_held_kind_is_exactly_the_strict_parse_refusal_852`, holds the predicate to the strict parse, with and without a BUMP index, and its kind to the stream's, over 676,313 inputs: every single-byte change, cut, one-byte extension, insertion and deletion of the 11 transactions of `tests/transaction/vectors/{tx_valid,bigtx,beef_cross_sdk}.rs` and the recording, and 4,096 strings from a fixed seed. `sort_txs` and `verify_structure` read that one predicate (`BeefTx::strict_read`, crate-private). `fuzz_beef_parser` asserts the same through every door: `verify_structure`, `sort_txs` alone (the entry in `not_valid`, its `is_valid` field false), and `is_valid` and `verify_valid` under a BUMP index over the entry's own hash.
+- Cost. One parse per raw entry without a parsed transaction, as before: a `verify_valid` of n proven raw entries makes n parses on `8729f8a5`, on `649d746f` and here (the one predicate is that parse, `NoOutputs` read from it, and `verify_structure` hands the sort the held entries it found); a `sort_txs` called alone now parses each proven raw entry that holds no parsed transaction, and so does `to_binary` through it (a review's run on 2026-11-10, release, the median of five, 2,000 raw entries each carrying a BUMP index: `sort_txs` alone 0.90 ms on `8729f8a5`, 0.91 ms on `649d746f`, 1.24 ms here; `to_binary` 1.38, 1.43, 1.76 ms). Measured in release, five runs each, the median `verify_valid` of 2,000 raw entries each carrying a BUMP index: 3.02 ms on `8729f8a5`, 3.00 ms on `649d746f`, 3.02 ms here; of 2,000 unproven chained entries: 1.16, 1.15, 1.14 ms.
+- Migration. A caller merges `tx.to_binary()`; bytes from a stranger are checked with `Transaction::from_binary` before `merge_raw_tx`. A BEEF that held such an entry and was answered valid is now refused by `sort_txs` (the entry and every child that names it in `not_valid`), `verify_structure` (the kind above), `verify_valid` and `is_valid` (`valid: false`); 0.9.0 refuses the same bytes at construction. A caller that matched a kind sees another in two cells that 0.8.3 already refused: a transaction with bytes after it and its parents absent was `InputNamesNoElement` (its prefix's input missing; `sort_txs` listed it in `with_missing_inputs`) and is `TrailingBytes`; an atomic subject from whose bytes no transaction can be read was `UnrelatedTransaction` and is its held kind. No public item, signature or field changes.
+- Not in this patch. The writers (`to_binary`, `to_hex`, `to_binary_atomic`) still write held bytes as given: they return no `Result` on this line and cannot refuse, and no verdict door calls such a BEEF valid. #843, #842 and #845, as the entry above says.
+
+### Notes: cross-SDK parity (#852)
+
+The reference keeps the same bytes and its `verifyValid` reads them as their prefix. `mergeRawTx` builds a `BeefTx` from them unchecked (`ts-stack@edf6e03` `Beef.ts:842-846`), against its constructor's own precondition ("If `number[]` must be a valid serialized transaction", `BeefTx.ts:179-180`). The entry's input txids come from a scan of the prefix (`:24-49,52-54`), skipped under a BUMP index (`:200-201`), and its txid is the hash of all the bytes (`:110-113`). `verifyValid` (`Beef.ts:1054-1088`) never asks for the lazy `tx` getter that would refuse them (`BeefTx.ts:118-121`). So it answers valid for a suffixed entry whose prefix's parents are present and proven, and for any bytes under a BUMP index whose BUMP carries their hash; the scan throws at construction for bytes it cannot read without an index. Its own `tx` getter, `fromBinaryStrict` and `Transaction.fromBEEF` refuse the same BEEF, and its `mergeBeef`, which writes and strictly re-reads, throws on it. This crate gives the reference's end-to-end verdict at the structural door; the 23 recorded cells where `verifyValid` alone answers valid are the stated divergence, counted in the test. go-sdk at `2ca481c` never holds unparsed bytes: `MergeRawTx` parses a prefix, keeps that prefix's own txid, and errors on bytes it cannot read, with or without a BUMP index (`transaction/beef.go:820-848`). BRC-62's field table gives the raw field as "RawTx bytes as in standard format BRC-12" with no length field before it and the `Has BUMP` byte after it (`0062.md:67-68`), so the field ends where the transaction's parse ends.
+
+### Notes: cross-SDK parity (#840)
+
+The reference refuses at each door this crate now refuses, in the same words where they are recorded (`fromBinary`, `fromHex`, `fromEF`, `fromHexEF`, `parseScriptOffsets`), and reads a prefix only through `fromReader`, as `from_reader` does. Three cells refuse on both sides in other words, older than #840: a hex text of odd length is `InvalidHex` here (the `hex` crate), where the reference pads it with a leading zero and fails reading the shifted bytes (`Number can only safely store up to 53 bits` for the transaction, `Invalid EF marker` for EF; `utils.ts` `hexToUint8Array`); a BEEF followed by bytes is refused by `from_beef` in the stream's words (`TrailingBytes`, 0.4.2) where the reference says `Serialized BEEF contains trailing data`; a transaction without its lock time is this crate's `ReaderUnderflow` where the reference's readers say `Reader read exceeds available data` over a `number[]` (`fromEF`, `parseScriptOffsets` and a `fromReader` handed a `Reader`; `parseScriptOffsets` on a `number[]` the recorded cell) and `ReaderUint8Array read exceeds available data` over a `Uint8Array`, which `fromBinary`, `fromHex` and `fromHexEF` always read (`ReaderUint8Array.ts:13-19,46`, `Transaction.ts:523-536,562-564`). go-sdk at `2ca481c`: `NewTransactionFromBytes` refuses a byte after the frame (`used != len(b)`, `nLockTime length must be 4 bytes long`, `transaction/transaction.go:56-67`, `errors.go:10`), and reads EF through the same door (`ReadFrom` detects the marker, `:81-140`); `NewTransactionFromHex` decodes then calls it (`:45-53`), an odd-length text refused by `encoding/hex` as here; `NewTransactionFromStream` and `ReadFrom` are its prefix readers (`:72-81`), as `from_reader` is here.
+
+One cell older than #840 is stated (#844 conforms it on beta): an amount of 2^53 satoshis or more. The reference reads an output's amount, and an EF input's source amount, through `readUInt64LEBn().toNumber()` (`Transaction.ts:388,409,497`) and refuses it in `Number can only safely store up to 53 bits` (`BigNumber.ts:628`) at `fromBinary`, `fromHex`, `fromReader` and `fromEF`; this crate reads a `u64` at every reader and answers `Ok`, the id the hash of the bytes, as go-sdk does (`transaction/output.go:29,53`). No such transaction is valid at the node (`MAX_MONEY`, 21,000,000 BSV, bitcoin-sv v1.2.2 `amount.h:130`; `bad-txns-vout-toolarge` in `CheckTransactionCommon`, `validation.cpp:548-551`; its parser reads the amount as an `int64_t`, `amount.h:18,107-112`, so 2^64 - 1 is -1 there, `bad-txns-vout-negative`, `:543-546`). The reference's writer refuses such a number before any byte (`The number is larger than 2 ^ 53 (unsafe)`, `BigNumber.ts:462`, through `writeUInt64LE`, `Transaction.ts:1083`), recorded for #844 (`writer_53`). Pinned by `an_output_of_two_to_the_53_satoshis_is_read_where_the_reference_refuses_840` and its siblings.
+
+Two prefix readers outside `transaction` are not changed here: `Signature::from_der` reads the DER sequence its length byte names and ignores bytes after it, where the reference's `Signature.fromDER` refuses them (`Signature DER invalid`, `primitives/Signature.ts:64-65`), so a signature parsed from a buffer with a suffix verifies as the signature alone where it is parsed without the wallet's canonical-DER check first (`messages::verify`, whose signature is the bytes after the key ID, `src/messages/signed.rs:191-193`; `compat::bsm::verify_message_der`): #842, the stable line's 0.8.5 (#849); `primitives::bsv::sighash::parse_transaction` reads a transaction's fields from the front and ignores what follows (no cache, no txid; no reference twin), so a sighash over such bytes is the prefix transaction's.
+
+### Changed: `Documentation` runs in `ci.yml` on every pull request and push; a tag's call skips the benchmark comparison (cherry-picked from beta `a67ea411`, PR #524, issue #515)
+
+Two CI facts, taken from `beta` by `git cherry-pick -x`, no code. A Release run
+on `beta` failed rustdoc on an unresolved intra-doc link that two reviewed pull
+requests had let through: `Documentation` lived in `docs.yml`, which no pull
+request and no push starts. The job moves back into `ci.yml` with no
+condition, so it runs on pull requests, pushes, dispatches and the Release
+workflow's call; its command is unchanged (`cargo doc --no-deps --all-features`
+under `RUSTDOCFLAGS: -Dwarnings`), and `docs.yml` keeps `actionlint` alone.
+`tests/arch_ci_pr_runs_the_required_set.rs` names `Documentation` in
+`REQUIRED_ON_MAIN` (13 contexts) and `REQUIRED_ON_BETA` (12), the intended
+protection, not the live one: the captain adds the context to `main`'s
+protection only after the job has reported green on `main`, reads it back, and
+adds it to the sequencer's required-check list.
+
+`bench.yml`'s `Benchmark Regression Check` refuses a caller on a `refs/tags/`
+ref (`if: ${{ !startsWith(github.ref, 'refs/tags/') }}`): a reusable workflow
+sees its caller's ref, and on a tag's call the comparison measured the runner's
+load. A branch dispatch still compares the commit with the last release tag
+before it; `Benchmarks Build` and the `scoreboard` still run on every tag.
+`documentation_is_a_pr_and_push_gate_with_warnings_denied` and
+`benchmark_comparisons_skip_tags_and_allow_branch_dispatches_and_pr_callers`
+pin the two.
+
+### Changed: a push runs exactly the required set; the measurements run on dispatch and before every tag, each in its own workflow with its own badge (the owner's word of 2026-10-27)
+
+The owner's word at 20:1xZ, 2026-10-27, through the keeper: "sick of seeing
+all these CI failures... why are none of them passing... they are all so
+hardcore and slowing us down". The keeper's read: beta's last push run was red
+on the Benchmark Regression Check alone, a job that judges the runner's load,
+not the commit. The keeper's ruling, the balance: a push to `beta` or `main`
+runs exactly the required set, the same contexts as a pull request to that
+line, nothing more; every job that judges something other than the commit runs
+on `workflow_dispatch` and once before a tag, each in its own workflow with its
+own badge, never on the push run; the README badge points at the required-set
+workflow on `main`; a cancelled run under the concurrency rule is never a red.
+Nothing is lost: the measurements still run before every tag.
+
+`ci.yml` keeps the required set (`Test Suite (ubuntu-latest, stable)`,
+`Clippy`, `Rustfmt`, `vectors`, `deny`, `ratchet`, `fixtures`, `secrets`,
+`wasm32 (combined)`, `main-in-beta` on beta, `dependents` on main, `semver` and
+`beta-born` on a pull request), the context names unchanged. Two of the
+required jobs read a pull request and cannot run on a push: `semver` (the
+base's last tag) and `beta-born` (the PR's commits). The five other test cells
+(macOS, Windows, the beta toolchain) run on a dispatch of `ci.yml` (the
+nightly's `ci-full` on each line, the sync's) and on a tag's call. The
+dependents jobs stay in `ci.yml`, since `dependents` is required on `main` and
+a called workflow's job reports as `<caller> / <name>`; they leave beta's push
+and run on a dispatch on either line and on every tag. The new workflows, each
+with `workflow_dispatch` and `workflow_call`:
+
+- `bench.yml`: `Benchmark Regression Check`, `Benchmarks Build` and the
+  `scoreboard` (its `needs` now the two bench jobs; it reads artifacts, as
+  before). On `main` the bench jobs keep main's bodies: main has no
+  `tools/bench-compare` and no `benches/baseline.json`, so no record input and
+  no corpus secret; `Benchmarks Build` is `cargo bench --no-run`, and the
+  critcmp regression check, which compared a pull request's base and head and
+  ran on beta's ref alone, compares the commit with the last release tag
+  before it (a `-beta.` tag never, a tag never with itself).
+- `msrv.yml`: `msrv`.
+- `features.yml`: `features` (each feature alone) and the five wasm32 slices
+  other than the required `wasm32 (combined)` (`wasm32 (watchtower)`,
+  `(monitor)`, `(chaintracks)`, `(overlay)`, `(relay)`).
+- `machete.yml`: `unused dependencies` (non-blocking, as before).
+- `docs.yml`: `Documentation` (rustdoc) and `actionlint`, the checks of the text.
+
+`release.yml` calls `ci.yml` and the five on every version tag (main's are
+plain `vX.Y.Z`). The publish waits for `ci.yml`, `docs.yml`, `msrv.yml`,
+`features.yml` and `machete.yml`, as it waited for those jobs inside `ci.yml`.
+`bench.yml` runs beside the publish and does not hold it: a red there is the
+runner's as often as the commit's, and it shows on the tag's run and the badge.
+Before this change a tag's call skipped the regression check. `nightly.yml` is
+unchanged: it is dispatch-only (the entry below) and not callable, so
+`RELEASING.md` step 3 names its dispatch before a minor tag.
+
+| Job (context) | Pull request | Push to `beta` | Push to `main` | Dispatch | Before a tag |
+|---|---|---|---|---|---|
+| `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`, `deny`, `ratchet`, `fixtures`, `secrets`, `wasm32 (combined)` | yes | yes | yes | yes (`ci.yml`) | yes |
+| the other five `Test Suite` cells | no | no | no | yes (`ci.yml`) | yes |
+| `main-in-beta` | into `beta` | yes | no | on `sync/main-into-beta` | no |
+| `semver`, `beta-born` | `semver` both; `beta-born` into `main` | no | no | no | `semver` on `main` (against the release before it, #214) |
+| `Plan pinned dependents`, `dependent (<id>)`, `dependents` | into `main` | no (was yes) | yes | yes (`ci.yml`) | yes |
+| `Benchmark Regression Check` | no | no (was yes) | no | yes (`bench.yml`) | yes, not holding the publish (was skipped) |
+| `Benchmarks Build`, `scoreboard` | no | no (was yes) | no (was yes) | yes (`bench.yml`) | yes, not holding the publish |
+| `msrv` | no | no (was yes) | no (was yes) | yes (`msrv.yml`) | yes |
+| `features`, the other five `wasm32 (...)` | no | no (was yes) | no (was yes) | yes (`features.yml`) | yes |
+| `unused dependencies` | no | no (was yes) | no (was yes) | yes (`machete.yml`) | yes |
+| `Documentation`, `actionlint` | no | no (was yes) | no (was yes) | yes (`docs.yml`) | yes |
+
+The badges: README carries one per workflow, the required set's first. The
+`CI` badge reads `ci.yml` with `?branch=main`, so a beta push in progress or
+cancelled never shows there. The five measurement badges read their
+workflow's latest run on the default branch. `ci.yml`'s concurrency group
+stays per event and ref (`ci-<event>-<ref>`, without the record mark now that
+the record input is `bench.yml`'s). A newer push cancels the run it
+supersedes, and that cancelled run is never a red: the newer run judges the
+same line.
+
+`tests/arch_ci_pr_runs_the_required_set.rs` pins it. A push to each line runs
+exactly its required set less `semver` and `beta-born`
+(`a_push_to_beta_runs_exactly_betas_required_set`,
+`a_push_to_main_runs_exactly_mains_required_set`, both RED on the previous
+`ci.yml`, which named every leaving job, the Benchmark Regression Check among
+them). A dispatch on each line and a tag's call run every job and the six test
+cells. Each measurement workflow is triggered by dispatch and call alone, and
+`release.yml` calls it (`the_measurements_run_on_dispatch_and_before_a_tag_never_on_a_push`).
+Three edits are refused: the dependents back on beta's push, `semver` on a
+push (on `main` the edit removes main's condition, which also admits a tag's
+call), an unrequired job on the push run. The evaluator reads `startsWith`.
+Nothing under `src/` changes. `CLAUDE.md` (rule 7, the layout),
+`RELEASING.md` (steps 2, 3, 5), `README.md`, `docs/NIGHTLY.md`,
+`docs/RATCHETS.md` and `benches/CLAUDE.md` say so.
+
+### Changed: the oracles run on demand, the nightly schedule removed (the owner's word of 2026-10-27)
+
+The owner's fleet word of 2026-10-27: the nightly runs were a waste of
+resources. The `schedule` trigger is gone from `.github/workflows/nightly.yml`
+on both lines (the 03:00 UTC cron of #283 and #284 and its cap are moot);
+`workflow_dispatch` stays, so the mutation shards, the fuzz hours, the
+scoreboard and `ci.yml`'s full set on each line run when asked: one dispatched
+measurement before each minor tag, none for a prerelease. The push matrix on
+the protected branches is unchanged (the rule of 2026-10-26). `docs/NIGHTLY.md`
+says so. The port of beta's ed1eccb (PR #351).
+
+### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
+
+`ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
+(the bench baseline's record mode, `bench_baseline_record`; the nightly's
+dispatch of this workflow) shared the group with every push to `beta`, and
+the first record run for #245 (2026-10-27 04:23Z, run 40449439162) was
+cancelled by #306's landing twenty minutes in. The group is
+`ci-<event>-[record-]<ref>` now: a push to a line cancels the earlier push's
+run as before, a pull request's own ref keeps each PR in a group of its own,
+a dispatch runs to its end beside a push and a pull request. On `beta` a
+record dispatch also runs apart from the nightly's dispatch of the same line
+(the group marks it); `main` has no record input and keys the group on the
+event alone. The keeper's CI
+rule (a pull request runs exactly its line's required
+set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
+`main` is a `git cherry-pick -x` (RELEASING.md point 11).
+
+### Changed: the nightly's heavy work holds at most six concurrent slots
+
+The mutant shards run six at a time (`max-parallel: 6`, twenty before) and
+the fuzz targets six at a time after them (`needs: [source, mutants]`, run
+whatever the shards' result), so the night's heavy work never holds more
+than six of the account's twenty concurrent slots and a pull request's run
+at 03:00 UTC starts within minutes; the shards finish later in the night
+and decide the same (the owner's balance rule of 2026-10-26, the keeper's
+reading, as the nightly goes live with main's copy of the schedule).
+
+### Changed: the secrets scan covers the commits the event brings (#272)
+
+CI's `secrets` job ran gitleaks over every ref of the checkout (gitleaks's
+`git` mode with no range, the checkout fetching every branch), so a
+key-looking test literal on any pushed branch failed every pull request's
+scan: PR #257 at 2026-10-26 16:46Z, the two findings being the #105
+branch's witnesses, with no location printed. On a pull request the scan
+now covers the PR's own commits (the base sha to `HEAD`, what decides the
+merge; an empty base sha falls back to the line's history), on a push and
+on a dispatch the line's full history, and `-v` prints a finding's location
+with the value redacted. `tests/arch_secrets_scan_scope.rs` pins the step
+(red on the old one). `.gitleaks.toml` judges the two literals by reason:
+secp256k1's generator point in compressed form (the public key of the
+private key 1, the #105 witnesses' identity key, also in the EC, sighash
+and cross-SDK tests and the auth and overlay vectors) and the old revealer
+shape's test key of `tests/wallet_http_json_shapes_105.rs` (the Go SDK's
+test public key, also across the wallet-wire vectors), beside the BRC-56
+vectors and the corpus-gen nonce.
+
+### Changed: a pull request runs exactly its line's required set; the full matrix on a push and nightly
+
+The owner's word of 2026-10-26, through the keeper: CI must pass and must not
+put needless load on GitHub. The keeper's count that day: 215 workflow runs on
+the account in 24 hours, 99 of them this crate's CI at 32 jobs each, 79
+cancelled by concurrency. The merge queue already gives one CI run per PR, so
+the jobs per run were what remained.
+
+On a pull request a job of `ci.yml` now runs if and only if its context is
+required on the base line's protection (beta's eleven, main's twelve): the
+Test Suite matrix produces its `(ubuntu-latest, stable)` cell alone, `wasm32`
+its `combined` consumer alone (the six consumers' features moved from
+`include` rows to a step's table, so no row can add a cell), `dependents` with
+`Plan pinned dependents` and each `dependent (<id>)` (the jobs it needs to
+decide) only into `main`; `main-in-beta`, `beta-born` and `semver` as before.
+`docs`, `actionlint`, `msrv`, `features`, `unused dependencies`, the other
+five test cells, the other four wasm32 slices, `Benchmark Regression Check`,
+`Benchmarks Build` and `scoreboard` no longer run on a pull request: a PR into
+`beta` runs 11 jobs (32 before), into `main` 13 plus one per consumer the plan
+admits. A push to `beta` or `main`, the sync's dispatch and a tag's call run
+every job as before; `nightly.yml`'s new `ci-full` job dispatches `ci.yml` on
+`beta` and on `main` each night (`nightly.yml` comes to `main` with it, as
+`beta` writes it: GitHub fires a schedule from the default branch, `main`, so
+its mutation and fuzz jobs start too, on `beta`'s sources), so each line's
+own workflow runs its whole matrix at its tip whether or not anything was
+pushed (a `workflow_call` from
+the nightly would run the caller's ref, `main`'s on a schedule, and share its
+concurrency group; a schedule on `ci.yml` fires on `main` alone).
+`cancel-in-progress` is unchanged. On `main` the benchmarks job keeps its
+body (`critcmp` of a pull request's base and head, which no other event
+carries) and runs on `beta`'s ref alone, which `main`'s file never sees;
+`beta`'s baseline record input is `beta`'s.
+
+`tests/arch_ci_pr_runs_the_required_set.rs` pins it: the two lines' required
+contexts as constants (read by `gh api
+repos/Calhooon/bsv-rs/branches/<line>/protection/required_status_checks`), a
+string-level reader of each job's `if:`, `needs:` and matrix, and the rule
+both ways on each line (every required context proven to run on a PR into
+it, no job outside the set and its needs able to run there), plus every job
+on a push and on the nightly's dispatch save five named exceptions. A context
+added to or dropped from a protection is a change to the test's constants.
+
+### Fixed: a dead function under every slice without `script` (#115)
+
+`after_last_code_separator` (`primitives/bsv/sighash.rs`) has one caller, the
+script templates' signing path, but compiled under `primitives`, so a consumer
+building `block`, `primitives`, `compat` or `totp` alone with warnings denied
+(the Cloudflare workers' CI) could not build the crate. Found by the dependents
+check (#83) on its first hosted run, on chaintracks-cloudflare's `block` slice.
+The function is gated on `script`; the `clippy` job now checks each published
+slice alone with `-D warnings`, which was RED on the pre-fix tree for the four
+slices and is the pin.
+
+### Changed: beta carries everything main carries, main nothing beta did not bear, checked by CI (the owner's word, 2026-10-25)
+
+CI only; nothing under `src/` moves. A commit is on a line by sha, by patch
+(`git cherry`), or by a cherry-pick link in either direction (a
+`(cherry picked from commit <sha>)` line naming a commit of the other line).
+`ci.yml` gains `main-in-beta`: on every PR into `beta`, every push to `beta`
+and a dispatch on the sync branch it fails naming each commit of `origin/main`
+the tree lacks that way; and `beta-born`: on every PR into `main` it fails
+naming each commit of the PR `origin/beta` lacks that way, a release commit
+(`Cargo.toml`'s version and `CHANGELOG.md`'s headings alone) let through and
+said in the log. The new `sync-main-into-beta.yml` opens, on every push to
+`main`, one PR from `sync/main-into-beta` into `beta`: each missing commit
+`git cherry-pick -x`'d in main's order, landed by rebase merge (both lines
+keep linear history; the link lives in the message). A conflicting pick is
+aborted, the picks before it kept, the PR labelled `needs-hand` with the
+commit and its files; a rerun picks onto a branch that holds beta's tip, so a
+hand resolution survives main moving again. `ci.yml` gains `workflow_dispatch`
+so the sync starts the suite on its branch. `RELEASING.md` steps 11 to 14
+(beta's 17 to 20) write the rule; `tests/arch_ci_lines.rs` pins the three jobs.
+On main this is PR #205's three commits by `git cherry-pick -x`: main's
+`ci.yml` takes beta's `on:` (`[main, beta]` and `workflow_dispatch`), which
+changes nothing a main event runs, since a beta event reads beta's file, and
+keeps `main-in-beta`, which runs on nothing here, so the two files and the
+test read the same on both lines.
+
+### Changed
+
+- main's gate takes beta's `deny`, `dependents` (plan, one check per consumer, the summary), `semver`, `ratchet` (its baseline measured on main), `fixtures` (skipping with a warning while the recordings are beta's), `features`, `wasm32` slices and `scoreboard` jobs; `semver` checks a PR against the last release tag held to a patch, and a release tag against the release before it (#214).
+
 ## [0.8.4] - 2026-11-10
 
-Tagged on `main` (`v0.8.4`, commit `9caa38b4`) and never published. Its release run was cancelled before the publish step: the section this heading stood over on `main` then carried an entry (#258, a certificate's revocation outpoint index) for code the stable line does not have. What the stable line fixed that day (bytes after a transaction at the transaction readers, #840; a raw BEEF entry that is not exactly one transaction, #852) ships in 0.8.5, whose section is added here when its release commit is synced. The tag stays where it is: a `v*` tag is never moved and never deleted.
+Tagged on `main` (`v0.8.4`, commit `9caa38b4`) and never published. Its release run was cancelled before the publish step: the section this heading stood over on `main` then carried an entry (#258, a certificate's revocation outpoint index) for code the stable line does not have. What the stable line fixed that day (bytes after a transaction at the transaction readers, #840; a raw BEEF entry that is not exactly one transaction, #852) ships in 0.8.5, above. The tag stays where it is: a `v*` tag is never moved and never deleted.
 
 ## [0.9.0-beta.7] - 2026-11-04
 
