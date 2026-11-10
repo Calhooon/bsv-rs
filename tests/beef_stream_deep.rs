@@ -71,7 +71,8 @@ fn funded_beef() -> (Beef, String) {
     let txid = funding.id();
     let mut beef = Beef::new();
     let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&txid, 800_000));
-    beef.merge_raw_tx(funding.to_binary(), Some(bump));
+    beef.merge_raw_tx(funding.to_binary(), Some(bump))
+        .expect("the bytes are one transaction");
     (beef, txid)
 }
 
@@ -81,7 +82,8 @@ fn chain_beef(n: usize) -> (Beef, String) {
     for _ in 1..n {
         let tx = spend(&[(prev, 0)], 1);
         prev = tx.id();
-        beef.merge_raw_tx(tx.to_binary(), None);
+        beef.merge_raw_tx(tx.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     (beef, prev)
 }
@@ -89,7 +91,7 @@ fn chain_beef(n: usize) -> (Beef, String) {
 #[test]
 fn the_source_writes_the_p0_5_chain() {
     let (mut beef, subject_hex) = chain_beef(50);
-    let expected = beef.to_binary();
+    let expected = beef.to_binary().expect("the BEEF is writable");
     let mut written = Vec::new();
     ChainSource::new(50).read_to_end(&mut written).unwrap();
     assert_eq!(to_hex(&written), to_hex(&expected));

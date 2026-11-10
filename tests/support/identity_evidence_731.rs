@@ -118,11 +118,14 @@ pub fn build(name: &str) -> Built {
     let mut beef = Beef::new();
     let index = beef.merge_bump(lone_leaf(&proven.id(), 900));
     // X's raw entry: proven by the BUMP when X is `alone`, unproven else.
-    let x_raw = BeefTx::from_raw_tx(x.to_binary(), proven_subject.then_some(index));
+    let x_raw = BeefTx::from_raw_tx(x.to_binary(), proven_subject.then_some(index))
+        .expect("the bytes are one transaction");
     let x_txid_only = BeefTx::from_txid(x.id());
     if !proven_subject {
-        beef.txs
-            .push(BeefTx::from_raw_tx(proven.to_binary(), Some(index)));
+        beef.txs.push(
+            BeefTx::from_raw_tx(proven.to_binary(), Some(index))
+                .expect("the bytes are one transaction"),
+        );
     }
     if raw_first {
         beef.txs.extend([x_raw, x_txid_only]);
@@ -134,7 +137,7 @@ pub fn build(name: &str) -> Built {
     let mut reversed = from_hex(&x.id()).unwrap();
     reversed.reverse();
     writer.write_bytes(&reversed);
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     Built {
         beef: writer.into_bytes(),
         subject: x.id(),

@@ -75,7 +75,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
         let (kind, arg) = step.split_once(':').unwrap();
         let answer = match kind {
             "reread" => {
-                *beef = Beef::from_hex(&beef.to_hex()).unwrap();
+                *beef = Beef::from_hex(&beef.to_hex().expect("the BEEF writes")).unwrap();
                 None
             }
             "twin" => {
@@ -103,7 +103,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 None
             }
             "hex" => {
-                beef.to_hex();
+                beef.to_hex().expect("the BEEF writes");
                 None
             }
             "valid" => {
@@ -117,7 +117,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
             "wire" => {
                 // The bytes `to_writer` writes, unsorted, read back.
                 let mut writer = bsv_rs::primitives::Writer::new();
-                beef.to_writer(&mut writer);
+                beef.to_writer(&mut writer).expect("the BEEF writes");
                 *beef = Beef::from_binary(writer.as_bytes()).unwrap();
                 None
             }
@@ -150,7 +150,8 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 None
             }
             "raw" => {
-                beef.merge_raw_tx(tx(v, arg).to_binary(), None);
+                beef.merge_raw_tx(tx(v, arg).to_binary(), None)
+                    .expect("the bytes are one transaction");
                 None
             }
             "txid" => {
@@ -191,8 +192,9 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 None
             }
             "push" => {
-                beef.txs
-                    .push(BeefTx::from_raw_tx(tx(v, arg).to_binary(), None));
+                beef.txs.push(
+                    BeefTx::from_raw_tx(tx(v, arg).to_binary(), None).expect("one transaction"),
+                );
                 None
             }
             "swap" => {
@@ -203,7 +205,8 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 let (a, b) = arg.split_once('_').unwrap();
                 let a = txid(v, a);
                 let at = beef.txs.iter().position(|t| t.txid() == a).unwrap();
-                beef.txs[at] = BeefTx::from_raw_tx(tx(v, b).to_binary(), None);
+                beef.txs[at] =
+                    BeefTx::from_raw_tx(tx(v, b).to_binary(), None).expect("one transaction");
                 None
             }
             "mut" => Some(
@@ -259,13 +262,14 @@ fn run(name: &str) -> (Value, Value) {
     if let Some(source) = case.get("source") {
         let mut other = Beef::new();
         apply(&v, &mut other, source, &mut Vec::new());
-        beef.merge_beef(&other);
+        beef.merge_beef(&other)
+            .expect("the source writes and reads back");
     }
     if let Some(after) = case.get("after") {
         apply(&v, &mut beef, after, &mut answers);
     }
     // Written first, as the recorder reads the entries after its `toHex`.
-    let hex = beef.to_hex();
+    let hex = beef.to_hex().expect("the BEEF writes");
     let entries: Vec<Value> = beef
         .txs
         .iter()
@@ -346,9 +350,10 @@ fn written(names: &[&str]) -> String {
     let v = vector();
     let mut b = Beef::new();
     for name in names {
-        b.merge_raw_tx(tx(&v, name).to_binary(), None);
+        b.merge_raw_tx(tx(&v, name).to_binary(), None)
+            .expect("the bytes are one transaction");
     }
-    b.to_hex()
+    b.to_hex().expect("the BEEF writes")
 }
 
 fn entry(name: &str, bump_index: Option<usize>, form: &str) -> Value {

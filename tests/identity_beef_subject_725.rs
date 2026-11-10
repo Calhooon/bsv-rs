@@ -114,13 +114,14 @@ fn txs(v: &Value, token: &LockingScript) -> Txs {
 fn absent_atomic_txid(t: &Txs, absent: &str) -> Vec<u8> {
     let mut beef = Beef::new();
     let index = beef.merge_bump(lone_leaf(&t.alone));
-    beef.merge_raw_tx(t.alone.to_binary(), Some(index));
+    beef.merge_raw_tx(t.alone.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     let mut writer = Writer::new();
     writer.write_u32_le(0x0101_0101);
     let mut subject = from_hex(absent).unwrap();
     subject.reverse();
     writer.write_bytes(&subject);
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     writer.into_bytes()
 }
 
@@ -130,7 +131,8 @@ fn txid_only_parent(t: &Txs) -> Beef {
     let mut beef = Beef::new();
     beef.merge_bump(lone_leaf(&t.parent));
     beef.merge_txid_only(t.parent.id());
-    beef.merge_raw_tx(t.subject.to_binary(), None);
+    beef.merge_raw_tx(t.subject.to_binary(), None)
+        .expect("the bytes are one transaction");
     beef
 }
 
@@ -138,10 +140,13 @@ fn txid_only_parent(t: &Txs) -> Beef {
 /// proven, merged newest first so the writer's sort decides the order.
 fn chain(t: &Txs) -> Beef {
     let mut beef = Beef::new();
-    beef.merge_raw_tx(t.tip.to_binary(), None);
-    beef.merge_raw_tx(t.middle.to_binary(), None);
+    beef.merge_raw_tx(t.tip.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(t.middle.to_binary(), None)
+        .expect("the bytes are one transaction");
     let index = beef.merge_bump(lone_leaf(&t.parent));
-    beef.merge_raw_tx(t.parent.to_binary(), Some(index));
+    beef.merge_raw_tx(t.parent.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     beef
 }
 
@@ -258,7 +263,9 @@ async fn a_txid_only_parent_before_an_unproven_subject_is_skipped_as_the_referen
     let v = vector();
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
-    let plain = txid_only_parent(&t).to_binary();
+    let plain = txid_only_parent(&t)
+        .to_binary()
+        .expect("the BEEF is writable");
     let atomic = txid_only_parent(&t)
         .to_binary_atomic(&t.subject.id())
         .unwrap();
@@ -296,7 +303,7 @@ async fn a_three_transaction_chain_is_read_from_its_subject_by_both_parsers_725(
     let v = vector();
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
-    let plain = chain(&t).to_binary();
+    let plain = chain(&t).to_binary().expect("the BEEF is writable");
     let atomic = chain(&t).to_binary_atomic(&t.tip.id()).unwrap();
     for (name, beef) in [("chain", plain), ("chain_atomic", atomic)] {
         let (outcome, refused_at) = recorded(&v, name, &beef, &t.tip.id());

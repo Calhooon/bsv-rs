@@ -354,7 +354,7 @@ fn reversed(bytes: &[u8]) -> Option<Vec<u8>> {
     }
     beef.txs.reverse();
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     Some(writer.into_bytes())
 }
 

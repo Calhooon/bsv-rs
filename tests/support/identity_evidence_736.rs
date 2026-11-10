@@ -73,7 +73,8 @@ fn lone_leaf(txid: &str, height: u32) -> MerklePath {
 /// `tx` merged raw with a BUMP of its own at `height`.
 fn proven(beef: &mut Beef, tx: &Transaction, height: u32) {
     let index = beef.merge_bump(lone_leaf(&tx.id(), height));
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
 }
 
 /// A push of `n` zero bytes under OP_PUSHDATA4, as a locking script.
@@ -167,10 +168,15 @@ fn graph_inputs(subject_inputs: usize, parent_inputs: usize) -> (Vec<u8>, String
         .add_output(TransactionOutput::new(1, token()))
         .unwrap();
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
-    beef.merge_raw_tx(parent.to_binary(), None);
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(parent.to_binary(), None)
+        .expect("the bytes are one transaction");
     proven(&mut beef, &g, 900);
-    (beef.to_binary(), subject.id())
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 /// The unproven subject's scripts the token and `subject_padding` bytes
@@ -186,9 +192,13 @@ fn graph_script_bytes(subject_padding: usize, n: usize) -> (Vec<u8>, String) {
         .add_output(TransactionOutput::new(0, padding(subject_padding)))
         .unwrap();
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
     proven(&mut beef, &parent, 900);
-    (beef.to_binary(), subject.id())
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 /// The proven grandparent, the parent raw and txid-only (`raw_before`
@@ -200,18 +210,20 @@ fn parent_twice(raw_before: bool) -> (Vec<u8>, String) {
     let subject = spending(parent.id(), "", token());
     let mut beef = Beef::new();
     let index = beef.merge_bump(lone_leaf(&g.id(), 900));
-    let raw = BeefTx::from_raw_tx(parent.to_binary(), None);
+    let raw = BeefTx::from_raw_tx(parent.to_binary(), None).expect("the bytes are one transaction");
     let txid_only = BeefTx::from_txid(parent.id());
-    beef.txs
-        .push(BeefTx::from_raw_tx(g.to_binary(), Some(index)));
+    beef.txs.push(
+        BeefTx::from_raw_tx(g.to_binary(), Some(index)).expect("the bytes are one transaction"),
+    );
     if raw_before {
         beef.txs.extend([raw, txid_only]);
     } else {
         beef.txs.extend([txid_only, raw]);
     }
-    beef.txs
-        .push(BeefTx::from_raw_tx(subject.to_binary(), None));
+    beef.txs.push(
+        BeefTx::from_raw_tx(subject.to_binary(), None).expect("the bytes are one transaction"),
+    );
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     (writer.into_bytes(), subject.id())
 }

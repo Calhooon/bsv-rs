@@ -7,6 +7,216 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the BEEF writers, merge_beef and merge_raw_tx return Result and refuse what they cannot write faithfully (#817)
+
+**Migration:** `beef.to_binary()`, `beef.to_hex()`, `beef.to_writer(w)`,
+`beef.merge_beef(&b)`, `beef.merge_raw_tx(..)`, `BeefTx::from_raw_tx(..)` and
+`BeefTx::to_writer(w, version)` now return `Result` (`Result<Vec<u8>>`, `Result<String>`,
+`Result<()>`, `Result<()>`, `Result<&BeefTx>`, `Result<BeefTx>`, `Result<()>`): add `?`.
+An `Err` from a writer names an entry or a word the BEEF cannot carry: a txid-only entry
+under a word other than V2 (`a valid serialized Transaction is expected`; set
+`version = BEEF_V2` or drop the entry), a version word other than V1 or V2, a txid-only
+txid that is not 64 hex digits, or a BUMP `MerklePath`'s writer refuses. `to_binary_atomic`
+keeps its signature; its panic is an `Err`. `merge_bump`, `merge_transaction`,
+`merge_txid_only` and `make_txid_only` keep theirs. The semver tool does not flag a
+return type wrapped in `Result` on these receivers, so this line is the signal. A survey of
+the dependents (each grepped by its own path; counts by call text, the test column the
+files under a `tests` path): `bsv-wallet-toolbox-rs@a3377ef0` `merge_raw_tx` 52 (8 test),
+`merge_beef` 2 (1), BEEF writers about 22 (4); `bsv-overlay-cloudflare@2efad2f0`
+`merge_raw_tx` 56 (13), `merge_beef` 5 (0), BEEF writers about 63 (14), `to_writer` 3;
+`bsv-wallet-cli@f4285bf` and `rust-message-box@08418ec` none of these doors (their
+`to_binary_atomic` calls keep their signature). The overlay engine's three accumulators
+(`engine.rs` `hydrate_utxo_history`, `gasp_overlay.rs` `validate_graph_anchor`,
+`overlay-cloudflare/src/routes.rs`'s lookup answer) merge parsed BEEFs into a stored one
+and write it: where the accumulator was V1 and a merged BEEF held a txid-only entry they
+panicked (an abort on wasm32); they now receive `Err(BeefError("a valid serialized
+Transaction is expected"))` from `to_binary`, each in a function that already returns
+`Result`. `merge_beef` of a BEEF `Beef::from_binary` returned is always `Ok` (the fuzz
+invariant below).
+
+The production sites in a function that does not return `Result` (read by their own paths at
+the pins above; a `.expect()` there brings the abort back on wasm32, so each wants its own
+fallback): `bsv-wallet-toolbox-rs` `src/storage/sqlx/create_action.rs:2082`
+(`merge_beef_linked`, `()`), `:2103` (`describe_invalid_beef`, `String`), `:2209`
+(`prune_beef_to_roots`, `()`); `bsv-overlay-cloudflare` `crates/overlay-cloudflare/src/ef.rs:193,199`
+(`merge_raw_sources`, `Vec<u8>`), `crates/overlay-cloudflare/src/proof_fetcher.rs:2562`
+(`stitch_and_trim_pot_beef`, `Option`), `crates/low-app-layer/src/credit_beef.rs:120`
+(`merge_parent`, `bool`), `crates/low-app-layer/src/beef_guard.rs:286` (`strip_bumps`,
+`Option`), `crates/overlay-engine/src/gasp_overlay.rs:466` (`beef_of`, `Vec<u8>`),
+`crates/overlay-engine/src/engine.rs:4674` (`stitch_proof_into_stored_beef`, `Option`).
+Sites whose `Result` carries another error type need a `map_err`, not a `?`: the overlay's `proof_fetcher.rs:2986,3034`
+and `routes.rs:3020,3027` (`String`, the lookup accumulator among them) and
+`advertiser.rs:361` (`AdvertiserError`). The toolbox's `src/services/services.rs:2062,2073`
+sit in `get_beef`, whose `Result` is the toolbox's own, carrying `SdkError(#[from] bsv_rs::Error)`
+(`src/error.rs:134`): a `?` suffices there. `Transaction::to_beef` and `to_beef_v1` keep
+their signatures and now return the writers' `Err` for a source transaction whose
+`merkle_path` the BUMP writer refuses (written by the lenient BUMP writer until this change).
+
+What was wrong: `BeefTx::write_tx_data` panicked (`BeefTx has no transaction data to
+write`, `src/transaction/beef_tx.rs:478` at `9ab384c9`) when the V1 branch reached a
+txid-only entry, a state reached from wire bytes (a V1 BEEF read, then `merge_txid_only`,
+`make_txid_only` or `merge_beef` of a V2 BEEF holding one, then any writer); on wasm32 an
+abort (rule 5). The writers also wrote without a word states no reader reads back as
+written: a version word other than V1 or V2 (V1-shaped entries after it), a txid-only
+txid that is not hex or not 64 digits (`from_hex(..).unwrap_or_default()`: nothing, or its
+bytes at their length), and every BUMP through `MerklePath`'s lenient writer
+(`to_writer_lenient_until_beef_817`, removed). `merge_raw_tx` and `BeefTx::from_raw_tx`
+kept bytes that are not one transaction (a raw entry has no length prefix in a BEEF, so
+every element written after it misframes), and `merge_beef` merged a source the
+reference's snapshot refuses.
+
+The rule (decided on #817 by eleven design reads; the owner's standard of 2026-11-10): a
+writer refuses only a state it cannot write faithfully (bytes that would not frame, or
+would read back as another state) and writes every other state, valid or not, as the
+reference does; validity is the readers' and `verify`'s. The reference's words where it
+refuses; where it writes bytes no reader reads back as written, this crate refuses in its
+own words, states the row and drafts it for upstream.
+
+One crate-private read-only check (`src/transaction/beef_writable.rs`, which also holds the three `Beef` writers now; `BeefTx`'s in `beef_tx_writer.rs`) runs before any
+byte, shared by every writer, so a caller's `Writer` is untouched on `Err`. In the order
+the reference meets them (`ts-stack@edf6e03` `Beef.ts:360-373`):
+
+| State | Refused in | The reference |
+|---|---|---|
+| a txid-only entry whose txid is empty, ahead of everything | `Invalid txid-only entry txid: expected 64 hex digits, got 0` | throws `Internal` there (`BeefTx.ts:105-116`, `#ensureSerializableState`, `Beef.ts:334-340`) |
+| a BUMP hash with a non-hex character | `Invalid hex string` (`Error::MerklePathError`) | throws the same (`MerklePath.ts:289`) |
+| in written order, a txid-only entry under a word other than V2 | `a valid serialized Transaction is expected` | throws the same (`BeefTx.ts:253-258`) |
+| in written order, a V2 txid-only txid with a non-hex character | `Invalid hex string` | throws the same (`hex.ts:6-17`) |
+| a version word other than V1 or V2 | `Serialized BEEF must start with 4022206465 or 4022206466 but starts with N` | writes the word; its reader refuses it in these words (`Beef.ts:1251-1254`), and so does `mergeBeef` |
+| a BUMP `MerklePath::to_writer` refuses | its words (PR #831's table) | writes it misframed or reads it back otherwise |
+| in written order, a txid-only txid of other than 64 hex digits | `Invalid txid-only entry txid: expected 64 hex digits, got N` | writes its bytes at their length; pads 63 digits to another txid |
+| a raw entry held without its parse whose bytes are not one transaction | `from_raw_tx`'s words | writes the bytes its door kept |
+
+`to_binary(&mut self)` refuses around its sort where the reference's `#getSerializedBytes`
+does (`Beef.ts:360-373`): a txid-only entry with an empty txid before the sort, the entries
+left as held, as the reference's `#ensureSerializableState` throws `Internal` ahead of
+`#ensureSortedForSerialization` (`:367-368`); every other refusal after it, the entries
+sorted, as the reference's `toWriter` throws after its sort (a non-hex BUMP hash, a txid-only
+entry outside V2, a non-hex txid-only txid), and as it sorts before writing each state this
+crate refuses in its own words (the version word, a txid of other than 64 hex digits, a raw
+entry that is not one transaction, a BUMP `MerklePath`'s writer refuses). Until #817's fold
+(the rule read of PR #836) the empty txid was refused after the sort, the entries sorted where
+the reference's come back unchanged; pinned by the vector's `sort_on_refusal` (four cells,
+the entries' order before and after the reference's throw, Node v22.18.0) in
+`the_entries_order_after_a_refusal_is_the_reference_s_817`. `to_binary_atomic` checks the closure before the
+subject's txid, as the reference builds the closure's bytes first (`Beef.ts:409-410`). A
+BUMP index naming no BUMP is written, as the reference writes it; go-sdk@2ca481c's `Bytes`
+refuses it (`invalid BEEF BUMP index: %d`, `transaction/beef.go:1549-1550`).
+
+`merge_raw_tx` and `BeefTx::from_raw_tx` refuse bytes that are not exactly one
+transaction, with or without a BUMP index, the BEEF untouched, by a framing scan
+(`src/transaction/beef_raw_frame.rs`: varints and lengths, linear, no allocation) that
+reads what the reference's `scanRawTransaction` reads and refuses in its words where it
+refuses (`Serialized transaction exceeds available BEEF data`, `ReaderUint8Array read
+exceeds available data`, `non-canonical varInt`, `number too large to retain precision -
+use readVarIntBn`; `BeefTx.ts:16-48`), and bytes after the lock time in this crate's,
+`Serialized transaction has N bytes after its lock time`. The scan agrees with this
+crate's transaction reader on every cut and single-byte change of the fixture (the unit
+test). The writers' check scans a raw entry held without its parse (one merged with a BUMP
+index); no public door holds an unframed one since this change.
+
+`merge_beef(&mut self, other: &Beef) -> Result<()>` gives the reference snapshot's verdict
+(`mergeBeef`, `Beef.ts:971-990`: `fromBinaryStrict(beef.toBinary())` before the target
+changes), the target untouched on `Err`: the literal round trip, the source's writer check
+over its entries in the order the reference writes them (`written_order`, #621), its bytes
+written in that order and read back by `Beef::from_binary`, a reader's refusal in that
+reader's words (#477's row). One write and one read of the source per merge. This answers
+the #764 row's residues (a V1 source holding a txid-only entry merged; a source BUMP with
+two leaves at one offset, an empty level 0, no levels or two roots merged; a duplicate's hash or txid
+flag kept): each is now refused.
+
+`merge_bump` computes the new BUMP's root once and combines a held BUMP of its height and
+root through `MerklePath::combine_verified` (crate-private, infallible: the checks are made
+at the call, as go-sdk's `combineVerified` is called from `MergeBump`), where
+`existing.combine(&bump)`'s result was dropped after the same checks; `combine`'s
+behaviour is unchanged. A BUMP whose root does not compute is appended (stated below).
+
+Tests: `tests/beef_v1_txid_only_writer_817.rs` (8, the lane `fix-v1-txid-panic`'s tests
+reworked from its rejected V2 form: each V2-bytes assertion now the `Err` in the
+reference's words, the V2 bytes the remedy's and the reference's own), and
+`tests/beef_writer_refusals_817.rs` (13), against
+`tests/vectors/beef_v1_txid_only_writer_817.json` (its recorder
+`tests/support/beef_v1_txid_only_writer_817.mjs` extended, additions only: 19 writer cells,
+14 raw-door, 3 txid-door, 12 merge-door, 2 bump-door, 7 doubled-txid, 4 sort-on-refusal
+(#817's fold); Node v22.18.0, two runs
+byte-identical); the framing scan's units in `src/transaction/raw_frame_817_tests.rs`
+(4). The sweep: 337 BEEFs this tree's vectors hold (115 V1; 334 before the rebase onto
+#832's fold, whose three recorded cases add three) read, written `Ok`, read back to
+the same entries and BUMPs, a fixed point; the differential: `merge_beef`'s verdict equal to
+`Beef::from_binary(&source.clone().to_binary()?)` on six states of each of the 337 (2,022).
+
+A BEEF holding one txid twice (the cell the mutation-model ensemble of 2026-11-10 handed to
+this change: two lenses would refuse it at the writer, one said the readers accept it from
+the wire) is written, by the rule: the reference writes every such state and both its
+readers read the two entries back (`Beef.fromReader` pushes each entry read,
+`Beef.ts:1262-1266`), and this crate's reader keeps both too, so the bytes read back as the
+state written. Seven recorded cells (a raw entry twice, V1 and V2; raw then txid-only and
+txid-only then raw; a proven entry twice, V1 and V2; a proven entry then its txid alone),
+each read from bytes and pushed by hand into `txs`: this crate writes the reference's bytes
+on all fourteen, save two read from bytes, which `to_binary` sorts where the reference
+returns the bytes read (the #764 row's older writer difference, #621), written there as the
+reference writes the same entries pushed; every one read back as held; `merge_beef` of each
+holds one entry, the raw one, as the reference's does
+(`a_beef_holding_one_txid_twice_is_written_and_read_back_as_held_817`). Nothing is stated.
+
+The rebase: this change was built on PR #832's withdrawn head (`9ab384c9`, the lazy repair)
+and carried onto its rebuilt one (`192b2c10`, `Beef::edit_tx`), with nothing of the
+withdrawn machinery back. `merge_bump`'s `combine_verified` is on `merge_bump` in
+`beef.rs`; `merge_raw_tx` and `merge_beef` keep their signatures and refusals, moved into
+`beef_writable.rs` for `beef.rs`'s line ceiling; `Beef::edit_tx` re-serializes an edited raw
+entry through `Transaction::to_binary`, one transaction's frame by construction, held with
+its parse (`BeefTx::from_parts`, no scan), so no writer refusal can meet the entry it
+repairs (it refuses a txid-only entry before the edit). The draft for upstream is row 63
+of the queue (the rebuild took row 61, its fold row 62).
+
+The fold (PR #836's three reads, 2026-11-10): rebased onto #832's folded head (`65369528`),
+whose `Beef::edit_tx` pins of unframed raw bytes (bytes that do not parse, a byte after the
+lock time) moved from `tests/beef_edit_door_817.rs` into the unit module
+`src/transaction/beef/index_817_tests.rs`, the entries built by the crate-private
+`BeefTx::from_framed_raw_tx` (the public doors refuse such bytes, pinned by
+`the_unframed_raw_states_are_refused_at_the_public_doors_817`), and whose three recorded
+cases move the sweep to 337 BEEFs; `to_binary` refuses an empty txid-only txid before its
+sort (above); `merge_bump`'s two rootless BUMPs of one height and the scan's varint bounds
+at each side (`fd fd00`, `fe 00000100`, `ff 0000000001000000`, 2^53 - 1 read; the reference's
+words, a probe of its scan under Node v22.18.0) pinned, each RED under its planted mutation.
+`fuzz_beef_parser` asserts that every BEEF `from_binary` returns writes `Ok`, reads back and
+merges. RED on a scratch copy of `9ab384c9`: both files compile-RED (46 errors: the doors
+return values); a probe there panics at `src/transaction/beef_tx.rs:478:13` (`:453:13` on the
+rebuilt base `192b2c10`, the cold read's RED) (`BeefTx has no
+transaction data to write`) on the V1 cells and writes the rest without a word. The lane
+record is `docs/lanes/fix-817-beef-writers.md`.
+
+### Notes: cross-SDK parity (#817)
+
+The reference (`ts-stack@edf6e03`) throws, in the words this crate uses, for a txid-only
+entry outside V2, a non-hex txid-only txid, a non-hex BUMP hash, a raw transaction its
+scan cuts short (without an index) and, at `mergeBeef`, a version word other than V1 or V2.
+Stated rows (the root `CLAUDE.md`): its writer writes a version word other than V1 or V2,
+a txid-only txid of other than 64 hex digits and a raw entry with bytes after its lock time
+(or, merged with an index, any bytes) as frames no reader reads back as written, which
+this crate refuses in its own words (drafted for upstream as row 63 of the #375 queue,
+`docs/lanes/375-filings/beef-writer-unframed-states-ts-stack.md`; unfiled); its
+`mergeTxidOnly('')` throws `Internal` after pushing the entry, where this crate takes it
+and its writer refuses it; its `mergeBeef` reads the Atomic word `01010101` as a prefix and
+names the word after it (`... starts with 2958992019` on the recording) where this crate
+names the word held; its `mergeBeef` refuses a BUMP the snapshot's reader refuses in its
+reader's words (`Duplicate offset: 0, at height: 0`, `Merkle Path must contain between 1
+and 54 levels`) where this crate's reader refuses in its own (#477's row); it merges a
+source BUMP whose duplicate carries a hash (its reader dropping the hash), which this
+crate's writer refuses; and where a BUMP of the same height is held, its `mergeBump` throws
+`computeRoot`'s error for a BUMP whose root does not compute (`No valid leaf found in the
+Merkle Path`, `Beef.ts:793-799`) where this crate appends it, the readers and `verify`
+judging it. go-sdk at `2ca481c` refuses a version word other than V1 or V2 in its `Bytes`
+(`invalid BEEF version: %d`, `transaction/beef.go:1533-1534`) and a txid-only entry under
+V1 (`BEEF V1 cannot serialize txid-only transaction <txid>`, `:1546-1548`), holds a txid as
+a 32-byte hash, reads `MergeRawTx`'s bytes with `Transaction.ReadFrom` over a
+`bytes.Reader` (`:820-826`), a prefix: a truncated transaction errs in `io`'s words, the
+bytes after the lock time are left unread and the parsed transaction held without them
+(`transaction.go:81-213`; `NewTransactionFromBytes`, `:56-67`, which refuses them, is not
+called), refuses an index past the BUMPs at that door (`invalid bump index`, `:837-839`),
+refuses one in its `Bytes` (`invalid BEEF BUMP index: %d`, `:1549-1550`) and returns `-1` from `MergeBump`
+for a root that does not compute (`:757-767`); not filed.
+
 ### Fixed: Beef::edit_tx re-keys an edited entry at once, the index notices a hand edit of txs, and an entry names the last BUMP holding it (#817)
 
 **Migration:** `beef.find_txid_mut(t)?.tx_mut()?.f = x` becomes

@@ -25,11 +25,12 @@ exclude_re = [
   # with the six scopes 0x41, 0xc1, 0x42, 0xc2, 0x43, 0xc3 equal on the tree and the mutant
   # (EQUIVALENT, 0.97).
   '^src/script/template\.rs:210:36: replace \| with \^ in compute_sighash_scope$',
-  # src/transaction/beef.rs:1197:29, `<` to `<=` in `dependency_order` (#603, PR #632, at
+  # src/transaction/beef.rs:1132:29, `<` to `<=` in `dependency_order` (#603, PR #632, at
   # 869:33 in `Beef::sort_txs` until #621's second fold moved the sort's body into the free
   # function `dependency_order` beside it, the line unchanged; 1204 until #817's edit door
   # moved `push_tx` into `beef/index.rs`; 1201 until its second fold added the `holds_twins`
-  # field and wrote `clone_shallow` through the derived `Clone`). The indices
+  # field and wrote `clone_shallow` through the derived `Clone`, 1197 then; 1132 since the BEEF
+  # writers and the two fallible merge doors moved to `beef_writable.rs`, #817). The indices
   # never equal at that comparison by the sort's invariant: a transaction never waits on its own
   # txid once accepted (the repeat-txid skip precedes the waking of waiters), so `<` and `<=`
   # choose the same branch (bsv-script-lean lean/BsvChain/Views/Wire/BEEF.lean:338-342,370-373,
@@ -37,7 +38,7 @@ exclude_re = [
   # reads: the cold read (MERGE, 0.9), the adversarial read with self-referencing, merged
   # raw/txid-only, self-caching and ring shapes probed byte-identical (EQUIVALENT, 0.95), the
   # rule read (EQUIVALENT, 0.96).
-  '^src/transaction/beef\.rs:1197:29: replace < with <= in dependency_order$',
+  '^src/transaction/beef\.rs:1132:29: replace < with <= in dependency_order$',
   # src/transaction/merkle_path_walk.rs:142:27 replaced by true, 142:27 replaced by false and
   # 142:33 `!=` to `==`, with 73:13 (the `shared` field deleted from `RootWalker::shared`) (#603,
   # PR #628; merkle_path.rs:652:27, 652:33 and 584:13 until the walker moved, #93 P0; 141 until

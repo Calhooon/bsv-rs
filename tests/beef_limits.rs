@@ -27,7 +27,8 @@ fn chain_beef(n: usize) -> (Beef, String) {
     let mut prev = funding.id();
     let mut beef = Beef::new();
     let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&prev, 800_000));
-    beef.merge_raw_tx(funding.to_binary(), Some(bump));
+    beef.merge_raw_tx(funding.to_binary(), Some(bump))
+        .expect("the bytes are one transaction");
     for _ in 1..n {
         let mut tx = Transaction::new();
         let mut input = TransactionInput::new(prev, 0);
@@ -35,14 +36,15 @@ fn chain_beef(n: usize) -> (Beef, String) {
         tx.inputs.push(input);
         tx.outputs.push(TransactionOutput::new(1_000, lock.clone()));
         prev = tx.id();
-        beef.merge_raw_tx(tx.to_binary(), None);
+        beef.merge_raw_tx(tx.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     (beef, prev)
 }
 
 fn chain_bytes(n: usize) -> (Vec<u8>, String) {
     let (mut beef, subject) = chain_beef(n);
-    (beef.to_binary(), subject)
+    (beef.to_binary().expect("the BEEF is writable"), subject)
 }
 
 fn hints(max_txs: usize, max_bumps: usize) -> BeefLimits {
@@ -66,7 +68,7 @@ fn a_beef_over_every_hint_is_read_all_the_same() {
             .expect("a valid BEEF is not refused for its counts");
         assert_eq!(beef.txs.len(), 10);
         assert_eq!(beef.bumps.len(), 1);
-        assert_eq!(beef.to_binary(), bytes);
+        assert_eq!(beef.to_binary().expect("the BEEF is writable"), bytes);
     }
 }
 
@@ -79,7 +81,7 @@ fn a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing() {
     let mut beef = Beef::from_binary(&bytes).expect("parses");
     beef.txs.clear();
     let mut writer = bsv_rs::primitives::Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     let mut claimed = writer.into_bytes();
     // The last byte is the tx count (0); claim 0xFFFFFFFF transactions instead.
     claimed.pop();

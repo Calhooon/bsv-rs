@@ -27,22 +27,25 @@
 //! }
 //!
 //! // Serialize back
-//! let hex = beef.to_hex();
+//! let hex = beef.to_hex()?;
 //! ```
 
 use std::collections::{HashMap, HashSet};
 
-use crate::primitives::{from_hex, to_hex, Reader, Writer};
+use crate::primitives::{from_hex, Reader, Writer};
 use crate::Result;
 
 use super::beef_stream::{atomic_unreached, display_hex, Kind};
 use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V2};
 
 mod collect;
+// The writers' check and `merge_beef`'s verdict (#817), in the same selection.
 mod in_memory;
 mod index;
 mod merge_entry;
 mod merge_graph;
+#[path = "beef_writable.rs"]
+mod writable;
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
 use collect::AfterFrame;
@@ -346,20 +349,24 @@ impl Beef {
     pub fn merge_bump(&mut self, bump: MerklePath) -> usize {
         // `#markMutated(false)` (`Beef.ts:690`): the bytes read are stale.
         self.wire_order = false;
-        // Check for existing bump with same block height and root
-        for (i, existing) in self.bumps.iter_mut().enumerate() {
-            if existing.block_height == bump.block_height {
-                if let (Ok(root1), Ok(root2)) =
-                    (existing.compute_root(None), bump.compute_root(None))
-                {
-                    if root1 == root2 {
-                        // Combine the bumps
-                        let _ = existing.combine(&bump);
-                        self.update_bump_indices(i);
-                        return i;
-                    }
-                }
-            }
+        // An existing bump of the same block height and root is combined:
+        // both roots are computed here, so the combine cannot fail
+        // (`combine_verified`; until #817 `combine`'s result was dropped
+        // after the same checks). Where the new BUMP's root does not compute
+        // it is appended, where the reference's `#findOrInsertBump` throws
+        // `computeRoot`'s error when a BUMP of its height is held
+        // (`Beef.ts:793-799`): a stated row, the readers and `verify` judging
+        // the BUMP (#817).
+        let root = bump.compute_root(None).ok();
+        let same = |existing: &MerklePath| {
+            existing.block_height == bump.block_height
+                && root.is_some()
+                && existing.compute_root(None).ok() == root
+        };
+        if let Some(i) = self.bumps.iter().position(same) {
+            self.bumps[i].combine_verified(&bump);
+            self.update_bump_indices(i);
+            return i;
         }
 
         // Add as new bump
@@ -396,14 +403,6 @@ impl Beef {
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
         idx
-    }
-
-    /// Merges raw transaction bytes into this BEEF.
-    pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx {
-        let new_tx = BeefTx::from_raw_tx(raw_tx, bump_index);
-        let txid = new_tx.txid();
-        let idx = self.store_raw_entry(new_tx, txid);
-        &self.txs[idx]
     }
 
     /// Merges a txid-only entry into this BEEF.
@@ -464,42 +463,6 @@ impl Beef {
         let mut bumps = self.bumps.iter_mut();
         if let Some(i) = bumps.rposition(|b| b.contains_and_mark(&txid)) {
             self.txs[tx_idx].set_bump_index(Some(i));
-        }
-    }
-
-    /// Merges another BEEF into this one, as the reference's `mergeBeef`
-    /// does (`ts-stack@edf6e03` `Beef.ts:971-990`): from a snapshot of the
-    /// source, the BEEF its serialization writes, never the source's objects.
-    ///
-    /// Bumps are merged before the entries, each with every level sorted
-    /// by offset as the snapshot reads it (#621's third fold), and may
-    /// receive new indices in self. The entries are walked in the order the source's
-    /// [`to_binary`](Self::to_binary) writes them (its sort when the source
-    /// needs one, computed on the side: `other` is not sorted, #621's second
-    /// fold; held order until then), each merged as its written form, its
-    /// bytes or its txid alone: a parsed source entry contributes the bytes
-    /// the writer writes for it, no transaction object, source link or
-    /// merkle path of its own (#621's second fold; its transaction cloned
-    /// until then). Each is merged without the source's bump index (found
-    /// by scanning self.bumps), and only where self holds nothing under its
-    /// txid or holds the txid alone: an entry self holds raw or parsed is
-    /// left as it is, its BUMP index and source links kept (#621's fold;
-    /// replaced until then). A raw entry is filed under the txid it holds,
-    /// hashed no second time (#621).
-    pub fn merge_beef(&mut self, other: &Beef) {
-        self.refresh_mutated(); // The target re-keyed (`Beef.ts:976`, #621's fourth fold).
-        self.mark_mutated();
-        for bump in &other.bumps {
-            // Each level by offset, as the snapshot reads it (`MerklePath.ts:148-149`, #621's third fold).
-            let mut bump = bump.clone();
-            for level in &mut bump.path {
-                level.sort_by_key(|leaf| leaf.offset);
-            }
-            self.merge_bump(bump);
-        }
-
-        for i in other.written_order() {
-            self.merge_beef_entry(&other.txs[i]);
         }
     }
 
@@ -891,38 +854,6 @@ impl Beef {
         Ok(beef)
     }
 
-    /// Serializes this BEEF to binary.
-    pub fn to_binary(&mut self) -> Vec<u8> {
-        self.refresh_mutated();
-        if self.needs_sort {
-            self.sort_txs();
-        }
-
-        let mut writer = Writer::new();
-        self.to_writer(&mut writer);
-        writer.into_bytes()
-    }
-
-    /// Serializes this BEEF to a hex string.
-    pub fn to_hex(&mut self) -> String {
-        to_hex(&self.to_binary())
-    }
-
-    /// Writes this BEEF to a Writer.
-    pub fn to_writer(&self, writer: &mut Writer) {
-        writer.write_u32_le(self.version);
-
-        writer.write_var_int(self.bumps.len() as u64);
-        for bump in &self.bumps {
-            bump.to_writer_lenient_until_beef_817(writer);
-        }
-
-        writer.write_var_int(self.txs.len() as u64);
-        for tx in &self.txs {
-            tx.to_writer(writer, self.version);
-        }
-    }
-
     /// Serializes this BEEF as Atomic BEEF for a specific transaction.
     ///
     /// The BEEF written is the subject's BRC-95 closure, not every entry this
@@ -957,6 +888,10 @@ impl Beef {
             )));
         }
         let closure = self.atomic_closure(txid)?;
+        // The closure's bytes are built before the subject's, as the
+        // reference's are (`Beef.ts:409-410`), so its refusals come first
+        // (#817; until then a txid-only entry under V1 panicked here).
+        closure.check_writable()?;
 
         let mut writer = Writer::new();
         writer.write_u32_le(ATOMIC_BEEF);
@@ -967,7 +902,7 @@ impl Beef {
         reversed.reverse();
         writer.write_bytes(&reversed);
 
-        closure.to_writer(&mut writer);
+        closure.write_checked(&mut writer);
         Ok(writer.into_bytes())
     }
 
@@ -1281,7 +1216,9 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, // locktime
         ];
 
-        let beef_tx = beef.merge_raw_tx(raw_tx, None);
+        let beef_tx = beef
+            .merge_raw_tx(raw_tx, None)
+            .expect("the bytes are one transaction");
         let txid = beef_tx.txid();
 
         // Verify it's not txid-only
@@ -1348,7 +1285,9 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, // locktime
         ];
         let tx_a_id = {
-            let btx = beef.merge_raw_tx(tx_a_raw.clone(), None);
+            let btx = beef
+                .merge_raw_tx(tx_a_raw.clone(), None)
+                .expect("the bytes are one transaction");
             btx.txid()
         };
 
@@ -1374,7 +1313,9 @@ mod tests {
         tx_b_raw.push(0x00); // script length
         tx_b_raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // locktime
         let tx_b_id = {
-            let btx = beef.merge_raw_tx(tx_b_raw, None);
+            let btx = beef
+                .merge_raw_tx(tx_b_raw, None)
+                .expect("the bytes are one transaction");
             btx.txid()
         };
 
@@ -1392,7 +1333,9 @@ mod tests {
         tx_c_raw.push(0x00);
         tx_c_raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
         let _tx_c_id = {
-            let btx = beef.merge_raw_tx(tx_c_raw, None);
+            let btx = beef
+                .merge_raw_tx(tx_c_raw, None)
+                .expect("the bytes are one transaction");
             btx.txid()
         };
 
@@ -1437,7 +1380,7 @@ mod tests {
 
         // Round-trip
         let mut beef = Beef::from_binary(&original).unwrap();
-        let reserialized = beef.to_binary();
+        let reserialized = beef.to_binary().expect("the BEEF is writable");
 
         assert_eq!(
             original, reserialized,
@@ -1462,7 +1405,7 @@ mod tests {
         let original = writer.into_bytes();
 
         let mut beef = Beef::from_binary(&original).unwrap();
-        let reserialized = beef.to_binary();
+        let reserialized = beef.to_binary().expect("the BEEF is writable");
 
         assert_eq!(
             original, reserialized,
@@ -1526,7 +1469,9 @@ mod tests {
 
     /// Helper: adds a raw tx to a beef and returns its txid.
     fn add_raw_tx(beef: &mut Beef, raw: Vec<u8>, bump_index: Option<usize>) -> String {
-        beef.merge_raw_tx(raw, bump_index).txid()
+        beef.merge_raw_tx(raw, bump_index)
+            .expect("the bytes are one transaction")
+            .txid()
     }
 
     /// Helper: adds a raw tx to a beef, creates a coinbase-style BUMP for it, and
@@ -1555,10 +1500,12 @@ mod tests {
         let txid_b = add_proven_tx(&mut beef_b, raw_b.clone(), 101);
 
         // Merge B into A.
-        beef_a.merge_beef(&beef_b);
+        beef_a
+            .merge_beef(&beef_b)
+            .expect("the source BEEF writes and reads back");
 
         // Serialize, parse back.
-        let bin = beef_a.to_binary();
+        let bin = beef_a.to_binary().expect("the BEEF is writable");
         let parsed = Beef::from_binary(&bin).unwrap();
 
         // Verify raw bytes of both txs survived the round-trip.
@@ -1635,14 +1582,14 @@ mod tests {
         let txid_2 = add_raw_tx(&mut beef_v2, raw_2.clone(), None);
 
         // Serialize as V2, parse back.
-        let v2_bin = beef_v2.to_binary();
+        let v2_bin = beef_v2.to_binary().expect("the BEEF is writable");
         let mut parsed_v2 = Beef::from_binary(&v2_bin).unwrap();
         assert_eq!(parsed_v2.version, BEEF_V2);
         assert_eq!(parsed_v2.txs.len(), 2);
 
         // Switch to V1, serialize, parse back.
         parsed_v2.version = BEEF_V1;
-        let v1_bin = parsed_v2.to_binary();
+        let v1_bin = parsed_v2.to_binary().expect("the BEEF is writable");
         let parsed_v1 = Beef::from_binary(&v1_bin).unwrap();
 
         assert_eq!(parsed_v1.version, BEEF_V1);
@@ -1668,7 +1615,7 @@ mod tests {
         let txid = add_proven_tx(&mut beef, raw_tx.clone(), 300);
         let _ = txid; // used indirectly via the bump
 
-        let bin = beef.to_binary();
+        let bin = beef.to_binary().expect("the BEEF is writable");
 
         // V1 format:
         //   4 bytes: version (0x0100BEEF LE -> 01 00 BE EF)
@@ -1711,7 +1658,7 @@ mod tests {
         let txid = add_raw_tx(&mut beef, raw_tx.clone(), None);
 
         // Round-trip through serialization.
-        let bin = beef.to_binary();
+        let bin = beef.to_binary().expect("the BEEF is writable");
         let parsed = Beef::from_binary(&bin).unwrap();
 
         let found = parsed.find_txid(&txid).unwrap();
@@ -1751,7 +1698,9 @@ mod tests {
         assert_eq!(beef_b.find_txid(&txid_b).unwrap().bump_index(), Some(0));
 
         // Merge B into A.
-        beef_a.merge_beef(&beef_b);
+        beef_a
+            .merge_beef(&beef_b)
+            .expect("the source BEEF writes and reads back");
 
         // After merge, A should have 2 bumps.
         assert_eq!(beef_a.bumps.len(), 2);
@@ -1806,7 +1755,7 @@ mod tests {
 
         assert_eq!(beef.txs.len(), 5);
 
-        let size_before = beef.to_binary().len();
+        let size_before = beef.to_binary().expect("the BEEF is writable").len();
 
         // Prove A1.
         let bump_a1 = MerklePath::from_coinbase_txid(&txid_a1, 11);
@@ -1817,7 +1766,7 @@ mod tests {
 
         beef.trim_known_proven();
 
-        let size_after = beef.to_binary().len();
+        let size_after = beef.to_binary().expect("the BEEF is writable").len();
 
         // A0 removed, bump for block 10 removed.
         assert!(beef.find_txid(&txid_a0).is_none(), "A0 should be trimmed");
@@ -2052,7 +2001,10 @@ mod tests {
             0xff, 0xff, 0xff, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00,
         ];
-        let txid = beef.merge_raw_tx(raw, None).txid();
+        let txid = beef
+            .merge_raw_tx(raw, None)
+            .expect("the bytes are one transaction")
+            .txid();
         let bump = MerklePath::from_coinbase_txid(&txid, 100);
         let bi = beef.merge_bump(bump);
         beef.find_txid_mut(&txid).unwrap().set_bump_index(Some(bi));
@@ -2073,8 +2025,12 @@ mod tests {
         let tx_a_raw = make_raw_tx(None, 1000, None);
         let tx_b_raw = make_raw_tx(None, 2000, Some(&[0x01])); // different script → different txid
 
-        let tx_a_id = BeefTx::from_raw_tx(tx_a_raw.clone(), None).txid();
-        let tx_b_id = BeefTx::from_raw_tx(tx_b_raw.clone(), None).txid();
+        let tx_a_id = BeefTx::from_raw_tx(tx_a_raw.clone(), None)
+            .expect("the bytes are one transaction")
+            .txid();
+        let tx_b_id = BeefTx::from_raw_tx(tx_b_raw.clone(), None)
+            .expect("the bytes are one transaction")
+            .txid();
 
         // Build BEEF 1 with TX_A proven. Its merkle path has TX_B's txid as a sibling.
         let mut beef1 = Beef::new();
@@ -2115,7 +2071,9 @@ mod tests {
             .set_bump_index(Some(bi_b));
 
         // Merge BEEF 2 into BEEF 1.
-        beef1.merge_beef(&beef2);
+        beef1
+            .merge_beef(&beef2)
+            .expect("the source BEEF writes and reads back");
 
         // TX_A should still point to bump[0] (height=100)
         let tx_a = beef1.find_txid(&tx_a_id).unwrap();
@@ -2145,7 +2103,9 @@ mod tests {
         // A bump that proves SOME OTHER tx (txid=true for it) and holds
         // `tx_id` beside it (txid=false).
         let tx_raw = make_raw_tx(None, 1234, None);
-        let tx_id = BeefTx::from_raw_tx(tx_raw.clone(), None).txid();
+        let tx_id = BeefTx::from_raw_tx(tx_raw.clone(), None)
+            .expect("the bytes are one transaction")
+            .txid();
         let other_txid = "d".repeat(64);
 
         let bump = MerklePath {
@@ -2168,7 +2128,8 @@ mod tests {
         beef.merge_bump(bump);
 
         // merge_raw_tx (bump_index=None) runs try_to_validate_bump_index.
-        beef.merge_raw_tx(tx_raw, None);
+        beef.merge_raw_tx(tx_raw, None)
+            .expect("the bytes are one transaction");
 
         let tx = beef.find_txid(&tx_id).unwrap();
         assert_eq!(tx.bump_index(), Some(0), "the sibling leaf's BUMP");
@@ -2571,7 +2532,8 @@ mod merkle_path_reattach_tests {
 
         let mut beef = Beef::new();
         let bump_index = beef.merge_bump(funding.merkle_path.clone().unwrap());
-        beef.merge_raw_tx(funding.to_binary(), Some(bump_index));
+        beef.merge_raw_tx(funding.to_binary(), Some(bump_index))
+            .expect("the bytes are one transaction");
 
         let mut prev = shallow(&funding);
         for level in 0..levels {
@@ -2604,7 +2566,8 @@ mod merkle_path_reattach_tests {
                     Script::from_binary(&raw).unwrap(),
                 ));
             }
-            beef.merge_raw_tx(tx.to_binary(), None);
+            beef.merge_raw_tx(tx.to_binary(), None)
+                .expect("the bytes are one transaction");
             prev = shallow(&tx);
         }
 
@@ -2614,7 +2577,10 @@ mod merkle_path_reattach_tests {
             levels as usize + 1,
             "the fixture BEEF holds the funding plus every level, each once"
         );
-        (beef.to_binary(), subject_txid)
+        (
+            beef.to_binary().expect("the BEEF is writable"),
+            subject_txid,
+        )
     }
 }
 
@@ -2626,6 +2592,7 @@ mod merkle_path_reattach_tests {
 #[cfg(test)]
 mod iterative_equivalence_tests {
     use super::*;
+    use crate::primitives::to_hex;
     use crate::script::{LockingScript, UnlockingScript};
     use crate::transaction::{TransactionInput, TransactionOutput};
     use rand::rngs::StdRng;
@@ -2860,7 +2827,7 @@ mod iterative_equivalence_tests {
         if atomic {
             beef.to_binary_atomic(&tx.id())
         } else {
-            Ok(beef.to_binary())
+            Ok(beef.to_binary().expect("the BEEF is writable"))
         }
     }
 
@@ -2906,9 +2873,11 @@ mod iterative_equivalence_tests {
             } else if rng.gen_bool(0.2) {
                 let height = rng.gen_range(800_000..800_003);
                 let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&txid, height));
-                beef.merge_raw_tx(tx.to_binary(), Some(bump));
+                beef.merge_raw_tx(tx.to_binary(), Some(bump))
+                    .expect("the bytes are one transaction");
             } else {
-                beef.merge_raw_tx(tx.to_binary(), None);
+                beef.merge_raw_tx(tx.to_binary(), None)
+                    .expect("the bytes are one transaction");
             }
             made.push((txid, outputs as u32));
         }

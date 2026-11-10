@@ -338,15 +338,18 @@ fn linked_chain(n: usize) -> (Transaction, String) {
         let mut prev = funding.id();
         let mut beef = Beef::new();
         let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&prev, 800_000));
-        beef.merge_raw_tx(funding.to_binary(), Some(bump));
+        beef.merge_raw_tx(funding.to_binary(), Some(bump))
+            .expect("the bytes are one transaction");
         let mut parent = prev.clone();
         for _ in 1..n {
             let tx = spend(&[(prev.clone(), 0)], 1);
             parent = prev;
             prev = tx.id();
-            beef.merge_raw_tx(tx.to_binary(), None);
+            beef.merge_raw_tx(tx.to_binary(), None)
+                .expect("the bytes are one transaction");
         }
-        let tx = Transaction::from_beef(&beef.to_binary(), None).expect("the chain links");
+        let tx = Transaction::from_beef(&beef.to_binary().expect("the BEEF is writable"), None)
+            .expect("the chain links");
         (tx, parent)
     })
 }

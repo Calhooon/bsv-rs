@@ -78,7 +78,8 @@ fn assert_merged_as_recorded(name: &str) {
                 beef.merge_bump(bump(&v, what));
             }
             "raw" => {
-                beef.merge_raw_tx(tx(&v, what).to_binary(), None);
+                beef.merge_raw_tx(tx(&v, what).to_binary(), None)
+                    .expect("the bytes are one transaction");
             }
             other => panic!("no step {other}"),
         }
@@ -94,7 +95,7 @@ fn assert_merged_as_recorded(name: &str) {
         .map(|n| v["txs"][n]["txid"].as_str().unwrap());
     assert_eq!(returned.as_deref(), recorded, "{name}: the entry returned");
     assert_eq!(
-        beef.to_hex(),
+        beef.to_hex().expect("the BEEF is writable"),
         c["beef"].as_str().unwrap(),
         "{name}: the bytes the reference's mergeTransaction then toHex writes"
     );
@@ -233,11 +234,17 @@ fn a_graph_merged_twice_moves_no_entry_and_writes_one_merges_bytes_764() {
     let once = case(&v, "chain_proven_at_the_root");
     let mut beef = Beef::new();
     beef.merge_transaction(materialize(&v, &once["merge"]));
-    assert_eq!(beef.to_hex(), once["beef"].as_str().unwrap());
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        once["beef"].as_str().unwrap()
+    );
     let order = |b: &Beef| b.txs.iter().map(|t| t.txid()).collect::<Vec<_>>();
     let first = order(&beef);
     beef.merge_transaction(materialize(&v, &once["merge"]));
     assert_eq!(order(&beef), first, "the second merge moved an entry");
-    assert_eq!(beef.to_hex(), once["beef"].as_str().unwrap());
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        once["beef"].as_str().unwrap()
+    );
     assert_merged_as_recorded("chain_proven_at_the_root_merged_twice");
 }

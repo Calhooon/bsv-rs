@@ -40,12 +40,16 @@ fn merge_beef_keeps_the_source_entrys_txid_621() {
 
     let mut source = Beef::new();
     source.push_tx(
-        BeefTx::from_raw_tx(bytes.clone(), None).with_txid(sentinel.clone()),
+        BeefTx::from_raw_tx(bytes.clone(), None)
+            .expect("the bytes are one transaction")
+            .with_txid(sentinel.clone()),
         sentinel.clone(),
     );
 
     let mut merged = Beef::new();
-    merged.merge_beef(&source);
+    merged
+        .merge_beef(&source)
+        .expect("the source BEEF writes and reads back");
 
     let entry = merged
         .find_txid(&sentinel)
@@ -68,7 +72,9 @@ fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
     let bytes = raw();
     let old = hash_of(&bytes);
     let mut source = Beef::new();
-    source.merge_raw_tx(bytes.clone(), None);
+    source
+        .merge_raw_tx(bytes.clone(), None)
+        .expect("the bytes are one transaction");
     let entry = source.find_txid_mut(&old).unwrap();
     {
         let tx = entry.tx_mut().unwrap();
@@ -82,7 +88,9 @@ fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
     assert_ne!(entry.txid(), old, "txid() hashes the edited fields");
 
     let mut merged = Beef::new();
-    merged.merge_beef(&source);
+    merged
+        .merge_beef(&source)
+        .expect("the source BEEF writes and reads back");
     for e in &merged.txs {
         let held = e.raw_tx().expect("a raw entry");
         assert_eq!(

@@ -76,13 +76,14 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
         let (kind, what) = step.as_str().unwrap().split_once(':').unwrap();
         match kind {
             "reread" => {
-                *beef = Beef::from_hex(&beef.to_hex()).unwrap();
+                *beef = Beef::from_hex(&beef.to_hex().expect("the BEEF is writable")).unwrap();
             }
             "bump" => {
                 beef.merge_bump(bump(v, what));
             }
             "raw" => {
-                beef.merge_raw_tx(tx(v, what).to_binary(), None);
+                beef.merge_raw_tx(tx(v, what).to_binary(), None)
+                    .expect("the bytes are one transaction");
             }
             "txid" => {
                 beef.merge_txid_only(tx(v, what).id());
@@ -138,13 +139,15 @@ fn assert_merged_as_recorded(name: &str) {
     for (how, source) in [("as built", &source), ("read back", &read_back)] {
         let mut target = Beef::new();
         apply(&v, &mut target, &c["target"]);
-        target.merge_beef(source);
+        target
+            .merge_beef(source)
+            .expect("the source BEEF writes and reads back");
         let recorded = match how {
             "read back" => c["read_back_beef"].as_str().unwrap(),
             _ => c["beef"].as_str().unwrap(),
         };
         assert_eq!(
-            target.to_hex(),
+            target.to_hex().expect("the BEEF is writable"),
             recorded,
             "{name} ({how}): the bytes the reference's mergeBeef then toHex writes"
         );
@@ -194,7 +197,7 @@ fn assert_merged_as_recorded(name: &str) {
         "{name}: merge_beef left the source's order as held"
     );
     assert_eq!(
-        source.to_hex(),
+        source.to_hex().expect("the BEEF is writable"),
         c["source_beef"].as_str().unwrap(),
         "{name}: the source's bytes"
     );

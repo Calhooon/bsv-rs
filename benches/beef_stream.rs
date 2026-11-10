@@ -63,20 +63,25 @@ fn build_fixture(path: &Path, bytes: usize) -> [u8; 32] {
     let mut beef = Beef::new();
     beef.bumps
         .push(MerklePath::from_coinbase_txid(&prev, HEIGHT as u32));
-    beef.txs
-        .push(BeefTx::from_raw_tx(funding.to_binary(), Some(0)));
+    beef.txs.push(
+        BeefTx::from_raw_tx(funding.to_binary(), Some(0)).expect("the bytes are one transaction"),
+    );
     let count = bytes / 1_000;
     for _ in 1..count - 1 {
         let tx = transaction(prev, payload);
         prev = tx.id();
-        beef.txs.push(BeefTx::from_raw_tx(tx.to_binary(), None));
+        beef.txs.push(
+            BeefTx::from_raw_tx(tx.to_binary(), None).expect("the bytes are one transaction"),
+        );
     }
     let tail = transaction(prev.clone(), payload);
-    beef.txs.push(BeefTx::from_raw_tx(tail.to_binary(), None));
-    let overhead = beef.to_binary().len() - bytes;
+    beef.txs
+        .push(BeefTx::from_raw_tx(tail.to_binary(), None).expect("the bytes are one transaction"));
+    let overhead = beef.to_binary().expect("the BEEF is writable").len() - bytes;
     let tail = transaction(prev, payload - overhead);
-    *beef.txs.last_mut().expect("tail") = BeefTx::from_raw_tx(tail.to_binary(), None);
-    let encoded = beef.to_binary();
+    *beef.txs.last_mut().expect("tail") =
+        BeefTx::from_raw_tx(tail.to_binary(), None).expect("the bytes are one transaction");
+    let encoded = beef.to_binary().expect("the BEEF is writable");
     assert_eq!(encoded.len(), bytes, "fixture byte count");
     std::fs::write(path, encoded).expect("write fixture");
     root
@@ -87,7 +92,7 @@ fn build_reversed(forward: &Path, path: &Path) {
     let mut beef = Beef::from_binary(&std::fs::read(forward).expect("fixture")).expect("a BEEF");
     beef.txs.reverse();
     let mut writer = bsv_rs::primitives::Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     std::fs::write(path, writer.into_bytes()).expect("write fixture");
 }
 

@@ -126,6 +126,24 @@ fuzz_target!(|data: &[u8]| {
     let hinted = hinted.expect("the hinted parse refused what the parse accepted");
     assert_eq!(hinted.txs.len(), beef.txs.len());
 
+    // #817: every BEEF the parse returns writes `Ok`, an `Ok` write reads
+    // back to the same entries and BUMPs and is a fixed point, and so the
+    // BEEF merges (`merge_beef`'s verdict is that round trip).
+    let written = beef
+        .to_binary()
+        .expect("a BEEF the parse returned is refused by the writer (#817)");
+    let mut back = Beef::from_binary(&written).expect("an Ok write does not read back (#817)");
+    assert_eq!(back.txs.len(), beef.txs.len(), "the entries read back");
+    assert_eq!(back.bumps.len(), beef.bumps.len(), "the BUMPs read back");
+    assert_eq!(
+        back.to_binary().expect("the read-back BEEF writes"),
+        written,
+        "a write of the read-back BEEF is the same bytes"
+    );
+    Beef::new()
+        .merge_beef(&beef)
+        .expect("a BEEF the parse returned merges (#817)");
+
     // Link every subject (the iterative walk), serialize, clone and drop it
     let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
     for txid in &txids {
@@ -140,8 +158,9 @@ fuzz_target!(|data: &[u8]| {
 
     // Sort, validate and round-trip
     let _ = beef.verify_valid(true);
-    let bytes = beef.to_binary();
-    let _ = Beef::from_binary(&bytes);
+    if let Ok(bytes) = beef.to_binary() {
+        Beef::from_binary(&bytes).expect("an Ok write does not read back (#817)");
+    }
     let _ = Transaction::from_beef(data, None);
     let _ = Transaction::from_atomic_beef(data);
 });

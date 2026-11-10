@@ -74,7 +74,8 @@ fn build(v: &Value, case: &Value) -> Beef {
                 beef.merge_bump(bump(v, name));
             }
             "raw" => {
-                beef.merge_raw_tx(tx(v, name).to_binary(), None);
+                beef.merge_raw_tx(tx(v, name).to_binary(), None)
+                    .expect("the bytes are one transaction");
             }
             "tx" => {
                 beef.merge_transaction(tx(v, name));
@@ -129,7 +130,7 @@ fn assert_written_as_recorded(v: &Value, name: &str) {
         assert_atomic_as_recorded(v, &case, &mut beef, name);
     }
     assert_eq!(
-        beef.to_hex(),
+        beef.to_hex().expect("the BEEF is writable"),
         case["beef"].as_str().unwrap(),
         "{name}: the bytes the reference's toBinary writes"
     );
@@ -247,7 +248,7 @@ fn a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765() {
         assert!(beef.bumps[index as usize]
             .txids()
             .contains(&parent.to_string()));
-        let mut read = Beef::from_binary(&beef.to_binary()).unwrap();
+        let mut read = Beef::from_binary(&beef.to_binary().expect("the BEEF is writable")).unwrap();
         assert!(read.verify_valid(false).valid, "{name}");
     }
 }
@@ -364,7 +365,11 @@ fn path_case_walk(v: &Value, name: &str) -> (Vec<Value>, Value) {
         .unwrap()
         .clone();
     let mut written = build(v, &case);
-    assert_eq!(written.to_hex(), case["beef"].as_str().unwrap(), "{name}");
+    assert_eq!(
+        written.to_hex().expect("the BEEF is writable"),
+        case["beef"].as_str().unwrap(),
+        "{name}"
+    );
     let mut read = Beef::from_hex(case["beef"].as_str().unwrap()).unwrap();
     let set_on = v["txs"][case["set_on"].as_str().unwrap()]["txid"]
         .as_str()
@@ -548,7 +553,10 @@ fn a_transaction_entry_after_to_hex_keeps_the_never_serialized_order_stated_798(
     let name = "transaction_uncle_naming_no_bump_after_to_hex";
     let case = index_case(&v, name);
     let mut beef = build(&v, &case);
-    assert_eq!(beef.to_hex(), case["beef"].as_str().unwrap());
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        case["beef"].as_str().unwrap()
+    );
     let join = v["txs"]["join"]["txid"].as_str().unwrap();
     let ours = to_hex(&beef.to_binary_atomic(join).unwrap());
     assert_ne!(ours, case["atomic"][0]["beef"].as_str().unwrap());
@@ -569,7 +577,8 @@ fn a_stub_read_from_bytes_written_atomic_is_refused_as_stub_not_proven_798() {
     let v = vector();
     let case = index_case(&v, "txid_only_after_both_with_child");
     let child = v["txs"]["child"]["txid"].as_str().unwrap();
-    let mut read = Beef::from_binary(&build(&v, &case).to_binary()).unwrap();
+    let mut read =
+        Beef::from_binary(&build(&v, &case).to_binary().expect("the BEEF is writable")).unwrap();
     let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
     // Read from bytes, the stub has no index.
     assert_eq!(read.find_txid(parent).unwrap().bump_index(), None);

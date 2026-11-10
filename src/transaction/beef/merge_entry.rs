@@ -54,7 +54,8 @@ impl Beef {
         }
         // No source bump index: the BUMP is found by scanning
         // self.bumps, as `#mergeRawTxEntry(btx._rawTx)` passes none.
-        self.store_raw_entry(BeefTx::from_raw_tx(raw.into_owned(), None), txid);
+        // Framed: `merge_beef`'s verdict wrote and read these bytes (#817).
+        self.store_raw_entry(BeefTx::from_framed_raw_tx(raw.into_owned(), None), txid);
     }
 
     /// The positions of the source's entries in the order the reference's

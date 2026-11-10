@@ -1073,7 +1073,7 @@ async fn test_lookup_missing_type_is_refused() {
 /// A BEEF of two transactions, each proven by a block of its own, built by
 /// this crate's writer: its bytes and the two txids. A binary aggregated
 /// answer's BEEF is parsed (#735's fold), so the fixtures are real BEEFs.
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 fn two_transaction_beef() -> (Vec<u8>, String, String) {
     use bsv_rs::script::{LockingScript, UnlockingScript};
     use bsv_rs::transaction::{
@@ -1096,10 +1096,15 @@ fn two_transaction_beef() -> (Vec<u8>, String, String) {
         let path =
             MerklePath::new(height, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap();
         let index = beef.merge_bump(path);
-        beef.merge_raw_tx(tx.to_binary(), Some(index));
+        beef.merge_raw_tx(tx.to_binary(), Some(index))
+            .expect("the bytes are one transaction");
         txids.push(tx.id());
     }
-    (beef.to_binary(), txids.remove(0), txids.remove(0))
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        txids.remove(0),
+        txids.remove(0),
+    )
 }
 
 /// The Atomic BEEF of `txid` out of `beef`, as each output of a binary

@@ -46,7 +46,7 @@ fn record(case: &Value, operator: &str) -> RegistryRecord {
         0,
         1,
         case["locking_script"].as_str().unwrap().to_string(),
-        beef.to_binary(),
+        beef.to_binary().expect("the BEEF is writable"),
     );
     RegistryRecord::new(definition, token)
 }

@@ -122,7 +122,7 @@ fn refusal(beef: &Beef) -> Option<String> {
         sorted.with_missing_inputs,
         held.txs.len(),
         held.bumps.len(),
-        held.to_binary().len()
+        held.to_binary().expect("the BEEF is writable").len()
     ))
 }
 
@@ -130,7 +130,7 @@ fn refusal(beef: &Beef) -> Option<String> {
 /// valid, B carrying the BUMP at `HEIGHT` with the block's root.
 fn assert_links(beef: &mut Beef, subject: &str, b: &str, root: &str) {
     assert_eq!(refusal(beef), None);
-    let bytes = beef.to_binary();
+    let bytes = beef.to_binary().expect("the BEEF is writable");
     let mut read = Beef::from_binary(&bytes).unwrap();
     assert!(read.verify_valid(false).valid, "the bytes read back");
     let any = HeadersFn(|_: u64, _: &Hash32| true);
@@ -169,14 +169,17 @@ fn a_sibling_mined_input_merged_without_an_index_links_to_the_bump_holding_it_76
     let c = tx(&[(&blk.a.id(), 0), (&b.id(), 0)], 6_500);
     let mut beef = Beef::new();
     beef.merge_bump(blk.a_bump.clone());
-    beef.merge_raw_tx(blk.a.to_binary(), None);
-    beef.merge_raw_tx(b.to_binary(), None);
-    beef.merge_raw_tx(c.to_binary(), None);
+    beef.merge_raw_tx(blk.a.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(b.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(c.to_binary(), None)
+        .expect("the bytes are one transaction");
 
     assert_eq!(refusal(&beef), None, "the p25 BEEF");
     assert_eq!(beef.find_txid(&b.id()).unwrap().bump_index(), Some(0));
     assert_eq!(beef.bumps[0].txids(), vec![blk.a.id(), b.id()]);
-    let hex = beef.to_hex();
+    let hex = beef.to_hex().expect("the BEEF is writable");
     assert!(
         hex.contains(&leaf_bytes(&b.id(), "02")),
         "B's leaf written 02"
@@ -197,7 +200,8 @@ fn a_txid_no_bump_holds_stays_unproven_and_its_missing_parent_refused_765() {
     let mut beef = Beef::new();
     beef.merge_bump(blk.a_bump);
     for t in [&blk.a, &b, &c] {
-        beef.merge_raw_tx(t.to_binary(), None);
+        beef.merge_raw_tx(t.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     assert_eq!(beef.find_txid(&b.id()).unwrap().bump_index(), None);
     let text = refusal(&beef).expect("refused");
@@ -231,7 +235,8 @@ fn chain(parent: &str) -> Chain {
 
 fn merge_raw(beef: &mut Beef, txs: &[&Transaction]) {
     for t in txs {
-        beef.merge_raw_tx(t.to_binary(), None);
+        beef.merge_raw_tx(t.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
 }
 
@@ -262,10 +267,12 @@ fn the_seven_arrangements_of_a_txid_held_as_a_sibling_leaf_link_765() {
     let mut spends = Beef::new();
     merge_raw(&mut spends, &[s, u1, u2]);
     let mut beef = spends.clone();
-    beef.merge_beef(&proof);
+    beef.merge_beef(&proof)
+        .expect("the source BEEF writes and reads back");
     cases.push(("merge_beef: the proof into the chain", beef));
     let mut beef = proof.clone();
-    beef.merge_beef(&spends);
+    beef.merge_beef(&spends)
+        .expect("the source BEEF writes and reads back");
     cases.push(("merge_beef: the chain into the proof", beef));
 
     let mut beef = Beef::new();
@@ -319,7 +326,7 @@ fn a_txid_only_sibling_and_two_roots_at_one_height_answer_for_their_own_reasons_
     merge_raw(&mut beef, &[&k.blk.a, &k.u1, &k.u2]);
     assert_eq!(beef.find_txid(&k.s.id()).unwrap().bump_index(), Some(0));
     assert!(beef.verify_valid(false).valid && beef.verify_valid(true).valid);
-    let mut read = Beef::from_binary(&beef.to_binary()).unwrap();
+    let mut read = Beef::from_binary(&beef.to_binary().expect("the BEEF is writable")).unwrap();
     assert!(read.verify_valid(false).valid, "the txid-only S read back");
 
     let other = tx(&[(&"2a".repeat(32), 0)], 1_000);

@@ -111,14 +111,16 @@ fn cases() -> Vec<(Vec<u8>, Value)> {
         .iter()
         .map(|case| {
             let mut beef = Beef::new();
-            beef.merge_raw_tx(parent.to_binary(), None);
+            beef.merge_raw_tx(parent.to_binary(), None)
+                .expect("the bytes are one transaction");
             if case["subject"].as_str().unwrap() == child.id() {
-                beef.merge_raw_tx(child.to_binary(), None);
+                beef.merge_raw_tx(child.to_binary(), None)
+                    .expect("the bytes are one transaction");
             }
             for name in case["bumps"].as_array().unwrap() {
                 beef.merge_bump(bump(name.as_str().unwrap(), &p, sibling));
             }
-            let bytes = beef.to_binary();
+            let bytes = beef.to_binary().expect("the BEEF is writable");
             assert_eq!(
                 to_hex(&bytes),
                 case["beef"].as_str().unwrap(),

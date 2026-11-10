@@ -477,11 +477,13 @@ fn written(bump: MerklePath, raws: &[Vec<u8>]) -> Vec<u8> {
     let mut beef = Beef::with_version(BEEF_V1);
     beef.bumps.push(bump);
     for (i, raw) in raws.iter().enumerate() {
-        beef.txs
-            .push(BeefTx::from_raw_tx(raw.clone(), (i == 0).then_some(0)));
+        beef.txs.push(
+            BeefTx::from_raw_tx(raw.clone(), (i == 0).then_some(0))
+                .expect("the bytes are one transaction"),
+        );
     }
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     writer.into_bytes()
 }
 
@@ -688,7 +690,7 @@ fn a_cursor_edge_of_a_transaction_not_held_raw_is_refused_wire_atomic_beef_023()
     beef.txs
         .push(BeefTx::from_txid(BLOCK_9_COINBASE.to_string()));
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     let txid_only = writer.into_bytes();
     let whole_verdict = StreamVerifier::new(&txid_only[..], &tracker, None)
         .run()

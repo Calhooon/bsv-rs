@@ -62,7 +62,8 @@ fn spending(sources: &[(String, u32)], outputs: usize, satoshis: u64) -> Transac
 fn merge_proven(beef: &mut Beef, tx: &Transaction) {
     let leaf = MerklePathLeaf::new_txid(0, tx.id());
     let index = beef.merge_bump(MerklePath::new(900, vec![vec![leaf]]).unwrap());
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
 }
 
 /// A shape's BEEF, its subject and the transactions under it.
@@ -113,18 +114,22 @@ fn two_parents_of(g: &Transaction, gg: Option<&Transaction>) -> Built {
         .add_output(TransactionOutput::new(1, token()))
         .unwrap();
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
-    beef.merge_raw_tx(p1_tx.to_binary(), None);
-    beef.merge_raw_tx(p2_tx.to_binary(), None);
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(p1_tx.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(p2_tx.to_binary(), None)
+        .expect("the bytes are one transaction");
     match gg {
         Some(gg) => {
-            beef.merge_raw_tx(g.to_binary(), None);
+            beef.merge_raw_tx(g.to_binary(), None)
+                .expect("the bytes are one transaction");
             merge_proven(&mut beef, gg);
         }
         None => merge_proven(&mut beef, g),
     }
     Built {
-        beef: beef.to_binary(),
+        beef: beef.to_binary().expect("the BEEF is writable"),
         subject: subject.id(),
         p1: p1_tx.id(),
         p2: p2_tx.id(),

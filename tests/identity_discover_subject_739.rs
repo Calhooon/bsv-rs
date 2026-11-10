@@ -65,8 +65,9 @@ fn proven_spend(byte: &str, lock: LockingScript) -> Vec<u8> {
     let path = MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap();
     let mut beef = Beef::new();
     let index = beef.merge_bump(path);
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
-    beef.to_binary()
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
+    beef.to_binary().expect("the BEEF is writable")
 }
 
 /// A token the recorder issued, under the vector's `tokens`.
@@ -90,13 +91,14 @@ fn over_bound(byte: &str, n: usize) -> Vec<u8> {
     }
     let path = MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, subject.id())]]).unwrap();
     let index = beef.merge_bump(path);
-    beef.merge_raw_tx(subject.to_binary(), Some(index));
+    beef.merge_raw_tx(subject.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     let mut writer = Writer::new();
     writer.write_u32_le(0x0101_0101);
     let mut txid = from_hex(&subject.id()).unwrap();
     txid.reverse();
     writer.write_bytes(&txid);
-    writer.write_bytes(&beef.to_binary());
+    writer.write_bytes(&beef.to_binary().expect("the BEEF is writable"));
     writer.into_bytes()
 }
 

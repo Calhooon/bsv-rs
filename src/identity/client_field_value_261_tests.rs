@@ -71,8 +71,9 @@ fn proven(tx: &Transaction) -> Vec<u8> {
     let path = crate::transaction::MerklePath::new(900, vec![vec![leaf]]).unwrap();
     let mut beef = Beef::new();
     let index = beef.merge_bump(path);
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
-    beef.to_binary()
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
+    beef.to_binary().expect("the BEEF is writable")
 }
 
 /// The subject's signed revelation of `json` (#544), as the reference's

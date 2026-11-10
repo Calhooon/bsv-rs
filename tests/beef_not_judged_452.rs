@@ -218,7 +218,9 @@ fn bytes(tx: &Transaction, deferred: bool) -> Vec<u8> {
     }
     writer.write_var_int(beef.txs.len() as u64);
     for entry in beef.txs.iter().rev() {
-        entry.to_writer(&mut writer, BEEF_V1);
+        entry
+            .to_writer(&mut writer, BEEF_V1)
+            .expect("the BEEF is writable");
     }
     writer.into_bytes()
 }
@@ -428,7 +430,9 @@ fn a_source_height_above_u32_is_reachable_through_streaming_headers_452() {
     writer.write_bytes(reader.read_remaining());
     writer.write_var_int(beef.txs.len() as u64);
     for entry in &beef.txs {
-        entry.to_writer(&mut writer, BEEF_V1);
+        entry
+            .to_writer(&mut writer, BEEF_V1)
+            .expect("the BEEF is writable");
     }
     let headers = WideHeightHeaders {
         height,

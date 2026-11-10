@@ -261,8 +261,9 @@ fn two_transactions_beef() -> Vec<u8> {
         .unwrap()
         .to_string();
     let mut both = Beef::from_binary(&beef()).unwrap();
-    both.merge_beef(&Beef::from_binary(&from_hex(&second).unwrap()).unwrap());
-    let bytes = both.to_binary();
+    both.merge_beef(&Beef::from_binary(&from_hex(&second).unwrap()).unwrap())
+        .expect("the source BEEF writes and reads back");
+    let bytes = both.to_binary().expect("the BEEF is writable");
     assert_eq!(
         to_hex(&bytes),
         vector()["two_transactions_beef"].as_str().unwrap(),

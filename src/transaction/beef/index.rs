@@ -272,7 +272,7 @@ impl Beef {
     /// use bsv_rs::transaction::{Beef, Transaction};
     ///
     /// let mut beef = Beef::new();
-    /// let txid = beef.merge_raw_tx(Transaction::new().to_binary(), None).txid();
+    /// let txid = beef.merge_raw_tx(Transaction::new().to_binary(), None)?.txid();
     /// let edited = beef.edit_tx(&txid, |tx| {
     ///     tx.lock_time = 7;
     ///     tx.id()

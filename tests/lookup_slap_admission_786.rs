@@ -90,11 +90,12 @@ fn advertisement(host: &str, satoshis: u64) -> (String, OutputListItem) {
     let index = beef.merge_bump(
         MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, txid.clone())]]).unwrap(),
     );
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     (
         txid,
         OutputListItem {
-            beef: beef.to_binary(),
+            beef: beef.to_binary().expect("the BEEF is writable"),
             output_index: 0,
             context: None,
             txid: None,

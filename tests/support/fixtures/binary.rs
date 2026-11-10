@@ -130,7 +130,7 @@ fn beef_entry(name: &str, input: Value, mut beef: Beef, atomic: bool) -> Value {
         beef.to_binary_atomic(beef.atomic_txid.clone().as_deref().unwrap())
             .unwrap()
     } else {
-        beef.to_binary()
+        beef.to_binary().expect("the BEEF is writable")
     };
     let mut parsed = Beef::from_binary(&bytes).unwrap();
     let roundtrip = if atomic {
@@ -138,7 +138,7 @@ fn beef_entry(name: &str, input: Value, mut beef: Beef, atomic: bool) -> Value {
             .to_binary_atomic(parsed.atomic_txid.clone().as_deref().unwrap())
             .unwrap()
     } else {
-        parsed.to_binary()
+        parsed.to_binary().expect("the BEEF is writable")
     };
     assert_eq!(roundtrip, bytes, "{name}: BEEF round trip");
     let expected_stream = stream(&bytes, bytes.len());
@@ -184,7 +184,7 @@ pub fn record(suite: &mut Suite) {
         ),
         (
             "examples/beef_spv.rs",
-            "8091b0f87f3f111f64148f144232cbc37ff6349a40a96c76e9f471543c3ab4aa",
+            "37f25c28a3611491dae340b2134e2cda1babf60143ca15995cfd9c74a140df51",
         ),
         (
             "examples/overlay.rs",
@@ -291,8 +291,10 @@ pub fn record(suite: &mut Suite) {
     for (version, name) in [(BEEF_V1, "v1"), (BEEF_V2, "v2")] {
         let mut beef = Beef::with_version(version);
         let bump = beef.merge_bump(funding.merkle_path.clone().unwrap());
-        beef.merge_raw_tx(funding.to_binary(), Some(bump));
-        beef.merge_raw_tx(spend.to_binary(), None);
+        beef.merge_raw_tx(funding.to_binary(), Some(bump))
+            .expect("the bytes are one transaction");
+        beef.merge_raw_tx(spend.to_binary(), None)
+            .expect("the bytes are one transaction");
         let source = if version == BEEF_V1 {
             shared_beef::BRC62_HEX
         } else {
@@ -324,8 +326,12 @@ pub fn record(suite: &mut Suite) {
     }
     let mut atomic = Beef::new();
     let bump = atomic.merge_bump(funding.merkle_path.clone().unwrap());
-    atomic.merge_raw_tx(funding.to_binary(), Some(bump));
-    atomic.merge_raw_tx(spend.to_binary(), None);
+    atomic
+        .merge_raw_tx(funding.to_binary(), Some(bump))
+        .expect("the bytes are one transaction");
+    atomic
+        .merge_raw_tx(spend.to_binary(), None)
+        .expect("the bytes are one transaction");
     atomic.atomic_txid = Some(spend.id());
     let existing = Beef::from_binary(&file(
         "tests/vectors/beef_of_any_size/example_atomic_payment.bin",

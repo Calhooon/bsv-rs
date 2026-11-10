@@ -126,7 +126,7 @@ fn corrupt(h: &support::Harness, kind: &str) {
             let mut beef = Beef::new();
             beef.merge_transaction(tx);
             beef.merge_transaction(h.sources[1].0.clone());
-            list.beef = Some(beef.to_binary());
+            list.beef = Some(beef.to_binary().expect("the BEEF is writable"));
         }
         "satoshis" => list.outputs[0].satoshis += 1,
         "spendable" => list.outputs[0].spendable = false,
