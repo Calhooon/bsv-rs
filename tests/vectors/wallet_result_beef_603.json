@@ -1,0 +1,83 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk/src/wallet/WalletResultBEEF.ts",
+  "runtime": "v22.18.0",
+  "recorder": "tests/support/wallet_result_beef_603.mjs",
+  "cases": [
+    {
+      "name": "height_2_53",
+      "kills": [
+        "53:10 > ==",
+        "53:10 > >="
+      ],
+      "hex": "0200beef01ff000000000000200001010000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a100",
+      "parse": "varInt is too large"
+    },
+    {
+      "name": "height_2_53_minus_1",
+      "kills": [
+        "53:10 > >="
+      ],
+      "hex": "0200beef01ffffffffffffff1f0001010000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a100",
+      "parse": "ok",
+      "txids": []
+    },
+    {
+      "name": "outputs_remaining_multiple_of_9",
+      "kills": [
+        "88:36 / %"
+      ],
+      "hex": "0200beef000100010000000001010000000000000005515151515100000000",
+      "parse": "ok",
+      "txids": [
+        "959e18e3133d078029b690dba7ec312e0ff342dab47c47b65a86abdfa6a278e7"
+      ]
+    },
+    {
+      "name": "level_count_half_remaining",
+      "kills": [
+        "119:19 > ==",
+        "119:19 > >="
+      ],
+      "hex": "0200beef010002020000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a10100b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b201010100",
+      "parse": "ok",
+      "txids": []
+    },
+    {
+      "name": "offset_at_level_max",
+      "kills": [
+        "126:23 > ==",
+        "126:23 > >="
+      ],
+      "hex": "0200beef010002020000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a10100b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2020100c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3feffffff7f00d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d400",
+      "parse": "ok",
+      "txids": []
+    },
+    {
+      "name": "offset_past_level_max",
+      "kills": [
+        "126:46 >> <<",
+        "126:56 || &&"
+      ],
+      "hex": "0200beef010002020000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a10100b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2020100c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3fe0000008000d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d400",
+      "parse": "Invalid Merkle Path offset"
+    },
+    {
+      "name": "atomic_closed_expected_parent",
+      "kills": [
+        "247:9 None",
+        "252:16 !",
+        "271:21 == !="
+      ],
+      "hex": "01010101d6b88baae09705889e052648af13d7e9a22a36f0a6df896ac51d6072c63e51950200beef000200010000000001010000000000000001510000000000010000000114180092832c9e49f36e37c2cfa6695a6670cc66dcba42266245e11c8f9de4cf0000000000ffffffff010100000000000000015100000000",
+      "parent": "cfe49d8f1ce145622642badc66cc70665a69a6cfc2376ef3499e2c8392001814",
+      "subject": "95513ec672601dc56a89dfa6f0362aa2e9d713af4826059e880597e0aa8bb8d6",
+      "parse": "ok",
+      "txids": [
+        "cfe49d8f1ce145622642badc66cc70665a69a6cfc2376ef3499e2c8392001814",
+        "95513ec672601dc56a89dfa6f0362aa2e9d713af4826059e880597e0aa8bb8d6"
+      ],
+      "atomic_strict": "95513ec672601dc56a89dfa6f0362aa2e9d713af4826059e880597e0aa8bb8d6",
+      "atomic_partial": "95513ec672601dc56a89dfa6f0362aa2e9d713af4826059e880597e0aa8bb8d6"
+    }
+  ]
+}

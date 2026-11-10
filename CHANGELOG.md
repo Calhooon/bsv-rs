@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: src/wallet/substrates/result_values/beef.rs's survivors of the complete run killed from the reference's recorded verdicts (#603)
+
+- The complete run of 2026-11-04 (`docs/census/mutants-2026-11-04.json`, `2ff81a44`)
+  measured `beef.rs` at 75.00% (51 caught, 17 missed, 0 timeout, 13 unviable; floor 75).
+  Six library tests, `src/wallet/substrates/result_values/beef_603_tests.rs`, read seven
+  shapes of `tests/vectors/wallet_result_beef_603.json`, each verdict recorded from the
+  reference (`ts-stack@edf6e03` `packages/sdk/src/wallet/WalletResultBEEF.ts`, bundled alone,
+  Node v22.18.0, `tests/support/wallet_result_beef_603.mjs`, two runs byte-identical); each
+  asserts the verdict, the transactions read and the subject's txid, never a message (every
+  caller drops the error's content). Twelve kills, each RED on its mutant in a scratch copy:
+  a BUMP height of 2^53 refused and 2^53 - 1 read (`readVarInt`, `:84`; `53:10` `>` to `==`
+  and to `>=`); a transaction whose bytes after the output count are 18, a multiple of 9,
+  read (`88:36` `/` to `%`); a level of one duplicate leaf with three bytes left read
+  (`119:19` `>` to `==` and to `>=`); a level-1 leaf at `0x7fffffff` read and at `0x80000000`
+  refused (`readMerklePath`, `:257-259`; `126:23` `>` to `==` and to `>=`, `126:46` `>>` to
+  `<<`, `126:56` `||` to `&&`); a closed Atomic BEEF's subject returned over an expected
+  parent txid, as the strict `parseWalletResultAtomicBEEF` returns it before the expected
+  txid is read (`:389-428`; `WalletResultValidation.ts:1376-1415`; `247:9` body to `None`,
+  `252:16` `!` deleted, `271:21` `==` to `!=`).
+- Five survivors remain, candidates for equivalence (not declared; `.cargo/mutants.toml`
+  untouched): `74:36`, `88:36` and `119:40` `/` to `*`, and `165:15` `>` to `==` and to
+  `>=`. Each moves an early refusal of a count the bytes cannot hold (an input is at least
+  41 bytes, an output 9, a leaf 2, a BUMP 37; a count of 0 with nothing left fails at the
+  transaction count's read); no capacity is reserved, so the loop's next read fails on the
+  same input and only the `Err` `parse` returns changes, which no caller reads.
+- After, with the nightly's selection (`mutation_args("substrates", "k/41", [beef.rs])`,
+  `--jobs 1 --baseline=skip --timeout 240`, the baseline green at 22 s build and 137 s
+  test): 63 caught, 5 missed, 0 timeout, 13 unviable, 92.65% (63/68). No public API, wire
+  byte or verdict changes; `docs/ratchets.json` untouched, the next complete run records
+  the score. The lane: `docs/lanes/kill-rv-beef.md`.
+
 ### Changed: MerklePath's writers return Result and refuse what they cannot write faithfully (#817)
 
 **Migration:** `path.to_binary()`, `path.to_hex()` and `path.to_writer(w)` now return
