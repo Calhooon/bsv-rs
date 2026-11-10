@@ -290,7 +290,8 @@ mod streaming {
         writer.write_bytes(reader.read_remaining());
         writer.write_var_int(beef.txs.len() as u64);
         for tx in &beef.txs {
-            tx.to_writer(&mut writer, BEEF_V1);
+            tx.to_writer(&mut writer, BEEF_V1)
+                .expect("the BEEF is writable");
         }
         writer.into_bytes()
     }

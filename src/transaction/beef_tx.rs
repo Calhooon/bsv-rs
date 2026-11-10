@@ -8,10 +8,14 @@
 //! The BEEF format supports "known" transactions which are represented solely by their txid.
 //! This allows parties with shared history to exchange smaller proofs.
 
-use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
+use crate::primitives::{sha256d, to_hex, Reader};
 use crate::Result;
 
 use super::transaction::Transaction;
+
+// The writer and its check (#817), in the nightly's `beef*.rs` mutation selection.
+#[path = "beef_tx_writer.rs"]
+mod writer;
 
 /// BEEF V1 format marker - when written as little-endian u32, produces bytes: 01 00 BE EF
 pub const BEEF_V1: u32 = 0xEFBE0001;
@@ -92,7 +96,29 @@ impl BeefTx {
     }
 
     /// Creates a BeefTx from raw transaction bytes.
-    pub fn from_raw_tx(raw_tx: Vec<u8>, bump_index: Option<usize>) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// `Error::BeefError` for bytes that are not exactly one transaction
+    /// (#817), with or without `bump_index`: cut short or malformed, in the
+    /// words the reference's scan throws at the same read
+    /// (`Serialized transaction exceeds available BEEF data`,
+    /// `ReaderUint8Array read exceeds available data`, `non-canonical varInt`;
+    /// `ts-stack@edf6e03` `BeefTx.ts:16-48`), or with bytes after the lock
+    /// time, `Serialized transaction has N bytes after its lock time`. A raw
+    /// entry has no length on the wire, so such bytes would misframe every
+    /// element a writer wrote after them. The reference scans only where no
+    /// index is given and reads a prefix (stated rows, the root `CLAUDE.md`);
+    /// until #817 this kept the bytes and dropped the parse's failure.
+    pub fn from_raw_tx(raw_tx: Vec<u8>, bump_index: Option<usize>) -> Result<Self> {
+        super::beef_raw_frame::one_transaction(&raw_tx).map_err(crate::Error::BeefError)?;
+        Ok(Self::from_framed_raw_tx(raw_tx, bump_index))
+    }
+
+    /// [`from_raw_tx`](Self::from_raw_tx) for bytes already framed as one
+    /// transaction: `merge_beef`'s source entries, written and read back by
+    /// its verdict before any is merged (#817).
+    pub(crate) fn from_framed_raw_tx(raw_tx: Vec<u8>, bump_index: Option<usize>) -> Self {
         let mut btx = Self {
             bump_index,
             tx: None,
@@ -410,50 +436,6 @@ impl BeefTx {
         }
     }
 
-    /// Writes this BeefTx to a Writer.
-    pub fn to_writer(&self, writer: &mut Writer, version: u32) {
-        if version == BEEF_V2 {
-            if self.is_txid_only() {
-                // TXID only format
-                writer.write_u8(TxDataFormat::TxidOnly as u8);
-                let txid_bytes = from_hex(&self.txid()).unwrap_or_default();
-                let mut reversed = txid_bytes;
-                reversed.reverse();
-                writer.write_bytes(&reversed);
-            } else if let Some(bump_idx) = self.bump_index {
-                // Raw tx with bump index
-                writer.write_u8(TxDataFormat::RawTxAndBumpIndex as u8);
-                writer.write_var_int(bump_idx as u64);
-                self.write_tx_data(writer);
-            } else {
-                // Raw tx without bump index
-                writer.write_u8(TxDataFormat::RawTx as u8);
-                self.write_tx_data(writer);
-            }
-        } else {
-            // V1 format
-            self.write_tx_data(writer);
-            if let Some(bump_idx) = self.bump_index {
-                writer.write_u8(1);
-                writer.write_var_int(bump_idx as u64);
-            } else {
-                writer.write_u8(0);
-            }
-        }
-    }
-
-    /// Writes the transaction data (raw bytes or serialized).
-    #[allow(clippy::panic)] // #134: called only for an entry with data; the writers it serves return no Result
-    fn write_tx_data(&self, writer: &mut Writer) {
-        if let Some(ref raw_tx) = self.raw_tx {
-            writer.write_bytes(raw_tx);
-        } else if let Some(ref tx) = self.tx {
-            writer.write_bytes(&tx.to_binary());
-        } else {
-            panic!("BeefTx has no transaction data to write");
-        }
-    }
-
     /// Reads a BeefTx from a Reader.
     pub fn from_reader(reader: &mut Reader, version: u32) -> Result<Self> {
         if version == BEEF_V2 {
@@ -519,6 +501,7 @@ fn read_tx(reader: &mut Reader) -> Result<(Transaction, Vec<u8>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::primitives::from_hex;
 
     // Simple P2PKH transaction hex
     const TEST_TX_HEX: &str = "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000";
@@ -535,7 +518,7 @@ mod tests {
     #[test]
     fn test_from_raw_tx() {
         let raw_tx = from_hex(TEST_TX_HEX).unwrap();
-        let beef_tx = BeefTx::from_raw_tx(raw_tx, Some(0));
+        let beef_tx = BeefTx::from_raw_tx(raw_tx, Some(0)).expect("the bytes are one transaction");
         assert!(!beef_tx.is_txid_only());
         assert!(beef_tx.has_proof());
         assert_eq!(beef_tx.bump_index(), Some(0));
@@ -621,12 +604,13 @@ mod tests {
     /// bytes parsed without one.
     fn raw_and_parsed(hex: &str) -> [BeefTx; 2] {
         let raw = from_hex(hex).unwrap();
-        let proven = BeefTx::from_raw_tx(raw.clone(), Some(0));
+        let proven =
+            BeefTx::from_raw_tx(raw.clone(), Some(0)).expect("the bytes are one transaction");
         assert!(
             proven.tx().is_none(),
             "a proven entry keeps its bytes alone"
         );
-        let unproven = BeefTx::from_raw_tx(raw, None);
+        let unproven = BeefTx::from_raw_tx(raw, None).expect("the bytes are one transaction");
         assert!(unproven.tx().is_some(), "an unproven entry is parsed");
         [proven, unproven]
     }
@@ -683,7 +667,8 @@ mod tests {
         let other = "00".repeat(32);
         let entries = [
             BeefTx::from_tx(tx, None),
-            BeefTx::from_raw_tx(from_hex(TEST_TX_HEX).unwrap(), Some(0)),
+            BeefTx::from_raw_tx(from_hex(TEST_TX_HEX).unwrap(), Some(0))
+                .expect("the bytes are one transaction"),
             BeefTx::from_txid(TEST_TX_ID.to_string()),
         ];
         for entry in entries {
@@ -699,7 +684,8 @@ mod tests {
     #[test]
     fn raw_tx_or_compute_is_the_held_bytes_or_the_serialization_beef_tx_ts_144_151() {
         let raw = from_hex(TEST_TX_HEX).unwrap();
-        let mut read = BeefTx::from_raw_tx(raw.clone(), Some(0));
+        let mut read =
+            BeefTx::from_raw_tx(raw.clone(), Some(0)).expect("the bytes are one transaction");
         assert_eq!(read.raw_tx_or_compute(), Some(raw.clone()));
 
         let mut built = BeefTx::from_tx(Transaction::from_hex(TEST_TX_HEX).unwrap(), None);
@@ -747,7 +733,7 @@ mod tests {
     #[allow(deprecated)] // the deprecated `tx_mut` and its `refresh` are what this pins
     fn a_transaction_mutated_through_tx_mut_is_the_entry_reading_beef_tx_ts_160_177() {
         let raw = from_hex(TEST_TX_HEX).unwrap();
-        let mut entry = BeefTx::from_raw_tx(raw, None);
+        let mut entry = BeefTx::from_raw_tx(raw, None).expect("the bytes are one transaction");
         assert!(!entry.refresh(), "nothing mutated, nothing to sync");
         let before = entry.input_txids.clone();
         assert_eq!(before.len(), 1);

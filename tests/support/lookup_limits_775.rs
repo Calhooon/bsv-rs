@@ -114,10 +114,11 @@ pub fn binary_beef_spending(source: &str) -> BinaryBeef {
     let path = MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, txid.clone())]]).unwrap();
     let mut beef = Beef::new();
     let index = beef.merge_bump(path);
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     let atomic_len = beef.to_binary_atomic(&txid).unwrap().len();
     BinaryBeef {
-        bytes: beef.to_binary(),
+        bytes: beef.to_binary().expect("the BEEF is writable"),
         txid,
         atomic_len,
     }

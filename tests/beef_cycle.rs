@@ -382,7 +382,8 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
         let (reread, _) = bounded(&format!("renamed chain of {n}: round trip"), {
             let (mut beef, renamed) = (beef.clone(), renamed.clone());
             move || {
-                let mut back = Beef::from_binary(&beef.to_binary()).unwrap();
+                let mut back =
+                    Beef::from_binary(&beef.to_binary().expect("the BEEF is writable")).unwrap();
                 (
                     back.find_txid(&renamed).is_some(),
                     back.verify_structure().err(),
@@ -435,7 +436,7 @@ fn a_ring_written_in_the_input_cache_stops_the_sort_and_the_judge() {
         let (reread, _) = bounded(&format!("cached ring of {n}: round trip"), {
             let mut beef = beef.clone();
             move || {
-                let bytes = beef.to_binary();
+                let bytes = beef.to_binary().expect("the BEEF is writable");
                 Beef::from_binary(&bytes).unwrap().verify_structure().err()
             }
         });

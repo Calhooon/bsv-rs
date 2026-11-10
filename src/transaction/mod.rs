@@ -85,6 +85,7 @@
 //! ```
 
 pub mod beef;
+mod beef_raw_frame;
 pub mod beef_stream;
 pub mod beef_tx;
 pub mod broadcaster;

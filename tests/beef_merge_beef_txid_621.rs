@@ -137,7 +137,9 @@ fn merge_entry_by_entry(target: &mut Beef, source: &Beef) {
                 .find_txid(&tx.txid())
                 .is_some_and(|e| !e.is_txid_only());
             if !held {
-                target.merge_raw_tx(raw.to_vec(), None);
+                target
+                    .merge_raw_tx(raw.to_vec(), None)
+                    .expect("the bytes are one transaction");
             }
         } else {
             panic!("a BEEF read from bytes holds bytes or a txid");
@@ -154,7 +156,7 @@ struct Seen {
 }
 
 fn seen(mut beef: Beef, txids: &[String]) -> Seen {
-    let bytes = beef.to_binary();
+    let bytes = beef.to_binary().expect("the BEEF is writable");
     let entries = beef
         .txs
         .iter()
@@ -179,7 +181,9 @@ fn prefilled(source: &Beef) -> Option<Beef> {
     let (_, second) = raws.next()?;
     let mut target = Beef::new();
     target.merge_txid_only(leading);
-    target.merge_raw_tx(second.to_vec(), None);
+    target
+        .merge_raw_tx(second.to_vec(), None)
+        .expect("the bytes are one transaction");
     Some(target)
 }
 
@@ -192,7 +196,9 @@ fn merge_beef_writes_the_bytes_the_per_entry_merge_writes_621() {
         let txids: Vec<String> = source.txs.iter().map(BeefTx::txid).collect();
 
         let mut merged = Beef::new();
-        merged.merge_beef(source);
+        merged
+            .merge_beef(source)
+            .expect("the source BEEF writes and reads back");
         let mut by_entry = Beef::new();
         merge_entry_by_entry(&mut by_entry, source);
         assert_eq!(
@@ -203,7 +209,9 @@ fn merge_beef_writes_the_bytes_the_per_entry_merge_writes_621() {
 
         if let (Some(mut merged), Some(mut by_entry)) = (prefilled(source), prefilled(source)) {
             prefilled_count += 1;
-            merged.merge_beef(source);
+            merged
+                .merge_beef(source)
+                .expect("the source BEEF writes and reads back");
             merge_entry_by_entry(&mut by_entry, source);
             assert_eq!(
                 seen(merged, &txids),
@@ -233,9 +241,13 @@ fn a_source_entry_built_from_raw_bytes_without_a_txid_merges_under_its_hash_621(
     let txid = to_hex(&hash);
 
     let mut source = Beef::new();
-    source.txs.push(BeefTx::from_raw_tx(raw.clone(), None));
+    source
+        .txs
+        .push(BeefTx::from_raw_tx(raw.clone(), None).expect("the bytes are one transaction"));
     let mut merged = Beef::new();
-    merged.merge_beef(&source);
+    merged
+        .merge_beef(&source)
+        .expect("the source BEEF writes and reads back");
     assert_eq!(
         merged.find_txid(&txid).unwrap().raw_tx(),
         Some(raw.as_slice())
@@ -259,7 +271,9 @@ fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
     assert_ne!(old, new);
 
     let mut merged = Beef::new();
-    merged.merge_beef(&source);
+    merged
+        .merge_beef(&source)
+        .expect("the source BEEF writes and reads back");
     assert!(merged.find_txid(&new).is_some());
     assert!(merged.find_txid(&old).is_none());
     assert_eq!(merged.find_txid(&new).unwrap().tx().unwrap().lock_time, 7);

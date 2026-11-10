@@ -76,8 +76,9 @@ fn beef_of(name: &str) -> (Vec<u8>, String) {
     let mut beef = Beef::new();
     let leaf = MerklePathLeaf::new_txid(0, tx.id());
     let index = beef.merge_bump(MerklePath::new(815 + satoshis as u32, vec![vec![leaf]]).unwrap());
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
-    (beef.to_binary(), tx.id())
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
+    (beef.to_binary().expect("the BEEF is writable"), tx.id())
 }
 
 /// The shapes the recorder drives: each host's answer in rank order, a

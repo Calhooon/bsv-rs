@@ -110,7 +110,10 @@ fn witness_bytes() -> Vec<(&'static str, Vec<u8>)> {
         beef.to_binary_atomic(&child.id()).unwrap()
     };
     vec![
-        ("inputBEEF", with_parent().to_binary()),
+        (
+            "inputBEEF",
+            with_parent().to_binary().expect("the BEEF is writable"),
+        ),
         ("signable", child(&[])),
         ("signed", child(&[0x51])),
     ]

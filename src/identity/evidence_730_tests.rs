@@ -122,8 +122,11 @@ fn the_source_txid_check_is_unreached_from_bytes_on_both_sides_730() {
         writer.write_u32_le(0);
         let raw = writer.into_bytes();
         let mut beef = sdk::transaction::Beef::new();
-        beef.merge_raw_tx(raw, None);
-        let parsed = sdk::transaction::Beef::from_binary(&beef.to_binary()).unwrap();
+        beef.merge_raw_tx(raw, None)
+            .expect("the bytes are one transaction");
+        let parsed =
+            sdk::transaction::Beef::from_binary(&beef.to_binary().expect("the BEEF is writable"))
+                .unwrap();
         let entry = parsed
             .find_txid(form["raw_hash"].as_str().unwrap())
             .unwrap();

@@ -573,7 +573,7 @@ impl Transaction {
             beef.push_transaction(ancestor.id(), ancestor, None);
         }
 
-        Ok(beef.to_binary())
+        beef.to_binary()
     }
 
     /// Serializes this transaction and its ancestors to BEEF V1 format.
@@ -621,7 +621,7 @@ impl Transaction {
             beef.push_transaction(ancestor.id(), ancestor, None);
         }
 
-        Ok(beef.to_binary())
+        beef.to_binary()
     }
 
     /// Serializes this transaction to Atomic BEEF format.
@@ -2800,7 +2800,7 @@ mod from_beef_subject_tests {
         }
 
         let mut w = crate::primitives::encoding::Writer::new();
-        beef.to_writer(&mut w);
+        beef.to_writer(&mut w).expect("the BEEF is writable");
         (w.into_bytes(), child_id, parent_id)
     }
 

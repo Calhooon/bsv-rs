@@ -1,0 +1,1291 @@
+{
+  "description": "The reference's BEEF writers and merge doors on each state, recorded at the pin: the words each throws, or the bytes it writes and what its strict reader reads back. This crate refuses in the reference's words where the reference throws; each cell where the reference writes and this crate refuses or reads otherwise is asserted as stated by name in the tests (#817)",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "node": "v22.18.0",
+  "v1_hex": "0100beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000",
+  "parent_txid": "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+  "child_txid": "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+  "fresh_txid": "8170000000000000000000000000000000000000000000000000000000000817",
+  "cases": [
+    {
+      "name": "merge_txid_only",
+      "reference": {
+        "thrown": "a valid serialized Transaction is expected",
+        "v2_read_back_txs": 3,
+        "v2_read_back_bumps": 1
+      },
+      "ours_hex": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587303021708000000000000000000000000000000000000000000000000000000007081010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d0070000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "make_txid_only",
+      "reference": {
+        "thrown": "a valid serialized Transaction is expected",
+        "v2_read_back_txs": 2,
+        "v2_read_back_bumps": 1
+      },
+      "ours_hex": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "merge_beef_v2_txid_only",
+      "reference": {
+        "thrown": "a valid serialized Transaction is expected",
+        "v2_read_back_txs": 3,
+        "v2_read_back_bumps": 1
+      },
+      "ours_hex": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587303021708000000000000000000000000000000000000000000000000000000007081010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d0070000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "to_binary_atomic_make_txid_only",
+      "reference": {
+        "thrown": "a valid serialized Transaction is expected"
+      }
+    }
+  ],
+  "child_raw": "01000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000",
+  "parent_raw": "01000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000",
+  "writers": [
+    {
+      "name": "version_word_efbe0003",
+      "write": {
+        "ok": "0300beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 4022206467"
+        },
+        "from_binary_strict": {
+          "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 4022206467"
+        }
+      }
+    },
+    {
+      "name": "version_word_atomic",
+      "write": {
+        "ok": "0101010101fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 2958992019"
+        },
+        "from_binary_strict": {
+          "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 2958992019"
+        }
+      }
+    },
+    {
+      "name": "version_word_zero",
+      "write": {
+        "ok": "0000000001fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+        },
+        "from_binary_strict": {
+          "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 0"
+        }
+      }
+    },
+    {
+      "name": "version_word_with_txid_only",
+      "write": {
+        "thrown": "a valid serialized Transaction is expected"
+      }
+    },
+    {
+      "name": "version_word_with_non_hex_bump_hash",
+      "write": {
+        "thrown": "Invalid hex string"
+      }
+    },
+    {
+      "name": "v1_txid_only_with_non_hex_bump_hash",
+      "write": {
+        "thrown": "Invalid hex string"
+      }
+    },
+    {
+      "name": "txid_only_non_hex",
+      "write": {
+        "thrown": "Invalid hex string"
+      }
+    },
+    {
+      "name": "txid_only_62_digits",
+      "write": {
+        "ok": "0200beef000102ababababababababababababababababababababababababababababababab"
+      },
+      "read_back": {
+        "from_binary": {
+          "thrown": "ReaderUint8Array read exceeds available data"
+        },
+        "from_binary_strict": {
+          "thrown": "ReaderUint8Array read exceeds available data"
+        }
+      }
+    },
+    {
+      "name": "txid_only_66_digits",
+      "write": {
+        "ok": "0200beef000102ababababababababababababababababababababababababababababababababab"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "abababababababababababababababababababababababababababababababab"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "thrown": "Serialized BEEF contains trailing data"
+        }
+      }
+    },
+    {
+      "name": "txid_only_63_digits",
+      "write": {
+        "ok": "0200beef000102bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc0a"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "0abcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "0abcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "txid_only_upper_case",
+      "write": {
+        "ok": "0200beef000102abababababababababababababababababababababababababababababababab"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "abababababababababababababababababababababababababababababababab"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "abababababababababababababababababababababababababababababababab"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "txid_only_non_hex_short",
+      "write": {
+        "thrown": "Invalid hex string"
+      }
+    },
+    {
+      "name": "txid_only_empty_after_merge_threw",
+      "write": {
+        "thrown": "Internal"
+      }
+    },
+    {
+      "name": "txid_only_empty_with_non_hex_bump_hash",
+      "write": {
+        "thrown": "Internal"
+      }
+    },
+    {
+      "name": "raw_with_index_truncated",
+      "write": {
+        "ok": "0200beef0001010001000000016b2a31d8bd"
+      },
+      "read_back": {
+        "from_binary": {
+          "thrown": "ReaderUint8Array read exceeds available data"
+        },
+        "from_binary_strict": {
+          "thrown": "ReaderUint8Array read exceeds available data"
+        }
+      }
+    },
+    {
+      "name": "raw_with_index_trailing_byte",
+      "write": {
+        "ok": "0200beef0001010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "thrown": "Serialized BEEF contains trailing data"
+        }
+      }
+    },
+    {
+      "name": "raw_without_index_trailing_byte",
+      "write": {
+        "ok": "0200beef00010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "thrown": "Serialized BEEF contains trailing data"
+        }
+      }
+    },
+    {
+      "name": "raw_index_out_of_range",
+      "write": {
+        "ok": "0200beef0001010501000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "ok": {
+            "version": 4022206466,
+            "txs": 1,
+            "bumps": 0,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "raw_both_versions_v1",
+      "write": {
+        "ok": "0100beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "read_back": {
+        "from_binary": {
+          "ok": {
+            "version": 4022206465,
+            "txs": 2,
+            "bumps": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ]
+          }
+        },
+        "from_binary_strict": {
+          "ok": {
+            "version": 4022206465,
+            "txs": 2,
+            "bumps": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "raw_door": [
+    {
+      "name": "empty",
+      "bump_index": null,
+      "merge": {
+        "thrown": "Serialized transaction exceeds available BEEF data"
+      },
+      "txs_after": 0
+    },
+    {
+      "name": "empty",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "56944c5d3f98413ef45cf54545538103cc9f298e0575820ad3591376e2e0f65d",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "truncated_version",
+      "bump_index": null,
+      "merge": {
+        "thrown": "Serialized transaction exceeds available BEEF data"
+      },
+      "txs_after": 0
+    },
+    {
+      "name": "truncated_version",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "c50abe17b21c62c88b062af24566ffb788c556a2c6c59ef7d2e0dfac9e062495",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "truncated_in_input",
+      "bump_index": null,
+      "merge": {
+        "thrown": "ReaderUint8Array read exceeds available data"
+      },
+      "txs_after": 0
+    },
+    {
+      "name": "truncated_in_input",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "151fba07f327fa6694a18dd640656ae6e82ef835a5ca104bcbf398299367a454",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "truncated_lock_time",
+      "bump_index": null,
+      "merge": {
+        "thrown": "Serialized transaction exceeds available BEEF data"
+      },
+      "txs_after": 0
+    },
+    {
+      "name": "truncated_lock_time",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "8b8871e9721d3c9e5d12646ed3d61bd42d133d59e2da1c2e53b2967ad13d3840",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "trailing_byte",
+      "bump_index": null,
+      "merge": {
+        "ok": {
+          "txid": "f6a64e2786a5a175a54fcd62fa35881e5e4e57d8711d004da27d4fb111b07073",
+          "input_txids": [
+            "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+          ]
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "trailing_byte",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "f6a64e2786a5a175a54fcd62fa35881e5e4e57d8711d004da27d4fb111b07073",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "non_canonical_input_count",
+      "bump_index": null,
+      "merge": {
+        "thrown": "non-canonical varInt"
+      },
+      "txs_after": 0
+    },
+    {
+      "name": "non_canonical_input_count",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "960ba8107d9ef0d88a55f9ce24e9f598c122802a99740efd1ac3422c4d3b58f3",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "one_transaction",
+      "bump_index": null,
+      "merge": {
+        "ok": {
+          "txid": "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+          "input_txids": [
+            "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+          ]
+        }
+      },
+      "txs_after": 1
+    },
+    {
+      "name": "one_transaction",
+      "bump_index": 0,
+      "merge": {
+        "ok": {
+          "txid": "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+          "input_txids": []
+        }
+      },
+      "txs_after": 1
+    }
+  ],
+  "txid_door": [
+    {
+      "name": "empty",
+      "merge": {
+        "thrown": "Internal"
+      },
+      "txs_after": 1,
+      "write_after": {
+        "thrown": "Internal"
+      }
+    },
+    {
+      "name": "non_hex",
+      "merge": {
+        "ok": "zz"
+      },
+      "txs_after": 1,
+      "write_after": {
+        "thrown": "Invalid hex string"
+      }
+    },
+    {
+      "name": "short_hex",
+      "merge": {
+        "ok": "abcd"
+      },
+      "txs_after": 1,
+      "write_after": {
+        "ok": "0200beef000102cdab"
+      }
+    }
+  ],
+  "merge_door": [
+    {
+      "name": "v1_source_with_txid_only",
+      "merge": {
+        "thrown": "a valid serialized Transaction is expected"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_version_word",
+      "merge": {
+        "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 4022206467"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_txid_only_non_hex",
+      "merge": {
+        "thrown": "Invalid hex string"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_txid_only_62_digits",
+      "merge": {
+        "thrown": "ReaderUint8Array read exceeds available data"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_raw_trailing_byte_with_index",
+      "merge": {
+        "thrown": "Serialized BEEF contains trailing data"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_bump_non_hex_hash",
+      "merge": {
+        "thrown": "Invalid hex string"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_bump_two_leaves_at_one_offset",
+      "merge": {
+        "thrown": "Duplicate offset: 0, at height: 0"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_bump_no_levels",
+      "merge": {
+        "thrown": "Merkle Path must contain between 1 and 54 levels"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_bump_duplicate_with_hash",
+      "merge": {
+        "ok": null
+      },
+      "target_unchanged": false
+    },
+    {
+      "name": "source_version_word_and_txid_only_62_digits",
+      "merge": {
+        "thrown": "a valid serialized Transaction is expected"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_version_word_and_bump_no_levels",
+      "merge": {
+        "thrown": "Serialized BEEF must start with 4022206465 or 4022206466 but starts with 4022206467"
+      },
+      "target_unchanged": true
+    },
+    {
+      "name": "source_valid",
+      "merge": {
+        "ok": null
+      },
+      "target_unchanged": false
+    }
+  ],
+  "bump_door": [
+    {
+      "name": "held_height_root_does_not_compute",
+      "merge": {
+        "thrown": "No valid leaf found in the Merkle Path"
+      },
+      "bumps_after": 1
+    },
+    {
+      "name": "no_held_height_root_does_not_compute",
+      "merge": {
+        "ok": 0
+      },
+      "bumps_after": 1
+    }
+  ],
+  "doubled_txid": [
+    {
+      "name": "raw_twice",
+      "version": 4022206466,
+      "bytes": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "raw_twice",
+      "version": 4022206465,
+      "bytes": "0100beef000201000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0100beef000201000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0100beef000201000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "raw_then_txid_only",
+      "version": 4022206466,
+      "bytes": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000214a4aa8744685e9327e1d770bfaa401c8a0adfb09eeb4415a42608d31c865b19",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000214a4aa8744685e9327e1d770bfaa401c8a0adfb09eeb4415a42608d31c865b19"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000214a4aa8744685e9327e1d770bfaa401c8a0adfb09eeb4415a42608d31c865b19"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "txid_only_then_raw",
+      "version": 4022206466,
+      "bytes": "0200beef00020214a4aa8744685e9327e1d770bfaa401c8a0adfb09eeb4415a42608d31c865b190001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef00020214a4aa8744685e9327e1d770bfaa401c8a0adfb09eeb4415a42608d31c865b190001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e803000000000000015100000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef00020001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e8030000000000000151000000000214a4aa8744685e9327e1d770bfaa401c8a0adfb09eeb4415a42608d31c865b19"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 0,
+              "txids": [
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+                "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "proven_raw_twice",
+      "version": 4022206466,
+      "bytes": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "proven_raw_twice",
+      "version": 4022206465,
+      "bytes": "0100beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d0070000000000000151000000000100",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0100beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d0070000000000000151000000000100"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0100beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b248958730201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d0070000000000000151000000000100"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206465,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "proven_raw_then_txid_only",
+      "version": 4022206466,
+      "bytes": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873",
+      "read": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      },
+      "pushed": {
+        "held": 2,
+        "write": {
+          "ok": "0200beef01fe68770c00010100026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b2489587302026b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873010001000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d007000000000000015100000000"
+        },
+        "read_back": {
+          "from_binary": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          },
+          "from_binary_strict": {
+            "ok": {
+              "version": 4022206466,
+              "txs": 2,
+              "bumps": 1,
+              "txids": [
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+                "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+              ]
+            }
+          }
+        },
+        "merge_into_empty": {
+          "ok": {
+            "txs": 1,
+            "txids": [
+              "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+            ],
+            "txid_only": [
+              false
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "sort_on_refusal": [
+    {
+      "name": "empty_txid",
+      "before": [
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        ""
+      ],
+      "write": {
+        "thrown": "Internal"
+      },
+      "after": [
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        ""
+      ]
+    },
+    {
+      "name": "non_hex_txid",
+      "before": [
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+      ],
+      "write": {
+        "thrown": "Invalid hex string"
+      },
+      "after": [
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+      ]
+    },
+    {
+      "name": "v1_txid_only",
+      "before": [
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        "8170000000000000000000000000000000000000000000000000000000000817"
+      ],
+      "write": {
+        "thrown": "a valid serialized Transaction is expected"
+      },
+      "after": [
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "8170000000000000000000000000000000000000000000000000000000000817"
+      ]
+    },
+    {
+      "name": "version_word",
+      "before": [
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414",
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b"
+      ],
+      "write": {
+        "ok": "04030201000201000000018181818181818181818181818181818181818181818181818181818181818181000000000151ffffffff01d0070000000000000151000000000001000000016b2a31d8bdd45df55737e921bb4d8081cfebb75a461793a25eb0df7b24895873000000000151ffffffff01e80300000000000001510000000000"
+      },
+      "after": [
+        "735889247bdfb05ea29317465ab7ebcf81804dbb21e93757f55dd4bdd8312a6b",
+        "195b861cd30826a41544eb9eb0df0a8a1c40aabf70d7e127935e684487aaa414"
+      ]
+    }
+  ]
+}

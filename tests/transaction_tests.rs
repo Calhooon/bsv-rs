@@ -586,7 +586,9 @@ mod transaction_tests {
             beef2.merge_transaction(tx2.clone());
 
             // Merge beef2 into beef1
-            beef1.merge_beef(&beef2);
+            beef1
+                .merge_beef(&beef2)
+                .expect("the source BEEF writes and reads back");
 
             // Both transactions should be in beef1
             assert!(
@@ -650,7 +652,7 @@ mod transaction_tests {
             let mut beef_v1 = Beef::with_version(BEEF_V1);
             beef_v1.merge_transaction(create_test_transaction(1));
 
-            let binary = beef_v1.to_binary();
+            let binary = beef_v1.to_binary().expect("the BEEF is writable");
             let parsed = Beef::from_binary(&binary).unwrap();
             assert_eq!(parsed.version, BEEF_V1);
 
@@ -658,7 +660,7 @@ mod transaction_tests {
             let mut beef_v2 = Beef::with_version(BEEF_V2);
             beef_v2.merge_transaction(create_test_transaction(2));
 
-            let binary = beef_v2.to_binary();
+            let binary = beef_v2.to_binary().expect("the BEEF is writable");
             let parsed = Beef::from_binary(&binary).unwrap();
             assert_eq!(parsed.version, BEEF_V2);
         }
@@ -732,7 +734,7 @@ mod transaction_tests {
             let mut beef = Beef::new();
             beef.merge_transaction(create_test_transaction(1));
 
-            let hex = beef.to_hex();
+            let hex = beef.to_hex().expect("the BEEF is writable");
             let parsed = Beef::from_hex(&hex).unwrap();
 
             assert_eq!(beef.version, parsed.version);
@@ -745,7 +747,7 @@ mod transaction_tests {
             beef.merge_transaction(create_test_transaction(1));
             beef.merge_transaction(create_test_transaction(2));
 
-            let binary = beef.to_binary();
+            let binary = beef.to_binary().expect("the BEEF is writable");
             let parsed = Beef::from_binary(&binary).unwrap();
 
             assert_eq!(beef.version, parsed.version);
@@ -776,7 +778,8 @@ mod transaction_tests {
             let raw = tx.to_binary();
             let txid = tx.id();
 
-            beef.merge_raw_tx(raw, None);
+            beef.merge_raw_tx(raw, None)
+                .expect("the bytes are one transaction");
 
             assert!(beef.find_txid(&txid).is_some(), "Raw tx should be merged");
         }
@@ -1429,14 +1432,14 @@ mod transaction_tests {
         #[test]
         fn test_empty_beef_v1() {
             let mut beef = Beef::with_version(BEEF_V1);
-            let hex = beef.to_hex();
+            let hex = beef.to_hex().expect("the BEEF is writable");
             assert_eq!(hex.to_lowercase(), EMPTY_BEEF_V1_HEX.to_lowercase());
         }
 
         #[test]
         fn test_empty_beef_v2() {
             let mut beef = Beef::with_version(BEEF_V2);
-            let hex = beef.to_hex();
+            let hex = beef.to_hex().expect("the BEEF is writable");
             assert_eq!(hex.to_lowercase(), EMPTY_BEEF_V2_HEX.to_lowercase());
         }
 
@@ -1480,7 +1483,7 @@ mod transaction_tests {
         #[test]
         fn test_beef_set_roundtrip() {
             let mut beef = Beef::from_hex(BEEF_SET_HEX).expect("Should parse");
-            let binary = beef.to_binary();
+            let binary = beef.to_binary().expect("the BEEF is writable");
             let parsed = Beef::from_binary(&binary).expect("Should parse binary");
             assert_eq!(beef.version, parsed.version);
             assert_eq!(beef.txs.len(), parsed.txs.len());

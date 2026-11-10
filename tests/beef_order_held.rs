@@ -95,11 +95,13 @@ fn written(version: u32, raws: &[Vec<u8>]) -> Vec<u8> {
     beef.bumps.push(funding_bump());
     for raw in raws {
         let proven = sha256d(raw) == beef_chain::funding_root();
-        beef.txs
-            .push(BeefTx::from_raw_tx(raw.clone(), proven.then_some(0)));
+        beef.txs.push(
+            BeefTx::from_raw_tx(raw.clone(), proven.then_some(0))
+                .expect("the bytes are one transaction"),
+        );
     }
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     writer.into_bytes()
 }
 
@@ -109,9 +111,11 @@ fn brc62_order(version: u32) -> Vec<u8> {
     let (parent, child) = parent_and_child();
     let mut beef = Beef::with_version(version);
     let bump = beef.merge_bump(funding_bump());
-    beef.merge_raw_tx(child, None);
-    beef.merge_raw_tx(parent, Some(bump));
-    beef.to_binary()
+    beef.merge_raw_tx(child, None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(parent, Some(bump))
+        .expect("the bytes are one transaction");
+    beef.to_binary().expect("the BEEF is writable")
 }
 
 /// The child written ahead of its parent.
@@ -656,11 +660,13 @@ fn family_beef(raws: &[&Vec<u8>]) -> (Vec<u8>, HashMap<u64, Hash32>) {
     ));
     for raw in raws {
         let proven = sha256d(raw) == root;
-        beef.txs
-            .push(BeefTx::from_raw_tx((*raw).clone(), proven.then_some(0)));
+        beef.txs.push(
+            BeefTx::from_raw_tx((*raw).clone(), proven.then_some(0))
+                .expect("the bytes are one transaction"),
+        );
     }
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     (
         writer.into_bytes(),
         HashMap::from([(beef_chain::HEIGHT, root)]),

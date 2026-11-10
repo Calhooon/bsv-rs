@@ -46,7 +46,8 @@ fn main() {
     // knows which transaction the container is ABOUT.
     let mut beef = Beef::new();
     let bump = beef.merge_bump(proof);
-    beef.merge_raw_tx(funding.to_binary(), Some(bump));
+    beef.merge_raw_tx(funding.to_binary(), Some(bump))
+        .expect("the bytes are one transaction");
     beef.merge_transaction(spend);
     let bytes = beef.to_binary_atomic(&subject).unwrap();
     println!("beef {} bytes, subject {subject}", bytes.len());

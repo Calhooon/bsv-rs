@@ -77,7 +77,7 @@ fn listing(tokens: &Value) -> ListOutputsResult {
     ListOutputsResult {
         total_outputs: outputs.len() as u32,
         outputs,
-        beef: Some(beef.to_binary()),
+        beef: Some(beef.to_binary().expect("the BEEF is writable")),
     }
 }
 

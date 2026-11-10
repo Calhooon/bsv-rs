@@ -68,8 +68,9 @@ fn held_raw() -> (Beef, Transaction, Transaction) {
     let u = tx(&"bb".repeat(32), 2_000);
     let v = locked(u.clone(), 1);
     let mut beef = Beef::new();
-    beef.merge_raw_tx(u.to_binary(), None);
-    let beef = Beef::from_binary(&beef.to_binary()).unwrap();
+    beef.merge_raw_tx(u.to_binary(), None)
+        .expect("the bytes are one transaction");
+    let beef = Beef::from_binary(&beef.to_binary().expect("the BEEF writes")).unwrap();
     (beef, u, v)
 }
 
@@ -92,7 +93,7 @@ fn edit_tx_on_a_raw_entry_rekeys_it_at_once_and_keeps_it_raw_817() {
         "raw, re-written"
     );
     assert_eq!(entry.input_txids, vec!["bb".repeat(32)]);
-    let bytes = beef.to_binary();
+    let bytes = beef.to_binary().expect("the BEEF writes");
     assert_eq!(Beef::from_binary(&bytes).unwrap().txs.len(), 1);
     assert_eq!(ids(&Beef::from_binary(&bytes).unwrap()), vec![v.id()]);
 }
@@ -116,7 +117,7 @@ fn edit_tx_on_a_txid_only_entry_or_an_unknown_txid_is_refused_unchanged_817() {
     let (mut beef, u, _) = held_raw();
     let other = "cc".repeat(32);
     beef.merge_txid_only(other.clone());
-    let before = beef.clone().to_hex();
+    let before = beef.clone().to_hex().expect("the BEEF writes");
     let mut ran = false;
     let refused = beef.edit_tx(&other, |_| ran = true);
     assert!(
@@ -129,15 +130,16 @@ fn edit_tx_on_a_txid_only_entry_or_an_unknown_txid_is_refused_unchanged_817() {
         "{unknown:?}"
     );
     assert!(!ran, "no closure runs on a refusal");
-    assert_eq!(beef.clone().to_hex(), before);
+    assert_eq!(beef.clone().to_hex().expect("the BEEF writes"), before);
     assert!(beef.find_txid(&u.id()).is_some());
 }
 
 #[test]
 fn edit_tx_onto_a_txid_another_entry_holds_is_refused_byte_for_byte_unchanged_817() {
     let (mut beef, u, v) = held_raw();
-    beef.merge_raw_tx(v.to_binary(), None);
-    let before = beef.clone().to_binary();
+    beef.merge_raw_tx(v.to_binary(), None)
+        .expect("the bytes are one transaction");
+    let before = beef.clone().to_binary().expect("the BEEF writes");
     let order = ids(&beef);
     let refused = beef.edit_tx(&u.id(), |t| t.lock_time = 1);
     assert!(
@@ -145,29 +147,33 @@ fn edit_tx_onto_a_txid_another_entry_holds_is_refused_byte_for_byte_unchanged_81
         "{refused:?}"
     );
     assert_eq!(ids(&beef), order);
-    assert_eq!(beef.clone().to_binary(), before);
+    assert_eq!(beef.clone().to_binary().expect("the BEEF writes"), before);
     assert!(beef.find_txid(&u.id()).is_some() && beef.find_txid(&v.id()).is_some());
 }
 
 #[test]
 fn an_edit_that_keeps_the_txid_moves_nothing_and_is_kept_817() {
     let (mut beef, u, _) = held_raw();
-    let read = beef.clone().to_binary();
+    let read = beef.clone().to_binary().expect("the BEEF writes");
     assert_eq!(beef.edit_tx(&u.id(), |_| 7), Ok(7));
-    assert_eq!(beef.clone().to_binary(), read, "no byte moves");
+    assert_eq!(
+        beef.clone().to_binary().expect("the BEEF writes"),
+        read,
+        "no byte moves"
+    );
     // A field the bytes do not carry is kept, under the same key.
     let path = MerklePath::from_coinbase_txid(&u.id(), 900_000);
     beef.edit_tx(&u.id(), |t| t.merkle_path = Some(path.clone()))
         .unwrap();
     let held = beef.find_txid(&u.id()).unwrap().tx().unwrap();
     assert_eq!(held.merkle_path.as_ref().unwrap().block_height, 900_000);
-    assert_eq!(beef.to_binary(), read);
+    assert_eq!(beef.to_binary().expect("the BEEF writes"), read);
 }
 
 #[test]
 fn a_panic_in_the_edit_leaves_the_beef_untouched_817() {
     let (mut beef, u, v) = held_raw();
-    let before = beef.clone().to_hex();
+    let before = beef.clone().to_hex().expect("the BEEF writes");
     let caught = catch_unwind(AssertUnwindSafe(|| {
         beef.edit_tx(&u.id(), |t| {
             t.lock_time = 1;
@@ -178,7 +184,7 @@ fn a_panic_in_the_edit_leaves_the_beef_untouched_817() {
     assert!(beef.find_txid(&u.id()).is_some(), "U still held");
     assert!(beef.find_txid(&v.id()).is_none());
     assert_eq!(beef.find_txid(&u.id()).unwrap().tx().unwrap().lock_time, 0);
-    assert_eq!(beef.to_hex(), before);
+    assert_eq!(beef.to_hex().expect("the BEEF writes"), before);
 }
 
 /// Every door after an edit holds one entry under the new txid, finds it
@@ -188,7 +194,8 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
     type Door = fn(&mut Beef, &Transaction);
     let doors: [(&str, Door); 14] = [
         ("merge_raw_tx", |b, v| {
-            b.merge_raw_tx(v.to_binary(), None);
+            b.merge_raw_tx(v.to_binary(), None)
+                .expect("the bytes are one transaction");
         }),
         ("merge_txid_only", |b, v| {
             b.merge_txid_only(v.id());
@@ -202,8 +209,11 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
         }),
         ("merge_beef", |b, v| {
             let mut other = Beef::new();
-            other.merge_raw_tx(v.to_binary(), None);
-            b.merge_beef(&other);
+            other
+                .merge_raw_tx(v.to_binary(), None)
+                .expect("the bytes are one transaction");
+            b.merge_beef(&other)
+                .expect("the source writes and reads back");
         }),
         ("find_txid", |b, v| assert!(b.find_txid(&v.id()).is_some())),
         ("find_txid_mut", |b, v| {
@@ -222,7 +232,7 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
             assert!(b.make_txid_only(&v.id()).unwrap().is_txid_only());
         }),
         ("to_binary", |b, _| {
-            b.to_binary();
+            b.to_binary().expect("the BEEF writes");
         }),
         ("to_binary_atomic", |b, v| {
             b.to_binary_atomic(&v.id()).unwrap();
@@ -245,7 +255,7 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
         );
         assert!(beef.find_txid(&v.id()).is_some(), "{door}");
         assert!(beef.find_txid(&u.id()).is_none(), "{door}");
-        let back = Beef::from_binary(&beef.to_binary()).unwrap();
+        let back = Beef::from_binary(&beef.to_binary().expect("the BEEF writes")).unwrap();
         assert_eq!(ids(&back), vec![v.id()], "{door}: written once");
     }
 }
@@ -257,7 +267,8 @@ fn three() -> (Beef, [Transaction; 3]) {
     let w = tx(&"ee".repeat(32), 5_000);
     let mut beef = Beef::new();
     for t in [&x, &u, &w] {
-        beef.merge_raw_tx(t.to_binary(), None);
+        beef.merge_raw_tx(t.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     (beef, [x, u, w])
 }
@@ -273,7 +284,8 @@ fn a_hand_retain_then_find_txid_and_merge_raw_tx_holds_each_txid_once_817() {
     assert!(beef.find_txid(&u.id()).is_some());
     assert!(beef.find_txid(&w.id()).is_some(), "W found after the shift");
     assert!(beef.find_txid(&x.id()).is_none(), "the dropped X is gone");
-    beef.merge_raw_tx(w.to_binary(), None);
+    beef.merge_raw_tx(w.to_binary(), None)
+        .expect("the bytes are one transaction");
     assert_eq!(ids(&beef), vec![u.id(), w.id()], "W held once");
     // The `&mut` door rebuilt the index: plain hits again.
     assert_eq!(beef.find_txid(&w.id()).unwrap().txid(), w.id());
@@ -284,11 +296,13 @@ fn a_hand_retain_then_find_txid_and_merge_raw_tx_holds_each_txid_once_817() {
 fn a_hand_push_then_a_lookup_finds_the_pushed_entry_817() {
     let (mut beef, [x, _, _]) = three();
     let y = tx(&"cc".repeat(32), 7_000);
-    beef.txs.push(BeefTx::from_raw_tx(y.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(y.to_binary(), None).expect("one transaction"));
     assert!(beef.find_txid(&y.id()).is_some());
     assert!(beef.find_txid(&x.id()).is_some());
     let held = beef.txs.len();
-    beef.merge_raw_tx(y.to_binary(), None);
+    beef.merge_raw_tx(y.to_binary(), None)
+        .expect("the bytes are one transaction");
     assert_eq!(beef.txs.len(), held, "Y held once");
 }
 
@@ -301,7 +315,8 @@ fn a_hand_swap_then_a_lookup_of_each_finds_it_817() {
     beef.txs.swap(0, 1);
     assert_eq!(beef.find_txid(&x.id()).unwrap().txid(), x.id());
     assert_eq!(beef.find_txid(&u.id()).unwrap().txid(), u.id());
-    beef.merge_raw_tx(x.to_binary(), None);
+    beef.merge_raw_tx(x.to_binary(), None)
+        .expect("the bytes are one transaction");
     assert_eq!(
         ids(&beef),
         vec![u.id(), x.id(), w.id()],
@@ -317,20 +332,23 @@ fn a_hand_swap_then_a_lookup_of_each_finds_it_817() {
 fn a_hand_replace_keeping_the_count_misses_until_reindex_stated_817() {
     let (mut beef, [x, u, _]) = three();
     let y = tx(&"cc".repeat(32), 7_000);
-    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None);
+    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None).expect("one transaction");
     assert!(beef.find_txid(&y.id()).is_none(), "the window: a miss");
     assert!(
         beef.find_txid(&x.id()).is_none(),
         "the replaced X: its hit names Y"
     );
     let mut windowed = beef.clone();
-    windowed.merge_raw_tx(y.to_binary(), None);
+    windowed
+        .merge_raw_tx(y.to_binary(), None)
+        .expect("the bytes are one transaction");
     let twice = windowed.txs.iter().filter(|t| t.txid() == y.id()).count();
     assert_eq!(twice, 2, "stored twice inside the window");
     beef.reindex();
     assert!(beef.find_txid(&y.id()).is_some(), "reindex: found");
     let held = beef.txs.len();
-    beef.merge_raw_tx(y.to_binary(), None);
+    beef.merge_raw_tx(y.to_binary(), None)
+        .expect("the bytes are one transaction");
     assert_eq!(beef.txs.len(), held, "after reindex, held once");
     assert!(beef.find_txid(&u.id()).is_some());
 }
@@ -364,7 +382,8 @@ fn reindex_rekeys_an_entry_edited_through_the_deprecated_tx_mut_817() {
         beef.find_txid(&v.id()).unwrap().input_txids,
         vec!["bb".repeat(32)]
     );
-    beef.merge_raw_tx(v.to_binary(), None);
+    beef.merge_raw_tx(v.to_binary(), None)
+        .expect("the bytes are one transaction");
     assert_eq!(ids(&beef), vec![v.id()]);
 }
 
@@ -399,13 +418,14 @@ fn beef_and_beef_tx_are_send_and_not_sync_as_on_beta_817() {
 fn a_hand_push_a_door_then_a_retain_back_to_the_count_finds_the_pushed_entry_817() {
     let (mut beef, [x, u, _]) = three();
     let z = tx(&"cc".repeat(32), 7_000);
-    beef.txs.push(BeefTx::from_raw_tx(z.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(z.to_binary(), None).unwrap());
     beef.find_txid_mut(&u.id()).unwrap();
     beef.txs.retain(|t| t.txid() != x.id());
     assert_eq!(beef.txs.len(), 3);
     assert_eq!(beef.find_txid(&z.id()).map(BeefTx::txid), Some(z.id()));
     let held = beef.txs.len();
-    beef.merge_raw_tx(z.to_binary(), None);
+    beef.merge_raw_tx(z.to_binary(), None).unwrap();
     assert_eq!(beef.txs.len(), held, "Z held once");
 }
 
@@ -416,7 +436,8 @@ fn a_hand_push_a_door_then_a_retain_back_to_the_count_finds_the_pushed_entry_817
 #[test]
 fn a_hand_push_of_a_held_txid_is_answered_by_the_later_entry_after_a_door_stated_817() {
     let (mut beef, [x, _, _]) = three();
-    beef.txs.push(BeefTx::from_raw_tx(x.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(x.to_binary(), None).unwrap());
     let found = beef.find_txid(&x.id()).unwrap();
     assert!(
         std::ptr::eq(found, &beef.txs[0]),
@@ -428,49 +449,30 @@ fn a_hand_push_of_a_held_txid_is_answered_by_the_later_entry_after_a_door_stated
     assert_eq!(beef.txs.iter().filter(|t| t.txid() == x.id()).count(), 2);
 }
 
-/// `edit_tx` on raw bytes that do not parse is refused as `BeefError`, the
-/// BEEF unchanged and the closure not run, as its rustdoc says (#817's fold:
-/// the parser's own error until then, `ReaderUnderflow`).
+/// The two states of #817's fold that only unframed raw bytes reach (bytes
+/// that do not parse, a byte after the lock time) are no longer reachable
+/// through a public door since the writers' change of #817: `merge_raw_tx`
+/// and `BeefTx::from_raw_tx` refuse such bytes, pinned here; `edit_tx`'s
+/// answers on them are the unit module `src/transaction/beef/index_817_tests.rs`
+/// (`edit_tx_on_raw_bytes_that_do_not_parse_is_a_beef_error_817`,
+/// `a_no_op_edit_of_raw_bytes_with_a_trailing_byte_moves_nothing_817`), the
+/// entries built there by the crate-private `BeefTx::from_framed_raw_tx`.
 #[test]
-fn edit_tx_on_raw_bytes_that_do_not_parse_is_a_beef_error_817() {
+fn the_unframed_raw_states_are_refused_at_the_public_doors_817() {
     let mut beef = Beef::new();
-    let id = beef.merge_raw_tx(vec![0xde, 0xad], None).txid();
-    let before = beef.clone().to_binary();
-    let mut ran = false;
-    let refused = beef.edit_tx(&id, |_| ran = true).unwrap_err();
-    assert!(
-        matches!(&refused, Error::BeefError(m)
-            if m.starts_with(&format!("{id} is held in this Beef as raw bytes that do not parse as a transaction: "))),
-        "{refused:?}"
-    );
-    assert!(!ran);
-    assert_eq!(beef.to_binary(), before);
-}
-
-/// A no-op edit of an entry whose raw bytes carry a byte after the
-/// transaction moves nothing: the entry keeps its txid (the hash of every
-/// byte) and its bytes, and with the transaction's canonical txid held by
-/// another entry it is not refused (#817's fold: re-keyed under the
-/// canonical txid, or refused, until then).
-#[test]
-fn a_no_op_edit_of_raw_bytes_with_a_trailing_byte_moves_nothing_817() {
-    let t = tx(&"bb".repeat(32), 2_000);
-    let mut raw = t.to_binary();
+    let mut raw = tx(&"bb".repeat(32), 2_000).to_binary();
     raw.push(0x00);
-    let mut beef = Beef::new();
-    let id = beef.merge_raw_tx(raw.clone(), None).txid();
-    assert_ne!(id, t.id());
-    let before = beef.clone().to_binary();
-    assert_eq!(beef.edit_tx(&id, |_| 7), Ok(7));
-    assert_eq!(ids(&beef), vec![id.clone()]);
-    assert_eq!(beef.find_txid(&id).unwrap().raw_tx(), Some(&raw[..]));
-    assert_eq!(beef.clone().to_binary(), before, "no byte moves");
-    // The canonical txid held by another entry: still no refusal.
-    beef.merge_raw_tx(t.to_binary(), None);
-    let held = beef.clone().to_binary();
-    assert_eq!(beef.edit_tx(&id, |_| ()), Ok(()));
-    assert_eq!(beef.to_binary(), held);
-    assert_eq!(beef.txs.len(), 2);
+    for bytes in [vec![0xde, 0xad], raw] {
+        assert!(matches!(
+            beef.merge_raw_tx(bytes.clone(), None),
+            Err(Error::BeefError(_))
+        ));
+        assert!(matches!(
+            BeefTx::from_raw_tx(bytes, None),
+            Err(Error::BeefError(_))
+        ));
+    }
+    assert!(beef.txs.is_empty());
 }
 
 /// The no-op edit keeps the entry's `is_valid` (the strength read's S4).
@@ -508,7 +510,7 @@ fn a_closure_returning_an_err_value_still_has_its_edit_stored_817() {
 fn the_two_edit_tx_cells_inside_the_window_stated_817() {
     let (mut beef, [x, _, _]) = three();
     let y = locked(x.clone(), 5);
-    beef.txs[1] = BeefTx::from_raw_tx(y.to_binary(), None);
+    beef.txs[1] = BeefTx::from_raw_tx(y.to_binary(), None).unwrap();
     beef.edit_tx(&x.id(), |t| t.lock_time = 5).unwrap();
     let held = beef.txs.iter().filter(|t| t.txid() == y.id()).count();
     assert_eq!(held, 2, "the collision missed inside the window");
@@ -543,13 +545,15 @@ fn a_hand_removal_then_two_pushes_finds_each_pushed_entry_817() {
     beef.txs.retain(|t| t.txid() != x.id());
     let p = tx(&"ab".repeat(32), 7_000);
     let q = tx(&"cd".repeat(32), 9_000);
-    beef.txs.push(BeefTx::from_raw_tx(p.to_binary(), None));
-    beef.txs.push(BeefTx::from_raw_tx(q.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(p.to_binary(), None).unwrap());
+    beef.txs
+        .push(BeefTx::from_raw_tx(q.to_binary(), None).unwrap());
     for t in [&u, &w, &p, &q] {
         assert_eq!(beef.find_txid(&t.id()).map(BeefTx::txid), Some(t.id()));
     }
-    beef.merge_raw_tx(p.to_binary(), None);
-    beef.merge_raw_tx(q.to_binary(), None);
+    beef.merge_raw_tx(p.to_binary(), None).unwrap();
+    beef.merge_raw_tx(q.to_binary(), None).unwrap();
     assert_eq!(ids(&beef), vec![u.id(), w.id(), p.id(), q.id()]);
 }
 
@@ -562,8 +566,10 @@ fn a_hand_removal_then_two_pushes_finds_each_pushed_entry_817() {
 fn two_hand_pushed_twins_are_answered_by_the_later_817() {
     let (mut beef, _) = three();
     let y = tx(&"cc".repeat(32), 7_000);
-    beef.txs.push(BeefTx::from_raw_tx(y.to_binary(), None));
-    beef.txs.push(BeefTx::from_raw_tx(y.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
+    beef.txs
+        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
     let found = beef.find_txid(&y.id()).unwrap();
     assert!(std::ptr::eq(found, &beef.txs[4]), "the later twin");
 }
@@ -578,7 +584,8 @@ fn two_hand_pushed_twins_are_answered_by_the_later_817() {
 #[test]
 fn an_edit_of_a_hand_pushed_twin_keeps_the_other_entry_found_817() {
     let (mut beef, [_, u, _]) = three();
-    beef.txs.push(BeefTx::from_raw_tx(u.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(u.to_binary(), None).unwrap());
     let v = locked(u.clone(), 1);
     beef.edit_tx(&u.id(), |t| t.lock_time = 1).unwrap();
     assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));
@@ -594,7 +601,8 @@ fn an_edit_of_a_hand_pushed_twin_keeps_the_other_entry_found_817() {
 #[test]
 fn an_edit_of_a_twin_after_reindex_keeps_the_other_entry_found_817() {
     let (mut beef, [_, u, _]) = three();
-    beef.txs.push(BeefTx::from_raw_tx(u.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(u.to_binary(), None).unwrap());
     beef.reindex();
     beef.edit_tx(&u.id(), |t| t.lock_time = 1).unwrap();
     assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));

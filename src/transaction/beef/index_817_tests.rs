@@ -29,7 +29,7 @@ fn three() -> (Beef, [Transaction; 3]) {
     let txs = [tx("dd", 3_000), tx("bb", 2_000), tx("ee", 5_000)];
     let mut beef = Beef::new();
     for t in &txs {
-        beef.merge_raw_tx(t.to_binary(), None);
+        beef.merge_raw_tx(t.to_binary(), None).unwrap();
     }
     (beef, txs)
 }
@@ -41,7 +41,8 @@ fn three() -> (Beef, [Transaction; 3]) {
 fn a_mut_door_after_a_hand_push_or_retain_indexes_every_entry_817() {
     let (mut beef, [x, _, _]) = three();
     let y = tx("cc", 7_000);
-    beef.txs.push(BeefTx::from_raw_tx(y.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
     assert_eq!(beef.indexed_len, 3, "the hand push is not indexed yet");
     beef.find_txid_mut(&x.id());
     assert_eq!(beef.indexed_len, beef.txs.len());
@@ -61,7 +62,7 @@ fn a_mut_door_after_a_hand_push_or_retain_indexes_every_entry_817() {
 fn a_miss_while_the_count_stands_reads_no_entry_817() {
     let (mut beef, _) = three();
     let y = tx("cc", 7_000);
-    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None);
+    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None).unwrap();
     assert_eq!(beef.index_of(&y.id()), None);
 }
 
@@ -73,8 +74,9 @@ fn a_grown_count_indexes_the_tail_alone_817() {
     let (mut beef, [x, _, _]) = three();
     let y = tx("cc", 7_000);
     let z = tx("ab", 9_000);
-    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None);
-    beef.txs.push(BeefTx::from_raw_tx(z.to_binary(), None));
+    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None).unwrap();
+    beef.txs
+        .push(BeefTx::from_raw_tx(z.to_binary(), None).unwrap());
     beef.find_txid_mut(&z.id());
     assert_eq!(beef.txid_index.get(&z.id()), Some(&3));
     assert_eq!(beef.txid_index.get(&y.id()), None, "the tail alone");
@@ -93,8 +95,10 @@ fn a_grown_count_with_a_moved_prefix_rebuilds_whole_817() {
     beef.txs.retain(|t| t.txid() != x.id());
     let y = tx("cc", 7_000);
     let z = tx("ab", 9_000);
-    beef.txs.push(BeefTx::from_raw_tx(y.to_binary(), None));
-    beef.txs.push(BeefTx::from_raw_tx(z.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
+    beef.txs
+        .push(BeefTx::from_raw_tx(z.to_binary(), None).unwrap());
     assert_eq!(
         beef.find_txid_mut(&y.id()).map(|e| e.txid()),
         Some(y.id()),
@@ -138,8 +142,75 @@ fn a_self_lookup_after_a_retain_and_pushes_scans_whole_817() {
     beef.txs.retain(|t| t.txid() != x.id());
     let y = tx("cc", 7_000);
     let z = tx("ab", 9_000);
-    beef.txs.push(BeefTx::from_raw_tx(y.to_binary(), None));
-    beef.txs.push(BeefTx::from_raw_tx(z.to_binary(), None));
+    beef.txs
+        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
+    beef.txs
+        .push(BeefTx::from_raw_tx(z.to_binary(), None).unwrap());
     assert_eq!(beef.index_of(&y.id()), Some(2));
     assert_eq!(beef.indexed_len, 3, "a &self lookup writes no index");
+}
+
+/// Each entry's txid and raw bytes in order: what the two unframed-bytes
+/// pins compare, as the writers refuse an entry held raw that is not one
+/// transaction (#817's writers, `beef_raw_frame.rs`).
+fn held(beef: &Beef) -> Vec<(String, Option<Vec<u8>>)> {
+    beef.txs
+        .iter()
+        .map(|t| (t.txid(), t.raw_tx().map(<[u8]>::to_vec)))
+        .collect()
+}
+
+/// `edit_tx` on raw bytes that do not parse is refused as `BeefError`, the
+/// BEEF unchanged and the closure not run, as its rustdoc says (#817's fold:
+/// the parser's own error until then, `ReaderUnderflow`). Built by the
+/// crate-private `from_framed_raw_tx`: the public doors refuse such bytes
+/// since the writers' change of #817.
+#[test]
+fn edit_tx_on_raw_bytes_that_do_not_parse_is_a_beef_error_817() {
+    let mut beef = Beef::new();
+    beef.txs
+        .push(BeefTx::from_framed_raw_tx(vec![0xde, 0xad], None));
+    beef.reindex();
+    let id = beef.txs[0].txid();
+    let before = held(&beef);
+    let mut ran = false;
+    let refused = beef.edit_tx(&id, |_| ran = true).unwrap_err();
+    assert!(
+        matches!(&refused, crate::Error::BeefError(m)
+            if m.starts_with(&format!("{id} is held in this Beef as raw bytes that do not parse as a transaction: "))),
+        "{refused:?}"
+    );
+    assert!(!ran);
+    assert_eq!(held(&beef), before);
+}
+
+/// A no-op edit of an entry whose raw bytes carry a byte after the
+/// transaction moves nothing: the entry keeps its txid (the hash of every
+/// byte) and its bytes, and with the transaction's canonical txid held by
+/// another entry it is not refused (#817's fold: re-keyed under the
+/// canonical txid, or refused, until then).
+#[test]
+fn a_no_op_edit_of_raw_bytes_with_a_trailing_byte_moves_nothing_817() {
+    let t = tx("bb", 2_000);
+    let mut raw = t.to_binary();
+    raw.push(0x00);
+    let mut beef = Beef::new();
+    beef.txs.push(BeefTx::from_framed_raw_tx(raw.clone(), None));
+    beef.reindex();
+    let id = beef.txs[0].txid();
+    assert_ne!(id, t.id());
+    let before = held(&beef);
+    assert_eq!(beef.edit_tx(&id, |_| 7), Ok(7));
+    assert_eq!(
+        beef.txs.iter().map(BeefTx::txid).collect::<Vec<_>>(),
+        vec![id.clone()]
+    );
+    assert_eq!(beef.find_txid(&id).unwrap().raw_tx(), Some(&raw[..]));
+    assert_eq!(held(&beef), before, "no byte moves");
+    // The canonical txid held by another entry: still no refusal.
+    beef.merge_raw_tx(t.to_binary(), None).unwrap();
+    let kept = held(&beef);
+    assert_eq!(beef.edit_tx(&id, |_| ()), Ok(()));
+    assert_eq!(held(&beef), kept);
+    assert_eq!(beef.txs.len(), 2);
 }

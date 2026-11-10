@@ -24,7 +24,8 @@ fn proven(beef: &mut Beef, byte: &str, height: u32) -> String {
     .unwrap();
     let path = MerklePath::new(height, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap();
     let index = beef.merge_bump(path);
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     tx.id()
 }
 
@@ -34,7 +35,7 @@ fn two() -> (Vec<u8>, String, String, usize, usize) {
     let mut beef = Beef::new();
     let a = proven(&mut beef, "11", 900);
     let b = proven(&mut beef, "22", 901);
-    let bytes = beef.to_binary();
+    let bytes = beef.to_binary().expect("the BEEF is writable");
     let la = beef.to_binary_atomic(&a).unwrap().len();
     let lb = beef.to_binary_atomic(&b).unwrap().len();
     (bytes, a, b, la, lb)

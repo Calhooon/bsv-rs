@@ -68,7 +68,8 @@ fn write(bump: MerklePath, entries: &[(&Transaction, bool)], atomic: Option<&str
     let mut beef = Beef::new();
     let index = beef.merge_bump(bump);
     for (tx, proven) in entries {
-        beef.merge_raw_tx(tx.to_binary(), proven.then_some(index));
+        beef.merge_raw_tx(tx.to_binary(), proven.then_some(index))
+            .expect("the bytes are one transaction");
     }
     let mut writer = Writer::new();
     if let Some(txid) = atomic {
@@ -77,7 +78,7 @@ fn write(bump: MerklePath, entries: &[(&Transaction, bool)], atomic: Option<&str
         subject.reverse();
         writer.write_bytes(&subject);
     }
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     writer.into_bytes()
 }
 

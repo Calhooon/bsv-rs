@@ -352,19 +352,13 @@ impl MerklePath {
 
     /// The writer's check (#817): a non-hex hash anywhere first (the
     /// reference's throw), then the earliest state, in written order, whose
-    /// bytes would not frame or would read back as another path. Read-only.
-    fn check_writable(&self) -> Result<()> {
+    /// bytes would not frame or would read back as another path. Read-only;
+    /// `Beef`'s writers run it on each BUMP before any byte (`beef_writable.rs`).
+    pub(crate) fn check_writable(&self) -> Result<()> {
         // The reference's writer throws at a non-hex hash wherever it sits,
         // before or after any state it writes without a word, so this one
         // scan comes ahead of every other check (#817's fold).
-        let non_hex = self.path.iter().flatten().any(|leaf| {
-            !leaf.duplicate
-                && leaf
-                    .hash
-                    .as_deref()
-                    .is_some_and(|hash| !super::merkle_path_walk::is_reference_hex(hash))
-        });
-        if non_hex {
+        if self.writes_non_hex() {
             return Err(crate::Error::MerklePathError(
                 super::merkle_path_walk::INVALID_HEX.to_string(),
             ));
@@ -407,16 +401,23 @@ impl MerklePath {
         Ok(())
     }
 
-    /// The bytes 0.9.0-beta wrote for any path, unchecked: the tree height cut
-    /// to a byte, a missing or undecodable hash written as nothing.
-    ///
-    /// For `Beef`'s writers alone, which stay infallible until the second lane
-    /// of #817 makes them fallible with `merge_beef`; that lane removes this.
-    pub(crate) fn to_writer_lenient_until_beef_817(&self, writer: &mut Writer) {
-        self.write_unchecked(writer);
+    /// A leaf not flagged duplicate holds a hash with a character that is
+    /// not a hex digit: the one state of this path the reference's writer
+    /// throws on (`MerklePath.ts:289`), which `Beef`'s check asks of every
+    /// BUMP ahead of the states the reference writes (#817).
+    pub(crate) fn writes_non_hex(&self) -> bool {
+        self.path.iter().flatten().any(|leaf| {
+            !leaf.duplicate
+                && leaf
+                    .hash
+                    .as_deref()
+                    .is_some_and(|hash| !super::merkle_path_walk::is_reference_hex(hash))
+        })
     }
 
-    fn write_unchecked(&self, writer: &mut Writer) {
+    /// The bytes of a path [`check_writable`](Self::check_writable)
+    /// accepted: for `to_writer` and `Beef`'s writers, each after the check.
+    pub(crate) fn write_unchecked(&self, writer: &mut Writer) {
         writer.write_var_int(self.block_height as u64);
         writer.write_u8(self.path.len() as u8);
 
@@ -515,7 +516,17 @@ impl MerklePath {
                 "Cannot combine paths with different roots".to_string(),
             ));
         }
+        self.combine_verified(other);
+        Ok(())
+    }
 
+    /// The merge of [`combine`](Self::combine) once its checks hold (the
+    /// same block height, each root computed and equal), which cannot fail:
+    /// `Beef::merge_bump` computes both roots itself and calls this, so no
+    /// error is left to ignore there (#817; go-sdk@2ca481c's
+    /// `combineVerified`, `transaction/merklepath.go`, called from
+    /// `MergeBump`, `beef.go:767-768`).
+    pub(crate) fn combine_verified(&mut self, other: &MerklePath) {
         // Ensure path has enough levels
         while self.path.len() < other.path.len() {
             self.path.push(Vec::new());
@@ -548,8 +559,6 @@ impl MerklePath {
 
         // Trim unnecessary nodes
         self.trim();
-
-        Ok(())
     }
 
     /// Removes all internal nodes that are not required by level zero txid nodes.

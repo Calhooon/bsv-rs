@@ -76,9 +76,9 @@ pub(super) fn inputs(
 pub(super) fn merge_beef<'a>(beefs: impl IntoIterator<Item = &'a [u8]>) -> Result<Vec<u8>> {
     let mut merged = Beef::new();
     for bytes in beefs {
-        merged.merge_beef(&Beef::from_binary(bytes)?);
+        merged.merge_beef(&Beef::from_binary(bytes)?)?;
     }
-    Ok(merged.to_binary())
+    merged.to_binary()
 }
 
 pub(super) async fn sign_bound_inputs<W: WalletInterface>(

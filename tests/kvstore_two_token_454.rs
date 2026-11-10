@@ -56,7 +56,7 @@ async fn compare(global: bool, remove: bool) {
     }
     *h.wallet.listed.lock().unwrap() = Some(ListOutputsResult {
         total_outputs: 2,
-        beef: Some(beef.to_binary()),
+        beef: Some(beef.to_binary().expect("the BEEF is writable")),
         outputs: sources
             .iter()
             .map(|(tx, _)| WalletOutput {

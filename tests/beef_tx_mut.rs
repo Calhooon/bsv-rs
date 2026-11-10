@@ -130,7 +130,7 @@ fn an_input_repointed_through_edit_tx_is_what_every_reader_reads() {
 
     // The written bytes carry the mutated transaction, and read back they
     // are the BEEF the readers judged.
-    let bytes = beef.clone().to_binary();
+    let bytes = beef.clone().to_binary().expect("the BEEF is writable");
     let hex = to_hex(&bytes);
     assert!(
         hex.contains(&mutated.to_hex()),
@@ -192,7 +192,7 @@ fn a_proven_entry_edited_keeps_its_bump_index_and_is_not_proven() {
         beef.clone().verify_structure().err(),
         Some(Kind::TxidNotInBump)
     );
-    let bytes = beef.to_binary();
+    let bytes = beef.to_binary().expect("the BEEF is writable");
     assert_eq!(
         Beef::from_binary(&bytes).unwrap().verify_structure().err(),
         Some(Kind::TxidNotInBump),
@@ -211,7 +211,8 @@ fn a_tx_mut_edit_is_unseen_by_the_per_entry_doors_stated_171() {
     let (mut beef, _, q, c, _) = repointed();
     let mut moved = tx(&q.id());
     moved.lock_time = 3;
-    beef.merge_raw_tx(moved.to_binary(), None);
+    beef.merge_raw_tx(moved.to_binary(), None)
+        .expect("the bytes are one transaction");
     let entry = beef.find_txid_mut(&moved.id()).unwrap();
     entry.tx_mut().unwrap().lock_time = 4;
     let renamed = entry.txid();
@@ -222,7 +223,8 @@ fn a_tx_mut_edit_is_unseen_by_the_per_entry_doors_stated_171() {
     again.invalidate_caches();
     assert_eq!(again.id(), renamed);
     let held = beef.txs.len();
-    beef.merge_raw_tx(again.to_binary(), None);
+    beef.merge_raw_tx(again.to_binary(), None)
+        .expect("the bytes are one transaction");
     assert_eq!(beef.txs.len(), held + 1, "stored a second time");
     beef.reindex();
     assert!(beef.find_txid(&renamed).is_some());

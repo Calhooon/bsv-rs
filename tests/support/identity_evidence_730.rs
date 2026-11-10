@@ -57,7 +57,8 @@ fn lone_leaf(txid: &str, height: u32) -> MerklePath {
 /// `tx` merged raw with a BUMP of its own at `height`.
 fn proven(beef: &mut Beef, tx: &Transaction, height: u32) {
     let index = beef.merge_bump(lone_leaf(&tx.id(), height));
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
 }
 
 /// A push of `n` zero bytes under OP_PUSHDATA4, as a locking script.
@@ -76,7 +77,7 @@ fn atomic(txid: &str, beef: &mut Beef) -> Vec<u8> {
     let mut subject = from_hex(txid).unwrap();
     subject.reverse();
     writer.write_bytes(&subject);
-    writer.write_bytes(&beef.to_binary());
+    writer.write_bytes(&beef.to_binary().expect("the BEEF is writable"));
     writer.into_bytes()
 }
 
@@ -122,11 +123,17 @@ fn second_spend() -> (Vec<u8>, String) {
         .add_output(TransactionOutput::new(1, token()))
         .unwrap();
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
-    beef.merge_raw_tx(a.to_binary(), None);
-    beef.merge_raw_tx(b.to_binary(), None);
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(a.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(b.to_binary(), None)
+        .expect("the bytes are one transaction");
     proven(&mut beef, &g, 900);
-    (beef.to_binary(), subject.id())
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 fn no_inputs() -> (Vec<u8>, String) {
@@ -135,8 +142,12 @@ fn no_inputs() -> (Vec<u8>, String) {
         .add_output(TransactionOutput::new(1, token()))
         .unwrap();
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
-    (beef.to_binary(), subject.id())
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 fn inputs(n: usize) -> (Vec<u8>, String) {
@@ -151,7 +162,10 @@ fn inputs(n: usize) -> (Vec<u8>, String) {
         .unwrap();
     let mut beef = Beef::new();
     proven(&mut beef, &subject, 900);
-    (beef.to_binary(), subject.id())
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 fn script_bytes(n: usize) -> (Vec<u8>, String) {
@@ -161,7 +175,10 @@ fn script_bytes(n: usize) -> (Vec<u8>, String) {
         .unwrap();
     let mut beef = Beef::new();
     proven(&mut beef, &subject, 900);
-    (beef.to_binary(), subject.id())
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 fn transactions(n: usize) -> (Vec<u8>, String) {
@@ -190,9 +207,13 @@ fn proven_parent() -> (Vec<u8>, String) {
     let g = grandparent();
     let subject = spending(g.id(), "", token());
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
     proven(&mut beef, &g, 900);
-    (beef.to_binary(), subject.id())
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }
 
 /// #728's shape 4 with the grandparent present raw and proven by its own
@@ -203,8 +224,13 @@ fn another_bump_grandparent_proven() -> (Vec<u8>, String) {
     let subject = spending(parent.id(), "", token());
     let mut beef = Beef::new();
     let index = beef.merge_bump(lone_leaf(&"33".repeat(32), 901));
-    beef.merge_raw_tx(parent.to_binary(), Some(index));
+    beef.merge_raw_tx(parent.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     proven(&mut beef, &g, 900);
-    beef.merge_raw_tx(subject.to_binary(), None);
-    (beef.to_binary(), subject.id())
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    (
+        beef.to_binary().expect("the BEEF is writable"),
+        subject.id(),
+    )
 }

@@ -31,7 +31,7 @@ impl Actions {
         for id in txids {
             beef.merge_transaction(state.0[&id].clone());
         }
-        beef.to_binary()
+        beef.to_binary().expect("the BEEF is writable")
     }
 
     pub fn create(&self, args: &CreateActionArgs) -> CreateActionResult {

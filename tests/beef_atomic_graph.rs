@@ -502,7 +502,8 @@ fn what_this_crates_writer_writes_its_own_two_readers_accept() {
             beef.merge_bump(bump.clone());
         }
         for node in order {
-            beef.merge_raw_tx(node.raw.clone(), node.bump);
+            beef.merge_raw_tx(node.raw.clone(), node.bump)
+                .expect("the bytes are one transaction");
         }
         let bytes = beef.to_binary_atomic(&subject).unwrap();
         let written = Beef::from_binary(&bytes).unwrap();
@@ -593,12 +594,15 @@ fn the_atomic_writer_emits_the_brc95_closure_and_drops_the_rest() {
     for bump in &bumps {
         beef.merge_bump(bump.clone());
     }
-    beef.merge_raw_tx(x.to_binary(), Some(0));
-    beef.merge_raw_tx(y.to_binary(), None);
+    beef.merge_raw_tx(x.to_binary(), Some(0))
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(y.to_binary(), None)
+        .expect("the bytes are one transaction");
     for node in &graph.nodes {
-        beef.merge_raw_tx(node.raw.clone(), node.bump.map(|b| b + 1));
+        beef.merge_raw_tx(node.raw.clone(), node.bump.map(|b| b + 1))
+            .expect("the bytes are one transaction");
     }
-    let all = beef.clone().to_binary();
+    let all = beef.clone().to_binary().expect("the BEEF is writable");
     let subject = graph.node("S").txid.clone();
     let bytes = beef.to_binary_atomic(&subject).unwrap();
 

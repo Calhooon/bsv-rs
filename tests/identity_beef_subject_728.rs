@@ -115,11 +115,14 @@ fn txs(v: &Value, token: &LockingScript) -> Txs {
 /// grandparent (`parent`) proven, merged newest to oldest.
 fn chain(t: &Txs) -> Vec<u8> {
     let mut beef = Beef::new();
-    beef.merge_raw_tx(t.tip.to_binary(), None);
-    beef.merge_raw_tx(t.middle.to_binary(), None);
+    beef.merge_raw_tx(t.tip.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(t.middle.to_binary(), None)
+        .expect("the bytes are one transaction");
     let index = beef.merge_bump(lone_leaf(&t.parent.id(), 900));
-    beef.merge_raw_tx(t.parent.to_binary(), Some(index));
-    beef.to_binary()
+    beef.merge_raw_tx(t.parent.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
+    beef.to_binary().expect("the BEEF is writable")
 }
 
 /// Shape 2's BEEF: the token's transaction proven at 900, then the parent
@@ -127,7 +130,8 @@ fn chain(t: &Txs) -> Vec<u8> {
 fn txid_only_last(t: &Txs) -> Beef {
     let mut beef = Beef::new();
     let index = beef.merge_bump(lone_leaf(&t.alone.id(), 900));
-    beef.merge_raw_tx(t.alone.to_binary(), Some(index));
+    beef.merge_raw_tx(t.alone.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     beef.merge_bump(lone_leaf(&t.parent.id(), 901));
     beef.merge_txid_only(t.parent.id());
     beef
@@ -142,7 +146,7 @@ fn beside_token(t: &Txs) -> Vec<u8> {
     let mut subject = from_hex(&t.parent.id()).unwrap();
     subject.reverse();
     writer.write_bytes(&subject);
-    writer.write_bytes(&txid_only_last(t).to_binary());
+    writer.write_bytes(&txid_only_last(t).to_binary().expect("the BEEF is writable"));
     writer.into_bytes()
 }
 
@@ -151,9 +155,11 @@ fn beside_token(t: &Txs) -> Vec<u8> {
 fn another_bump(t: &Txs, another: &str) -> Vec<u8> {
     let mut beef = Beef::new();
     let index = beef.merge_bump(lone_leaf(another, 900));
-    beef.merge_raw_tx(t.parent.to_binary(), Some(index));
-    beef.merge_raw_tx(t.subject.to_binary(), None);
-    beef.to_binary()
+    beef.merge_raw_tx(t.parent.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(t.subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.to_binary().expect("the BEEF is writable")
 }
 
 /// A facilitator answering every question with one output.
@@ -279,7 +285,9 @@ async fn a_txid_only_entry_written_last_is_skipped_by_both_parsers_728() {
     let v = vector();
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
-    let beef = txid_only_last(&t).to_binary();
+    let beef = txid_only_last(&t)
+        .to_binary()
+        .expect("the BEEF is writable");
     let (index, outcome, refused_at) = recorded(&v, "txid_only_last", &beef);
     assert_eq!((index, outcome.as_str()), (0, "skipped"));
     assert_eq!(

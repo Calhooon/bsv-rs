@@ -104,7 +104,8 @@ fn funded_beef() -> (Beef, String) {
     let txid = funding.id();
     let mut beef = Beef::new();
     let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&txid, 800_000));
-    beef.merge_raw_tx(funding.to_binary(), Some(bump));
+    beef.merge_raw_tx(funding.to_binary(), Some(bump))
+        .expect("the bytes are one transaction");
     (beef, txid)
 }
 
@@ -116,7 +117,8 @@ fn chain_beef(n: usize) -> (Beef, String) {
     for _ in 1..n {
         let tx = spend(&[(prev, 0)], 1);
         prev = tx.id();
-        beef.merge_raw_tx(tx.to_binary(), None);
+        beef.merge_raw_tx(tx.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     (beef, prev)
 }
@@ -129,7 +131,8 @@ fn diamond_beef(levels: usize) -> (Beef, String) {
     for _ in 0..levels {
         let tx = spend(&[(prev.clone(), 0), (prev, 1)], 2);
         prev = tx.id();
-        beef.merge_raw_tx(tx.to_binary(), None);
+        beef.merge_raw_tx(tx.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     (beef, prev)
 }
@@ -137,7 +140,7 @@ fn diamond_beef(levels: usize) -> (Beef, String) {
 /// The BEEF's bytes in dependency order (oldest first).
 fn chain_bytes(n: usize) -> (Vec<u8>, String) {
     let (mut beef, subject) = chain_beef(n);
-    (beef.to_binary(), subject)
+    (beef.to_binary().expect("the BEEF is writable"), subject)
 }
 
 /// The subject of an `n`-deep chain, parsed and linked on the 1 GiB thread.
@@ -385,7 +388,7 @@ fn a_reversed_deep_chain_is_valid_on_the_three_readers_in_linear_time_on_a_small
     root.reverse();
     beef.txs.reverse();
     let mut writer = bsv_rs::primitives::Writer::new();
-    beef.to_writer(&mut writer);
+    beef.to_writer(&mut writer).expect("the BEEF is writable");
     let bytes = std::sync::Arc::new(writer.into_bytes());
     let whole = {
         let bytes = bytes.clone();
@@ -430,7 +433,7 @@ fn a_reversed_deep_chain_is_valid_on_the_three_readers_in_linear_time_on_a_small
 #[test]
 fn a_24_deep_diamond_parses_and_links_in_under_a_second_on_a_small_stack() {
     let (mut beef, subject) = diamond_beef(24);
-    let bytes = beef.to_binary();
+    let bytes = beef.to_binary().expect("the BEEF is writable");
     let (id, elapsed) = on_small_stack("diamond", move || {
         let tx = Transaction::from_beef(&bytes, None).expect("the diamond parses and links");
         tx.id()

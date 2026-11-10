@@ -97,14 +97,18 @@ fn two_branches(p1: usize, p2: usize) -> Built {
         .add_output(TransactionOutput::new(1, token()))
         .unwrap();
     let mut beef = Beef::new();
-    beef.merge_raw_tx(subject.to_binary(), None);
-    beef.merge_raw_tx(first.to_binary(), None);
-    beef.merge_raw_tx(second.to_binary(), None);
+    beef.merge_raw_tx(subject.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(first.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(second.to_binary(), None)
+        .expect("the bytes are one transaction");
     let leaf = MerklePathLeaf::new_txid(0, g_txid.clone());
     let index = beef.merge_bump(MerklePath::new(900, vec![vec![leaf]]).unwrap());
-    beef.merge_raw_tx(g.to_binary(), Some(index));
+    beef.merge_raw_tx(g.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     Built {
-        beef: beef.to_binary(),
+        beef: beef.to_binary().expect("the BEEF is writable"),
         subject: subject.id(),
         g: g_txid,
         p1: first.id(),

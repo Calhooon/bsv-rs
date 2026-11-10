@@ -87,9 +87,13 @@ fn proven(id: &str) -> (Vec<u8>, MerklePath) {
 fn a_bump_of_a_held_height_and_root_is_combined_wire_beef_001() {
     let expected = case("merge_beef_into_itself");
     let mut beef = read("beef-001");
-    beef.merge_beef(&read("beef-001"));
+    beef.merge_beef(&read("beef-001"))
+        .expect("the source BEEF writes and reads back");
     assert_eq!(beef.bumps.len() as u64, expected["bumps"].as_u64().unwrap());
-    assert_eq!(beef.to_hex(), text(&expected["hex"]));
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        text(&expected["hex"])
+    );
 }
 
 /// Kills `update_bump_indices` replaced with `()` at 359:9: a BUMP merged after
@@ -99,11 +103,13 @@ fn a_bump_of_a_held_height_and_root_is_combined_wire_beef_001() {
 fn a_bump_merged_after_its_transaction_proves_it_wire_beef_023() {
     let f = family();
     let mut beef = Beef::with_version(BEEF_V1);
-    beef.merge_raw_tx(f.parent, None);
-    beef.merge_raw_tx(f.child, None);
+    beef.merge_raw_tx(f.parent, None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(f.child, None)
+        .expect("the bytes are one transaction");
     beef.merge_bump(f.bump);
     assert_eq!(
-        beef.to_hex(),
+        beef.to_hex().expect("the BEEF is writable"),
         text(&case("bump_merged_after_its_transaction")["hex"])
     );
 }
@@ -118,10 +124,18 @@ fn a_merge_after_a_serialization_sorts_again_wire_beef_023() {
     let f = family();
     let mut beef = Beef::with_version(BEEF_V1);
     beef.merge_bump(f.bump);
-    beef.merge_raw_tx(f.child, None);
-    assert_eq!(beef.to_hex(), text(&expected["first"]));
-    beef.merge_raw_tx(f.parent, None);
-    assert_eq!(beef.to_hex(), text(&expected["second"]));
+    beef.merge_raw_tx(f.child, None)
+        .expect("the bytes are one transaction");
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        text(&expected["first"])
+    );
+    beef.merge_raw_tx(f.parent, None)
+        .expect("the bytes are one transaction");
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        text(&expected["second"])
+    );
 }
 
 /// Kills `find_bump` replaced with `None` at 145:9 (`Beef.ts:570-574`).
@@ -197,7 +211,10 @@ fn from_reader_reads_the_frame_and_leaves_the_byte_after_it_wire_beef_030() {
     let bytes = row("beef-030");
     let mut reader = Reader::new(&bytes);
     let mut beef = Beef::from_reader(&mut reader).unwrap();
-    assert_eq!(beef.to_hex(), text(&expected["hex"]));
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        text(&expected["hex"])
+    );
     assert_eq!(
         reader.remaining() as u64,
         expected["left"].as_u64().unwrap()
@@ -224,7 +241,10 @@ fn a_plain_beef_is_not_atomic_wire_beef_001_atomic_beef_001() {
 #[test]
 fn a_shallow_clone_writes_the_bytes_of_the_original_wire_beef_023() {
     let mut clone = read("beef-023").clone_shallow();
-    assert_eq!(clone.to_hex(), text(&case("clone")["hex"]));
+    assert_eq!(
+        clone.to_hex().expect("the BEEF is writable"),
+        text(&case("clone")["hex"])
+    );
 }
 
 /// Kills `to_log_string` replaced with `String::new()` and `"xyzzy".into()` at
@@ -247,7 +267,10 @@ fn two_bumps_at_one_height_with_one_root_are_valid_wire_beef_001() {
     let mut beef = read("beef-001");
     let bump = beef.bumps[0].clone();
     beef.bumps.push(bump);
-    assert_eq!(beef.to_hex(), text(&expected["hex"]));
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        text(&expected["hex"])
+    );
     assert_eq!(
         beef.verify_valid(false).valid,
         expected["valid"].as_bool().unwrap()
@@ -265,7 +288,10 @@ fn two_bumps_at_one_height_with_two_roots_are_refused_wire_beef_001_beef_002() {
     let (_, mut other) = proven("beef-002");
     other.block_height = beef.bumps[0].block_height;
     beef.bumps.push(other);
-    assert_eq!(beef.to_hex(), text(&expected["hex"]));
+    assert_eq!(
+        beef.to_hex().expect("the BEEF is writable"),
+        text(&expected["hex"])
+    );
     assert_eq!(
         beef.verify_valid(false).valid,
         expected["valid"].as_bool().unwrap()
@@ -331,8 +357,10 @@ fn a_raw_transaction_without_inputs_sorts_after_the_proven_wire_beef_023() {
     let f = family();
     let mut beef = Beef::with_version(BEEF_V1);
     beef.merge_bump(f.bump);
-    beef.merge_raw_tx(f.parent, None);
-    beef.merge_raw_tx(from_hex(text(&expected["raw"])).unwrap(), None);
+    beef.merge_raw_tx(f.parent, None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(from_hex(text(&expected["raw"])).unwrap(), None)
+        .expect("the bytes are one transaction");
     let sorted = beef.sort_txs();
     assert_eq!(sorted.txid_only, strings(&expected["txid_only"]));
     let order: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
@@ -348,8 +376,14 @@ fn a_ring_in_the_input_cache_is_refused_wire_beef_002_beef_004() {
     let (one, _) = proven("beef-002");
     let (two, _) = proven("beef-004");
     let mut beef = Beef::with_version(BEEF_V1);
-    let a = beef.merge_raw_tx(one, None).txid();
-    let c = beef.merge_raw_tx(two, None).txid();
+    let a = beef
+        .merge_raw_tx(one, None)
+        .expect("the bytes are one transaction")
+        .txid();
+    let c = beef
+        .merge_raw_tx(two, None)
+        .expect("the bytes are one transaction")
+        .txid();
     beef.find_txid_mut(&a).unwrap().input_txids = vec![c.clone()];
     beef.find_txid_mut(&c).unwrap().input_txids = vec![a];
     let sorted = beef.sort_txs();
@@ -371,10 +405,13 @@ fn behind_a_proof() -> Beef {
     let (spend, bump) = proven("beef-002");
     let (outside, _) = proven("beef-004");
     let mut beef = Beef::with_version(BEEF_V1);
-    beef.merge_raw_tx(f.parent, None);
+    beef.merge_raw_tx(f.parent, None)
+        .expect("the bytes are one transaction");
     beef.merge_bump(bump);
-    beef.merge_raw_tx(spend, None);
-    beef.merge_raw_tx(outside, None);
+    beef.merge_raw_tx(spend, None)
+        .expect("the bytes are one transaction");
+    beef.merge_raw_tx(outside, None)
+        .expect("the bytes are one transaction");
     beef
 }
 

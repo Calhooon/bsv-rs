@@ -119,9 +119,10 @@ fn output(byte: &str, lock: LockingScript) -> OutputListItem {
     let path = MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap();
     let mut beef = Beef::new();
     let index = beef.merge_bump(path);
-    beef.merge_raw_tx(tx.to_binary(), Some(index));
+    beef.merge_raw_tx(tx.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     OutputListItem {
-        beef: beef.to_binary(),
+        beef: beef.to_binary().expect("the BEEF is writable"),
         output_index: 0,
         context: None,
         txid: None,
