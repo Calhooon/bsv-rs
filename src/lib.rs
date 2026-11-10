@@ -36,6 +36,11 @@
 
 // Error types (shared across modules)
 pub mod error;
+// The lib's own tests read the integration tests' shared builders, written
+// against `bsv_rs::` paths, through this alias (#621's pre-pass differential,
+// `transaction/beef/prepass_621_tests.rs`).
+#[cfg(test)]
+extern crate self as bsv_rs;
 #[cfg(feature = "transaction")]
 pub use error::TransportFault;
 #[cfg(feature = "wallet")]

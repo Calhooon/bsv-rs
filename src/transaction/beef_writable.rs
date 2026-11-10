@@ -68,11 +68,15 @@ impl Beef {
     /// What the reference's snapshot refuses, before `self` changes (#817):
     /// the source's write as [`to_writer`](Self::to_writer) judges it (its
     /// words, the entries met in the order the snapshot writes them), then
-    /// this crate's strict reader of those bytes
-    /// ([`from_binary`](Self::from_binary), in its words). The literal round
-    /// trip, one write and one read of the source per merge; until #817 such
-    /// a source was merged (a V1 source holding a txid-only entry, a BUMP the
-    /// snapshot's reader refuses, the #764 row's residues).
+    /// what this crate's strict reader of those bytes refuses
+    /// ([`from_binary`](Self::from_binary), in its words), judged by a
+    /// pre-pass that writes no entry (#621's pre-pass, after #817: each BUMP
+    /// read by the reader's decoder at its place in the frame; from #817 to
+    /// it the literal round trip, one write and one read of the source per
+    /// merge, about twice the merge's cost), proven equal to that round trip
+    /// by its differential and fuzz target. Until #817 such a source was
+    /// merged (a V1 source holding a txid-only entry, a BUMP the snapshot's
+    /// reader refuses, the #764 row's residues).
     pub fn merge_beef(&mut self, other: &Beef) -> Result<()> {
         let order = other.written_order();
         other.snapshot_verdict(&order)?;
@@ -156,9 +160,11 @@ impl Beef {
     ///   reader's (`Beef.ts:1251-1254`), whose writer writes the word;
     /// - a BUMP [`MerklePath::to_writer`](crate::transaction::MerklePath::to_writer) refuses, in its words;
     /// - in held order, a txid-only entry's txid of other than 64 hex digits:
-    ///   `Invalid txid-only entry txid: expected 64 hex digits, got N`; a raw
-    ///   entry whose bytes are not exactly one transaction, in
-    ///   [`BeefTx::from_raw_tx`](crate::transaction::BeefTx::from_raw_tx)'s words.
+    ///   `Invalid txid-only entry txid: expected 64 hex digits, got N`; an
+    ///   entry whose written bytes are not exactly one transaction (held
+    ///   raw, or a parsed transaction caching a transaction and more, as
+    ///   `Transaction::from_binary` of a longer buffer left it until #840;
+    ///   #621's fold), in [`BeefTx::from_raw_tx`](crate::transaction::BeefTx::from_raw_tx)'s words.
     ///
     /// The last two classes and the version word are written by the
     /// reference as bytes no reader reads back as written (stated rows, the
@@ -214,13 +220,12 @@ impl Beef {
     /// The bytes of a BEEF the check accepted, the entries in held order, as
     /// 0.9.0-beta wrote every BEEF.
     pub(super) fn write_checked(&self, writer: &mut Writer) {
-        self.write_entries(writer, &(0..self.txs.len()).collect::<Vec<_>>(), false);
+        self.write_entries(writer, &(0..self.txs.len()).collect::<Vec<_>>());
     }
 
     /// The version, the BUMPs and the entries in `order`, each entry's
-    /// transaction as `merge_beef` merges it when `as_merged` (its
-    /// `written_tx_bytes`), else as `to_writer` writes it.
-    fn write_entries(&self, writer: &mut Writer, order: &[usize], as_merged: bool) {
+    /// transaction as its `written_tx_bytes` (what `merge_beef` merges).
+    fn write_entries(&self, writer: &mut Writer, order: &[usize]) {
         writer.write_u32_le(self.version);
         writer.write_var_int(self.bumps.len() as u64);
         for bump in &self.bumps {
@@ -228,24 +233,48 @@ impl Beef {
         }
         writer.write_var_int(order.len() as u64);
         for &i in order {
-            self.txs[i].write_unchecked(writer, self.version, as_merged);
+            self.txs[i].write_unchecked(writer, self.version);
         }
     }
 
     /// `merge_beef`'s verdict on `self` as its source: what the reference's
     /// snapshot refuses (`mergeBeef`, `Beef.ts:971-990`:
-    /// `fromBinaryStrict(beef.toBinary())`, before the target changes). The
-    /// literal round trip: the writer's check over the entries in the order
-    /// the reference's `toBinary` writes them (`order`, `written_order`), the
-    /// bytes written in that order, each entry as `merge_beef` merges it,
-    /// then this crate's strict reader of those bytes
-    /// ([`from_binary`](Self::from_binary): a frame, a BUMP or an element its
-    /// collect refuses), its refusal in its own words (#477's row). The
-    /// source is not changed.
+    /// `fromBinaryStrict(beef.toBinary())`, before the target changes), from
+    /// a pre-pass that writes no entry (#621, after #817): the writer's check
+    /// over the entries in the order the reference's `toBinary` writes them
+    /// (`order`, `written_order`), then what this crate's strict reader
+    /// ([`from_binary`](Self::from_binary)) refuses on those bytes, which
+    /// after the check is a BUMP's alone ([`bumps_as_read`](Self::bumps_as_read):
+    /// each BUMP's bytes read by the reader's decoder and folded by its
+    /// judge, at its offset in the frame, in its words). Proven equal to the
+    /// literal round trip it replaces ([`snapshot_round_trip`](Self::snapshot_round_trip),
+    /// the oracle, kept for the tests and the fuzz target): the same `Ok`,
+    /// or the same `Err` in the same words. The source is not changed.
     pub(super) fn snapshot_verdict(&self, order: &[usize]) -> Result<()> {
         self.check_writable_in(order)?;
+        self.bumps_as_read()
+    }
+
+    /// The literal round trip `merge_beef` decided by until the pre-pass
+    /// (#817 to #621's pre-pass), kept as the oracle the pre-pass is proven
+    /// against: the writer's check over `order`, the bytes written in that
+    /// order (each entry as `merge_beef` merges it), and this crate's strict
+    /// reader of them; the snapshot read back on `Ok`.
+    #[cfg(any(test, fuzzing))]
+    pub(super) fn snapshot_round_trip(&self, order: &[usize]) -> Result<Beef> {
+        self.check_writable_in(order)?;
         let mut writer = Writer::new();
-        self.write_entries(&mut writer, order, true);
-        Beef::from_binary(&writer.into_bytes()).map(drop)
+        self.write_entries(&mut writer, order);
+        Beef::from_binary(&writer.into_bytes())
+    }
+
+    /// The oracle of `merge_beef`'s verdict for the fuzz target (#621):
+    /// [`snapshot_round_trip`](Self::snapshot_round_trip) over this BEEF's
+    /// written order. Built only under `cfg(fuzzing)` (cargo-fuzz's) and the
+    /// crate's own tests; no part of the API.
+    #[cfg(any(test, fuzzing))]
+    #[doc(hidden)]
+    pub fn merge_snapshot_oracle(&self) -> Result<Beef> {
+        self.snapshot_round_trip(&self.written_order())
     }
 }

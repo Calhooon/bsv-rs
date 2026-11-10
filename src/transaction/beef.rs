@@ -1163,6 +1163,8 @@ mod index_817_tests;
 #[cfg(test)]
 mod merge_entry_621_tests;
 #[cfg(test)]
+mod prepass_621_tests;
+#[cfg(test)]
 mod reference_603_tests;
 
 #[cfg(test)]

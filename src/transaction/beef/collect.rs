@@ -29,6 +29,7 @@
 use std::collections::HashMap;
 
 use crate::primitives::encoding::bounded_capacity;
+use crate::primitives::Writer;
 use crate::Result;
 
 use super::super::beef_stream::{
@@ -151,6 +152,69 @@ impl Beef {
         beef.wire_order = true;
         let used = usize::try_from(decoder.offset()).unwrap_or(bin.len());
         Ok((beef, used))
+    }
+
+    /// What [`from_binary`](Self::from_binary) refuses among this BEEF's
+    /// BUMPs on the bytes the writers would write for it, judged without the
+    /// entries' bytes (#621, after #817): `merge_beef`'s pre-pass, after the
+    /// writers' check ([`check_writable_in`](Self::check_writable_in)).
+    ///
+    /// Each BUMP is written alone ([`MerklePath::write_unchecked`], the
+    /// writers' bytes) and read by the reader's own decoder
+    /// ([`Bump::read_alone`](super::super::beef_stream::Bump::read_alone)),
+    /// its offsets moved to where the BUMP sits in the frame (the version
+    /// word, the BUMP count's varint, the BUMPs before it); then folded into
+    /// the reader's [`Judge`] and taken to its in-memory form, in
+    /// [`collect`](Self::collect)'s order, so a refusal is the reader's: the
+    /// earliest refusal of the reading (a BUMP whose root a leading BUMP of
+    /// its height contradicts, `RootNotCarried`, ahead of a later BUMP's
+    /// decoder refusal), in its words and at its offset.
+    ///
+    /// Nothing after the BUMPs can be refused by the reader once the check
+    /// passed: the frame's words are V1 or V2 (checked), the counts are
+    /// varints the writer writes, every txid-only entry is 64 hex digits
+    /// (checked), and every entry's written bytes are exactly one
+    /// transaction (checked by `one_transaction`, which takes exactly the
+    /// bytes `Transaction`'s reader takes: the bytes held, else a parsed
+    /// transaction's cached serialization, one transaction from every door
+    /// since #840, where `Transaction::from_binary` set it to the whole
+    /// buffer it read a prefix of until then; else none, a
+    /// serialization of the fields being one transaction by construction;
+    /// #621's fold, where a parsed entry was taken on trust and one caching
+    /// a transaction and more passed here and failed the round trip); and
+    /// the judge's refusals of an entry
+    /// (its content, its BUMP index) are returned only beside a later
+    /// refusal of the bytes, which no entry's bytes give. The differential
+    /// against the literal round trip pins it
+    /// (`beef/prepass_621_tests.rs`, `fuzz_beef_parser`).
+    pub(super) fn bumps_as_read(&self) -> Result<()> {
+        let mut judge = Judge::new();
+        let mut head = Writer::new();
+        head.write_u32_le(self.version);
+        head.write_var_int(self.bumps.len() as u64);
+        let mut at = head.len() as u64;
+        for path in &self.bumps {
+            let mut writer = Writer::new();
+            path.write_unchecked(&mut writer);
+            let bytes = writer.into_bytes();
+            let moved = |r: Refusal| Refusal {
+                offset: r.offset + at,
+                ..r
+            };
+            let mut bump =
+                Bump::read_alone(&bytes).map_err(|r| judge.refuse(refusal_error(&moved(r))))?;
+            bump.offset = at;
+            for leaf in bump.levels.iter_mut().flatten() {
+                leaf.at += at;
+            }
+            let element = Element::Bump(bump);
+            judge.fold(&element);
+            if let Element::Bump(bump) = &element {
+                in_memory_bump(bump).map_err(|e| judge.refuse(e))?;
+            }
+            at += bytes.len() as u64;
+        }
+        Ok(())
     }
 
     /// One element of the stream, in its in-memory form.

@@ -24,14 +24,15 @@ impl BeefTx {
     /// Transaction is expected`, the reference's words, `BeefTx.ts:253-258`),
     /// a txid-only txid with a non-hex character (`Invalid hex string`, the
     /// reference's) or of other than 64 hex digits (`Invalid txid-only entry
-    /// txid: expected 64 hex digits, got N`), a raw entry held without its
-    /// parse whose bytes are not one transaction
-    /// ([`from_raw_tx`](Self::from_raw_tx)'s words). Until #817 a txid-only entry
+    /// txid: expected 64 hex digits, got N`), an entry whose written bytes
+    /// are not one transaction, held raw or parsed with a cache holding a
+    /// transaction and more (#621's fold; [`from_raw_tx`](Self::from_raw_tx)'s
+    /// words). Until #817 a txid-only entry
     /// under a word other than V2 panicked, and a txid of other than 64 hex
     /// digits was written as the bytes it decoded to, or none.
     pub fn to_writer(&self, writer: &mut Writer, version: u32) -> Result<()> {
         self.writable(version)?;
-        self.write_unchecked(writer, version, false);
+        self.write_unchecked(writer, version);
         Ok(())
     }
 
@@ -70,8 +71,20 @@ impl BeefTx {
     /// other than 64 hex digits (the reference writes its bytes at their
     /// length, or pads an odd length with a leading zero, a txid of another
     /// text: `Invalid txid-only entry txid: expected 64 hex digits, got N`);
-    /// a raw entry held without its parse whose bytes are not exactly one
+    /// an entry with data whose written bytes are not exactly one
     /// transaction (`from_raw_tx`'s words; its constructor scans them too).
+    /// The bytes judged are the ones [`written_tx_bytes`](Self::written_tx_bytes)
+    /// gives, held with a parse or without (#621's fold): the held bytes,
+    /// else the transaction's cached serialization (since #840 one
+    /// transaction from every door that sets it; until then
+    /// `Transaction::from_binary` and `from_hex` set it to the whole buffer
+    /// they read a prefix of, the check holding without that fix), else
+    /// none to scan (a serialization
+    /// built from the fields is one transaction by construction, and an
+    /// entry mutated through `tx_mut` is written from its fields). Until the
+    /// fold a parsed entry was not scanned, so one holding a transaction
+    /// followed by more bytes was written as a frame the reader refuses and
+    /// merged by `merge_beef`. Linear, no allocation.
     pub(crate) fn own_refusal(&self) -> Result<()> {
         if self.is_txid_only() {
             let digits = self.txid().len();
@@ -80,11 +93,14 @@ impl BeefTx {
                     "Invalid txid-only entry txid: expected 64 hex digits, got {digits}"
                 )));
             }
-        } else if self.tx.is_none() {
-            if let Some(ref raw_tx) = self.raw_tx {
-                super::super::beef_raw_frame::one_transaction(raw_tx)
-                    .map_err(crate::Error::BeefError)?;
-            }
+        } else if let Some(ref raw_tx) = self.raw_tx {
+            super::super::beef_raw_frame::one_transaction(raw_tx)
+                .map_err(crate::Error::BeefError)?;
+        } else if let (Some(ref tx), false) = (&self.tx, self.mutated) {
+            tx.with_cached_bytes(|bytes| {
+                bytes.map_or(Ok(()), super::super::beef_raw_frame::one_transaction)
+            })
+            .map_err(crate::Error::BeefError)?;
         }
         Ok(())
     }
@@ -99,12 +115,14 @@ impl BeefTx {
 
     /// The bytes of an entry [`writable`](Self::writable) accepted under
     /// `version`, as 0.9.0-beta wrote them; for `to_writer` and `Beef`'s
-    /// writers, each after the check. `as_merged` writes a parsed
-    /// transaction's bytes as `merge_beef` merges them
-    /// ([`written_tx_bytes`](Self::written_tx_bytes)), for its verdict. An entry with nothing to write (a
-    /// txid-only one, which the check refuses outside V2) writes no
+    /// writers, each after the check. The transaction's bytes are
+    /// [`written_tx_bytes`](Self::written_tx_bytes), the ones the check
+    /// judged and `merge_beef` merges (#621's fold: an entry mutated through
+    /// `tx_mut` written from its fields by every writer, where `to_writer`
+    /// wrote a cache set after the mutation). An entry with nothing to write
+    /// (a txid-only one, which the check refuses outside V2) writes no
     /// transaction bytes: the check is the guard, no panic is left (#817).
-    pub(crate) fn write_unchecked(&self, writer: &mut Writer, version: u32, as_merged: bool) {
+    pub(crate) fn write_unchecked(&self, writer: &mut Writer, version: u32) {
         if version == BEEF_V2 {
             if self.is_txid_only() {
                 // TXID only format
@@ -117,15 +135,15 @@ impl BeefTx {
                 // Raw tx with bump index
                 writer.write_u8(TxDataFormat::RawTxAndBumpIndex as u8);
                 writer.write_var_int(bump_idx as u64);
-                self.write_tx_data(writer, as_merged);
+                self.write_tx_data(writer);
             } else {
                 // Raw tx without bump index
                 writer.write_u8(TxDataFormat::RawTx as u8);
-                self.write_tx_data(writer, as_merged);
+                self.write_tx_data(writer);
             }
         } else {
             // V1 format
-            self.write_tx_data(writer, as_merged);
+            self.write_tx_data(writer);
             if let Some(bump_idx) = self.bump_index {
                 writer.write_u8(1);
                 writer.write_var_int(bump_idx as u64);
@@ -135,17 +153,11 @@ impl BeefTx {
         }
     }
 
-    /// Writes the transaction data (raw bytes or serialized); nothing for a
+    /// Writes the transaction data (`written_tx_bytes`); nothing for a
     /// txid-only entry, which the writers' check keeps from here (#817).
-    fn write_tx_data(&self, writer: &mut Writer, as_merged: bool) {
-        if as_merged {
-            if let Some(bytes) = self.written_tx_bytes() {
-                writer.write_bytes(&bytes);
-            }
-        } else if let Some(ref raw_tx) = self.raw_tx {
-            writer.write_bytes(raw_tx);
-        } else if let Some(ref tx) = self.tx {
-            writer.write_bytes(&tx.to_binary());
+    fn write_tx_data(&self, writer: &mut Writer) {
+        if let Some(bytes) = self.written_tx_bytes() {
+            writer.write_bytes(&bytes);
         }
     }
 }

@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use bsv_rs::transaction::{
-    verify_stream, verify_stream_structure, Beef, BeefLimits, BeefStream, Element, Headers, Kind,
-    Transaction, Verdict,
+    verify_stream, verify_stream_structure, Beef, BeefLimits, BeefStream, BeefTx, Element, Headers,
+    Kind, MerklePathLeaf, Transaction, Verdict,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -96,6 +96,143 @@ fn the_two_readers_agree(data: &[u8]) {
     }
 }
 
+/// `merge_beef`'s verdict from its pre-pass is the literal round trip's
+/// (#621, after #817): the oracle (`Beef::merge_snapshot_oracle`, built
+/// under `cfg(fuzzing)` alone) refuses in the same words, and after an `Ok`
+/// the target merged from the source writes the bytes of the target merged
+/// from the oracle's snapshot.
+fn the_pre_pass_is_the_round_trip(source: &Beef) {
+    let oracle = source.merge_snapshot_oracle();
+    let mut merged = Beef::new();
+    let ours = merged.merge_beef(source);
+    match (ours, oracle) {
+        (Ok(()), Ok(snapshot)) => {
+            let mut by_snapshot = Beef::new();
+            by_snapshot
+                .merge_beef(&snapshot)
+                .expect("the snapshot read back merges");
+            assert_eq!(
+                merged.to_binary().expect("a merged BEEF writes"),
+                by_snapshot.to_binary().expect("a merged BEEF writes"),
+                "the merged bytes are the snapshot's (#621)"
+            );
+        }
+        (Err(ours), Err(oracle)) => assert_eq!(ours, oracle, "the refusal (#621)"),
+        (ours, oracle) => panic!(
+            "the pre-pass {ours:?} where the round trip {:?} (#621)",
+            oracle.map(drop)
+        ),
+    }
+}
+
+/// The states a source can be put in through its public fields, chosen by
+/// the input's bytes: a BUMP the reader refuses (no levels, an empty level 0,
+/// 65 levels, a second leaf at an offset, an offset outside the tree, a
+/// duplicate at an even offset, a leaf removed), a BUMP of a held height
+/// with another root ahead of a refused one, a bad version word, a txid-only
+/// entry of 62 digits, an entry edited through the deprecated door, a
+/// parsed entry whose cached bytes are a held transaction twice (#621's
+/// fold: the state `Transaction::from_binary` of such a buffer left until
+/// #840, built since through `Transaction::with_cached_bytes_for_test`,
+/// under `cfg(fuzzing)` alone; put in by `merge_transaction` and by a hand
+/// push).
+fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
+    let pick = |i: usize| data.get(i).copied().unwrap_or(0) as usize;
+    let mut states = Vec::new();
+    let n = beef.bumps.len();
+    if n > 0 {
+        let at = pick(0) % n;
+        for k in 0..7 {
+            let mut b = beef.clone();
+            let path = &mut b.bumps[at].path;
+            match k {
+                0 => path.clear(),
+                1 => {
+                    if let Some(level) = path.first_mut() {
+                        level.clear();
+                    }
+                }
+                2 => path.resize_with(65, Vec::new),
+                3 => {
+                    let level = pick(1) % path.len().max(1);
+                    if let Some(leaves) = path.get_mut(level) {
+                        if let Some(leaf) = leaves.first().cloned() {
+                            leaves.push(leaf);
+                        }
+                    }
+                }
+                4 => {
+                    if let Some(leaf) = path.first_mut().and_then(|l| l.last_mut()) {
+                        leaf.offset = u64::MAX >> (pick(2) % 64);
+                    }
+                }
+                5 => {
+                    if let Some(level) = path.first_mut() {
+                        level.push(MerklePathLeaf::new_duplicate((pick(3) as u64) * 2));
+                    }
+                }
+                _ => {
+                    let height = pick(4) % path.len().max(1);
+                    if let Some(level) = path.get_mut(height) {
+                        if !level.is_empty() {
+                            let i = pick(5) % level.len();
+                            level.remove(i);
+                        }
+                    }
+                }
+            }
+            states.push(b);
+        }
+        let mut b = beef.clone();
+        let mut other = b.bumps[at].clone();
+        if let Some(leaf) = other
+            .path
+            .first_mut()
+            .and_then(|l| l.iter_mut().find(|l| l.hash.is_some()))
+        {
+            leaf.hash = Some("11".repeat(32));
+        }
+        let mut broken = b.bumps[at].clone();
+        broken.path.clear();
+        b.bumps.push(other);
+        b.bumps.push(broken);
+        states.push(b);
+    }
+    let mut b = beef.clone();
+    b.version = 0xEFBE_0003;
+    states.push(b);
+    let mut b = beef.clone();
+    b.merge_txid_only("ab".repeat(31));
+    states.push(b);
+    let mut b = beef.clone();
+    if let Some(entry) = b.txs.iter_mut().find(|t| !t.is_txid_only()) {
+        if let Some(tx) = entry.tx_mut() {
+            tx.lock_time ^= 1;
+        }
+        states.push(b);
+    }
+    if let Some(raw) = beef.txs.iter().find_map(|t| t.raw_tx().map(<[u8]>::to_vec)) {
+        // A parsed entry caching a transaction and more (#621's fold): the
+        // state `Transaction::from_binary` left on a doubled buffer until
+        // #840, built through the fuzzing-only cache door since no public
+        // door reaches it.
+        let doubled = [raw.as_slice(), raw.as_slice()].concat();
+        for door in 0..2 {
+            let tx = Transaction::from_binary(&raw)
+                .expect("a raw entry the reader collected is one transaction")
+                .with_cached_bytes_for_test(doubled.clone());
+            let mut b = beef.clone();
+            if door == 0 {
+                b.merge_transaction(tx);
+            } else {
+                b.txs.push(BeefTx::from_tx(tx, None));
+            }
+            states.push(b);
+        }
+    }
+    states
+}
+
 fuzz_target!(|data: &[u8]| {
     the_two_readers_agree(data);
 
@@ -143,6 +280,10 @@ fuzz_target!(|data: &[u8]| {
     Beef::new()
         .merge_beef(&beef)
         .expect("a BEEF the parse returned merges (#817)");
+    the_pre_pass_is_the_round_trip(&beef);
+    for state in hand_states(&beef, data) {
+        the_pre_pass_is_the_round_trip(&state);
+    }
 
     // Link every subject (the iterative walk), serialize, clone and drop it
     let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();

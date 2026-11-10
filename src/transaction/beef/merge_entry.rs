@@ -54,7 +54,9 @@ impl Beef {
         }
         // No source bump index: the BUMP is found by scanning
         // self.bumps, as `#mergeRawTxEntry(btx._rawTx)` passes none.
-        // Framed: `merge_beef`'s verdict wrote and read these bytes (#817).
+        // Framed: `merge_beef`'s verdict checked them as the writers' check
+        // does (a raw entry held without its parse scanned, `one_transaction`;
+        // every other a parse's bytes or its serialization; #817, #621).
         self.store_raw_entry(BeefTx::from_framed_raw_tx(raw.into_owned(), None), txid);
     }
 
