@@ -101,3 +101,54 @@ fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
     }
     assert!(merged.find_txid(&old).is_some());
 }
+
+/// #621's fold, the `to_writer` change's lasting pin (Calhooon/bsv-rs#843's
+/// break will make the public stale state unbuildable): an entry edited
+/// through the deprecated `tx_mut` whose transaction caches bytes other
+/// than its fields' (here the bytes before the edit, set through the crate's
+/// cache door) is written from its fields by `Beef::to_writer` and
+/// `BeefTx::to_writer`, as `to_binary` and `merge_beef` write it. On
+/// `7df16cf6` `to_writer` wrote the cache.
+#[test]
+#[allow(deprecated)] // the stale cache is a state of the deprecated `tx_mut` alone
+fn to_writer_writes_a_tx_mut_entry_from_its_fields_not_its_cache_621() {
+    use crate::primitives::Writer;
+    use crate::transaction::BEEF_V2;
+    let bytes = raw();
+    let mut edited = Transaction::from_binary(&bytes).unwrap();
+    edited.lock_time = 7;
+    let fields = {
+        let fresh = edited.clone();
+        fresh.invalidate_caches();
+        fresh.to_binary()
+    };
+    assert_ne!(fields, bytes);
+    let stale = edited.with_cached_bytes_for_test(bytes.clone());
+
+    let mut beef = Beef::new();
+    beef.merge_raw_tx(bytes, None).unwrap();
+    *beef.txs[0].tx_mut().unwrap() = stale;
+
+    let mut entry = Writer::new();
+    beef.txs[0].to_writer(&mut entry, BEEF_V2).unwrap();
+    let entry = entry.into_bytes();
+    assert_eq!(
+        &entry[1..],
+        fields.as_slice(),
+        "BeefTx::to_writer: the fields"
+    );
+
+    let mut writer = Writer::new();
+    beef.to_writer(&mut writer).unwrap();
+    let written = writer.into_bytes();
+    let back = Beef::from_binary(&written).unwrap();
+    assert_eq!(
+        back.txs[0].raw_tx().unwrap(),
+        fields.as_slice(),
+        "Beef::to_writer"
+    );
+    assert_eq!(beef.to_binary().unwrap(), written, "to_binary the same");
+    let mut merged = Beef::new();
+    merged.merge_beef(&beef).unwrap();
+    assert_eq!(merged.to_binary().unwrap(), written, "merge_beef the same");
+}

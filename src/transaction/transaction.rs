@@ -852,6 +852,31 @@ impl Transaction {
         copy
     }
 
+    /// Calls `f` with the cached serialization, or `None` when none is
+    /// cached, without copying it: the bytes [`to_binary`](Self::to_binary)
+    /// returns while the cache holds. For the BEEF writers' check (#621's
+    /// fold): `from_binary` and `from_hex` cache the bytes they read, which
+    /// are exactly one transaction since #840 (until then the whole buffer
+    /// they read a prefix of), `to_binary` its own serialization, `Clone` a
+    /// copy.
+    pub(crate) fn with_cached_bytes<R>(&self, f: impl FnOnce(Option<&[u8]>) -> R) -> R {
+        f(self.raw_bytes_cache.borrow().as_deref())
+    }
+
+    /// This transaction with `bytes` as its cached serialization, whatever
+    /// they hold: the state `from_binary` of a buffer longer than one
+    /// transaction left until #840, which no public door builds since, and a
+    /// stale cache under edited fields (#621's fold: its differential, the
+    /// `to_writer` pin and `fuzz_beef_parser`'s hand states). Built only
+    /// under `cfg(fuzzing)` (cargo-fuzz's) and the crate's own tests, as
+    /// `Beef::merge_snapshot_oracle` is; no part of the API.
+    #[cfg(any(test, fuzzing))]
+    #[doc(hidden)]
+    pub fn with_cached_bytes_for_test(self, bytes: Vec<u8>) -> Self {
+        *self.raw_bytes_cache.borrow_mut() = Some(bytes);
+        self
+    }
+
     /// Invalidates all serialization caches.
     ///
     /// Public because `inputs`/`outputs` are public fields: after mutating

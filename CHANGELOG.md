@@ -7,6 +7,176 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance: merge_beef's verdict from a pre-pass, proven equal to the write-and-read-back; its cost is beta's again (#621)
+
+`Beef::merge_beef` gives the verdict of the reference's snapshot
+(`ts-stack@edf6e03` `Beef.ts:971-990`, `fromBinaryStrict(beef.toBinary())`
+before the target changes) since #817, by doing it literally: the source
+written in its merge order and read back by `Beef::from_binary`. That doubled
+the merge's cost. The verdict now comes from a pre-pass that writes no entry:
+the writers' check (unchanged, read-only), then what the reader refuses on
+those bytes, which after the check is a BUMP's alone. Each BUMP is written
+alone and read by the reader's own decoder (`Bump::read_alone`), its offsets
+moved to its place in the frame, folded into the reader's own judge and
+taken to its in-memory form, in `collect`'s order (`Beef::bumps_as_read`,
+`src/transaction/beef/collect.rs`), so a refusal is the reader's in its words
+and at its offset, the judge's earlier `RootNotCarried` (a BUMP whose root a
+leading BUMP of its height contradicts) ahead of a later BUMP's decoder
+refusal as the reader names it. No rule is copied: every refusal is the
+reader's function on the BUMP's bytes. Nothing after the BUMPs can be refused
+once the check passed (the version word checked, the counts the writer's
+varints, every txid-only txid 64 hex digits, every entry's written bytes
+scanned by `one_transaction`, which takes exactly the bytes `Transaction`'s
+reader takes: the bytes held, else a parsed transaction's cached
+serialization, else none, a serialization of the fields being one
+transaction by construction), and the judge's refusal of an entry is returned only beside a
+later refusal of the bytes, which no entry's bytes give: no state takes a
+slow path.
+
+**The proof.** The literal round trip is kept as the oracle
+(`Beef::snapshot_round_trip`, `#[cfg(any(test, fuzzing))]`, and
+`Beef::merge_snapshot_oracle`, `#[doc(hidden)]` under the same cfg for the
+fuzz target; cargo-fuzz sets `cfg(fuzzing)`, declared in `[lints.rust]`
+`unexpected_cfgs`). `src/transaction/beef/prepass_621_tests.rs` compares the
+two: on every BEEF this tree's vectors hold (338 since #841's vector, 337
+before it) under fourteen states (as
+read; a bad version word; a 62-digit and a fresh txid-only entry; a second
+leaf at an offset; no levels; an empty level 0; 65 levels; an offset outside
+the tree; a BUMP of a held height with another root ahead of a refused BUMP;
+that BUMP alone; a carried node changed; a sibling removed; an entry edited
+through `tx_mut` with a duplicate at an even offset), 4,732 sources: 2,215
+`Ok` and 2,517 refused the same (variant and words), 1,726 of those by the
+reader, 243 of them the judge's `RootNotCarried` ahead of a later BUMP's
+refusal; on #817's recorded `writers` and `merge_door` states, 27 sources: 4
+`Ok`, 23 refused the same, 2 by the reader. After every `Ok`, the source
+merged into an empty target and into one holding a raw entry writes the
+bytes of the oracle's snapshot merged into the same target; after every
+`Err`, the door refuses the same and the target is untouched. The shared
+builders of #817's recorded states moved to
+`tests/support/beef_merge_states_817.rs` (the lib reaches them through a
+`#[cfg(test)] extern crate self as bsv_rs`). `fuzz_beef_parser` asserts the
+same for every BEEF it parses and eleven states it builds from each by the
+input's bytes (seven BUMP states, the contradicting BUMP ahead of a refused
+one, a bad word, a 62-digit txid-only entry, an entry edited through
+`tx_mut`): three 60-second runs, 104,108, 118,514 and 139,319 executions,
+none failing. Three faults planted in a scratch copy, one at a time, each red
+on the differential: a BUMP's decoder refusal dropped (both tests,
+`prepass_621_tests.rs:81`, the pre-pass `Ok` where the oracle refuses); the
+decoder's refusal named ahead of the judge's earlier one
+(`the_pre_pass_is_the_round_trip_on_every_vector_beef_621`, `:67`,
+`TreeHeightZero` at 92 for `RootNotCarried` at 46); a BUMP of 65 to 255
+levels passed (the same test, `:81`).
+
+**The cost**, `merge_beef` in release (debug), the median of three runs, on
+this host: beta `6a9dde3c`, PR #836's head `b8c368e9`, this change:
+
+| merge | beta | #836's head | this change |
+|---|---:|---:|---:|
+| 2,000 sources of ten raw entries, built in memory, into one accumulator | 22.6 ms (172 ms) | 42.2 ms (408 ms) | 23.0 ms (174 ms) |
+| the same 2,000 sources read from bytes | 19.6 ms (156 ms) | 39.8 ms (390 ms) | 20.0 ms (153 ms) |
+| one source of 20,000 raw entries | 10.5 ms (90.8 ms) | 33.0 ms (335 ms) | 10.5 ms (89.0 ms) |
+| 20,000 sources of ten into one accumulator | 2,346 ms (23.4 s) | 2,625 ms (18.9 s) | 2,374 ms (14.4 s) |
+
+Within noise of beta on each row (the debug 20,000-source row ranges 12.8 to
+24.6 s across the nine runs, the scan below its bulk).
+
+**A cost stated, not changed.** `merge_beef` scans the whole target for
+entries edited through the deprecated `BeefTx::tx_mut` on every call
+(`refresh_mutated`, #621's fourth fold), so merges into one growing BEEF grow
+faster than linearly. The scan's own share, measured as an empty source
+merged beside each merge as the target grows (release, median of three):
+0.1 ms at 2,000 total entries (200 merges of ten; about 4 percent of the
+merges, by the per-entry cost of the 2,000-source row), 11.5 ms at 20,000
+(about half of the 23 ms) and 2,210 ms at 200,000 (about nine tenths of the
+2,374 ms); beta's figures the same (0.1, 11.1, 2,174 ms). The cost goes when
+the deprecated `BeefTx::tx_mut` is removed (the owner's decision for 0.9.0):
+an edit through `Beef::edit_tx` re-keys at once and leaves nothing to scan.
+No mechanism is added for it.
+
+**The fold (the three reads of PR #839).** The cold read found a state
+the pre-pass passed and the oracle refused: `Transaction::from_binary` of a
+transaction followed by more bytes read the prefix and cached the whole
+buffer (filed as #840, the reader's own fix, landed at `7df16cf6` before
+this change was rebased onto it), and the writers' check scanned
+only a raw entry held without its parse, so a BEEF holding that transaction
+parsed (through `merge_transaction`, or a hand push of `BeefTx::from_tx`)
+was merged by `merge_beef` (`Ok`, where #817's round trip refused it,
+`invalid BEEF at byte 92: TrailingBytes`) and written by every writer as a
+frame its own reader refuses (on #817 too). The writers' check now scans
+the bytes the writer writes for every entry with data, held with a parse or
+without (`BeefTx::own_refusal`; the cache borrowed, no copy): such an entry
+is refused by the writers and by `merge_beef` alike, before any byte and
+with the target untouched, in the framing scan's words (`Serialized
+transaction has N bytes after its lock time`, `from_raw_tx`'s), where #817's
+round trip named the reader's (`invalid BEEF at byte N: TrailingBytes`, or a
+later byte's refusal); a verdict that moves from `Ok` back to a refusal,
+from #817's head in its words alone. The doors that set a transaction's
+cache: `from_binary` and `from_hex` (the transaction's own bytes since
+#840; the whole buffer until then), `to_binary` (its own serialization) and `Clone` (a
+copy); an entry edited through `tx_mut` drops it. The writers now write
+every entry's transaction as `merge_beef` merges it (`written_tx_bytes`), so
+`to_writer` writes an entry edited through `tx_mut` from its fields, as
+`to_binary` and `merge_beef` did, where it wrote a cache set after the edit.
+Pinned by `a_parsed_entry_whose_cached_bytes_trail_its_transaction_is_refused_621`
+(the differential: the 338 sweep BEEFs under the state put in by both
+doors, 676 refused alike, the figure derived from the sweep's own count),
+whose state is built through the crate's test door
+(`Transaction::with_cached_bytes_for_test`, `#[doc(hidden)]` under
+`cfg(any(test, fuzzing))`, absent from a normal build): since #840
+`Transaction::from_binary` refuses a transaction followed by more bytes, so
+no public door builds a cache longer than one transaction, and the scan
+stays as the pre-pass's premise checked, not assumed. The integration test
+that built the state through `from_binary` is removed (after the rebase onto
+#840 it returned before asserting). `fuzz_beef_parser`'s two hand states
+build it through the same door (before the second fold they `break` at
+`from_binary` and pinned nothing): with `own_refusal`'s parsed-cache scan
+removed in a scratch copy the target fails on its seeds
+(`fuzz_beef_parser.rs:121`, `the pre-pass Ok(()) where the round trip
+Err(BeefError("invalid BEEF at byte 67: BumpIndexNamesNoBump { index: 0
+}"))`), and on the tip one 120-second run, 205,996 executions, none failing.
+The writers' second change, `to_writer` writing an entry edited through
+`tx_mut` from its fields, is pinned by
+`an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621`
+(`tests/beef_writer_refusals_817.rs`), rebuilt in the second fold on a
+state public calls still reach (X parsed by `from_binary`, `to_binary`
+called, `lock_time` changed without `invalidate_caches`, assigned through
+`*tx_mut()`: `to_writer`, `to_binary` and `merge_beef` write the same edited
+bytes), and by the unit
+`to_writer_writes_a_tx_mut_entry_from_its_fields_not_its_cache_621`
+(`beef/merge_entry_621_tests.rs`, through the cache door, also
+`BeefTx::to_writer`), the lasting pin once Calhooon/bsv-rs#843's break (a
+`Transaction` that owns its fields) makes the public state unbuildable; both
+RED on `7df16cf6` (`to_writer writes the edited fields, not the stale
+cache`: the stale lock time written). Its cost, release, the median of five
+inside each run, on this host: before the rebase, `to_binary` of 20,000
+entries read from bytes 3.17 ms on `780f5e7f`, 3.01 ms on `a7984877`,
+3.10 ms here; `merge_beef` of 2,000 sources of ten 38.97, 18.76, 18.95 ms;
+of one source of 20,000 27.77, 7.19, 7.12 ms; `merge_raw_tx` of 20,000
+10.22, 9.89, 9.89 ms. Re-measured after the rebase (the second fold, five
+runs each, beta `7df16cf6` against the tip, medians of the five run
+medians): `to_binary` of 20,000 entries read from bytes 3.94 against
+4.45 ms (13 percent; every tip run above every beta run), of 20,000 raw
+entries built by `merge_raw_tx` 4.03 against 4.28 ms (6 percent), of 20,000
+parsed entries built by `merge_transaction` 4.19 against 4.49 ms
+(7 percent): the scan of each parsed entry's cache and the bytes every
+writer now takes from `written_tx_bytes`, about 25 ns per entry, stated,
+not changed (the cold read's 2 to 6 percent on its host; the scoped re-read
+of the second fold, its own probe of 20,000 independent entries of one
+input and one output, five runs each, the median of five inside each run,
+the median of the run medians, under a one-minute load near 8: 3.86
+against 4.04 ms, 3.77 against 3.95 ms and 4.00 against 4.42 ms in the
+same three shapes, 5, 5 and 11 percent, and `merge_beef` of 2,000 sources
+of ten read from bytes 46.41 against 22.30 ms, of one source of 20,000
+29.04 against 8.25 ms).
+
+No migration: no signature moves, and no verdict moves but the fold's above.
+A verdict that moved
+would turn `the_pre_pass_is_the_round_trip_on_every_vector_beef_621` and
+`the_pre_pass_is_the_round_trip_on_every_recorded_state_817_621` red, and
+#817's `merge_beef_refuses_what_the_snapshot_refuses_the_target_untouched_817`
+and `merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_817`
+with them. No cross-SDK parity note: the verdicts are #817's.
+
 ### Fixed: Signature::from_der reads a DER signature as the reference does; bytes after it, a wrong sequence length, a long-form length and an unneeded leading zero were accepted (#842)
 
 **What was wrong.** `Signature::from_der` checked only that its input was not

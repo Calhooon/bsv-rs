@@ -131,6 +131,8 @@ tracing = { version = "0.1", default-features = false, optional = true }
 [lints.rust]
 # no `unsafe` in the crate (#135)
 unsafe_code = "forbid"
+# `cfg(fuzzing)`, cargo-fuzz's: `Beef::merge_snapshot_oracle` for `fuzz_beef_parser` (#621)
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
 # every public item says what it is (#135)
 missing_docs = "deny"
 

@@ -18,28 +18,20 @@
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
+#[path = "support/beef_merge_states_817.rs"]
+mod beef_merge_states_817;
 #[path = "support/beef_seeds_817.rs"]
 mod beef_seeds_817;
 
-use bsv_rs::primitives::{from_hex, to_hex, Writer};
-use bsv_rs::script::{LockingScript, UnlockingScript};
-use bsv_rs::transaction::{
-    Beef, BeefTx, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
-    BEEF_V1, BEEF_V2,
-};
+use beef_merge_states_817::{fixture, merge_source, vector, writer_state, BAD_WORD, FRESH};
+
+use bsv_rs::primitives::{from_hex, Writer};
+use bsv_rs::transaction::{Beef, BeefTx, MerklePath, MerklePathLeaf, BEEF_V1, BEEF_V2};
 use bsv_rs::Error;
 use serde_json::Value;
 
 /// A change written into a source through its public fields.
 type Change = Box<dyn Fn(&mut Beef)>;
-
-const VECTOR: &str = include_str!("vectors/beef_v1_txid_only_writer_817.json");
-const FRESH: &str = "8170000000000000000000000000000000000000000000000000000000000817";
-const BAD_WORD: u32 = 0xEFBE_0003;
-
-fn vector() -> Value {
-    serde_json::from_str(VECTOR).unwrap()
-}
 
 fn cell<'a>(v: &'a Value, group: &str, name: &str) -> &'a Value {
     v[group]
@@ -48,48 +40,6 @@ fn cell<'a>(v: &'a Value, group: &str, name: &str) -> &'a Value {
         .iter()
         .find(|c| c["name"] == name)
         .unwrap_or_else(|| panic!("no {group} cell {name}"))
-}
-
-fn spend(source: &str, vout: u32, sats: u64) -> Transaction {
-    let mut tx = Transaction::new();
-    let mut input = TransactionInput::new(source.to_string(), vout);
-    input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
-    tx.inputs.push(input);
-    tx.outputs.push(TransactionOutput::new(
-        sats,
-        LockingScript::from_binary(&[0x51]).unwrap(),
-    ));
-    tx
-}
-
-/// The recording's fixture: a proven parent and its child, the child's V1
-/// BEEF, and both raw transactions, each checked against the recording.
-struct Fixture {
-    v1: Vec<u8>,
-    parent_raw: Vec<u8>,
-    child_raw: Vec<u8>,
-}
-
-fn fixture(v: &Value) -> Fixture {
-    let mut parent = spend(&"81".repeat(32), 0, 2_000);
-    parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 817_000));
-    let mut child = spend(&parent.id(), 0, 1_000);
-    child.inputs[0].source_transaction = Some(Box::new(parent.clone()));
-    let v1 = child.to_beef_v1(false).unwrap();
-    assert_eq!(
-        to_hex(&v1),
-        v["v1_hex"].as_str().unwrap(),
-        "the recording's V1 BEEF"
-    );
-    let parent_raw = parent.to_binary();
-    let child_raw = child.to_binary();
-    assert_eq!(to_hex(&parent_raw), v["parent_raw"].as_str().unwrap());
-    assert_eq!(to_hex(&child_raw), v["child_raw"].as_str().unwrap());
-    Fixture {
-        v1,
-        parent_raw,
-        child_raw,
-    }
 }
 
 /// The words of a refusal of either class this change returns.
@@ -122,69 +72,6 @@ fn refused_by_every_writer(beef: &mut Beef, expected: &str, name: &str) {
     );
     assert_eq!(words(beef.to_binary()), expected, "{name}: to_binary");
     assert_eq!(words(beef.to_hex()), expected, "{name}: to_hex");
-}
-
-/// The states of the `writers` group, each built here as the recorder built
-/// it. A state this crate's doors refuse (a raw entry that is not one
-/// transaction) has no builder: its cell is pinned at the door.
-fn writer_state(name: &str, f: &Fixture) -> Option<Beef> {
-    let v1 = || Beef::from_binary(&f.v1).unwrap();
-    let txid_only = |txid: &str| {
-        let mut b = Beef::new();
-        b.merge_txid_only(txid.to_string());
-        b
-    };
-    Some(match name {
-        "version_word_efbe0003" | "version_word_atomic" | "version_word_zero" => {
-            let mut b = v1();
-            b.version = match name {
-                "version_word_efbe0003" => BAD_WORD,
-                "version_word_atomic" => 0x0101_0101,
-                _ => 0,
-            };
-            b
-        }
-        "version_word_with_txid_only" => {
-            let mut b = v1();
-            b.version = BAD_WORD;
-            b.merge_txid_only(FRESH.to_string());
-            b
-        }
-        "version_word_with_non_hex_bump_hash" => {
-            let mut b = v1();
-            b.version = BAD_WORD;
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
-            b
-        }
-        "v1_txid_only_with_non_hex_bump_hash" => {
-            let mut b = v1();
-            b.merge_txid_only(FRESH.to_string());
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
-            b
-        }
-        "txid_only_non_hex" => txid_only(&"zz".repeat(32)),
-        "txid_only_62_digits" => txid_only(&"ab".repeat(31)),
-        "txid_only_66_digits" => txid_only(&"ab".repeat(33)),
-        "txid_only_63_digits" => txid_only(&format!("a{}", "bc".repeat(31))),
-        "txid_only_upper_case" => txid_only(&"AB".repeat(32)),
-        "txid_only_non_hex_short" => txid_only("zz"),
-        "txid_only_empty_after_merge_threw" => txid_only(""),
-        "txid_only_empty_with_non_hex_bump_hash" => {
-            let mut b = v1();
-            b.version = BEEF_V2;
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
-            b.merge_txid_only(String::new());
-            b
-        }
-        "raw_index_out_of_range" => {
-            let mut b = Beef::new();
-            b.merge_raw_tx(f.child_raw.clone(), Some(5))
-                .expect("the bytes are one transaction");
-            b
-        }
-        "raw_both_versions_v1" => v1(),
-        _ => return None,
-    })
 }
 
 /// The cells where this crate refuses and the reference writes bytes no
@@ -389,68 +276,6 @@ fn the_txid_door_takes_any_text_and_the_writer_judges_it_817() {
 }
 
 /// A source in each `merge_door` state, built here as the recorder built it.
-fn merge_source(name: &str, f: &Fixture) -> Option<Beef> {
-    let v1 = || Beef::from_binary(&f.v1).unwrap();
-    Some(match name {
-        "v1_source_with_txid_only" => {
-            let mut b = v1();
-            b.merge_txid_only(FRESH.to_string());
-            b
-        }
-        "source_version_word" => {
-            let mut b = v1();
-            b.version = BAD_WORD;
-            b
-        }
-        "source_txid_only_non_hex" | "source_txid_only_62_digits" => {
-            let mut b = Beef::new();
-            let digits = if name.ends_with("non_hex") {
-                "zz".repeat(32)
-            } else {
-                "ab".repeat(31)
-            };
-            b.merge_txid_only(digits);
-            b
-        }
-        "source_bump_non_hex_hash" => {
-            let mut b = v1();
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
-            b
-        }
-        "source_bump_two_leaves_at_one_offset" => {
-            let mut b = v1();
-            b.bumps[0].path[0].push(MerklePathLeaf::new(0, "11".repeat(32)));
-            b
-        }
-        "source_bump_no_levels" => {
-            let mut b = v1();
-            b.bumps[0].path.clear();
-            b
-        }
-        "source_bump_duplicate_with_hash" => {
-            let mut b = v1();
-            let mut dup = MerklePathLeaf::new_duplicate(1);
-            dup.hash = Some("11".repeat(32));
-            b.bumps[0].path[0].push(dup);
-            b
-        }
-        "source_version_word_and_txid_only_62_digits" => {
-            let mut b = Beef::new();
-            b.merge_txid_only("ab".repeat(31));
-            b.version = BAD_WORD;
-            b
-        }
-        "source_version_word_and_bump_no_levels" => {
-            let mut b = v1();
-            b.bumps[0].path.clear();
-            b.version = BAD_WORD;
-            b
-        }
-        "source_valid" => v1(),
-        _ => return None,
-    })
-}
-
 /// `merge_beef` gives the reference snapshot's verdict, the target untouched
 /// on `Err`: the reference's words where its writer throws and where its
 /// reader refuses at the version word; this crate's reader's words where its
@@ -913,4 +738,54 @@ fn the_entries_order_after_a_refusal_is_the_reference_s_817() {
         assert_eq!(words(beef.to_hex()), expected, "{name}");
         assert_eq!(order(&beef), recorded(c, "after"), "{name}: after");
     }
+}
+
+/// The other side of #621's fold: an entry edited through the deprecated
+/// `tx_mut` is written from its fields by every writer, as `to_binary`
+/// (after its refresh) and `merge_beef` write it; `to_writer` wrote the
+/// transaction's cache, stale after the edit, bytes another transaction's.
+/// The state through public calls: X parsed by `Transaction::from_binary`,
+/// `to_binary` called (the cache X's bytes), `lock_time` changed without
+/// `invalidate_caches`, the result assigned through `*tx_mut()`. Calhooon/
+/// bsv-rs#843's break (a `Transaction` that owns its fields) will make that
+/// state unbuildable here; the lasting pin is the unit test through the
+/// crate's cache door, `beef/merge_entry_621_tests.rs`'
+/// `to_writer_writes_a_tx_mut_entry_from_its_fields_not_its_cache_621`.
+#[test]
+#[allow(deprecated)]
+fn an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621() {
+    let f = fixture(&vector());
+    let mut stale = bsv_rs::transaction::Transaction::from_binary(&f.parent_raw).unwrap();
+    assert_eq!(
+        stale.to_binary(),
+        f.parent_raw,
+        "the cache the parent's bytes"
+    );
+    stale.lock_time ^= 1;
+    let mut fresh = bsv_rs::transaction::Transaction::from_binary(&f.parent_raw).unwrap();
+    fresh.lock_time ^= 1;
+    fresh.invalidate_caches();
+    let edited = fresh.to_binary();
+    assert_ne!(edited, f.parent_raw, "the edit moves the bytes");
+
+    let mut beef = Beef::new();
+    beef.merge_raw_tx(f.parent_raw.clone(), None).unwrap();
+    *beef.txs[0].tx_mut().unwrap() = stale;
+    let mut writer = Writer::new();
+    beef.to_writer(&mut writer).unwrap();
+    let written = writer.into_bytes();
+    let back = Beef::from_binary(&written).expect("to_writer's bytes read back");
+    assert_eq!(
+        back.txs[0].raw_tx().unwrap(),
+        edited.as_slice(),
+        "to_writer writes the edited fields, not the stale cache"
+    );
+    assert_eq!(
+        beef.to_binary().unwrap(),
+        written,
+        "to_binary writes the same"
+    );
+    let mut merged = Beef::new();
+    merged.merge_beef(&beef).unwrap();
+    assert_eq!(merged.to_binary().unwrap(), written, "merge_beef the same");
 }
