@@ -1,0 +1,438 @@
+{
+  "issue": 621,
+  "reference": "ts-stack@edf6e03 packages/sdk (Beef.ts:950-967, :971-986)",
+  "runtime": "node v22.18.0",
+  "txs": {
+    "t": {
+      "txid": "b578352a3092d2b04171d60f9861038ec27975f33b4017f375ee40d2cadf01fc",
+      "raw": "0100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    "u": {
+      "txid": "ba051c66362199d5ec932c68bd29f7e1e07620de7743bad649e39d7a5ae6a7f0",
+      "raw": "0100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000"
+    },
+    "c": {
+      "txid": "7001506aa6c2075a580575b8077015a724d0fb94cd5f6ce773e6a2c7e0249ef1",
+      "raw": "0100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000"
+    },
+    "x": {
+      "txid": "0a6d64c859b2fbca4f4f0ad634ded46ad660be6d64cdaeb88afa208845491385",
+      "raw": "0100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000"
+    },
+    "y": {
+      "txid": "b04ed26bb63fed274f538256afbd366ec8937c46bcfa9f3c5d01b0e817ee7ba0",
+      "raw": "0100000001cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc000000000151ffffffff01a00f000000000000015100000000"
+    },
+    "a": {
+      "txid": "34e7321b046ef80290416e02205ba74285ef437e55df0fbce9c730bca745b94b",
+      "raw": "0100000001a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb0000000000151ffffffff013c0f000000000000015100000000"
+    },
+    "b": {
+      "txid": "4a3a57e246fa3d0ac6afbbb623e2d470ec42412190a0f7dca12bb696e83d79aa",
+      "raw": "0100000001851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a000000000151ffffffff01540b000000000000015100000000"
+    },
+    "v": {
+      "txid": "b4e610e8559df36f74a028b51d00a54c9b9deba6f1d380af8d1ef8fb5682b280",
+      "raw": "0100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000"
+    }
+  },
+  "bumps": {
+    "t_800000": "fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5",
+    "t_800001": "fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5",
+    "x_800002": "fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a",
+    "tu_800003_unsorted": "fe03350c0001020102fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba",
+    "u_800004": "fe04350c0001010002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba"
+  },
+  "unsorted_bumps": {
+    "tu_800003_unsorted": {
+      "height": 800003,
+      "path": [
+        [
+          {
+            "offset": 1,
+            "hash": "b578352a3092d2b04171d60f9861038ec27975f33b4017f375ee40d2cadf01fc",
+            "txid": true
+          },
+          {
+            "offset": 0,
+            "hash": "ba051c66362199d5ec932c68bd29f7e1e07620de7743bad649e39d7a5ae6a7f0",
+            "txid": true
+          }
+        ]
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "held_raw_keeps_its_bump_index",
+      "target": [
+        "bump:t_800000",
+        "raw:t"
+      ],
+      "source": [
+        "bump:t_800001",
+        "raw:t"
+      ],
+      "source_beef": "0200beef01fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "beef": "0200beef02fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "tx": "t",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef02fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "held_unproven_raw_takes_the_merged_bump",
+      "target": [
+        "raw:t"
+      ],
+      "source": [
+        "bump:t_800001",
+        "raw:t"
+      ],
+      "source_beef": "0200beef01fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "beef": "0200beef01fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "t",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef01fe01350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "held_parsed_entry_keeps_its_links",
+      "target": [
+        "graph:c_of_t"
+      ],
+      "source": [
+        "raw:c"
+      ],
+      "source_beef": "0200beef0001000100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000",
+      "beef": "0200beef0002000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000000100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "t",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "c",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ],
+      "c_links": [
+        true
+      ],
+      "read_back_beef": "0200beef0002000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000000100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000"
+    },
+    {
+      "name": "held_txid_only_is_upgraded",
+      "target": [
+        "bump:t_800000",
+        "txid:t",
+        "raw:u"
+      ],
+      "source": [
+        "raw:t"
+      ],
+      "source_beef": "0200beef0001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "beef": "0200beef01fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b502000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510000000001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "u",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "t",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef01fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b502000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510000000001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "txid_only_source_keeps_the_held_raw",
+      "target": [
+        "raw:t"
+      ],
+      "source": [
+        "txid:t"
+      ],
+      "source_beef": "0200beef000102fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5",
+      "beef": "0200beef0001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "t",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef0001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "nothing_held_is_appended",
+      "target": [
+        "raw:u"
+      ],
+      "source": [
+        "bump:t_800000",
+        "raw:t"
+      ],
+      "source_beef": "0200beef01fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "beef": "0200beef01fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b502000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510000000001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "u",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "t",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef01fe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b502000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d00700000000000001510000000001000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "source_merged_in_its_written_order",
+      "target": [
+        "bump:x_800002",
+        "raw:x"
+      ],
+      "source": [
+        "raw:a",
+        "raw:b",
+        "txid:y"
+      ],
+      "source_beef": "0200beef0003000100000001851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a000000000151ffffffff01540b00000000000001510000000002a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb0000100000001a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb0000000000151ffffffff013c0f000000000000015100000000",
+      "beef": "0200beef01fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0402a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb001000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000000100000001851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a000000000151ffffffff01540b000000000000015100000000000100000001a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb0000000000151ffffffff013c0f000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "y",
+          "bump_index": null,
+          "txid_only": true
+        },
+        {
+          "tx": "x",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "b",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "a",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef01fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a0402a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb001000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000000100000001851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0a000000000151ffffffff01540b000000000000015100000000000100000001a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb0000000000151ffffffff013c0f000000000000015100000000"
+    },
+    {
+      "name": "linked_parsed_source_entry_merges_its_bytes_alone",
+      "target": [
+        "raw:u"
+      ],
+      "source": [
+        "raw:c",
+        "link:c_to_t"
+      ],
+      "source_beef": "0200beef0001000100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000",
+      "beef": "0200beef0002000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000000100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "u",
+          "bump_index": null,
+          "txid_only": false
+        },
+        {
+          "tx": "c",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ],
+      "c_links": [
+        false
+      ],
+      "read_back_beef": "0200beef0002000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015100000000000100000001fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5000000000151ffffffff018403000000000000015100000000"
+    },
+    {
+      "name": "read_source_merged_in_its_wire_order",
+      "target": [],
+      "source": [
+        "bump:x_800002",
+        "bump:t_800000",
+        "raw:x",
+        "txid:t"
+      ],
+      "source_beef": "0200beef02fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50201000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5",
+      "beef": "0200beef02fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50201000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5",
+      "bumps": 2,
+      "entries": [
+        {
+          "tx": "x",
+          "bump_index": 0,
+          "txid_only": false
+        },
+        {
+          "tx": "t",
+          "bump_index": 1,
+          "txid_only": true
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef02fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50201000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b00000000000001510000000002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5"
+    },
+    {
+      "name": "unsorted_source_bump_merged_sorted",
+      "target": [],
+      "source": [
+        "bump:tu_800003_unsorted",
+        "raw:t"
+      ],
+      "source_beef": "0200beef01fe03350c0001020102fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba0101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "beef": "0200beef01fe03350c0001020002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba0102fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000",
+      "bumps": 1,
+      "entries": [
+        {
+          "tx": "t",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef01fe03350c0001020002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba0102fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50101000100000001aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa000000000151ffffffff01e803000000000000015100000000"
+    },
+    {
+      "name": "read_source_then_txid_merged_is_sorted",
+      "target": [],
+      "source": [
+        "bump:x_800002",
+        "bump:t_800000",
+        "raw:x",
+        "txid:t",
+        "reread:",
+        "txid:y"
+      ],
+      "source_beef": "0200beef02fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50302fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b502a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb001000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "beef": "0200beef02fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50302a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b501000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 2,
+      "entries": [
+        {
+          "tx": "y",
+          "bump_index": null,
+          "txid_only": true
+        },
+        {
+          "tx": "t",
+          "bump_index": 1,
+          "txid_only": true
+        },
+        {
+          "tx": "x",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef02fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b50302a07bee17e8b0015d3c9ffabc467c93c86e36bdaf5682534f27ed3fb66bd24eb002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b501000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000"
+    },
+    {
+      "name": "read_source_then_bump_merged_is_sorted",
+      "target": [],
+      "source": [
+        "bump:x_800002",
+        "bump:t_800000",
+        "raw:x",
+        "txid:t",
+        "reread:",
+        "bump:u_800004"
+      ],
+      "source_beef": "0200beef03fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5fe04350c0001010002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba0202fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b501000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "beef": "0200beef03fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5fe04350c0001010002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba0202fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b501000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000",
+      "bumps": 3,
+      "entries": [
+        {
+          "tx": "t",
+          "bump_index": 1,
+          "txid_only": true
+        },
+        {
+          "tx": "x",
+          "bump_index": 0,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef03fe02350c0001010002851349458820fa8ab8aecd646dbe60d66ad4de34d60a4f4fcafbb259c8646d0afe00350c0001010002fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b5fe04350c0001010002f0a7e65a7a9de349d6ba4377de2076e0e1f729bd682c93ecd5992136661c05ba0202fc01dfcad240ee75f317403bf37579c28e0361980fd67141b0d292302a3578b501000100000001dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd000000000151ffffffff01b80b000000000000015100000000"
+    },
+    {
+      "name": "edited_target_entry_held_raw",
+      "target": [
+        "raw:u",
+        "edit:u_to_v"
+      ],
+      "source": [
+        "raw:v"
+      ],
+      "source_beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "v",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000"
+    },
+    {
+      "name": "edited_target_entry_held_txid_only",
+      "target": [
+        "raw:u",
+        "edit:u_to_v"
+      ],
+      "source": [
+        "txid:v"
+      ],
+      "source_beef": "0200beef00010280b28256fbf81e8daf80d3f1a6eb9d9b4ca5001db528a0746ff39d55e810e6b4",
+      "beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000",
+      "bumps": 0,
+      "entries": [
+        {
+          "tx": "v",
+          "bump_index": null,
+          "txid_only": false
+        }
+      ],
+      "c_links": null,
+      "read_back_beef": "0200beef0001000100000001bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000000000151ffffffff01d007000000000000015101000000"
+    }
+  ]
+}

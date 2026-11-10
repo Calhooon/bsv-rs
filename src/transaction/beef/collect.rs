@@ -148,6 +148,7 @@ impl Beef {
         }
         beef.atomic_txid = decoder.subject().as_ref().map(display_hex);
         beef.needs_sort = true;
+        beef.wire_order = true;
         let used = usize::try_from(decoder.offset()).unwrap_or(bin.len());
         Ok((beef, used))
     }

@@ -7,6 +7,291 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: Beef::merge_beef leaves an entry the target holds alone, as the reference does, and files a raw source entry under the txid it holds, one hash less per entry (#621)
+
+From bsv-wallet-toolbox-rs's A8 cycle 1 (issue #621, its opening slice) and
+its fold (the reads of 2026-11-09). Two changes in `merge_beef`'s per-entry
+merge, now one crate-private door, `merge_beef_entry`
+(`src/transaction/beef/merge_entry.rs`):
+
+1. **A held entry is left alone.** The reference's `mergeBeef` merges a
+   source entry through `#mergeBeefTxEntry` (`ts-stack@edf6e03`
+   `packages/sdk/src/transaction/Beef.ts:950-967`): a txid-only entry is
+   appended only where the target holds nothing under its txid, a raw or
+   parsed one only where it holds nothing or the txid alone (that entry
+   upgraded in its place). `merge_beef` replaced an entry the target held raw
+   or parsed (`replace_or_append`, #764) and rescanned its BUMP index to the
+   last BUMP holding it, so a target holding T raw under BUMP 0 and merging a
+   source with T raw and a BUMP at another height that also holds T wrote
+   index 1 where the reference keeps 0; and an entry `merge_transaction`
+   stored with its source links lost them. Both now stay. The source's BUMPs
+   still merge before its entries, and the BEEF is marked for a sort whatever
+   the source holds (`#markMutated(true)`, `:978`).
+2. **No second hash.** A raw source entry is filed under the txid it holds
+   (the crate-private `BeefTx::held_txid`: the decoder's hash of the bytes it
+   read, or `merge_raw_tx`'s), where `merge_raw_tx(raw, None)` hashed its
+   bytes again (one `sha256d` and one clone of the body per entry; on beta
+   nothing is re-serialized, the parse keeps the bytes). An entry holding no
+   txid (the public `BeefTx::from_raw_tx`, or one whose `tx_mut` borrow
+   cached a stale serialization before `raw_tx_or_compute`) is filed under
+   the hash of its bytes, never under `txid()`'s reading of its fields: the
+   opening slice filed the stale-cache entry's old bytes under the edited
+   fields' hash (the strength read's FIX).
+3. **The source is merged as its snapshot** (the second fold, the rule
+   read's FIX). The reference's `mergeBeef` merges
+   `Beef.fromBinaryStrict(beef.toBinary())` (`Beef.ts:971-990`), so it walks
+   the source's entries in the order that `toBinary` writes them and sees each
+   one as its bytes or its txid alone. Its snapshot holds every entry raw
+   (`BeefTx.fromReader`, `BeefTx.ts:288-311`), so the `_tx` branch of
+   `#mergeBeefTxEntry` is never reached from `mergeBeef`. `merge_beef`
+   walked the source in held order and cloned a parsed entry's transaction
+   with its source links and merkle path. It now walks the source in the
+   order the reference's `#getSerializedBytes` writes it (`:360-373`), the
+   source unchanged:
+   - **A source read from bytes and not touched since** keeps the order it
+     was read in: the reference returns the bytes `fromBinary` read
+     (`:363-364`, `:1268-1270`), unsorted. A crate-private mark, `wire_order`,
+     is set by the reader and cleared by every merge door, `merge_bump`
+     included (`#markMutated(false)`, `:690`, which invalidates the cache),
+     and by the sort.
+   - **A source that needs a sort** is walked in that sort's order,
+     computed on a list of positions (`dependency_order` in `beef.rs`, the one dependency
+     order `sort_txs` reorders by). An entry mutated through `tx_mut` counts
+     as needing a sort, read with the input txids its refresh would give it,
+     as `synchronizeNestedTransactionMutations` makes it (`:342-352`).
+   - **Otherwise** the source is walked in held order.
+
+   Each entry is merged as the bytes the writer writes for it
+   (`BeefTx::written_tx_bytes`: the held bytes, else the transaction's
+   serialization), filed under its held txid or its bytes' hash. It carries
+   no transaction object, no link, no path of its own, and its linked
+   sources that are not entries are not walked. The source's BUMPs merge
+   with every level sorted by offset, as the snapshot's reader sorts them
+   (`MerklePath.ts:148-149`), the source's own BUMPs unchanged (the third
+   fold, the rule read's FIX; merged as held until then, so a source BUMP
+   built in memory with its level 0 out of offset order was written so in
+   the target). The cost against the opening slice's claim (one hash and one body
+   clone less per raw transaction):
+   - **A raw entry** still costs one body clone and no hash.
+   - **A parsed entry** costs one serialization (cached in the transaction)
+     in place of a `Transaction` clone, and a hash when it holds no txid.
+   - **The order** costs nothing for a source read from bytes. A source
+     built in memory pays one pass over its entries and one dependency
+     order over a copy of the position list. Nothing is serialized whole and
+     nothing is parsed back.
+
+Pinned by `tests/beef_merge_beef_held_621.rs` (fourteen cases since the fourth fold, twelve since the third, nine since the second
+fold, six before, against
+`tests/vectors/beef_merge_beef_held_621.json`, recorded from the reference's
+`mergeBeef` then `toHex` at the pin under Node v22.18.0 by
+`tests/support/beef_merge_beef_held_621.mjs`, two runs byte-identical; each
+target and source rebuilt by this crate's writer, the source merged as built
+and read back from its bytes: a held raw entry keeping index 0, a held
+unproven raw entry proven by the merged BUMP, a held `merge_transaction`
+entry keeping its link, a held txid-only entry upgraded, a txid-only source
+over a held raw entry, nothing held appended; 2 of 6 RED on `abbda405`, the
+written index `01` for `00` and the links `[false]` for `[true]`; the second
+fold's three, each source merged as built before anything sorts it and its
+bytes compared after, the read-back merge against the recorded
+`read_back_beef`:
+- the rule read's scenario (X held proven; the source `merge_raw_tx` A
+  spending Y, `merge_raw_tx` B spending X, `merge_txid_only` Y, never
+  serialized before the merge): the reference's target writes Y, X, B, A;
+- a parsed source entry C linked in memory to T, T no entry of the source:
+  C appended raw, no link;
+- a source read from bytes with T a txid alone after X proven: the target
+  writes X, T, where a sort of the source would put T first.
+
+The first two are RED on `c85b232c` (the bytes Y, X, A, B; the links `[true]`
+for `[false]`). The third is green there and RED on a scratch copy of the tip
+with the wire-order clause removed, which also turns the differential RED at the
+first BEEF it reaches, `beef_merge_beef_held_621.json#24`), by
+`src/transaction/beef/merge_entry_621_tests.rs`
+(`a_stale_cached_entry_is_filed_under_its_bytes_hash_621`, RED on `abbda405`:
+the merged entry filed under `f881639b...`, its bytes hashing to `2954e7ae...`;
+`merge_beef_keeps_the_source_entrys_txid_621`, a sentinel txid kept, RED on
+`c96f3c7e`), and by the differential `tests/beef_merge_beef_txid_621.rs`
+(every BEEF the tree holds, 286 at `c85b232c` (260 when the lane counted
+them), merged into an empty `Beef` and 118 (102) into one holding a
+txid-only and a raw entry of the source, write what the per-entry merge
+through `merge_bump` and `merge_raw_tx` writes for each entry the target
+does not hold raw; green on `c96f3c7e`, `abbda405` and the tip: no case
+moves; every source the tree holds is read from bytes, so the second fold
+walks them as read. The second fold also checked the 288 sources directly
+against the reference's `new Beef().mergeBeef(bytes).toHex()` under Node
+v22.18.0: 288 are the same; the reference throws on the 289th,
+`height64.bin`, at its 54-level bound, the #603 row. The first cut of the
+fold sorted every source and moved two of them,
+`identity_beef_subject_728.json` #1 and #3, away from the reference's
+bytes; that is how the wire-order clause was found.
+
+The third fold's three cases (twelve in the file), recorded by the same
+recorder at the pin, additions only, two runs byte-identical:
+- a source BUMP built by `MerklePath::new` with T at offset 1 before U at
+  0, merged into an empty target: the target writes U, T, the source keeps
+  its order (`an_unsorted_source_bump_is_merged_with_its_levels_sorted_621`;
+  RED on `079e0a14`, `left: "0200beef01fe03350c0001020102fc01df..."`, the
+  leaf at offset 1 written first, `right: "0200beef01fe03350c0001020002f0a7..."`);
+- a source read from bytes (X, T as read), then `merge_txid_only` of a
+  fresh Y: the target writes Y, T, X, the sort's order, as the reference's
+  cache ends at `mergeTxidOnly` (`Beef.ts:926`);
+- the same source read from bytes, then `merge_bump` of a BUMP proving none
+  of its entries: T, X (`#markMutated(false)`, `:690`).
+
+The last two pin the mark's clearing, which no test pinned (the cold read
+of the second fold: both planted faults survived). Green on `079e0a14`; on
+a scratch copy of it, the clearing removed from `mark_mutated` turns
+`a_source_read_then_given_a_txid_is_merged_in_its_sorted_order_621` RED,
+and removed from `merge_bump` turns
+`a_source_read_then_given_a_bump_is_merged_in_its_sorted_order_621` RED.
+
+The fourth fold (the rule read of the third): `merge_beef` re-keys the
+TARGET before it merges (`refresh_mutated`, then the mark), as the
+reference's `mergeBeef` synchronizes it (`Beef.ts:976-978`,
+`synchronizeNestedTransactionMutations`, `:342-352`). Until then an entry
+the target held as A and edited through `tx_mut` to A' was not found under
+A' (the index keyed by A, `has_txid` refusing the old key), so a source
+holding A' raw, or as a txid alone, appended a second A'. Two cases
+recorded by the same recorder (an `edit:u_to_v` step, V being U with a lock
+time of 1; additions only, two runs byte-identical under Node v22.18.0):
+`an_entry_edited_in_the_target_is_found_held_by_its_new_txid_621` and
+`an_entry_edited_in_the_target_keeps_a_txid_only_source_out_621`, both RED
+on `c8a5d9c9` (`left: "0200beef0002..."`, two entries, `right:
+"0200beef0001..."`, one). The reference's other step,
+`#synchronizeNestedBumpMutations` (`:296-309`), has no state to act on
+here: on a BUMP edit it clears its serialization caches, marks the BEEF for
+a sort and drops two lookup maps (`#invalidateBumpIndexes`, `:601-604`:
+`#bumpIndexesByHeight`, `#bumpIndexByTxid`, `:169-170`). This crate keeps
+no serialization cache or BUMP map (`merge_bump` scans `self.bumps` live,
+`beef.rs:350`, as `update_bump_indices` does, `:379`), and the mark follows
+in both. Neither side re-points an entry's `bump_index` after a BUMP edit
+(the reference's maps are lookups; `BeefTx._bumpIndex` is untouched), so a
+stale index stays stale on both sides. One cell differs, the reference's
+own staleness, stated and not followed: the synchronization invalidates
+nothing while its BUMP state was never captured (`#bumpState == null`,
+`:297-299`, a `new Beef()` no BUMP-synchronizing door has touched), but
+`mergeRawTx`, `mergeTxidOnly` and `mergeTransaction` build the lookup maps
+without capturing it (`#tryToValidateBumpIndex`, `:1329-1340`;
+`#findOrInsertBump`, `:791-811`). A target that `merge_raw_tx` was called
+on, then given a BUMP holding X through the public `bumps` field, then
+merged with a source holding X raw, leaves X unproven there (the map has no
+X) and writes it with index 0 here (the live scan finds it, the leaf
+flagged); a source BUMP of that BUMP's height and root is pushed as a
+second BUMP there (the height map is empty) and combined here. Ours: the
+live scan, a reading of the BUMPs held; no case is recorded (a reading,
+no cargo or Node, review-rule-fix-621-fold4).
+
+Migration: no public item is added or changed. A caller of `merge_beef`
+whose target already holds a txid raw or parsed now keeps that entry: its
+BUMP index and links as they were, where it took the source's bytes and the
+last BUMP holding it. The written bytes move only where two BUMPs of
+different height or root prove that txid (a reorg, two roots at a height);
+there the earlier entry's index is written, the reference's. Since the
+second fold there are two more changes. A caller passing a source built in
+memory whose parsed entries carry links (or a merkle path) no longer gets
+those objects or links in the target: each entry arrives as its bytes, and a
+linked source that is not an entry of the source is not merged. A caller
+relying on the held order among ties gets the source's serialized order
+instead: the sort when the source needs one, the order read for a source
+fresh from bytes. Verdicts do not move: a BEEF is valid in any order
+(#240). A caller wanting
+the source's entry to win calls `make_txid_only(txid)` before the merge (the
+held entry is then upgraded in its place) or `merge_raw_tx` after it. The
+survey: in this crate `src/kvstore/token_spends.rs:79` merges into an empty
+`Beef` sources read by `from_binary` (a txid held twice across the merged
+BEEFs keeps its earlier entry); in `~/bsv/bsv-wallet-toolbox-rs`
+`src/storage/sqlx/create_action.rs:2082` (`merge_beef_linked`, its link pass
+after unchanged) and `sibling_bump_tests.rs:146`; in
+`~/bsv/bsv-overlay-cloudflare` `overlay-cloudflare/src/routes.rs:3020`,
+`low-app-layer/src/credit_beef.rs:120`, `compaction.rs:229` (a test),
+`overlay-engine/src/gasp_overlay.rs:1363` and `engine.rs:4032`; none in
+`~/bsv/bsv-wallet-cli` or `~/bsv/rust-message-box`. Every source there is
+read from bytes, so part 2's no-second-hash moves nothing; the held-entry
+rule moves an index only on the two-BUMP shape above. The issue's second half
+(a public shape for judging bytes already in hand: `StreamVerifier` over a
+slice, a public `Judge`) has no reference shape and is the owner's question,
+not this entry's.
+
+### Notes: cross-SDK parity (#621)
+
+Conformed. `merge_beef` takes `#mergeBeefTxEntry`'s three branches as written
+(`ts-stack@edf6e03` `Beef.ts:950-967`, `mergeBeef` `:971-986`); go-sdk@2ca481c
+takes the same conditions (`MergeBeefTxWithTxid`, `transaction/beef.go:984-1000`,
+called from `MergeBeef`, `:1010-1017`) and keeps the map's txid, the shape of
+the no-second-hash change. The reference snapshots the source through its
+bytes (`fromBinaryStrict(beef.toBinary())`) and hashes each raw entry twice
+(`:842-846`, `BeefTx.ts:105-115`). The opening slice and its fold merged
+the source as held and said the vector showed that writes the same on both
+readings. That was false: the vector's "as built" merge serialized the source
+first, which sorted it in place, and so hid the order. A source built in
+memory and never serialized was walked unsorted here and sorted there, and
+the sort breaks ties by position, so the written bytes differed. A parsed
+entry was also merged as its object. Since the second fold `merge_beef` walks
+the snapshot's order and form (part 3) without serializing the source, and
+since the third fold its BUMPs with each level sorted by offset. Eight
+residues are stated:
+- An edit made straight through the public `txs`, `bumps` or `version`
+  fields, or through `find_txid_mut(..).set_bump_index`, to a BEEF read from
+  bytes leaves it read as unchanged, where the reference's cache check sees
+  the change and sorts.
+- This crate's `to_binary` sorts such a BEEF before writing, where the
+  reference's `toBinary` returns the bytes read. That is a writer
+  difference, older than #621 (a finding for the captain). `merge_beef`
+  does not call it, but a caller can: a source read from bytes and then
+  written with `to_binary` or `to_hex` is sorted in place and loses its
+  mark, so a merge after that walks the sort's order where the reference
+  walks the bytes read (the vector's `read_source_merged_in_its_wire_order`
+  source: X, T there, T, X here; the review of the second fold, a scratch
+  probe). `verify_valid`, `is_valid` and `sort_txs` sort on both sides and
+  leave no difference when they pass (but see the `verify_valid` refusal
+  below).
+- The source is not sorted in place, where the reference's `toBinary`
+  sorts a source needing a sort (`#ensureSortedForSerialization`,
+  `:354-358`), so its held `txs` order moves there and not here.
+- A V1 source holding a txid-only entry (`Beef::with_version(1)` then
+  `merge_txid_only`) is merged here, where the reference's `toBinary`
+  throws `a valid serialized Transaction is expected`
+  (`BeefTx.ts:253-258,282-284`) before any merge; `merge_beef` returns no
+  `Result`.
+- A source read from bytes and then refused by `verify_valid` at a BUMP
+  root or an entry keeps its read order here (`verify_structure` returns
+  before its sort), where the reference's `verifyValid` sorts it first
+  (`Beef.ts:1064-1065`); one refused on the atomic rule is sorted here,
+  where the reference returns before its sort (`:1064`).
+- A `tx_mut` borrow that edits nothing counts as a mutation here and sorts
+  the source, where the reference's `syncRawTxFromTransaction` finds the
+  same bytes and keeps the read order (`BeefTx.ts:160-164`).
+- A `tx_mut` entry whose stale serialization `raw_tx_or_compute` cached
+  (the state `a_stale_cached_entry_is_filed_under_its_bytes_hash_621`
+  builds, which the reference cannot hold) is ordered by `dependency_order`
+  under `txid()`, the edited fields' hash, while it is merged as its stale
+  bytes under their own hash (`merge_entry.rs`, `written_order`); a crate-only
+  state, stated rather than closed: closing it changes the dependency order's
+  inputs, more than the fold's line.
+- A source BUMP the snapshot's reader refuses or reshapes is merged here
+  as held, each level sorted (`sort_by_key`, stable, as V8's `sort` of
+  `a.offset - b.offset` is). The reader (`MerklePath.fromReader(br, false)`,
+  `Beef.ts:1259`; `MerklePath.ts:108-150,198-264`) refuses a level with two
+  leaves at one offset (`Duplicate offset`), level 0 empty, more than 54
+  levels and leaves that climb to two roots (`Mismatched roots`), so the
+  reference's `mergeBeef` throws before any merge, where `merge_beef`
+  merges it (no `Result`, the V1 row's class). It reads a leaf flagged
+  duplicate as a duplicate alone (`(flags & 1) === 1`, the hash and the
+  txid flag dropped, `:133-139`, the writer omitting the hash, `:288-290`),
+  where the clone keeps a duplicate leaf's `txid` flag (the target writes
+  `03`, which this crate's reader refuses, the reference's `01`) and its
+  `hash` (`contains_and_mark` can then prove an entry by it). Only a BUMP
+  built through the public `MerklePath` or `Beef::bumps` fields reaches
+  these (`MerklePath::new` and every reader refuse two leaves at one
+  offset, an empty level 0 and two roots, and no constructor makes the
+  duplicate leaf's flag or hash); the 55 to 64 levels `new` and a BEEF read
+  from bytes may carry are the #603 row (`height64.bin`). The fallible writers
+  (#817) would revisit this cell beside the V1 one.
+
+Until the fold the held
+entry was replaced, older than #621 (the #764 row's "one-entry merge of
+`merge_beef`" read it as parity; the root `CLAUDE.md` row now states it).
+
 ### Tests: the tracing-gated wire diagnostics measured under its feature, its survivors killed by the sink (#603)
 
 The complete mutation run of 2026-11-04 scored `src/wallet/wire/diagnostics.rs`
