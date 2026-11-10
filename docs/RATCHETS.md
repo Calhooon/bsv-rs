@@ -154,9 +154,21 @@ The compiler counters build a scratch copy of the library with
 `tools/ratchet/library.Cargo.lock` in place, so two runs resolve the same
 crates. The lock pins the dependencies alone: the tool sets the root
 package's `version` line in its scratch copy to the version that copy's
-`Cargo.toml` declares (the one `[[package]]` named as the manifest's package
-with no `source` line; none or two, and the run stops naming what it found;
-`tools/ratchet/src/tree.rs`, `lock_for_manifest`), so the committed lock's
+`Cargo.toml` declares, as cargo reads it (`cargo +1.95.0 metadata --no-deps
+--offline` on the scratch copy, which resolves nothing and touches no network;
+a version inherited from a workspace is cargo's to resolve and is read; the
+manifest is never read by lines). The entry set is the one `[[package]]` of
+that name with no `source` line; none or two, and the run stops naming what it
+found (`tools/ratchet/src/tree.rs`, `package_of` and `lock_for_package`, called
+by `materialize`). What cargo or rustup refuses stops as `cargo metadata
+failed on the measured tree at <commit>: ` and their own words (the `error:`
+line and every line after it up to the next blank line, then each `Caused by:`
+block: a foreign workspace's stop names its `Cargo.toml`, an absent toolchain's
+is rustup's and blames no manifest), and a missing `Cargo.toml` stops in its
+own; the call's arguments are built in one place and pinned by a test, and a
+workspace's package is the one whose `manifest_path` is the manifest; the
+tool's unit tests read real minimal packages and materialize a Git repository
+they build, then read the scratch lock it gets. So the committed lock's
 own-version line is whatever it was at the last dependency refresh and is not
 read, and a version commit (a release's `Cargo.toml` and `CHANGELOG.md`
 alone) needs no lock edit. A PR that adds, removes or bumps a dependency in
