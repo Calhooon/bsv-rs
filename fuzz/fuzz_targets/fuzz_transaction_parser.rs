@@ -1,6 +1,16 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
+/// Every output amount below 2^53 (#844).
+fn assert_safe_amounts(tx: &bsv_rs::transaction::Transaction) {
+    for output in &tx.outputs {
+        assert!(
+            output.satoshis.is_none_or(|s| s < 1 << 53),
+            "a reader accepted an output of 2^53 satoshis or more (#844)"
+        );
+    }
+}
+
 fuzz_target!(|data: &[u8]| {
     // Fuzz transaction parsing - should never panic
     if let Ok(tx) = bsv_rs::primitives::bsv::sighash::parse_transaction(data) {
@@ -36,6 +46,9 @@ fuzz_target!(|data: &[u8]| {
             .expect("a transaction's own bytes read back");
         assert_eq!(again.id(), tx.id());
         let _ = tx.to_hex();
+        // No accepted transaction holds an amount the reference cannot
+        // hold (#844: 2^53 satoshis or more is refused in its words).
+        assert_safe_amounts(&tx);
     }
 
     // The reader form reads one transaction from the front and leaves the
@@ -43,6 +56,7 @@ fuzz_target!(|data: &[u8]| {
     // reads to the same transaction (#840).
     let mut reader = bsv_rs::primitives::Reader::new(data);
     if let Ok(tx) = bsv_rs::transaction::Transaction::from_reader(&mut reader) {
+        assert_safe_amounts(&tx);
         let used = data.len() - reader.remaining();
         assert_eq!(
             tx.to_binary(),
@@ -96,6 +110,13 @@ fuzz_target!(|data: &[u8]| {
         "from_hex_ef agrees with from_ef"
     );
     if let Ok(tx) = by_ef {
+        assert_safe_amounts(&tx);
+        for input in &tx.inputs {
+            assert!(
+                input.source_satoshis().is_none_or(|s| s < 1 << 53),
+                "from_ef accepted a source amount of 2^53 or more (#844)"
+            );
+        }
         let ef = tx
             .to_ef()
             .expect("a transaction read from EF carries every source EF writes");

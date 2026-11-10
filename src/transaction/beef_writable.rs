@@ -104,7 +104,10 @@ impl Beef {
     ///
     /// Refuses what [`to_writer`](Self::to_writer) refuses (#817), in the
     /// reference's order around its sort (`#getSerializedBytes`,
-    /// `Beef.ts:360-373`): a txid-only entry whose txid is empty is refused
+    /// `Beef.ts:360-373`): an entry holding a transaction with an output of
+    /// 2^53 or more is refused first, in the reference's writer's words, as
+    /// its `synchronizeNestedTransactionMutations` serializes every held
+    /// transaction before anything else (#844's fold); a txid-only entry whose txid is empty is refused
     /// before the sort, the entries left as held, as the reference's
     /// `#ensureSerializableState` throws `Internal` ahead of
     /// `#ensureSortedForSerialization`; every other refusal after it, the
@@ -113,6 +116,7 @@ impl Beef {
     /// words). Until #817's fold the empty txid was refused after the sort.
     pub fn to_binary(&mut self) -> Result<Vec<u8>> {
         self.refresh_mutated();
+        self.refuse_unsafe_amount()?;
         self.refuse_empty_txid()?;
         if self.needs_sort {
             self.sort_txs();
@@ -146,7 +150,12 @@ impl Beef {
     /// judged before any byte is written, so `writer` is untouched on `Err`;
     /// the earliest in the order the reference meets them:
     ///
-    /// - a txid-only entry whose txid is empty, ahead of everything (the
+    /// - an entry holding a transaction with an output of 2^53 satoshis or
+    ///   more, ahead of everything: `The number is larger than 2 ^ 53
+    ///   (unsafe)`, the reference's writer's (`BigNumber.ts:462`, its BEEF
+    ///   writers serializing every held transaction first, `Beef.ts:360-362`;
+    ///   #844's fold, recorded);
+    /// - a txid-only entry whose txid is empty (the
     ///   reference's `Internal`, `BeefTx.ts:105-116`, at `Beef.ts:334-340`):
     ///   `Invalid txid-only entry txid: expected 64 hex digits, got 0`;
     /// - a BUMP hash with a character that is not a hex digit:
@@ -182,9 +191,20 @@ impl Beef {
         self.check_writable_in(&(0..self.txs.len()).collect::<Vec<_>>())
     }
 
-    /// A txid-only entry whose txid is empty, refused ahead of everything,
-    /// where the reference's `txid` getter throws `Internal` (`BeefTx.ts:105-116`)
-    /// from `#ensureSerializableState`, before its sort (`Beef.ts:367-368`).
+    /// An entry holding a transaction with an output of 2^53 or more, refused
+    /// ahead of everything in the reference's writer's words (#844's fold),
+    /// as its `#getSerializedBytes` serializes every held transaction first
+    /// (`synchronizeNestedTransactionMutations`, `Beef.ts:360-362`), before
+    /// its `#ensureSerializableState` and its sort. The words name no entry,
+    /// so the order the entries are met in moves nothing.
+    pub(super) fn refuse_unsafe_amount(&self) -> Result<()> {
+        self.txs.iter().try_for_each(BeefTx::amount_refusal)
+    }
+
+    /// A txid-only entry whose txid is empty, refused ahead of everything
+    /// save an unsafe amount, where the reference's `txid` getter throws
+    /// `Internal` (`BeefTx.ts:105-116`) from `#ensureSerializableState`,
+    /// before its sort (`Beef.ts:367-368`).
     fn refuse_empty_txid(&self) -> Result<()> {
         match self.txs.iter().find(|tx| tx.empty_txid()) {
             Some(tx) => tx.own_refusal(),
@@ -195,6 +215,7 @@ impl Beef {
     /// The writers' check with the entries met in `order` (positions in
     /// `txs`), the order they would be written.
     pub(super) fn check_writable_in(&self, order: &[usize]) -> Result<()> {
+        self.refuse_unsafe_amount()?;
         self.refuse_empty_txid()?;
         if let Some(bump) = self.bumps.iter().find(|bump| bump.writes_non_hex()) {
             return bump.check_writable(); // `Invalid hex string`, the refusal it checks ahead
