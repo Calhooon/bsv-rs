@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): the byte bounds held as a stated row by the keeper's 2026-10-30 08:1xZ line (the reference's own safeguards, Go's choice); the short-input panic it names in a sentence is drafted alone as [ecies-bitcore-short-input-go-sdk.md](./ecies-bitcore-short-input-go-sdk.md), queue row 51.
+
 # Bound ECIES inputs before hashing, encryption and decryption
 
 Repository: bsv-blockchain/go-sdk

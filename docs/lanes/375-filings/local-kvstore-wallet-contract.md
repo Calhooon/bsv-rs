@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [local-kvstore-token-authentication-go-sdk.md](./local-kvstore-token-authentication-go-sdk.md), queue row 50 (the signAction options dropped: go-sdk's store has no configured options to carry).
+
 # Carry local KVStore action options and authenticate selected outputs before signing
 
 Repository: bsv-blockchain/go-sdk

@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): held as a stated row (ours) by the keeper's 2026-10-30 08:1xZ line for the bounds; the certificateRequest type waits on the ts-stack draft (queue row 56), since the reference refuses its own mapping; not queued.
+
 # Bound authenticated HTTP responses and match the returned request ID
 
 Repository: bsv-blockchain/go-sdk

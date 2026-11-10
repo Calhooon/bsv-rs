@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [bip39-nfkd-go-sdk.md](./bip39-nfkd-go-sdk.md), queue row 42.
+
 # Normalize BIP-39 phrase and passphrase with NFKD
 
 Repository: bsv-blockchain/go-sdk

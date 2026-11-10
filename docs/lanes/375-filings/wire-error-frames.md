@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [wire-error-frames-go-sdk.md](./wire-error-frames-go-sdk.md), queue row 44.
+
 # Frame wallet failures and bound error text in the wire processor
 
 Repository: bsv-blockchain/go-sdk

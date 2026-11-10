@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [wallet-http-originator-redirect-go-sdk.md](./wallet-http-originator-redirect-go-sdk.md), queue row 48.
+
 # Validate wallet HTTP originators and refuse redirects before forwarding
 
 Repository: bsv-blockchain/go-sdk

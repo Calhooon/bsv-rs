@@ -1,3 +1,5 @@
+Status (the filings-older-1110 lane, 2026-11-10): superseded by [overlay-admin-token-counterparty-go-sdk.md](./overlay-admin-token-counterparty-go-sdk.md), queue row 45.
+
 # Match canonical overlay advertisement key derivation
 
 Repository: bsv-blockchain/go-sdk

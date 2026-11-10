@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the older divergence rows traced for the main-merge gate (#375)
+
+The filings-1109 lane left the divergence rows older than 0.9.0-beta.6 that
+still read "filing pending" untraced. The filings-older-1110 lane read each at
+the pins (go-sdk `2ca481c`, ts-stack `edf6e03`, BRCs `5119a9b`, BIP-39 at
+`bitcoin/bips@100ba872`) and records the verdicts in
+`docs/lanes/filings-older-1110.md`. Of the 24 `CLAUDE.md` rows: 1 filed
+(BRC-103's signed certificate texts, BRCs #360, filed 2026-10-27 and named
+nowhere until now), 2 ours as stated rows (#445's certificate cap and #294's
+requested-set checks, on the keeper's 2026-10-30 08:1xZ line for the
+reference's own safeguards), 3 already queued (rows 29 and 40) and 18 newly
+drafted, none stale at the other SDK's pin. Seventeen drafts are queue rows
+41 to 57 of `docs/lanes/375-filings/QUEUE.md`, each opening `keeper's word
+first`: fourteen against go-sdk (the Peer's pinned identity, #353; BIP-39
+NFKD, #163; the wire's false verdicts and refused abort as success, #197 and
+#206; the processor's missing error frames, #202; the overlay admin token's
+self counterparty; the txid-only revocation outpoint, #268; Electrum key
+detection by length, #109; the HTTP substrates' originator and redirects,
+#323; the auth transport's redirects, #320; the local store's unsigned token
+and unauthenticated read, #326; `BitcoreDecrypt`'s panic on a short envelope,
+from #333; the wire client's result validation, #487; the registry token's
+lock and field count, #543; the registry spend's index, #548), two against
+ts-stack (the arithmetic `RangeError` out of `verify`, #331; the HTTP
+certificateRequest refused by the same SDK's intake, #416) and one against
+the BRCs (BRC-104's header comparator, #369, the keeper's word asked on
+whether to file). Upstream reads found two numbers the rows do not carry:
+ts-stack #1372 covers the toolbox's code-8 collision (#137), and ts-stack
+#1410 is the same finding as #1466 (#282), filed twice. One row is stale, the
+BIP-39 wordlist row's byte-compare sentence, superseded by #163. The gate's
+count over the list's 118 rows: 29 filed, 55 ours, 33 waiting on queue rows
+26 to 35, 37, 38 and 40 to 57, 1 stale, none unclassed. The nineteen
+never-queued batch-1 drafts of 2026-10-30 each carry a status line naming
+their successor or verdict. No row's words in `CLAUDE.md` or the census were
+changed (the keeper writes a number in at the filing); nothing was filed; no
+source, test or vector changed.
+
 ### Changed: the default mode requires a push-only unlocking script only where the reference's default does (a version of 1 or below); a version above 1 runs it, as the reference and the node do (#816; the owner's word)
 
 Without a flag word, `Spend` required a push-only unlocking script at every
