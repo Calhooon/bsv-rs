@@ -27,6 +27,8 @@ mod review_projection;
 mod scalars;
 pub(crate) mod timestamp;
 mod wire;
+#[cfg(test)]
+mod wire_total_603_tests;
 
 pub(crate) use action_binding::input_sources;
 #[cfg(feature = "http")]
