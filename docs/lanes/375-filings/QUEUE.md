@@ -42,6 +42,18 @@ threads following answers to the earlier ones.
 | 27 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/sighash-scriptcode-op-return-stop-ts-stack.md](./sighash-scriptcode-op-return-stop-ts-stack.md) | Spend's CHECKSIG scriptCode drops every byte after a top-level OP_RETURN, so an unlocking-script check signs a different digest than the node (unfiled; drafted by the #654 lane on 2026-11-02; the keeper files it) |
 | 28 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/script-chunker-if-depth-clamp-go-sdk.md](./script-chunker-if-depth-clamp-go-sdk.md) | DecodeScript reads a negative IF depth as the top level, so OP_RETURN after a stray OP_ENDIF swallows the rest of the script (from #634's fold, the keeper's word of 2026-11-02 22:1xZ: the ask to fold only at depth 0 as the reference does, six of fifteen shapes apart; unfiled; after rows 26 and 27, row 27 #658's) |
 | 29 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/transaction-version-sign-ts-stack.md](./transaction-version-sign-ts-stack.md) | Spend's explicit flags read a transaction version at or above 2^31 as malleable, where the node and go-sdk read it as a negative int32 (from #418: the ask `(this.transactionVersion \| 0) > 1` in `#enforceNonMalleability`; the default mode's unsigned reading is the reference's and bsv-rs's since #418; unfiled) |
+| 30 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/spend-pubkey-encoding-point-check-ts-stack.md](./spend-pubkey-encoding-point-check-ts-stack.md) | Spend refuses an off-curve public key at the encoding check, where the node passes it to the signature check and lets `OP_CHECKSIG OP_NOT` succeed (from #660; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 31 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/merkle-path-verify-coinbase-depth-ts-stack.md](./merkle-path-verify-coinbase-depth-ts-stack.md) | MerklePath.verify refuses an offset-0 proof one block before the node would mine its spend, and refuses a proven coinbase that nothing spends (from #734; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 32 | bsv-blockchain/ts-stack | [docs/lanes/375-filings/script-to-asm-op-return-ts-stack.md](./script-to-asm-op-return-ts-stack.md) | Script.toASM drops the OP_RETURN opcode of every script that ends in an OP_RETURN, so fromASM reads back a different script (from #603 shard B and #634; row 26 leaves this round trip out, this row asks it alone; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 33 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/ship-discovery-output-index-panic-go-sdk.md](./ship-discovery-output-index-panic-go-sdk.md) | Broadcaster.FindInterestedHosts panics on a SHIP lookup output whose outputIndex is past the transaction's outputs (from #804; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 34 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/binary-lookup-answer-count-and-index-go-sdk.md](./binary-lookup-answer-count-and-index-go-sdk.md) | parseBinaryLookupAnswer allocates from an unbounded outpoint count and truncates an output index past 32 bits (from #775; beside go-sdk #407; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 35 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/overlay-discovery-advertisement-admission-go-sdk.md](./overlay-discovery-advertisement-admission-go-sdk.md) | SLAP and SHIP host discovery admit a host from an advertisement that is unsigned, of any value, or for another transaction (from #786, #804 and #544; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 36 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/topic-broadcaster-all-hosts-requirement-go-sdk.md](./topic-broadcaster-all-hosts-requirement-go-sdk.md) | An all-hosts acknowledgment requirement passes when an interested host failed, because only the successful hosts are checked (from the open PR #820; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 37 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/lookup-query-merge-go-sdk.md](./lookup-query-merge-go-sdk.md) | LookupResolver.Query returns a lone freeform answer over every other host's outputs, lets a later copy of an outpoint replace the earlier, and returns the outputs in map order (from #796 and the open PR #821 (#815); unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 38 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/beef-merge-held-bump-go-sdk.md](./beef-merge-held-bump-go-sdk.md) | Beef.MergeTransaction does not attach a BUMP the Beef already holds for the transaction, so the transaction is stored unproven and its sources are walked (from #764; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 39 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/lookup-answer-json-beef-encoding-go-sdk.md](./lookup-answer-json-beef-encoding-go-sdk.md) | OutputListItem writes its BEEF as a base64 string in JSON, which the TypeScript lookup client refuses (from #768; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+| 40 | bsv-blockchain/go-sdk | [docs/lanes/375-filings/pushdrop-lock-wallet-bytes-go-sdk.md](./pushdrop-lock-wallet-bytes-go-sdk.md) | PushDrop.Lock re-encodes the wallet's public key as compressed and re-serializes its signature, so a token's bytes differ from the TypeScript lock for the same wallet answer (from #782; beside go-sdk #401; unfiled; drafted by the filings-1109 lane on 2026-11-09; the keeper's word first) |
+
 
 The keeper's 2026-10-30 11:1xZ word inserts the certificate-response
 preimage witness tenth, after the DER witness. The queue now has seventeen
@@ -146,6 +158,16 @@ are go-sdk's nine (rows 14 to 17, 19 to 22 and 25) and ts-stack's two (rows
 on 2026-11-04, then rows 19 to 22 (row 21 ahead of row 20), then rows 23 and
 24, then row 25, each from the draft as it stands on beta at 00:00Z on its
 day. Nothing new has been filed.
+
+The filings-1109 lane (2026-11-09, the owner's question of that day whether the
+references need upstream issues) adds rows 30 to 40, eleven drafts, three
+against ts-stack and eight against go-sdk, from the divergence rows and parity
+notes since 0.9.0-beta.6 and the open pull requests' notes; the table and the
+candidates it dropped are in [docs/lanes/filings-1109.md](../filings-1109.md).
+Row 29 (`transaction-version-sign-ts-stack.md`, from #418) is carried by the
+open PR #812 and is not repeated here; whichever lands second keeps both rows
+in order. Each new draft opens with `keeper's word first` and waits for the
+keeper's per-draft word, then the owner's cadence. Nothing new has been filed.
 
 ## HOLD
 
