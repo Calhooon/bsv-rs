@@ -262,7 +262,8 @@ async fn test_mock_broadcast_facilitator_missing_url_returns_empty() {
 
 #[tokio::test]
 async fn test_lookup_resolver_with_mock() {
-    // Create a mock facilitator that returns a freeform answer
+    // Create a mock facilitator that returns a freeform answer (the resolver
+    // answers the empty output list since #815)
     let mock = Arc::new(MockLookupFacilitator::new());
 
     // The resolver with host_overrides will use the override hosts directly
@@ -301,12 +302,13 @@ async fn test_lookup_resolver_with_mock() {
     assert!(result.is_ok(), "Query should succeed: {:?}", result);
     let answer = result.unwrap();
 
-    match answer {
-        LookupAnswer::Freeform { result } => {
-            assert_eq!(result["data"], "test_result");
-        }
-        _ => panic!("Expected Freeform answer from resolver"),
-    }
+    // Since #815 the resolver answers the merged output list, as the
+    // reference's `query` does (`LookupResolver.ts:1445-1450`): a freeform
+    // host contributes nothing, so the answer is the empty list.
+    assert!(
+        matches!(&answer, LookupAnswer::OutputList { outputs } if outputs.is_empty()),
+        "{answer:?}"
+    );
 
     // The mock should have been called once for the query
     assert!(mock.get_call_count() >= 1);
@@ -629,11 +631,13 @@ async fn test_lookup_resolver_multiple_hosts() {
     // Both hosts should have been queried
     assert_eq!(mock.get_call_count(), 2);
 
-    // The result should be a freeform (first successful freeform wins)
-    match result.unwrap() {
-        LookupAnswer::Freeform { .. } => {} // Expected
-        _ => panic!("Expected Freeform answer"),
-    }
+    // Since #815 no freeform answer is returned: every host freeform, the
+    // merged output list is empty, as the reference's `query` answers.
+    let answer = result.unwrap();
+    assert!(
+        matches!(&answer, LookupAnswer::OutputList { outputs } if outputs.is_empty()),
+        "{answer:?}"
+    );
 }
 
 // =============================================================================

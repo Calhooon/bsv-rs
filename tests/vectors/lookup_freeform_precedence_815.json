@@ -1,0 +1,373 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk LookupResolver.queryDetailed and query",
+  "node": "v22.18.0",
+  "beefs": {
+    "A": "0200beef01fd300301010002933a42dd32e34693d534635e65c10c44e064430d7c72451dfd6aff9099997e33010100010000000115151515151515151515151515151515151515151515151515151515151515150000000000ffffffff010100000000000000015100000000",
+    "B": "0200beef01fd3103010100022b38f493a422efdd51a3b74a77484c3b06f43553fe5a1b76f2c5b0270e038003010100010000000115151515151515151515151515151515151515151515151515151515151515150000000000ffffffff010200000000000000015100000000"
+  },
+  "txids": {
+    "A": "337e999990ff6afd1d45727c0d4364e0440cc1655e6334d59346e332dd423a93",
+    "B": "0380030e27b0c5f2761b5afe5335f4063b4c48774ab7a351ddef22a493f4382b"
+  },
+  "shapes": [
+    {
+      "hosts": [
+        {
+          "freeform": {
+            "note": "freeform"
+          },
+          "role": "free"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "list"
+        }
+      ],
+      "name": "freeform_then_list",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              1
+            ]
+          }
+        ],
+        "hostCount": 2,
+        "successfulHosts": 1,
+        "emptyHosts": 0,
+        "freeformHosts": 1,
+        "failedHosts": 0,
+        "reputation": {
+          "free": [
+            0,
+            0
+          ],
+          "list": [
+            1,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "list"
+        },
+        {
+          "freeform": {
+            "note": "freeform"
+          },
+          "role": "free"
+        }
+      ],
+      "name": "list_then_freeform",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              1
+            ]
+          }
+        ],
+        "hostCount": 2,
+        "successfulHosts": 1,
+        "emptyHosts": 0,
+        "freeformHosts": 1,
+        "failedHosts": 0,
+        "reputation": {
+          "list": [
+            1,
+            0
+          ],
+          "free": [
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "hosts": [
+        {
+          "freeform": {
+            "note": "one"
+          },
+          "role": "free"
+        },
+        {
+          "freeform": "two",
+          "role": "free_2"
+        }
+      ],
+      "name": "every_host_freeform",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [],
+        "hostCount": 2,
+        "successfulHosts": 0,
+        "emptyHosts": 0,
+        "freeformHosts": 2,
+        "failedHosts": 0,
+        "reputation": {
+          "free": [
+            0,
+            0
+          ],
+          "free_2": [
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "hosts": [
+        {
+          "freeform": null,
+          "role": "free"
+        }
+      ],
+      "name": "lone_freeform",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [],
+        "hostCount": 1,
+        "successfulHosts": 0,
+        "emptyHosts": 0,
+        "freeformHosts": 1,
+        "failedHosts": 0,
+        "reputation": {
+          "free": [
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "hosts": [
+        {
+          "freeform": {
+            "note": "freeform"
+          },
+          "role": "free"
+        },
+        {
+          "outputs": [],
+          "role": "empty"
+        }
+      ],
+      "name": "freeform_and_empty_list",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [],
+        "hostCount": 2,
+        "successfulHosts": 1,
+        "emptyHosts": 1,
+        "freeformHosts": 1,
+        "failedHosts": 0,
+        "reputation": {
+          "free": [
+            0,
+            0
+          ],
+          "empty": [
+            1,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "hosts": [
+        {
+          "outputs": [
+            {
+              "context": [
+                1
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "list"
+        },
+        {
+          "freeform": [
+            1,
+            2,
+            3
+          ],
+          "role": "free"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                2
+              ],
+              "hint": null,
+              "outputIndex": 0,
+              "tx": "B"
+            },
+            {
+              "context": [
+                3
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "list_2"
+        }
+      ],
+      "name": "list_freeform_list",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              1
+            ]
+          },
+          {
+            "tx": "B",
+            "outputIndex": 0,
+            "hint": null,
+            "context": [
+              2
+            ]
+          }
+        ],
+        "hostCount": 3,
+        "successfulHosts": 2,
+        "emptyHosts": 0,
+        "freeformHosts": 1,
+        "failedHosts": 0,
+        "reputation": {
+          "list": [
+            1,
+            0
+          ],
+          "free": [
+            0,
+            0
+          ],
+          "list_2": [
+            1,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "hosts": [
+        {
+          "freeform": {
+            "note": "freeform"
+          },
+          "role": "free"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                4
+              ],
+              "hint": "B",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "liar"
+        },
+        {
+          "outputs": [
+            {
+              "context": [
+                5
+              ],
+              "hint": "A",
+              "outputIndex": 0,
+              "tx": "A"
+            }
+          ],
+          "role": "honest"
+        }
+      ],
+      "name": "freeform_liar_honest",
+      "reference": {
+        "type": "output-list",
+        "query_type": "output-list",
+        "outputs": [
+          {
+            "tx": "A",
+            "outputIndex": 0,
+            "hint": "A",
+            "context": [
+              5
+            ]
+          }
+        ],
+        "hostCount": 3,
+        "successfulHosts": 2,
+        "emptyHosts": 0,
+        "freeformHosts": 1,
+        "failedHosts": 0,
+        "reputation": {
+          "free": [
+            0,
+            0
+          ],
+          "liar": [
+            1,
+            0
+          ],
+          "honest": [
+            1,
+            0
+          ]
+        }
+      }
+    }
+  ]
+}

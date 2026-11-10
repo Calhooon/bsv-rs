@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a freeform answer from one host no longer blanks a lookup; LookupResolver::query answers the merged output list, as the reference does (#815)
+
+From the overlay bucket's blocking line 2 (review-strength-fix-804, PR #813,
+and review-strength-fix-796, PR #808, merged).
+
+**What was wrong.** `LookupResolver::query` merged every host's output list
+and then, if any host had answered freeform, returned the earliest freeform
+answer in place of the merge (`src/overlay/lookup_resolver/query.rs`, the
+`first_freeform` slot). One discovered host answering freeform (any SLAP- or
+SHIP-advertised stranger) blanked the lookup for every consumer: the
+kvstore's global store read no entry, the registry and the identity client
+no record, and since #804 every SHIP discovery was refused in `SHIP answer is
+not a bounded output list.`, so a broadcast found no interested host. The
+lists the other hosts gave were discarded, and the #796 hint contradictions
+counted on them described an answer nobody received.
+
+**The reference.** No path of its `query` returns a freeform answer
+(`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/LookupResolver.ts`):
+`query` is `return (await this.queryDetailed(question, timeout, options)).answer`
+(`:1374`), and `queryDetailed` answers
+`{ answer: { type: 'output-list', outputs: progress.outputs }, progress }`
+(`:1445-1450`), its other exits are throws (`:1431`, `:1437-1443`). A host's
+freeform answer is counted and nothing else: `recordLookupHostAnswer`
+(`:1493-1514`) sends an output list to `session.recordOutputAnswer` and
+anything else to `session.recordFreeformAnswer()` (`:1512`), which is
+`if (!this.closed) this.freeformHosts++` (`:1085-1087`); the session's
+`snapshot` is always `type: 'output-list'` (`:1123-1135`). For the host's
+reputation a freeform answer is neither a success nor a failure (`:2399-2402`,
+`if (isFreeformAnswer(normalizedAnswer)) return normalizedAnswer`), as this
+crate already had it (#760).
+
+**The fix.** `query` answers the merged output list in every case, empty when
+no host answered one; a freeform answer contributes nothing (a formula answer
+stays a recorded failure that contributes nothing). The #796 merge (the hint
+compare, `txid_hint_contradictions`, the displacement), #760's accounting and
+#775's budgets run unchanged on the lists kept. No public type or signature
+changes; `LookupAnswer::Freeform` stays (a facilitator still returns it, and
+`find_competent_hosts` still reads it as a tracker's neutral answer).
+
+**The tests.** `tests/lookup_freeform_precedence_815.rs` (6) replays
+`tests/vectors/lookup_freeform_precedence_815.json`, recorded by
+`tests/support/lookup_freeform_precedence_815.mjs` against the reference's own
+`LookupResolver.queryDetailed` and `query` (Node v22.18.0, a scripted
+facilitator, `.invalid` hosts never dialled, BEEFs by this crate's writer;
+seven shapes: one host freeform and one an output list in both orders, every
+host freeform, a lone freeform host, a freeform host beside an empty list,
+three hosts mixed, and a freeform host beside a liar and an honest host),
+each answer the reference's, the hint merge's count 1, and each host's
+successes and failures the reference's tracker's. All six RED on `71202e33`
+(`left: {"type": "Freeform"}`). `tests/overlay_ship_discovery_804.rs`:
+`a_freeform_ls_ship_host_beside_an_advertising_one_admits_the_advertised_host_815`
+(both rank orders) and `a_freeform_ls_ship_host_admits_no_host_and_refuses_nothing_815`
+(replacing `an_answer_that_is_no_output_list_refuses_the_discovery_804`), both
+RED on `71202e33` (`SHIP answer is not a bounded output list.`); the
+recording's `not_output_list` case, which the reference reached through a
+stub resolver, now replays as no host here and its refusal is pinned at the
+reader, `topic_broadcaster/discovery.rs`'s
+`a_freeform_answer_handed_to_the_reader_is_refused_815`. Three older pins
+that asserted the freeform answer through the resolver now assert the empty
+list (`overlay_mock_tests.rs`' `test_lookup_resolver_with_mock` and
+`test_lookup_resolver_multiple_hosts`, `lookup_tracker_accounting_762.rs`'
+`a_freeform_answer_with_a_null_result_is_an_answer_762`, whose facilitator
+half is unchanged).
+
+**Migration.** A caller that read a freeform answer from
+`LookupResolver::query` (or through `TopicBroadcaster::find_interested_hosts`,
+which refused it) no longer receives one: the answer is the merged output
+list, empty when every host answered freeform. So a `TopicBroadcaster::broadcast_tx`
+whose `ls_ship` hosts all answer freeform fails `ERR_NO_HOSTS_INTERESTED`
+where it failed `ERR_HOST_DISCOVERY`, the code the reference's broadcaster
+answers with its own resolver (`SHIPBroadcaster.ts:475`); a caller matching
+the old code on that shape matches the new one. Inside this crate no caller
+depended on it (`GlobalKVStore`'s freeform arm and the identity, registry and
+storage readers' non-list arms read nothing, as an empty list reads nothing);
+in the dependents read (`~/bsv/bsv-overlay-cloudflare`,
+`~/bsv/bsv-wallet-toolbox-rs`, `~/bsv/bsv-wallet-cli`, `~/bsv/rust-message-box`)
+none reads a freeform answer from `LookupResolver::query`: the
+overlay-cloudflare matches on `LookupAnswer::Freeform` are its own lookup
+services' answers and its engine's, and the toolbox's `parse_overlay_answer`
+reads any non-list answer as no certificate. A caller that needs a host's
+freeform result asks that host through an `OverlayLookupFacilitator`
+directly.
+
+### Notes: cross-SDK parity (#815)
+
+The answer is the reference's on every recorded shape, and each host's
+reputation counts are its tracker's. The reference's `queryDetailed` also
+reports the hosts' tally (`freeformHosts`, `successfulHosts`, `emptyHosts`,
+recorded in the vector); this crate has no `queryDetailed` and no tally, older
+than #815. go-sdk at `2ca481c` returns a freeform answer when the response
+that reached its channel first is one (`overlay/lookup/resolver.go:122-124`,
+`if successfulResponses[0].Type == AnswerTypeFreeform { return
+successfulResponses[0], nil }`), so a freeform host that answers fastest
+blanks its lookup as this crate's did, and otherwise drops freeform answers
+from the merge (`:128-130`); with no successful response it errs
+`no-successful-responses` (`:118-120`), where the reference and this crate
+answer the empty list. Theirs: go-sdk, not filed (the witness:
+tests/lookup_freeform_precedence_815.rs; tests/vectors/lookup_freeform_precedence_815.json).
+
 ### Fixed: the default mode reads the transaction version unsigned, as the reference does; a word keeps the node's `int32_t` (#418)
 
 From the #397 re-review's observation (2026-10-28). `Spend`'s default mode

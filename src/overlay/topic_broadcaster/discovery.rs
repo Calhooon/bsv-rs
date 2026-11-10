@@ -207,4 +207,32 @@ mod tests {
             ))
         );
     }
+
+    /// The reader refuses an answer that is no output list in the reference's
+    /// words (`SHIPBroadcaster.ts:737-744`), the recording's `not_output_list`
+    /// case, which the reference reached through a stub resolver. Since #815
+    /// `LookupResolver::query` answers an output list in every case, so this
+    /// refusal is reached through no resolver of this crate.
+    #[test]
+    fn a_freeform_answer_handed_to_the_reader_is_refused_815() {
+        let recorded: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/vectors/ship_discovery_admission_804.json"
+        ))
+        .unwrap();
+        let case = recorded["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "not_output_list")
+            .unwrap();
+        let answer = LookupAnswer::Freeform {
+            result: case["answer"]["result"].clone(),
+        };
+        assert_eq!(
+            interested_hosts(&["tm_ship_discovery".to_string()], answer),
+            Err(Error::OverlayError(
+                case["refusal"].as_str().unwrap().to_string()
+            ))
+        );
+    }
 }
