@@ -28,7 +28,7 @@ import zipfile
 SURFACES = {
     "script": ["src/script/**/*.rs"],
     "beef": ["src/transaction/beef*.rs"],
-    "merkle": ["src/transaction/merkle_path.rs"],
+    "merkle": ["src/transaction/merkle_path.rs", "src/transaction/merkle_path_walk.rs"],
     "wire": ["src/wallet/wire/**/*.rs"],
     "substrates": ["src/wallet/substrates/**/*.rs"],
 }
@@ -92,7 +92,8 @@ def test_skips(surface):
 def is_gate_path(file):
     """True for a file the owner's word holds at 80 percent, whatever the record says."""
     return file.startswith("src/script/") or Path(file).match("src/transaction/beef*.rs") \
-        or file == "src/transaction/merkle_path.rs"
+        or file == "src/transaction/merkle_path.rs" \
+        or file == "src/transaction/merkle_path_walk.rs"
 
 
 def load_floors(path):

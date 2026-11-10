@@ -910,6 +910,13 @@ class MerkleSurfaceKeepsItsSiblingTests(unittest.TestCase):
         self.assertFalse(any(skip in name for skip in skips), skips)
         self.assertIn("transaction::beef::", skips)
 
+    def test_the_merkle_walk_is_a_gate_path_of_the_merkle_surface_93(self):
+        walk = "src/transaction/merkle_path_walk.rs"
+        self.assertIn(walk, nightly.SURFACES["merkle"])
+        self.assertIn("src/transaction/merkle_path.rs", nightly.SURFACES["merkle"])
+        self.assertTrue(nightly.is_gate_path(walk))
+        self.assertFalse(nightly.is_gate_path("src/transaction/merkle_path_extra.rs"))
+
 
 class ReachRuleFixture(unittest.TestCase):
     """Cut 7: a small tree in a git repository, the reach rule run on its diffs."""

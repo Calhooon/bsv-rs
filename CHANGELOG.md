@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the cached root walk moves to `merkle_path_walk.rs` (#93 P0)
+
+`RootWalker`, its `Node`, `SCAN_MAX` and `hash_pair` move out of
+`src/transaction/merkle_path.rs` into the sibling module
+`src/transaction/merkle_path_walk.rs` byte for byte, comments included; the
+only edits are `pub(super)` on `RootWalker`, its `new`, `shared` and
+`root_from`, and on `hash_pair`, and the `use` lines that reach them. It is the
+reference's `computeRootCached` (`ts-stack@edf6e03` `MerklePath.ts:335-366`),
+the walk the constructors' root check and `compute_root` share. No public item,
+verdict or error text changes; `MerklePath::verify` (#734) does not touch the
+walker and stays where it is.
+
+The `merkle` mutation surface (`.github/scripts/nightly_mutants.py`) names both
+files and the 80 percent gate holds the new one (`is_gate_path`, by its exact
+name: `merkle_path_extra.rs` stays outside), pinned by
+`test_the_merkle_walk_is_a_gate_path_of_the_merkle_surface_93`; the gate's comment
+in `nightly.yml` names it (the record writer's floor sentence in
+`mutants_record.py` is left as it was: it rewrites the records before it byte
+for byte, `test_a_record_before_791_is_rewritten_byte_for_byte_791`), and the three equivalence
+entries of `.cargo/mutants.toml` are re-keyed to `merkle_path_walk.rs:141:27`
+and `:141:33` (`merkle_path.rs:652` until the move). The mutant list over the
+two files is the old file's, 96 mutants of the same texts, only file and line
+moved.
+
 ### Tests: discovery on the default config asks the four Mainnet trackers, each once with ls_slap and a 5000 ms wait (#787)
 
 No test ran `find_competent_hosts` on `LookupResolverConfig::default()`, so a
