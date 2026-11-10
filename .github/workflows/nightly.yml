@@ -721,7 +721,7 @@ jobs:
           merge-multiple: true
 
       # #602: 80% on the gate paths (src/script/**, src/transaction/beef*.rs,
-      # src/transaction/merkle_path.rs); elsewhere the floor is the checked-out
+      # src/transaction/merkle_path.rs, src/transaction/merkle_path_walk.rs, #93); elsewhere the floor is the checked-out
       # ratchet record's `mutation_floors` member, the measured score rounded
       # down with its improvement issue, which `tools/ratchet/run --check
       # --against` refuses to lower or remove. Cut 7: the night's files are
