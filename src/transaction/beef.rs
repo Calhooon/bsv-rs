@@ -107,6 +107,12 @@ pub struct Beef {
     pub atomic_txid: Option<String>,
     /// Index of txids to BeefTx for fast lookup.
     txid_index: HashMap<String, usize>,
+    /// The entry count the index was last true for: a count that moved is a
+    /// hand edit of `txs` (#817, `beef/index.rs`).
+    indexed_len: usize,
+    /// Two entries of one txid seen when last indexed: `edit_tx` then keeps
+    /// the old key, the other entry found (#817's second fold).
+    holds_twins: bool,
     /// Whether the transactions need sorting.
     needs_sort: bool,
     /// The entries as a reader read them, untouched since: the reference's
@@ -129,6 +135,8 @@ impl Beef {
             version,
             atomic_txid: None,
             txid_index: HashMap::new(),
+            indexed_len: 0,
+            holds_twins: false,
             needs_sort: true,
             wire_order: false,
         }
@@ -138,14 +146,6 @@ impl Beef {
     fn mark_mutated(&mut self) {
         self.needs_sort = true;
         self.wire_order = false;
-    }
-
-    /// Appends `tx` under `txid` and returns its index.
-    fn push_tx(&mut self, tx: BeefTx, txid: String) -> usize {
-        self.txs.push(tx);
-        let idx = self.txs.len() - 1;
-        self.txid_index.insert(txid, idx);
-        idx
     }
 
     /// Finds a MerklePath that contains the given txid at level 0: the LAST
@@ -408,7 +408,7 @@ impl Beef {
 
     /// Merges a txid-only entry into this BEEF.
     pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx {
-        if let Some(idx) = self.index_of(&txid) {
+        if let Some(idx) = self.position(&txid) {
             return &self.txs[idx];
         }
 
@@ -426,7 +426,7 @@ impl Beef {
     ///
     /// Returns the modified BeefTx if found, None if txid not in BEEF.
     pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx> {
-        let idx = self.index_of(txid)?;
+        let idx = self.position(txid)?;
 
         // If already txid-only, just return it
         if self.txs[idx].is_txid_only() {
@@ -1059,15 +1059,8 @@ impl Beef {
 
     /// Returns a shallow clone of this BEEF.
     pub fn clone_shallow(&self) -> Self {
-        Self {
-            bumps: self.bumps.clone(),
-            txs: self.txs.clone(),
-            version: self.version,
-            atomic_txid: self.atomic_txid.clone(),
-            txid_index: self.txid_index.clone(),
-            needs_sort: self.needs_sort,
-            wire_order: self.wire_order,
-        }
+        // Every field, as the derived `Clone` copies them.
+        self.clone()
     }
 
     /// A summary of this BEEF in `Beef.toLogString`'s text (`Beef.ts:1698-1733`
@@ -1230,6 +1223,8 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
     (new_order, result)
 }
 
+#[cfg(test)]
+mod index_817_tests;
 #[cfg(test)]
 mod merge_entry_621_tests;
 #[cfg(test)]

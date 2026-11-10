@@ -214,9 +214,13 @@ impl BeefTx {
     /// refused `TxidNotInBump`. `input_txids` is refreshed by the BEEF's next
     /// whole-BEEF reader (`sort_txs`, `verify_structure`, `verify_valid`,
     /// `is_valid`, `to_binary`, `to_binary_atomic`, `trim_known_proven`,
-    /// `to_log_string`), which also re-keys the BEEF's index by the new
-    /// txid; until then a lookup by the new txid misses and one by the old
-    /// txid finds nothing.
+    /// `to_log_string`) or [`Beef::reindex`](super::beef::Beef::reindex),
+    /// which also re-key the BEEF's index by the new txid; until then a
+    /// lookup by the new txid misses and one by the old txid finds nothing,
+    /// so a per-entry merge of the new txid stores it a second time (the
+    /// #171 window, stated). [`Beef::edit_tx`](super::beef::Beef::edit_tx)
+    /// re-keys the entry at once (#817).
+    #[deprecated(note = "use Beef::edit_tx")]
     pub fn tx_mut(&mut self) -> Option<&mut Transaction> {
         self.parse_raw();
         if let Some(ref tx) = self.tx {
@@ -740,6 +744,7 @@ mod tests {
     /// they changed and false when nothing did (`:164`, `:176`). Here the
     /// mutation goes through `tx_mut` and the sync is `refresh` (bsv-rs#171).
     #[test]
+    #[allow(deprecated)] // the deprecated `tx_mut` and its `refresh` are what this pins
     fn a_transaction_mutated_through_tx_mut_is_the_entry_reading_beef_tx_ts_160_177() {
         let raw = from_hex(TEST_TX_HEX).unwrap();
         let mut entry = BeefTx::from_raw_tx(raw, None);
