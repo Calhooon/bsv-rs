@@ -1,0 +1,107 @@
+{
+  "source": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "content_length_list",
+      "mode": "http",
+      "call": "getHeight",
+      "args": {},
+      "body": {
+        "prefix": "{\"height\":1}",
+        "padByte": 32,
+        "length": 12,
+        "chunkBytes": 1048576,
+        "declared": "12, 12"
+      },
+      "reference": {
+        "error": "HTTPWalletJSON response has an invalid Content-Length"
+      }
+    },
+    {
+      "name": "exact_cap_declared",
+      "mode": "http",
+      "call": "getHeight",
+      "args": {},
+      "body": {
+        "prefix": "{\"height\":1}",
+        "padByte": 32,
+        "length": 268435456,
+        "chunkBytes": 1048576,
+        "declared": "268435456"
+      },
+      "reference": {
+        "accepted": true,
+        "height": 1
+      }
+    },
+    {
+      "name": "exact_cap_chunked",
+      "mode": "http",
+      "call": "getHeight",
+      "args": {},
+      "body": {
+        "prefix": "{\"height\":1}",
+        "padByte": 32,
+        "length": 268435456,
+        "chunkBytes": 1048576,
+        "declared": null
+      },
+      "reference": {
+        "accepted": true,
+        "height": 1
+      }
+    },
+    {
+      "name": "one_past_cap_chunked",
+      "mode": "http",
+      "call": "getHeight",
+      "args": {},
+      "body": {
+        "prefix": "{\"height\":1}",
+        "padByte": 32,
+        "length": 268435457,
+        "chunkBytes": 1048576,
+        "declared": null
+      },
+      "reference": {
+        "error": "HTTPWalletJSON response exceeds the maximum permitted size"
+      }
+    },
+    {
+      "name": "unsafe_key_in_outputs",
+      "mode": "snapshot",
+      "call": "createAction",
+      "requestText": "{\"outputs\":[{\"constructor\":1}]}",
+      "reference": {
+        "error": "Wallet result request records must contain only safe string keys"
+      }
+    },
+    {
+      "name": "labels_at_bound",
+      "mode": "snapshot",
+      "call": "listActions",
+      "requestArray": {
+        "field": "labels",
+        "item": 0,
+        "length": 1000000
+      },
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "labels_past_bound",
+      "mode": "snapshot",
+      "call": "listActions",
+      "requestArray": {
+        "field": "labels",
+        "item": 0,
+        "length": 1000001
+      },
+      "reference": {
+        "error": "Wallet request arrays must have a bounded own length"
+      }
+    }
+  ]
+}

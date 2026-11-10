@@ -12,6 +12,8 @@ mod beef;
 #[cfg(test)]
 mod beef_603_tests;
 mod boundary;
+#[cfg(test)]
+mod boundary_603_tests;
 mod bytes;
 mod certificate;
 mod certificates;
