@@ -1,0 +1,310 @@
+{
+  "source": "ts-stack@edf6e03",
+  "node": "v22.23.3",
+  "cases": [
+    {
+      "name": "c1_dense_byte_array_past_the_node_limit",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1,\"extra\":\"@@EXPANSION@@\"}",
+      "expansion": {
+        "marker": "\"@@EXPANSION@@\"",
+        "kind": "array",
+        "length": 1000001,
+        "item": 0
+      },
+      "reference": {
+        "accepted": true,
+        "value": 1
+      }
+    },
+    {
+      "name": "c2_integral_value_above_255",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1,\"extra\":\"@@EXPANSION@@\"}",
+      "expansion": {
+        "marker": "\"@@EXPANSION@@\"",
+        "kind": "array",
+        "length": 1000001,
+        "item": 300
+      },
+      "reference": {
+        "error": "Invalid HTTPWalletJSON getHeight raw response result array length: expected at most 1000000 entries"
+      }
+    },
+    {
+      "name": "c3_non_byte_array_one_property_past",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1,\"extra\":\"@@EXPANSION@@\"}",
+      "expansion": {
+        "marker": "\"@@EXPANSION@@\"",
+        "kind": "array",
+        "length": 999998,
+        "item": "x"
+      },
+      "reference": {
+        "error": "Invalid HTTPWalletJSON getHeight raw response result object graph: expected a bounded result"
+      }
+    },
+    {
+      "name": "c3_non_byte_array_at_the_property_bound",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1,\"extra\":\"@@EXPANSION@@\"}",
+      "expansion": {
+        "marker": "\"@@EXPANSION@@\"",
+        "kind": "array",
+        "length": 999997,
+        "item": "x"
+      },
+      "reference": {
+        "accepted": true,
+        "value": 1
+      }
+    },
+    {
+      "name": "c4_index_keyed_object_outside_the_byte_names",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1,\"extra\":\"@@EXPANSION@@\"}",
+      "expansion": {
+        "marker": "\"@@EXPANSION@@\"",
+        "kind": "index_object",
+        "length": 999999,
+        "item": 0
+      },
+      "reference": {
+        "error": "Invalid HTTPWalletJSON getHeight raw response result object graph: expected a bounded result"
+      }
+    },
+    {
+      "name": "c5_escaped_quote",
+      "call": "getVersion",
+      "args": {},
+      "bodyText": "{\"version\":\"ab\\\"cdefg\"}",
+      "reference": {
+        "accepted": true,
+        "value": "ab\"cdefg"
+      }
+    },
+    {
+      "name": "c6_historical_byte_object_raw_path",
+      "call": "encrypt",
+      "args": {
+        "protocolID": [
+          1,
+          "fixture keys"
+        ],
+        "keyID": "fixture",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "counterparty": "self"
+      },
+      "bodyText": "{\"ciphertext\":{\"0\":1,\"1\":2},\"pad\":1e400}",
+      "reference": {
+        "accepted": true,
+        "value": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "c7_byte_field_name_unsafe_key",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1,\"data\":{\"__proto__\":1}}",
+      "reference": {
+        "error": "Invalid HTTPWalletJSON getHeight raw response result object key __proto__: expected a safe record key"
+      }
+    },
+    {
+      "name": "c8_nested_arrays_raw_path",
+      "call": "getHeight",
+      "args": {},
+      "bodyText": "{\"height\":1000.0,\"pad\":[[1],2],\"x\":1e400}",
+      "reference": {
+        "accepted": true,
+        "value": 1000
+      }
+    },
+    {
+      "name": "c10_trailing_bits_reference_raw_path",
+      "call": "createAction",
+      "args": {
+        "description": "fixture action",
+        "inputBEEF": [
+          2,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          182,
+          10,
+          153,
+          93,
+          247,
+          33,
+          9,
+          25,
+          30,
+          73,
+          131,
+          150,
+          246,
+          127,
+          24,
+          16,
+          177,
+          31,
+          160,
+          229,
+          224,
+          144,
+          137,
+          186,
+          12,
+          159,
+          178,
+          73,
+          253,
+          243,
+          24,
+          220,
+          1,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          68,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inputs": [
+          {
+            "outpoint": "dc18f3fd49b29f0cba8990e0e5a01fb110187ff69683491e190921f75d990ab6.0",
+            "inputDescription": "fixture input",
+            "unlockingScriptLength": 1
+          }
+        ],
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 900,
+            "outputDescription": "fixture output"
+          }
+        ],
+        "options": {
+          "knownTxids": [
+            "4444444444444444444444444444444444444444444444444444444444444444"
+          ],
+          "returnTXIDOnly": false,
+          "noSend": true,
+          "randomizeOutputs": false,
+          "signAndProcess": false
+        }
+      },
+      "bodyText": "{\"signableTransaction\":{\"tx\":[1,1,1,1,234,170,137,251,194,197,213,110,91,107,237,213,139,221,188,248,198,95,160,33,187,243,161,86,201,14,75,153,205,171,175,46,2,0,190,239,1,254,0,53,12,0,1,1,0,2,182,10,153,93,247,33,9,25,30,73,131,150,246,127,24,16,177,31,160,229,224,144,137,186,12,159,178,73,253,243,24,220,2,1,0,1,0,0,0,1,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,68,0,0,0,0,1,81,255,255,255,255,1,232,3,0,0,0,0,0,0,1,81,0,0,0,0,0,1,0,0,0,1,182,10,153,93,247,33,9,25,30,73,131,150,246,127,24,16,177,31,160,229,224,144,137,186,12,159,178,73,253,243,24,220,0,0,0,0,0,255,255,255,255,1,132,3,0,0,0,0,0,0,1,81,0,0,0,0],\"reference\":\"AR==\"},\"pad\":1e400}",
+      "reference": {
+        "accepted": true,
+        "value": "AR=="
+      }
+    },
+    {
+      "name": "c11_negative_zero_byte_raw_path",
+      "call": "encrypt",
+      "args": {
+        "protocolID": [
+          1,
+          "fixture keys"
+        ],
+        "keyID": "fixture",
+        "plaintext": [
+          1,
+          2,
+          3
+        ],
+        "counterparty": "self"
+      },
+      "bodyText": "{\"ciphertext\":[-0,1.0],\"pad\":1e400}",
+      "reference": {
+        "accepted": true,
+        "value": [
+          0,
+          1
+        ]
+      }
+    }
+  ]
+}

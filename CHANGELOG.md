@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: src/wallet/substrates/result_values/raw_tree.rs's survivors of the complete run killed from the reference's recordings (#603)
+
+- The complete run of 2026-11-04 (at `2ff81a44`; the file unchanged since) measured `raw_tree.rs` at 57.01%
+  (61 caught, 41 missed, 5 timeouts): the budget cases of #432 stop at the 1,000,000-node visit bound, never the
+  1,000,002-property one, and the raw normalization (`normalized`, reached only when the typed and the `Value`
+  readings both fail) has its one test in `wallet_http_json_linear_432`, a cost check the night leaves out.
+  `tests/wallet_http_json_raw_tree_603.rs` (wiremock) holds ten tests on eleven cases recorded from
+  `ts-stack@edf6e03`'s `HTTPWalletJSON` under Node 22 (`tests/support/http_json_raw_tree_603.mjs` writing
+  `tests/vectors/http_json_raw_tree_603.json`; the large bodies as `array` and `index_object` recipes): a dense
+  byte array of 1,000,001 entries counted as bytes; 300 not a byte; a non-byte array one property past
+  1,000,002 refused and at it read; an index-keyed object outside the seventeen byte names counting its keys;
+  an escaped quote; the historical byte object, nested arrays, a trailing-bits signable reference (`AR==`) and a
+  `-0` byte on the raw path; an unsafe key under the byte name `data`. Each case runs on its own thread under a
+  20 s answer bound, so a cursor mutant that spins fails the case and does not hold the binary open (`397:24`
+  `-=`: 20 s, 325 MB resident). Two crate-contract pins, counted apart, in
+  `src/wallet/substrates/result_values/raw_tree_tests.rs`: the copied-byte budget judged on the sum (R03's
+  256 MiB, unreachable by HTTP under the 256 MiB body cap) and only the reference token replaced
+  (`raw_tree.rs:294-295`). By source: 35 kills on the reference's recordings (a), 4 on the two pins (c); 39 of
+  the 46 survivors killed, each RED on its mutant in a scratch copy (`docs/lanes/kill-raw-tree.md`).
+- Not killed: `328:48` (`&&` to `||` in `enqueue`) is an equivalence candidate: it writes a non-historical
+  index-keyed byte object as an array, and no member a wallet answer is read into tells the two apart (the
+  maps are `String` to `String`, no nested result struct reads a positional sequence of numbers, every raw byte
+  member carries one of the seventeen names, and a root of index keys is refused by its call's validator before
+  `normalized`). Seven mutants spin or allocate without bound: `140:5` (`token_end` to 1), `143:17` `*=`,
+  `146:30` `-=`, `152:17` `*=` and `181:28` `-=` and `*=` timed out again run alone (the hangs); `168:28` `*=`
+  (a frame pushed per turn) timed out once in its shard on this host where the complete run caught it, and
+  `397:24` `*=` was not run here (both left to the nightly's #781 re-run).
+- Re-measured with the nightly's substrates selection (`--lib` and the targets naming `wallet`, 151 at the base and 152 at the tip, less the cost checks
+  and the binaries run apart), `--jobs 1`, `--timeout 390`: base 59 caught, 40 missed, 3 unviable of the 102 run;
+  tip 98 caught, 1 missed, 1 timeout, 3 unviable of 103, the six hangs timed out alone. The score: 98 of 99
+  (99.0%) under #781 with `168:28` re-timed out, 98.0% counting it now, 91.6% with every timeout counted in (the
+  record's way; the floor stays the complete run's).
+
 ### Changed: the BEEF writers, merge_beef and merge_raw_tx return Result and refuse what they cannot write faithfully (#817)
 
 **Migration:** `beef.to_binary()`, `beef.to_hex()`, `beef.to_writer(w)`,
