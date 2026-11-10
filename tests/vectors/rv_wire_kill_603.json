@@ -1,0 +1,60 @@
+{
+  "source": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "rows": [
+    {
+      "name": "total_at_cap",
+      "call": "revealCounterpartyKeyLinkage",
+      "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "revelation_time": "2026-11-09T00:00:00.000Z",
+      "encrypted_linkage_length": 268435455,
+      "encrypted_linkage_proof_length": 1,
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "total_past_cap",
+      "call": "revealCounterpartyKeyLinkage",
+      "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "revelation_time": "2026-11-09T00:00:00.000Z",
+      "encrypted_linkage_length": 268435456,
+      "encrypted_linkage_proof_length": 1,
+      "reference": {
+        "accepted": false,
+        "message": "Invalid revealCounterpartyKeyLinkage result byte arrays: expected at most 268435456 total bytes"
+      }
+    },
+    {
+      "name": "small_control",
+      "call": "revealCounterpartyKeyLinkage",
+      "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+      "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "revelation_time": "2026-11-09T00:00:00.000Z",
+      "encrypted_linkage_length": 1,
+      "encrypted_linkage_proof_length": 1,
+      "reference": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "list_outputs_matching_script",
+      "call": "listOutputs",
+      "args": {
+        "basket": "default",
+        "include": "entire transactions"
+      },
+      "request_hex": "061066697874757265732e696e76616c69640764656661756c7400ff02ffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "00016f0200beef01fe00350c0001010002b60a995df72109191e498396f67f1810b11fa0e5e09089ba0c9fb249fdf318dc01010001000000014444444444444444444444444444444444444444444444444444444444444444000000000151ffffffff01e803000000000000015100000000dc18f3fd49b29f0cba8990e0e5a01fb110187ff69683491e190921f75d990ab600fde8030151ffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reference": {
+        "accepted": true,
+        "locking_script": "51"
+      }
+    }
+  ]
+}

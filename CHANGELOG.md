@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: `result_values/wire.rs`'s four survivors of the complete run killed (#603)
+
+The complete mutation run of 2026-11-04 scored
+`src/wallet/substrates/result_values/wire.rs` 13 caught, 4 missed, 1 unviable
+(76.47%, floor 76; `docs/census/mutants-2026-11-04.md:110`, `:510-515`). The
+four, each against the reference's verdict recorded by
+`tests/support/rv_wire_kill_603.mjs` (`ts-stack@edf6e03` under Node v22.18.0,
+`tests/vectors/rv_wire_kill_603.json`):
+
+- `43:65` `>` to `==` and to `>=`, and `207:9` (the linkage's two byte fields
+  deleted from `Fields.binary`): the typed byte slices' total is refused past
+  `MAX_BYTES` alone, as `validateWalletResult` refuses past
+  `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletResultValidation.ts:632-637`, a strict
+  `>`): a revealCounterpartyKeyLinkage result of 268,435,455 and 1 bytes is
+  accepted on both sides, 268,435,456 and 1 refused in the same words
+  (`Invalid revealCounterpartyKeyLinkage result byte arrays: expected at most
+  268435456 total bytes`). Killed by
+  `a_linkage_whose_byte_fields_total_the_cap_is_accepted_603` (`>=`) and
+  `a_linkage_whose_byte_fields_total_past_the_cap_is_refused_603` (`==`,
+  `207:9`) in `src/wallet/substrates/result_values/wire_total_603_tests.rs`.
+  Through `WalletWireTransceiver` no answer reaches the check with a total
+  past the cap, since `transceiver.rs` refuses a response over `MAX_BYTES`
+  before decoding (`boundary.rs`, the reference's
+  `WalletWireTransceiver.ts:108-132`) and a frame carries more than its byte
+  fields' sum (read, not run); `WalletWireProcessor` reaches it, since it
+  validates a wallet's linkage result before encoding it
+  (`processor.rs:447`, `validation.rs:308-313`), as the reference's processor
+  does (`#invokeValidatedWallet`, `WalletWireProcessor.ts:2421-2431`, at
+  `:1752-1756`): a wallet answering 268,435,456 and 1 bytes is refused there
+  in these words, so the three are reachable at a public door (the cold
+  read's probe through `process_message`, RED on each of the three, not
+  committed). The tests call the crate-internal
+  `WireResult::check`, the Rust form of the reference's exported
+  `validateWalletResult` (`WalletResultValidation.ts:2179`, exported by
+  `wallet/index.ts:20`); the zeroed 256 MiB slices are never read (the test
+  binary's peak resident size 14 MB).
+- `193:13` (listOutputs' typed outputs deleted from `Fields`): a present script
+  the BEEF commits at the outpoint is compared by its bytes and accepted, as
+  the reference's transceiver accepts it (`WalletResultValidation.ts:2109-2130`
+  through `WalletWireTransceiver.ts:650-665`); under the mutant the metadata's
+  `""` is compared and the answer refused `the script committed by BEEF`. The
+  #487 recording had no accepted row with a present matching script. Killed by
+  `a_listed_output_whose_script_matches_its_beef_is_accepted_603`
+  (`tests/wallet_wire_result_kill_603.rs`), #487's `listOutputs_valid` frame
+  written by #487's writer with the script `51` (the nine-byte absent sentinel
+  becoming `0151`), the request bytes the reference transceiver's.
+
+Each RED on its mutant in a scratch copy, GREEN on the tree. Re-measured with
+the oracle's selection (`nightly_mutants.mutation_args('substrates', ...)`,
+152 binaries, `--jobs 1`, nine shards): 17 caught, 0 missed, 0 timeout,
+1 unviable (`154:9`, `Default::default()` of a type with none), 17 of 17
+viable (100.00%). No equivalent found. `wire.rs` and `docs/ratchets.json` are
+unchanged; no public API, wire byte or behaviour changes.
+
 ### Tests: src/wallet/substrates/result_values/beef.rs's survivors of the complete run killed from the reference's recorded verdicts (#603)
 
 - The complete run of 2026-11-04 (`docs/census/mutants-2026-11-04.json`, `2ff81a44`)
