@@ -310,12 +310,19 @@ impl Spend {
 }
 ```
 
-Two ways to run it. Without a word: strict for version ≤ 1 (MINIMALDATA, LOW_S,
-CLEANSTACK, NULLDUMMY), relaxed for version ≥ 2 read unsigned (0x80000000 and
-above relaxed, as the reference's `readUInt32LE` number; under a word the node's
-`int32_t`, strict there, #418), push-only unlocking scripts at
-every version, no NULLFAIL (ts-sdk `isRelaxed()`). With a word: `ScriptFlags::block(era)`
-is what a mining node applies, `ScriptFlags::standard(era)` what a relaying node with
+Two ways to run it. Without a word: strict for a version of 1 or below
+(MINIMALDATA, LOW_S, CLEANSTACK, NULLDUMMY and push-only unlocking scripts),
+relaxed above 1, no NULLFAIL, as ts-sdk's default (`isRelaxed()`;
+`#shouldEnforceSigPushOnly()` is `!#isRelaxed()`, `Spend.ts:319-321,365-369` at
+`ts-stack@edf6e03`), the version read unsigned as the reference's `readUInt32LE`
+number, so 0x80000000 and above are relaxed (#418). The push-only rule held at
+every version until #816 (the owner's word of 2026-11-09 23:5xZ);
+`set_require_push_only(true)` gives that older refusal, pinned by
+`tests/script_push_only_default_816.rs`. Under a word the version is the node's
+`int32_t` (#418): the node under Chronicle relaxes the same rules from 2 to
+0x7FFFFFFF alone and keeps them at 2^31 and above, where the default mode is
+relaxed (`interpreter.cpp:34-44,2321-2334` at v1.2.2). With a word:
+`ScriptFlags::block(era)` is what a mining node applies, `ScriptFlags::standard(era)` what a relaying node with
 default policy applies; NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS and
 COMPRESSED_PUBKEYTYPE exist only under a word. A consensus oracle selects the block
 word. The gates, their sites in bitcoin-sv v1.2.2 and what is not modeled are the
@@ -556,7 +563,7 @@ direct call (no trait object, no table of function pointers, no clone added).
 | `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the public key encoding (length and prefix alone, as the node's `IsCompressedOrUncompressedPubKey`, and COMPRESSED_PUBKEYTYPE; the point the signature check's, #660), the scriptCode (`script_code.rs` since #654, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
 | `script_code.rs` | The scriptCode of a signature check from the bytes as the node builds it (#654; `interpreter.cpp:1470-1484`, `1566-1579`): `script_code` (the executing script's bytes from the last executed codeseparator, the chunk index's byte offset, to its end; inside the unlocking script the locking script's bytes under a word carrying `CHRONICLE` and in the default mode at every version; each non-FORKID signature's push deleted), `find_and_delete` (`CScript::FindAndDelete`, `script.h:201-224`, byte for byte: `GetOp2`'s walk, consecutive copies, the bytes after a failed read kept; both loops bounded by the script's length, which no walk that advances reaches, so a walker that does not advance ends instead of hanging, #681), `push_of` (`CScript() << vchSig`); called by `OP_CHECKSIG` and `OP_CHECKMULTISIG` in `crypto.rs`, never through `Script::to_binary`'s chunk serializer, which stops at a data-carrying `OP_RETURN` (the reference's writer, kept). Unit tests `script_code_tests.rs` (the node's `FindAndDelete` unit cases as the sibling's Lean states them; since #681 the writer's headers at 0, 75, 76, 255, 256, 65535 and 65536 bytes against `script.h:102-130`, the walk over each push form with the pattern in its data, a PUSHDATA2 of `0x0100` read as 256, a cut push at the last byte kept, and the walk's bound) |
 | `signature_encoding.rs` | Signature encoding (DER, LOW_S at the order, hash type delegated to `hash_type.rs`, FORKID); at version 1 without a word, hash type before low-S and the reference catch's `The signature format is invalid.` for either refusal (#417); under a word low-S before hash type with distinct node messages. Without a word, no fork-ID gate at either version: a signature lacking the bit uses the original digest and its verification result (#429); under a word the mandatory bit and refusal text are unchanged. DER-off requires an explicit word in TypeScript; this crate refuses that word for lacking SIGHASH_FORKID. Its unit test pins the order before wrapping |
-| `hash_type.rs` | `relaxed_by_default`, the default mode's version reading (`version as u32 > 1`, `Spend.ts:319-321`, #418), called at `Spend::new`'s four rules and coin era, the hash-type gate and `signature_encoding.rs`'s version-1 wrapper (version 0 strict, an undefined hash type above 2^31 in #23's version-2 words, and the word's push-only gate on the `int32_t` pinned by #418's fold); STRICTENC's defined base type and the Chronicle hash-type gate: version > 1 (unsigned) without a word, refused in the reference's visible words (the DER wrapper's `The signature format is invalid.`, `Spend.ts:622-625`, over the gate's at `:586-591`), `CHRONICLE` under a word (#22, #397); the version-1 default caller wraps undefined-type errors too (#417), while version-2 words stay as pinned by #23 |
+| `hash_type.rs` | `relaxed_by_default`, the default mode's version reading (`version as u32 > 1`, `Spend.ts:319-321`, #418), called at `Spend::new`'s five rules (push-only with them, #816) and coin era, the hash-type gate and `signature_encoding.rs`'s version-1 wrapper (version 0 strict, an undefined hash type above 2^31 in #23's version-2 words, and the word's push-only gate on the `int32_t` pinned by #418's fold); STRICTENC's defined base type and the Chronicle hash-type gate: version > 1 (unsigned) without a word, refused in the reference's visible words (the DER wrapper's `The signature format is invalid.`, `Spend.ts:622-625`, over the gate's at `:586-591`), `CHRONICLE` under a word (#22, #397); the version-1 default caller wraps undefined-type errors too (#417), while version-2 words stay as pinned by #23 |
 | `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
 | `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `stack_memory_consensus` (the block path's, #38), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
 | `reference_read.rs` | The default mode's read limit, the reference's (#331, the keeper's word of 2026-10-27): `refusal` (`Invalid string length` for a magnitude past 536,870,888 bits, V8's longest string, `toString(2)` at `BigNumber.ts:450`), `result_refusal` (the same figure on a result's bits: `push_arithmetic_result`'s sum or difference), `shift_refusal` (the numeric left shift's: `Maximum BigInt size exceeded` past 2^30 bits, V8's `BigInt` cap, thrown by the reference's `value << bits` before its string, else `result_refusal`), `magnitude_bits` (the magnitude's bits from the bytes, padding none); `num.rs`'s `check_reference_read` applies it at every read in the default mode, after the minimal-encoding check |
@@ -577,7 +584,7 @@ const WORD_MEMORY_LIMIT: usize = DEFAULT_STACK_MEMORY_USAGE_POLICY;  // 100MB, u
 const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
 // mod.rs
 const REQUIRE_MINIMAL_PUSH: bool = true;        // the default mode, version <= 1 only
-const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;  // the default mode, every version
+const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;  // the default mode, version <= 1 only (read unsigned), as ts-sdk's default (#816)
 const REQUIRE_LOW_S_SIGNATURES: bool = true;     // the default mode, version <= 1 only
 const REQUIRE_CLEAN_STACK: bool = true;          // the default mode, version <= 1 only
 // NULLDUMMY: the default mode, version <= 1 only. NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS,

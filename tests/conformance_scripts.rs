@@ -17,8 +17,8 @@
 //! this census runs bsv-rs's `Spend` interpreter in the ts-sdk *default*
 //! evaluation mode (no flag word passed). That mode enforces, for transaction
 //! version <= 1, MINIMALDATA (minimal pushes + minimally-encoded numbers),
-//! LOW_S, NULLDUMMY and CLEANSTACK, and at every version SIGPUSHONLY
-//! (push-only unlocking scripts) and strict DER/pubkey encodings. A signature
+//! LOW_S, NULLDUMMY, CLEANSTACK and SIGPUSHONLY (push-only unlocking scripts,
+//! #816), and at every version strict DER/pubkey encodings. A signature
 //! without SIGHASH_FORKID uses the original digest (#429); it has no NULLFAIL, MINIMALIF or
 //! DISCOURAGE_UPGRADABLE_NOPS rule; and it runs the post-genesis BSV opcode
 //! set (OP_MUL/OP_CAT/OP_LSHIFT... enabled; a second OP_ELSE, an undefined
@@ -362,7 +362,8 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
             );
         }
         if msg.contains("can only contain push operations") && !has("SIGPUSHONLY") {
-            return Some("bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)");
+            // version <= 1 alone since #816 (`Spend.ts:365-369`)
+            return Some("the default mode enforces SIGPUSHONLY at version <= 1 (a word would express the fixture)");
         }
         // a non-minimal number in the reference's words since bsv-rs#397
         if (msg.contains("not minimally-encoded")

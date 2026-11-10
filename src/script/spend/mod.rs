@@ -11,9 +11,9 @@
 //! Without a flag word, [`Spend`] runs the TypeScript SDK's default evaluation
 //! mode: strict for a transaction of version 1 or lower (minimal pushes and
 //! numbers, low-S, a clean stack, an empty CHECKMULTISIG dummy), relaxed for
-//! version 2 and above, push-only unlocking scripts at every version, no
-//! NULLFAIL rule, and `0xb3`-`0xb7` run as the Chronicle opcodes at every
-//! version (bsv-rs#397). That mode is neither of the words a node validates under.
+//! version 2 and above, push-only unlocking scripts at version 1 or below
+//! alone, as the reference's default (#816), no NULLFAIL, the Chronicle
+//! opcodes at every version (#397); no word a node uses.
 //!
 //! With [`Spend::set_flags`], every rule is derived from a [`ScriptFlags`] word
 //! and the transaction version exactly as bitcoin-sv v1.2.2 derives it at each
@@ -130,7 +130,7 @@ use push::is_chunk_minimal_push;
 /// Require minimal push encoding
 const REQUIRE_MINIMAL_PUSH: bool = true;
 
-/// Require push-only unlocking scripts
+/// Require push-only unlocking scripts (version <= 1 without a word, #816)
 const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;
 
 /// Require low-S signatures
@@ -403,9 +403,9 @@ impl Spend {
             stack_mem: 0,
             alt_stack_mem: 0,
             node_mem: 0,
-            require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING,
-            // ts-sdk isRelaxed(): version > 1 (u32, #418) drops MINIMALDATA, LOW_S,
-            // CLEANSTACK, NULLDUMMY; a word: the node's i32 (interpreter.cpp:40-44).
+            // ts-sdk isRelaxed(): version > 1 (u32; #418, #816) relaxes these; a word: node's i32.
+            require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING
+                && !relaxed_by_default(transaction_version),
             require_minimal: REQUIRE_MINIMAL_PUSH && !relaxed_by_default(transaction_version),
             require_low_s: REQUIRE_LOW_S_SIGNATURES && !relaxed_by_default(transaction_version),
             require_clean_stack: REQUIRE_CLEAN_STACK && !relaxed_by_default(transaction_version),
