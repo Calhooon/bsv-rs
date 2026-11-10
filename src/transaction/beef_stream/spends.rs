@@ -4,9 +4,8 @@
 use std::sync::Arc;
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::script::{
-    LockingScript, NotJudgedCause, ScriptEvaluationError, Spend, TxSpendParams, UnlockingScript,
-};
+use crate::script::NotJudgedCause;
+use crate::transaction::spending::{judge_input, InputRefusal, InputRules, InputVerified};
 
 use super::budget::WorkSpent;
 use super::deferred::HeldInput;
@@ -154,7 +153,6 @@ impl<T: TxFields> InputCheck<'_, T> {
     ) -> Result<(), Stop> {
         let input = self.body.input(vin);
         let refuse = |why| self.refuse(input.at, Some(vin as u32), why);
-        let script_error = |e: String| refuse(SpendRefusal::Script(e));
         let source_height = index
             .proven
             .get(&input.prev)
@@ -169,55 +167,49 @@ impl<T: TxFields> InputCheck<'_, T> {
                     cause,
                 })
             })?;
-        let locking_script =
-            LockingScript::from_binary(&source.script).map_err(|e| script_error(e.to_string()))?;
-        let unlocking_script = UnlockingScript::from_binary(self.body.unlocking(vin))
-            .map_err(|e| script_error(e.to_string()))?;
-        let mut spend = Spend::with_transaction(TxSpendParams {
-            transaction: shared,
-            input_index: vin,
-            source_satoshis: source.satoshis,
-            locking_script,
-            unlocking_script,
-            memory_limit: self.evaluation.memory,
-            work_limit: self.evaluation.work.input_limit(),
-        })
-        .map_err(|e| script_error(e.to_string()))?;
-        if let Some(flags) = flags {
-            spend.set_flags(flags);
-        }
-        let result = spend.validate();
+        let rules = InputRules::for_verifier(
+            flags,
+            self.evaluation.memory,
+            self.evaluation.work.input_limit(),
+        );
+        let judged = judge_input(
+            &shared,
+            vin,
+            &source.script,
+            self.body.unlocking(vin),
+            source.satoshis,
+            &rules,
+        );
         let charged = self
             .evaluation
             .work
-            .charge(&mut work.total, vin as u32, spend.work_spent());
-        self.execution_result(vin, result, charged)
+            .charge(&mut work.total, vin as u32, judged.work_spent);
+        self.execution_result(vin, judged.result, charged)
     }
 
     fn execution_result(
         &self,
         vin: usize,
-        result: Result<bool, ScriptEvaluationError>,
+        result: Result<InputVerified, InputRefusal>,
         charged: Result<(), NotJudgedCause>,
     ) -> Result<(), Stop> {
         let input = vin as u32;
         let refuse = |why| self.refuse(self.body.input(vin).at, Some(input), why);
-        match result {
-            Ok(true) => charged.map_err(|cause| refuse(SpendRefusal::NotJudged { input, cause })),
-            Ok(false) => Err(refuse(SpendRefusal::Script(
-                "the script did not succeed".to_string(),
-            ))),
-            Err(e) => {
-                let cause = e.resource_limit.and_then(|limit| {
-                    super::super::verify_refusal::work_budget_cause(input, limit)
-                });
-                Err(match (cause, e.resource_limit) {
-                    (Some(cause), _) => refuse(SpendRefusal::NotJudged { input, cause }),
-                    (_, Some(limit)) => refuse(SpendRefusal::Resource(limit)),
-                    (_, None) => refuse(SpendRefusal::Script(e.message)),
-                })
+        let e = match result.map_err(InputRefusal::before_evaluation) {
+            Ok(_) => {
+                return charged.map_err(|cause| refuse(SpendRefusal::NotJudged { input, cause }))
             }
-        }
+            Err(Err(error)) => return Err(refuse(SpendRefusal::Script(error.to_string()))),
+            Err(Ok(e)) => e,
+        };
+        let cause = e
+            .resource_limit
+            .and_then(|limit| super::super::verify_refusal::work_budget_cause(input, limit));
+        Err(match (cause, e.resource_limit) {
+            (Some(cause), _) => refuse(SpendRefusal::NotJudged { input, cause }),
+            (_, Some(limit)) => refuse(SpendRefusal::Resource(limit)),
+            (_, None) => refuse(SpendRefusal::Script(e.message)),
+        })
     }
 }
 

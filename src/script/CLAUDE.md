@@ -310,6 +310,14 @@ impl Spend {
 }
 ```
 
+Outside this module a `Spend` is built for an input in one place alone,
+`src/transaction/spending.rs`'s `judge_input` (#855): the one-input door
+(`transaction::SpendingTransaction`, `transaction::verify_input`),
+`Transaction::verify` and the streaming reader call it, and
+`tests/arch_one_input_core.rs` refuses a third site. `Spend`, `SpendParams`,
+`TxSpendParams` and `with_transaction` keep their shape; a caller judging an
+input of a transaction it holds as bytes uses the door.
+
 Two ways to run it. Without a word: strict for a version of 1 or below
 (MINIMALDATA, LOW_S, CLEANSTACK, NULLDUMMY and push-only unlocking scripts),
 relaxed above 1, no NULLFAIL, as ts-sdk's default (`isRelaxed()`;

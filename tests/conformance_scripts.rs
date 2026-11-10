@@ -44,6 +44,8 @@ use conformance_script_allowlist::{classify_chronicle_hash_type, EVALUATION_UNSU
 #[path = "support/conformance_signature_words_417.rs"]
 mod conformance_signature_words_417;
 use conformance_signature_words_417::classify_signature_words_417;
+#[path = "support/conformance_door_855.rs"]
+mod conformance_door_855;
 #[path = "support/conformance_forkid_gate_429.rs"]
 mod conformance_forkid_gate_429;
 
@@ -551,6 +553,36 @@ fn conformance_scripts_evaluation() {
     }
 
     finish_evaluation(summary);
+}
+
+/// The door as a second runner over the same vectors (#855): every
+/// `node-script` vector and every `node-transaction` input with its prevout
+/// judged through `transaction::verify_input` on the spending transaction's
+/// bytes answers what the `Spend` runner answers, valid or refused in the
+/// same words. Its counts are its own; `conformance_scripts_evaluation`'s
+/// pinned totals are untouched.
+#[test]
+fn conformance_scripts_through_the_door_855() {
+    let Some(dir) = corpus_dir() else { return };
+    let file = load_json(&dir.join("vectors/sdk/scripts/evaluation.json"));
+    let vectors = file["vectors"].as_array().expect("vectors array");
+    let prev_hook = silence_panics();
+    let census = conformance_door_855::door_census(vectors);
+    std::panic::set_hook(prev_hook);
+    eprintln!(
+        "through the door: {} node-script vectors, {} node-transaction inputs, {} not expressed ({:?})",
+        census.scripts,
+        census.inputs,
+        census.not_expressed.len(),
+        census.not_expressed
+    );
+    assert!(census.scripts > 0 && census.inputs > 0);
+    assert!(
+        census.differences.is_empty(),
+        "{} differ:\n{}",
+        census.differences.len(),
+        census.differences.join("\n")
+    );
 }
 
 /// Applies mismatch classification for node-script; returns a debug line on

@@ -39,9 +39,10 @@ use bsv_rs::messages;
 use bsv_rs::primitives::bsv::shamir::split_private_key_with;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
 use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, PrivateKey};
+use bsv_rs::script::{ProtocolEra, ScriptFlags, UnlockingScript};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_structure, Beef, Headers, Kind, MerklePath, MerklePathLeaf,
-    Verdict,
+    Transaction, TransactionInput, Verdict,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -700,12 +701,17 @@ fn main() {
         return;
     }
     let args: Vec<String> = std::env::args().collect();
+    let base = Path::new(ROOT).join("fuzz/corpus");
+    if args.iter().any(|a| a == "--door-only") {
+        // `fuzz_verify_input`'s seeds alone (#855).
+        door_corpus(&base);
+        return;
+    }
     let rest = args
         .iter()
         .position(|a| a == "--rest")
         .and_then(|i| args.get(i + 1))
         .map(PathBuf::from);
-    let base = Path::new(ROOT).join("fuzz/corpus");
     beef_corpora(&base);
     wallet_corpora(&base);
     key_corpora(&base);
@@ -714,6 +720,7 @@ fn main() {
     parser_corpora(&base);
     reader_corpora(&base);
     signature_corpus(&base);
+    door_corpus(&base);
 }
 
 /// The DER reader's seeds (#842): every DER of `signature_der_842.json` (the
@@ -959,4 +966,78 @@ fn reader_corpora(base: &Path) {
     }
     shamir.add("zero-point", b"1.1.2.abcd\n2.3J.2.abcd");
     shamir.report("fuzz_shamir_backup");
+}
+
+/// One input of `fuzz_verify_input` (#855): the mode, the flag bits, the
+/// index, the amount, the locking script's length, the locking script and the
+/// spending transaction (the target's layout).
+fn door_input(mode: u8, bits: u32, index: u8, lock: &[u8], tx: &[u8]) -> Vec<u8> {
+    let mut out = vec![mode];
+    out.extend(bits.to_le_bytes());
+    out.push(index);
+    out.extend(1u64.to_le_bytes());
+    out.extend((lock.len() as u16).to_le_bytes());
+    out.extend(lock);
+    out.extend(tx);
+    out
+}
+
+/// The door's seeds (#855): `spend_valid.json`'s pairs, each spent by a
+/// one-input transaction at versions 1 and 2 in the default mode and at
+/// version 2 under the post-Chronicle block word; then the refusals before
+/// evaluation on the first pair (an index past the inputs, a byte after the
+/// transaction, the transaction cut, an unknown flag bit, a word without
+/// GENESIS).
+fn door_corpus(base: &Path) {
+    let mut door = Corpus::new(base, "fuzz_verify_input");
+    let vectors: Vec<Value> =
+        serde_json::from_str(&read("tests/vectors/spend_valid.json")).unwrap();
+    let block = ScriptFlags::block(ProtocolEra::PostChronicle).bits();
+    let spend = |unlock: &[u8], version: u32| {
+        let mut input = TransactionInput::new("00".repeat(32), 0);
+        input.set_unlocking_script(UnlockingScript::from_binary(unlock).unwrap());
+        Transaction::with_params(version, vec![input], vec![], 0).to_binary()
+    };
+    for (i, vector) in vectors.iter().enumerate() {
+        let (Ok(unlock), Ok(lock)) = (
+            from_hex(vector["scriptSig"].as_str().unwrap()),
+            from_hex(vector["scriptPubKey"].as_str().unwrap()),
+        ) else {
+            continue;
+        };
+        door.add(
+            &format!("spend-{i}-v1"),
+            &door_input(0, 0, 0, &lock, &spend(&unlock, 1)),
+        );
+        door.add(
+            &format!("spend-{i}-v2"),
+            &door_input(0, 0, 0, &lock, &spend(&unlock, 2)),
+        );
+        door.add(
+            &format!("spend-{i}-v2-block"),
+            &door_input(1, block, 0, &lock, &spend(&unlock, 2)),
+        );
+    }
+    let tx = spend(&[0x51], 2);
+    door.add("refused-index-past", &door_input(0, 0, 1, &[0x61], &tx));
+    door.add(
+        "refused-trailing-byte",
+        &door_input(0, 0, 0, &[0x61], &[&tx[..], &[0]].concat()),
+    );
+    door.add(
+        "refused-truncated",
+        &door_input(0, 0, 0, &[0x61], &tx[..tx.len() - 1]),
+    );
+    door.add(
+        "refused-unknown-bit",
+        &door_input(1, 1 << 31, 0, &[0x61], &tx),
+    );
+    let no_genesis = ScriptFlags::block(ProtocolEra::PostChronicle)
+        .without(ScriptFlags::GENESIS)
+        .bits();
+    door.add(
+        "refused-no-genesis",
+        &door_input(1, no_genesis, 0, &[0x61], &tx),
+    );
+    door.report("fuzz_verify_input");
 }
