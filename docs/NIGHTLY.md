@@ -410,8 +410,12 @@ not the copy's (cargo-mutants also copies the `ts-stack/` directory, about
 checkout, so a mutation run without the variable reads the narrow figure even
 with ts-stack checked out beside bsv-rs.
 
-The sibling script harness remains the other oracle; production edits under
-`src/script/` or `src/transaction/` still require its before/after seed run.
+The sibling script harness remains the other oracle; since #97 (S1) it runs on
+every pull request into beta and every push to beta, with no reach filter (about
+1m7s on GitHub; `tests/sibling/CLAUDE.md`, "When it runs: always") (`ci.yml`'s `sibling` job, one command:
+`.github/scripts/sibling_harness.py run`, manual `tests/sibling/CLAUDE.md`), all
+nine corpora against the committed column, in place of the hand before/after
+seed run.
 
 ### The narrow figure and the widened one (#602)
 

@@ -104,3 +104,17 @@ The node machine is the sibling's Lean definition judged by its harness: `harnes
 - The signer column (`run_signer`): it needs a regtest node; #92's design.
 - The harness's `bsv-rs` pin and rules: the sibling's lanes, through the keeper.
 - A release, a consumer's pin, the protection PATCH: the captain's and the owner's.
+
+## As built (S1 and S2 in one PR, #853, 2026-11-10)
+
+Departures from the plan above, each stated where it was made (`docs/lanes/fix-97-s1.md`, the CHANGELOG entry, `ci.yml`'s `sibling` comment):
+
+- The pin is `Calhooon/bsv-script-lean@1c051eae`, the public edition (an export of `da684279`, a descendant of `5dc337e1`), not `5dc337e1`: the private repository is archived and unread by the job. No token; nothing vendored. The public edition withholds 150 `gen` entries; the command drops them from its staged copy and the column counts them.
+- `--corpus all` on every pull request (S5's width decided by the measured wall), not seed alone.
+- Q97.5 was ruled as a split, not (a) or (b): the node's verdicts with no waiver; this crate's words against `tests/sibling/column.json`, re-recorded in the commit that changes them. S6 is not built.
+- `sibling` is in `REQUIRED_ON_BETA` alone (fixes are born on beta), not in `REQUIRED_ON_MAIN`.
+- No reach filter (#853's fold, the captain's ruling of 2026-11-10): the job builds and judges on every pull request into beta, push to beta, dispatch and tag call, about 1m7s on GitHub. The plan step's `grep -E` the PR opened with missed `src/lib.rs`, `build.rs` and a rename out of a listed path, and no path list sees a dependency's release (no `Cargo.lock` is tracked); `tests/arch_ci_pr_runs_the_required_set.rs` refuses a condition on the job's steps.
+- Explained rows are refused (#853's fold): `--record` records no run carrying a rules row or an abort witness and at a fixed pin moves words only; compare is RED on any rules row of the run; a column carrying one is exit 2.
+- The judging step cannot absorb its own failure (#853's second fold): it is pinned byte for byte in `tests/arch_ci_pr_runs_the_required_set.rs` (`SIBLING_STEP`, no `continue-on-error`, no `defaults:`), a run must carry every corpus the column does, and `--record` at a fixed pin refuses any entry whose verdict moved (two offsetting flips keep every total). Since #853's third fold the pin is the whole job (`SIBLING_JOB`, its key line to its last) and what it inherits (`SIBLING_INHERITS`: the workflow's `permissions:`, `concurrency:` and `env:`; `WORKFLOW_KEYS`, no `defaults:`), and the context `sibling` is the job's alone: a step inserted before the judging one, a job- or workflow-level `env:` key (`BASH_ENV`, `PATH`, `PYTHONPATH`, `RUNNER_TEMP`), a job `container:`, another checkout action or `ref:`, which the second fold's pin of one step passed (its scoped cold re-read), are each refused. The pin travels in the pull request's own tree beside the job it holds; holding it against a pull request is the next stage (the judge read from beta, reported by its own App).
+- `tests/arch_sibling_pin.rs` (one pin across `ci.yml`, `bench.yml` and the column) is not built: `bench.yml` still reads the seed at `8840488c`; the column's pin is checked against the checkout at run time only (`sibling_harness.py` `compare`, exit 2).
+- S3's witness transaction on the pull request and S4's scoreboard input are not built: a divergence is named by id from `run_diff`'s log.
