@@ -158,6 +158,24 @@ be raised but never lowered or removed. [RATCHETS.md](RATCHETS.md).
 the defaults, `--locked` against one audit lockfile: RustSec findings and
 yanked crates fail, the ignore list stays empty, licenses are allowlisted,
 sources are crates.io only. [RELEASING.md](../RELEASING.md) step 2.
+Duplicate versions warn and are never skipped (`deny.toml`, `[bans]`
+`multiple-versions = "warn"`, no `skip` or `skip-tree`); #104 tracks them.
+Measured 2026-11-09 at `c96f3c7e` (0.9.0-beta.7, a fresh lockfile, cargo-deny
+0.20.2; all three graphs pass with eleven duplicate warnings in all, three in
+the wasm32 slice, five in the defaults; the census in
+[lanes/fix-104.md](lanes/fix-104.md)):
+
+| family | versions | graphs | older side's parents | verdict | what would end it |
+|---|---|---|---|---|---|
+| base64 | 0.22.1, 0.23.1 | all | bsv-rs, reqwest 0.12.28, wiremock 0.6.2 (dev, pinned `=0.6.2`, `Cargo.toml:149`) against hyper-util 0.1.21 | ecosystem | a wiremock release on base64 0.23 (0.6.5, the newest, is on 0.22) and the dev pin lifted to it, then bsv-rs and reqwest 0.13 with it |
+| core-foundation | 0.9.4, 0.10.1 | all | system-configuration 0.7.0 (hyper-util's macOS proxy lookup) against security-framework 3.7.0 | ecosystem | a hyper-util release on system-configuration 0.8 (0.1.21, the newest, asks `^0.7`) |
+| getrandom | 0.2.17, 0.4.3 | all | bsv-rs, rand_core 0.6.4 against tempfile 3.27.0 (native-tls, native only) | owner | rand 0.8 to 0.10 and the `wasm` feature's `getrandom/js` to `wasm_js`: the owner's question (#104) |
+| rand_core | 0.6.4, 0.10.1 | all, wasm32, default | rand 0.8.8, rand_chacha 0.3.1, crypto-common 0.1.7 against the curves' 0.14 line | owner | rides with getrandom (rand 0.8) |
+| syn | 2.0.119, 3.0.10 | all, wasm32, default | zerocopy-derive 0.8.63 (every graph, through rand 0.8's ppv-lite86 and criterion's half), thiserror-impl 1.0.69, openssl-macros 0.1.1 (all) | ecosystem | zerocopy-derive and openssl-macros on syn 3 (both newest on syn 2); thiserror 2 moves no graph |
+| windows-sys | 0.52.0, 0.61.2 | all, default | memory-stats 1.2.0 (dev, Windows) | ecosystem | a memory-stats release past 1.2.0 (none since 2024-06-26) |
+| crypto-common | 0.1.7, 0.2.2 | all, wasm32, default | aead 0.5, cipher 0.4, universal-hash 0.5 (aes-gcm 0.10, aes 0.8, cbc 0.1), digest 0.10 (all) | in this crate | aes-gcm 0.11 (no default features), aes 0.9, cbc 0.2 clear wasm32 and the defaults; all also needs tokio-tungstenite 0.30 |
+| cpufeatures | 0.2.17, 0.3.1 | all, default | aes 0.8.4, polyval 0.6.2, sha1 0.10.7 (all) | in this crate | the same two moves |
+| sha1, digest, block-buffer | 0.10, 0.11/0.12 | all | tungstenite 0.24 (the `websocket` feature) | partly | tokio-tungstenite 0.30 clears the three and brings rand and thiserror pairs into all |
 
 **Semver.** `cargo-semver-checks` against the last `v*` tag reachable from
 the PR base, the release type read from the version (0.9.0 on `beta` is a

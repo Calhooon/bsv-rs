@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the duplicate dependency families on beta, each one's constraint (#104)
+
+Re-measured the duplicate versions the `deny` step warns about (#104, part
+of #101) on `beta` at `c96f3c7e`, a fresh lockfile, cargo-deny 0.20.2: the
+three locked graphs pass with the ignore list empty and no skips, and warn
+on eleven families with all features, three in the Cloudflare wasm32 slice
+and five in the defaults. The five of 0.8.2 stand (base64, core-foundation,
+getrandom, syn, windows-sys); six are new since the k256 0.14 move (#125:
+rand_core, crypto-common, cpufeatures, sha1, digest, block-buffer). Each
+family's parents, the newest parent release and its verdict are in
+`docs/ARCHITECTURE.md` (the **Deny.** table) and `docs/lanes/fix-104.md`:
+base64, core-foundation, syn and windows-sys wait on upstream releases
+(wiremock, hyper-util, zerocopy-derive and openssl-macros, memory-stats);
+getrandom and rand_core are the owner's question (rand 0.8 and getrandom
+0.2 for the wasm32 `js` backend); crypto-common and cpufeatures could
+converge here (aes-gcm 0.11, aes 0.9, cbc 0.2) and sha1, digest and
+block-buffer partly (tokio-tungstenite 0.30), each its own later slice.
+Nothing in the crate, its manifest, `deny.toml` or a workflow changed.
+
 ### Fixed: the topic broadcaster's acknowledgment requirements as the reference has them: the requirement topics checked at construction, every interested host seeded, the three failure codes
 
 The overlay bucket's blocking lines 3, 4 and 5 of 2026-11-09 (the reads of
