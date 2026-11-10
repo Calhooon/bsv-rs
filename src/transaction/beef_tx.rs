@@ -250,6 +250,48 @@ impl BeefTx {
         true
     }
 
+    /// The txid the entry holds, without hashing: the decoder's hash of the
+    /// bytes it read (`collect.rs`), `merge_raw_tx`'s or `from_txid`'s.
+    /// `None` for an entry built by the public `from_raw_tx` or `from_tx`
+    /// and for one mutated through `tx_mut` (#621's fold: `merge_beef` hashes
+    /// such an entry's bytes, never trusting `txid()`'s reading of its
+    /// fields, which a stale cache after `raw_tx_or_compute` can part from).
+    pub(crate) fn held_txid(&self) -> Option<&str> {
+        self.txid.as_deref()
+    }
+
+    /// The bytes [`to_writer`](Self::to_writer) writes for the entry's
+    /// transaction, as [`Beef::to_binary`](super::beef::Beef::to_binary)
+    /// writes them (after its `refresh`, which drops a mutated transaction's
+    /// cached hash and bytes): the held bytes, else the transaction's
+    /// serialization; `None` for a txid-only entry. The snapshot form of an
+    /// entry in `merge_beef` (#621's second fold).
+    pub(crate) fn written_tx_bytes(&self) -> Option<std::borrow::Cow<'_, [u8]>> {
+        if let Some(ref raw_tx) = self.raw_tx {
+            return Some(std::borrow::Cow::Borrowed(raw_tx));
+        }
+        let tx = self.tx.as_ref()?;
+        if self.mutated {
+            tx.invalidate_caches();
+        }
+        Some(std::borrow::Cow::Owned(tx.to_binary()))
+    }
+
+    /// The input txids the BEEF's next `refresh` would give an entry mutated
+    /// through [`tx_mut`](Self::tx_mut), read without changing the entry;
+    /// `None` when it is not waiting on a refresh (its `input_txids` are
+    /// current). For `merge_beef`'s order of a source it does not sort
+    /// (#621's second fold).
+    pub(crate) fn refreshed_input_txids(&self) -> Option<Vec<String>> {
+        if !self.mutated {
+            return None;
+        }
+        if self.has_proof() {
+            return Some(Vec::new());
+        }
+        Some(self.tx.as_ref().map(input_txids_of).unwrap_or_default())
+    }
+
     /// True when the entry's txid is `txid`, without a copy when it is held.
     pub(crate) fn has_txid(&self, txid: &str) -> bool {
         match self.txid {
@@ -360,17 +402,7 @@ impl BeefTx {
         self.parse_raw();
 
         if let Some(ref tx) = self.tx {
-            let mut seen = std::collections::HashSet::new();
-            for input in &tx.inputs {
-                // Use get_source_txid() which falls back to source_transaction
-                // when source_txid is None (e.g., when input was created via
-                // TransactionInput::with_source_transaction())
-                if let Ok(txid) = input.get_source_txid() {
-                    if !txid.is_empty() && seen.insert(txid.clone()) {
-                        self.input_txids.push(txid);
-                    }
-                }
-            }
+            self.input_txids = input_txids_of(tx);
         }
     }
 
@@ -454,6 +486,23 @@ impl BeefTx {
             Ok(Self::from_parts(tx, raw_tx, bump_index))
         }
     }
+}
+
+/// The txids `tx`'s inputs name, each once, in input order.
+fn input_txids_of(tx: &Transaction) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut txids = Vec::new();
+    for input in &tx.inputs {
+        // Use get_source_txid() which falls back to source_transaction
+        // when source_txid is None (e.g., when input was created via
+        // TransactionInput::with_source_transaction())
+        if let Ok(txid) = input.get_source_txid() {
+            if !txid.is_empty() && seen.insert(txid.clone()) {
+                txids.push(txid);
+            }
+        }
+    }
+    txids
 }
 
 /// A raw transaction at the reader: its parse and the bytes it took.

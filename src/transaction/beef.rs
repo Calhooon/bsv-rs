@@ -41,6 +41,7 @@ use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V2};
 mod collect;
 mod in_memory;
 mod index;
+mod merge_entry;
 mod merge_graph;
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
@@ -108,6 +109,10 @@ pub struct Beef {
     txid_index: HashMap<String, usize>,
     /// Whether the transactions need sorting.
     needs_sort: bool,
+    /// The entries as a reader read them, untouched since: the reference's
+    /// `toBinary` writes such a BEEF's bytes as read (`Beef.ts:360-364`,
+    /// `:1268-1270`), so `merge_beef` walks it unsorted (#621's second fold).
+    wire_order: bool,
 }
 
 impl Beef {
@@ -125,12 +130,14 @@ impl Beef {
             atomic_txid: None,
             txid_index: HashMap::new(),
             needs_sort: true,
+            wire_order: false,
         }
     }
 
     /// Marks the BEEF as needing re-sort.
     fn mark_mutated(&mut self) {
         self.needs_sort = true;
+        self.wire_order = false;
     }
 
     /// Appends `tx` under `txid` and returns its index.
@@ -337,6 +344,8 @@ impl Beef {
     ///
     /// The index of the merged bump.
     pub fn merge_bump(&mut self, bump: MerklePath) -> usize {
+        // `#markMutated(false)` (`Beef.ts:690`): the bytes read are stale.
+        self.wire_order = false;
         // Check for existing bump with same block height and root
         for (i, existing) in self.bumps.iter_mut().enumerate() {
             if existing.block_height == bump.block_height {
@@ -393,10 +402,7 @@ impl Beef {
     pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx {
         let new_tx = BeefTx::from_raw_tx(raw_tx, bump_index);
         let txid = new_tx.txid();
-        let idx = self.replace_or_append(new_tx.with_txid(txid.clone()), txid);
-        self.try_to_validate_bump_index(idx);
-        self.mark_mutated();
-
+        let idx = self.store_raw_entry(new_tx, txid);
         &self.txs[idx]
     }
 
@@ -461,29 +467,39 @@ impl Beef {
         }
     }
 
-    /// Merges another BEEF into this one.
+    /// Merges another BEEF into this one, as the reference's `mergeBeef`
+    /// does (`ts-stack@edf6e03` `Beef.ts:971-990`): from a snapshot of the
+    /// source, the BEEF its serialization writes, never the source's objects.
     ///
-    /// Bumps are merged first and may receive new indices in self. Transactions
-    /// are then merged WITHOUT passing bump indices from the source — instead,
-    /// `try_to_validate_bump_index` discovers the correct index by scanning
-    /// self.bumps. This matches the TypeScript SDK's `mergeBeefTx` behavior.
+    /// Bumps are merged before the entries, each with every level sorted
+    /// by offset as the snapshot reads it (#621's third fold), and may
+    /// receive new indices in self. The entries are walked in the order the source's
+    /// [`to_binary`](Self::to_binary) writes them (its sort when the source
+    /// needs one, computed on the side: `other` is not sorted, #621's second
+    /// fold; held order until then), each merged as its written form, its
+    /// bytes or its txid alone: a parsed source entry contributes the bytes
+    /// the writer writes for it, no transaction object, source link or
+    /// merkle path of its own (#621's second fold; its transaction cloned
+    /// until then). Each is merged without the source's bump index (found
+    /// by scanning self.bumps), and only where self holds nothing under its
+    /// txid or holds the txid alone: an entry self holds raw or parsed is
+    /// left as it is, its BUMP index and source links kept (#621's fold;
+    /// replaced until then). A raw entry is filed under the txid it holds,
+    /// hashed no second time (#621).
     pub fn merge_beef(&mut self, other: &Beef) {
+        self.refresh_mutated(); // The target re-keyed (`Beef.ts:976`, #621's fourth fold).
+        self.mark_mutated();
         for bump in &other.bumps {
-            self.merge_bump(bump.clone());
+            // Each level by offset, as the snapshot reads it (`MerklePath.ts:148-149`, #621's third fold).
+            let mut bump = bump.clone();
+            for level in &mut bump.path {
+                level.sort_by_key(|leaf| leaf.offset);
+            }
+            self.merge_bump(bump);
         }
 
-        for tx in &other.txs {
-            if tx.is_txid_only() {
-                self.merge_txid_only(tx.txid());
-            } else if let Some(raw) = tx.raw_tx() {
-                // Do NOT pass tx.bump_index() — it's the old index from
-                // `other` which is invalid after bumps were re-indexed.
-                // merge_raw_tx calls try_to_validate_bump_index to discover
-                // the correct index by scanning self.bumps.
-                self.merge_raw_tx(raw.to_vec(), None);
-            } else if let Some(t) = tx.tx() {
-                self.push_transaction(t.id(), t.clone(), None);
-            }
+        for i in other.written_order() {
+            self.merge_beef_entry(&other.txs[i]);
         }
     }
 
@@ -790,113 +806,18 @@ impl Beef {
     /// (`@bsv/sdk` `Beef.#topoSort`, "preserve the legacy repeated-scan
     /// ordering without repeating scans").
     pub fn sort_txs(&mut self) -> SortResult {
-        use std::cmp::Reverse;
-        use std::collections::{BinaryHeap, HashSet};
-
         self.refresh_mutated();
-        let mut result = SortResult::default();
-        let mut valid_txids: HashMap<String, bool> = HashMap::new();
-        let txids: Vec<String> = self.txs.iter().map(|tx| tx.txid()).collect();
-        let known: HashSet<&str> = txids.iter().map(String::as_str).collect();
-
-        // Separate transactions by type
-        let mut with_proof: Vec<usize> = Vec::new();
-        let mut txid_only: Vec<usize> = Vec::new();
-        let mut queue: Vec<usize> = Vec::new();
-
-        for (i, tx) in self.txs.iter_mut().enumerate() {
+        for tx in &mut self.txs {
             tx.is_valid = Some(tx.has_proof());
-            if tx.has_proof() {
-                valid_txids.insert(txids[i].clone(), true);
-                with_proof.push(i);
-            } else if tx.is_txid_only() && tx.input_txids.is_empty() {
-                valid_txids.insert(txids[i].clone(), true);
-                txid_only.push(i);
-                result.txid_only.push(txids[i].clone());
-            } else {
-                queue.push(i);
-            }
         }
-
-        // Check for missing inputs
-        let mut with_missing: Vec<usize> = Vec::new();
-        let mut pending: Vec<usize> = Vec::new();
-
-        for &i in &queue {
-            let mut has_missing = false;
-            for input_txid in &self.txs[i].input_txids {
-                if !known.contains(input_txid.as_str()) {
-                    result.missing_inputs.push(input_txid.clone());
-                    has_missing = true;
-                }
-            }
-            if has_missing {
-                with_missing.push(i);
-                result.with_missing_inputs.push(txids[i].clone());
-            } else {
-                pending.push(i);
-            }
-        }
-
-        // Each pending transaction waits on its inputs that are not valid
-        // yet; `dependents` lists the waiters of each such txid.
-        let n = self.txs.len();
-        let mut waiting_on = vec![0usize; n];
-        let mut dependents: HashMap<&str, Vec<usize>> = HashMap::new();
-        for &i in &pending {
-            for input_txid in &self.txs[i].input_txids {
-                if !valid_txids.contains_key(input_txid) {
-                    waiting_on[i] += 1;
-                    dependents.entry(input_txid.as_str()).or_default().push(i);
-                }
-            }
-        }
-
-        // Accept in (scan, position) order. A transaction's scan is the first
-        // in which every input it waits on was valid before its position: an
-        // input made valid at (scan s, position p) counts from scan s for a
-        // waiter after p, and from scan s + 1 for a waiter before p. A txid is
-        // valid from its first accepted entry.
-        let mut scan = vec![0usize; n];
-        let mut accepted = vec![false; n];
-        let mut ready: BinaryHeap<Reverse<(usize, usize)>> = pending
-            .iter()
-            .filter(|&&i| waiting_on[i] == 0)
-            .map(|&i| Reverse((0, i)))
-            .collect();
-        let mut sorted_pending: Vec<usize> = Vec::new();
-        while let Some(Reverse((s, i))) = ready.pop() {
-            accepted[i] = true;
-            sorted_pending.push(i);
-            if valid_txids.insert(txids[i].clone(), true).is_some() {
-                continue; // a repeated txid: its waiters were released already
-            }
-            for j in dependents.remove(txids[i].as_str()).unwrap_or_default() {
-                let from = if i < j { s } else { s + 1 };
-                scan[j] = scan[j].max(from);
-                waiting_on[j] -= 1;
-                if waiting_on[j] == 0 {
-                    ready.push(Reverse((scan[j], j)));
-                }
-            }
-        }
-
-        // Remaining are not valid
-        let not_valid: Vec<usize> = pending.into_iter().filter(|&i| !accepted[i]).collect();
-        for &i in &not_valid {
-            result.not_valid.push(txids[i].clone());
-        }
-
-        // Collect valid txids
-        result.valid = valid_txids.keys().cloned().collect();
-
-        // Reorder transactions - build new order indices
-        let mut new_order: Vec<usize> = Vec::with_capacity(n);
-        new_order.extend(&with_missing);
-        new_order.extend(&not_valid);
-        new_order.extend(&txid_only);
-        new_order.extend(&with_proof);
-        new_order.extend(&sorted_pending);
+        let (new_order, result) = {
+            let inputs: Vec<&[String]> = self
+                .txs
+                .iter()
+                .map(|tx| tx.input_txids.as_slice())
+                .collect();
+            dependency_order(&self.txs, &inputs)
+        };
 
         // Move the transactions into the new order (every index is in exactly
         // one of the five lists; anything left over keeps its relative order
@@ -909,6 +830,7 @@ impl Beef {
         self.txs.extend(old.into_iter().flatten());
 
         self.needs_sort = false;
+        self.wire_order = false;
         self.rebuild_index();
 
         result
@@ -1144,6 +1066,7 @@ impl Beef {
             atomic_txid: self.atomic_txid.clone(),
             txid_index: self.txid_index.clone(),
             needs_sort: self.needs_sort,
+            wire_order: self.wire_order,
         }
     }
 
@@ -1193,6 +1116,122 @@ impl Default for Beef {
     }
 }
 
+/// [`Beef::sort_txs`]'s order of `txs` (every position once) and result,
+/// from the entries alone: `merge_beef` walks an unsorted source by it
+/// (#621's second fold, `Beef.ts:360-373`); `inputs[i]` the txids entry `i`
+/// waits on (its `input_txids`, or its mutated transaction's).
+fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortResult) {
+    use std::cmp::Reverse;
+    use std::collections::{BinaryHeap, HashSet};
+
+    let mut result = SortResult::default();
+    let mut valid_txids: HashMap<String, bool> = HashMap::new();
+    let txids: Vec<String> = txs.iter().map(BeefTx::txid).collect();
+    let known: HashSet<&str> = txids.iter().map(String::as_str).collect();
+
+    // Separate transactions by type
+    let mut with_proof: Vec<usize> = Vec::new();
+    let mut txid_only: Vec<usize> = Vec::new();
+    let mut queue: Vec<usize> = Vec::new();
+
+    for (i, tx) in txs.iter().enumerate() {
+        if tx.has_proof() {
+            valid_txids.insert(txids[i].clone(), true);
+            with_proof.push(i);
+        } else if tx.is_txid_only() && inputs[i].is_empty() {
+            valid_txids.insert(txids[i].clone(), true);
+            txid_only.push(i);
+            result.txid_only.push(txids[i].clone());
+        } else {
+            queue.push(i);
+        }
+    }
+
+    // Check for missing inputs
+    let mut with_missing: Vec<usize> = Vec::new();
+    let mut pending: Vec<usize> = Vec::new();
+
+    for &i in &queue {
+        let mut has_missing = false;
+        for input_txid in inputs[i] {
+            if !known.contains(input_txid.as_str()) {
+                result.missing_inputs.push(input_txid.clone());
+                has_missing = true;
+            }
+        }
+        if has_missing {
+            with_missing.push(i);
+            result.with_missing_inputs.push(txids[i].clone());
+        } else {
+            pending.push(i);
+        }
+    }
+
+    // Each pending transaction waits on its inputs that are not valid
+    // yet; `dependents` lists the waiters of each such txid.
+    let n = txs.len();
+    let mut waiting_on = vec![0usize; n];
+    let mut dependents: HashMap<&str, Vec<usize>> = HashMap::new();
+    for &i in &pending {
+        for input_txid in inputs[i] {
+            if !valid_txids.contains_key(input_txid) {
+                waiting_on[i] += 1;
+                dependents.entry(input_txid.as_str()).or_default().push(i);
+            }
+        }
+    }
+
+    // Accept in (scan, position) order. A transaction's scan is the first
+    // in which every input it waits on was valid before its position: an
+    // input made valid at (scan s, position p) counts from scan s for a
+    // waiter after p, and from scan s + 1 for a waiter before p. A txid is
+    // valid from its first accepted entry.
+    let mut scan = vec![0usize; n];
+    let mut accepted = vec![false; n];
+    let mut ready: BinaryHeap<Reverse<(usize, usize)>> = pending
+        .iter()
+        .filter(|&&i| waiting_on[i] == 0)
+        .map(|&i| Reverse((0, i)))
+        .collect();
+    let mut sorted_pending: Vec<usize> = Vec::new();
+    while let Some(Reverse((s, i))) = ready.pop() {
+        accepted[i] = true;
+        sorted_pending.push(i);
+        if valid_txids.insert(txids[i].clone(), true).is_some() {
+            continue; // a repeated txid: its waiters were released already
+        }
+        for j in dependents.remove(txids[i].as_str()).unwrap_or_default() {
+            let from = if i < j { s } else { s + 1 };
+            scan[j] = scan[j].max(from);
+            waiting_on[j] -= 1;
+            if waiting_on[j] == 0 {
+                ready.push(Reverse((scan[j], j)));
+            }
+        }
+    }
+
+    // Remaining are not valid
+    let not_valid: Vec<usize> = pending.into_iter().filter(|&i| !accepted[i]).collect();
+    for &i in &not_valid {
+        result.not_valid.push(txids[i].clone());
+    }
+
+    // Collect valid txids
+    result.valid = valid_txids.keys().cloned().collect();
+
+    // Reorder transactions - build new order indices
+    let mut new_order: Vec<usize> = Vec::with_capacity(n);
+    new_order.extend(&with_missing);
+    new_order.extend(&not_valid);
+    new_order.extend(&txid_only);
+    new_order.extend(&with_proof);
+    new_order.extend(&sorted_pending);
+
+    (new_order, result)
+}
+
+#[cfg(test)]
+mod merge_entry_621_tests;
 #[cfg(test)]
 mod reference_603_tests;
 
