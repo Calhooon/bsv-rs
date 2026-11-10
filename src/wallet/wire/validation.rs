@@ -85,6 +85,22 @@ pub(super) fn explicit_wallet_code(error: &Error) -> Option<u8> {
     }
 }
 
+/// A wallet refusal's or accepted abort's class and words, the record the
+/// processor's `tracing` events carry (`src/wallet/wire/CLAUDE.md`, the
+/// error frame: `class` its name beside the words, #137, #439); every other
+/// error, `WalletReviewActions` among them, has none. This crate's own
+/// contract: the reference logs nothing at `#invokeWallet`
+/// (`WalletWireProcessor.ts:2402-2418` at `ts-stack@edf6e03`). Compiled in
+/// every build so the selection is judged where the default build runs (#603).
+#[cfg_attr(not(feature = "tracing"), allow(dead_code))]
+pub(super) fn refusal_record(error: &Error) -> Option<(crate::error::WalletRefusalClass, &str)> {
+    match error {
+        Error::WalletRefusal { class, message } => Some((*class, message)),
+        Error::AbortAccepted(a) => Some((a.class, &a.message)),
+        _ => None,
+    }
+}
+
 /// The words an error frame carries: the reference writes `error.message`
 /// (`WalletWireProcessor.ts:2387`), never this crate's `Display` prefix. A
 /// `WalletError` is its own words (the replacement's constant, a stub's
@@ -331,6 +347,49 @@ fn iso_timestamp(value: &str, call: &str, field: &str) -> Checked {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A crate-contract pin (#603): `src/wallet/wire/CLAUDE.md`'s error frame,
+    /// "`invoke_wallet` emits one `warn` event where it chooses the constant:
+    /// `call` ..., `error` (... a refusal's or accepted-abort record's words,
+    /// with `class` its name beside them, #137, #439), the message `wallet
+    /// error framed as Wallet operation failed`, and for a `WalletRefusal` or
+    /// `AbortAccepted` one `warn` event with `call` and `class` (the
+    /// reference's name), the message `wallet refusal framed with its code`".
+    /// The reference logs nothing there (`WalletWireProcessor.ts:2402-2418`).
+    #[test]
+    fn a_refusal_and_an_accepted_abort_carry_their_class_and_words_to_the_event() {
+        use crate::error::{AbortAcceptance, WalletRefusalClass};
+        use crate::wallet::ReviewActionsRefusal;
+        let coded = Error::WalletRefusal {
+            class: WalletRefusalClass::InsufficientFunds,
+            message: "short".into(),
+        };
+        assert_eq!(
+            refusal_record(&coded),
+            Some((WalletRefusalClass::InsufficientFunds, "short"))
+        );
+        let uncoded = Error::WalletRefusal {
+            class: WalletRefusalClass::Unauthorized,
+            message: "denied".into(),
+        };
+        assert_eq!(
+            refusal_record(&uncoded),
+            Some((WalletRefusalClass::Unauthorized, "denied"))
+        );
+        let accepted = Error::AbortAccepted(Box::new(AbortAcceptance::new(
+            "ref",
+            WalletRefusalClass::InvalidOperation,
+            "already broadcast",
+        )));
+        assert_eq!(
+            refusal_record(&accepted),
+            Some((WalletRefusalClass::InvalidOperation, "already broadcast"))
+        );
+        assert_eq!(refusal_record(&Error::WalletError("words".into())), None);
+        let review = Error::WalletReviewActions(Box::new(ReviewActionsRefusal::new(Vec::new())));
+        assert_eq!(explicit_wallet_code(&review), Some(5));
+        assert_eq!(refusal_record(&review), None);
+    }
 
     #[test]
     fn a_byte_array_past_the_frame_bound_is_refused_with_code_6() {

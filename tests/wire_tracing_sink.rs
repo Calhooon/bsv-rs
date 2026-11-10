@@ -16,7 +16,7 @@
 mod fixtures;
 
 use bsv_rs::wallet::wire::{WalletCall, WalletWireProcessor};
-use bsv_rs::{Error, WalletRefusalClass};
+use bsv_rs::{AbortAcceptance, Error, WalletRefusalClass};
 use fixtures::wallet::Stub;
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -229,6 +229,58 @@ async fn an_uncoded_refusal_raises_one_event_with_its_class_and_words() {
         event.fields["error"],
         "Access is denied due to an authorization error."
     );
+    assert_eq!(
+        event.fields["message"],
+        "wallet error framed as Wallet operation failed"
+    );
+    assert_eq!(event.fields.len(), 4, "{:?}", event.fields);
+}
+
+/// #439: an accepted abort whose class has an SDK code keeps its words and
+/// code on the wire (`WalletWireProcessor.ts:2416` at `ts-stack@edf6e03`),
+/// framed byte for byte as the `WalletRefusal` of the same class and words;
+/// the event is this crate's contract (`src/wallet/wire/CLAUDE.md`): one
+/// `warn` event with the call's name and the record's class (#603).
+#[tokio::test]
+async fn an_accepted_abort_with_a_coded_class_raises_one_event_with_its_class() {
+    let error = Error::AbortAccepted(Box::new(AbortAcceptance::new(
+        "ref",
+        WalletRefusalClass::InsufficientFunds,
+        "short",
+    )));
+    let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
+    assert_eq!(hex::encode(&frame), "070573686f727400");
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.level, Level::WARN);
+    assert_eq!(event.fields["call"], "getHeight");
+    assert_eq!(event.fields["class"], "WERR_INSUFFICIENT_FUNDS");
+    assert_eq!(
+        event.fields["message"],
+        "wallet refusal framed with its code"
+    );
+    assert_eq!(event.fields.len(), 3, "{:?}", event.fields);
+}
+
+/// #439: an accepted abort whose class has no SDK code is framed as `Wallet
+/// operation failed` (`:2417`), so its class and its words go to the one
+/// `warn` event beside the call's name (this crate's contract, #603).
+#[tokio::test]
+async fn an_accepted_abort_with_an_uncoded_class_raises_one_event_with_its_class_and_words() {
+    let words = "Access is denied due to an authorization error.";
+    let error = Error::AbortAccepted(Box::new(AbortAcceptance::new(
+        "ref",
+        WalletRefusalClass::Unauthorized,
+        words,
+    )));
+    let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
+    assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.level, Level::WARN);
+    assert_eq!(event.fields["call"], "getHeight");
+    assert_eq!(event.fields["class"], "WERR_UNAUTHORIZED");
+    assert_eq!(event.fields["error"], words);
     assert_eq!(
         event.fields["message"],
         "wallet error framed as Wallet operation failed"

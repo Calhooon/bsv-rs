@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the wire processor's tracing-gated survivors killed and their selection moved where the oracle builds it (#603)
+
+The 2026-11-04 census left four survivors in
+`WalletWireProcessor::invoke_wallet` (`src/wallet/wire/processor.rs`
+`252:25`, `253:25`, `263:25`, `266:25`, each a deleted match arm), all four
+under `#[cfg(feature = "tracing")]`. The mutation oracle builds with
+`--features full,http`, and `full` does not carry `tracing`, so it never
+compiled the text it mutated and counted every arm as missed; the binary that
+listens for the events, `tests/wire_tracing_sink.rs`, is outside its
+selection (`APART`). In the `tracing` build two were already killed:
+`a_wallet_refusal_raises_one_event_with_the_call_and_its_class` RED with
+`252:25` deleted (`left: 0, right: 1`, no event) and
+`an_uncoded_refusal_raises_one_event_with_its_class_and_words` RED with
+`263:25` deleted (`no entry found for key`, no `class`). Two tests are added
+for the accepted abort, which no test named:
+`an_accepted_abort_with_a_coded_class_raises_one_event_with_its_class`
+(frame `070573686f727400`, one event with `call`, `class` and the kept
+message; RED with `253:25` deleted, `left: 0, right: 1`) and
+`an_accepted_abort_with_an_uncoded_class_raises_one_event_with_its_class_and_words`
+(frame `Wallet operation failed`, one event with four fields; RED with
+`266:25` deleted, `no entry found for key`).
+
+The selection itself moved into `src/wallet/wire/validation.rs` beside
+`explicit_wallet_code`: `refusal_record`, compiled in every build, gives a
+`WalletRefusal`'s or an `AbortAccepted`'s class and words and `None` for
+every other error (`WalletReviewActions` among them, which raises no kept
+event, as before). Both cfg blocks of `invoke_wallet` call it through
+`if let`, so no arm mutant is left in uncompiled text. Its unit test,
+`a_refusal_and_an_accepted_abort_carry_their_class_and_words_to_the_event`,
+is a crate-contract pin quoting `src/wallet/wire/CLAUDE.md`'s event
+sentence; it went RED with each arm deleted and with the body `None`. The
+events are this crate's addition: the reference logs nothing at
+`#invokeWallet` (`WalletWireProcessor.ts:2402-2418` at `ts-stack@edf6e03`),
+so there is no parity note. Nothing observable changed: no wire byte, no
+`Display`, no event field, no public API.
+
+Re-measured with the oracle's own selection (`nightly_mutants.py`'s
+`mutation_args("wire", ...)`, `cargo mutants --jobs 1`, sharded):
+`processor.rs` 37 mutants, 6 caught, 0 missed, 0 timeout, 31 unviable,
+100% of viable (60.00% at the census); `validation.rs` 73 mutants (68 at the census, 95.83%), 26
+caught, 1 missed, 0 timeout, 46 unviable, 96.30% (the miss is the census's
+`245:15`, now `261:15`, `>` to `>=` in `result_bytes`, not this lane's).
+`processor.rs` fell from 934 to 926 lines. `src/wallet/wire/diagnostics.rs`
+(0 of 2 at the census) has the same cause and is left for its own lane. The
+record is `docs/lanes/kill-wire-processor.md`.
+
 ### Docs: the upstream filing queue brought up to date (#375)
 
 The owner asked on 2026-11-09 whether the references need upstream issues; the

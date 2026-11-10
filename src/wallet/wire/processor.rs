@@ -248,25 +248,17 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             .map_err(|error| match explicit_wallet_code(&error) {
                 Some(_) => {
                     #[cfg(feature = "tracing")]
-                    if let Some(class) = match &error {
-                        Error::WalletRefusal { class, .. } => Some(class),
-                        Error::AbortAccepted(a) => Some(&a.class),
-                        _ => None,
-                    } {
-                        diagnostics::kept(call, *class);
+                    if let Some((class, _)) = validation::refusal_record(&error) {
+                        diagnostics::kept(call, class);
                     }
                     error
                 }
                 None => {
                     #[cfg(feature = "tracing")]
-                    match &error {
-                        Error::WalletRefusal { class, message } => {
-                            diagnostics::replaced(call, Some(class), message);
-                        }
-                        Error::AbortAccepted(a) => {
-                            diagnostics::replaced(call, Some(&a.class), &a.message);
-                        }
-                        _ => diagnostics::replaced(call, None, &error),
+                    if let Some((class, words)) = validation::refusal_record(&error) {
+                        diagnostics::replaced(call, Some(&class), words);
+                    } else {
+                        diagnostics::replaced(call, None, &error);
                     }
                     Error::WalletError(WALLET_OPERATION_FAILED.to_string())
                 }
