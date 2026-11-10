@@ -18,7 +18,7 @@ fn child_raw() -> Vec<u8> {
 /// This crate's reader takes `bytes` whole as one transaction.
 fn parses_whole(bytes: &[u8]) -> bool {
     let mut reader = Reader::new(bytes);
-    Transaction::from_reader_internal(&mut reader).is_ok() && reader.remaining() == 0
+    Transaction::from_reader(&mut reader).is_ok() && reader.remaining() == 0
 }
 
 #[test]

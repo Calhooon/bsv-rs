@@ -132,6 +132,22 @@ pub struct ScriptOffset {
     pub length: usize,
 }
 
+/// The reference's words for bytes after a transaction
+/// (`ts-stack@edf6e03` `Transaction.ts:462`, `:535`; #840).
+const TRAILING_DATA: &str = "Serialized transaction contains trailing data";
+
+/// The reference's words for bytes after an EF transaction (`Transaction.ts:419`).
+const EF_TRAILING_DATA: &str = "Serialized EF transaction contains trailing data";
+
+/// Refuses a reader that has not reached its end, in `words`.
+fn refuse_trailing(reader: &Reader, words: &str) -> Result<()> {
+    if reader.is_empty() {
+        Ok(())
+    } else {
+        Err(crate::Error::TransactionError(words.to_string()))
+    }
+}
+
 impl Transaction {
     /// Creates a new empty transaction with default version 1.
     pub fn new() -> Self {
@@ -168,41 +184,47 @@ impl Transaction {
         }
     }
 
-    /// Parses a transaction from binary data.
+    /// Parses a transaction from binary data: the bytes are exactly one
+    /// transaction.
     ///
-    /// # Arguments
+    /// A byte after the lock time is refused as
+    /// `TransactionError("Serialized transaction contains trailing data")`,
+    /// the reference's words (`ts-stack@edf6e03` `Transaction.ts:532-535`);
+    /// until #840 such bytes were kept as the cached serialization and hashed
+    /// into the txid. To read one transaction from the front of a longer
+    /// buffer, use [`from_reader`](Self::from_reader).
     ///
-    /// * `bin` - The binary transaction data
-    ///
-    /// # Returns
-    ///
-    /// The parsed transaction.
+    /// ```
+    /// use bsv_rs::transaction::Transaction;
+    /// let tx = Transaction::new();
+    /// let mut bytes = tx.to_binary();
+    /// assert_eq!(Transaction::from_binary(&bytes)?.id(), tx.id());
+    /// bytes.push(0);
+    /// assert!(Transaction::from_binary(&bytes).is_err());
+    /// # Ok::<(), bsv_rs::Error>(())
+    /// ```
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
-        let raw_bytes = bin.to_vec();
-        let mut reader = Reader::new(bin);
-        let tx = Self::from_reader(&mut reader)?;
-
-        *tx.raw_bytes_cache.borrow_mut() = Some(raw_bytes);
+        let tx = Self::from_whole(bin, TRAILING_DATA)?;
+        *tx.raw_bytes_cache.borrow_mut() = Some(bin.to_vec());
         Ok(tx)
     }
 
-    /// Parses a transaction from a hex string.
-    ///
-    /// # Arguments
-    ///
-    /// * `hex` - The hex-encoded transaction
-    ///
-    /// # Returns
-    ///
-    /// The parsed transaction.
+    /// One transaction read from `bin`, a byte after it refused in `words`.
+    fn from_whole(bin: &[u8], words: &str) -> Result<Self> {
+        let mut reader = Reader::new(bin);
+        let tx = Self::from_reader(&mut reader)?;
+        refuse_trailing(&reader, words)?;
+        Ok(tx)
+    }
+
+    /// Parses a transaction from a hex string: the text is exactly one
+    /// transaction, refused as [`from_binary`](Self::from_binary) refuses
+    /// bytes after it (#840).
     pub fn from_hex(hex: &str) -> Result<Self> {
         let bin = from_hex(hex)?;
-        let raw_bytes = bin.clone();
-        let mut reader = Reader::new(&bin);
-        let tx = Self::from_reader(&mut reader)?;
-
-        *tx.raw_bytes_cache.borrow_mut() = Some(raw_bytes);
+        let tx = Self::from_whole(&bin, TRAILING_DATA)?;
         *tx.hex_cache.borrow_mut() = Some(hex.to_lowercase());
+        *tx.raw_bytes_cache.borrow_mut() = Some(bin);
         Ok(tx)
     }
 
@@ -317,6 +339,9 @@ impl Transaction {
         }
 
         let lock_time = reader.read_u32_le()?;
+        // The reference's words for a byte after the EF frame
+        // (`Transaction.ts:419`, #840).
+        refuse_trailing(&reader, EF_TRAILING_DATA)?;
 
         Ok(Self::with_params(version, inputs, outputs, lock_time))
     }
@@ -335,13 +360,30 @@ impl Transaction {
         Self::from_ef(&bin)
     }
 
-    /// Parses a transaction from a Reader.
-    pub(crate) fn from_reader_internal(reader: &mut Reader) -> Result<Self> {
-        Self::from_reader(reader)
-    }
-
-    /// Parses a transaction from a Reader.
-    fn from_reader(reader: &mut Reader) -> Result<Self> {
+    /// Reads one transaction from the front of a reader and leaves the
+    /// reader after its lock time, the bytes after it unread: the
+    /// reference's `fromReader` (`ts-stack@edf6e03` `Transaction.ts:466-468`).
+    /// The door for a transaction at the front of a longer buffer, where
+    /// [`from_binary`](Self::from_binary) refuses the bytes after it (#840).
+    /// The transaction holds no copy of the reader's bytes: its serialization
+    /// and txid are computed from its fields. One cell reads what `fromReader`
+    /// refuses: an output amount of 2^53 satoshis or more is read as its `u64`,
+    /// where the reference throws `Number can only safely store up to 53 bits`
+    /// (`Transaction.ts:497`; a stated row, closed by #844).
+    ///
+    /// ```
+    /// use bsv_rs::{primitives::Reader, transaction::Transaction};
+    /// let tx = Transaction::new();
+    /// let mut bytes = tx.to_binary();
+    /// bytes.extend_from_slice(&[1, 2, 3, 4]);
+    /// let mut reader = Reader::new(&bytes);
+    /// let read = Transaction::from_reader(&mut reader)?;
+    /// assert_eq!(read.id(), tx.id());
+    /// assert_eq!(read.to_binary(), tx.to_binary());
+    /// assert_eq!(reader.remaining(), 4);
+    /// # Ok::<(), bsv_rs::Error>(())
+    /// ```
+    pub fn from_reader(reader: &mut Reader) -> Result<Self> {
         let version = reader.read_u32_le()?;
 
         let input_count = reader.read_var_int_num()?;
@@ -411,7 +453,9 @@ impl Transaction {
     ///
     /// # Returns
     ///
-    /// The script offsets for inputs and outputs.
+    /// The script offsets for inputs and outputs. The bytes are exactly one
+    /// transaction: a missing lock time or a byte after it is refused, as the
+    /// reference's `parseScriptOffsets` refuses them (#840).
     pub fn parse_script_offsets(bin: &[u8]) -> Result<ScriptOffsets> {
         let mut reader = Reader::new(bin);
         let mut input_offsets = Vec::new();
@@ -458,6 +502,11 @@ impl Transaction {
             // Skip script
             reader.read_bytes(script_len)?;
         }
+
+        // The lock time, then nothing: the reference's `parseScriptOffsets`
+        // (`Transaction.ts:460-462`, #840).
+        reader.read_u32_le()?;
+        refuse_trailing(&reader, TRAILING_DATA)?;
 
         Ok(ScriptOffsets {
             inputs: input_offsets,

@@ -494,7 +494,7 @@ fn input_txids_of(tx: &Transaction) -> Vec<String> {
 /// A raw transaction at the reader: its parse and the bytes it took.
 fn read_tx(reader: &mut Reader) -> Result<(Transaction, Vec<u8>)> {
     let tx_start = reader.position();
-    let tx = Transaction::from_reader_internal(reader)?;
+    let tx = Transaction::from_reader(reader)?;
     Ok((tx, reader.consumed_since(tx_start).to_vec()))
 }
 

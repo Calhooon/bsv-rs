@@ -317,8 +317,8 @@ impl Beef {
         let is_valid = entry.is_valid;
         if tx.to_binary() == before {
             // The same transaction bytes: the entry keeps its txid and the
-            // bytes it holds (a raw entry read with bytes after the
-            // transaction included), so no key, order or wire byte moves.
+            // bytes it holds, so no key, order or wire byte moves (raw bytes
+            // with a byte after the transaction are refused above, #840).
             let edited = if entry.held_raw() {
                 let raw = entry
                     .raw_tx()

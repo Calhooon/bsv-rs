@@ -184,13 +184,15 @@ fn edit_tx_on_raw_bytes_that_do_not_parse_is_a_beef_error_817() {
     assert_eq!(held(&beef), before);
 }
 
-/// A no-op edit of an entry whose raw bytes carry a byte after the
-/// transaction moves nothing: the entry keeps its txid (the hash of every
-/// byte) and its bytes, and with the transaction's canonical txid held by
-/// another entry it is not refused (#817's fold: re-keyed under the
-/// canonical txid, or refused, until then).
+/// An edit of an entry whose raw bytes carry a byte after the transaction
+/// (a crate-only state: no public door holds such bytes since #817) is
+/// refused and moves nothing, as an entry whose bytes do not parse is:
+/// since #840 `Transaction::from_binary` refuses the byte after the lock
+/// time, as the reference's `BeefTx` throws reading it through `Transaction.fromBinaryView`
+/// (`BeefTx.ts:121`, `Transaction.ts:532-535`). Until #840 the edit ran on the prefix and the
+/// entry kept its txid, the hash of every byte (#817's fold).
 #[test]
-fn a_no_op_edit_of_raw_bytes_with_a_trailing_byte_moves_nothing_817() {
+fn an_edit_of_raw_bytes_with_a_trailing_byte_is_refused_840() {
     let t = tx("bb", 2_000);
     let mut raw = t.to_binary();
     raw.push(0x00);
@@ -200,17 +202,16 @@ fn a_no_op_edit_of_raw_bytes_with_a_trailing_byte_moves_nothing_817() {
     let id = beef.txs[0].txid();
     assert_ne!(id, t.id());
     let before = held(&beef);
-    assert_eq!(beef.edit_tx(&id, |_| 7), Ok(7));
+    let mut ran = false;
+    let refused = beef.edit_tx(&id, |_| ran = true).unwrap_err();
     assert_eq!(
-        beef.txs.iter().map(BeefTx::txid).collect::<Vec<_>>(),
-        vec![id.clone()]
+        refused,
+        crate::Error::BeefError(format!(
+            "{id} is held in this Beef as raw bytes that do not parse as a transaction: \
+             transaction error: Serialized transaction contains trailing data"
+        ))
     );
-    assert_eq!(beef.find_txid(&id).unwrap().raw_tx(), Some(&raw[..]));
+    assert!(!ran);
     assert_eq!(held(&beef), before, "no byte moves");
-    // The canonical txid held by another entry: still no refusal.
-    beef.merge_raw_tx(t.to_binary(), None).unwrap();
-    let kept = held(&beef);
-    assert_eq!(beef.edit_tx(&id, |_| ()), Ok(()));
-    assert_eq!(held(&beef), kept);
-    assert_eq!(beef.txs.len(), 2);
+    assert_eq!(beef.find_txid(&id).unwrap().raw_tx(), Some(&raw[..]));
 }

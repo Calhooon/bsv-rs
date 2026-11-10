@@ -579,7 +579,8 @@ fn merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_8
             compared += 1;
         }
     }
-    assert_eq!(compared, 6 * 337, "six states of every BEEF read");
+    // 337 BEEFs read until #840's vector brought its clean V2 BEEF.
+    assert_eq!(compared, 6 * 338, "six states of every BEEF read");
 }
 
 /// The order of the checks is the order the reference meets them: an empty
