@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the ratchet tool reads a manifest's name and version by `cargo metadata`, not by a line scanner; `materialize` is pinned by the scratch lock it writes (cherry-picked from beta `f97e94f6`, PR #865)
+
+- The follow-up to 0.8.5's ratchet entry (the cold reads of PR #859 and of PR #865). `package_of` (`tools/ratchet/src/tree.rs`) runs `cargo +1.95.0 metadata --no-deps --offline --format-version 1` on the scratch copy's `Cargo.toml` and takes the package whose `manifest_path` is that manifest; the line scanner of `Cargo.toml`, wrong on some valid manifests, is deleted. No dependency is added and `tools/ratchet/Cargo.lock` does not change. What cargo refuses stops in cargo's words. The tests (28 in the tool on this line; beta's 30 count two `model.rs` tests of another commit) run `materialize` on a Git repository each test builds and read the scratch `Cargo.lock` it writes. Tool and records only; nothing under `src/` moved.
+
 ## [0.8.5] - 2026-11-10
 
 ### Fixed: the ratchet's library lock no longer goes stale when the crate's own version moves; a release commit is Cargo.toml and CHANGELOG.md alone on both lines

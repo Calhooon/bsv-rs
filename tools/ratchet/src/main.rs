@@ -129,19 +129,35 @@ fn main() -> std::process::ExitCode {
 #[cfg(test)]
 mod test_support {
     use crate::{tree::Tree, Result};
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
-    pub fn fixture() -> Result<Tree> {
+    static NEXT_FOLDER: AtomicU64 = AtomicU64::new(0);
+
+    /// A new empty folder under TMPDIR (or RUNNER_TEMP), named by the process id and
+    /// a process-wide counter, never by the clock: two calls never meet, and a folder
+    /// left by an earlier process of the same id is passed over.
+    pub fn folder(prefix: &str) -> Result<PathBuf> {
         let base = std::env::var_os("TMPDIR")
             .or_else(|| std::env::var_os("RUNNER_TEMP"))
             .ok_or("tests require TMPDIR or RUNNER_TEMP")?;
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_nanos();
-        let path = std::path::PathBuf::from(base)
-            .join(format!("ratchet-test-{}-{nonce}", std::process::id()));
-        std::fs::create_dir(&path)?;
+        loop {
+            let path = PathBuf::from(&base).join(format!(
+                "{prefix}-{}-{}",
+                std::process::id(),
+                NEXT_FOLDER.fetch_add(1, Ordering::Relaxed)
+            ));
+            match std::fs::create_dir(&path) {
+                Ok(()) => return Ok(path.canonicalize()?),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+
+    pub fn fixture() -> Result<Tree> {
         let tree = Tree {
-            path,
+            path: folder("ratchet-test")?,
             commit: "a".repeat(40),
         };
         std::fs::create_dir(tree.path.join("src"))?;
