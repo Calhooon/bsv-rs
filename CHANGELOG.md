@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.4] - 2026-11-10
-
 ### Fixed: the ratchet's library lock no longer goes stale when the crate's own version moves; a release commit is Cargo.toml and CHANGELOG.md alone on both lines
 
 - What contradicted what. `RELEASING.md` steps 3 and 11 (3 and 17 on `beta`) and the `beta-born` job (`release_commit()` in `ci.yml`) admit a release commit of `Cargo.toml` and `CHANGELOG.md` alone. The ratchet's compiler counters build a scratch copy of the library with `tools/ratchet/library.Cargo.lock` in place and run cargo `--locked`; that lock records the crate's own version (`0.8.3` on `main`, `0.9.0-beta.7` on `beta`), so the version line of a release made it stale and the `ratchet` step stopped (`cargo clippy (pedantic, cognitive complexity >25) failed (exit status: 101); no measurement was recorded ... the library lock is stale`), and `docs/RATCHETS.md` asked for the lock's refresh in the same pull request, which the release-commit rule forbids. Met on PR #858, the 0.8.4 release commit on `main` (2026-11-10 18:49Z); beta's prerelease commits had touched the lock as a third file for the same reason, where `beta-born` does not run.
@@ -198,35 +196,6 @@ at 03:00 UTC starts within minutes; the shards finish later in the night
 and decide the same (the owner's balance rule of 2026-10-26, the keeper's
 reading, as the nightly goes live with main's copy of the schedule).
 
-### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
-
-`Certificate::from_binary` refused a revocation outpoint index above
-`u32::MAX` in #122's words (`invalid revocation outpoint index: expected at
-most 4294967295, got 4294967296`). It now refuses it through the wire's
-helper (`integer_refusal`, `src/wallet/wire/mod.rs`, #255), the one form of
-every bound refusal: `Invalid revocation outpoint index: expected an integer
-from 0 to 4294967295, received 4294967296`, still
-`Error::CertificateValidationError`. The name `revocation outpoint index`
-is this crate's: the reference has no words for this bound. The bound
-stands under #122 (a refusal, never a cast; BRC-12's outpoint index is four
-bytes on the wire). No behavior beyond the words. Pinned by
-`a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bound_refusals_form`
-(`src/auth/certificates/certificate.rs`, RED on the pre-fix tree). No vector
-or recording carried these words.
-
-### Notes: cross-SDK parity (#258)
-
-The reference's `Certificate.fromBinary` reads the index with
-`readVarIntNumStrict(false)` and no `#requireInteger` (`ts-stack@edf6e03`
-`packages/sdk/src/auth/certificates/Certificate.ts:353`), so it accepts an
-index above `0xffffffff` up to `2^53 - 1` (`readVarIntNumStrict.ts`'s
-precision bound) into the outpoint string; its `toBinary` refuses one above
-`0xffffffff` (`Certificate.ts:263-270`). Go's reader casts the varint to
-`uint32` (`go-sdk@2ca481c` `wallet/serializer/serializer.go:82-96`, a
-truncation above the bound) and its writer writes a `uint32` (`:20-25`).
-This crate's reader refuses it: no SDK writer produces the oversized index,
-so the bound meets the north star's "accept what the reference accepts".
-
 ### Changed: the secrets scan covers the commits the event brings (#272)
 
 CI's `secrets` job ran gitleaks over every ref of the checkout (gitleaks's
@@ -327,6 +296,10 @@ test read the same on both lines.
 ### Changed
 
 - main's gate takes beta's `deny`, `dependents` (plan, one check per consumer, the summary), `semver`, `ratchet` (its baseline measured on main), `fixtures` (skipping with a warning while the recordings are beta's), `features`, `wasm32` slices and `scoreboard` jobs; `semver` checks a PR against the last release tag held to a patch, and a release tag against the release before it (#214).
+
+## [0.8.4] - 2026-11-10
+
+Tagged (`v0.8.4`, commit `9caa38b4`) and never published. Its release run was cancelled before the publish step: this heading then stood over an entry (#258, a certificate's revocation outpoint index) for code this line does not have, brought in by a changelog hunk of a CI cherry-pick (`c014150e`). That entry and its parity note are removed; everything else that stood under this heading ships in 0.8.5, above. The tag stays where it is: a `v*` tag is never moved and never deleted.
 
 ## [0.8.3] - 2026-10-25
 
