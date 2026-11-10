@@ -1461,14 +1461,15 @@ impl Transaction {
                         .to_string(),
                 )
             })?;
-            total_in += sats;
+            total_in = super::amount::add_amount(total_in, sats, "Transaction input total")?;
         }
 
         // Calculate total output satoshis (excluding change)
         let mut total_out: u64 = 0;
         for output in &self.outputs {
             if !output.change {
-                total_out += output.satoshis.unwrap_or(0);
+                let sats = output.satoshis.unwrap_or(0);
+                total_out = super::amount::add_amount(total_out, sats, "Transaction output total")?;
             }
         }
 
@@ -1487,7 +1488,13 @@ impl Transaction {
         Ok(())
     }
 
-    /// Distributes change among change outputs.
+    /// Distributes change among change outputs. The random arm is the
+    /// reference's `#distributeChange` (`ts-stack@edf6e03` `Transaction.ts:864-897`):
+    /// a Benford portion of what remains to each but the last, the rest to the
+    /// last, an output at 0 satoshis where the change runs out, as there (#868).
+    /// The equal arm writes `change / n` to each and one satoshi more to each of
+    /// the first `change % n`, where the reference gives the remainder to the
+    /// last (`:886-892`; stated, the root `CLAUDE.md` row).
     fn distribute_change(&mut self, change: u64, distribution: ChangeDistribution) {
         let change_outputs: Vec<usize> = self
             .outputs
@@ -1497,9 +1504,9 @@ impl Transaction {
             .map(|(i, _)| i)
             .collect();
 
-        if change_outputs.is_empty() {
+        let Some((&last, rest)) = change_outputs.split_last() else {
             return;
-        }
+        };
 
         match distribution {
             ChangeDistribution::Equal => {
@@ -1517,36 +1524,28 @@ impl Transaction {
                 }
             }
             ChangeDistribution::Random => {
-                // Use Benford's law distribution for privacy
-                let mut distributed = 0u64;
-                let count = change_outputs.len();
-
-                for (i, &idx) in change_outputs.iter().enumerate() {
-                    if i == count - 1 {
-                        // Last output gets remaining
-                        self.outputs[idx].satoshis = Some(change - distributed);
-                    } else {
-                        // Random portion using Benford-like distribution
-                        let remaining = change - distributed;
-                        let portion = self.benford_number(1, remaining);
-                        self.outputs[idx].satoshis = Some(portion);
-                        distributed += portion;
-                    }
+                // Benford's law, for privacy: each output but the last a
+                // portion of what remains, the last the rest.
+                let mut remaining = change;
+                for &idx in rest {
+                    let portion = Self::benford_number(remaining);
+                    self.outputs[idx].satoshis = Some(portion);
+                    remaining -= portion;
                 }
+                self.outputs[last].satoshis = Some(remaining);
             }
         }
     }
 
-    /// Generates a random number following Benford's law distribution.
-    fn benford_number(&self, min: u64, max: u64) -> u64 {
+    /// The reference's `#benfordNumber(0, max)`: `floor(max * log10(1 + 1/d) / log10(10))`
+    /// for a digit `d` of 1 to 9, never above `max` (the factor is at most log10(2)).
+    /// The digit is drawn by `gen_range`, where the reference takes `Random(1)[0] % 9 + 1`.
+    /// Until #868 it divided by `log10(1)`, zero.
+    fn benford_number(max: u64) -> u64 {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
-
-        let d: f64 = rng.gen_range(1..=9) as f64;
-        let factor = (1.0 + 1.0 / d).log10() / 1_f64.log10();
-
-        let range = (max - min) as f64;
-        min + (range * factor) as u64
+        let d: f64 = rand::thread_rng().gen_range(1..=9) as f64;
+        let factor = (1.0 + 1.0 / d).log10() / 10_f64.log10();
+        (max as f64 * factor).floor() as u64
     }
 
     /// Returns the current fee based on inputs and outputs.
@@ -1563,12 +1562,13 @@ impl Transaction {
                         .to_string(),
                 )
             })?;
-            total_in += sats;
+            total_in = super::amount::add_amount(total_in, sats, "Transaction input total")?;
         }
 
         let mut total_out: u64 = 0;
         for output in &self.outputs {
-            total_out += output.satoshis.unwrap_or(0);
+            let sats = output.satoshis.unwrap_or(0);
+            total_out = super::amount::add_amount(total_out, sats, "Transaction output total")?;
         }
 
         Ok(total_in.saturating_sub(total_out))
@@ -1681,7 +1681,11 @@ impl Transaction {
 
     /// Returns the total satoshis of all outputs.
     pub fn total_output_satoshis(&self) -> u64 {
-        self.outputs.iter().filter_map(|o| o.satoshis).sum()
+        // Saturating: a sum past `u64` panicked in a debug build (#868's class).
+        self.outputs
+            .iter()
+            .filter_map(|o| o.satoshis)
+            .fold(0, u64::saturating_add)
     }
 
     /// Every transaction reachable from `self` through `source_transaction`

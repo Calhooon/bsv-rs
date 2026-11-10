@@ -63,6 +63,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
 | `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
 | `template_tests.rs` | 22 | default | P2PKH, P2PK, Multisig, RPuzzle script templates |
+| `transaction_fee_random_change_868.rs` | 6 | `transaction` | #868 (cherry-picked from beta): `Transaction::fee` over two or more change outputs as the random arm of the reference's `#distributeChange` (`ts-stack@edf6e03` `Transaction.ts:864-897`): over 2, 3 and 5 change outputs, 2,000 runs per cell at changes of 12,345, 2e15, the count, 2, 1 and 0, no panic, every amount within the change and summing to it, each but the last a Benford portion `floor(remaining * log10(1 + 1/d))` of what remains, the last the rest, no change removing the change outputs; a change below the output count at the reference's fixed answer (`[0, 0, 1]`); `fee`'s and `get_fee`'s totals past `u64` refused in the reference's `addSatoshiAmount` words, `total_output_satoshis` saturating. On beta `f97e94f6` 6 of 6 RED in debug and 5 of 6 in release; the published 0.8.5 the same |
 | `transaction_tests.rs` | 104 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry, SPV verify |
 | `wallet_tests.rs` | 56 | `wallet` | KeyDeriver, CachedKeyDeriver, ProtoWallet, wire protocol |
 | `wallet_wire_cross_sdk_tests.rs` | 42 | `wallet` | Cross-SDK wire protocol vectors from Go SDK (54 vectors) |

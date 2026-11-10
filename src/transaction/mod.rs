@@ -84,6 +84,7 @@
 //! let is_valid = tracker.is_valid_root_for_height("merkle_root_hex", 999)?;
 //! ```
 
+mod amount;
 pub mod beef;
 pub mod beef_stream;
 pub mod beef_tx;
