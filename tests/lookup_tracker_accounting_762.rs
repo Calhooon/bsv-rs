@@ -201,9 +201,11 @@ mod http_answers {
             matches!(&answer, LookupAnswer::Freeform { result } if result.is_null()),
             "{answer:?}"
         );
+        // The resolver answers the merged output list since #815, as the
+        // reference's `query` does: the freeform host contributes nothing.
         let answer = http_resolver(&host).query(&question(), None).await.unwrap();
         assert!(
-            matches!(&answer, LookupAnswer::Freeform { result } if result.is_null()),
+            matches!(&answer, LookupAnswer::OutputList { outputs } if outputs.is_empty()),
             "{answer:?}"
         );
         assert!(

@@ -49,6 +49,13 @@ impl LookupResolver {
     /// not, a success; a freeform answer nothing, a backoff kept; an error or
     /// any other answer a failure.
     ///
+    /// The answer is always the merged output list, empty when no host
+    /// answered one, as the reference's `query` answers (`ts-stack@edf6e03`
+    /// `LookupResolver.ts:1369-1375`, `:1445-1450`): a host's freeform
+    /// answer is not returned and does not blank the other hosts' lists
+    /// (#815; until then the earliest freeform answer was returned over the
+    /// aggregate).
+    ///
     /// The hosts asked are the admitted ones (#785): the discovered (or
     /// overriding) hosts and then the additional ones, each at its earliest
     /// occurrence, at most `limits.max_hosts` (`ts-stack@edf6e03`
@@ -143,7 +150,6 @@ impl LookupResolver {
         // The key to the held copy's slot in `all_outputs` and whether its
         // hint disagrees with its subject (#796).
         let mut seen_outputs: HashMap<String, (usize, bool)> = HashMap::new();
-        let mut first_freeform: Option<LookupAnswer> = None;
 
         // The query's byte budget, shared by its hosts (`:1624-1631`, #775)
         let budget = LookupByteBudget::new(self.limits.max_total_bytes);
@@ -247,14 +253,14 @@ impl LookupResolver {
                                 }
                             }
                         }
-                        LookupAnswer::Freeform { .. } => {
-                            if first_freeform.is_none() {
-                                first_freeform = Some(answer);
-                            }
-                        }
-                        LookupAnswer::Formula { .. } => {
-                            // Formula responses are not aggregated
-                        }
+                        // A freeform answer is counted by the reference's
+                        // session and never answered (`recordFreeformAnswer`,
+                        // `:1085-1087`, from `:1512`; the session's
+                        // `snapshot`, `:1123-1135`, and `queryDetailed`'s
+                        // answer, `:1445-1450`, an output list), so it
+                        // contributes nothing here (#815); a formula answer
+                        // is a failure already recorded above.
+                        LookupAnswer::Freeform { .. } | LookupAnswer::Formula { .. } => {}
                     }
                 }
                 // A resource limit is neutral: nothing recorded for the
@@ -267,13 +273,11 @@ impl LookupResolver {
             }
         }
 
-        // Return freeform if we got one, otherwise aggregated output list
-        if let Some(freeform) = first_freeform {
-            Ok(freeform)
-        } else {
-            Ok(LookupAnswer::OutputList {
-                outputs: all_outputs.into_iter().flatten().collect(),
-            })
-        }
+        // The merged output list, empty when no host answered one: no path
+        // of the reference's `query` answers freeform (`:1369-1375`,
+        // `:1445-1450`; #815).
+        Ok(LookupAnswer::OutputList {
+            outputs: all_outputs.into_iter().flatten().collect(),
+        })
     }
 }

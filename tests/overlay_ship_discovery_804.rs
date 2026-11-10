@@ -313,8 +313,15 @@ async fn two_hundred_fifty_seven_outputs_refuse_the_discovery_804() {
     );
 }
 
+/// Since #815 a freeform `ls_ship` host is no refusal: `LookupResolver::query`
+/// answers the empty output list, as the reference's resolver does
+/// (`LookupResolver.ts:1445-1450`), and no host is admitted. The reader's
+/// refusal of an answer that is no output list (the recording's
+/// `not_output_list`, the reference's stub resolver handing it the answer)
+/// is pinned below the resolver, `topic_broadcaster/discovery.rs`'s
+/// `a_freeform_answer_handed_to_the_reader_is_refused_815`.
 #[tokio::test]
-async fn an_answer_that_is_no_output_list_refuses_the_discovery_804() {
+async fn a_freeform_ls_ship_host_admits_no_host_and_refuses_nothing_815() {
     let b = broadcaster(
         LookupAnswer::Freeform {
             result: serde_json::json!({}),
@@ -322,10 +329,82 @@ async fn an_answer_that_is_no_output_list_refuses_the_discovery_804() {
         HashMap::new(),
     )
     .unwrap();
-    assert_eq!(
-        b.find_interested_hosts().await.map(|h| h.len()),
-        Err(Error::OverlayError(NOT_BOUNDED.into()))
-    );
+    assert_eq!(b.find_interested_hosts().await.map(|h| h.len()), Ok(0));
+}
+
+/// A lookup facilitator answering each `ls_ship` host with its own answer.
+struct ByHost(HashMap<String, LookupAnswer>);
+
+#[async_trait::async_trait(?Send)]
+impl OverlayLookupFacilitator for ByHost {
+    async fn lookup(
+        &self,
+        url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> bsv_rs::Result<LookupAnswer> {
+        Ok(self.0[url].clone())
+    }
+}
+
+/// #815: one `ls_ship` host answering freeform no longer blanks the SHIP
+/// discovery: the host another `ls_ship` host advertises is admitted, in
+/// either rank order. Until #815 the resolver answered the freeform answer
+/// and the discovery refused in `SHIP answer is not a bounded output list.`
+#[tokio::test]
+async fn a_freeform_ls_ship_host_beside_an_advertising_one_admits_the_advertised_host_815() {
+    static N: AtomicUsize = AtomicUsize::new(0);
+    for freeform_ahead in [true, false] {
+        let n = N.fetch_add(1, Ordering::Relaxed);
+        let free = format!("https://free-{n}.ship-discovery-815-rs.invalid");
+        let list = format!("https://list-{n}.ship-discovery-815-rs.invalid");
+        let answers = HashMap::from([
+            (
+                free.clone(),
+                LookupAnswer::Freeform {
+                    result: serde_json::json!({}),
+                },
+            ),
+            (
+                list.clone(),
+                LookupAnswer::OutputList {
+                    outputs: vec![ad("advertised")],
+                },
+            ),
+        ]);
+        let hosts = if freeform_ahead {
+            vec![free, list]
+        } else {
+            vec![list, free]
+        };
+        let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
+            facilitator: Some(Arc::new(ByHost(answers))),
+            slap_trackers: Some(vec![]),
+            host_overrides: Some(HashMap::from([("ls_ship".to_string(), hosts)])),
+            limits: raised_limits(),
+            ..Default::default()
+        }));
+        let b = TopicBroadcaster::new(
+            vec![TOPIC.to_string()],
+            TopicBroadcasterConfig {
+                resolver: Some(resolver),
+                facilitator: Some(Arc::new(Acknowledging)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let admitted: Vec<String> = b
+            .find_interested_hosts()
+            .await
+            .unwrap()
+            .into_keys()
+            .collect();
+        assert_eq!(
+            admitted,
+            vec![host("advertised")],
+            "freeform ahead: {freeform_ahead}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -488,7 +567,13 @@ async fn the_reference_recorded_ship_admissions_are_this_crates_804() {
     assert_eq!(cases.len(), 17);
     for case in cases {
         let name = case["name"].as_str().unwrap();
-        let ours = if name == "not_output_list" {
+        if name == "not_output_list" {
+            // The reference's stub resolver handed the reader a freeform
+            // answer; this crate's resolver answers an output list in every
+            // case since #815, so the discovery admits nothing and refuses
+            // nothing here (the reader's refusal pinned in
+            // `topic_broadcaster/discovery.rs`, `_815`).
+            assert_eq!(case["refusal"], NOT_BOUNDED);
             let b = broadcaster(
                 LookupAnswer::Freeform {
                     result: case["answer"]["result"].clone(),
@@ -496,12 +581,10 @@ async fn the_reference_recorded_ship_admissions_are_this_crates_804() {
                 HashMap::new(),
             )
             .unwrap();
-            b.find_interested_hosts().await.map(|h| {
-                let mut h: Vec<String> = h.into_keys().collect();
-                h.sort();
-                h
-            })
-        } else if let Some(count) = case["output_count"].as_u64() {
+            assert_eq!(b.find_interested_hosts().await.map(|h| h.len()), Ok(0));
+            continue;
+        }
+        let ours = if let Some(count) = case["output_count"].as_u64() {
             admitted(plain()[..count as usize].to_vec()).await
         } else {
             admitted(recorded_outputs(case)).await
