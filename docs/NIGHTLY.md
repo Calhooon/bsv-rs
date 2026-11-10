@@ -238,7 +238,13 @@ environment disables it, so each mutation can reuse the baseline's compilation.
 
 The test command is `cargo test --features "full,http" --locked --lib`, followed
 by one `--test NAME` for every target of the shard's selection (below, "The
-selection", #685). The same target selection
+selection", #685). The wire surface's word is `full,http,tracing`
+(`SURFACE_FEATURES`, #603): `src/wallet/wire/diagnostics.rs` is compiled only
+under `tracing`, which is outside `full`, so under `full,http` its two mutants
+rewrote unbuilt text and read `missed` in the complete run of 2026-11-04; the
+wire surface also runs `wire_tracing_sink` beside its selection
+(`SURFACE_TESTS`), where its kills live. The other four surfaces keep
+`full,http`. The same target selection
 applies to `cargo test --no-run`. The library commits no `Cargo.lock`, so each
 mutation job runs `cargo generate-lockfile` in its checkout before cargo-mutants
 copies it: `--locked` then holds the baseline and every mutant to one graph
@@ -298,7 +304,8 @@ under the direct reading measured 4,438, below). Three of that reading's targets
 left out: a binary reached only by reading the source's text (the six `arch_*`
 walks of `src/`, a literal naming the file), since a mutant rewrites the text it
 reads and its verdict on the text tests no behaviour; the binaries the Test Suite
-runs apart (`memory_profiling`, `wire_tracing_sink`); and the cost checks
+runs apart (`memory_profiling`, `wire_tracing_sink`; the wire surface runs the
+sink beside its selection since #603, not through it); and the cost checks
 above. Every source of a module reaches the same binaries, so the 85 measured
 files' sets are three: 138 for the 43 script files, 107 for the four BEEF and
 Merkle files, 131 for the 38 wire and substrates files (median 138; 136, 104 and

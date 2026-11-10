@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the tracing-gated wire diagnostics measured under its feature, its survivors killed by the sink (#603)
+
+The complete mutation run of 2026-11-04 scored `src/wallet/wire/diagnostics.rs`
+0 of 2 (`kept` and `replaced` replaced by `()`, both missed;
+`docs/census/mutants-2026-11-04.md:113`, `:406-409`). Neither is equivalent:
+under the `tracing` feature each removes a `warn` event a collector sees. The
+oracle never compiled the file: `mod diagnostics;` sits under
+`#[cfg(feature = "tracing")]` (`src/wallet/wire/mod.rs:77-78`), `tracing` is
+outside `full`, the oracle built every surface with `--features full,http`, and
+its selection left out `tests/wire_tracing_sink.rs`, a binary the Test Suite
+runs apart (`affected_tests.APART`). Each mutant rewrote unbuilt text (0 s
+build) and read `missed`. A scratch copy with the file's body replaced by
+`compile_error!` builds under `full,http` and refuses under `full,http,tracing`.
+
+The oracle's word: `nightly_mutants.py` gives the wire surface its own feature
+word, `full,http,tracing` (`SURFACE_FEATURES`), and runs the sink beside its
+selection (`SURFACE_TESTS`, added in `mutation_args`, since `selection` keys by
+module and the wire and substrates surfaces are both `wallet`'s); a changed
+sink re-measures the wire files. The other four surfaces keep `full,http`;
+`APART` stays for CI's step and the pull request planner. The wire mutant list
+is 793 under both words (`cargo mutants --list`): none leaves. Pinned by
+`test_603_the_wire_surface_compiles_the_tracing_gated_diagnostics_and_runs_its_sink`
+(RED before the change: `['full', 'http']`) and the two `test_685_*` tests,
+which read the new truth.
+
+The kills: `kept` by `a_wallet_refusal_raises_one_event_with_the_call_and_its_class`,
+`replaced` by the two uncoded-error tests and
+`an_uncoded_refusal_raises_one_event_with_its_class_and_words`, each RED on
+its mutant at `events.len()` 0. The same cause left the four `tracing`-gated
+match arms of `invoke_wallet` unmet (`src/wallet/wire/processor.rs:252:25`,
+`253:25`, `263:25`, `266:25`); no test fed an `AbortAccepted`, so two new
+tests in `tests/wire_tracing_sink.rs` do:
+`an_accepted_abort_of_a_coded_class_raises_the_kept_event_with_its_class_439`
+and
+`an_accepted_abort_of_an_uncoded_class_raises_the_replaced_event_with_its_class_and_words_439`,
+each RED with its arm deleted. Re-measured under the new word: 2 of 2 caught
+in `diagnostics.rs` (100.00%) and the four arms caught.
+
+Every kill is a crate-contract pin, counted apart (reference kills 0): the
+reference's `#invokeWallet` logs nothing (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/substrates/WalletWireProcessor.ts:2402-2419`), nor
+does go-sdk's processor at `2ca481c`, and BRC-100 at `5119a9b` names no
+logging; the line pinned is `src/wallet/wire/CLAUDE.md:85`. No public API, wire
+byte or behaviour changes.
+
 ### Changed: the cached root walk moves to `merkle_path_walk.rs` (#93 P0)
 
 `RootWalker`, its `Node`, `SCAN_MAX` and `hash_pair` move out of
