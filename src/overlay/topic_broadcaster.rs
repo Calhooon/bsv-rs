@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 mod discovery; // the discovery's admission and the endpoint's origin (#804)
+mod requirements; // the acknowledgment requirements as the reference has them
 
 /// Acknowledgment requirement for broadcast success.
 #[derive(Debug, Clone, Default)]
@@ -49,12 +50,19 @@ pub struct TopicBroadcasterConfig {
     /// - `Any`: At least one topic must be acknowledged by each host
     /// - `Some(topics)`: Specified topics must be acknowledged by all hosts
     /// - `None`: No requirement
+    ///
+    /// Every interested host is judged, a host that failed as one that
+    /// acknowledged nothing (`SHIPBroadcaster.ts:511-512`). A list naming a
+    /// topic outside the broadcast's refuses [`TopicBroadcaster::new`]
+    /// (`:182-193`), as it does in the two fields below.
     pub require_ack_from_all_hosts: RequireAck,
     /// Required acknowledgment from any host for these topics.
     ///
-    /// - `All`: All topics must be acknowledged by at least one host
-    /// - `Any`: At least one topic must be acknowledged by at least one host (default)
-    /// - `Some(topics)`: Specified topics must be acknowledged by at least one host
+    /// - `All`: All topics must be acknowledged by at least one host (default,
+    ///   the reference's `'all'`, `SHIPBroadcaster.ts:436`)
+    /// - `Any`: At least one topic must be acknowledged by at least one host
+    /// - `Some(topics)`: One host must acknowledge every specified topic
+    ///   (the reference's list reads `require: 'all'`, `SHIPBroadcaster.ts:584`)
     /// - `None`: No requirement
     pub require_ack_from_any_host: RequireAck,
     /// Specific host requirements.
@@ -109,7 +117,11 @@ impl TopicBroadcaster {
     /// specific-host requirements are refused as the reference's
     /// constructor refuses them (`SHIPBroadcaster.ts:195-219`, #804): more
     /// than 32 hosts, a host that is no endpoint origin, two hosts of one
-    /// origin.
+    /// origin; or a requirement's topic list (all hosts, any host, each
+    /// specific host) is refused as `snapshotAcknowledgmentRequirement`
+    /// refuses it (`:182-193`): more than 64 topics, one not a unique
+    /// canonical `tm_` name, or one outside `topics`
+    /// (`<label> may only reference topics included in this broadcast.`).
     pub fn new(topics: Vec<String>, config: TopicBroadcasterConfig) -> Result<Self> {
         // Validate at least one topic
         if topics.is_empty() {
@@ -128,12 +140,35 @@ impl TopicBroadcaster {
             }
         }
 
+        // The all-host and any-host requirements' topic lists, as the
+        // reference snapshots them (`SHIPBroadcaster.ts:430-439`,
+        // `snapshotAcknowledgmentRequirement`, `:182-193`): nothing is sent
+        // under a requirement naming a topic outside the broadcast's.
+        requirements::snapshot(
+            &config.require_ack_from_all_hosts,
+            &topics,
+            "All-host acknowledgment requirement",
+        )?;
+        requirements::snapshot(
+            &config.require_ack_from_any_host,
+            &topics,
+            "Any-host acknowledgment requirement",
+        )?;
+
         // Each key its endpoint's origin, as the reference snapshots them
         // (`SHIPBroadcaster.ts:195-219`, under `allowHTTP` for the local
-        // preset alone, `:426`; #804)
+        // preset alone, `:426`; #804), each requirement's topics checked
+        // after its key (`:212-216`)
         let require_ack_from_specific_hosts = discovery::specific_hosts(
             config.require_ack_from_specific_hosts,
             config.network_preset.allow_http(),
+            |origin, requirement| {
+                requirements::snapshot(
+                    requirement,
+                    &topics,
+                    &format!("Acknowledgment requirement for {origin}"),
+                )
+            },
         )?;
 
         let facilitator = config.facilitator.unwrap_or_else(|| {
@@ -286,13 +321,16 @@ impl TopicBroadcaster {
             });
         }
 
-        // Check acknowledgment requirements
-        if let Err(e) = self.check_acknowledgments(&host_acks) {
+        // Every interested host seeded with an empty set, so a host that
+        // failed acknowledged nothing (`SHIPBroadcaster.ts:511-512`); then
+        // the three checks in the reference's order and codes (`:538-546`)
+        let host_acks = requirements::seeded(interested_hosts.keys(), host_acks);
+        if let Err(failure) = self.check_acknowledgments(&host_acks) {
             return Err(BroadcastFailure {
                 status: BroadcastStatus::Error,
-                code: "ERR_REQUIRE_ACK_FAILED".into(),
+                code: failure.code().into(),
                 txid: Some(tx.id()),
-                description: e.to_string(),
+                description: failure.description().into(),
                 more: None,
             });
         }
@@ -346,140 +384,6 @@ impl TopicBroadcaster {
         // (`SHIPBroadcaster.ts:737-786`, #804; the authentication, `:775`,
         // since #544)
         discovery::interested_hosts(&self.topics, answer)
-    }
-
-    /// Check acknowledgment requirements.
-    fn check_acknowledgments(&self, host_acks: &HashMap<String, HashSet<String>>) -> Result<()> {
-        // Check require_ack_from_all_hosts
-        self.check_all_hosts_requirement(host_acks)?;
-
-        // Check require_ack_from_any_host
-        self.check_any_host_requirement(host_acks)?;
-
-        // Check require_ack_from_specific_hosts
-        self.check_specific_hosts_requirement(host_acks)?;
-
-        Ok(())
-    }
-
-    fn check_all_hosts_requirement(
-        &self,
-        host_acks: &HashMap<String, HashSet<String>>,
-    ) -> Result<()> {
-        let required_topics = match &self.require_ack_from_all_hosts {
-            RequireAck::None => return Ok(()),
-            RequireAck::All => self.topics.clone(),
-            RequireAck::Any => self.topics.clone(),
-            RequireAck::Some(topics) => topics.clone(),
-        };
-
-        let require_all = !matches!(self.require_ack_from_all_hosts, RequireAck::Any);
-
-        for acked_topics in host_acks.values() {
-            if require_all {
-                // All required topics must be acknowledged by this host
-                for topic in &required_topics {
-                    if !acked_topics.contains(topic) {
-                        return Err(Error::OverlayError(
-                            "Not all hosts acknowledged the required topics.".into(),
-                        ));
-                    }
-                }
-            } else {
-                // At least one required topic must be acknowledged by this host
-                let any_acked = required_topics.iter().any(|t| acked_topics.contains(t));
-                if !any_acked {
-                    return Err(Error::OverlayError(
-                        "Not all hosts acknowledged at least one required topic.".into(),
-                    ));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn check_any_host_requirement(
-        &self,
-        host_acks: &HashMap<String, HashSet<String>>,
-    ) -> Result<()> {
-        let required_topics = match &self.require_ack_from_any_host {
-            RequireAck::None => return Ok(()),
-            RequireAck::All => self.topics.clone(),
-            RequireAck::Any => self.topics.clone(),
-            RequireAck::Some(topics) => topics.clone(),
-        };
-
-        let require_all = matches!(self.require_ack_from_any_host, RequireAck::All);
-
-        if require_all {
-            // All required topics must be acknowledged by at least one host
-            for acked_topics in host_acks.values() {
-                let acks_all = required_topics.iter().all(|t| acked_topics.contains(t));
-                if acks_all {
-                    return Ok(());
-                }
-            }
-            Err(Error::OverlayError(
-                "No host acknowledged all required topics.".into(),
-            ))
-        } else {
-            // At least one required topic must be acknowledged by at least one host
-            for acked_topics in host_acks.values() {
-                let any_acked = required_topics.iter().any(|t| acked_topics.contains(t));
-                if any_acked {
-                    return Ok(());
-                }
-            }
-            Err(Error::OverlayError(
-                "No host acknowledged the required topics.".into(),
-            ))
-        }
-    }
-
-    fn check_specific_hosts_requirement(
-        &self,
-        host_acks: &HashMap<String, HashSet<String>>,
-    ) -> Result<()> {
-        for (host, requirement) in &self.require_ack_from_specific_hosts {
-            let acked_topics = match host_acks.get(host) {
-                Some(topics) => topics,
-                None => {
-                    return Err(Error::OverlayError(format!(
-                        "Required host {} did not respond successfully.",
-                        host
-                    )));
-                }
-            };
-
-            let (required_topics, require_all) = match requirement {
-                RequireAck::None => continue,
-                RequireAck::All => (self.topics.clone(), true),
-                RequireAck::Any => (self.topics.clone(), false),
-                RequireAck::Some(topics) => (topics.clone(), true),
-            };
-
-            if require_all {
-                for topic in &required_topics {
-                    if !acked_topics.contains(topic) {
-                        return Err(Error::OverlayError(format!(
-                            "Host {} did not acknowledge required topic {}.",
-                            host, topic
-                        )));
-                    }
-                }
-            } else {
-                let any_acked = required_topics.iter().any(|t| acked_topics.contains(t));
-                if !any_acked {
-                    return Err(Error::OverlayError(format!(
-                        "Host {} did not acknowledge any required topic.",
-                        host
-                    )));
-                }
-            }
-        }
-
-        Ok(())
     }
 
     fn network_preset_str(&self) -> &'static str {

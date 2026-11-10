@@ -127,10 +127,12 @@ fn admitted(topics: &[String], output: &OutputListItem) -> Option<(String, Strin
 /// `snapshotSpecificHostRequirements`' keys (`:195-219`): more than 32
 /// refused before any is read, each key its endpoint's origin under the
 /// preset's `allowHTTP`, a second key of one origin refused, in the
-/// reference's words. The requirement values are taken as given.
+/// reference's words; each requirement then judged by `check` under its
+/// origin (`snapshotAcknowledgmentRequirement`, `:212-216`).
 pub(super) fn specific_hosts<T>(
     requirements: HashMap<String, T>,
     allow_http: bool,
+    check: impl Fn(&str, &T) -> Result<()>,
 ) -> Result<HashMap<String, T>> {
     if requirements.len() > MAX_SHIP_HOSTS {
         return Err(refused(
@@ -145,6 +147,7 @@ pub(super) fn specific_hosts<T>(
                 "Specific-host acknowledgment requirements contain a duplicate host.",
             ));
         }
+        check(&origin, &requirement)?;
         result.insert(origin, requirement);
     }
     Ok(result)
