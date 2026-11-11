@@ -1,0 +1,36 @@
+name: Front pages
+
+# The reconciler (RELEASING.md step 23 (f)): dispatched at an advisory sitting, once the
+# advisory is published, to see every front page agree with what was published. release.yml
+# runs the same command after every publish. Never on a schedule (the owner's word of
+# 2026-11-10: no scheduled oracles). It writes nothing: a red line names the page to fix by hand
+# (`front_pages.py notes <tag>` prints a page's notes, its advisory notice the first lines).
+on:
+  workflow_dispatch:
+    inputs:
+      wait:
+        description: Seconds to wait for what time heals (docs.rs's build, crates.io's index)
+        required: false
+        default: '0'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Front pages agree
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: The page script's tests
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_front_pages.py'
+
+      - name: The front pages agree with what was published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAIT: ${{ inputs.wait }}
+        run: python3 -B .github/scripts/front_pages.py check --wait "$WAIT"

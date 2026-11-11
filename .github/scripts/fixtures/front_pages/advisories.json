@@ -1,0 +1,10 @@
+[{"ghsa_id": "GHSA-aaaa-bbbb-cccc", "state": "published", "severity": "medium", "score": 5.3,
+  "summary": "bsv-rs: Thing::read kept bytes after the thing",
+  "html_url": "https://github.com/example/bsv-rs/security/advisories/GHSA-aaaa-bbbb-cccc",
+  "vulnerabilities": [
+    {"package": "bsv-rs", "vulnerable_version_range": "< 0.8.7", "patched_versions": "0.8.7"},
+    {"package": "bsv-rs", "vulnerable_version_range": ">= 0.9.0-beta.1, <= 0.9.0-beta.1", "patched_versions": null}]},
+ {"ghsa_id": "GHSA-zzzz-zzzz-zzzz", "state": "draft", "severity": "critical", "score": 9.8,
+  "summary": "PLANTED DRAFT TEXT",
+  "html_url": "https://github.com/example/bsv-rs/security/advisories/GHSA-zzzz-zzzz-zzzz",
+  "vulnerabilities": [{"package": "bsv-rs", "vulnerable_version_range": "<= 0.9.0-beta.1", "patched_versions": null}]}]

@@ -24,6 +24,13 @@
 //! when a gate is gone, would stop running after an earlier gate failed, prints no
 //! `PASS`/`FAIL` line of its own, or is missing from the last step that names every gate
 //! that did not pass; a job with a matrix or a second cache restore is refused too.
+//!
+//! The Release page (the design reads of 2026-11-11, D7 and D9; RELEASING.md step 5):
+//! `release.yml` refuses a tag whose `CHANGELOG.md` has no section before it publishes,
+//! makes the page in a `page` job after `Publish to crates.io` (notes from
+//! `front_pages.py notes` with this run's id, flags from `front_pages.py flags`), holds
+//! `contents: write` in that job alone, and runs the reconciler after it;
+//! `front-pages.yml` runs the reconciler on a dispatch and nothing else (no schedule).
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::fs;
@@ -505,6 +512,9 @@ const BUNDLES: &[(&str, &[(&str, &str)])] = &[
         "checks",
         &[
             ("mutants-entries", "mutants-entries"),
+            // the Release page generator's and the reconciler's tests (front_pages.py), run
+            // at every pull request so release.yml's page job never meets them broken
+            ("front-pages", "front-pages"),
             ("vectors", "vectors"),
             ("fixtures", "fixtures"),
             ("secrets", "secrets"),
@@ -769,5 +779,144 @@ fn every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663()
             "checks: the mutants-entries gate does not run mutants_entries.py",
             "a workflow rewrites the entries (`--fix` is the captain's, by hand)",
         ]
+    );
+}
+
+/// What release.yml and front-pages.yml must hold for the Release page and the reconciler.
+fn release_pages(release: &str, dispatch: &str) -> Vec<String> {
+    let mut errors = shape("release.yml", release);
+    errors.extend(shape("front-pages.yml", dispatch));
+    let job = |name: &str| {
+        block(release, 2, &format!("{name}:"))
+            .unwrap_or_default()
+            .join("\n")
+    };
+    let version = job("version");
+    if !version.contains("- name: The tag's changelog has its section")
+        || !version.contains(r#"grep -qE "^## \[${version//./\\.}\]( |$)" CHANGELOG.md"#)
+    {
+        errors.push("release.yml: the version job does not refuse a tag without its changelog section before the publish".to_owned());
+    }
+    let page = job("page");
+    if page.is_empty() {
+        errors.push("release.yml: no `page` job".to_owned());
+    }
+    for (needle, why) in [
+        (
+            "needs: publish",
+            "the page is made after the crate is published",
+        ),
+        ("contents: write", "it creates the release"),
+        (
+            "test_front_pages.py",
+            "the generator's tests before it runs",
+        ),
+        (
+            r#"front_pages.py notes "$GITHUB_REF_NAME" --run "$GITHUB_RUN_ID""#,
+            "the notes from the tag and this run",
+        ),
+        (
+            r#"front_pages.py flags "$GITHUB_REF_NAME""#,
+            "prerelease and Latest from the version",
+        ),
+        (
+            r#"gh release create "$GITHUB_REF_NAME" --verify-tag"#,
+            "the page of the pushed tag alone",
+        ),
+    ] {
+        if !page.contains(needle) {
+            errors.push(format!("release.yml page: no `{needle}` ({why})"));
+        }
+    }
+    let writers = release.matches("contents: write").count();
+    if writers != 1 {
+        errors.push(format!(
+            "release.yml: `contents: write` in {writers} places, not the page job's alone"
+        ));
+    }
+    let agree = job("front-pages");
+    for (needle, why) in [
+        ("needs: page", "the reconciler reads the page just made"),
+        ("front_pages.py check", "the reconciler runs"),
+    ] {
+        if !agree.contains(needle) {
+            errors.push(format!("release.yml front-pages: no `{needle}` ({why})"));
+        }
+    }
+    let on = block(dispatch, 0, "on:").unwrap_or_default().join("\n");
+    if !on.contains("workflow_dispatch:") {
+        errors.push("front-pages.yml: not dispatchable".to_owned());
+    }
+    for trigger in ["schedule:", "push:", "pull_request", "workflow_run:"] {
+        if on.contains(trigger) {
+            errors.push(format!(
+                "front-pages.yml: fires on `{trigger}`; the reconciler runs on a dispatch alone"
+            ));
+        }
+    }
+    if !dispatch.contains("front_pages.py check") {
+        errors.push("front-pages.yml: does not run the reconciler".to_owned());
+    }
+    errors
+}
+
+#[test]
+fn the_release_makes_its_page_after_the_publish_and_the_reconciler_runs_on_dispatch_alone() {
+    let release = read(".github/workflows/release.yml");
+    let dispatch = read(".github/workflows/front-pages.yml");
+    let errors = release_pages(&release, &dispatch);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+}
+
+#[test]
+fn a_release_page_made_early_with_write_elsewhere_or_a_scheduled_reconciler_is_refused() {
+    let release = read(".github/workflows/release.yml");
+    let dispatch = read(".github/workflows/front-pages.yml");
+    let unchecked = release.replacen(
+        "      - name: The tag's changelog has its section\n",
+        "      - name: renamed\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&unchecked, &dispatch),
+        ["release.yml: the version job does not refuse a tag without its changelog section before the publish"]
+    );
+    let early = release.replacen(
+        "    needs: publish\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n",
+        "    needs: ci\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&early, &dispatch),
+        ["release.yml page: no `needs: publish` (the page is made after the crate is published)"]
+    );
+    let wide = release.replacen(
+        "permissions:\n  contents: read\n",
+        "permissions:\n  contents: write\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&wide, &dispatch),
+        ["release.yml: `contents: write` in 2 places, not the page job's alone"]
+    );
+    let back_patch = release.replacen(
+        r#"front_pages.py flags "$GITHUB_REF_NAME""#,
+        "echo --latest",
+        1,
+    );
+    assert_eq!(
+        release_pages(&back_patch, &dispatch),
+        [
+            r#"release.yml page: no `front_pages.py flags "$GITHUB_REF_NAME"` (prerelease and Latest from the version)"#
+        ]
+    );
+    let scheduled = dispatch.replacen(
+        "on:\n  workflow_dispatch:\n",
+        "on:\n  schedule:\n    - cron: '0 6 * * *'\n  workflow_dispatch:\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&release, &scheduled),
+        ["front-pages.yml: fires on `schedule:`; the reconciler runs on a dispatch alone"]
     );
 }

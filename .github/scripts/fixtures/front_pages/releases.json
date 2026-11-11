@@ -1,0 +1,4 @@
+[{"tag_name": "v0.9.0-beta.1", "prerelease": true, "draft": false, "body": "> Affected by a published advisory: GHSA-aaaa-bbbb-cccc"},
+ {"tag_name": "v0.8.7", "prerelease": false, "draft": false, "body": "A security patch."},
+ {"tag_name": "v0.8.6", "prerelease": false, "draft": false, "body": "> Affected by a published advisory: GHSA-aaaa-bbbb-cccc"},
+ {"tag_name": "v0.8.5", "prerelease": false, "draft": true, "body": "a draft page is no page"}]

@@ -41,6 +41,17 @@ jobs:
             exit 1
           fi
 
+      # The Release page is generated from the tag's own section (front_pages.py notes), so a
+      # tag whose CHANGELOG.md has no `## [X.Y.Z]` heading is refused here, before anything is
+      # published: the page job would otherwise fail after the crate is on crates.io
+      - name: The tag's changelog has its section
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -qE "^## \[${version//./\\.}\]( |$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${version}]' heading; the Release page is made from that section"
+            exit 1
+          fi
+
       # Two lines (RELEASING.md, "The two lines"): a plain vX.Y.Z tag must be on main (the
       # stable line); a vX.Y.Z-beta.N tag must be on beta (the programme's line, #75).
       - name: The tagged commit is on its line
@@ -137,3 +148,61 @@ jobs:
         run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  # The GitHub Release page, made in the run that publishes (D7 of the design reads of
+  # 2026-11-11; RELEASING.md step 5): its notes generated from the tag's CHANGELOG.md section,
+  # the PUBLISHED advisories and this run's jobs and logs (front_pages.py notes). Write access
+  # is this job's alone; actions: read and checks: read let it read this run's jobs and logs.
+  # A prerelease is marked so and never Latest; a stable tag takes Latest only when it is the
+  # highest stable version (a back-patch must not take the mark; front_pages.py flags).
+  page:
+    name: Release page
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: The page script's tests
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_front_pages.py'
+
+      - name: The notes, from the tag's changelog and this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/scripts/front_pages.py notes "$GITHUB_REF_NAME" --run "$GITHUB_RUN_ID" > "$RUNNER_TEMP/notes.md"
+
+      - name: Make the Release page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r -a flags <<< "$(python3 -B .github/scripts/front_pages.py flags "$GITHUB_REF_NAME")"
+          echo "gh release create ${GITHUB_REF_NAME} ${flags[*]}"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "bsv-rs ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+
+  # The reconciler (D9): red when a front page disagrees with what was published (crates.io,
+  # GitHub's Latest and the newest stable tag; a page for every version crates.io serves;
+  # docs.rs; the rendered README; SECURITY.md on both lines; the About fields; every page
+  # inside a published advisory's range naming it). It waits up to an hour for what time
+  # heals (docs.rs's build, crates.io's index), never for a permanent miss. Also dispatched
+  # by front-pages.yml at an advisory sitting; never scheduled.
+  front-pages:
+    name: Front pages agree
+    needs: page
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: The front pages agree with what was published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/scripts/front_pages.py check --wait 3600

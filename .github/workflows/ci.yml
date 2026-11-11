@@ -739,6 +739,17 @@ jobs:
           cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked
           python3 .github/scripts/mutants_entries.py
 
+      # the Release page generator and the front pages' reconciler (front_pages.py, run by
+      # release.yml after the publish) on their recorded answers, so a change that breaks them
+      # is red at its pull request, not after a tag published (a markdown-only change, which
+      # cannot reach them, skips it as it skips every gate but secrets)
+      - name: front-pages
+        id: front-pages
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS front-pages"; else echo "FAIL front-pages"; fi' EXIT
+          python3 -B -m unittest discover -s .github/scripts -p 'test_front_pages.py'
+
       # the conformance vectors as one named gate: the shared JSON under tests/vectors/ and the
       # ts-stack corpus
       - name: vectors
@@ -827,6 +838,7 @@ jobs:
           DOCS_ONLY: ${{ steps.plan.outputs.docs_only }}
           VERDICTS: |
             ${{ steps.mutants-entries.outcome }} mutants-entries
+            ${{ steps.front-pages.outcome }} front-pages
             ${{ steps.vectors.outcome }} vectors
             ${{ steps.fixtures.outcome }} fixtures
             ${{ steps.secrets.outcome }} secrets
