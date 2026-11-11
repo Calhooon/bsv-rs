@@ -69,7 +69,9 @@ impl Signature {
     /// An empty integer is zero, as the reference reads it.
     ///
     /// Until #842 bytes after the signature, a wrong sequence length, a
-    /// long-form length and an unneeded leading zero were accepted.
+    /// sequence length byte with its high bit set taken as a plain length and
+    /// an unneeded leading zero were accepted; a long-form length was refused
+    /// already, with other error texts.
     ///
     /// # Example
     ///
