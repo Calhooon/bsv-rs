@@ -1615,53 +1615,29 @@ impl Transaction {
         Ok(())
     }
 
-    /// Distributes change among change outputs. The random arm is the
-    /// reference's `#distributeChange` (`ts-stack@edf6e03` `Transaction.ts:864-897`):
+    /// Distributes change among change outputs, as the reference's
+    /// `#distributeChange` does (`ts-stack@edf6e03` `Transaction.ts:864-897`):
+    /// equal, `floor(change / n)` to each and the remainder to the last; random,
     /// a Benford portion of what remains to each but the last, the rest to the
-    /// last, an output at 0 satoshis where the change runs out, as there (#868).
-    /// The equal arm writes `change / n` to each and one satoshi more to each of
-    /// the first `change % n`, where the reference gives the remainder to the
-    /// last (`:886-892`; stated, the root `CLAUDE.md` row).
+    /// last. An output may receive 0 satoshis, as there (#868).
     fn distribute_change(&mut self, change: u64, distribution: ChangeDistribution) {
-        let change_outputs: Vec<usize> = self
-            .outputs
-            .iter()
-            .enumerate()
-            .filter(|(_, o)| o.change)
-            .map(|(i, _)| i)
+        let change_outputs: Vec<usize> = (0..self.outputs.len())
+            .filter(|&i| self.outputs[i].change)
             .collect();
-
         let Some((&last, rest)) = change_outputs.split_last() else {
             return;
         };
-
-        match distribution {
-            ChangeDistribution::Equal => {
-                let per_output = change / change_outputs.len() as u64;
-                let mut remaining = change % change_outputs.len() as u64;
-
-                for &idx in &change_outputs {
-                    let extra = if remaining > 0 {
-                        remaining -= 1;
-                        1
-                    } else {
-                        0
-                    };
-                    self.outputs[idx].satoshis = Some(per_output + extra);
-                }
-            }
-            ChangeDistribution::Random => {
-                // Benford's law, for privacy: each output but the last a
-                // portion of what remains, the last the rest.
-                let mut remaining = change;
-                for &idx in rest {
-                    let portion = Self::benford_number(remaining);
-                    self.outputs[idx].satoshis = Some(portion);
-                    remaining -= portion;
-                }
-                self.outputs[last].satoshis = Some(remaining);
-            }
+        let per_output = change / change_outputs.len() as u64;
+        let mut remaining = change;
+        for &idx in rest {
+            let portion = match distribution {
+                ChangeDistribution::Equal => per_output,
+                ChangeDistribution::Random => Self::benford_number(remaining),
+            };
+            self.outputs[idx].satoshis = Some(portion);
+            remaining -= portion;
         }
+        self.outputs[last].satoshis = Some(remaining);
     }
 
     /// The reference's `#benfordNumber(0, max)`: `floor(max * log10(1 + 1/d) / log10(10))`
