@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-11-11
+
 ### Fixed: Transaction::from_json refuses an input txid that is not 64 hex digits and holds a valid one in lower case (the reader half of #845, cherry-picked from beta `29d8c366`, PR #856)
 
 - What was wrong. `Transaction::from_json`, for a document with no `hex` member, stored each input's `txid` member as given, unchecked (`src/transaction/tx_json.rs`), and the writer wrote a text it could not read as 32 zero bytes. On 0.8.5 (`a8186851`) an input `txid` of `"zz"`, `"abcd"` or `""` answered `Ok`, each written with the outpoint txid `00...00` and one transaction id, `490b76e7...`: three documents were one transaction, spending an outpoint none of them named. An upper-case txid was held as given, so one txid could be held as two strings.
