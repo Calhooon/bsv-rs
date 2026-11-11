@@ -122,3 +122,11 @@ reads' docs commits `0d57dd7b` and `5033fc92` taken on it) is two:
   `transaction.rs:1676:9`, `:1591:13`, `:1598:17`, `:1693:13`; `left: [1, 0]`,
   `right: [0, 1]`), 5 of 6 in release (the sum test passes: the wrap keeps
   the sum).
+- **B** (`lane/fix-868-equal`, on A): the equal arm conformed (`floor(change
+  / n)` to each, the remainder to the last), the equal test back in the file
+  (seven), the `tests/transaction_tests.rs` hunk, the `### Changed` entry and
+  its migration line, the equal arm's sentence removed from the parity note and
+  the root row. The equal test RED on A's tree (`left: [2, 2, 1]`, `right: [1,
+  1, 3]`), green on B. `git diff` of the fold's step-1 tip (`de13146a`, the
+  one commit with both reads' docs commits) against B over `src` and `tests`
+  is empty: the split changed no code and no test.

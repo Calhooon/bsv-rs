@@ -8,7 +8,8 @@
 //! last 0, the last the whole change). These tests pin the reference's distribution at the pin
 //! (`Transaction.ts:864-897`): every change output but the last takes
 //! `floor(remaining * log10(1 + 1/d))` for a digit `d` of 1 to 9, the last
-//! takes what remains; an output may be 0 satoshis
+//! takes what remains; the equal arm writes `floor(change / n)` to every
+//! change output and the remainder to the last; an output may be 0 satoshis
 //! (the reference gives no output a minimum). The change is the inputs less
 //! the other outputs less the fee; with none, the change outputs are removed.
 //! A sum of a caller's amounts past `u64` is refused in the reference's
@@ -154,6 +155,21 @@ async fn random_change_below_the_output_count_leaves_outputs_at_zero_868() {
             tx.fee(Some(FEE), ChangeDistribution::Random).await.unwrap();
             assert_eq!(change_amounts(&tx), expected, "change {change} over {n}");
         }
+    }
+}
+
+#[tokio::test]
+async fn equal_change_writes_the_floor_to_each_and_the_remainder_to_the_last_868() {
+    for (change, n, expected) in [
+        (5u64, 3usize, vec![1u64, 1, 3]),
+        (1, 3, vec![0, 0, 1]),
+        (12_345, 5, vec![2_469; 5]),
+        (12_346, 5, vec![2_469, 2_469, 2_469, 2_469, 2_470]),
+        (10, 4, vec![2, 2, 2, 4]),
+    ] {
+        let mut tx = spend(change, n);
+        tx.fee(Some(FEE), ChangeDistribution::Equal).await.unwrap();
+        assert_eq!(change_amounts(&tx), expected, "change {change} over {n}");
     }
 }
 

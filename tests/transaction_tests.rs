@@ -2427,15 +2427,18 @@ mod transaction_tests {
                 .map(|i| spend_tx.outputs[i].satoshis.unwrap())
                 .collect();
 
-            // Verify they are approximately equal (within 1 sat of each other)
-            let max_change = *change_amounts.iter().max().unwrap();
-            let min_change = *change_amounts.iter().min().unwrap();
+            // The reference's equal arm (`Transaction.ts:886-892` at ts-stack@edf6e03,
+            // #868): floor(change / 3) to each, the remainder (under 3) to the last.
+            let per_output = change_amounts[0];
+            assert_eq!(
+                change_amounts[1], per_output,
+                "amounts: {:?}",
+                change_amounts
+            );
             assert!(
-                max_change - min_change <= 1,
-                "Change amounts should be approximately equal (within 1 sat). \
-                 Got amounts: {:?}, diff: {}",
-                change_amounts,
-                max_change - min_change
+                change_amounts[2] >= per_output && change_amounts[2] - per_output < 3,
+                "the last change output takes the remainder: {:?}",
+                change_amounts
             );
 
             // Verify total output = total input (no sats lost)
