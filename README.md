@@ -24,15 +24,14 @@ with the RustSec advisory database: stay on the newest patch of your line.
 
 ## Install
 
-```toml
-[dependencies]
-bsv-rs = { version = "0.8", features = ["transaction", "wallet"] }
+```sh
+cargo add bsv-rs --features transaction,wallet
 ```
 
-`0.8` takes every patch of the stable line. The 0.9.0 line is in prerelease on
-crates.io (`0.9.0-beta.N`), developed on the `beta` branch; the published
-advisories affect its prereleases so far, and the next one carries the fixes
-([SECURITY.md](SECURITY.md) has the table).
+`cargo add` takes the newest stable release. The 0.9.0 line is in prerelease on
+crates.io (`cargo add bsv-rs@0.9.0-beta.N`), developed on the `beta` branch;
+the published advisories affect its prereleases so far, and the next one
+carries the fixes.
 
 Defaults enable `primitives` and `script`. [Cargo.toml](Cargo.toml) lists the
 module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
