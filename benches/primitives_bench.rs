@@ -339,7 +339,7 @@ fn bench_shamir(c: &mut Criterion) {
         b.iter(|| black_box(&shares).to_backup_format())
     });
 
-    let backup = shares.to_backup_format();
+    let backup = shares.to_backup_format().unwrap();
     group.bench_function("from_backup_format", |b| {
         b.iter(|| {
             bsv_rs::primitives::bsv::shamir::KeyShares::from_backup_format(black_box(&backup))

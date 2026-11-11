@@ -234,7 +234,7 @@ let key = PrivateKey::random();
 
 // Split into 5 shares with threshold of 3
 let shares = split_private_key(&key, 3, 5)?;
-let backup = shares.to_backup_format();
+let backup = shares.to_backup_format()?; // BRC-140's shares (#854)
 
 // Recover from any 3 shares
 let subset = KeyShares::from_backup_format(&backup[0..3])?;
@@ -265,11 +265,12 @@ Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_
 | `sighash.rs` | 623 | BIP-143 style sighash computation |
 | `tx_signature.rs` | 309 | Transaction signature encoding/decoding with sighash scope |
 | `schnorr.rs` | 413 | Schnorr zero-knowledge proofs for ECDH verification |
-| `shamir.rs` | 440 | Shamir secret sharing for private key backup/recovery; `split_private_key_with` (bsv-rs#180) |
-| `shamir_tests.rs` | 604 | `shamir.rs`'s 34 unit tests (moved for the file-size ratchet, bsv-rs#180) |
-| `polynomial.rs` | 394 | Polynomial operations over finite field (for Shamir) |
+| `shamir.rs` | 576 | BRC-140 Shamir backup (#854), the reference's writer and reader; `split_private_key_with` (bsv-rs#180) |
+| `shamir_legacy.rs` | 147 | `recover_private_key_from_legacy_backup`: a backup bsv-rs 0.8.5 or earlier wrote, each share bounded at 65 bytes (#854) |
+| `shamir_tests.rs` | 645 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
+| `polynomial.rs` | 432 | Polynomial operations over finite field (for Shamir); `from_string` the reference's bounded canonical reading (#854) |
 
-Key exports: `compute_sighash`, `build_sighash_preimage`, `compute_sighash_for_signing`, `compute_sighash_from_raw`, `parse_transaction`, `RawTransaction`, `SighashCache`, `SighashParams`, `TxInput`, `TxOutput`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `split_private_key_with`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`)
+Key exports: `compute_sighash`, `build_sighash_preimage`, `compute_sighash_for_signing`, `compute_sighash_from_raw`, `parse_transaction`, `RawTransaction`, `SighashCache`, `SighashParams`, `TxInput`, `TxOutput`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `split_private_key_with`, `recover_private_key_from_legacy_backup`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`)
 
 ### p256 (P-256/secp256r1)
 

@@ -1,8 +1,10 @@
-//! Shamir Secret Sharing for private key backup and recovery.
+//! Shamir Secret Sharing for private key backup and recovery: BRC-140.
 //!
-//! This module implements Shamir's Secret Sharing scheme for splitting a private key
-//! into multiple shares, where any threshold number of shares can reconstruct the
-//! original key, but fewer shares reveal nothing about it.
+//! A private key is split into shares of which any `threshold` recover it
+//! and fewer reveal nothing about it. The shares and their text are
+//! BRC-140's (`key-derivation/0140.md` at `f7f1520`) and the reference's
+//! (`ts-stack@edf6e03` `PrivateKey.ts`, `Polynomial.ts`), so a backup written
+//! here is read by `@bsv/sdk` and go-sdk and theirs here (#854).
 //!
 //! # Example
 //!
@@ -17,7 +19,7 @@
 //! let shares = split_private_key(&key, 3, 5).unwrap();
 //!
 //! // Export to backup format
-//! let backup = shares.to_backup_format();
+//! let backup = shares.to_backup_format().unwrap();
 //! assert_eq!(backup.len(), 5);
 //!
 //! // Recover from any 3 shares
@@ -31,21 +33,41 @@
 //!
 //! Each share is serialized as: `base58(x).base58(y).threshold.integrity`
 //!
-//! - `base58(x)` and `base58(y)` are the point coordinates
-//! - `threshold` is the minimum number of shares needed for recovery
-//! - `integrity` is the first 4 characters of base58(sha256(secret)) for verification
+//! - `base58(x)` and `base58(y)` are the point's coordinates, canonical
+//!   base58 of their minimal big-endian bytes (`1` for zero)
+//! - `threshold` is the minimum number of shares needed for recovery, 2 to 255
+//! - `integrity` is the leading 8 hex digits of HASH160 of the compressed
+//!   public key
+//!
+//! A backup written by bsv-rs 0.8.5 or earlier (a 4-character tag after the
+//! last `.`) is refused by [`KeyShares::from_backup_format`]; it is
+//! recovered by [`recover_private_key_from_legacy_backup`].
 
 use crate::error::{Error, Result};
 use crate::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
-use crate::primitives::encoding::{from_base58, to_base58};
-use crate::primitives::hash::sha256;
+use crate::primitives::encoding::to_hex;
+use crate::primitives::hash::sha512_hmac;
 use crate::primitives::BigNumber;
 use crate::primitives::PrivateKey;
+use rand::rngs::OsRng;
+use rand::RngCore;
+
+#[path = "shamir_legacy.rs"]
+mod legacy;
+pub use legacy::recover_private_key_from_legacy_backup;
+
+/// The most shares a collection holds and the largest threshold
+/// (`MAX_SHAMIR_SHARES`, `ts-stack@edf6e03` `Polynomial.ts:7`).
+const MAX_SHARES: usize = 255;
+/// The longest share text, in UTF-16 code units (`PrivateKey.ts:12`).
+const MAX_SHARE_LENGTH: usize = 256;
+/// The attempts BRC-140 allows a share's coordinate (`PrivateKey.ts:525-527`).
+const MAX_COORDINATE_ATTEMPTS: usize = 5;
 
 /// A collection of key shares that can be used to recover a private key.
 ///
-/// Contains the share points, the threshold needed for recovery, and an
-/// integrity checksum to verify successful recovery.
+/// Contains the share points, the threshold needed for recovery, and the
+/// BRC-140 integrity tag that verifies a recovery.
 ///
 /// Its `Debug` shows the threshold, the share count and the integrity tag
 /// (which every backup string carries), never a share's value;
@@ -56,7 +78,8 @@ pub struct KeyShares {
     pub points: Vec<PointInFiniteField>,
     /// The minimum number of shares needed for recovery.
     pub threshold: usize,
-    /// Integrity check: first 4 characters of base58(sha256(secret)).
+    /// The integrity tag: the leading 8 hex digits of HASH160 of the
+    /// compressed public key.
     pub integrity: String,
 }
 
@@ -70,6 +93,73 @@ impl std::fmt::Debug for KeyShares {
     }
 }
 
+fn crypto(words: impl Into<String>) -> Error {
+    Error::CryptoError(words.into())
+}
+
+/// `assertKeyShareCollection` (`ts-stack@edf6e03` `PrivateKey.ts:17-27`).
+fn assert_collection(points: usize, threshold: usize, integrity: &str) -> Result<()> {
+    if points == 0 || points > MAX_SHARES {
+        return Err(crypto(format!(
+            "shares must contain from 1 to {MAX_SHARES} entries"
+        )));
+    }
+    if !(2..=MAX_SHARES).contains(&threshold) {
+        return Err(crypto(format!(
+            "threshold must be a safe integer from 2 to {MAX_SHARES}"
+        )));
+    }
+    if !is_integrity(integrity) {
+        return Err(crypto(
+            "integrity must be an 8-character lowercase hexadecimal string",
+        ));
+    }
+    Ok(())
+}
+
+/// `/^[1-9A-HJ-NP-Za-km-z]{1,64}$/` (`PrivateKey.ts:13`, `Polynomial.ts:9`).
+pub(crate) fn is_base58_field(field: &str) -> bool {
+    (1..=64).contains(&field.len())
+        && field.bytes().all(|b| {
+            matches!(b, b'1'..=b'9' | b'A'..=b'H' | b'J'..=b'N' | b'P'..=b'Z' | b'a'..=b'k' | b'm'..=b'z')
+        })
+}
+
+/// `/^(?:[2-9]|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])$/` (`PrivateKey.ts:14`): a
+/// threshold of 2 to 255, no sign, no leading zero.
+pub(crate) fn threshold_of(field: &str) -> Option<usize> {
+    if field.is_empty() || field.len() > 3 || field.starts_with('0') {
+        return None;
+    }
+    if !field.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let t: usize = field.parse().ok()?;
+    (2..=MAX_SHARES).contains(&t).then_some(t)
+}
+
+/// `/^[0-9a-f]{8}$/` (`PrivateKey.ts:15`).
+pub(crate) fn is_integrity(field: &str) -> bool {
+    field.len() == 8
+        && field
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// A share's four fields, or `None` for any other count (bounded: at most
+/// five are split off).
+pub(crate) fn four_fields(share: &str) -> Option<[&str; 4]> {
+    let mut parts = share.splitn(5, '.');
+    let fields = [parts.next()?, parts.next()?, parts.next()?, parts.next()?];
+    parts.next().is_none().then_some(fields)
+}
+
+/// The BRC-140 tag: `hex(HASH160(compressed public key))[0:8]`
+/// (`PrivateKey.ts:535`).
+fn integrity_of(key: &PrivateKey) -> String {
+    to_hex(&key.public_key().hash160()[..4])
+}
+
 impl KeyShares {
     /// Creates a new KeyShares instance.
     ///
@@ -77,7 +167,7 @@ impl KeyShares {
     ///
     /// * `points` - The share points
     /// * `threshold` - The minimum number of shares needed for recovery
-    /// * `integrity` - The integrity checksum string
+    /// * `integrity` - The integrity tag (8 lowercase hex digits)
     pub fn new(points: Vec<PointInFiniteField>, threshold: usize, integrity: String) -> Self {
         Self {
             points,
@@ -86,96 +176,106 @@ impl KeyShares {
         }
     }
 
-    /// Parses key shares from backup format strings.
+    /// Parses BRC-140 backup shares, the reference's `KeyShares.fromBackupFormat`
+    /// (`ts-stack@edf6e03` `PrivateKey.ts:55-102`), verdict for verdict and in
+    /// its words.
     ///
-    /// Each share string must be in the format: `base58(x).base58(y).threshold.integrity`
-    ///
-    /// # Arguments
-    ///
-    /// * `shares` - The backup format strings
-    ///
-    /// # Returns
-    ///
-    /// The parsed KeyShares, or an error if parsing fails or shares are inconsistent
+    /// Each share is `x.y.threshold.integrity`: x and y canonical base58 of 1
+    /// to 64 characters (the point read by [`PointInFiniteField::from_string`]),
+    /// the threshold 2 to 255 with no sign or leading zero, the integrity 8
+    /// lowercase hex digits.
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - Any share string has an invalid format
-    /// - Shares have different thresholds
-    /// - Shares have different integrity values
+    /// Every refusal names the share by its index, never its text:
+    /// - no shares or more than 255: `shares must contain from 1 to 255 entries`
+    /// - a share over 256 characters: `Invalid share format in share N`
+    /// - other than four fields: `Invalid share format in share N. Expected format: "x.y.t.i"`
+    /// - a field outside its grammar: `Invalid canonical share data in share N`
+    /// - `Threshold mismatch in share N`, then `Integrity mismatch in share N`
+    /// - a point that does not round-trip: the point's sentence
+    ///
+    /// A backup written by bsv-rs 0.8.5 or earlier carries a 4-character tag
+    /// and is refused here as `Invalid canonical share data in share 0`;
+    /// recover it with
+    /// [`recover_private_key_from_legacy_backup`].
     ///
     /// # Example
     ///
     /// ```rust
     /// use bsv_rs::primitives::bsv::shamir::KeyShares;
     ///
+    /// // BRC-140's example shares (key-derivation/0140.md)
     /// let backup = vec![
-    ///     "2.someY.3.abcd".to_string(),
-    ///     "3.otherY.3.abcd".to_string(),
-    ///     "4.anotherY.3.abcd".to_string(),
+    ///     "45s4vLL2hFvqmxrarvbRT2vZoQYGZGocsmaEksZ64o5M.A7nZrGux15nEsQGNZ1mbfnMKugNnS6SYYEQwfhfbDZG8.3.2f804d43".to_string(),
+    ///     "7aPzkiGZgvU4Jira5PN9Qf9o7FEg6uwy1zcxd17NBhh3.CCt7NH1sPFgceb6phTRkfviim2WvmUycJCQd2BxauxP9.3.2f804d43".to_string(),
     /// ];
-    /// // Note: This example would fail because "someY" etc. aren't valid base58
-    /// // In practice, use actual share strings from split_private_key()
+    /// let shares = KeyShares::from_backup_format(&backup).unwrap();
+    /// assert_eq!(shares.threshold, 3);
+    /// assert!(shares.recover_private_key().is_err()); // two of three
     /// ```
     pub fn from_backup_format(shares: &[String]) -> Result<Self> {
-        if shares.is_empty() {
-            return Err(Error::CryptoError(
-                "No shares provided for recovery".to_string(),
-            ));
+        if shares.is_empty() || shares.len() > MAX_SHARES {
+            return Err(crypto(format!(
+                "shares must contain from 1 to {MAX_SHARES} entries"
+            )));
         }
-
+        let mut threshold = 0;
+        let mut integrity = "";
         let mut points = Vec::with_capacity(shares.len());
-        let mut threshold: Option<usize> = None;
-        let mut integrity: Option<String> = None;
-
         for (idx, share) in shares.iter().enumerate() {
-            let (point, t, i) = decode_share(share, idx)?;
-
-            // Validate consistency
-            if let Some(existing_threshold) = threshold {
-                if existing_threshold != t {
-                    return Err(Error::CryptoError(format!(
-                        "Threshold mismatch: share 0 has threshold {}, share {} has threshold {}",
-                        existing_threshold, idx, t
-                    )));
-                }
-            } else {
-                threshold = Some(t);
+            // JavaScript's `length`: UTF-16 code units, counted to the bound.
+            if share.encode_utf16().take(MAX_SHARE_LENGTH + 1).count() > MAX_SHARE_LENGTH {
+                return Err(crypto(format!("Invalid share format in share {idx}")));
             }
-
-            if let Some(ref existing_integrity) = integrity {
-                if existing_integrity != &i {
-                    return Err(Error::CryptoError(format!(
-                        "Integrity mismatch: share 0 has integrity '{}', share {} has integrity '{}'",
-                        existing_integrity, idx, i
-                    )));
+            let Some([x, y, t, i]) = four_fields(share) else {
+                return Err(crypto(format!(
+                    "Invalid share format in share {idx}. Expected format: \"x.y.t.i\""
+                )));
+            };
+            let t = match threshold_of(t) {
+                Some(t) if is_base58_field(x) && is_base58_field(y) && is_integrity(i) => t,
+                _ => {
+                    return Err(crypto(format!(
+                        "Invalid canonical share data in share {idx}"
+                    )))
                 }
-            } else {
-                integrity = Some(i);
+            };
+            if idx != 0 && threshold != t {
+                return Err(crypto(format!("Threshold mismatch in share {idx}")));
             }
-
-            points.push(point);
+            if idx != 0 && integrity != i {
+                return Err(crypto(format!("Integrity mismatch in share {idx}")));
+            }
+            threshold = t;
+            integrity = i;
+            points.push(PointInFiniteField::from_string(
+                &share[..x.len() + 1 + y.len()],
+            )?);
         }
-
-        let (Some(threshold), Some(integrity)) = (threshold, integrity) else {
-            return Err(Error::CryptoError("No shares to recombine".to_string()));
-        };
+        assert_collection(points.len(), threshold, integrity)?;
         Ok(Self {
             points,
             threshold,
-            integrity,
+            integrity: integrity.to_string(),
         })
     }
 
-    /// Converts the key shares to backup format strings.
-    ///
-    /// Each share is serialized as: `base58(x).base58(y).threshold.integrity`.
+    /// Writes the shares as BRC-140 backup strings, the reference's
+    /// `toBackupFormat` (`ts-stack@edf6e03` `PrivateKey.ts:104-118`).
     /// Reveals every share's value, which `Debug` redacts.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// A vector of backup format strings, one per share
+    /// Refuses, before any string, a state the reader refuses, in the
+    /// reference's words: no points or more than 255 (`shares must contain
+    /// from 1 to 255 entries`), a threshold outside 2 to 255 (`threshold must
+    /// be a safe integer from 2 to 255`), an integrity other than 8 lowercase
+    /// hex digits (`integrity must be an 8-character lowercase hexadecimal
+    /// string`), a point whose text [`PointInFiniteField::from_string`]
+    /// refuses (a coordinate at or above p set through the public fields: its
+    /// sentence) or that does not read back as itself (`shares must contain
+    /// canonical finite-field points`).
     ///
     /// # Example
     ///
@@ -185,38 +285,35 @@ impl KeyShares {
     ///
     /// let key = PrivateKey::random();
     /// let shares = split_private_key(&key, 2, 3).unwrap();
-    /// let backup = shares.to_backup_format();
-    ///
-    /// // Each string can be stored separately
-    /// for (i, share_str) in backup.iter().enumerate() {
-    ///     println!("Share {}: {}", i + 1, share_str);
-    /// }
+    /// let backup = shares.to_backup_format().unwrap();
+    /// assert_eq!(backup.len(), 3);
     /// ```
-    pub fn to_backup_format(&self) -> Vec<String> {
+    pub fn to_backup_format(&self) -> Result<Vec<String>> {
+        assert_collection(self.points.len(), self.threshold, &self.integrity)?;
         self.points
             .iter()
             .map(|point| {
-                format!(
-                    "{}.{}.{}",
-                    point.to_point_string(),
-                    self.threshold,
-                    self.integrity
-                )
+                let serialized = point.to_point_string();
+                if PointInFiniteField::from_string(&serialized)?.to_point_string() != serialized {
+                    return Err(crypto("shares must contain canonical finite-field points"));
+                }
+                Ok(format!(
+                    "{serialized}.{}.{}",
+                    self.threshold, self.integrity
+                ))
             })
             .collect()
     }
 
-    /// Recovers the private key from the shares using Lagrange interpolation.
-    ///
-    /// The secret is the y-intercept (value at x=0) of the polynomial that passes
-    /// through all the share points.
-    ///
-    /// # Returns
-    ///
-    /// The recovered private key, or an error if:
-    /// - There are fewer shares than the threshold
-    /// - The integrity check fails
-    /// - The recovered value is not a valid private key
+    /// Recovers the private key, the reference's `PrivateKey.fromKeyShares`
+    /// (`ts-stack@edf6e03` `PrivateKey.ts:575-623`): the collection checked
+    /// as [`to_backup_format`](Self::to_backup_format) checks it, then
+    /// `At least T shares are required to reconstruct the private key`, the
+    /// leading `threshold` points' coordinates canonical (`share coordinates
+    /// must be canonical field elements`) and distinct (`Duplicate share
+    /// detected, each must be unique.`), the secret interpolated at x = 0 and
+    /// read modulo the group order, and its tag compared (`Integrity hash
+    /// mismatch`). Shares past the threshold are not read.
     ///
     /// # Example
     ///
@@ -227,57 +324,91 @@ impl KeyShares {
     /// let key = PrivateKey::random();
     /// let shares = split_private_key(&key, 3, 5).unwrap();
     ///
-    /// // Recover from exactly 3 shares
     /// let recovered = shares.recover_private_key().unwrap();
     /// assert_eq!(key.to_bytes(), recovered.to_bytes());
     /// ```
     pub fn recover_private_key(&self) -> Result<PrivateKey> {
-        if self.points.len() < self.threshold {
-            return Err(Error::CryptoError(format!(
-                "Insufficient shares: have {}, need {}",
-                self.points.len(),
-                self.threshold
-            )));
+        assert_collection(self.points.len(), self.threshold, &self.integrity)?;
+        let mismatch = || crypto("Integrity hash mismatch");
+        // A secret of 0 mod n is no key: refused in the words the reference
+        // gives it, and never returned (#854's fold).
+        let key = interpolate(&self.points, self.threshold, InterpolationWords::BRC140)?
+            .ok_or_else(mismatch)?;
+        if integrity_of(&key) != self.integrity {
+            return Err(mismatch());
         }
-
-        // Create polynomial from points and evaluate at x=0
-        let poly = Polynomial::new(self.points.clone(), self.threshold);
-        let secret = poly.value_at(&BigNumber::zero());
-
-        // Convert to 32-byte representation
-        // The secret should fit in 32 bytes (it's a private key value)
-        let secret_bytes = secret.to_bytes_be(32);
-
-        // Create the private key
-        let key = PrivateKey::from_bytes(&secret_bytes)?;
-
-        // Verify integrity
-        let computed_integrity = compute_integrity(&key);
-        if computed_integrity != self.integrity {
-            return Err(Error::CryptoError(format!(
-                "Integrity check failed: computed '{}', expected '{}'",
-                computed_integrity, self.integrity
-            )));
-        }
-
         Ok(key)
     }
 }
 
-/// Splits a private key into multiple shares using Shamir's Secret Sharing.
+/// The words of the interpolation's refusals, the reader's or the legacy
+/// reader's.
+pub(crate) struct InterpolationWords {
+    pub(crate) duplicate: &'static str,
+    pub(crate) too_few: fn(usize) -> String,
+}
+
+impl InterpolationWords {
+    const BRC140: Self = Self {
+        duplicate: "Duplicate share detected, each must be unique.",
+        too_few: |t| format!("At least {t} shares are required to reconstruct the private key"),
+    };
+}
+
+/// The secret through the leading `threshold` points (`PrivateKey.ts:587-620`):
+/// at least `threshold` points, each coordinate in `[0, p)`, the x values
+/// distinct, `f(0)` read modulo the group order `n` (the reference's
+/// `new PrivateKey(..)`, `modN` `'apply'`). `None` when that is 0: no key,
+/// which each caller refuses in its integrity words (`Integrity hash
+/// mismatch`, the words of the recording; a key of 0 is never returned).
+pub(crate) fn interpolate(
+    points: &[PointInFiniteField],
+    threshold: usize,
+    words: InterpolationWords,
+) -> Result<Option<PrivateKey>> {
+    if points.len() < threshold {
+        return Err(crypto((words.too_few)(threshold)));
+    }
+    let used = &points[..threshold];
+    let p = BigNumber::secp256k1_prime();
+    let canonical = |v: &BigNumber| !v.is_negative() && v.compare(&p).is_lt();
+    if !used.iter().all(|pt| canonical(&pt.x) && canonical(&pt.y)) {
+        return Err(crypto("share coordinates must be canonical field elements"));
+    }
+    for (i, a) in used.iter().enumerate() {
+        if used[i + 1..].iter().any(|b| b.x == a.x) {
+            return Err(crypto(words.duplicate));
+        }
+    }
+    let secret = Polynomial::new(used.to_vec(), threshold)
+        .value_at(&BigNumber::zero())
+        .modulo(&BigNumber::secp256k1_order());
+    if secret.is_zero() {
+        return Ok(None);
+    }
+    PrivateKey::from_bytes(&secret.to_bytes_be(32)).map(Some)
+}
+
+/// Splits a private key into BRC-140 shares, the reference's `toKeyShares`
+/// (`ts-stack@edf6e03` `PrivateKey.ts:478-538`).
 ///
-/// The secret (private key) becomes the constant term of a random polynomial.
-/// Shares are generated by evaluating the polynomial at x = 1, 2, 3, ..., total.
+/// The secret is the constant term of a random polynomial of degree
+/// `threshold - 1`; each share's x coordinate is drawn by BRC-140's
+/// procedure (a 64-byte seed per split, `x = HMAC-SHA-512(seed, [i, attempt,
+/// 32 fresh bytes]) mod p`, drawn again when 0 or already used, at most 5
+/// attempts), so two splits of one key share no coordinate.
 ///
 /// # Arguments
 ///
 /// * `key` - The private key to split
-/// * `threshold` - The minimum number of shares needed for recovery (must be >= 2)
-/// * `total` - The total number of shares to generate (must be >= threshold)
+/// * `threshold` - The minimum number of shares needed for recovery, 2 to 255
+/// * `total` - The total number of shares to generate, `threshold` to 255
 ///
-/// # Returns
+/// # Errors
 ///
-/// The generated key shares, or an error if the parameters are invalid
+/// In the reference's words, in its order: `threshold must be at least 2`,
+/// `totalShares must be at least 2`, `threshold should be less than or equal
+/// to totalShares`, `threshold and totalShares cannot exceed 255`.
 ///
 /// # Example
 ///
@@ -293,54 +424,71 @@ impl KeyShares {
 /// assert_eq!(shares.points.len(), 5);
 /// assert_eq!(shares.threshold, 3);
 /// ```
-///
-/// # Security
-///
-/// - Choose threshold based on your security requirements
-/// - Higher threshold = more shares needed = more secure against partial compromise
-/// - Lower threshold = easier to recover = less secure
-/// - Typical values: 2-of-3, 3-of-5, etc.
 pub fn split_private_key(key: &PrivateKey, threshold: usize, total: usize) -> Result<KeyShares> {
     // a_1..a_{t-1}: random scalars, never zero (the `_with` form checks)
-    let draws = 1..threshold.clamp(1, 255);
+    let draws = 1..threshold.clamp(1, MAX_SHARES);
     let coefficients: Vec<[u8; 32]> = draws.map(|_| PrivateKey::random().to_bytes()).collect();
-    split_private_key_with(key, threshold, total, &coefficients)
+    let mut seed = [0u8; 64];
+    OsRng.fill_bytes(&mut seed);
+    let fresh = || {
+        let mut draw = [0u8; 32];
+        OsRng.fill_bytes(&mut draw);
+        Some(draw)
+    };
+    split(key, threshold, total, &coefficients, &seed, fresh)
 }
 
-/// [`split_private_key`] with the coefficients a_1..a_{t-1} given, each 32
-/// bytes big-endian reduced modulo p; the plain form draws them and calls
-/// this, so the same coefficients give the same shares (a reproducible seed
-/// corpus, bsv-rs#180). This crate's addition: TS draws its polynomial inside
-/// `toKeyShares`. Refuses as the plain form does, a count other than
-/// `threshold - 1` as `InvalidDataLength` (in bytes), and a coefficient 0
-/// modulo p as `CryptoError` (a zero top one lowers the degree). Production
-/// code uses [`split_private_key`]: the coefficients and one share give the key.
+/// [`split_private_key`] with its draws given: the coefficients a_1..a_{t-1}
+/// (each 32 bytes big-endian, reduced modulo p), the split's 64-byte HMAC
+/// `seed` and the 32-byte draws of the coordinate procedure, one per attempt
+/// in order (`total` of them unless an attempt is drawn again). The plain
+/// form draws them and calls the same code, so the same draws give the same
+/// shares (a reproducible seed corpus, bsv-rs#180). This crate's addition:
+/// TS draws inside `toKeyShares`. Refuses as the plain form does, a
+/// coefficient count other than `threshold - 1` as `InvalidDataLength` (in
+/// bytes), a coefficient 0 modulo p as `CryptoError` (a zero top one lowers
+/// the degree), and `draws` running out as `CryptoError`. Production code
+/// uses [`split_private_key`]: the draws and one share give the key.
 pub fn split_private_key_with(
     key: &PrivateKey,
     threshold: usize,
     total: usize,
     coefficients: &[[u8; 32]],
+    seed: &[u8; 64],
+    draws: &[[u8; 32]],
 ) -> Result<KeyShares> {
-    // Validate parameters
+    let mut draws = draws.iter().copied();
+    split(key, threshold, total, coefficients, seed, move || {
+        draws.next()
+    })
+}
+
+fn split(
+    key: &PrivateKey,
+    threshold: usize,
+    total: usize,
+    coefficients: &[[u8; 32]],
+    seed: &[u8; 64],
+    mut draw: impl FnMut() -> Option<[u8; 32]>,
+) -> Result<KeyShares> {
     if threshold < 2 {
-        return Err(Error::CryptoError(
-            "Threshold must be at least 2".to_string(),
+        return Err(crypto("threshold must be at least 2"));
+    }
+    if total < 2 {
+        return Err(crypto("totalShares must be at least 2"));
+    }
+    if threshold > total {
+        return Err(crypto(
+            "threshold should be less than or equal to totalShares",
         ));
     }
-    if total < threshold {
-        return Err(Error::CryptoError(format!(
-            "Total shares ({}) must be at least threshold ({})",
-            total, threshold
+    if threshold > MAX_SHARES || total > MAX_SHARES {
+        return Err(crypto(format!(
+            "threshold and totalShares cannot exceed {MAX_SHARES}"
         )));
-    }
-    if threshold > 255 {
-        return Err(Error::CryptoError(
-            "Threshold cannot exceed 255".to_string(),
-        ));
     }
 
     let p = BigNumber::secp256k1_prime();
-
     if coefficients.len() != threshold - 1 {
         let (expected, actual) = (32 * (threshold - 1), 32 * coefficients.len());
         return Err(Error::InvalidDataLength { expected, actual });
@@ -353,27 +501,53 @@ pub fn split_private_key_with(
             .map(|c| BigNumber::from_bytes_be(c).modulo(&p)),
     );
     if terms[1..].iter().any(BigNumber::is_zero) {
-        let zero = "Shamir coefficient is zero modulo p";
-        return Err(Error::CryptoError(zero.into()));
+        return Err(crypto("Shamir coefficient is zero modulo p"));
     }
 
-    // Generate shares by evaluating polynomial at x = 1, 2, ..., total
-    let mut points = Vec::with_capacity(total);
-
-    for i in 1..=total {
-        let x = BigNumber::from_u64(i as u64);
+    let mut points: Vec<PointInFiniteField> = Vec::with_capacity(total);
+    for i in 0..total {
+        let x = coordinate(i, seed, &mut draw, &points, &p)?;
         let y = evaluate_polynomial(&terms, &x, &p);
         points.push(PointInFiniteField::new(x, y));
     }
 
-    // Compute integrity checksum
-    let integrity = compute_integrity(key);
-
     Ok(KeyShares {
         points,
         threshold,
-        integrity,
+        integrity: integrity_of(key),
     })
+}
+
+/// Share `i`'s x coordinate by BRC-140's procedure (`PrivateKey.ts:513-531`):
+/// `HMAC-SHA-512(seed, [i, attempt, r_0..r_31]) mod p`, drawn again when 0 or
+/// already used; the attempt after the fifth refused before its value is
+/// judged, as the reference's loop refuses it.
+fn coordinate(
+    i: usize,
+    seed: &[u8; 64],
+    draw: &mut impl FnMut() -> Option<[u8; 32]>,
+    used: &[PointInFiniteField],
+    p: &BigNumber,
+) -> Result<BigNumber> {
+    // i < 255 and the attempt <= 5: each one byte, as the reference's array
+    let index = u8::try_from(i).map_err(|_| crypto("share index exceeds 255"))?;
+    let mut attempt = 0u8;
+    loop {
+        let fresh = draw().ok_or_else(|| crypto("Shamir coordinate draws exhausted"))?;
+        let mut counter = Vec::with_capacity(34);
+        counter.extend_from_slice(&[index, attempt]);
+        counter.extend_from_slice(&fresh);
+        let x = BigNumber::from_bytes_be(&sha512_hmac(seed, &counter)).modulo(p);
+        attempt += 1;
+        if usize::from(attempt) > MAX_COORDINATE_ATTEMPTS {
+            return Err(crypto(
+                "Failed to generate unique x coordinate after 5 attempts",
+            ));
+        }
+        if !x.is_zero() && !used.iter().any(|pt| pt.x == x) {
+            return Ok(x);
+        }
+    }
 }
 
 /// Evaluates a polynomial at a given point.
@@ -395,57 +569,6 @@ fn evaluate_polynomial(
     }
 
     result
-}
-
-/// Computes the integrity checksum for a private key.
-///
-/// Returns the first 4 characters of base58(sha256(key_bytes)).
-fn compute_integrity(key: &PrivateKey) -> String {
-    let hash = sha256(&key.to_bytes());
-    let b58 = to_base58(&hash);
-
-    // Take first 4 characters
-    if b58.len() >= 4 {
-        b58[..4].to_string()
-    } else {
-        b58
-    }
-}
-
-/// Decodes a share from its backup format string.
-///
-/// Format: `base58(x).base58(y).threshold.integrity`
-///
-/// Returns the point, threshold, and integrity string. A refusal names the
-/// share by its index, never its text, which carries `y` (the reference's
-/// words, `ts-stack@edf6e03` `PrivateKey.ts:69-75`).
-fn decode_share(share: &str, idx: usize) -> Result<(PointInFiniteField, usize, String)> {
-    let components: Vec<&str> = share.split('.').collect();
-
-    if components.len() != 4 {
-        return Err(Error::CryptoError(format!(
-            "Invalid share format in share {idx}. Expected format: \"x.y.t.i\""
-        )));
-    }
-
-    // Parse x and y from base58
-    let x_bytes = from_base58(components[0])?;
-    let y_bytes = from_base58(components[1])?;
-
-    let x = BigNumber::from_bytes_be(&x_bytes);
-    let y = BigNumber::from_bytes_be(&y_bytes);
-
-    let point = PointInFiniteField::new(x, y);
-
-    // Parse threshold
-    let threshold: usize = components[2]
-        .parse()
-        .map_err(|_| Error::CryptoError(format!("Invalid canonical share data in share {idx}")))?;
-
-    // Integrity is the last component
-    let integrity = components[3].to_string();
-
-    Ok((point, threshold, integrity))
 }
 
 #[cfg(test)]

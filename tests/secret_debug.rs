@@ -18,6 +18,9 @@
 use bsv_rs::compat::bip32::{ExtendedKey, Network};
 use bsv_rs::compat::bip39::Mnemonic;
 use bsv_rs::primitives::bsv::shamir::split_private_key_with;
+
+/// The coordinate draws of a fixed split (BRC-140's procedure, #854).
+const DRAWS: [[u8; 32]; 3] = [[0xa1; 32], [0xa2; 32], [0xa3; 32]];
 use bsv_rs::primitives::bsv::{PointInFiniteField, Polynomial};
 use bsv_rs::primitives::encoding::to_base58;
 use bsv_rs::primitives::p256::P256PrivateKey;
@@ -160,10 +163,10 @@ fn share_secrets(p: &PointInFiniteField) -> Vec<String> {
 #[test]
 fn shamir_shares_debug_prints_no_share_value() {
     let key = private_key();
-    let shares =
-        split_private_key_with(&key, 2, 3, &[[0x42; 32]]).expect("fixed coefficient split");
+    let shares = split_private_key_with(&key, 2, 3, &[[0x42; 32]], &[0x5e; 64], &DRAWS)
+        .expect("fixed coefficient split");
     let mut secrets: Vec<String> = shares.points.iter().flat_map(share_secrets).collect();
-    secrets.extend(shares.to_backup_format());
+    secrets.extend(shares.to_backup_format().expect("written"));
     secrets.extend(private_key_secrets(&key));
 
     assert_hides("KeyShares", &both(&shares), &secrets);
@@ -190,7 +193,8 @@ fn a_struct_holding_the_secrets_prints_none_of_them() {
     let m = mnemonic();
     let key = private_key();
     let xprv = master();
-    let shares = split_private_key_with(&key, 2, 3, &[[0x42; 32]]).expect("split");
+    let shares =
+        split_private_key_with(&key, 2, 3, &[[0x42; 32]], &[0x5e; 64], &DRAWS).expect("split");
     let mut secrets = mnemonic_secrets(&m);
     secrets.extend(private_key_secrets(&key));
     secrets.extend(extended_key_secrets(&xprv));
@@ -355,8 +359,9 @@ fn no_door_that_parses_secret_material_echoes_its_input_in_an_error() {
     let xprv = ExtendedKey::new_master(&key_bytes, Network::Mainnet)
         .expect("seed")
         .to_string();
-    let shares = split_private_key_with(&key, 2, 3, &[[0x42; 32]]).expect("split");
-    let backup = shares.to_backup_format();
+    let shares =
+        split_private_key_with(&key, 2, 3, &[[0x42; 32]], &[0x5e; 64], &DRAWS).expect("split");
+    let backup = shares.to_backup_format().expect("written");
     let entropy = bsv_rs::primitives::sha256(b"tests/secret_debug.rs entropy");
 
     // (door, case, the error's texts, the secret texts it must not carry)
@@ -512,6 +517,27 @@ fn no_door_that_parses_secret_material_echoes_its_input_in_an_error() {
                 case,
                 error_texts(PointInFiniteField::from_string(&m)),
                 secret.clone(),
+            ));
+        }
+    }
+    // The legacy reader (#854) on a backup bsv-rs 0.8.5 wrote of the key 1
+    // (`tests/shamir_backup_854.rs`' constant): a share's y is its secret.
+    let legacy = [
+        "2.GUibg2QL6Zip4QDpTAiPhM5zaMAxoXJBWFxVszov1Wch.2.GuMr",
+        "4.CyX42Vhnhbgu336cu9nahbewE4EEv9kMYfxqv9oJ4JDj.2.GuMr",
+    ];
+    for share in legacy {
+        let y = share.split('.').nth(1).expect("y").to_owned();
+        let other = legacy.iter().find(|s| **s != share).expect("the other");
+        for (case, m) in text_mutants(share, Some('.')) {
+            let all = [m, other.to_string()];
+            rows.push((
+                "recover_private_key_from_legacy_backup".into(),
+                case,
+                error_texts(
+                    bsv_rs::primitives::bsv::shamir::recover_private_key_from_legacy_backup(&all),
+                ),
+                vec![y.clone(), share.to_owned()],
             ));
         }
     }
@@ -872,8 +898,9 @@ fn the_websocket_options_print_no_credential_in_their_url() {
 fn a_malformed_share_is_named_by_its_index_not_echoed() {
     use bsv_rs::primitives::bsv::KeyShares;
     let key = door_key();
-    let shares = split_private_key_with(&key, 2, 3, &[[0x42; 32]]).expect("split");
-    let backup = shares.to_backup_format();
+    let shares =
+        split_private_key_with(&key, 2, 3, &[[0x42; 32]], &[0x5e; 64], &DRAWS).expect("split");
+    let backup = shares.to_backup_format().expect("written");
     let point = shares.points[1].to_point_string();
     // A share with a fifth part and a point with a third: the text carries y.
     let bad = [backup[0].clone(), format!("{}.{}", backup[1], backup[1])];

@@ -21,8 +21,13 @@
 //! ```
 
 use crate::error::{Error, Result};
+use crate::primitives::bsv::shamir::is_base58_field;
 use crate::primitives::encoding::{from_base58, to_base58};
 use crate::primitives::BigNumber;
+
+/// The longest point text, in UTF-16 code units (`ts-stack@edf6e03`
+/// `Polynomial.ts:8`).
+const MAX_POINT_STRING_LENGTH: usize = 129;
 
 /// A point in a finite field, representing a share in Shamir's Secret Sharing.
 ///
@@ -66,15 +71,14 @@ impl PointInFiniteField {
         }
     }
 
-    /// Parses a point from a string in the format "base58(x).base58(y)".
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - The string representation of the point
-    ///
-    /// # Returns
-    ///
-    /// The parsed point, or an error if the format is invalid
+    /// Parses a point from its text, `base58(x).base58(y)`, as the
+    /// reference's `PointInFiniteField.fromString` reads it (`ts-stack@edf6e03`
+    /// `Polynomial.ts:32-49`): at most 129 characters, exactly two fields,
+    /// each 1 to 64 base58 characters, and the point's own text again, so a
+    /// leading `1` (other than zero's `1`) or a coordinate at or above p is
+    /// refused. Every refusal is the reference's one sentence, never the
+    /// text, which carries `y`: `Finite-field point must use a bounded
+    /// canonical Base58 representation`.
     ///
     /// # Example
     ///
@@ -82,24 +86,32 @@ impl PointInFiniteField {
     /// use bsv_rs::primitives::bsv::polynomial::PointInFiniteField;
     ///
     /// let point = PointInFiniteField::from_string("2.3J").unwrap();
+    /// assert!(PointInFiniteField::from_string("12.3J").is_err());
     /// ```
     pub fn from_string(s: &str) -> Result<Self> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 2 {
-            // The reference's words, never the text, which carries `y`
-            // (`ts-stack@edf6e03` `Polynomial.ts:32-45`).
-            return Err(Error::InvalidBase58(
+        let refused = || {
+            Error::InvalidBase58(
                 "Finite-field point must use a bounded canonical Base58 representation".into(),
-            ));
+            )
+        };
+        // JavaScript's `length`: UTF-16 code units, counted to the bound.
+        if s.encode_utf16().take(MAX_POINT_STRING_LENGTH + 1).count() > MAX_POINT_STRING_LENGTH {
+            return Err(refused());
         }
-
-        let x_bytes = from_base58(parts[0])?;
-        let y_bytes = from_base58(parts[1])?;
-
-        let x = BigNumber::from_bytes_be(&x_bytes);
-        let y = BigNumber::from_bytes_be(&y_bytes);
-
-        Ok(Self::new(x, y))
+        let mut parts = s.splitn(3, '.');
+        let (Some(x), Some(y), None) = (parts.next(), parts.next(), parts.next()) else {
+            return Err(refused());
+        };
+        if !is_base58_field(x) || !is_base58_field(y) {
+            return Err(refused());
+        }
+        let x = BigNumber::from_bytes_be(&from_base58(x).map_err(|_| refused())?);
+        let y = BigNumber::from_bytes_be(&from_base58(y).map_err(|_| refused())?);
+        let point = Self::new(x, y);
+        if point.to_point_string() != s {
+            return Err(refused());
+        }
+        Ok(point)
     }
 
     /// Converts the point to a string in the format "base58(x).base58(y)".

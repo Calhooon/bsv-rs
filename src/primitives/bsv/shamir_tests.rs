@@ -55,7 +55,7 @@ fn test_backup_format_roundtrip() {
     let shares = split_private_key(&key, 3, 5).unwrap();
 
     // Export to backup format
-    let backup = shares.to_backup_format();
+    let backup = shares.to_backup_format().unwrap();
     assert_eq!(backup.len(), 5);
 
     // Each backup string should have 4 parts
@@ -131,22 +131,21 @@ fn test_integrity_check_fails_on_corruption() {
     let corrupted = KeyShares::new(
         shares.points.clone(),
         2,
-        "XXXX".to_string(), // Wrong integrity
+        "00000000".to_string(), // Wrong integrity
     );
 
     let result = corrupted.recover_private_key();
-    assert!(matches!(result, Err(Error::CryptoError(_))));
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Integrity check failed"));
+    assert_eq!(
+        result.unwrap_err(),
+        Error::CryptoError("Integrity hash mismatch".into())
+    );
 }
 
 #[test]
 fn test_backup_format_parsing() {
     let key = PrivateKey::random();
     let shares = split_private_key(&key, 2, 3).unwrap();
-    let backup = shares.to_backup_format();
+    let backup = shares.to_backup_format().unwrap();
 
     // Verify format
     let parsed = KeyShares::from_backup_format(&backup).unwrap();
@@ -157,30 +156,32 @@ fn test_backup_format_parsing() {
 
 #[test]
 fn test_mismatched_threshold_in_shares() {
-    // Create two shares manually with different thresholds
-    let share1 = "2.abc.3.XXXX".to_string();
-    let share2 = "3.def.4.XXXX".to_string(); // Different threshold
-
-    let result = KeyShares::from_backup_format(&[share1, share2]);
-    assert!(matches!(result, Err(Error::CryptoError(_))));
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Threshold mismatch"));
+    let key = PrivateKey::random();
+    let backup = split_private_key(&key, 2, 3)
+        .unwrap()
+        .to_backup_format()
+        .unwrap();
+    let other = backup[1].replacen(".2.", ".3.", 1);
+    let result = KeyShares::from_backup_format(&[backup[0].clone(), other]);
+    assert_eq!(
+        result.unwrap_err(),
+        Error::CryptoError("Threshold mismatch in share 1".into())
+    );
 }
 
 #[test]
 fn test_mismatched_integrity_in_shares() {
-    // Create two shares manually with different integrity
-    let share1 = "2.abc.3.AAAA".to_string();
-    let share2 = "3.def.3.BBBB".to_string(); // Different integrity
-
-    let result = KeyShares::from_backup_format(&[share1, share2]);
-    assert!(matches!(result, Err(Error::CryptoError(_))));
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Integrity mismatch"));
+    let key = PrivateKey::random();
+    let backup = split_private_key(&key, 2, 3)
+        .unwrap()
+        .to_backup_format()
+        .unwrap();
+    let other = format!("{}00000000", &backup[1][..backup[1].len() - 8]);
+    let result = KeyShares::from_backup_format(&[backup[0].clone(), other]);
+    assert_eq!(
+        result.unwrap_err(),
+        Error::CryptoError("Integrity mismatch in share 1".into())
+    );
 }
 
 #[test]
@@ -214,18 +215,13 @@ fn test_large_number_of_shares() {
 }
 
 #[test]
-fn test_compute_integrity() {
+fn test_integrity_is_brc140s_hash160_prefix() {
+    // BRC-140: hex(HASH160(compressed public key))[0:8]; key 1's is the
+    // reference's `751e76e8` (vectors/shamir_backup_854.json).
     let key =
         PrivateKey::from_hex("0000000000000000000000000000000000000000000000000000000000000001")
             .unwrap();
-
-    let integrity = compute_integrity(&key);
-    // Should be 4 characters
-    assert_eq!(integrity.len(), 4);
-
-    // Integrity should be deterministic
-    let integrity2 = compute_integrity(&key);
-    assert_eq!(integrity, integrity2);
+    assert_eq!(integrity_of(&key), "751e76e8");
 }
 
 #[test]
@@ -255,38 +251,41 @@ fn test_evaluate_polynomial() {
 }
 
 #[test]
-fn test_decode_share() {
-    // Create a valid share format
-    let key = PrivateKey::random();
-    let shares = split_private_key(&key, 2, 3).unwrap();
-    let backup = shares.to_backup_format();
-
-    let (point, threshold, integrity) = decode_share(&backup[0], 0).unwrap();
-    assert_eq!(threshold, 2);
-    assert_eq!(integrity, shares.integrity);
-    assert_eq!(point.x, shares.points[0].x);
-    assert_eq!(point.y, shares.points[0].y);
-}
-
-#[test]
-fn test_decode_share_invalid_format() {
-    // Too few parts
-    assert!(matches!(
-        decode_share("a.b.c", 0),
-        Err(Error::CryptoError(_))
-    ));
-
-    // Too many parts
-    assert!(matches!(
-        decode_share("a.b.c.d.e", 0),
-        Err(Error::CryptoError(_))
-    ));
-
-    // Invalid threshold
-    assert!(matches!(
-        decode_share("2.abc.notanumber.XXXX", 0),
-        Err(Error::CryptoError(_))
-    ));
+fn test_share_field_grammars() {
+    assert_eq!(four_fields("a.b.c.d"), Some(["a", "b", "c", "d"]));
+    assert_eq!(four_fields("a.b.c"), None);
+    assert_eq!(four_fields("a.b.c.d.e"), None);
+    for (t, read) in [
+        ("2", Some(2)),
+        ("10", Some(10)),
+        ("255", Some(255)),
+        ("199", Some(199)),
+    ] {
+        assert_eq!(threshold_of(t), read, "{t}");
+    }
+    for t in [
+        "",
+        "0",
+        "1",
+        "02",
+        "+2",
+        " 2",
+        "256",
+        "999",
+        "1000",
+        "notanumber",
+    ] {
+        assert_eq!(threshold_of(t), None, "{t}");
+    }
+    assert!(is_integrity("0123abcd"));
+    for i in ["0123ABCD", "0123abc", "0123abcde", "GuMr", "0123abcg"] {
+        assert!(!is_integrity(i), "{i}");
+    }
+    assert!(is_base58_field("1"));
+    assert!(is_base58_field(&"z".repeat(64)));
+    for f in ["", "0", "O", "I", "l", &"z".repeat(65)] {
+        assert!(!is_base58_field(f), "{f}");
+    }
 }
 
 #[test]
@@ -306,7 +305,10 @@ fn test_threshold_greater_than_total_shares() {
     let result = split_private_key(&key, 50, 5);
     assert!(matches!(result, Err(Error::CryptoError(_))));
     assert!(
-        result.unwrap_err().to_string().contains("must be at least"),
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("threshold should be less than or equal to totalShares"),
         "Expected error about total shares being less than threshold"
     );
 }
@@ -328,24 +330,21 @@ fn test_total_shares_less_than_2() {
 #[test]
 fn test_duplicate_shares_in_recovery() {
     // Mirrors Go: TestDuplicateShareDetected
-    // Providing the same share twice should result in failed recovery
-    // (the Lagrange interpolation will produce incorrect results or fail)
+    // Providing the same share twice is refused
     let key = PrivateKey::random();
     let shares = split_private_key(&key, 3, 5).unwrap();
-    let backup = shares.to_backup_format();
+    let backup = shares.to_backup_format().unwrap();
 
     // Use share 0, share 1, and share 1 again (duplicate)
     let recovery =
         KeyShares::from_backup_format(&[backup[0].clone(), backup[1].clone(), backup[1].clone()])
             .unwrap();
 
-    // Recovery should fail: either the interpolation gives wrong result
-    // (integrity check fails) or the mod_inverse fails on duplicate x coords
+    // The reference's refusal (`PrivateKey.ts:603-611`)
     let result = recovery.recover_private_key();
-    assert!(
-        matches!(result, Err(Error::CryptoError(_))),
-        "Expected CryptoError when using duplicate shares for recovery, got {:?}",
-        result
+    assert_eq!(
+        result.unwrap_err(),
+        Error::CryptoError("Duplicate share detected, each must be unique.".into())
     );
 }
 
@@ -364,8 +363,8 @@ fn test_fewer_points_than_threshold() {
         result
             .unwrap_err()
             .to_string()
-            .contains("Insufficient shares"),
-        "Expected 'Insufficient shares' error message"
+            .contains("At least 3 shares are required to reconstruct the private key"),
+        "Expected the reference's too-few words"
     );
 }
 
@@ -581,7 +580,7 @@ fn test_backup_recovery_full_roundtrip() {
     for _ in 0..3 {
         let key = PrivateKey::random();
         let shares = split_private_key(&key, 3, 5).unwrap();
-        let backup = shares.to_backup_format();
+        let backup = shares.to_backup_format().unwrap();
         assert_eq!(backup.len(), 5);
 
         // Recover from first 3 backup strings
@@ -605,4 +604,42 @@ fn test_zero_total_shares() {
     let key = PrivateKey::random();
     let result = split_private_key(&key, 2, 0);
     assert!(matches!(result, Err(Error::CryptoError(_))));
+}
+
+/// BRC-140's retry arms (`PrivateKey.ts:513-528`), reached at the private
+/// seam: the public split cannot force a second attempt (an x of 0 or a
+/// repeat needs an HMAC-SHA-512 value no draw chooses), but `coordinate`
+/// takes the used points. x(k) = HMAC-SHA-512(seed, [0, k, draw k]) mod p,
+/// computed here: with x(0..3) used the fifth attempt answers x(4); with
+/// x(0..4) used and six draws the sixth attempt is refused before its value
+/// is judged, in the reference's words (#854's fold, the re-reads of PR #876).
+#[test]
+fn the_coordinate_draws_again_on_a_used_x_and_refuses_the_sixth_attempt_854() {
+    use crate::primitives::bsv::polynomial::PointInFiniteField;
+    use crate::primitives::hash::sha512_hmac;
+    let p = BigNumber::secp256k1_prime();
+    let seed = [7u8; 64];
+    let d: Vec<[u8; 32]> = (0..6u8).map(|k| [0x10 + k; 32]).collect();
+    let x_at = |attempt: u8| {
+        let mut c = vec![0u8, attempt];
+        c.extend_from_slice(&d[attempt as usize]);
+        BigNumber::from_bytes_be(&sha512_hmac(&seed, &c)).modulo(&p)
+    };
+    let used = |n: u8| -> Vec<PointInFiniteField> {
+        (0..n)
+            .map(|a| PointInFiniteField::new(x_at(a), BigNumber::one()))
+            .collect()
+    };
+    let run = |n: u8| {
+        let mut it = d.clone().into_iter();
+        super::coordinate(0, &seed, &mut || it.next(), &used(n), &p)
+    };
+    assert_eq!(run(0).unwrap(), x_at(0), "attempt 0");
+    assert_eq!(run(1).unwrap(), x_at(1), "x(0) used: the second attempt");
+    assert_eq!(run(4).unwrap(), x_at(4), "x(0..3) used: the fifth attempt");
+    assert_eq!(
+        run(5).unwrap_err().to_string(),
+        "cryptographic operation failed: Failed to generate unique x coordinate after 5 attempts",
+        "x(0..4) used, six draws: the sixth attempt refused"
+    );
 }
