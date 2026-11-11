@@ -13,6 +13,10 @@ categories = ["cryptography", "encoding", "parser-implementations"]
 # the workflows and the repository process files are not part of the crate
 exclude = ["/.github/", "/RELEASING.md", "/CLAUDE.md", "/.gitleaksignore"]
 
+# docs.rs builds the default features unless told otherwise: it showed three of the modules for 0.8.6
+[package.metadata.docs.rs]
+all-features = true
+
 # primeorder and crypto-bigint are named for a feature and a floor, never imported (the comments below)
 [package.metadata.cargo-machete]
 ignored = ["primeorder", "crypto-bigint"]
