@@ -6,22 +6,33 @@
 [![Features](https://github.com/Calhooon/bsv-rs/actions/workflows/features.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/features.yml)
 [![Unused dependencies](https://github.com/Calhooon/bsv-rs/actions/workflows/machete.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/machete.yml)
 [![Docs](https://github.com/Calhooon/bsv-rs/actions/workflows/docs.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/docs.yml)
+[![docs.rs](https://docs.rs/bsv-rs/badge.svg)](https://docs.rs/bsv-rs)
 
-**0.7.1**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
+A Rust SDK for BSV: keys and cryptography, Script, transactions,
 BEEF and SPV, block headers and proof of work, wallets, authentication and
 overlay clients. Optional features support native applications and wasm hosts.
 Compatibility is tested against shared vectors; the crate also has explicit
 local evaluator contracts and documented differences from other SDKs.
 
-The release of record is the tag `v0.7.1`; the version on crates.io is 0.7.1,
-the same release. [CHANGELOG.md](CHANGELOG.md) says what each release changed.
+Every release is a tag `vX.Y.Z` of this repository, published to
+[crates.io](https://crates.io/crates/bsv-rs) and documented on
+[docs.rs](https://docs.rs/bsv-rs); [CHANGELOG.md](CHANGELOG.md) says what each
+release changed. Security advisories are published on this repository's
+[Security tab](https://github.com/Calhooon/bsv-rs/security/advisories) and filed
+with the RustSec advisory database: stay on the newest patch of your line.
+[SECURITY.md](SECURITY.md) says how to report a vulnerability.
 
 ## Install
 
 ```toml
 [dependencies]
-bsv-rs = { version = "=0.7.1", features = ["transaction", "wallet"] }
+bsv-rs = { version = "0.8", features = ["transaction", "wallet"] }
 ```
+
+`0.8` takes every patch of the stable line. The 0.9.0 line is in prerelease on
+crates.io (`0.9.0-beta.N`), developed on the `beta` branch; the published
+advisories affect its prereleases so far, and the next one carries the fixes
+([SECURITY.md](SECURITY.md) has the table).
 
 Defaults enable `primitives` and `script`. [Cargo.toml](Cargo.toml) lists the
 module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
