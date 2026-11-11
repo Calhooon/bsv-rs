@@ -48,7 +48,7 @@
 //! let shares = split_private_key(&key, 3, 5).unwrap();
 //!
 //! // Export to backup format for storage
-//! let backup = shares.to_backup_format();
+//! let backup = shares.to_backup_format().unwrap();
 //!
 //! // Later, recover from any 3 shares
 //! let subset = KeyShares::from_backup_format(&backup[0..3]).unwrap();
@@ -66,7 +66,9 @@ pub mod tx_signature;
 // Re-export commonly used items
 pub use polynomial::{PointInFiniteField, Polynomial};
 pub use schnorr::{Schnorr, SchnorrProof};
-pub use shamir::{split_private_key, split_private_key_with, KeyShares};
+pub use shamir::{
+    recover_private_key_from_legacy_backup, split_private_key, split_private_key_with, KeyShares,
+};
 pub use sighash::{
     build_sighash_preimage, compute_sighash, compute_sighash_for_signing, compute_sighash_from_raw,
     parse_transaction, RawTransaction, SighashCache, SighashParams, TxInput, TxOutput, SIGHASH_ALL,

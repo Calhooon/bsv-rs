@@ -13,9 +13,10 @@ This module provides BSV blockchain-specific operations including transaction si
 | `sighash.rs` | 623 | BIP-143 style sighash computation for transaction signing |
 | `tx_signature.rs` | 309 | Transaction signatures with sighash scope (checksig format) |
 | `schnorr.rs` | 413 | Schnorr ZK proofs for ECDH shared secret verification |
-| `polynomial.rs` | 394 | Polynomial operations for Lagrange interpolation |
-| `shamir.rs` | 440 | Shamir Secret Sharing for private key backup; `split_private_key_with` (bsv-rs#180) |
-| `shamir_tests.rs` | 604 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
+| `polynomial.rs` | 432 | Polynomial operations for Lagrange interpolation; `PointInFiniteField::from_string` the reference's bounded canonical reading (#854) |
+| `shamir.rs` | 576 | BRC-140 Shamir backup, the reference's writer and reader (#854); `split_private_key_with` (bsv-rs#180) |
+| `shamir_legacy.rs` | 147 | `recover_private_key_from_legacy_backup`: a backup bsv-rs 0.8.5 or earlier wrote, read by a deliberate call, each share bounded at the 65 bytes the old writer could write (#854) |
+| `shamir_tests.rs` | 645 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
 
 ## Key Exports
 
@@ -198,50 +199,57 @@ All points serialized in 33-byte compressed format for the challenge hash.
 
 ### Shamir Secret Sharing
 
+BRC-140 (`key-derivation/0140.md` at `BRCs@f7f1520`), written and read as the reference does (`ts-stack@edf6e03` `PrivateKey.ts:12-118,478-623`, `Polynomial.ts:32-49`; #854).
+
 ```rust
 /// A collection of key shares for recovery (derives Clone; Debug shows the
 /// share count, threshold and integrity, never a share)
 pub struct KeyShares {
     pub points: Vec<PointInFiniteField>,
     pub threshold: usize,
-    pub integrity: String,  // First 4 chars of base58(sha256(secret))
+    pub integrity: String,  // hex(HASH160(compressed public key))[0:8]
 }
 
 impl KeyShares {
     pub fn new(points: Vec<PointInFiniteField>, threshold: usize, integrity: String) -> Self
-    pub fn from_backup_format(shares: &[String]) -> Result<Self>
-    pub fn to_backup_format(&self) -> Vec<String>
-    pub fn recover_private_key(&self) -> Result<PrivateKey>
+    pub fn from_backup_format(shares: &[String]) -> Result<Self>   // fromBackupFormat, cell for cell
+    pub fn to_backup_format(&self) -> Result<Vec<String>>          // toBackupFormat: refuses what the reader refuses
+    pub fn recover_private_key(&self) -> Result<PrivateKey>        // fromKeyShares
 }
 
-/// Split a private key into shares
+/// Split a private key into shares (toKeyShares)
 pub fn split_private_key(
     key: &PrivateKey,
-    threshold: usize,  // Minimum shares needed (2..=255)
-    total: usize,      // Total shares to generate (>= threshold)
+    threshold: usize,  // 2..=255
+    total: usize,      // threshold..=255
 ) -> Result<KeyShares>
 
-/// The same split with the coefficients a_1..a_{t-1} given, not drawn
-/// (`split_private_key` draws them and calls this; bsv-rs#180): each 32 bytes
-/// big-endian, reduced mod p; a count other than threshold - 1 is
-/// InvalidDataLength (in bytes), a coefficient 0 mod p CryptoError
+/// The same split with its draws given (`split_private_key` draws them and
+/// calls the same code; bsv-rs#180, #854): the coefficients a_1..a_{t-1}
+/// (32 bytes big-endian, reduced mod p; a count other than threshold - 1 is
+/// InvalidDataLength, a coefficient 0 mod p CryptoError), the split's HMAC
+/// seed and one 32-byte draw per coordinate attempt (running out is
+/// `Shamir coordinate draws exhausted`)
 pub fn split_private_key_with(
     key: &PrivateKey,
     threshold: usize,
     total: usize,
     coefficients: &[[u8; 32]],
+    seed: &[u8; 64],
+    draws: &[[u8; 32]],
 ) -> Result<KeyShares>
+
+/// A backup bsv-rs 0.8.5 or earlier wrote (a 4-base58-character tag): the
+/// key, never a KeyShares, so the old form is never written again. This
+/// crate's addition, kept, not deprecated.
+pub fn recover_private_key_from_legacy_backup(shares: &[String]) -> Result<PrivateKey>
 ```
 
-**Parameter constraints**:
-- `threshold` must be >= 2 (1-of-N is just copying the secret)
-- `threshold` must be <= 255
-- `total` must be >= `threshold`
+**The writer** (`toKeyShares`, `PrivateKey.ts:478-538`): the secret the constant term of a polynomial of random coefficients; each share's x by BRC-140's procedure, `HMAC-SHA-512(seed, [i, attempt, 32 fresh bytes]) mod p` over a 64-byte seed per split, drawn again when 0 or already used, the attempt after the fifth refused (`Failed to generate unique x coordinate after 5 attempts`); the tag `hex(HASH160(compressed public key))[0:8]`. The parameters refused in the reference's words and order: `threshold must be at least 2`, `totalShares must be at least 2`, `threshold should be less than or equal to totalShares`, `threshold and totalShares cannot exceed 255`.
 
-**Recovery validation**:
-- `from_backup_format` validates that all shares have matching threshold and integrity values
-- `recover_private_key` checks that `points.len() >= threshold` before interpolation
-- After recovery, the integrity checksum is verified against the recovered key
+**The reader** (`fromBackupFormat`, `PrivateKey.ts:55-102`), each refusal naming the share by its index, never its text: 1 to 255 shares (`shares must contain from 1 to 255 entries`); a share over 256 UTF-16 code units (`Invalid share format in share N`); four fields (`Invalid share format in share N. Expected format: "x.y.t.i"`); x and y 1 to 64 base58 characters, the threshold 2 to 255 with no sign or leading zero, the tag 8 lowercase hex digits (`Invalid canonical share data in share N`); `Threshold mismatch in share N`, then `Integrity mismatch in share N`; the point through `PointInFiniteField::from_string` (129 characters at most, its own text again: a leading `1` or a coordinate at or above p refused, `Finite-field point must use a bounded canonical Base58 representation`). Recovery (`fromKeyShares`, `:575-623`): the collection checked as the writer checks it, `At least T shares are required to reconstruct the private key`, the leading T points' coordinates in `[0, p)` (`share coordinates must be canonical field elements`) and their x distinct (`Duplicate share detected, each must be unique.`), `f(0)` read modulo n, `Integrity hash mismatch` (a secret of 0 modulo n refused in those words, never returned, #854's fold). Shares past the threshold are not read.
+
+**The legacy reader** (`shamir_legacy.rs`): only what the old writer wrote: 1 to 255 shares, each at most 65 bytes (refused on its length before it is split: `Share N is longer than any legacy share (65 bytes): check it for spaces or a line break around or inside it; a share with an 8-hex-digit tag is BRC-140's, read with KeyShares::from_backup_format`) and of four fields, canonical base58 x and y, a threshold of 2 to 255, a tag of exactly 4 base58 characters (`base58(sha256(key bytes))[..4]`) the same on every share; refuses a BRC-140 share in words naming `KeyShares::from_backup_format`, duplicates and too few shares, and checks the old tag. Pinned by `tests/shamir_backup_854.rs` (16 tests) on six share sets the published 0.8.5 wrote; the writer's coordinates by the reference's `toKeyShares` fed the same draws (the vector's `fold_854.coordinates` and, of counting bytes, `fold2_854.coordinates`); `coordinate`'s retry arms at its seam (`shamir_tests.rs`). A secret of 0 modulo n is refused in the legacy reader's own words, `Legacy integrity check failed`. Whitespace that keeps an old share within 65 bytes is refused as `Invalid legacy share data in share N`.
 
 ### Polynomial Operations
 
@@ -256,7 +264,7 @@ pub struct PointInFiniteField {
 
 impl PointInFiniteField {
     pub fn new(x: BigNumber, y: BigNumber) -> Self   // Reduces mod secp256k1 prime
-    pub fn from_string(s: &str) -> Result<Self>       // "base58(x).base58(y)"
+    pub fn from_string(s: &str) -> Result<Self>       // "base58(x).base58(y)", the reference's bounded canonical reading (#854)
     pub fn to_point_string(&self) -> String
 }
 
@@ -286,8 +294,10 @@ These are not publicly exported but are key to understanding the implementation:
 | `compute_hash_outputs()` | sighash.rs | SHA256d of outputs (all, single, or zeros depending on scope) |
 | `compute_challenge()` | schnorr.rs | Fiat-Shamir challenge: `SHA256(A\|\|B\|\|S\|\|S'\|\|R) mod n` |
 | `evaluate_polynomial()` | shamir.rs | Horner's method polynomial evaluation mod prime |
-| `compute_integrity()` | shamir.rs | First 4 chars of `base58(sha256(key_bytes))` |
-| `decode_share()` | shamir.rs | Parse backup format string into point + threshold + integrity |
+| `integrity_of()` | shamir.rs | BRC-140's tag: `hex(HASH160(compressed public key))[0:8]` |
+| `coordinate()` | shamir.rs | BRC-140's x: `HMAC-SHA-512(seed, [i, attempt, draw]) mod p`, at most 5 attempts |
+| `interpolate()` | shamir.rs | `fromKeyShares`' checks and `f(0) mod n`, `None` for 0, shared with the legacy reader |
+| `legacy_integrity()` | shamir_legacy.rs | The old tag: leading 4 chars of `base58(sha256(key_bytes))` |
 
 ## Usage
 
@@ -389,7 +399,7 @@ let key = PrivateKey::random();
 let shares = split_private_key(&key, 3, 5).unwrap();
 
 // Export to backup format for storage
-let backup: Vec<String> = shares.to_backup_format();
+let backup: Vec<String> = shares.to_backup_format().unwrap();
 // Each string: "base58(x).base58(y).threshold.integrity"
 
 // Later, recover from any 3 shares
@@ -434,20 +444,20 @@ Base type extraction uses `SIGHASH_BASE_MASK` (0x1F) internally.
 
 ## Backup Format
 
-Shamir shares use this string format for storage:
+Shamir shares use BRC-140's text for storage:
 
 ```
 base58(x).base58(y).threshold.integrity
 ```
 
-Example: `2.8hKJ7vP...3.ABCD`
+Example (BRC-140's, threshold 3): `45s4vLL2hFvqmxrarvbRT2vZoQYGZGocsmaEksZ64o5M.A7nZrGux15nEsQGNZ1mbfnMKugNnS6SYYEQwfhfbDZG8.3.2f804d43`
 
-- `2`: x-coordinate (share index, starting at 1)
-- `8hKJ7vP...`: y-coordinate (the share value in base58)
-- `3`: threshold (minimum shares needed)
-- `ABCD`: integrity checksum (first 4 chars of base58(sha256(secret)))
+- `45s4vL...`: the x-coordinate, drawn by BRC-140's HMAC procedure (never 1..n)
+- `A7nZrG...`: the y-coordinate (the share's value)
+- `3`: threshold (minimum shares needed), 2 to 255
+- `2f804d43`: the integrity tag, the leading 8 hex digits of HASH160 of the compressed public key
 
-The integrity field allows verification that shares belong together and that recovery succeeded. `from_backup_format` validates that all shares have consistent threshold and integrity values.
+A share whose tag is 4 base58 characters (`...2.GuMr`) was written by bsv-rs 0.8.5 or earlier; `from_backup_format` refuses it and `recover_private_key_from_legacy_backup` recovers its key.
 
 ## Security Notes
 
@@ -470,12 +480,12 @@ The integrity field allows verification that shares belong together and that rec
 ### Shamir Secret Sharing
 - Threshold must be >= 2 and <= 255 (1-of-N is just copying)
 - All arithmetic is modulo the secp256k1 field prime
-- Polynomial coefficients generated from `PrivateKey::random()` for cryptographic randomness
+- Polynomial coefficients generated from `PrivateKey::random()`, the coordinates' seed and draws from `OsRng`
 - Store shares in separate secure locations
 - Never store more than (threshold - 1) shares together
 - No share is printed by `Debug` (`KeyShares`, `PointInFiniteField`, `Polynomial`; `tests/secret_debug.rs`, the secret Debug lane of 2026-11-10); `to_backup_format` and `Display` are the explicit conversions
-- No share is printed by an error (the fold of 2026-11-10): `KeyShares::from_backup_format` refuses a share of other than four parts in the reference's words, naming its index (`Invalid share format in share <idx>. Expected format: "x.y.t.i"`, `ts-stack@edf6e03` `PrivateKey.ts:74`), and a threshold that is not a number as `Invalid canonical share data in share <idx>` (`:87`); `PointInFiniteField::from_string` refuses other than two parts as `Finite-field point must use a bounded canonical Base58 representation` (`Polynomial.ts:32-45`); both echoed the text, `y` included, until then (`tests/secret_debug.rs`, `a_malformed_share_is_named_by_its_index_not_echoed` and the door table). The rest of the share reader is older and not the reference's, stated (the cold re-read of the fold, a probe on both sides): the reference's integrity is the first 8 hex digits of the public key's hash, written and read only in that form (`PrivateKey.ts:15,24-25,535,617`), where this crate's is the first 4 base58 characters of the SHA-256 of the key's bytes (`compute_integrity`), so neither recovers from the other's backup; it refuses a threshold outside 2 to 255 or not in its canonical text (`1`, `+2`, `02`, `256`) and an x or y that is not 1 to 64 canonical base58 characters (an empty y, a leading `1`), each in `Invalid canonical share data in share <idx>` or the point's sentence (`PrivateKey.ts:76-88`, `Polynomial.ts:32-45`, its round trip), where this crate reads every one of those thresholds and the leading `1`, and refuses the empty field in `invalid base58 string: empty string`; its mismatch words are `Threshold mismatch in share <idx>` and `Integrity mismatch in share <idx>` (`:90-94`), this crate's `Threshold mismatch: share 0 has threshold 2, share 1 has threshold 3` and `Integrity mismatch: share 0 has integrity '<tag>', share 1 has integrity '<tag>'` (no share value). Porting the format is Calhooon/bsv-rs#854 (filed, blocks-cut), not this fold's.
-- Duplicate shares in recovery cause failure (Lagrange interpolation requires unique x-coordinates)
+- No share is printed by an error: every refusal of either reader names the share by its index, in the reference's words (the legacy reader's in this crate's); `tests/secret_debug.rs`' door table runs both readers on malformed forms of a real share
+- Duplicate shares among the leading `threshold` are refused (`Duplicate share detected, each must be unique.`)
 - Providing more shares than threshold works (only first `threshold` points are used)
 
 ## Testing
@@ -486,7 +496,7 @@ The integrity field allows verification that shares belong together and that rec
 | `tx_signature.rs` | 6 unit tests | Roundtrip, blank sig, scope values, low-S |
 | `schnorr.rs` | 7 unit tests | Roundtrip, wrong inputs, mutual verification, deterministic challenge |
 | `polynomial.rs` | 8 unit tests | Linear/quadratic/constant polys, large numbers, string roundtrip, invalid format |
-| `shamir_tests.rs` | 34 unit tests | Split/recover, backup format, edge cases, parameter validation, cross-SDK parity |
+| `shamir_tests.rs` | 34 unit tests | Split/recover, backup format, edge cases, parameter validation, the share fields' grammars and the BRC-140 tag, `coordinate`'s retry arms at its seam (#854) |
 
 Cross-SDK sighash test vectors (500 vectors) are in `tests/vectors/` and exercised by integration tests.
 

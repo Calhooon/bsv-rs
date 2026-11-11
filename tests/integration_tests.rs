@@ -286,7 +286,7 @@ fn test_shamir_with_wif_export() {
 
     // Split into shares
     let shares = split_private_key(&original, 3, 5).unwrap();
-    let backup = shares.to_backup_format();
+    let backup = shares.to_backup_format().unwrap();
 
     // Recover from backup format (using first 3 shares)
     let restored = KeyShares::from_backup_format(&backup[0..3]).unwrap();
@@ -306,7 +306,7 @@ fn test_shamir_different_subsets() {
     let key_bytes = key.to_bytes();
 
     let shares = split_private_key(&key, 3, 5).unwrap();
-    let backup = shares.to_backup_format();
+    let backup = shares.to_backup_format().unwrap();
 
     // Test recovery with different subsets of 3 shares
     let subsets: Vec<Vec<String>> = vec![
@@ -559,7 +559,7 @@ fn test_key_backup_and_recovery_workflow() {
     let shares = split_private_key(&master_key, 3, 5).unwrap();
 
     // Step 3: Export to backup format
-    let backup_strings = shares.to_backup_format();
+    let backup_strings = shares.to_backup_format().unwrap();
     assert_eq!(backup_strings.len(), 5);
 
     // Step 4: Recover from any 3 shares (simulate user selecting shares 1, 3, 4)
@@ -624,61 +624,60 @@ fn test_multi_party_schnorr_verification() {
     ));
 }
 
-// The Shamir `_with` form (#180 item 1): the plain form's coefficients, solved
-// from its shares at x = 1, 2, 3 and fed to `split_private_key_with`, give the
-// same shares.
+// The Shamir `_with` form (#180 item 1, #854): its shares are the given
+// coefficients' polynomial at x coordinates drawn by BRC-140's procedure,
+// `HMAC-SHA-512(seed, [i, attempt, draw]) mod p` (`key-derivation/0140.md`
+// at BRCs@f7f1520, `ts-stack@edf6e03` `PrivateKey.ts:513-531`).
 #[test]
-fn split_private_key_with_returns_what_split_private_key_returns_given_its_coefficients() {
-    use bsv_rs::primitives::BigNumber;
+fn split_private_key_with_evaluates_its_coefficients_at_brc_140_coordinates() {
+    use bsv_rs::primitives::{sha512_hmac, BigNumber};
     let p = BigNumber::secp256k1_prime();
-    let bytes = |n: &BigNumber| -> [u8; 32] { n.to_bytes_be(32).try_into().unwrap() };
     let key = PrivateKey::from_bytes(&[5; 32]).unwrap();
     let a0 = BigNumber::from_bytes_be(&key.to_bytes());
-    let two_p = p.add(&p);
-
-    // 2 of 3: y1 = a0 + a1
-    let shares = split_private_key(&key, 2, 3).unwrap();
-    let y1 = &shares.points[0].y;
-    let a1 = y1.add(&p).sub(&a0).modulo(&p);
-    let again = split_private_key_with(&key, 2, 3, &[bytes(&a1)]).unwrap();
-    assert_eq!(again.to_backup_format(), shares.to_backup_format());
-
-    // 3 of 5: y1 = a0 + a1 + a2, y2 = a0 + 2 a1 + 4 a2
-    let shares = split_private_key(&key, 3, 5).unwrap();
-    let (y1, y2) = (&shares.points[0].y, &shares.points[1].y);
-    let inv2 = BigNumber::from_u64(2).mod_inverse(&p).unwrap();
-    let a2 = y2
-        .add(&a0)
-        .add(&two_p)
-        .sub(&y1.add(y1))
-        .modulo(&p)
-        .mul(&inv2)
-        .modulo(&p);
-    let a1 = y1.add(&two_p).sub(&a0).sub(&a2).modulo(&p);
-    let again = split_private_key_with(&key, 3, 5, &[bytes(&a1), bytes(&a2)]).unwrap();
-    assert_eq!(again.to_backup_format(), shares.to_backup_format());
-    let subset = KeyShares::from_backup_format(&again.to_backup_format()[2..]).unwrap();
+    let (a1, a2) = ([1u8; 32], [2u8; 32]);
+    let (seed, draws) = (
+        [7u8; 64],
+        [[0xa0; 32], [0xa1; 32], [0xa2; 32], [0xa3; 32], [0xa4; 32]],
+    );
+    let shares = split_private_key_with(&key, 3, 5, &[a1, a2], &seed, &draws).unwrap();
+    for (i, point) in shares.points.iter().enumerate() {
+        let mut counter = vec![i as u8, 0];
+        counter.extend_from_slice(&draws[i]);
+        let x = BigNumber::from_bytes_be(&sha512_hmac(&seed, &counter)).modulo(&p);
+        assert_eq!(point.x, x, "share {i}'s x");
+        let (b1, b2) = (BigNumber::from_bytes_be(&a1), BigNumber::from_bytes_be(&a2));
+        let y = a0.add(&b1.mul(&x)).add(&b2.mul(&x).mul(&x)).modulo(&p);
+        assert_eq!(point.y, y, "share {i}'s y");
+    }
+    let subset = KeyShares::from_backup_format(&shares.to_backup_format().unwrap()[2..]).unwrap();
     assert_eq!(
         subset.recover_private_key().unwrap().to_bytes(),
         key.to_bytes()
     );
 }
 
+/// A fixed split's BRC-140 seed and coordinate draws (#854).
+const SEED: [u8; 64] = [9; 64];
+const DRAWS: [[u8; 32]; 5] = [[0xb0; 32], [0xb1; 32], [0xb2; 32], [0xb3; 32], [0xb4; 32]];
+
 #[test]
 fn split_private_key_with_refuses_a_coefficient_count_other_than_threshold_less_one() {
     let key = PrivateKey::from_bytes(&[5; 32]).unwrap();
     for given in [0usize, 1, 3] {
         assert_eq!(
-            split_private_key_with(&key, 3, 5, &vec![[1; 32]; given]).unwrap_err(),
+            split_private_key_with(&key, 3, 5, &vec![[1; 32]; given], &SEED, &DRAWS).unwrap_err(),
             bsv_rs::Error::InvalidDataLength {
                 expected: 64,
                 actual: 32 * given
             }
         );
     }
-    let fixed = split_private_key_with(&key, 3, 5, &[[1; 32], [2; 32]]).unwrap();
-    let again = split_private_key_with(&key, 3, 5, &[[1; 32], [2; 32]]).unwrap();
-    assert_eq!(fixed.to_backup_format(), again.to_backup_format());
+    let fixed = split_private_key_with(&key, 3, 5, &[[1; 32], [2; 32]], &SEED, &DRAWS).unwrap();
+    let again = split_private_key_with(&key, 3, 5, &[[1; 32], [2; 32]], &SEED, &DRAWS).unwrap();
+    assert_eq!(
+        fixed.to_backup_format().unwrap(),
+        again.to_backup_format().unwrap()
+    );
 }
 
 #[test]
@@ -690,7 +689,7 @@ fn split_private_key_with_refuses_a_coefficient_zero_modulo_p() {
         .unwrap();
     for zero in [[0; 32], p] {
         assert!(matches!(
-            split_private_key_with(&key, 2, 3, &[zero]),
+            split_private_key_with(&key, 2, 3, &[zero], &SEED, &DRAWS),
             Err(bsv_rs::Error::CryptoError(_))
         ));
     }

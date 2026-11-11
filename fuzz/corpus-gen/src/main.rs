@@ -942,13 +942,17 @@ fn reader_corpora(base: &Path) {
 
     // Shamir backups as `split_private_key` and `to_backup_format` write
     // them (`tests/integration_tests.rs`' 3-of-5 and its subsets), one share
-    // per line, the coefficients the bytes 3, 4, ... repeated to 32.
+    // per line, the coefficients the bytes 3, 4, ... repeated to 32, the
+    // BRC-140 coordinate draws fixed (#854).
     let mut shamir = Corpus::new(base, "fuzz_shamir_backup");
     for (b, threshold, total) in [(5u8, 3usize, 5usize), (10, 2, 3), (11, 5, 8)] {
         let coefficients: Vec<[u8; 32]> = (3..).take(threshold - 1).map(|c| [c; 32]).collect();
-        let lines = split_private_key_with(&key(b), threshold, total, &coefficients)
-            .unwrap()
-            .to_backup_format();
+        let draws: Vec<[u8; 32]> = (0..total).map(|i| [0xa0 + i as u8; 32]).collect();
+        let lines =
+            split_private_key_with(&key(b), threshold, total, &coefficients, &[b; 64], &draws)
+                .unwrap()
+                .to_backup_format()
+                .unwrap();
         shamir.add(
             &format!("split-{threshold}-of-{total}"),
             lines.join("\n").as_bytes(),
@@ -964,7 +968,19 @@ fn reader_corpora(base: &Path) {
             mixed.join("\n").as_bytes(),
         );
     }
-    shamir.add("zero-point", b"1.1.2.abcd\n2.3J.2.abcd");
+    shamir.add("zero-point", b"1.1.2.abcd0123\n2.3J.2.abcd0123");
+    // BRC-140's example shares (key-derivation/0140.md at BRCs@f7f1520) and
+    // a backup bsv-rs 0.8.5 wrote, the legacy reader's form (#854).
+    shamir.add(
+        "brc140-example",
+        b"45s4vLL2hFvqmxrarvbRT2vZoQYGZGocsmaEksZ64o5M.A7nZrGux15nEsQGNZ1mbfnMKugNnS6SYYEQwfhfbDZG8.3.2f804d43\n\
+7aPzkiGZgvU4Jira5PN9Qf9o7FEg6uwy1zcxd17NBhh3.CCt7NH1sPFgceb6phTRkfviim2WvmUycJCQd2BxauxP9.3.2f804d43\n\
+9GaS2Tw5sXqqbuigdjwGPwPsQuEFqzqUXo5MAQhdK3es.8MLh2wyE3huyq6hiBXjSkJRucgyKh4jVY6ESq5jNtXRE.3.2f804d43",
+    );
+    shamir.add(
+        "legacy-0.8.5",
+        b"2.GUibg2QL6Zip4QDpTAiPhM5zaMAxoXJBWFxVszov1Wch.2.GuMr\n4.CyX42Vhnhbgu336cu9nahbewE4EEv9kMYfxqv9oJ4JDj.2.GuMr",
+    );
     shamir.report("fuzz_shamir_backup");
 }
 
