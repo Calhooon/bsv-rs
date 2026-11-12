@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-11-12
+
 ### Security: a transaction's BEEF ends with that transaction: the doors that write one from a transaction's own ancestry no longer sort it, so the read that names no txid takes the transaction back
 
 - What was wrong. `Transaction::to_beef` and `to_beef_v1` collected the transaction's ancestry — each entry's sources above it, the transaction last, BRC-62's own rule for the form ("we must ensure that we end with the tx being evaluated, and its inputs are above, and their inputs are above that") — then handed the assembled `Beef` to `Beef::to_binary`, whose sort writes the dependency order a caller-assembled BEEF takes. A graph whose collected order is not that order — one holding a proven branch beside a branch resting on a missing source — got its subject written before the proven ancestor, and `Transaction::from_beef(&bytes, None)` (its target `txid ?? atomic_txid ?? the last entry`) answered the last entry: a proven root, not the transaction the caller serialized. Every published version reads this way — the doors are as old as the crate's first release (`0.2.0` through `0.8.7`, released without this fix, and the `0.9.0-beta` line; the fix ships in `0.8.8`).
