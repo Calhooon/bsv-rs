@@ -389,7 +389,7 @@ impl ProtoWallet {
             self.key_deriver.root_key(),
             &identity_key,
             &args.counterparty,
-            &linkage,
+            &linkage.to_point(),
         )?;
 
         // Encode proof as R (33 bytes) || S' (33 bytes) || z (32 bytes) = 98 bytes

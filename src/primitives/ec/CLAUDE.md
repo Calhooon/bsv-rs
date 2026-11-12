@@ -9,9 +9,10 @@ This module provides secp256k1 elliptic curve operations for Bitcoin SV, includi
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
+| `mod.rs` | Module root; re-exports `PrivateKey`, `PublicKey`, `SharedSecret`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
 | `private_key.rs` | secp256k1 private key: generation, WIF encoding, signing, ECDH, BRC-42 child derivation |
 | `public_key.rs` | secp256k1 public key: serialization, address generation, verification, point arithmetic, BRC-42 child derivation |
+| `shared_secret.rs` | `SharedSecret`, the ECDH result (#843d6): one private field holding the point; `to_compressed`, `x` and `to_point` the three doors, each a reveal; a hand-written `Debug` (`SharedSecret { .. }`), `Clone`, constant-time `PartialEq`/`Eq`; no `Display`, `Hash`, serde, `Deref`, `AsRef`, `Default` or conversion into a `PublicKey`, no public constructor (`from_point` crate-only), the point not wiped on drop; five `compile_fail` doc tests (the fifth a struct expression from outside the crate, the field private, with its compiling twin); `tests/arch_shared_secret_843d6.rs` holds the surface |
 | `public_key_forms.rs` | `PublicKey::from_hex`'s reading: the reference's `PublicKey.fromString` forms (odd length, hybrid, coordinates at or above p reduced; #498); a `05` tag is `Unknown point format` here and, since #550, in `from_bytes` too |
 | `signature.rs` | ECDSA signature: DER/compact encoding, low-S normalization (BIP 62) |
 | `signature_der.rs` | The reference's `Signature.fromDER` reading (`ts-stack@edf6e03` `Signature.ts:44-97`), crate-visible, the one copy of its checks (#842): `read` answers R and S without the sign byte or the reference's words; `Signature::from_der` and `wallet::wire::reference_der` (#305's re-encoding) read through it; unit cells in `signature_der_tests.rs` |
@@ -40,7 +41,7 @@ pub struct PrivateKey {
     // Operations
     pub fn public_key(&self) -> PublicKey             // G * self
     pub fn sign(&self, msg_hash: &[u8; 32]) -> Result<Signature>  // RFC 6979, low-S
-    pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<PublicKey>  // ECDH
+    pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<SharedSecret>  // ECDH (#843d6)
     pub fn derive_child(&self, other_pubkey: &PublicKey, invoice_number: &str) -> Result<PrivateKey>  // BRC-42
 }
 // Implements: Clone, Debug (shows public key only), PartialEq, Eq, Drop (zeros memory)
@@ -81,11 +82,11 @@ pub struct PublicKey {
     pub fn is_valid(&self) -> bool                                    // Always true for parsed keys (Go/TS compat)
 
     // Point arithmetic
-    pub fn mul_scalar(&self, scalar: &[u8; 32]) -> Result<PublicKey>  // Point * scalar
+    pub fn mul_scalar(&self, scalar: &[u8; 32]) -> Result<PublicKey>  // Point * scalar; with a private scalar, the ECDH secret as a PublicKey (stated)
     pub fn add(&self, other: &PublicKey) -> Result<PublicKey>         // Point addition
 
     // ECDH and key derivation
-    pub fn derive_shared_secret(&self, other_privkey: &PrivateKey) -> Result<PublicKey>  // ECDH
+    pub fn derive_shared_secret(&self, other_privkey: &PrivateKey) -> Result<SharedSecret>  // ECDH (#843d6)
     pub fn derive_child(&self, other_privkey: &PrivateKey, invoice_number: &str) -> Result<PublicKey>  // BRC-42
 }
 // Implements: Clone, Debug, Display, PartialEq, Eq, Hash, Serialize, Deserialize
@@ -311,7 +312,8 @@ let recovered: PublicKey = serde_json::from_str(&json).unwrap();
 
 - **Private Key Zeroization**: `k256::SecretKey` automatically zeros memory on drop
 - **Debug Output**: PrivateKey debug shows only the public key, not the secret
-- **Constant-Time Comparison**: PrivateKey equality uses `subtle::ConstantTimeEq`
+- **Constant-Time Comparison**: PrivateKey and SharedSecret equality use `subtle::ConstantTimeEq`
+- **ECDH result**: `SharedSecret`'s `Debug` writes `SharedSecret { .. }`; the secret leaves only through `to_compressed`, `x` and `to_point` (#843d6)
 - **RFC 6979**: Deterministic nonce prevents k-reuse vulnerabilities
 - **BIP 62 Low-S**: Prevents transaction malleability; S normalized to <= n/2
 

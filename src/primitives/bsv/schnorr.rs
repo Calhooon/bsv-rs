@@ -22,7 +22,7 @@
 //! let bob = PrivateKey::random();
 //!
 //! // Alice computes shared secret with Bob's public key
-//! let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+//! let shared = alice.derive_shared_secret(&bob.public_key()).unwrap().to_point();
 //!
 //! // Alice generates a proof that she knows her private key and computed the shared secret correctly
 //! let proof = Schnorr::generate_proof(
@@ -226,7 +226,10 @@ mod tests {
     fn test_schnorr_roundtrip() {
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         let proof =
             Schnorr::generate_proof(&alice, &alice.public_key(), &bob.public_key(), &shared)
@@ -244,7 +247,10 @@ mod tests {
     fn test_schnorr_wrong_secret_fails() {
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         // Generate proof with correct shared secret
         let proof =
@@ -253,7 +259,10 @@ mod tests {
 
         // Create a different (wrong) shared secret
         let carol = PrivateKey::random();
-        let wrong_shared = alice.derive_shared_secret(&carol.public_key()).unwrap();
+        let wrong_shared = alice
+            .derive_shared_secret(&carol.public_key())
+            .unwrap()
+            .to_point();
 
         // Verification should fail with wrong shared secret
         assert!(!Schnorr::verify_proof(
@@ -268,7 +277,10 @@ mod tests {
     fn test_schnorr_wrong_public_key_fails() {
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         let proof =
             Schnorr::generate_proof(&alice, &alice.public_key(), &bob.public_key(), &shared)
@@ -288,7 +300,10 @@ mod tests {
     fn test_schnorr_wrong_bob_pubkey_fails() {
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         let proof =
             Schnorr::generate_proof(&alice, &alice.public_key(), &bob.public_key(), &shared)
@@ -311,10 +326,16 @@ mod tests {
         let bob = PrivateKey::random();
 
         // Alice computes shared secret
-        let alice_shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let alice_shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         // Bob computes the same shared secret
-        let bob_shared = bob.derive_shared_secret(&alice.public_key()).unwrap();
+        let bob_shared = bob
+            .derive_shared_secret(&alice.public_key())
+            .unwrap()
+            .to_point();
 
         // Both arrive at the same shared secret
         assert_eq!(alice_shared.to_compressed(), bob_shared.to_compressed());
@@ -354,7 +375,10 @@ mod tests {
         // The challenge should be deterministic given the same inputs
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         let nonce = PrivateKey::random();
         let r = nonce.public_key();
@@ -383,7 +407,10 @@ mod tests {
     fn test_schnorr_challenge_changes_with_different_inputs() {
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+        let shared = alice
+            .derive_shared_secret(&bob.public_key())
+            .unwrap()
+            .to_point();
 
         let nonce1 = PrivateKey::random();
         let r1 = nonce1.public_key();

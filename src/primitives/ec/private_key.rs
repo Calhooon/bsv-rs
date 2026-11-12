@@ -271,7 +271,9 @@ impl PrivateKey {
     ///
     /// # Returns
     ///
-    /// The shared secret as a public key (representing the resulting point)
+    /// The shared secret, a [`SharedSecret`](super::SharedSecret): its
+    /// `Debug` prints no secret, and it is revealed only through
+    /// `to_compressed`, `x` and `to_point`.
     ///
     /// # Example
     ///
@@ -287,8 +289,10 @@ impl PrivateKey {
     ///
     /// assert_eq!(alice_shared.to_compressed(), bob_shared.to_compressed());
     /// ```
-    pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<PublicKey> {
-        other_pubkey.mul_scalar(&self.to_bytes())
+    pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<super::SharedSecret> {
+        other_pubkey
+            .mul_scalar(&self.to_bytes())
+            .map(super::SharedSecret::from_point)
     }
 
     /// Derives a child private key using BRC-42 key derivation.

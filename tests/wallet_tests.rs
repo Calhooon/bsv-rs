@@ -208,7 +208,7 @@ mod key_deriver_tests {
         let secret2 = deriver
             .reveal_counterparty_secret(&Counterparty::Other(other))
             .unwrap();
-        assert_eq!(secret.to_hex(), secret2.to_hex());
+        assert_eq!(secret.to_compressed(), secret2.to_compressed());
     }
 
     #[test]

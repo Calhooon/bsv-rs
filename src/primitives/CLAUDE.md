@@ -82,12 +82,15 @@ pub struct HmacDrbg { ... }  // new(), new_with_hash(), generate(), reseed()
 // EC (secp256k1)
 pub struct PrivateKey { ... }  // random(), from_bytes(), from_hex(), from_wif(), sign(),
                                 // public_key(), to_bytes(), to_hex(), to_wif(), to_wif_with_prefix(),
-                                // derive_child(), derive_shared_secret()
+                                // derive_child(), derive_shared_secret() -> Result<SharedSecret>
 pub struct PublicKey { ... }   // from_bytes(), from_hex(), from_private_key(), from_scalar_mul_generator(),
                                 // verify(), to_compressed(), to_uncompressed(), to_hex(),
                                 // to_hex_uncompressed(), x(), y(), y_is_even(), hash160(),
                                 // to_address(), to_address_with_prefix(), derive_child(),
-                                // derive_shared_secret(), mul_scalar(), add(), is_valid()
+                                // derive_shared_secret() -> Result<SharedSecret>, mul_scalar() (point arithmetic),
+                                // add(), is_valid()
+pub struct SharedSecret { .. }  // the ECDH point (#843d6): to_compressed(), x(), to_point(), each a reveal;
+                                // Debug `SharedSecret { .. }`, constant-time ==; no Display/Hash/serde, no public constructor
 pub struct Signature { ... }   // new(), from_der(), from_compact(), from_compact_slice(),
                                 // r(), s(), to_der(), to_compact(), is_low_s(), to_low_s(), verify()
 ```
@@ -252,10 +255,11 @@ assert_eq!(key.to_bytes(), recovered.to_bytes());
 | `private_key.rs` | 564 | PrivateKey: random generation, WIF, signing, BRC-42 derivation, ECDH |
 | `public_key.rs` | 696 | PublicKey: verification, addresses, BRC-42 derivation, ECDH, point math |
 | `public_key_forms.rs` | 116 | `from_hex`'s reading: the reference's lenient key forms (#498) |
+| `shared_secret.rs` | 101 | `SharedSecret`, the ECDH result both `derive_shared_secret` doors and `reveal_counterparty_secret` return; its `Debug` prints no secret (#843d6) |
 | `signature.rs` | 531 | Signature: DER/compact encoding, low-S normalization, standalone verify |
 | `ecdsa.rs` | 306 | Core ECDSA sign/verify/recover functions |
 
-Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id`
+Key exports: `PrivateKey`, `PublicKey`, `SharedSecret`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id`
 
 ### bsv/ (BSV-Specific Operations)
 

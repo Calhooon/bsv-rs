@@ -241,7 +241,7 @@ fn test_schnorr_proof_with_derived_keys() {
     let bob_pub = bob.public_key();
 
     // Alice computes shared secret
-    let shared = alice.derive_shared_secret(&bob_pub).unwrap();
+    let shared = alice.derive_shared_secret(&bob_pub).unwrap().to_point();
 
     // Generate and verify Schnorr proof
     let proof = Schnorr::generate_proof(&alice, &alice_pub, &bob_pub, &shared).unwrap();
@@ -257,8 +257,14 @@ fn test_schnorr_proof_fails_with_wrong_secret() {
     let bob = PrivateKey::random();
     let carol = PrivateKey::random();
 
-    let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
-    let wrong_shared = alice.derive_shared_secret(&carol.public_key()).unwrap();
+    let shared = alice
+        .derive_shared_secret(&bob.public_key())
+        .unwrap()
+        .to_point();
+    let wrong_shared = alice
+        .derive_shared_secret(&carol.public_key())
+        .unwrap()
+        .to_point();
 
     let proof =
         Schnorr::generate_proof(&alice, &alice.public_key(), &bob.public_key(), &shared).unwrap();
@@ -590,8 +596,14 @@ fn test_multi_party_schnorr_verification() {
     let bob = PrivateKey::random();
 
     // Both compute the same shared secret
-    let alice_shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
-    let bob_shared = bob.derive_shared_secret(&alice.public_key()).unwrap();
+    let alice_shared = alice
+        .derive_shared_secret(&bob.public_key())
+        .unwrap()
+        .to_point();
+    let bob_shared = bob
+        .derive_shared_secret(&alice.public_key())
+        .unwrap()
+        .to_point();
 
     assert_eq!(alice_shared.to_compressed(), bob_shared.to_compressed());
 

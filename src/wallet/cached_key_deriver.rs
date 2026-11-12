@@ -41,7 +41,7 @@ use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 
 use crate::error::Result;
-use crate::primitives::{PrivateKey, PublicKey, SymmetricKey};
+use crate::primitives::{PrivateKey, PublicKey, SharedSecret, SymmetricKey};
 
 use super::key_deriver::{KeyDeriver, KeyDeriverApi};
 use super::types::{Counterparty, Protocol};
@@ -381,7 +381,7 @@ impl KeyDeriverApi for CachedKeyDeriver {
             .reveal_specific_secret(counterparty, protocol, key_id)
     }
 
-    fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<PublicKey> {
+    fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<SharedSecret> {
         // Secrets are not cached for security reasons
         self.inner.reveal_counterparty_secret(counterparty)
     }
