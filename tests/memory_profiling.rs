@@ -361,7 +361,9 @@ fn test_hashing_allocations() {
 /// - the stream alone, each element dropped as it is yielded: one chunk and
 ///   one element, with exactly the same peak at every depth under
 ///   one libtest thread (`RUST_TEST_THREADS=1` on CI's nextest step,
-///   `--test-threads=1` under `cargo test`; #372);
+///   `--test-threads=1` under `cargo test`; #372), judged on the minimum of
+///   `STREAM_SAMPLES` measurements of each depth, with at most two of the
+///   nine windows above the least of all nine (#873, below);
 /// - the structure verdict and the full verdict (scripts executed, each
 ///   parent output kept until it is spent): the peak over the stream's is
 ///   the index, a bounded number of bytes per element at every depth.
@@ -387,20 +389,61 @@ fn test_beef_stream_memory_is_flat_per_element() {
         dhat::HeapStats::get().max_bytes as u64
     }
 
-    println!("\n=== BEEF stream, the P0-5 deep chain ===");
-    let mut rows = Vec::new();
-    for n in [1_000usize, 4_000, 16_000] {
-        let tip = subject(n);
-        let headers = HashMap::from([(HEIGHT, funding_root())]);
+    const DEPTHS: [usize; 3] = [1_000, 4_000, 16_000];
+    // The stream's peak at each depth is the least of STREAM_SAMPLES windows,
+    // measured round by round over the depths (#873). The profile is the
+    // process's, not the stream's. A dhat profile of the opening window on macOS
+    // holds the stream's five blocks alone (17,004 B, every window equal over
+    // 40 runs); on Linux the opening stream window alone read 138 B high on PR
+    // #872 and PR #883 (17,150 against 17,012), its later windows equal: one
+    // window of one process each time. A likely source, measured here and not
+    // confirmed on Linux: libtest's main thread spawns the test thread and
+    // then blocks in `mpsc::Receiver::recv`, and its earliest block registers a
+    // waker that stays live (the context's `Arc`, 48 B, and the waker's `Vec`,
+    // 96 B; macOS adds its boxed pthread locks), so a main thread starved past
+    // the test's setup, as on a runner where nextest runs the file's processes
+    // side by side, lands it in whichever window is open: the scheduler picks
+    // the window, so a warm-up row would not cover a later one. An allocation
+    // that is not the stream's can only raise a peak, never lower it.
+    //
+    // Two judgments. (1) The least of each depth's windows, equal across the
+    // depths to the byte: a stream whose peak grows with the depth raises
+    // every window of the deeper depths. (2) At most MAX_HIGH_WINDOWS of the
+    // nine windows above the least of all nine: a cache inside the stream that
+    // fills once per process and keeps its capacity raises the windows of the
+    // round that grows it (one per depth, the depths ascending: three) and
+    // none after it, so the minima cannot see it and the count does. Two and
+    // not one: the logs show one stray per process, and two leaves room for a
+    // second of a cause not yet confirmed; not three: three is the cache's
+    // count. What the form cannot see, stated: three or more stray allocations
+    // in one process fail it (a flake, not a miss), and a cache grown in fewer
+    // than three windows (one depth alone) passes it.
+    const STREAM_SAMPLES: usize = 3;
+    const MAX_HIGH_WINDOWS: usize = 2;
+    let stream_peak = |n: usize| {
         let source = ChainSource::new(n);
-        let stream_only = peak(|| {
+        peak(|| {
             let mut elements = 0usize;
             for element in BeefStream::new(source) {
                 element.expect("the chain reads");
                 elements += 1;
             }
             assert_eq!(elements, n + 1);
-        });
+        })
+    };
+    let mut samples = vec![Vec::new(); DEPTHS.len()];
+    for _ in 0..STREAM_SAMPLES {
+        for (i, n) in DEPTHS.into_iter().enumerate() {
+            samples[i].push(stream_peak(n));
+        }
+    }
+
+    println!("\n=== BEEF stream, the P0-5 deep chain ===");
+    let mut rows = Vec::new();
+    for (i, n) in DEPTHS.into_iter().enumerate() {
+        let tip = subject(n);
+        let headers = HashMap::from([(HEIGHT, funding_root())]);
+        let stream_only = *samples[i].iter().min().expect("STREAM_SAMPLES > 0");
         let source = ChainSource::new(n);
         let structure = peak(|| {
             let verdict = verify_stream_structure(source, &headers, Some(tip));
@@ -413,24 +456,64 @@ fn test_beef_stream_memory_is_flat_per_element() {
         });
         let per = |total: u64| (total - stream_only.min(total)) as f64 / n as f64;
         println!(
-            "  N={n}: stream alone {stream_only} B; structure {structure} B ({:.1} B per element); \
-             scripts {full} B ({:.1} B per element)",
+            "  N={n}: stream alone {stream_only} B (the least of {:?}); structure {structure} B \
+             ({:.1} B per element); scripts {full} B ({:.1} B per element)",
+            samples[i],
             per(structure),
             per(full)
         );
         rows.push((n, stream_only, per(structure), per(full)));
     }
 
-    // One chunk and one element at any depth under the single-threaded harness.
+    // One chunk and one element at any depth under the single-threaded
+    // harness: the minima equal to the byte, every depth that differs named.
     let (_, first, ..) = rows[0];
-    for (n, stream_only, ..) in &rows {
-        assert_eq!(
-            *stream_only, first,
-            "the stream's peak differs at N={n}: {stream_only} vs {first} B; \
-             this pin is judged on one libtest thread (RUST_TEST_THREADS=1 in CI, \
-             --test-threads=1 under cargo test); libtest's concurrent \
-             60-second warning allocates in the process-wide profile (#372)"
-        );
+    let differing: Vec<String> = rows
+        .iter()
+        .filter(|(_, stream_only, ..)| *stream_only != first)
+        .map(|(n, stream_only, ..)| format!("N={n}: {stream_only} B"))
+        .collect();
+    assert!(
+        differing.is_empty(),
+        "the stream's peak differs from N=1000's {first} B at {}; each depth is the \
+         least of {STREAM_SAMPLES} windows, so a stray allocation outside the stream \
+         raises it only when it lands in every window of a depth (#873); this pin is \
+         judged on one libtest thread (RUST_TEST_THREADS=1 in CI, --test-threads=1 \
+         under cargo test); libtest's concurrent 60-second warning allocates in the \
+         process-wide profile (#372)",
+        differing.join(", ")
+    );
+    // At most two of the nine windows above the least of all nine: a stray
+    // allocation lands in one window of a process, a cache the stream fills
+    // once and keeps raises a window at each depth of the round that grows it.
+    let least = samples
+        .iter()
+        .flatten()
+        .min()
+        .copied()
+        .expect("windows measured");
+    let high: Vec<String> = (0..STREAM_SAMPLES)
+        .flat_map(|round| {
+            DEPTHS
+                .into_iter()
+                .enumerate()
+                .map(move |(i, n)| (round, i, n))
+        })
+        .filter(|&(round, i, _)| samples[i][round] > least)
+        .map(|(round, i, n)| format!("round {}, N={n}: {} B", round + 1, samples[i][round]))
+        .collect();
+    assert!(
+        high.len() <= MAX_HIGH_WINDOWS,
+        "{} of the {} stream windows read above the least, {least} B: {}; a stray \
+         allocation outside the stream lands in one window of a process, and more than \
+         {MAX_HIGH_WINDOWS} is read as the stream's (a cache it fills once and keeps \
+         raises a window at each depth of the round that grows it); three or more \
+         strays in one process fail this too, the form's stated limit (#873)",
+        high.len(),
+        STREAM_SAMPLES * DEPTHS.len(),
+        high.join(", ")
+    );
+    for (_, stream_only, ..) in &rows {
         assert!(
             *stream_only < 32 * 1024,
             "the stream holds more than a chunk"
