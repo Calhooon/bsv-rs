@@ -42,6 +42,13 @@
 //! A backup written by bsv-rs 0.8.5 or earlier (a 4-character tag after the
 //! last `.`) is refused by [`KeyShares::from_backup_format`]; it is
 //! recovered by [`recover_private_key_from_legacy_backup`].
+//!
+//! A set is read with every share's x non-zero and distinct, in the whole
+//! set and past the threshold window (#854): a share standing at x = 0
+//! carries the secret in its own y, so the set can substitute another key
+//! for the holder's, and a repeated x divides by zero in the interpolation.
+
+use std::collections::HashSet;
 
 use crate::error::{Error, Result};
 use crate::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
@@ -194,6 +201,8 @@ impl KeyShares {
     /// - a field outside its grammar: `Invalid canonical share data in share N`
     /// - `Threshold mismatch in share N`, then `Integrity mismatch in share N`
     /// - a point that does not round-trip: the point's sentence
+    /// - a share at x = 0 (#854): `Zero x coordinate in share N`
+    /// - two shares with one x (#854): `Duplicate share detected, each must be unique.`
     ///
     /// A backup written by bsv-rs 0.8.5 or earlier carries a 4-character tag
     /// and is refused here as `Invalid canonical share data in share 0`;
@@ -253,6 +262,10 @@ impl KeyShares {
                 &share[..x.len() + 1 + y.len()],
             )?);
         }
+        // #854: the x values of the whole set, read before the collection is
+        // built, so a set the door builds carries no share at x = 0 and no
+        // repeated x
+        refuse_degenerate_xs(&points, &InterpolationWords::BRC140)?;
         assert_collection(points.len(), threshold, integrity)?;
         Ok(Self {
             points,
@@ -310,10 +323,12 @@ impl KeyShares {
     /// as [`to_backup_format`](Self::to_backup_format) checks it, then
     /// `At least T shares are required to reconstruct the private key`, the
     /// leading `threshold` points' coordinates canonical (`share coordinates
-    /// must be canonical field elements`) and distinct (`Duplicate share
-    /// detected, each must be unique.`), the secret interpolated at x = 0 and
-    /// read modulo the group order, and its tag compared (`Integrity hash
-    /// mismatch`). Shares past the threshold are not read.
+    /// must be canonical field elements`), every share's x non-zero and
+    /// distinct in the whole set (#854: `Zero x coordinate in share N`,
+    /// `Duplicate share detected, each must be unique.`), the secret
+    /// interpolated at x = 0 and read modulo the group order, and its tag
+    /// compared (`Integrity hash mismatch`). Shares past the threshold are
+    /// not interpolated, but their x values are read.
     ///
     /// # Example
     ///
@@ -344,20 +359,23 @@ impl KeyShares {
 /// The words of the interpolation's refusals, the reader's or the legacy
 /// reader's.
 pub(crate) struct InterpolationWords {
+    pub(crate) zero_x: fn(usize) -> String,
     pub(crate) duplicate: &'static str,
     pub(crate) too_few: fn(usize) -> String,
 }
 
 impl InterpolationWords {
     const BRC140: Self = Self {
+        zero_x: |i| format!("Zero x coordinate in share {i}"),
         duplicate: "Duplicate share detected, each must be unique.",
         too_few: |t| format!("At least {t} shares are required to reconstruct the private key"),
     };
 }
 
 /// The secret through the leading `threshold` points (`PrivateKey.ts:587-620`):
-/// at least `threshold` points, each coordinate in `[0, p)`, the x values
-/// distinct, `f(0)` read modulo the group order `n` (the reference's
+/// at least `threshold` points, the leading `threshold`'s coordinates each in
+/// `[0, p)`, every x non-zero and distinct in the whole set (#854), `f(0)`
+/// read modulo the group order `n` (the reference's
 /// `new PrivateKey(..)`, `modN` `'apply'`). `None` when that is 0: no key,
 /// which each caller refuses in its integrity words (`Integrity hash
 /// mismatch`, the words of the recording; a key of 0 is never returned).
@@ -375,11 +393,7 @@ pub(crate) fn interpolate(
     if !used.iter().all(|pt| canonical(&pt.x) && canonical(&pt.y)) {
         return Err(crypto("share coordinates must be canonical field elements"));
     }
-    for (i, a) in used.iter().enumerate() {
-        if used[i + 1..].iter().any(|b| b.x == a.x) {
-            return Err(crypto(words.duplicate));
-        }
-    }
+    refuse_degenerate_xs(points, &words)?;
     let secret = Polynomial::new(used.to_vec(), threshold)
         .value_at(&BigNumber::zero())
         .modulo(&BigNumber::secp256k1_order());
@@ -387,6 +401,28 @@ pub(crate) fn interpolate(
         return Ok(None);
     }
     PrivateKey::from_bytes(&secret.to_bytes_be(32)).map(Some)
+}
+
+/// Refuses the x values interpolation cannot judge, before it runs, in the
+/// whole set and past the threshold window (#854): an x of zero, where a
+/// share's y is the secret itself and the whole set can substitute another
+/// key for the holder's, and a repeated x, where the Lagrange weights divide
+/// by zero. A set split by [`split_private_key`] carries neither (its x is
+/// drawn non-zero and distinct).
+pub(crate) fn refuse_degenerate_xs(
+    points: &[PointInFiniteField],
+    words: &InterpolationWords,
+) -> Result<()> {
+    let mut seen: HashSet<Vec<u8>> = HashSet::with_capacity(points.len());
+    for (idx, point) in points.iter().enumerate() {
+        if point.x.is_zero() {
+            return Err(crypto((words.zero_x)(idx)));
+        }
+        if !seen.insert(point.x.to_bytes_be_min()) {
+            return Err(crypto(words.duplicate));
+        }
+    }
+    Ok(())
 }
 
 /// Splits a private key into BRC-140 shares, the reference's `toKeyShares`
