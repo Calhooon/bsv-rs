@@ -274,7 +274,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
     // `src/transaction/CLAUDE.md`'s `beef/prepass_621_tests.rs` row,
     // `docs/lanes/fix-621.md`). A split that moves with no new vector is a
     // finding. The totals are derived, never pinned.
-    assert_eq!(read, 356, "every BEEF the vectors hold that reads");
+    assert_eq!(read, 361, "every BEEF the vectors hold that reads");
     assert_eq!(
         counts.ok + counts.refused,
         changes.len() * read,
@@ -288,7 +288,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
             counts.by_reader,
             counts.root_not_carried
         ),
-        (2416, 3636, 1761, 248)
+        (2443, 3694, 1789, 252)
     );
 }
 

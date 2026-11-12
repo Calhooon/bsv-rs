@@ -43,8 +43,11 @@ const RAW_TX_EXPECTED: &str = "a valid serialized Transaction is expected";
 /// transaction with an output of 2^53 - 1, plain, atomic and unproven, the
 /// 2^53 copies refused; 341 and 115 until #844's fold recorded the writers'
 /// control cells, fifteen BEEFs of a three-output transaction at 2^53 - 1,
-/// six of them V1: `Transaction.toBEEF` and the atomic `toAtomicBEEF` bodies).
-const SWEPT: (usize, usize) = (356, 121);
+/// six of them V1: `Transaction.toBEEF` and the atomic `toAtomicBEEF` bodies;
+/// 356 and 121 until 0.8.8's `beef_tx_order.json` brought its four witnesses'
+/// three BEEFs each — the door's, the reference's door's and its sorted —
+/// five distinct after the bytes' deduplication, every one V1).
+const SWEPT: (usize, usize) = (361, 126);
 
 /// A txid no fixture holds.
 const FRESH: &str = "8170000000000000000000000000000000000000000000000000000000000817";

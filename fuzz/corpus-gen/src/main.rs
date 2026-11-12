@@ -334,6 +334,67 @@ fn beef_corpora(base: &Path) {
         }
     }
 
+    // The transaction door's round trip (`fuzz_targets/fuzz_beef_parser.rs`):
+    // a graph with a proven root beside a missing source, the subject spending
+    // both — the door's walk collects it with the subject last, where the
+    // dependency sort a caller-assembled BEEF takes writes the proven root
+    // after it. `tests/beef_tx_order.rs` holds the same shape as a witness.
+    {
+        let root = |proven: bool, salt: u8| {
+            let mut r = Transaction::new();
+            r.set_version(1);
+            r.set_lock_time(salt as u32);
+            let mut input =
+                TransactionInput::new(format!("{salt:02x}{}", "5e".repeat(31)), (salt % 4) as u32);
+            input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
+            r.inputs_mut().push(input);
+            r.outputs_mut().push(TransactionOutput::new(
+                1000 + salt as u64,
+                LockingScript::from_binary(&[0x51]).unwrap(),
+            ));
+            if proven {
+                let id = r.id();
+                r.merkle_path = Some(
+                    MerklePath::new(
+                        800_000 + salt as u32,
+                        vec![vec![MerklePathLeaf::new_txid(0, id)]],
+                    )
+                    .unwrap(),
+                );
+            }
+            r
+        };
+        let link = |src: &Transaction| {
+            let mut i = TransactionInput::with_source_transaction(src.clone(), 0);
+            i.source_txid = Some(src.id());
+            i.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
+            i.sequence = 0xffffffff;
+            i
+        };
+        let mid = |src: &Transaction, salt: u64| {
+            let mut m = Transaction::new();
+            m.set_version(1);
+            m.set_lock_time(salt as u32);
+            m.inputs_mut().push(link(src));
+            m.outputs_mut().push(TransactionOutput::new(
+                500 + salt,
+                LockingScript::from_binary(&[0x51]).unwrap(),
+            ));
+            m
+        };
+        let mut subject = Transaction::new();
+        subject.set_version(2);
+        subject.set_lock_time(0x4243);
+        for src in [mid(&root(true, 1), 10), mid(&root(false, 2), 20)] {
+            subject.inputs_mut().push(link(&src));
+        }
+        subject.outputs_mut().push(TransactionOutput::new(
+            250,
+            LockingScript::from_binary(&[0x51]).unwrap(),
+        ));
+        beef.add("tx-door-order", &subject.to_beef(true).unwrap());
+    }
+
     // A door no row reaches: the leading mutation of a row (truncated, a
     // byte replaced, a byte inserted) the reader refuses with it.
     let mutate = |data: &[u8], at: usize, how: u8| -> Vec<u8> {
