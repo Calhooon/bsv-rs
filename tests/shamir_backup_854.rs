@@ -16,6 +16,7 @@ use bsv_rs::primitives::bsv::polynomial::PointInFiniteField;
 use bsv_rs::primitives::bsv::shamir::{
     recover_private_key_from_legacy_backup, split_private_key, split_private_key_with, KeyShares,
 };
+use bsv_rs::primitives::encoding::to_base58;
 use bsv_rs::primitives::{BigNumber, PrivateKey};
 use bsv_rs::Error;
 use serde_json::Value;
@@ -137,6 +138,16 @@ fn recover(shares: &[String]) -> bsv_rs::Result<PrivateKey> {
     KeyShares::from_backup_format(shares)?.recover_private_key()
 }
 
+/// The canonical base58 text of a coordinate: its minimal bytes, `1` for zero.
+fn field_text(value: &BigNumber) -> String {
+    let bytes = value.to_bytes_be_min();
+    if bytes.is_empty() {
+        "1".to_string()
+    } else {
+        to_base58(&bytes)
+    }
+}
+
 /// This crate's fixed draws for a split: the coefficients, the HMAC seed and
 /// one 32-byte draw per share.
 fn draws(threshold: usize, total: usize) -> (Vec<[u8; 32]>, [u8; 64], Vec<[u8; 32]>) {
@@ -186,23 +197,47 @@ fn the_references_shares_recover_their_keys_from_every_threshold_subset_854() {
     assert_eq!(cells, 2 * 3 * (3 + 10));
 }
 
+/// #854's fix: the read cells whose sets carry a share at x = 0 or a
+/// repeated x, refused at the door where the recording reads them. The vector
+/// keeps the recording's verdicts (it is read, never edited); this crate's
+/// words for those cells are named here.
+fn carved_854(name: &str) -> Option<&'static str> {
+    match name {
+        "same_share_twice" | "duplicate_past_the_threshold" | "shares_255_leading_distinct" => {
+            Some("Duplicate share detected, each must be unique.")
+        }
+        "x_zero" => Some("Zero x coordinate in share 0"),
+        _ => None,
+    }
+}
+
 #[test]
 fn the_readers_refusals_are_the_references_in_its_words_854() {
     let v = vector();
     let reads = v["reads"].as_array().unwrap();
     let mut differ = Vec::new();
+    let mut carved = 0;
     for cell in reads {
         let shares = strings(&cell["shares"]);
+        let name = cell["name"].as_str().unwrap();
         let parse = match KeyShares::from_backup_format(&shares) {
             Ok(_) => serde_json::json!({ "ok": true }),
             Err(e) => serde_json::json!({ "ok": false, "error": words(&e) }),
         };
         let answer = answer_of(&recover(&shares));
+        if let Some(ours) = carved_854(name) {
+            let refusal = serde_json::json!({ "ok": false, "error": ours });
+            assert_eq!(parse, refusal, "{name}");
+            assert_eq!(answer, refusal, "{name}");
+            carved += 1;
+            continue;
+        }
         if parse != cell["parse"] || answer != cell["answer"] {
             differ.push((cell["name"].clone(), parse, answer));
         }
     }
     assert!(differ.is_empty(), "{differ:#?}");
+    assert_eq!(carved, 3);
     assert_eq!(reads.len(), 46);
 }
 
@@ -708,25 +743,43 @@ fn recovery_judges_y_and_the_point_count_as_the_reference_does_854() {
     );
     // The reader's count is judged before any share is read: 255 read, and
     // 300 refused on the count, not at the malformed share 256 (`fold_854.reads`).
+    // The 255 cell repeats share 0's x past the threshold window, where the
+    // recording reads it (#854's fix reads the whole set; `carved_854`).
+    let mut carved = 0;
     for cell in v["fold_854"]["reads"].as_array().unwrap() {
         let shares = strings(&cell["shares"]);
+        let name = cell["name"].as_str().unwrap();
         let parse = match KeyShares::from_backup_format(&shares) {
             Ok(_) => serde_json::json!({ "ok": true }),
             Err(e) => serde_json::json!({ "ok": false, "error": words(&e) }),
         };
-        assert_eq!(parse, cell["parse"], "{}", cell["name"]);
-        assert_eq!(
-            answer_of(&recover(&shares)),
-            cell["answer"],
-            "{}",
-            cell["name"]
-        );
+        if let Some(ours) = carved_854(name) {
+            let refusal = serde_json::json!({ "ok": false, "error": ours });
+            assert_eq!(parse, refusal, "{name}");
+            assert_eq!(answer_of(&recover(&shares)), refusal, "{name}");
+            carved += 1;
+            continue;
+        }
+        assert_eq!(parse, cell["parse"], "{name}");
+        assert_eq!(answer_of(&recover(&shares)), cell["answer"], "{name}");
     }
-    // The legacy reader's count the same: 255 shares read (the leading two distinct).
+    assert_eq!(carved, 1);
+    // The legacy reader's count the same: 255 shares read, every x distinct
+    // (#854's fix reads the whole set, where 0.8.5 read the leading two
+    // only). The line f(x) = 1 through the points (1..=255, 1), the tag
+    // of key 1.
     let legacy: Value = serde_json::from_str(LEGACY_085).unwrap();
-    let s = strings(&legacy[0]["shares"]);
-    let mut many = vec![s[0].clone(), s[1].clone()];
-    many.resize(255, s[0].clone());
+    let tag = legacy[0]["shares"][0]
+        .as_str()
+        .unwrap()
+        .rsplit('.')
+        .next()
+        .unwrap()
+        .to_string();
+    let many: Vec<String> = (1u64..=255)
+        .map(|i| format!("{}.2.2.{}", field_text(&BigNumber::from_u64(i)), tag))
+        .collect();
+    assert_eq!(many.len(), 255);
     assert_eq!(
         recover_private_key_from_legacy_backup(&many)
             .unwrap()

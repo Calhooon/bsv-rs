@@ -52,8 +52,9 @@ fn is_legacy_integrity(field: &str) -> bool {
 /// [`PointInFiniteField::from_string`] reads it, so a leading `1` or a
 /// coordinate at or above p is refused); a threshold of 2 to 255 with no sign
 /// or leading zero; a tag of exactly 4 base58 characters, the same on every
-/// share; at least `threshold` shares, the leading `threshold` of them with
-/// distinct x. The recovered key's old tag is checked, and the key returned.
+/// share; at least `threshold` shares, every share's x non-zero and distinct
+/// in the whole set, past the threshold window (#854). The recovered key's
+/// old tag is checked, and the key returned.
 /// A share in BRC-140's form (an 8-hex-digit tag) is refused in words that
 /// name [`KeyShares::from_backup_format`](super::KeyShares::from_backup_format).
 ///
@@ -77,7 +78,8 @@ fn is_legacy_integrity(field: &str) -> bool {
 /// backup form; read it with KeyShares::from_backup_format`, `Invalid legacy
 /// share data in share N`, `Threshold mismatch in legacy share N`, `Integrity
 /// mismatch in legacy share N`, `At least T legacy shares are required to
-/// recover the private key`, `Duplicate legacy share detected, each must be
+/// recover the private key`, `Zero x coordinate in legacy share N`,
+/// `Duplicate legacy share detected, each must be
 /// unique.`, `Legacy integrity check failed`.
 ///
 /// # Example
@@ -135,6 +137,7 @@ pub fn recover_private_key_from_legacy_backup(shares: &[String]) -> Result<Priva
         points.push(point);
     }
     let words = InterpolationWords {
+        zero_x: |i| format!("Zero x coordinate in legacy share {i}"),
         duplicate: "Duplicate legacy share detected, each must be unique.",
         too_few: |t| format!("At least {t} legacy shares are required to recover the private key"),
     };

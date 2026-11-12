@@ -7,10 +7,12 @@
 //! returns. The standard reader takes only the canonical form, so what it
 //! reads is written back as the very lines given (#854), and the two forms
 //! are disjoint: the legacy reader refuses every set the standard reader
-//! reads (an 8-hex-digit tag names `from_backup_format`). The writer's round
-//! trip: the input's hash as a key, split by `split_private_key` (threshold
-//! and total from the leading byte) and written, parses back to the same
-//! lines and recovers that key.
+//! reads (an 8-hex-digit tag names `from_backup_format`). A set either
+//! reader takes holds no share at x = 0 and no repeated x (#854), in the
+//! whole set and past the threshold window. The writer's round trip: the
+//! input's hash as a key, split by `split_private_key` (threshold and total
+//! from the leading byte) and written, parses back to the same lines and
+//! recovers that key.
 use bsv_rs::primitives::bsv::shamir::{
     recover_private_key_from_legacy_backup, split_private_key, KeyShares,
 };
@@ -24,6 +26,11 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(text) = std::str::from_utf8(data) {
         let lines: Vec<String> = text.lines().map(str::to_string).collect();
         if let Ok(shares) = KeyShares::from_backup_format(&lines) {
+            let mut seen = std::collections::HashSet::new();
+            for point in &shares.points {
+                assert!(!point.x.is_zero(), "a share at x = 0");
+                assert!(seen.insert(point.x.to_bytes_be_min()), "a repeated x");
+            }
             let written = shares.to_backup_format().expect("what it read it writes");
             assert_eq!(written, lines, "the reader is canonical");
             assert!(recover_private_key_from_legacy_backup(&lines).is_err());
@@ -34,6 +41,14 @@ fuzz_target!(|data: &[u8]| {
         if lines.len() <= RECOVER {
             if let Ok(key) = recover_private_key_from_legacy_backup(&lines) {
                 assert!(KeyShares::from_backup_format(&lines).is_err());
+                let mut seen = std::collections::HashSet::new();
+                for line in &lines {
+                    // The first field is the x, canonical base58, so `1` is
+                    // zero's own text and a repeated text a repeated x.
+                    let x = line.split('.').next().unwrap_or("");
+                    assert!(x != "1", "a share at x = 0");
+                    assert!(seen.insert(x), "a repeated x");
+                }
                 let _ = key.to_bytes();
             }
         }

@@ -330,18 +330,15 @@ fn test_total_shares_less_than_2() {
 #[test]
 fn test_duplicate_shares_in_recovery() {
     // Mirrors Go: TestDuplicateShareDetected
-    // Providing the same share twice is refused
+    // Providing the same share twice is refused, at the door (#854: the
+    // whole set is read, in the reference's words)
     let key = PrivateKey::random();
     let shares = split_private_key(&key, 3, 5).unwrap();
     let backup = shares.to_backup_format().unwrap();
 
     // Use share 0, share 1, and share 1 again (duplicate)
-    let recovery =
-        KeyShares::from_backup_format(&[backup[0].clone(), backup[1].clone(), backup[1].clone()])
-            .unwrap();
-
-    // The reference's refusal (`PrivateKey.ts:603-611`)
-    let result = recovery.recover_private_key();
+    let result =
+        KeyShares::from_backup_format(&[backup[0].clone(), backup[1].clone(), backup[1].clone()]);
     assert_eq!(
         result.unwrap_err(),
         Error::CryptoError("Duplicate share detected, each must be unique.".into())
