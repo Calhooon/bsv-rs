@@ -8,6 +8,9 @@ use bsv_rs::transaction::{
 };
 use libfuzzer_sys::fuzz_target;
 
+#[path = "support/identity_law.rs"]
+mod identity_law;
+
 /// Headers that carry every root, so a BUMP's root is never the refusal and
 /// the reader walks on to the doors after it (the Lean's `Reason`s).
 struct EveryRoot;
@@ -98,7 +101,8 @@ fn the_two_readers_agree(data: &[u8]) {
 
 /// `merge_beef`'s verdict from its pre-pass is the literal round trip's
 /// (#621, after #817): the oracle (`Beef::merge_snapshot_oracle`, built
-/// under `cfg(fuzzing)` alone) refuses in the same words, and after an `Ok`
+/// under the `internal-test-doors` feature this crate turns on, #869's
+/// second fold) refuses in the same words, and after an `Ok`
 /// the target merged from the source writes the bytes of the target merged
 /// from the oracle's snapshot.
 fn the_pre_pass_is_the_round_trip(source: &Beef) {
@@ -208,7 +212,7 @@ fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
     let mut b = beef.clone();
     if let Some(entry) = b.txs.iter_mut().find(|t| !t.is_txid_only()) {
         if let Some(tx) = entry.tx_mut() {
-            tx.lock_time ^= 1;
+            tx.set_lock_time(tx.lock_time() ^ 1);
         }
         states.push(b);
     }
@@ -239,23 +243,23 @@ fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
     let edited = b
         .txs
         .iter()
-        .find(|t| t.tx().is_some_and(|tx| !tx.outputs.is_empty()))
+        .find(|t| t.tx().is_some_and(|tx| !tx.outputs().is_empty()))
         .map(BeefTx::txid);
     if let Some(txid) = edited {
-        if b.edit_tx(&txid, |tx| tx.outputs[0].satoshis = Some(amount))
+        if b.edit_tx(&txid, |tx| tx.outputs_mut()[0].satoshis = Some(amount))
             .is_ok()
         {
             states.push(b);
         }
     }
     if let Some(tx) = beef.txs.iter().find_map(|t| t.tx()) {
-        let mut outputs = tx.outputs.clone();
+        let mut outputs = tx.outputs().to_vec();
         outputs.push(bsv_rs::transaction::TransactionOutput::new(
             amount,
             bsv_rs::script::LockingScript::new(),
         ));
         let by_hand =
-            Transaction::with_params(tx.version, tx.inputs.clone(), outputs, tx.lock_time);
+            Transaction::with_params(tx.version(), tx.inputs().to_vec(), outputs, tx.lock_time());
         let mut b = beef.clone();
         b.merge_transaction(by_hand.clone());
         states.push(b);
@@ -318,6 +322,10 @@ fuzz_target!(|data: &[u8]| {
         the_pre_pass_is_the_round_trip(&state);
     }
 
+    // #843's law over every copy the BEEF stores, merged or not (#869's
+    // second fold).
+    identity_law::beef_copies_keep_the_law(&beef);
+
     // Link every subject (the iterative walk), serialize, clone and drop it
     let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
     for txid in &txids {
@@ -326,7 +334,9 @@ fuzz_target!(|data: &[u8]| {
             let _ = tx.to_atomic_beef(true);
             let copy = tx.clone();
             drop(tx);
-            let _ = copy.id();
+            // #843's law on the linked transaction under edits the input
+            // chooses, its linked sources included (#869's fold).
+            identity_law::edits_keep_the_law(copy, data);
         }
     }
 

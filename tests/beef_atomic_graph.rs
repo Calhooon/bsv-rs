@@ -47,10 +47,10 @@ fn tx(inputs: &[(&str, u32)], amounts: &[u64]) -> Transaction {
     for (txid, vout) in inputs {
         let mut input = TransactionInput::new(txid.to_string(), *vout);
         input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
-        t.inputs.push(input);
+        t.inputs_mut().push(input);
     }
     for amount in amounts {
-        t.outputs.push(TransactionOutput::new(
+        t.outputs_mut().push(TransactionOutput::new(
             *amount,
             LockingScript::from_binary(&[0x51]).unwrap(),
         ));
@@ -566,7 +566,7 @@ fn ts3_accepts(bytes: &[u8]) -> bool {
             Some(t) => t.clone(),
             None => Transaction::from_binary(entry.raw_tx().unwrap()).unwrap(),
         };
-        for input in &t.inputs {
+        for input in t.inputs() {
             if let Some(&j) = at.get(&input.get_source_txid().unwrap()) {
                 stack.push(j);
             }
@@ -824,7 +824,7 @@ fn ts_order(graph: &Graph) -> (Vec<u8>, Vec<&Node>) {
 
 /// The inputs of a node's transaction.
 fn inputs_of(node: &Node) -> usize {
-    Transaction::from_binary(&node.raw).unwrap().inputs.len()
+    Transaction::from_binary(&node.raw).unwrap().inputs().len()
 }
 
 #[test]

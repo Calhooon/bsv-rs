@@ -58,7 +58,7 @@ impl BeefTx {
     /// such bytes.
     pub(crate) fn amount_refusal(&self) -> Result<()> {
         if let Some(ref tx) = self.tx {
-            for output in &tx.outputs {
+            for output in tx.outputs() {
                 if super::super::amount::safe_amount(output.satoshis.unwrap_or(0)).is_err() {
                     return Err(crate::Error::BeefError(
                         super::super::amount::UNSAFE_WRITE.to_string(),

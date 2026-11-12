@@ -200,7 +200,7 @@ impl TransactionInput {
     pub fn source_satoshis(&self) -> Option<u64> {
         self.source_transaction
             .as_ref()
-            .and_then(|tx| tx.outputs.get(self.source_output_index as usize))
+            .and_then(|tx| tx.outputs().get(self.source_output_index as usize))
             .and_then(|out| out.satoshis)
     }
 
@@ -210,7 +210,7 @@ impl TransactionInput {
     pub fn source_locking_script(&self) -> Option<&LockingScript> {
         self.source_transaction
             .as_ref()
-            .and_then(|tx| tx.outputs.get(self.source_output_index as usize))
+            .and_then(|tx| tx.outputs().get(self.source_output_index as usize))
             .map(|out| &out.locking_script)
     }
 

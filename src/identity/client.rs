@@ -980,7 +980,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         };
 
         // Step 2: Get the output at the specified index
-        let tx_output = match tx.outputs.get(output.output_index as usize) {
+        let tx_output = match tx.outputs().get(output.output_index as usize) {
             Some(o) => o,
             None => return Ok(None), // Output index out of range
         };
@@ -1066,7 +1066,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         };
 
         // Step 2: Get the output at the specified index
-        let tx_output = match tx.outputs.get(output.output_index as usize) {
+        let tx_output = match tx.outputs().get(output.output_index as usize) {
             Some(o) => o,
             None => return Ok(None), // Output index out of range
         };

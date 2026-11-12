@@ -758,7 +758,7 @@ fn classify(
 /// digest reading none of them.
 pub(crate) fn sighash_of(tx: &Transaction) -> crate::Result<Arc<TxSighashCache>> {
     let outputs = tx
-        .outputs
+        .outputs()
         .iter()
         .map(|o| TxOutput {
             satoshis: o.satoshis.unwrap_or(0),
@@ -766,7 +766,7 @@ pub(crate) fn sighash_of(tx: &Transaction) -> crate::Result<Arc<TxSighashCache>>
         })
         .collect();
     let inputs = tx
-        .inputs
+        .inputs()
         .iter()
         .map(|i| {
             Ok(TxInput {
@@ -782,9 +782,9 @@ pub(crate) fn sighash_of(tx: &Transaction) -> crate::Result<Arc<TxSighashCache>>
         })
         .collect::<crate::Result<_>>()?;
     Ok(Arc::new(TxSighashCache::new(
-        tx.version as i32,
+        tx.version() as i32,
         inputs,
         outputs,
-        tx.lock_time,
+        tx.lock_time(),
     )))
 }

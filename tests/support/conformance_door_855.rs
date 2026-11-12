@@ -78,7 +78,7 @@ fn node_transaction_door(id: &str, input: &Value, census: &mut DoorCensus) {
     };
     let empty = vec![];
     let prevouts = input["prevouts"].as_array().unwrap_or(&empty);
-    for (vin, txin) in tx.inputs.iter().enumerate() {
+    for (vin, txin) in tx.inputs().iter().enumerate() {
         let Some(prevout) = prevouts.iter().find(|p| {
             Some(s(p, "txid")) == txin.source_txid.as_deref()
                 && (n(p, "vout") as u32) == txin.source_output_index

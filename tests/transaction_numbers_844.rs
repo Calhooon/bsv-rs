@@ -181,7 +181,7 @@ fn an_ef_source_of_two_to_the_53_satoshis_is_refused_844() {
         if c["edge"] == "two_to_the_53_minus_1" {
             assert_eq!(&here.unwrap(), &c["answer"], "{reader}");
             let tx = Transaction::from_hex_ef(c["input"].as_str().unwrap()).unwrap();
-            assert_eq!(tx.inputs[0].source_satoshis(), Some((1 << 53) - 1));
+            assert_eq!(tx.inputs()[0].source_satoshis(), Some((1 << 53) - 1));
         } else {
             assert_eq!(here.unwrap_err(), Error::TransactionError(UNSAFE.into()));
         }
@@ -384,26 +384,26 @@ const UNSAFE_WRITE: &str = "The number is larger than 2 ^ 53 (unsafe)";
 /// through the public field, as the recorder sets the reference's.
 fn three_outputs(position: usize, value: u64) -> Transaction {
     let mut tx = three_outputs_unchanged();
-    tx.outputs[position].satoshis = Some(value);
+    tx.outputs_mut()[position].satoshis = Some(value);
     // Fresh, so no cached bytes stand for the edited fields.
     Transaction::with_params(
-        tx.version,
-        tx.inputs.clone(),
-        tx.outputs.clone(),
-        tx.lock_time,
+        tx.version(),
+        tx.inputs().to_vec(),
+        tx.outputs().to_vec(),
+        tx.lock_time(),
     )
 }
 
 /// Block 170's transaction with a copy of its last output appended.
 fn three_outputs_unchanged() -> Transaction {
     let mut tx = Transaction::from_hex(TX_170).unwrap();
-    let last = tx.outputs[1].clone();
-    tx.outputs.push(last);
+    let last = tx.outputs()[1].clone();
+    tx.outputs_mut().push(last);
     Transaction::with_params(
-        tx.version,
-        tx.inputs.clone(),
-        tx.outputs.clone(),
-        tx.lock_time,
+        tx.version(),
+        tx.inputs().to_vec(),
+        tx.outputs().to_vec(),
+        tx.lock_time(),
     )
 }
 
@@ -466,7 +466,7 @@ fn writer_door_here(door: &str, position: usize, value: u64, txid: &str) -> Resu
         }
         "Beef.toBinary (edited in place)" => {
             let (mut beef, held) = three_outputs_beef();
-            beef.edit_tx(&held, |t| t.outputs[position].satoshis = Some(value))?;
+            beef.edit_tx(&held, |t| t.outputs_mut()[position].satoshis = Some(value))?;
             hex_of(beef.to_binary()?)
         }
         other => panic!("a door this test does not know: {other}"),
@@ -607,9 +607,14 @@ const TX_170: &str = "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423
 /// 2^53 (fresh, so no cached bytes stand for the edited fields).
 fn by_hand_53() -> Transaction {
     let read = Transaction::from_hex(TX_170).unwrap();
-    let mut outputs = read.outputs.clone();
+    let mut outputs = read.outputs().to_vec();
     outputs[0] = TransactionOutput::new(1 << 53, outputs[0].locking_script.clone());
-    Transaction::with_params(read.version, read.inputs.clone(), outputs, read.lock_time)
+    Transaction::with_params(
+        read.version(),
+        read.inputs().to_vec(),
+        outputs,
+        read.lock_time(),
+    )
 }
 
 #[test]
@@ -664,7 +669,7 @@ fn the_json_fields_carry_an_amount_the_readers_refuse_stated_844() {
     // `uint64`, `txjson.go:28-31`): stated, a cell for the captain.
     let json = r#"{"inputs":[],"outputs":[{"satoshis":9007199254740992,"lockingScript":"51"}],"version":1,"lockTime":0}"#;
     let tx = Transaction::from_json(json).unwrap();
-    assert_eq!(tx.outputs[0].satoshis, Some(1 << 53));
+    assert_eq!(tx.outputs()[0].satoshis, Some(1 << 53));
     assert!(Transaction::from_binary(&tx.to_binary()).is_err());
 }
 
@@ -729,7 +734,7 @@ fn a_json_input_txid_in_upper_case_is_held_in_lower_case_845() {
         .collect();
     for text in [GOOD.to_uppercase(), mixed] {
         let tx = Transaction::from_json(&json_with_txids(&[&text])).unwrap();
-        assert_eq!(tx.inputs[0].source_txid.as_deref(), Some(GOOD));
+        assert_eq!(tx.inputs()[0].source_txid.as_deref(), Some(GOOD));
         assert_eq!(tx.id(), lower.id());
         assert_eq!(tx.to_binary(), lower.to_binary());
         let json: Value = serde_json::from_str(&tx.to_json().unwrap()).unwrap();

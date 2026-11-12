@@ -29,7 +29,7 @@ pub(super) async fn token_spends<W: WalletInterface + ?Sized>(
     let tx = Transaction::from_atomic_beef(signable)?;
     let txid = record.txid().to_ascii_lowercase();
     let index = tx
-        .inputs
+        .inputs()
         .iter()
         .position(|input| {
             let source = input

@@ -118,8 +118,8 @@ fn wallet() -> FailingWallet {
         beef: Some(bytes),
         outputs: vec![WalletOutput {
             outpoint: Outpoint::from_string(&format!("{}.0", source.id())).unwrap(),
-            satoshis: source.outputs[0].satoshis.unwrap(),
-            locking_script: Some(source.outputs[0].locking_script.to_binary()),
+            satoshis: source.outputs()[0].satoshis.unwrap(),
+            locking_script: Some(source.outputs()[0].locking_script.to_binary()),
             spendable: true,
             tags: Some(vec!["alpha".into()]),
             labels: None,

@@ -46,18 +46,18 @@ fn spend(txid: &str, vout: u32) -> TransactionInput {
 /// 2,000 satoshis.
 fn parent() -> Transaction {
     let mut tx = Transaction::new();
-    tx.inputs.push(spend(&"aa".repeat(32), 0));
-    tx.outputs.push(TransactionOutput::new(1_000, one()));
-    tx.outputs.push(TransactionOutput::new(2_000, one()));
+    tx.inputs_mut().push(spend(&"aa".repeat(32), 0));
+    tx.outputs_mut().push(TransactionOutput::new(1_000, one()));
+    tx.outputs_mut().push(TransactionOutput::new(2_000, one()));
     tx
 }
 
 /// The recorder's child: spends both outputs of `parent`, one output of 2,500.
 fn child(parent: &str) -> Transaction {
     let mut tx = Transaction::new();
-    tx.inputs.push(spend(parent, 0));
-    tx.inputs.push(spend(parent, 1));
-    tx.outputs.push(TransactionOutput::new(2_500, one()));
+    tx.inputs_mut().push(spend(parent, 0));
+    tx.inputs_mut().push(spend(parent, 1));
+    tx.outputs_mut().push(TransactionOutput::new(2_500, one()));
     tx
 }
 
@@ -181,7 +181,7 @@ fn a_parent_proven_twice_carries_the_last_bump_on_every_input_732() {
     let tx = Transaction::from_beef(&bytes, Some(case["subject"].as_str().unwrap())).unwrap();
     assert!(tx.merkle_path.is_none(), "the child is unproven");
     let attached: Vec<(u32, String)> = tx
-        .inputs
+        .inputs()
         .iter()
         .map(|i| {
             held(

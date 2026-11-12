@@ -274,11 +274,11 @@ impl Beef {
     /// let mut beef = Beef::new();
     /// let txid = beef.merge_raw_tx(Transaction::new().to_binary(), None)?.txid();
     /// let edited = beef.edit_tx(&txid, |tx| {
-    ///     tx.lock_time = 7;
+    ///     tx.set_lock_time(7);
     ///     tx.id()
     /// })?;
     /// assert!(beef.find_txid(&txid).is_none());
-    /// assert_eq!(beef.find_txid(&edited).unwrap().tx().unwrap().lock_time, 7);
+    /// assert_eq!(beef.find_txid(&edited).unwrap().tx().unwrap().lock_time(), 7);
     /// # Ok::<(), bsv_rs::Error>(())
     /// ```
     pub fn edit_tx<R>(
@@ -305,13 +305,10 @@ impl Beef {
                 )))
             }
         };
-        // The bytes before the edit, then the caches cleared, so a copy's
-        // hash or bytes cached from before the edit are never read as its own.
-        tx.invalidate_caches();
+        // The bytes before the edit; the closure edits through the
+        // transaction's doors, which clear its caches (#843).
         let before = tx.to_binary();
-        tx.invalidate_caches();
         let value = edit(&mut tx);
-        tx.invalidate_caches();
         let entry = &self.txs[idx];
         let bump = entry.bump_index();
         let is_valid = entry.is_valid;

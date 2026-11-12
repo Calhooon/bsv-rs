@@ -206,6 +206,13 @@ socketio = ["auth"]
 dhat-profiling = ["dep:dhat"]
 # A diagnostics sink, not a module, so not in `full`: `full` builds are unchanged.
 tracing = ["dep:tracing"]
+# NO PART OF THE API: never enable it. It exposes the crate's test doors
+# (`Transaction::with_cached_bytes_for_test`, which plants a cache the doors
+# of #843 make unbuildable, and `Beef::merge_snapshot_oracle`, #869's
+# second fold) to this repository's own fuzz crate, which turns
+# it on (`fuzz/Cargo.toml`); not in `full`, never in a release note's
+# features, and free to change or vanish in any release (#869's fold).
+internal-test-doors = ["transaction"]
 
 [[bench]]
 name = "hash_bench"

@@ -55,7 +55,7 @@ fn listing(tokens: &Value) -> ListOutputsResult {
         .iter()
         .map(|item| {
             let tx = Transaction::from_beef(&item.beef, None).unwrap();
-            let output = &tx.outputs[item.output_index as usize];
+            let output = &tx.outputs()[item.output_index as usize];
             let result = WalletOutput {
                 outpoint: Outpoint::from_string(&format!(
                     "{}.{index}",

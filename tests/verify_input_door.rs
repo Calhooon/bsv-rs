@@ -249,21 +249,23 @@ struct Linked {
 }
 
 fn link(name: String, tx: &Transaction, parents: &HashMap<String, Transaction>) -> Option<Linked> {
-    if tx.inputs.is_empty() || tx.outputs.is_empty() {
+    if tx.inputs().is_empty() || tx.outputs().is_empty() {
         return None;
     }
     let mut tracker = MockChainTracker::new(TIP);
     let mut linked = tx.clone();
-    for (vin, input) in tx.inputs.iter().enumerate() {
+    for (vin, input) in tx.inputs().iter().enumerate() {
         let txid = input.get_source_txid().ok()?;
         let mut parent = parents.get(&txid)?.clone();
-        if parent.inputs.is_empty() || parent.outputs.len() <= input.source_output_index as usize {
+        if parent.inputs().is_empty()
+            || parent.outputs().len() <= input.source_output_index as usize
+        {
             return None;
         }
         let height = 800_000 + vin as u32;
         tracker.add_root(height, txid.clone());
         parent.merkle_path = Some(MerklePath::from_coinbase_txid(&txid, height));
-        linked.inputs[vin].source_transaction = Some(Box::new(parent));
+        linked.inputs_mut()[vin].source_transaction = Some(Box::new(parent));
     }
     Some(Linked {
         name,
@@ -377,9 +379,9 @@ fn verify_words(case: &Linked, chain: Option<&ChainParams>) -> Result<bool, Erro
 fn compare_verify(case: &Linked, chain: Option<&ChainParams>) -> Result<usize, String> {
     let prepared = SpendingTransaction::from_bytes(&case.tx.to_binary()).unwrap();
     let mut doors = Vec::new();
-    for (vin, input) in case.tx.inputs.iter().enumerate() {
+    for (vin, input) in case.tx.inputs().iter().enumerate() {
         let parent = input.source_transaction.as_ref().unwrap();
-        let output = &parent.outputs[input.source_output_index as usize];
+        let output = &parent.outputs()[input.source_output_index as usize];
         let rules = match chain {
             Some(chain) => {
                 let source = parent.merkle_path.as_ref().map(|p| p.block_height);
@@ -464,7 +466,7 @@ fn agrees(bytes: &[u8]) -> bool {
         Transaction::from_binary(bytes),
         SpendingTransaction::from_bytes(bytes),
     ) {
-        (Ok(tx), Ok(prepared)) => tx.inputs.len() == prepared.input_count(),
+        (Ok(tx), Ok(prepared)) => tx.inputs().len() == prepared.input_count(),
         (Err(a), Err(b)) => a == b,
         _ => false,
     }

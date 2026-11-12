@@ -39,10 +39,10 @@ use bsv_rs::messages;
 use bsv_rs::primitives::bsv::shamir::split_private_key_with;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
 use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, PrivateKey};
-use bsv_rs::script::{ProtocolEra, ScriptFlags, UnlockingScript};
+use bsv_rs::script::{LockingScript, ProtocolEra, ScriptFlags, UnlockingScript};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_structure, Beef, Headers, Kind, MerklePath, MerklePathLeaf,
-    Transaction, TransactionInput, Verdict,
+    Transaction, TransactionInput, TransactionOutput, Verdict,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -197,19 +197,17 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
             let Some(tx) = entry.tx() else {
                 continue;
             };
-            let [spent, ..] = &tx.inputs[..] else {
+            let [spent, ..] = &tx.inputs()[..] else {
                 continue;
             };
             let mut twice = tx.clone();
-            twice.inputs.push(spent.clone());
+            twice.inputs_mut().push(spent.clone());
             let mut null = tx.clone();
             let mut input = spent.clone();
             input.source_txid = Some("00".repeat(32));
             input.source_output_index = 0xffff_ffff;
-            null.inputs.push(input);
-            // A field set by hand leaves the serialization cache standing.
-            twice.invalidate_caches();
-            null.invalidate_caches();
+            null.inputs_mut().push(input);
+            // The doors clear the caches, so each serializes its fields (#843).
             // The transaction's bytes, as `Transaction::to_binary` writes
             // them, replaced in the row where they stand.
             let original = tx.to_binary();
@@ -260,6 +258,45 @@ fn lean_rows() -> Vec<(String, Vec<u8>)> {
     rows
 }
 
+/// A seed that reaches `fuzz_beef_parser`'s shared-text edit (#869's
+/// fourth fold): the identity law's edit loop reads the input from its
+/// leading byte (`support/identity_law.rs`, `edits_keep_the_law`), so a V2
+/// BEEF (`02 00 be ef`) makes two edits, the version (`data[1] = 00`, its
+/// four bytes `data[2..6]`) and then `data[6] % 14`: the low byte of the
+/// leading BUMP's block height written `fd <u16>`, here 269 (`0x010d`, 13:
+/// every input's text one, a second input linked to a copy of the linked
+/// source). The child spends its proven parent, so its linked subject has a
+/// linked input; under the linker keyed by the raw text again the target
+/// fails at once (`a linked source's id (#869)`). Built by this crate's own
+/// writer; the layout asserted, so a writer change that moves it is loud.
+fn shared_text_edit_seed() -> Vec<u8> {
+    let one = || LockingScript::from_binary(&[0x51]).unwrap();
+    let mut parent = Transaction::new();
+    let mut input = TransactionInput::new("aa".repeat(32), 0);
+    input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
+    parent.inputs_mut().push(input);
+    parent
+        .outputs_mut()
+        .push(TransactionOutput::new(1000, one()));
+    let mut child = Transaction::new();
+    let mut input = TransactionInput::new(parent.id(), 0);
+    input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
+    child.inputs_mut().push(input);
+    child.outputs_mut().push(TransactionOutput::new(900, one()));
+    let mut beef = Beef::new();
+    let leaf = MerklePathLeaf::new_txid(0, parent.id());
+    beef.merge_bump(MerklePath::new(269, vec![vec![leaf]]).unwrap());
+    beef.merge_raw_tx(parent.to_binary(), None).unwrap();
+    beef.merge_raw_tx(child.to_binary(), None).unwrap();
+    let data = beef.to_binary().unwrap();
+    assert_eq!(
+        &data[..8],
+        &[0x02, 0x00, 0xbe, 0xef, 0x01, 0xfd, 0x0d, 0x01]
+    );
+    assert_eq!((data[0] % 7, data[1] % 14, data[6] % 14), (2, 0, 13));
+    data
+}
+
 fn beef_corpora(base: &Path) {
     let mut beef = Corpus::new(base, "fuzz_beef_parser");
     let mut bump = Corpus::new(base, "fuzz_merkle_path");
@@ -285,6 +322,7 @@ fn beef_corpora(base: &Path) {
     ] {
         beef.add(&format!("cross-sdk-{name}"), &from_hex(hex).unwrap());
     }
+    beef.add("fold4-869-shared-text-edit", &shared_text_edit_seed());
     let atomic: Value =
         serde_json::from_str(&read("tests/transaction/vectors/atomic-beef.json")).unwrap();
     for v in atomic["vectors"].as_array().unwrap() {

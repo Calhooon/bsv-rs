@@ -43,8 +43,8 @@ fn tx(spends: &str, sats: u64) -> Transaction {
     let mut t = Transaction::new();
     let mut input = TransactionInput::new(spends.to_string(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
-    t.inputs.push(input);
-    t.outputs.push(TransactionOutput::new(
+    t.inputs_mut().push(input);
+    t.outputs_mut().push(TransactionOutput::new(
         sats,
         LockingScript::from_binary(&[0x51]).unwrap(),
     ));
@@ -53,8 +53,7 @@ fn tx(spends: &str, sats: u64) -> Transaction {
 
 /// `tx` with the lock time `lock`, its hash computed from the fields.
 fn locked(mut t: Transaction, lock: u32) -> Transaction {
-    t.lock_time = lock;
-    t.invalidate_caches();
+    t.set_lock_time(lock);
     t
 }
 
@@ -78,8 +77,8 @@ fn held_raw() -> (Beef, Transaction, Transaction) {
 fn edit_tx_on_a_raw_entry_rekeys_it_at_once_and_keeps_it_raw_817() {
     let (mut beef, u, v) = held_raw();
     let lock = beef.edit_tx(&u.id(), |t| {
-        t.lock_time = 1;
-        t.lock_time
+        t.set_lock_time(1);
+        t.lock_time()
     });
     assert_eq!(lock, Ok(1), "the closure's value comes back");
     assert_eq!(ids(&beef), vec![v.id()]);
@@ -105,10 +104,10 @@ fn edit_tx_on_a_parsed_entry_rekeys_it_and_keeps_it_parsed_817() {
     let mut beef = Beef::new();
     beef.merge_transaction(u.clone());
     assert!(beef.find_txid(&u.id()).unwrap().raw_tx().is_none());
-    beef.edit_tx(&u.id(), |t| t.lock_time = 1).unwrap();
+    beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
     let entry = beef.find_txid(&v.id()).unwrap();
     assert!(entry.raw_tx().is_none(), "parsed, as held");
-    assert_eq!(entry.tx().unwrap().lock_time, 1);
+    assert_eq!(entry.tx().unwrap().lock_time(), 1);
     assert_eq!(beef.txs.len(), 1);
 }
 
@@ -141,7 +140,7 @@ fn edit_tx_onto_a_txid_another_entry_holds_is_refused_byte_for_byte_unchanged_81
         .expect("the bytes are one transaction");
     let before = beef.clone().to_binary().expect("the BEEF writes");
     let order = ids(&beef);
-    let refused = beef.edit_tx(&u.id(), |t| t.lock_time = 1);
+    let refused = beef.edit_tx(&u.id(), |t| t.set_lock_time(1));
     assert!(
         matches!(refused, Err(Error::BeefError(ref m)) if m.contains("already held")),
         "{refused:?}"
@@ -176,14 +175,17 @@ fn a_panic_in_the_edit_leaves_the_beef_untouched_817() {
     let before = beef.clone().to_hex().expect("the BEEF writes");
     let caught = catch_unwind(AssertUnwindSafe(|| {
         beef.edit_tx(&u.id(), |t| {
-            t.lock_time = 1;
+            t.set_lock_time(1);
             panic!("the caller's edit fails half way");
         })
     }));
     assert!(caught.is_err());
     assert!(beef.find_txid(&u.id()).is_some(), "U still held");
     assert!(beef.find_txid(&v.id()).is_none());
-    assert_eq!(beef.find_txid(&u.id()).unwrap().tx().unwrap().lock_time, 0);
+    assert_eq!(
+        beef.find_txid(&u.id()).unwrap().tx().unwrap().lock_time(),
+        0
+    );
     assert_eq!(beef.to_hex().expect("the BEEF writes"), before);
 }
 
@@ -246,7 +248,7 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
     ];
     for (door, run) in doors {
         let (mut beef, u, v) = held_raw();
-        beef.edit_tx(&u.id(), |t| t.lock_time = 1).unwrap();
+        beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
         run(&mut beef, &v);
         assert_eq!(
             ids(&beef),
@@ -375,7 +377,7 @@ fn reindex_rekeys_an_entry_edited_through_the_deprecated_tx_mut_817() {
         .unwrap()
         .tx_mut()
         .unwrap()
-        .lock_time = 1;
+        .set_lock_time(1);
     assert!(beef.find_txid(&v.id()).is_none(), "the #171 window");
     beef.reindex();
     assert_eq!(
@@ -490,7 +492,7 @@ fn a_closure_returning_an_err_value_still_has_its_edit_stored_817() {
     let (mut beef, u, v) = held_raw();
     let value: Result<(), &str> = beef
         .edit_tx(&u.id(), |t| {
-            t.lock_time = 1;
+            t.set_lock_time(1);
             Err("the caller's own")
         })
         .unwrap();
@@ -511,7 +513,7 @@ fn the_two_edit_tx_cells_inside_the_window_stated_817() {
     let (mut beef, [x, _, _]) = three();
     let y = locked(x.clone(), 5);
     beef.txs[1] = BeefTx::from_raw_tx(y.to_binary(), None).unwrap();
-    beef.edit_tx(&x.id(), |t| t.lock_time = 5).unwrap();
+    beef.edit_tx(&x.id(), |t| t.set_lock_time(5)).unwrap();
     let held = beef.txs.iter().filter(|t| t.txid() == y.id()).count();
     assert_eq!(held, 2, "the collision missed inside the window");
 
@@ -520,7 +522,7 @@ fn the_two_edit_tx_cells_inside_the_window_stated_817() {
         .unwrap()
         .tx_mut()
         .unwrap()
-        .lock_time = 1;
+        .set_lock_time(1);
     assert!(beef.edit_tx(&v.id(), |_| ()).is_err(), "V missed");
     assert!(beef.edit_tx(&u.id(), |_| ()).is_err(), "U's hit names V");
     assert_eq!(
@@ -587,7 +589,7 @@ fn an_edit_of_a_hand_pushed_twin_keeps_the_other_entry_found_817() {
     beef.txs
         .push(BeefTx::from_raw_tx(u.to_binary(), None).unwrap());
     let v = locked(u.clone(), 1);
-    beef.edit_tx(&u.id(), |t| t.lock_time = 1).unwrap();
+    beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
     assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));
     assert!(std::ptr::eq(beef.find_txid(&v.id()).unwrap(), &beef.txs[3]));
     beef.merge_txid_only(u.id());
@@ -604,7 +606,7 @@ fn an_edit_of_a_twin_after_reindex_keeps_the_other_entry_found_817() {
     beef.txs
         .push(BeefTx::from_raw_tx(u.to_binary(), None).unwrap());
     beef.reindex();
-    beef.edit_tx(&u.id(), |t| t.lock_time = 1).unwrap();
+    beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
     assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));
     beef.merge_txid_only(u.id());
     assert_eq!(beef.txs.len(), 4, "U not stored again");

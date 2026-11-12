@@ -90,10 +90,11 @@ fn spend(spends: &[(String, u32)], outputs: usize) -> Transaction {
     for (txid, vout) in spends {
         let mut input = TransactionInput::new(txid.clone(), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
-        tx.inputs.push(input);
+        tx.inputs_mut().push(input);
     }
     for _ in 0..outputs {
-        tx.outputs.push(TransactionOutput::new(SATS, op_true()));
+        tx.outputs_mut()
+            .push(TransactionOutput::new(SATS, op_true()));
     }
     tx
 }
@@ -162,7 +163,7 @@ fn linked_depth(tx: &Transaction) -> (usize, bool) {
     let mut links = 0;
     let mut current = tx;
     while let Some(source) = current
-        .inputs
+        .inputs()
         .first()
         .and_then(|i| i.source_transaction.as_deref())
     {
@@ -302,11 +303,8 @@ fn a_deep_chain_built_in_memory_hashes_and_serializes_on_a_small_stack() {
         let mut linked = Transaction::from_beef(&bytes, None).expect("links");
         // Strip every source_txid: the shape `add_input_from_tx` builds.
         let mut current = &mut linked;
-        loop {
-            current.invalidate_caches();
-            let Some(input) = current.inputs.first_mut() else {
-                break;
-            };
+        // Each `inputs_mut()` clears that level's caches before the edit.
+        while let Some(input) = current.inputs_mut().first_mut() {
             if input.source_transaction.is_none() {
                 break;
             }
@@ -330,6 +328,51 @@ fn a_deep_chain_built_in_memory_hashes_and_serializes_on_a_small_stack() {
         .txid();
     assert_eq!(id, subject, "the same id as the parsed chain");
     assert_eq!(beef, original, "the same bytes as the parsed chain");
+}
+
+/// The chain with every input's `source_txid` a text that does not parse
+/// (`"zz"`), so each outpoint is its linked parent's hash, read through the
+/// parent's own serialization (#869's third fold; the cold re-read of the
+/// second fold measured `id`, `to_binary` and `verify` overflowing a stack on
+/// 0.8.5 and on beta at 20,000 links). `verify` finds a source by its txid
+/// text, so it refuses the subject's input in its words, after its walk.
+#[test]
+fn a_deep_chain_whose_txid_texts_do_not_parse_hashes_serializes_and_verifies_on_a_small_stack_869()
+{
+    let n = depth(DEFAULT_DEPTH);
+    let (tx, original) = on_big_stack(move || {
+        let (bytes, _) = chain_bytes(n);
+        let mut linked = Transaction::from_beef(&bytes, None).expect("links");
+        let mut current = &mut linked;
+        while let Some(input) = current.inputs_mut().first_mut() {
+            if input.source_transaction.is_none() {
+                break;
+            }
+            input.source_txid = Some("zz".to_string());
+            current = input.source_transaction.as_deref_mut().expect("source");
+        }
+        (linked, bytes)
+    });
+    let ((tx, id, bin, verified), elapsed) = on_small_stack("zz", move || {
+        let id = tx.id();
+        let bin = tx.to_binary();
+        let verified = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("a current-thread runtime")
+            .block_on(tx.verify(&MockChainTracker::always_valid(800_100), None, None))
+            .map_err(|e| e.to_string());
+        (tx, id, bin, verified)
+    });
+    println!("unparsable chain id + to_binary + verify: N={n} in {elapsed:?}");
+    drop_on_big_stack(tx);
+    let subject = Beef::from_binary(&original).expect("parses");
+    let subject = subject.txs.last().expect("a tx");
+    assert_eq!(id, subject.txid(), "the same id as the parsed chain");
+    assert_eq!(Some(bin.as_slice()), subject.raw_tx(), "the same bytes");
+    assert_eq!(
+        verified,
+        Err("transaction error: Input 0 has no source transaction".to_string())
+    );
 }
 
 /// The overlay's historians walk a transaction's linked ancestry, the one

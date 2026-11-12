@@ -165,10 +165,15 @@ impl Beef {
     /// `ts-stack@edf6e03`); until #603 the inputs were left unlinked.
     pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction> {
         let mut tx = self.find_txid(txid)?.tx()?.clone();
-        for input in &mut tx.inputs {
+        // Through the linking door, which keeps the copy's caches where the
+        // input names its txid (#869's second fold).
+        for i in 0..tx.inputs().len() {
+            let input = &tx.inputs()[i];
             if input.source_transaction.is_none() {
                 let held = input.source_txid.as_deref().and_then(|t| self.find_txid(t));
-                input.source_transaction = held.and_then(BeefTx::tx).cloned().map(Box::new);
+                if let Some(found) = held.and_then(BeefTx::tx) {
+                    tx.replace_source(i, Some(Box::new(found.clone())));
+                }
             }
         }
         Some(tx)
@@ -261,7 +266,7 @@ impl Beef {
             let next_input = match find_bump(&tx.id()) {
                 Some(mp) => {
                     tx.merkle_path = Some(mp.clone());
-                    tx.inputs.len()
+                    tx.inputs().len()
                 }
                 None => 0,
             };
@@ -274,35 +279,49 @@ impl Beef {
         let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx))];
 
         while let Some(top) = stack.last_mut() {
-            if top.next_input == top.tx.inputs.len() {
+            if top.next_input == top.tx.inputs().len() {
                 // Every input of this transaction is linked: hand it to the
                 // input of its parent that it sources, or back to the caller.
                 let Some(Frame { tx: done, .. }) = stack.pop() else {
                     break;
                 };
+                // Every link goes through the linking door, which keeps the
+                // caches where the input names its txid (#869's second fold:
+                // `inputs_mut` emptied them, and `verify` re-serialized).
                 match stack.last_mut() {
                     Some(parent) => {
-                        parent.tx.inputs[parent.next_input - 1].source_transaction =
-                            Some(Box::new(done));
+                        parent
+                            .tx
+                            .replace_source(parent.next_input - 1, Some(Box::new(done)));
                     }
                     None => *tx = done,
                 }
                 continue;
             }
-            let input = &mut top.tx.inputs[top.next_input];
+            let i = top.next_input;
             top.next_input += 1;
-            let Some(src_txid) = input.source_txid.clone() else {
-                continue;
+            let input = &top.tx.inputs()[i];
+            // Keyed by what the input links, its own source's id, named or not (#869's
+            // fourth fold), else its text (`Beef.ts:649-679` at `ts-stack@edf6e03`).
+            let src_txid = match (&input.source_transaction, &input.source_txid) {
+                (Some(own), _) => own.id(),
+                (None, Some(text)) => text.clone(),
+                (None, None) => continue, // links and names nothing: left as it is
             };
             if let Some(stub) = stubs.get(&src_txid) {
                 // Already linked in full once: this input gets the stub, which
                 // carries the output being spent (and the proof when there is
                 // one) without repeating the ancestry underneath it.
-                input.source_transaction = Some(Box::new(stub.clone()));
+                top.tx.replace_source(i, Some(Box::new(stub.clone())));
                 continue;
             }
             // Take the caller's own source when it carries one, else this BEEF's.
-            let mut src = match input.source_transaction.take() {
+            let own = if top.tx.inputs()[i].source_transaction.is_some() {
+                top.tx.replace_source(i, None)
+            } else {
+                None
+            };
+            let src = match own {
                 Some(own) => *own,
                 None => match self.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
                     Some(found) => found,
@@ -313,7 +332,7 @@ impl Beef {
             // form a cycle then terminates instead of walking forever, and for
             // the honest DAG case the order makes no difference (a transaction
             // is never reachable from inside its own ancestry).
-            let stub = Self::bare_stub(&mut src, find_bump(&src_txid));
+            let stub = Self::bare_stub(&src, find_bump(&src_txid));
             stubs.insert(src_txid, stub);
             stack.push(enter(src));
         }
@@ -321,18 +340,13 @@ impl Beef {
 
     /// A bare copy of `tx`: the transaction with this BEEF's BUMP in place of
     /// its own path when the BEEF proves it (#757), and with every input's `source_transaction` dropped, so no ancestry
-    /// is duplicated. The ancestry is lifted out before the clone and put back
-    /// after, so building a stub never copies a subtree.
-    fn bare_stub(tx: &mut Transaction, bump: Option<&MerklePath>) -> Transaction {
-        let ancestry: Vec<Option<Box<Transaction>>> = tx
-            .inputs
-            .iter_mut()
-            .map(|input| input.source_transaction.take())
-            .collect();
-        let mut stub = tx.clone();
-        for (input, source) in tx.inputs.iter_mut().zip(ancestry) {
-            input.source_transaction = source;
-        }
+    /// is duplicated; building a stub never copies a subtree.
+    fn bare_stub(tx: &Transaction, bump: Option<&MerklePath>) -> Transaction {
+        // `clone_for_beef` copies the transaction without its sources, each
+        // unnamed source's txid written in its place, so the stub's bytes and
+        // id are the transaction's (#843: until then the stub's inputs held
+        // neither, and a copied cache stood in for what its fields wrote).
+        let mut stub = tx.clone_for_beef();
         if let Some(mp) = bump {
             stub.merkle_path = Some(mp.clone());
         }
@@ -493,9 +507,9 @@ impl Beef {
                 tx.input_txids.clone()
             } else if let Some(parsed) = tx.parsed() {
                 parsed
-                    .inputs
+                    .inputs()
                     .iter()
-                    .filter_map(|inp| inp.get_source_txid().ok())
+                    .filter_map(crate::transaction::transaction::outpoint_txid_name)
                     .collect::<Vec<String>>()
             } else {
                 Vec::new()
@@ -1843,10 +1857,10 @@ mod tests {
 
         // Parse the parent from raw bytes and attach as source_transaction
         let parent_tx = Transaction::from_binary(&parent_raw).unwrap();
-        new_tx.inputs[0].source_transaction = Some(Box::new(parent_tx));
+        new_tx.inputs_mut()[0].source_transaction = Some(Box::new(parent_tx));
 
         // Set an empty unlocking script (required by to_ef)
-        new_tx.inputs[0].unlocking_script = Some(UnlockingScript::new());
+        new_tx.inputs_mut()[0].unlocking_script = Some(UnlockingScript::new());
 
         // Call to_ef()
         let ef_bytes = new_tx.to_ef().unwrap();
@@ -1868,7 +1882,7 @@ mod tests {
         assert_eq!(parsed.id(), new_txid, "EF round-trip should preserve txid");
 
         // Verify the source satoshis are embedded
-        let source_sats = parsed.inputs[0].source_satoshis().unwrap();
+        let source_sats = parsed.inputs()[0].source_satoshis().unwrap();
         assert_eq!(
             source_sats, 10_000,
             "source satoshis should be from parent output"
@@ -1894,16 +1908,16 @@ mod tests {
 
         // Parse and attach source_transactions
         let mut new_tx = Transaction::from_binary(&new_raw).unwrap();
-        assert_eq!(new_tx.inputs.len(), 2);
+        assert_eq!(new_tx.inputs().len(), 2);
 
         let parent_a_tx = Transaction::from_binary(&parent_a_raw).unwrap();
         let parent_b_tx = Transaction::from_binary(&parent_b_raw).unwrap();
 
-        new_tx.inputs[0].source_transaction = Some(Box::new(parent_a_tx));
-        new_tx.inputs[0].unlocking_script = Some(UnlockingScript::new());
+        new_tx.inputs_mut()[0].source_transaction = Some(Box::new(parent_a_tx));
+        new_tx.inputs_mut()[0].unlocking_script = Some(UnlockingScript::new());
 
-        new_tx.inputs[1].source_transaction = Some(Box::new(parent_b_tx));
-        new_tx.inputs[1].unlocking_script = Some(UnlockingScript::new());
+        new_tx.inputs_mut()[1].source_transaction = Some(Box::new(parent_b_tx));
+        new_tx.inputs_mut()[1].unlocking_script = Some(UnlockingScript::new());
 
         // Call to_ef() — should succeed with both inputs
         let ef_bytes = new_tx.to_ef().unwrap();
@@ -1914,16 +1928,16 @@ mod tests {
         // Round-trip through from_ef()
         let parsed = Transaction::from_ef(&ef_bytes).unwrap();
         assert_eq!(parsed.id(), new_txid, "EF round-trip txid mismatch");
-        assert_eq!(parsed.inputs.len(), 2, "should have 2 inputs");
+        assert_eq!(parsed.inputs().len(), 2, "should have 2 inputs");
 
         // Verify both parent outputs are embedded
         assert_eq!(
-            parsed.inputs[0].source_satoshis().unwrap(),
+            parsed.inputs()[0].source_satoshis().unwrap(),
             5000,
             "input 0 should embed parent A's 5000 sats"
         );
         assert_eq!(
-            parsed.inputs[1].source_satoshis().unwrap(),
+            parsed.inputs()[1].source_satoshis().unwrap(),
             7000,
             "input 1 should embed parent B's 7000 sats"
         );
@@ -1947,17 +1961,17 @@ mod tests {
         let parent_tx = Transaction::from_binary(&parent_raw).unwrap();
 
         // Verify parent has the big script in its output
-        let parent_script_bytes = parent_tx.outputs[0].locking_script.to_binary();
+        let parent_script_bytes = parent_tx.outputs()[0].locking_script.to_binary();
         assert_eq!(parent_script_bytes.len(), big_script.len());
 
-        new_tx.inputs[0].source_transaction = Some(Box::new(parent_tx));
-        new_tx.inputs[0].unlocking_script = Some(UnlockingScript::new());
+        new_tx.inputs_mut()[0].source_transaction = Some(Box::new(parent_tx));
+        new_tx.inputs_mut()[0].unlocking_script = Some(UnlockingScript::new());
 
         let ef_bytes = new_tx.to_ef().unwrap();
 
         // Round-trip and verify the full script is preserved
         let parsed = Transaction::from_ef(&ef_bytes).unwrap();
-        let embedded_script = parsed.inputs[0]
+        let embedded_script = parsed.inputs()[0]
             .source_locking_script()
             .unwrap()
             .to_binary();
@@ -1981,7 +1995,7 @@ mod tests {
         // Parse the new tx but do NOT attach source_transaction
         let mut new_tx = Transaction::from_binary(&new_raw).unwrap();
         // Set unlocking script so we get past that check
-        new_tx.inputs[0].unlocking_script = Some(crate::script::UnlockingScript::new());
+        new_tx.inputs_mut()[0].unlocking_script = Some(crate::script::UnlockingScript::new());
 
         // to_ef() should fail because source_transaction is missing
         let result = new_tx.to_ef();
@@ -2271,7 +2285,7 @@ mod merkle_path_reattach_tests {
         let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
         // F (proven) -> M (unproven, two outputs) -> R spending M:0 AND M:1.
         let mut funding = Transaction::new();
-        funding.inputs.push(TransactionInput {
+        funding.inputs_mut().push(TransactionInput {
             source_txid: Some("aa".repeat(32)),
             source_output_index: 0,
             unlocking_script: Some(crate::script::UnlockingScript::from_script(
@@ -2280,7 +2294,7 @@ mod merkle_path_reattach_tests {
             ..Default::default()
         });
         funding
-            .outputs
+            .outputs_mut()
             .push(TransactionOutput::new(100_000, lock.clone()));
         let funding_txid = funding.id();
         funding.merkle_path = Some(crate::transaction::MerklePath {
@@ -2297,10 +2311,10 @@ mod merkle_path_reattach_tests {
             .add_input_from_tx(funding, 0, P2PKH::unlock(&key, SignOutputs::All, false))
             .unwrap();
         middle
-            .outputs
+            .outputs_mut()
             .push(TransactionOutput::new(40_000, lock.clone()));
         middle
-            .outputs
+            .outputs_mut()
             .push(TransactionOutput::new(50_000, lock.clone()));
         middle.sign().await.unwrap();
         let mut subject = Transaction::new();
@@ -2318,7 +2332,9 @@ mod merkle_path_reattach_tests {
                 P2PKH::unlock(&key, SignOutputs::All, false),
             )
             .unwrap();
-        subject.outputs.push(TransactionOutput::new(80_000, lock));
+        subject
+            .outputs_mut()
+            .push(TransactionOutput::new(80_000, lock));
         subject.sign().await.unwrap();
         let beef = subject.to_beef(false).unwrap();
         let subject_txid = subject.id();
@@ -2326,7 +2342,7 @@ mod merkle_path_reattach_tests {
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
         // Every input carries the parent it spends, so its output (satoshis and
         // locking script) is right there...
-        for (vin, input) in parsed.inputs.iter().enumerate() {
+        for (vin, input) in parsed.inputs().iter().enumerate() {
             let src = input
                 .source_transaction
                 .as_ref()
@@ -2337,15 +2353,15 @@ mod merkle_path_reattach_tests {
                 "input {vin} must carry the parent it names"
             );
             assert!(
-                src.outputs.len() > input.source_output_index as usize,
+                src.outputs().len() > input.source_output_index as usize,
                 "input {vin}: the parent must carry the output being spent"
             );
         }
         // ...but the ancestry BELOW that parent is linked exactly once: input 0
         // gets the fully linked copy, input 1 a bare stub. Linking both in full
         // is what made 0.3.21 exponential on a chain of such spends.
-        let first = parsed.inputs[0].source_transaction.as_ref().unwrap();
-        let grand = first.inputs[0]
+        let first = parsed.inputs()[0].source_transaction.as_ref().unwrap();
+        let grand = first.inputs()[0]
             .source_transaction
             .as_ref()
             .expect("input 0: the first copy of the unproven parent is linked in full");
@@ -2353,9 +2369,9 @@ mod merkle_path_reattach_tests {
             grand.merkle_path.is_some(),
             "input 0: the proven grandparent must carry its merkle path"
         );
-        let second = parsed.inputs[1].source_transaction.as_ref().unwrap();
+        let second = parsed.inputs()[1].source_transaction.as_ref().unwrap();
         assert!(
-            second.inputs[0].source_transaction.is_none(),
+            second.inputs()[0].source_transaction.is_none(),
             "input 1 must get a BARE STUB of the parent, not a second full copy"
         );
         // Neither `verify` nor anything else may care which copy it reaches.
@@ -2456,14 +2472,14 @@ mod merkle_path_reattach_tests {
         let key = PrivateKey::random();
         let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
         let mut funding = Transaction::new();
-        funding.inputs.push(TransactionInput {
+        funding.inputs_mut().push(TransactionInput {
             source_txid: Some("aa".repeat(32)),
             source_output_index: 0,
             unlocking_script: Some(UnlockingScript::from_script(Script::new())),
             ..Default::default()
         });
         funding
-            .outputs
+            .outputs_mut()
             .push(TransactionOutput::new(10_000, lock.clone()));
         let funding_txid = funding.id();
         funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
@@ -2473,7 +2489,9 @@ mod merkle_path_reattach_tests {
             .add_input_from_tx(funding, 0, P2PKH::unlock(&key, SignOutputs::All, false))
             .unwrap();
         // 10,000 sats in, 11,000 out: the signature is valid over exactly this.
-        spend.outputs.push(TransactionOutput::new(11_000, lock));
+        spend
+            .outputs_mut()
+            .push(TransactionOutput::new(11_000, lock));
         spend.sign().await.unwrap();
         let beef = spend.to_beef(false).unwrap();
         let subject_txid = spend.id();
@@ -2490,7 +2508,7 @@ mod merkle_path_reattach_tests {
 
     /// Number of `source_transaction` objects reachable from `tx`.
     fn count_linked_sources(tx: &Transaction) -> usize {
-        tx.inputs
+        tx.inputs()
             .iter()
             .filter_map(|input| input.source_transaction.as_deref())
             .map(|src| 1 + count_linked_sources(src))
@@ -2512,11 +2530,16 @@ mod merkle_path_reattach_tests {
         use crate::script::{Script, ScriptTemplate, UnlockingScript};
         use crate::transaction::{Beef, MerklePath, TransactionInput, TransactionOutput};
 
-        /// A copy carrying no ancestry, so the fixture never materializes one.
+        /// A copy carrying no ancestry, so the fixture never materializes
+        /// one; each dropped source named by its txid, so the copy's bytes
+        /// are the transaction's (#843: until then a copied cache stood in
+        /// for inputs whose fields wrote 32 zero bytes).
         fn shallow(tx: &Transaction) -> Transaction {
             let mut copy = tx.clone();
-            for input in copy.inputs.iter_mut() {
-                input.source_transaction = None;
+            for input in copy.inputs_mut().iter_mut() {
+                if let Some(source) = input.source_transaction.take() {
+                    input.source_txid.get_or_insert_with(|| source.id());
+                }
             }
             copy
         }
@@ -2525,7 +2548,7 @@ mod merkle_path_reattach_tests {
         let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
 
         let mut funding = Transaction::new();
-        funding.inputs.push(TransactionInput {
+        funding.inputs_mut().push(TransactionInput {
             source_txid: Some("aa".repeat(32)),
             source_output_index: 0,
             unlocking_script: Some(UnlockingScript::from_script(Script::new())),
@@ -2533,7 +2556,7 @@ mod merkle_path_reattach_tests {
         });
         let mut sats: u64 = 4_000_000;
         funding
-            .outputs
+            .outputs_mut()
             .push(TransactionOutput::new(sats, lock.clone()));
         let funding_txid = funding.id();
         funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
@@ -2561,16 +2584,20 @@ mod merkle_path_reattach_tests {
                 .unwrap();
             }
             sats -= 1_000; // a little less out than in: the value rule
-            tx.outputs
+            tx.outputs_mut()
                 .push(TransactionOutput::new(sats / 2, lock.clone()));
-            tx.outputs
+            tx.outputs_mut()
                 .push(TransactionOutput::new(sats - sats / 2, lock.clone()));
             tx.sign().await.unwrap();
             if corrupt_level == Some(level) {
                 // [0x47/0x48 push][0x30 len][0x02 rlen][r...]: byte 10 is in r.
-                let mut raw = tx.inputs[0].unlocking_script.as_ref().unwrap().to_binary();
+                let mut raw = tx.inputs()[0]
+                    .unlocking_script
+                    .as_ref()
+                    .unwrap()
+                    .to_binary();
                 raw[10] ^= 0x01;
-                tx.inputs[0].unlocking_script = Some(UnlockingScript::from_script(
+                tx.inputs_mut()[0].unlocking_script = Some(UnlockingScript::from_script(
                     Script::from_binary(&raw).unwrap(),
                 ));
             }
@@ -2624,7 +2651,7 @@ mod iterative_equivalence_tests {
         if tx.merkle_path.is_some() {
             return; // proven: no ancestry needed
         }
-        for input in tx.inputs.iter_mut() {
+        for input in tx.inputs_mut().iter_mut() {
             let Some(src_txid) = input.source_txid.clone() else {
                 continue;
             };
@@ -2639,7 +2666,7 @@ mod iterative_equivalence_tests {
                     None => continue,
                 },
             };
-            let stub = Beef::bare_stub(&mut src, beef.find_bump(&src_txid));
+            let stub = Beef::bare_stub(&src, beef.find_bump(&src_txid));
             stubs.insert(src_txid, stub);
             legacy_attach_proof_memoized(beef, &mut src, stubs);
             input.source_transaction = Some(Box::new(src));
@@ -2785,8 +2812,8 @@ mod iterative_equivalence_tests {
             ancestors.push(tx.clone());
             return Ok(());
         }
-        for i in (0..tx.inputs.len()).rev() {
-            let input = &tx.inputs[i];
+        for i in (0..tx.inputs().len()).rev() {
+            let input = &tx.inputs()[i];
             if let Some(ref source_tx) = input.source_transaction {
                 legacy_collect_ancestors(
                     source_tx,
@@ -2866,11 +2893,11 @@ mod iterative_equivalence_tests {
                 };
                 let mut input = TransactionInput::new(txid, vout);
                 input.unlocking_script = Some(UnlockingScript::new());
-                tx.inputs.push(input);
+                tx.inputs_mut().push(input);
             }
             let outputs = rng.gen_range(1..=3);
             for _ in 0..outputs {
-                tx.outputs.push(TransactionOutput::new(
+                tx.outputs_mut().push(TransactionOutput::new(
                     rng.gen_range(1..10_000),
                     lock.clone(),
                 ));
@@ -2907,12 +2934,12 @@ mod iterative_equivalence_tests {
             out.push((
                 t.id(),
                 t.merkle_path.is_some(),
-                t.inputs
+                t.inputs()
                     .iter()
                     .map(|i| i.source_transaction.is_some())
                     .collect(),
             ));
-            for input in t.inputs.iter().rev() {
+            for input in t.inputs().iter().rev() {
                 if let Some(src) = input.source_transaction.as_deref() {
                     stack.push(src);
                 }
@@ -2933,8 +2960,7 @@ mod iterative_equivalence_tests {
     /// Strips every `source_txid` that has a linked source: the shape
     /// `add_input_from_tx` builds.
     fn strip_source_txids(tx: &mut Transaction) {
-        tx.invalidate_caches();
-        for input in tx.inputs.iter_mut() {
+        for input in tx.inputs_mut().iter_mut() {
             if let Some(src) = input.source_transaction.as_deref_mut() {
                 strip_source_txids(src);
                 input.source_txid = None;

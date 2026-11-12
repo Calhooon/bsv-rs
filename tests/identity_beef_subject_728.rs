@@ -262,7 +262,7 @@ async fn an_output_index_past_the_subjects_outputs_is_skipped_by_both_parsers_72
         )
     );
     let tx = Transaction::from_beef(&beef, None).unwrap();
-    assert_eq!((tx.id(), tx.outputs.len()), (t.tip.id(), 1));
+    assert_eq!((tx.id(), tx.outputs().len()), (t.tip.id(), 1));
     assert_eq!(read(beef.clone(), index, &subject).await, (0, 0));
     // The control: the same output at index 0 is read
     assert_eq!(read(beef, 0, &subject).await, (1, 1));
@@ -380,7 +380,7 @@ async fn a_parent_whose_bump_names_another_txid_is_skipped_as_the_reference_skip
     assert_eq!(parsed.verify_structure(), Err(Kind::TxidNotInBump));
     let selected = Transaction::from_beef(&beef, None).unwrap();
     assert_eq!(selected.id(), t.subject.id());
-    let parent = selected.inputs[0].source_transaction.as_ref().unwrap();
+    let parent = selected.inputs()[0].source_transaction.as_ref().unwrap();
     assert!(parent.merkle_path.is_none(), "the parent unproven");
     assert_eq!(read(beef, index, &subject).await, (0, 0), "this crate");
 }

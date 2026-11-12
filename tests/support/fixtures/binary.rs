@@ -184,7 +184,7 @@ pub fn record(suite: &mut Suite) {
         ),
         (
             "examples/beef_spv.rs",
-            "37f25c28a3611491dae340b2134e2cda1babf60143ca15995cfd9c74a140df51",
+            "8389c03039cb59920a7be1354a1fba15adc8d269a017e80dbeb5ecce25a67a99",
         ),
         (
             "examples/overlay.rs",

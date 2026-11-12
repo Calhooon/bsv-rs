@@ -12,7 +12,7 @@ fn run(input: &Value) -> Result<bool, String> {
     }
     let tx = Transaction::from_hex(s(input, "tx_hex")).unwrap();
     let prevouts = input["prevouts"].as_array().unwrap();
-    for (vin, txin) in tx.inputs.iter().enumerate() {
+    for (vin, txin) in tx.inputs().iter().enumerate() {
         let prevout = prevouts
             .iter()
             .find(|p| {

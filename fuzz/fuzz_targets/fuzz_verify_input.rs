@@ -88,7 +88,7 @@ fuzz_target!(|data: &[u8]| {
             assert_eq!(once, Err(InputRefusal::Transaction(reader)));
         }
         (Ok(tx), Ok(prepared)) => {
-            assert_eq!(tx.inputs.len(), prepared.input_count());
+            assert_eq!(tx.inputs().len(), prepared.input_count());
             let answer = prepared.verify_input(index, lock, amount, &rules);
             assert_eq!(answer, once);
             if index >= prepared.input_count() {

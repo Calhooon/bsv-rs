@@ -48,7 +48,7 @@ impl Beef {
             let bump = current.merkle_path.clone().map(|p| self.merge_bump(p));
             let idx = self.push_transaction(txid, current.clone_for_beef(), bump);
             if self.txs[idx].bump_index().is_none() {
-                let sources = current.inputs.iter().rev();
+                let sources = current.inputs().iter().rev();
                 stack.extend(sources.filter_map(|i| i.source_transaction.as_deref()));
             }
         }

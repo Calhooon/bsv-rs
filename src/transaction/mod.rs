@@ -152,7 +152,10 @@ pub use spending::{
     verify_input, DefaultMode, InputRefusal, InputRules, InputVerified, NodeFigures,
     SpendingTransaction,
 };
-pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};
+pub use transaction::{
+    ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction, TransactionParts,
+    TransactionPartsMut,
+};
 pub use work_budget::WorkBudget;
 
 // Sighash constants re-exported for convenience

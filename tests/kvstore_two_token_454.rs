@@ -61,8 +61,8 @@ async fn compare(global: bool, remove: bool) {
             .iter()
             .map(|(tx, _)| WalletOutput {
                 outpoint: Outpoint::from_string(&format!("{}.0", tx.id())).unwrap(),
-                satoshis: tx.outputs[0].satoshis.unwrap(),
-                locking_script: Some(tx.outputs[0].locking_script.to_binary()),
+                satoshis: tx.outputs()[0].satoshis.unwrap(),
+                locking_script: Some(tx.outputs()[0].locking_script.to_binary()),
                 spendable: true,
                 tags: Some(vec!["alpha".into()]),
                 custom_instructions: None,

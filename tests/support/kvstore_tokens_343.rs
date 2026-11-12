@@ -117,7 +117,7 @@ pub async fn setup(global: bool, count: usize) -> Harness {
             .iter()
             .map(|(tx, index)| WalletOutput {
                 outpoint: Outpoint::from_string(&format!("{}.{index}", tx.id())).unwrap(),
-                satoshis: tx.outputs[*index as usize].satoshis.unwrap(),
+                satoshis: tx.outputs()[*index as usize].satoshis.unwrap(),
                 locking_script: Some(lock.to_binary()),
                 spendable: true,
                 custom_instructions: None,
@@ -237,7 +237,7 @@ pub fn assert_spends(h: &Harness) {
             !spend.unlocking_script.is_empty(),
             "token unlocker must sign"
         );
-        tx.inputs[*index as usize].unlocking_script =
+        tx.inputs_mut()[*index as usize].unlocking_script =
             Some(bsv_rs::script::UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
     }
     verify_inputs(&tx);
@@ -259,7 +259,7 @@ fn requested_transaction(h: &Harness, args: &bsv_rs::wallet::CreateActionArgs) -
         ))
         .unwrap();
     }
-    if tx.outputs.is_empty() {
+    if tx.outputs().is_empty() {
         tx.add_output(TransactionOutput::new(
             0,
             LockingScript::from_binary(&[0x00, 0x6a]).unwrap(),
@@ -271,9 +271,9 @@ fn requested_transaction(h: &Harness, args: &bsv_rs::wallet::CreateActionArgs) -
 
 fn verify_inputs(tx: &Transaction) {
     let parsed = parse_transaction(&tx.to_binary()).unwrap();
-    for (index, input) in tx.inputs.iter().enumerate() {
-        let source =
-            &input.source_transaction.as_ref().unwrap().outputs[input.source_output_index as usize];
+    for (index, input) in tx.inputs().iter().enumerate() {
+        let source = &input.source_transaction.as_ref().unwrap().outputs()
+            [input.source_output_index as usize];
         let mut spend = Spend::new(SpendParams {
             source_txid: parsed.inputs[index].txid,
             source_output_index: input.source_output_index,
@@ -291,7 +291,7 @@ fn verify_inputs(tx: &Transaction) {
             input_index: index,
             unlocking_script: input.unlocking_script.clone().unwrap(),
             input_sequence: input.sequence,
-            lock_time: tx.lock_time,
+            lock_time: tx.lock_time(),
             memory_limit: None,
             work_limit: None,
         });

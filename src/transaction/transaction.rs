@@ -3,7 +3,6 @@
 //! Represents a complete Bitcoin transaction with inputs, outputs, and metadata.
 //! Provides parsing, serialization, signing, and fee computation functionality.
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
@@ -17,6 +16,10 @@ use super::output::TransactionOutput;
 use crate::primitives::{bounded_capacity, from_hex, sha256d, to_hex, var_int_len, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
+
+mod fields;
+pub(in crate::transaction) use fields::outpoint_txid_name;
+pub use fields::{TransactionParts, TransactionPartsMut};
 
 /// Number of placeholder outputs to fabricate for an EF source transaction whose
 /// spent output index is `source_output_index`, or `None` if that many outputs
@@ -64,28 +67,27 @@ fn ef_source_placeholder_len(source_output_index: u32) -> Option<usize> {
 /// tx.sign().await?;
 /// ```
 ///
+/// The four serialized fields are private (#843): read them through
+/// [`version`](Self::version), [`inputs`](Self::inputs),
+/// [`outputs`](Self::outputs) and [`lock_time`](Self::lock_time), write them
+/// through [`set_version`](Self::set_version), [`set_lock_time`](Self::set_lock_time),
+/// [`inputs_mut`](Self::inputs_mut), [`outputs_mut`](Self::outputs_mut) or
+/// [`parts_mut`](Self::parts_mut), each of which clears the caches first, so
+/// [`id`](Self::id), [`to_binary`](Self::to_binary) and [`to_hex`](Self::to_hex)
+/// are always those of the current fields.
+///
 /// `Clone` and `Drop` walk the linked `source_transaction` ancestry with an
 /// explicit stack, not by recursion (0.3.35, bsv-stack-lean #57): a chain of
 /// unproven links a stranger's BEEF can carry is as deep as the BEEF is long,
 /// and the derived glue spent several stack frames per link. `Debug` prints
 /// each input's linked source as its txid, not its ancestry (0.3.35, P0-5c).
 pub struct Transaction {
-    /// Transaction version number.
-    ///
-    /// Version 1 is standard. Version 2 enables BIP 68/112/113 features.
-    pub version: u32,
-
-    /// Transaction inputs.
-    pub inputs: Vec<TransactionInput>,
-
-    /// Transaction outputs.
-    pub outputs: Vec<TransactionOutput>,
-
-    /// Lock time.
-    ///
-    /// If non-zero, specifies the earliest time or block height at which
-    /// the transaction can be added to the blockchain.
-    pub lock_time: u32,
+    // The four serialized fields and their three caches, in a struct whose
+    // fields only the `sealed` module of `fields.rs` sees (#843, #869's
+    // sixth fold): read through `version()`, `inputs()`, `outputs()`,
+    // `lock_time()`, written through the doors there, every one of them
+    // through `Fields::write`, which empties the caches before it lends.
+    fields: fields::Fields,
 
     /// Metadata for attaching additional data to the transaction.
     ///
@@ -97,11 +99,6 @@ pub struct Transaction {
     /// When set, indicates this transaction has been mined and has SPV proof.
     /// Used by `to_beef()` to determine when to stop walking the ancestry chain.
     pub merkle_path: Option<MerklePath>,
-
-    // Caches for serialization and hashing
-    cached_hash: RefCell<Option<[u8; 32]>>,
-    raw_bytes_cache: RefCell<Option<Vec<u8>>>,
-    hex_cache: RefCell<Option<String>>,
 }
 
 /// Specifies how change should be distributed among change outputs.
@@ -152,17 +149,7 @@ fn refuse_trailing(reader: &Reader, words: &str) -> Result<()> {
 impl Transaction {
     /// Creates a new empty transaction with default version 1.
     pub fn new() -> Self {
-        Self {
-            version: 1,
-            inputs: Vec::new(),
-            outputs: Vec::new(),
-            lock_time: 0,
-            metadata: HashMap::new(),
-            merkle_path: None,
-            cached_hash: RefCell::new(None),
-            raw_bytes_cache: RefCell::new(None),
-            hex_cache: RefCell::new(None),
-        }
+        Self::with_params(1, Vec::new(), Vec::new(), 0)
     }
 
     /// Creates a new transaction with the specified parameters.
@@ -172,17 +159,14 @@ impl Transaction {
         outputs: Vec<TransactionOutput>,
         lock_time: u32,
     ) -> Self {
-        Self {
+        Self::from_parts(TransactionParts {
             version,
             inputs,
             outputs,
             lock_time,
             metadata: HashMap::new(),
             merkle_path: None,
-            cached_hash: RefCell::new(None),
-            raw_bytes_cache: RefCell::new(None),
-            hex_cache: RefCell::new(None),
-        }
+        })
     }
 
     /// Parses a transaction from binary data: the bytes are exactly one
@@ -207,9 +191,7 @@ impl Transaction {
     /// # Ok::<(), bsv_rs::Error>(())
     /// ```
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
-        let tx = Self::from_whole(bin, TRAILING_DATA)?;
-        *tx.raw_bytes_cache.borrow_mut() = Some(bin.to_vec());
-        Ok(tx)
+        Self::read_exact(bin.to_vec(), None)
     }
 
     /// One transaction read from `bin`, a byte after it refused in `words`.
@@ -224,11 +206,7 @@ impl Transaction {
     /// transaction, refused as [`from_binary`](Self::from_binary) refuses
     /// bytes after it (#840).
     pub fn from_hex(hex: &str) -> Result<Self> {
-        let bin = from_hex(hex)?;
-        let tx = Self::from_whole(&bin, TRAILING_DATA)?;
-        *tx.hex_cache.borrow_mut() = Some(hex.to_lowercase());
-        *tx.raw_bytes_cache.borrow_mut() = Some(bin);
-        Ok(tx)
+        Self::read_exact(from_hex(hex)?, Some(hex.to_lowercase()))
     }
 
     /// Parses a transaction from Extended Format (BRC-30).
@@ -306,13 +284,13 @@ impl Transaction {
                     source_output_index
                 ))
             })?;
-            let mut source_tx = Transaction::new();
-            source_tx.outputs = vec![TransactionOutput::default(); needed];
-            source_tx.outputs[source_output_index as usize] = TransactionOutput {
+            let mut outputs = vec![TransactionOutput::default(); needed];
+            outputs[source_output_index as usize] = TransactionOutput {
                 satoshis: Some(source_satoshis),
                 locking_script,
                 change: false,
             };
+            let source_tx = Transaction::with_params(1, Vec::new(), outputs, 0);
 
             inputs.push(TransactionInput {
                 source_transaction: Some(Box::new(source_tx)),
@@ -807,7 +785,7 @@ impl Transaction {
                     stack.push(Frame {
                         tx,
                         txid,
-                        inputs_left: tx.inputs.len(),
+                        inputs_left: tx.inputs().len(),
                     });
                 }
             }
@@ -826,7 +804,7 @@ impl Transaction {
             }
             top.inputs_left -= 1;
             let i = top.inputs_left;
-            let input = &top.tx.inputs[i];
+            let input = &top.tx.inputs()[i];
             if let Some(source_tx) = input.source_transaction.as_deref() {
                 entering = Some(source_tx);
             } else if !allow_partial {
@@ -840,59 +818,6 @@ impl Transaction {
             }
             // If allow_partial and source_transaction is None, just skip this input
         }
-    }
-
-    /// The copy of this transaction a BEEF stores: every field but the
-    /// ancestry, with each input's `source_txid` filled from its source when
-    /// it had none, so its bytes, its txid and its input txids are this
-    /// transaction's.
-    pub(super) fn clone_for_beef(&self) -> Transaction {
-        let mut copy = self.clone_without_sources();
-        for (copy_input, input) in copy.inputs.iter_mut().zip(&self.inputs) {
-            if copy_input.source_txid.is_none() {
-                if let Some(source) = input.source_transaction.as_deref() {
-                    copy_input.source_txid = Some(source.id());
-                }
-            }
-        }
-        copy
-    }
-
-    /// Calls `f` with the cached serialization, or `None` when none is
-    /// cached, without copying it: the bytes [`to_binary`](Self::to_binary)
-    /// returns while the cache holds. For the BEEF writers' check (#621's
-    /// fold): `from_binary` and `from_hex` cache the bytes they read, which
-    /// are exactly one transaction since #840 (until then the whole buffer
-    /// they read a prefix of), `to_binary` its own serialization, `Clone` a
-    /// copy.
-    pub(crate) fn with_cached_bytes<R>(&self, f: impl FnOnce(Option<&[u8]>) -> R) -> R {
-        f(self.raw_bytes_cache.borrow().as_deref())
-    }
-
-    /// This transaction with `bytes` as its cached serialization, whatever
-    /// they hold: the state `from_binary` of a buffer longer than one
-    /// transaction left until #840, which no public door builds since, and a
-    /// stale cache under edited fields (#621's fold: its differential, the
-    /// `to_writer` pin and `fuzz_beef_parser`'s hand states). Built only
-    /// under `cfg(fuzzing)` (cargo-fuzz's) and the crate's own tests, as
-    /// `Beef::merge_snapshot_oracle` is; no part of the API.
-    #[cfg(any(test, fuzzing))]
-    #[doc(hidden)]
-    pub fn with_cached_bytes_for_test(self, bytes: Vec<u8>) -> Self {
-        *self.raw_bytes_cache.borrow_mut() = Some(bytes);
-        self
-    }
-
-    /// Invalidates all serialization caches.
-    ///
-    /// Public because `inputs`/`outputs` are public fields: after mutating
-    /// them directly (e.g. setting `outputs[i].satoshis` or an input's
-    /// `unlocking_script`), call this so `to_binary()`/`hash()`/`id()` reflect
-    /// the mutation instead of returning stale cached bytes.
-    pub fn invalidate_caches(&self) {
-        *self.cached_hash.borrow_mut() = None;
-        *self.raw_bytes_cache.borrow_mut() = None;
-        *self.hex_cache.borrow_mut() = None;
     }
 
     /// Adds an input to the transaction.
@@ -918,8 +843,7 @@ impl Transaction {
             input.sequence = 0xFFFFFFFF;
         }
 
-        self.invalidate_caches();
-        self.inputs.push(input);
+        self.inputs_mut().push(input);
         Ok(())
     }
 
@@ -939,8 +863,7 @@ impl Transaction {
             ));
         }
 
-        self.invalidate_caches();
-        self.outputs.push(output);
+        self.outputs_mut().push(output);
         Ok(())
     }
 
@@ -1164,16 +1087,12 @@ impl Transaction {
         }
 
         // Build a minimal source transaction with the correct output at the given index
-        let mut source_tx = Transaction::new();
-        for _ in 0..vout {
-            source_tx
-                .outputs
-                .push(TransactionOutput::new(0, LockingScript::new()));
-        }
-        source_tx.outputs.push(TransactionOutput::new(
+        let mut outputs = vec![TransactionOutput::new(0, LockingScript::new()); vout as usize];
+        outputs.push(TransactionOutput::new(
             satoshis,
             prev_locking_script.clone(),
         ));
+        let source_tx = Transaction::with_params(1, Vec::new(), outputs, 0);
 
         let mut input = TransactionInput::new(prev_txid.to_string(), vout);
         input.source_transaction = Some(Box::new(source_tx));
@@ -1233,16 +1152,13 @@ impl Transaction {
             }
 
             // Build a minimal source transaction with the correct output at the given index
-            let mut source_tx = Transaction::new();
-            for _ in 0..utxo.vout {
-                source_tx
-                    .outputs
-                    .push(TransactionOutput::new(0, LockingScript::new()));
-            }
-            source_tx.outputs.push(TransactionOutput::new(
+            let mut outputs =
+                vec![TransactionOutput::new(0, LockingScript::new()); utxo.vout as usize];
+            outputs.push(TransactionOutput::new(
                 utxo.satoshis,
                 utxo.locking_script.clone(),
             ));
+            let source_tx = Transaction::with_params(1, Vec::new(), outputs, 0);
 
             let mut input = TransactionInput::new(utxo.txid.clone(), utxo.vout);
             input.source_transaction = Some(Box::new(source_tx));
@@ -1263,25 +1179,12 @@ impl Transaction {
 
     /// Serializes the transaction to binary format.
     pub fn to_binary(&self) -> Vec<u8> {
-        if let Some(ref bytes) = *self.raw_bytes_cache.borrow() {
-            return bytes.clone();
-        }
-
-        let bytes = self.build_serialized_bytes();
-        *self.raw_bytes_cache.borrow_mut() = Some(bytes.clone());
-        bytes
+        self.serialized_bytes().to_vec()
     }
 
     /// Serializes the transaction to a hex string.
     pub fn to_hex(&self) -> String {
-        if let Some(ref hex) = *self.hex_cache.borrow() {
-            return hex.clone();
-        }
-
-        let bytes = self.to_binary();
-        let hex = to_hex(&bytes);
-        *self.hex_cache.borrow_mut() = Some(hex.clone());
-        hex
+        self.serialized_hex().to_string()
     }
 
     /// Serializes the transaction to Extended Format (BRC-30).
@@ -1294,14 +1197,14 @@ impl Transaction {
     pub fn to_ef(&self) -> Result<Vec<u8>> {
         let mut writer = Writer::new();
 
-        writer.write_u32_le(self.version);
+        writer.write_u32_le(self.version());
 
         // Write EF marker
         writer.write_bytes(&[0x00, 0x00, 0x00, 0x00, 0x00, 0xEF]);
 
         // Write inputs with source data
-        writer.write_var_int(self.inputs.len() as u64);
-        for input in &self.inputs {
+        writer.write_var_int(self.inputs().len() as u64);
+        for input in self.inputs() {
             // Get TXID bytes (reversed)
             let txid_bytes = input.get_source_txid_bytes()?;
             writer.write_bytes(&txid_bytes);
@@ -1330,7 +1233,7 @@ impl Transaction {
             })?;
 
             let source_output = source_tx
-                .outputs
+                .outputs()
                 .get(input.source_output_index as usize)
                 .ok_or_else(|| {
                     crate::Error::TransactionError("Source output index out of bounds".to_string())
@@ -1344,8 +1247,8 @@ impl Transaction {
         }
 
         // Write outputs
-        writer.write_var_int(self.outputs.len() as u64);
-        for output in &self.outputs {
+        writer.write_var_int(self.outputs().len() as u64);
+        for output in self.outputs() {
             writer.write_u64_le(output.satoshis.unwrap_or(0));
 
             let script = output.locking_script.to_binary();
@@ -1353,7 +1256,7 @@ impl Transaction {
             writer.write_bytes(&script);
         }
 
-        writer.write_u32_le(self.lock_time);
+        writer.write_u32_le(self.lock_time());
 
         Ok(writer.into_bytes())
     }
@@ -1363,102 +1266,11 @@ impl Transaction {
         Ok(to_hex(&self.to_ef()?))
     }
 
-    /// Hashes, deepest first, every linked source whose id this transaction's
-    /// serialization reads THROUGH the source (an input with no
-    /// `source_txid`, the shape `add_input_from_tx` builds), so reading an id
-    /// never recurses more than one level: a chain built that way used to
-    /// recurse once per link through `id()` (0.3.35, bsv-stack-lean #57). The
-    /// reference does the same before it serializes (`@bsv/sdk`
-    /// `Transaction.materializeSourceTXIDs`).
-    fn hash_sources_without_txids(&self) {
-        fn unhashed(input: &TransactionInput) -> Option<&Transaction> {
-            if input.source_txid.is_some() {
-                return None;
-            }
-            input
-                .source_transaction
-                .as_deref()
-                .filter(|source| source.cached_hash.borrow().is_none())
-        }
-        if self.inputs.iter().all(|input| unhashed(input).is_none()) {
-            return;
-        }
-        // Every reachable source to hash, each after the one that links it,
-        // so the reversed list hashes a source before anything that reads it.
-        let mut order: Vec<&Transaction> = Vec::new();
-        let mut stack: Vec<&Transaction> = vec![self];
-        while let Some(tx) = stack.pop() {
-            for source in tx.inputs.iter().filter_map(unhashed) {
-                order.push(source);
-                stack.push(source);
-            }
-        }
-        for source in order.into_iter().rev() {
-            source.hash();
-        }
-    }
-
-    /// Builds the serialized bytes for this transaction.
-    fn build_serialized_bytes(&self) -> Vec<u8> {
-        self.hash_sources_without_txids();
-        let mut writer = Writer::new();
-
-        writer.write_u32_le(self.version);
-
-        // Write inputs
-        writer.write_var_int(self.inputs.len() as u64);
-        for input in &self.inputs {
-            // Write TXID (reversed)
-            if let Ok(txid_bytes) = input.get_source_txid_bytes() {
-                writer.write_bytes(&txid_bytes);
-            } else if let Some(ref tx) = input.source_transaction {
-                let hash = tx.hash();
-                writer.write_bytes(&hash);
-            } else {
-                writer.write_bytes(&[0u8; 32]);
-            }
-
-            writer.write_u32_le(input.source_output_index);
-
-            // Write unlocking script
-            if let Some(ref script) = input.unlocking_script {
-                let script_bytes = script.to_binary();
-                writer.write_var_int(script_bytes.len() as u64);
-                writer.write_bytes(&script_bytes);
-            } else {
-                writer.write_var_int(0);
-            }
-
-            writer.write_u32_le(input.sequence);
-        }
-
-        // Write outputs
-        writer.write_var_int(self.outputs.len() as u64);
-        for output in &self.outputs {
-            writer.write_u64_le(output.satoshis.unwrap_or(0));
-
-            let script = output.locking_script.to_binary();
-            writer.write_var_int(script.len() as u64);
-            writer.write_bytes(&script);
-        }
-
-        writer.write_u32_le(self.lock_time);
-
-        writer.into_bytes()
-    }
-
     /// Computes the transaction hash (double SHA-256).
     ///
     /// This is the internal byte order hash, not the display TXID.
     pub fn hash(&self) -> [u8; 32] {
-        if let Some(hash) = *self.cached_hash.borrow() {
-            return hash;
-        }
-
-        let bytes = self.to_binary();
-        let hash = sha256d(&bytes);
-        *self.cached_hash.borrow_mut() = Some(hash);
-        hash
+        self.serialized_hash()
     }
 
     /// Returns the transaction ID (TXID).
@@ -1488,10 +1300,8 @@ impl Transaction {
     /// - Change outputs haven't been computed (call `fee()` first)
     /// - Template signing fails
     pub async fn sign(&mut self) -> Result<()> {
-        self.invalidate_caches();
-
         // Validate all outputs have amounts
-        for output in &self.outputs {
+        for output in self.outputs() {
             if output.satoshis.is_none() {
                 if output.change {
                     return Err(crate::Error::TransactionError(
@@ -1512,10 +1322,10 @@ impl Transaction {
         // Sign each input with a template
         let raw_tx = self.to_binary();
 
-        for i in 0..self.inputs.len() {
-            if self.inputs[i].unlocking_script_template.is_some() {
+        for i in 0..self.inputs().len() {
+            if self.inputs()[i].unlocking_script_template.is_some() {
                 // Get source data for signing context
-                let source_satoshis = self.inputs[i].source_satoshis().ok_or_else(|| {
+                let source_satoshis = self.inputs()[i].source_satoshis().ok_or_else(|| {
                     crate::Error::TransactionError(format!(
                         "Input {} is missing source satoshis for signing",
                         i
@@ -1523,7 +1333,7 @@ impl Transaction {
                 })?;
 
                 // Clone the locking script to avoid borrow issues
-                let locking_script = self.inputs[i]
+                let locking_script = self.inputs()[i]
                     .source_locking_script()
                     .ok_or_else(|| {
                         crate::Error::TransactionError(format!(
@@ -1534,7 +1344,7 @@ impl Transaction {
                     .clone();
 
                 // Take the template temporarily
-                let Some(template) = self.inputs[i].unlocking_script_template.take() else {
+                let Some(template) = self.inputs_mut()[i].unlocking_script_template.take() else {
                     continue;
                 };
 
@@ -1542,13 +1352,11 @@ impl Transaction {
                     SigningContext::new(&raw_tx, i, source_satoshis, locking_script.as_script());
                 let unlocking = template.sign(&context)?;
 
-                self.inputs[i].unlocking_script = Some(unlocking);
-                self.inputs[i].unlocking_script_template = Some(template);
+                let input = &mut self.inputs_mut()[i];
+                input.unlocking_script = Some(unlocking);
+                input.unlocking_script_template = Some(template);
             }
         }
-
-        // Invalidate caches after signing
-        self.invalidate_caches();
 
         Ok(())
     }
@@ -1568,8 +1376,6 @@ impl Transaction {
         fee_sats: Option<u64>,
         change_distribution: ChangeDistribution,
     ) -> Result<()> {
-        self.invalidate_caches();
-
         // Calculate fee based on transaction size if not provided
         let fee = match fee_sats {
             Some(f) => f,
@@ -1581,7 +1387,7 @@ impl Transaction {
 
         // Calculate total input satoshis
         let mut total_in: u64 = 0;
-        for input in &self.inputs {
+        for input in self.inputs() {
             let sats = input.source_satoshis().ok_or_else(|| {
                 crate::Error::TransactionError(
                     "Source transactions are required for all inputs during fee computation"
@@ -1593,7 +1399,7 @@ impl Transaction {
 
         // Calculate total output satoshis (excluding change)
         let mut total_out: u64 = 0;
-        for output in &self.outputs {
+        for output in self.outputs() {
             if !output.change {
                 let sats = output.satoshis.unwrap_or(0);
                 total_out = super::amount::add_amount(total_out, sats, "Transaction output total")?;
@@ -1605,7 +1411,7 @@ impl Transaction {
 
         if change == 0 {
             // Remove change outputs if no change
-            self.outputs.retain(|o| !o.change);
+            self.outputs_mut().retain(|o| !o.change);
             return Ok(());
         }
 
@@ -1621,8 +1427,8 @@ impl Transaction {
     /// a Benford portion of what remains to each but the last, the rest to the
     /// last. An output may receive 0 satoshis, as there (#868).
     fn distribute_change(&mut self, change: u64, distribution: ChangeDistribution) {
-        let change_outputs: Vec<usize> = (0..self.outputs.len())
-            .filter(|&i| self.outputs[i].change)
+        let change_outputs: Vec<usize> = (0..self.outputs().len())
+            .filter(|&i| self.outputs()[i].change)
             .collect();
         let Some((&last, rest)) = change_outputs.split_last() else {
             return;
@@ -1634,10 +1440,10 @@ impl Transaction {
                 ChangeDistribution::Equal => per_output,
                 ChangeDistribution::Random => Self::benford_number(remaining),
             };
-            self.outputs[idx].satoshis = Some(portion);
+            self.outputs_mut()[idx].satoshis = Some(portion);
             remaining -= portion;
         }
-        self.outputs[last].satoshis = Some(remaining);
+        self.outputs_mut()[last].satoshis = Some(remaining);
     }
 
     /// The reference's `#benfordNumber(0, max)`: `floor(max * log10(1 + 1/d) / log10(10))`
@@ -1658,7 +1464,7 @@ impl Transaction {
     /// Returns an error if source transactions are missing.
     pub fn get_fee(&self) -> Result<u64> {
         let mut total_in: u64 = 0;
-        for input in &self.inputs {
+        for input in self.inputs() {
             let sats = input.source_satoshis().ok_or_else(|| {
                 crate::Error::TransactionError(
                     "Source transactions or sourceSatoshis are required for all inputs to calculate fee"
@@ -1669,7 +1475,7 @@ impl Transaction {
         }
 
         let mut total_out: u64 = 0;
-        for output in &self.outputs {
+        for output in self.outputs() {
             let sats = output.satoshis.unwrap_or(0);
             total_out = super::amount::add_amount(total_out, sats, "Transaction output total")?;
         }
@@ -1682,10 +1488,10 @@ impl Transaction {
         let mut size = 8; // version (4) + locktime (4)
 
         // Input count varint
-        size += var_int_len(self.inputs.len() as u64);
+        size += var_int_len(self.inputs().len() as u64);
 
         // Inputs
-        for input in &self.inputs {
+        for input in self.inputs() {
             size += 32; // TXID
             size += 4; // vout
             size += 4; // sequence
@@ -1707,10 +1513,10 @@ impl Transaction {
         }
 
         // Output count varint
-        size += var_int_len(self.outputs.len() as u64);
+        size += var_int_len(self.outputs().len() as u64);
 
         // Outputs
-        for output in &self.outputs {
+        for output in self.outputs() {
             size += 8; // satoshis
             let script_len = output.locking_script.to_binary().len();
             size += var_int_len(script_len as u64) + script_len;
@@ -1721,12 +1527,12 @@ impl Transaction {
 
     /// Returns the number of inputs.
     pub fn input_count(&self) -> usize {
-        self.inputs.len()
+        self.inputs().len()
     }
 
     /// Returns the number of outputs.
     pub fn output_count(&self) -> usize {
-        self.outputs.len()
+        self.outputs().len()
     }
 
     /// Returns true if this is a coinbase transaction.
@@ -1734,10 +1540,10 @@ impl Transaction {
     /// A coinbase transaction has exactly one input with a null TXID
     /// (all zeros) and output index of 0xFFFFFFFF.
     pub fn is_coinbase(&self) -> bool {
-        if self.inputs.len() != 1 {
+        if self.inputs().len() != 1 {
             return false;
         }
-        let input = &self.inputs[0];
+        let input = &self.inputs()[0];
         if input.source_output_index != 0xFFFFFFFF {
             return false;
         }
@@ -1753,7 +1559,7 @@ impl Transaction {
     ///
     /// Checks each output's locking script using `Script::is_data()`.
     pub fn has_data_outputs(&self) -> bool {
-        self.outputs
+        self.outputs()
             .iter()
             .any(|o| o.locking_script.as_script().is_data())
     }
@@ -1764,7 +1570,7 @@ impl Transaction {
     /// the satoshi value cannot be determined without it.
     pub fn total_input_satoshis(&self) -> Result<u64> {
         let mut total: u64 = 0;
-        for (i, input) in self.inputs.iter().enumerate() {
+        for (i, input) in self.inputs().iter().enumerate() {
             match input.source_satoshis() {
                 Some(sats) => {
                     total = total.checked_add(sats).ok_or_else(|| {
@@ -1785,7 +1591,7 @@ impl Transaction {
     /// Returns the total satoshis of all outputs.
     pub fn total_output_satoshis(&self) -> u64 {
         // Saturating: a sum past `u64` panicked in a debug build (#868's class).
-        self.outputs
+        self.outputs()
             .iter()
             .filter_map(|o| o.satoshis)
             .fold(0, u64::saturating_add)
@@ -1808,7 +1614,7 @@ impl Transaction {
             if tx.merkle_path.is_some() {
                 usize::MAX
             } else {
-                tx.inputs
+                tx.inputs()
                     .iter()
                     .filter(|input| input.source_transaction.is_some())
                     .count()
@@ -1832,7 +1638,7 @@ impl Transaction {
             if tx.merkle_path.is_some() {
                 continue; // proven: its ancestry is not needed
             }
-            for input in &tx.inputs {
+            for input in tx.inputs() {
                 if let Some(source) = input.source_transaction.as_deref() {
                     stack.push(source);
                 }
@@ -1909,7 +1715,7 @@ impl Transaction {
 /// transaction: the streaming reader's refusal (`beef_stream::no_transaction`)
 /// for the whole-transaction path, naming the txid and the kind.
 pub(super) fn refuse_no_transaction(tx: &Transaction, txid: &str) -> Result<()> {
-    match super::beef_stream::no_transaction(tx.inputs.len(), tx.outputs.len()) {
+    match super::beef_stream::no_transaction(tx.inputs().len(), tx.outputs().len()) {
         Some(reason) => Err(crate::Error::TransactionError(format!(
             "invalid transaction {}: {:?}",
             txid,
@@ -1919,110 +1725,19 @@ pub(super) fn refuse_no_transaction(tx: &Transaction, txid: &str) -> Result<()> 
     }
 }
 
-impl Transaction {
-    /// A copy of this transaction with every input's `source_transaction`
-    /// left `None`: the one level [`Clone`] copies per step of its walk.
-    fn clone_without_sources(&self) -> Self {
-        Self {
-            version: self.version,
-            inputs: self
-                .inputs
-                .iter()
-                .map(TransactionInput::clone_without_source)
-                .collect(),
-            outputs: self.outputs.clone(),
-            lock_time: self.lock_time,
-            metadata: self.metadata.clone(),
-            merkle_path: self.merkle_path.clone(),
-            cached_hash: self.cached_hash.clone(),
-            raw_bytes_cache: self.raw_bytes_cache.clone(),
-            hex_cache: self.hex_cache.clone(),
-        }
-    }
-}
-
-/// The derive's output, field for field; each input prints its linked source
-/// as its txid (`TransactionInput`'s `Debug`), so the output is the
-/// transaction, not its history.
-impl std::fmt::Debug for Transaction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Transaction")
-            .field("version", &self.version)
-            .field("inputs", &self.inputs)
-            .field("outputs", &self.outputs)
-            .field("lock_time", &self.lock_time)
-            .field("metadata", &self.metadata)
-            .field("merkle_path", &self.merkle_path)
-            .field("cached_hash", &self.cached_hash)
-            .field("raw_bytes_cache", &self.raw_bytes_cache)
-            .field("hex_cache", &self.hex_cache)
-            .finish()
-    }
-}
-
-impl Clone for Transaction {
-    /// A deep copy, ancestry included, as the derived `Clone` made: every
-    /// linked `source_transaction` is copied, and every input's
-    /// `unlocking_script_template` is left `None` (templates hold closures).
-    /// The ancestry is copied depth first with an explicit stack, so a deep
-    /// chain costs heap, not stack.
-    #[allow(clippy::expect_used)] // #134: the loop pops only what it pushed and returns at the root; Clone has no Result
-    fn clone(&self) -> Self {
-        /// One transaction being copied, and the next input to look at.
-        struct Frame<'a> {
-            original: &'a Transaction,
-            copy: Transaction,
-            next_input: usize,
-        }
-
-        let mut stack = vec![Frame {
-            original: self,
-            copy: self.clone_without_sources(),
-            next_input: 0,
-        }];
-        loop {
-            let top = stack.last_mut().expect("the stack is not empty");
-            let original = top.original;
-            let next_source = original
-                .inputs
-                .iter()
-                .enumerate()
-                .skip(top.next_input)
-                .find_map(|(i, input)| input.source_transaction.as_deref().map(|src| (i, src)));
-            if let Some((i, source)) = next_source {
-                top.next_input = i + 1;
-                stack.push(Frame {
-                    original: source,
-                    copy: source.clone_without_sources(),
-                    next_input: 0,
-                });
-                continue;
-            }
-            let done = stack.pop().expect("the stack is not empty").copy;
-            match stack.last_mut() {
-                Some(parent) => {
-                    parent.copy.inputs[parent.next_input - 1].source_transaction =
-                        Some(Box::new(done));
-                }
-                None => return done,
-            }
-        }
-    }
-}
-
 impl Drop for Transaction {
     /// Drops the linked ancestry one transaction at a time: every
     /// `source_transaction` is taken out before its owner is dropped, so no
     /// drop reaches below the one in hand.
     fn drop(&mut self) {
         let mut ancestry: Vec<Box<Transaction>> = self
-            .inputs
+            .inputs_mut()
             .iter_mut()
             .filter_map(|input| input.source_transaction.take())
             .collect();
         while let Some(mut tx) = ancestry.pop() {
             ancestry.extend(
-                tx.inputs
+                tx.inputs_mut()
                     .iter_mut()
                     .filter_map(|input| input.source_transaction.take()),
             );
@@ -2133,20 +1848,20 @@ mod tests {
     #[test]
     fn test_new_transaction() {
         let tx = Transaction::new();
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.lock_time, 0);
-        assert!(tx.inputs.is_empty());
-        assert!(tx.outputs.is_empty());
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.lock_time(), 0);
+        assert!(tx.inputs().is_empty());
+        assert!(tx.outputs().is_empty());
     }
 
     #[test]
     fn test_from_hex() {
         let tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
 
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.inputs.len(), 1);
-        assert_eq!(tx.outputs.len(), 2);
-        assert_eq!(tx.lock_time, 0);
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.outputs().len(), 2);
+        assert_eq!(tx.lock_time(), 0);
     }
 
     #[test]
@@ -2198,7 +1913,7 @@ mod tests {
         // Should succeed with TXID
         let good_input = TransactionInput::new("abc123".repeat(11), 0);
         assert!(tx.add_input(good_input).is_ok());
-        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.inputs().len(), 1);
     }
 
     #[test]
@@ -2221,7 +1936,7 @@ mod tests {
         let change_output = TransactionOutput::new_change(LockingScript::new());
         assert!(tx.add_output(change_output).is_ok());
 
-        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.outputs().len(), 2);
     }
 
     #[test]
@@ -2276,14 +1991,14 @@ mod tests {
         let mut input = TransactionInput::with_source_transaction(source_tx, 0);
         input.unlocking_script = Some(UnlockingScript::from_hex("00").unwrap());
 
-        tx.inputs.push(input);
+        tx.inputs_mut().push(input);
 
         // Add an output
         let output = TransactionOutput::new(
             50_000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         );
-        tx.outputs.push(output);
+        tx.outputs_mut().push(output);
 
         // Serialize to EF
         let ef_bytes = tx.to_ef().unwrap();
@@ -2292,13 +2007,13 @@ mod tests {
         let parsed = Transaction::from_ef(&ef_bytes).unwrap();
 
         // Verify the parsed transaction
-        assert_eq!(parsed.version, tx.version);
-        assert_eq!(parsed.inputs.len(), tx.inputs.len());
-        assert_eq!(parsed.outputs.len(), tx.outputs.len());
-        assert_eq!(parsed.lock_time, tx.lock_time);
+        assert_eq!(parsed.version(), tx.version());
+        assert_eq!(parsed.inputs().len(), tx.inputs().len());
+        assert_eq!(parsed.outputs().len(), tx.outputs().len());
+        assert_eq!(parsed.lock_time(), tx.lock_time());
 
         // Verify input has source satoshis
-        assert!(parsed.inputs[0].source_satoshis().is_some());
+        assert!(parsed.inputs()[0].source_satoshis().is_some());
     }
 
     #[test]
@@ -2329,7 +2044,7 @@ mod tests {
     fn test_is_coinbase() {
         // Create a coinbase transaction
         let mut coinbase_tx = Transaction::new();
-        coinbase_tx.inputs.push(TransactionInput {
+        coinbase_tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
                 "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -2339,7 +2054,7 @@ mod tests {
             unlocking_script_template: None,
             sequence: 0xFFFFFFFF,
         });
-        coinbase_tx.outputs.push(TransactionOutput::new(
+        coinbase_tx.outputs_mut().push(TransactionOutput::new(
             5000000000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
@@ -2351,7 +2066,7 @@ mod tests {
 
         // Transaction with 2 inputs is not coinbase
         let mut two_input_tx = Transaction::new();
-        two_input_tx.inputs.push(TransactionInput {
+        two_input_tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
                 "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -2361,7 +2076,7 @@ mod tests {
             unlocking_script_template: None,
             sequence: 0xFFFFFFFF,
         });
-        two_input_tx.inputs.push(TransactionInput {
+        two_input_tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some("abc123".repeat(11)),
             source_output_index: 0,
@@ -2376,7 +2091,7 @@ mod tests {
     fn test_has_data_outputs() {
         // Transaction with no data outputs
         let mut tx = Transaction::new();
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             100_000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
@@ -2384,7 +2099,7 @@ mod tests {
 
         // Transaction with an OP_RETURN output
         let mut tx_data = Transaction::new();
-        tx_data.outputs.push(TransactionOutput::new(
+        tx_data.outputs_mut().push(TransactionOutput::new(
             0,
             LockingScript::from_hex("6a0568656c6c6f").unwrap(), // OP_RETURN "hello"
         ));
@@ -2392,11 +2107,11 @@ mod tests {
 
         // Transaction with both data and non-data outputs
         let mut tx_mixed = Transaction::new();
-        tx_mixed.outputs.push(TransactionOutput::new(
+        tx_mixed.outputs_mut().push(TransactionOutput::new(
             100_000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
-        tx_mixed.outputs.push(TransactionOutput::new(
+        tx_mixed.outputs_mut().push(TransactionOutput::new(
             0,
             LockingScript::from_asm("OP_FALSE OP_RETURN").unwrap(),
         ));
@@ -2412,16 +2127,16 @@ mod tests {
         let mut tx = Transaction::new();
         tx.add_op_return_output(b"hello world").unwrap();
 
-        assert_eq!(tx.outputs.len(), 1);
-        assert_eq!(tx.outputs[0].satoshis, Some(0));
-        assert!(tx.outputs[0].locking_script.as_script().is_data());
-        assert!(tx.outputs[0]
+        assert_eq!(tx.outputs().len(), 1);
+        assert_eq!(tx.outputs()[0].satoshis, Some(0));
+        assert!(tx.outputs()[0].locking_script.as_script().is_data());
+        assert!(tx.outputs()[0]
             .locking_script
             .as_script()
             .is_safe_data_carrier());
 
         // Verify the script structure: OP_FALSE OP_RETURN <data>
-        let asm = tx.outputs[0].locking_script.to_asm();
+        let asm = tx.outputs()[0].locking_script.to_asm();
         assert!(asm.starts_with("OP_0 OP_RETURN"));
     }
 
@@ -2430,8 +2145,8 @@ mod tests {
         let mut tx = Transaction::new();
         tx.add_op_return_output(b"").unwrap();
 
-        assert_eq!(tx.outputs.len(), 1);
-        assert!(tx.outputs[0].locking_script.as_script().is_data());
+        assert_eq!(tx.outputs().len(), 1);
+        assert!(tx.outputs()[0].locking_script.as_script().is_data());
     }
 
     #[test]
@@ -2440,16 +2155,16 @@ mod tests {
         tx.add_op_return_parts_output(&[b"part1", b"part2", b"part3"])
             .unwrap();
 
-        assert_eq!(tx.outputs.len(), 1);
-        assert_eq!(tx.outputs[0].satoshis, Some(0));
-        assert!(tx.outputs[0].locking_script.as_script().is_data());
-        assert!(tx.outputs[0]
+        assert_eq!(tx.outputs().len(), 1);
+        assert_eq!(tx.outputs()[0].satoshis, Some(0));
+        assert!(tx.outputs()[0].locking_script.as_script().is_data());
+        assert!(tx.outputs()[0]
             .locking_script
             .as_script()
             .is_safe_data_carrier());
 
         // Verify all parts are present in the script
-        let asm = tx.outputs[0].locking_script.to_asm();
+        let asm = tx.outputs()[0].locking_script.to_asm();
         assert!(asm.starts_with("OP_0 OP_RETURN"));
     }
 
@@ -2463,8 +2178,8 @@ mod tests {
         tx2.add_op_return_output(b"single").unwrap();
 
         assert_eq!(
-            tx.outputs[0].locking_script.to_hex(),
-            tx2.outputs[0].locking_script.to_hex()
+            tx.outputs()[0].locking_script.to_hex(),
+            tx2.outputs()[0].locking_script.to_hex()
         );
     }
 
@@ -2485,12 +2200,12 @@ mod tests {
         tx.add_hash_puzzle_output("my secret", pubkey_hash, 50_000)
             .unwrap();
 
-        assert_eq!(tx.outputs.len(), 1);
-        assert_eq!(tx.outputs[0].satoshis, Some(50_000));
+        assert_eq!(tx.outputs().len(), 1);
+        assert_eq!(tx.outputs()[0].satoshis, Some(50_000));
 
         // Verify the script structure:
         // OP_HASH160 <hash> OP_EQUALVERIFY OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG
-        let asm = tx.outputs[0].locking_script.to_asm();
+        let asm = tx.outputs()[0].locking_script.to_asm();
         assert!(asm.starts_with("OP_HASH160"));
         assert!(asm.contains("OP_EQUALVERIFY OP_DUP OP_HASH160"));
         assert!(asm.ends_with("OP_EQUALVERIFY OP_CHECKSIG"));
@@ -2516,13 +2231,13 @@ mod tests {
         let mut tx = Transaction::new();
         assert_eq!(tx.total_output_satoshis(), 0);
 
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             100_000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
         assert_eq!(tx.total_output_satoshis(), 100_000);
 
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             50_000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
@@ -2533,7 +2248,7 @@ mod tests {
     fn test_total_output_satoshis_with_op_return() {
         let mut tx = Transaction::new();
         tx.add_op_return_output(b"data").unwrap();
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             100_000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
@@ -2553,7 +2268,7 @@ mod tests {
         .unwrap();
 
         let total = tx.total_input_satoshis().unwrap();
-        assert_eq!(total, source_tx.outputs[0].satoshis.unwrap());
+        assert_eq!(total, source_tx.outputs()[0].satoshis.unwrap());
     }
 
     #[test]
@@ -2581,8 +2296,8 @@ mod tests {
         let large_data = vec![0xAB; 10_000];
         tx.add_op_return_output(&large_data).unwrap();
 
-        assert_eq!(tx.outputs.len(), 1);
-        assert!(tx.outputs[0].locking_script.as_script().is_data());
+        assert_eq!(tx.outputs().len(), 1);
+        assert!(tx.outputs()[0].locking_script.as_script().is_data());
     }
 
     #[test]
@@ -2591,10 +2306,10 @@ mod tests {
         let empty_parts: &[&[u8]] = &[];
         tx.add_op_return_parts_output(empty_parts).unwrap();
 
-        assert_eq!(tx.outputs.len(), 1);
-        assert!(tx.outputs[0].locking_script.as_script().is_data());
+        assert_eq!(tx.outputs().len(), 1);
+        assert!(tx.outputs()[0].locking_script.as_script().is_data());
         // Should just be OP_FALSE OP_RETURN with no data
-        let asm = tx.outputs[0].locking_script.to_asm();
+        let asm = tx.outputs()[0].locking_script.to_asm();
         assert_eq!(asm, "OP_0 OP_RETURN");
     }
 
@@ -2610,8 +2325,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            tx1.outputs[0].locking_script.to_hex(),
-            tx2.outputs[0].locking_script.to_hex()
+            tx1.outputs()[0].locking_script.to_hex(),
+            tx2.outputs()[0].locking_script.to_hex()
         );
     }
 
@@ -2626,8 +2341,8 @@ mod tests {
             .unwrap();
 
         assert_ne!(
-            tx1.outputs[0].locking_script.to_hex(),
-            tx2.outputs[0].locking_script.to_hex()
+            tx1.outputs()[0].locking_script.to_hex(),
+            tx2.outputs()[0].locking_script.to_hex()
         );
     }
 
@@ -2647,17 +2362,17 @@ mod tests {
     fn test_add_input_from_tx() {
         let source_tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
         let expected_txid = source_tx.id();
-        let expected_satoshis = source_tx.outputs[0].satoshis.unwrap();
+        let expected_satoshis = source_tx.outputs()[0].satoshis.unwrap();
 
         let mut tx = Transaction::new();
         tx.add_input_from_tx(source_tx, 0, dummy_template())
             .unwrap();
 
-        assert_eq!(tx.inputs.len(), 1);
-        assert!(tx.inputs[0].has_source_transaction());
-        assert_eq!(tx.inputs[0].get_source_txid().unwrap(), expected_txid);
-        assert_eq!(tx.inputs[0].source_output_index, 0);
-        assert_eq!(tx.inputs[0].source_satoshis().unwrap(), expected_satoshis);
+        assert_eq!(tx.inputs().len(), 1);
+        assert!(tx.inputs()[0].has_source_transaction());
+        assert_eq!(tx.inputs()[0].get_source_txid().unwrap(), expected_txid);
+        assert_eq!(tx.inputs()[0].source_output_index, 0);
+        assert_eq!(tx.inputs()[0].source_satoshis().unwrap(), expected_satoshis);
     }
 
     #[test]
@@ -2671,12 +2386,12 @@ mod tests {
         tx.add_input_from(prev_txid, 0, &locking_script, satoshis, dummy_template())
             .unwrap();
 
-        assert_eq!(tx.inputs.len(), 1);
-        assert_eq!(tx.inputs[0].get_source_txid().unwrap(), prev_txid);
-        assert_eq!(tx.inputs[0].source_output_index, 0);
-        assert_eq!(tx.inputs[0].source_satoshis().unwrap(), satoshis);
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.inputs()[0].get_source_txid().unwrap(), prev_txid);
+        assert_eq!(tx.inputs()[0].source_output_index, 0);
+        assert_eq!(tx.inputs()[0].source_satoshis().unwrap(), satoshis);
         assert_eq!(
-            tx.inputs[0].source_locking_script().unwrap().to_hex(),
+            tx.inputs()[0].source_locking_script().unwrap().to_hex(),
             locking_script.to_hex()
         );
     }
@@ -2692,14 +2407,14 @@ mod tests {
         tx.add_input_from(prev_txid, 3, &locking_script, satoshis, dummy_template())
             .unwrap();
 
-        assert_eq!(tx.inputs.len(), 1);
-        assert_eq!(tx.inputs[0].source_output_index, 3);
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.inputs()[0].source_output_index, 3);
         // The minimal source transaction should have padding outputs + the real one at index 3
-        let source = tx.inputs[0].source_transaction.as_ref().unwrap();
-        assert_eq!(source.outputs.len(), 4);
-        assert_eq!(source.outputs[3].satoshis.unwrap(), satoshis);
+        let source = tx.inputs()[0].source_transaction.as_ref().unwrap();
+        assert_eq!(source.outputs().len(), 4);
+        assert_eq!(source.outputs()[3].satoshis.unwrap(), satoshis);
         assert_eq!(
-            source.outputs[3].locking_script.to_hex(),
+            source.outputs()[3].locking_script.to_hex(),
             locking_script.to_hex()
         );
     }
@@ -2776,21 +2491,21 @@ mod tests {
         let mut tx = Transaction::new();
         tx.add_inputs_from_utxos(&utxos).unwrap();
 
-        assert_eq!(tx.inputs.len(), 3);
+        assert_eq!(tx.inputs().len(), 3);
 
         // Verify each input matches its UTXO
         for (i, utxo) in utxos.iter().enumerate() {
-            assert_eq!(tx.inputs[i].get_source_txid().unwrap(), utxo.txid);
-            assert_eq!(tx.inputs[i].source_output_index, utxo.vout);
-            assert_eq!(tx.inputs[i].source_satoshis().unwrap(), utxo.satoshis);
+            assert_eq!(tx.inputs()[i].get_source_txid().unwrap(), utxo.txid);
+            assert_eq!(tx.inputs()[i].source_output_index, utxo.vout);
+            assert_eq!(tx.inputs()[i].source_satoshis().unwrap(), utxo.satoshis);
             assert_eq!(
-                tx.inputs[i].source_locking_script().unwrap().to_hex(),
+                tx.inputs()[i].source_locking_script().unwrap().to_hex(),
                 utxo.locking_script.to_hex()
             );
         }
 
         // Template should NOT be set (add_inputs_from_utxos does not set it)
-        for input in &tx.inputs {
+        for input in tx.inputs() {
             assert!(input.unlocking_script_template.is_none());
         }
     }
@@ -2801,7 +2516,7 @@ mod tests {
         let mut tx = Transaction::new();
         tx.add_inputs_from_utxos(&utxos).unwrap();
 
-        assert_eq!(tx.inputs.len(), 0);
+        assert_eq!(tx.inputs().len(), 0);
     }
 
     #[test]
@@ -2815,10 +2530,10 @@ mod tests {
             .unwrap();
 
         // The template should be set on the input
-        assert!(tx.inputs[0].unlocking_script_template.is_some());
+        assert!(tx.inputs()[0].unlocking_script_template.is_some());
 
         // Verify the template can produce an unlocking script
-        let template = tx.inputs[0].unlocking_script_template.as_ref().unwrap();
+        let template = tx.inputs()[0].unlocking_script_template.as_ref().unwrap();
         let dummy_tx = Transaction::new();
         let raw_tx = dummy_tx.to_binary();
         let locking_script = Script::new();

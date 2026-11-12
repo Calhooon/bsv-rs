@@ -108,7 +108,10 @@ pub use script::{Address, LockingScript, Script, ScriptChunk, UnlockingScript};
 
 // Convenience re-exports from transaction
 #[cfg(feature = "transaction")]
-pub use transaction::{ChangeDistribution, Transaction, TransactionInput, TransactionOutput};
+pub use transaction::{
+    ChangeDistribution, Transaction, TransactionInput, TransactionOutput, TransactionParts,
+    TransactionPartsMut,
+};
 
 // Convenience re-exports from wallet
 #[cfg(feature = "wallet")]

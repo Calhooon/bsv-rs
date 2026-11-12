@@ -787,8 +787,13 @@ fn eval_node_transaction_vector(
     // always echoes the input. Re-serialize from the parsed fields instead so
     // a lenient parse of a malformed tx cannot round-trip vacuously.
     let reserialized = |t: &Transaction| {
-        Transaction::with_params(t.version, t.inputs.clone(), t.outputs.clone(), t.lock_time)
-            .to_hex()
+        Transaction::with_params(
+            t.version(),
+            t.inputs().to_vec(),
+            t.outputs().to_vec(),
+            t.lock_time(),
+        )
+        .to_hex()
     };
     let tx = match parsed {
         Ok(t) if reserialized(&t) == tx_hex => t,
@@ -814,7 +819,7 @@ fn eval_node_transaction_vector(
     let mut first_error = String::new();
     let mut any_p2sh_prevout = false;
 
-    for (vin, txin) in tx.inputs.iter().enumerate() {
+    for (vin, txin) in tx.inputs().iter().enumerate() {
         let prevout = prevouts.iter().find(|p| {
             Some(s(p, "txid")) == txin.source_txid.as_deref()
                 && (n(p, "vout") as u32) == txin.source_output_index
@@ -886,7 +891,7 @@ fn eval_node_transaction_vector(
 fn validate_tx_input(tx: &Transaction, vin: usize, prevout: &Value) -> Result<(), String> {
     use bsv_rs::primitives::bsv::sighash::TxInput;
 
-    let txin = &tx.inputs[vin];
+    let txin = &tx.inputs()[vin];
     let locking = LockingScript::from_hex(s(prevout, "script_pubkey_hex"))
         .map_err(|e| format!("prevout script parse: {}", e))?;
     let unlocking = txin
@@ -895,7 +900,7 @@ fn validate_tx_input(tx: &Transaction, vin: usize, prevout: &Value) -> Result<()
         .ok_or_else(|| "missing unlocking script".to_string())?;
 
     let other_inputs: Vec<TxInput> = tx
-        .inputs
+        .inputs()
         .iter()
         .enumerate()
         .filter(|(i, _)| *i != vin)
@@ -911,7 +916,7 @@ fn validate_tx_input(tx: &Transaction, vin: usize, prevout: &Value) -> Result<()
         })
         .collect();
     let outputs: Vec<TxOutput> = tx
-        .outputs
+        .outputs()
         .iter()
         .map(|o| TxOutput {
             satoshis: o.satoshis.unwrap_or(0),
@@ -924,13 +929,13 @@ fn validate_tx_input(tx: &Transaction, vin: usize, prevout: &Value) -> Result<()
         source_output_index: txin.source_output_index,
         source_satoshis: n(prevout, "amount_satoshis") as u64,
         locking_script: locking,
-        transaction_version: tx.version as i32,
+        transaction_version: tx.version() as i32,
         other_inputs,
         outputs,
         input_index: vin,
         unlocking_script: unlocking,
         input_sequence: txin.sequence,
-        lock_time: tx.lock_time,
+        lock_time: tx.lock_time(),
         memory_limit: None,
         work_limit: None,
     });

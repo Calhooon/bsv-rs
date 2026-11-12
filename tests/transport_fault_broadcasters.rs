@@ -77,7 +77,7 @@ impl Service {
 fn transaction() -> Transaction {
     let mut tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
     let mut source = Transaction::new();
-    for _ in 0..=tx.inputs[0].source_output_index {
+    for _ in 0..=tx.inputs()[0].source_output_index {
         source
             .add_output(TransactionOutput::new(
                 1_000_000,
@@ -88,7 +88,7 @@ fn transaction() -> Transaction {
             ))
             .unwrap();
     }
-    tx.inputs[0].source_transaction = Some(Box::new(source));
+    tx.inputs_mut()[0].source_transaction = Some(Box::new(source));
     tx
 }
 

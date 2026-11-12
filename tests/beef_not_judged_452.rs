@@ -139,7 +139,7 @@ fn source(height: u32) -> Transaction {
         LockingScript::from_hex("51").unwrap(),
     ))
     .unwrap();
-    tx.lock_time = height;
+    tx.set_lock_time(height);
     tx.merkle_path = Some(MerklePath::from_coinbase_txid(&tx.id(), height));
     tx
 }
@@ -189,7 +189,7 @@ fn chain(case: Case) -> ChainParams {
 
 fn tracker(tx: &Transaction, tip: Option<ChainTip>) -> MockChainTracker {
     let mut tracker = MockChainTracker::new(CHRONICLE).with_mining_tip(tip);
-    for input in &tx.inputs {
+    for input in tx.inputs() {
         let source = input.source_transaction.as_ref().unwrap();
         let proof = source.merkle_path.as_ref().unwrap();
         tracker.add_root(
@@ -340,9 +340,8 @@ async fn chain_params_alone_decide_when_the_tip_disagrees_451() {
     // P2SH output rejection previously read the obsolete field, even though
     // the input's word already read ChainParams. Exercise that distinct site.
     let mut p2sh = tx.clone();
-    p2sh.outputs[0].locking_script =
+    p2sh.outputs_mut()[0].locking_script =
         LockingScript::from_hex("a914000000000000000000000000000000000000000087").unwrap();
-    p2sh.invalidate_caches();
     for (height, obsolete, refused) in [(GENESIS - 1, u32::MAX, true), (GENESIS - 2, 1, false)] {
         let tracker = tracker_for_p2sh(&p2sh, height, obsolete);
         let verdict = StreamVerifier::new(p2sh.to_beef(false).unwrap().as_slice(), &tracker, None)
@@ -391,8 +390,7 @@ async fn a_not_judged_error_names_the_unproven_ancestor_452() {
 #[tokio::test]
 async fn an_out_of_scope_word_precedes_a_missing_unlocking_script_452() {
     let mut tx = spending(Case::Coin);
-    tx.inputs[1].unlocking_script = None;
-    tx.invalidate_caches();
+    tx.inputs_mut()[1].unlocking_script = None;
     let tracker = tracker(&tx, Some(tip(CHRONICLE, GENESIS)));
     let error = tx
         .verify_with_chain_params(&tracker, None, None, &ChainParams::mainnet())
@@ -436,7 +434,7 @@ fn a_source_height_above_u32_is_reachable_through_streaming_headers_452() {
     }
     let headers = WideHeightHeaders {
         height,
-        root: tx.inputs[0].source_transaction.as_ref().unwrap().hash(),
+        root: tx.inputs()[0].source_transaction.as_ref().unwrap().hash(),
     };
     let bytes = writer.into_bytes();
     for verdict in [

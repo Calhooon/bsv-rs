@@ -229,7 +229,7 @@ fn load_evidence_transaction(
         .and_then(BeefTx::tx)
         .cloned()
         .ok_or(invalid("TransactionEvidence.ts:120-121"))?;
-    if output_index as usize >= subject.outputs.len() {
+    if output_index as usize >= subject.outputs().len() {
         return Err(invalid("TransactionEvidence.ts:126"));
     }
     Ok((beef, subject))
@@ -239,12 +239,12 @@ fn load_evidence_transaction(
 /// serialized bytes.
 fn graph_script_bytes(tx: &Transaction) -> usize {
     let locking: usize = tx
-        .outputs
+        .outputs()
         .iter()
         .map(|o| o.locking_script.to_binary().len())
         .sum();
     let unlocking: usize = tx
-        .inputs
+        .inputs()
         .iter()
         .filter_map(|i| i.unlocking_script.as_ref())
         .map(|s| s.to_binary().len())
@@ -265,14 +265,14 @@ fn assert_unconfirmed_graph(beef: &Beef, subject: &Transaction) -> Result<(), Re
             continue;
         }
         script_bytes += graph_script_bytes(current);
-        inputs += current.inputs.len();
+        inputs += current.inputs().len();
         if inputs > INPUTS || script_bytes > SCRIPT_BYTES {
             return Err(limit("TransactionEvidence.ts:170-171"));
         }
         if beef.find_bump(&id).is_some() {
             continue;
         }
-        if current.inputs.is_empty() {
+        if current.inputs().is_empty() {
             return Err(invalid("TransactionEvidence.ts:174"));
         }
         enqueue_unconfirmed_parents(beef, current, &mut pending, &mut spent)?;
@@ -289,7 +289,7 @@ fn enqueue_unconfirmed_parents<'a>(
     pending: &mut Vec<&'a Transaction>,
     spent: &mut HashSet<(String, u32)>,
 ) -> Result<(), Refusal> {
-    for input in &current.inputs {
+    for input in current.inputs() {
         let named = input.source_txid.as_deref();
         let Some(source) = named.and_then(|t| beef.find_txid(t)).and_then(BeefTx::tx) else {
             return Err(invalid("TransactionEvidence.ts:143"));

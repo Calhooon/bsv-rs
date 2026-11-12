@@ -1,9 +1,12 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
+#[path = "support/identity_law.rs"]
+mod identity_law;
+
 /// Every output amount below 2^53 (#844).
 fn assert_safe_amounts(tx: &bsv_rs::transaction::Transaction) {
-    for output in &tx.outputs {
+    for output in tx.outputs() {
         assert!(
             output.satoshis.is_none_or(|s| s < 1 << 53),
             "a reader accepted an output of 2^53 satoshis or more (#844)"
@@ -31,10 +34,10 @@ fuzz_target!(|data: &[u8]| {
             "from_binary returned a transaction other than its buffer"
         );
         let fresh = bsv_rs::transaction::Transaction::with_params(
-            tx.version,
-            tx.inputs.clone(),
-            tx.outputs.clone(),
-            tx.lock_time,
+            tx.version(),
+            tx.inputs().to_vec(),
+            tx.outputs().to_vec(),
+            tx.lock_time(),
         );
         assert_eq!(
             fresh.to_binary(),
@@ -49,6 +52,8 @@ fuzz_target!(|data: &[u8]| {
         // No accepted transaction holds an amount the reference cannot
         // hold (#844: 2^53 satoshis or more is refused in its words).
         assert_safe_amounts(&tx);
+        // #843's law under edits the input chooses (#869's fold).
+        identity_law::edits_keep_the_law(tx, data);
     }
 
     // The reader form reads one transaction from the front and leaves the
@@ -111,7 +116,7 @@ fuzz_target!(|data: &[u8]| {
     );
     if let Ok(tx) = by_ef {
         assert_safe_amounts(&tx);
-        for input in &tx.inputs {
+        for input in tx.inputs() {
             assert!(
                 input.source_satoshis().is_none_or(|s| s < 1 << 53),
                 "from_ef accepted a source amount of 2^53 or more (#844)"

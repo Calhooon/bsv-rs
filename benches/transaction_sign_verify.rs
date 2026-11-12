@@ -14,7 +14,7 @@ fn prepare_to_sign(unsigned: &Transaction, key: &PrivateKey) -> Transaction {
     // Transaction's clone copies data but deliberately drops callback templates.
     // Reinstall them during setup so every timed iteration signs all inputs.
     let mut tx = unsigned.clone();
-    for input in &mut tx.inputs {
+    for input in tx.inputs_mut() {
         input.unlocking_script_template =
             Some(Box::new(P2PKH::unlock(key, SignOutputs::All, false)));
     }
@@ -29,8 +29,8 @@ fn bench(c: &mut Criterion) {
     let mut source = Transaction::new();
     let mut input = TransactionInput::new("aa".repeat(32), 0);
     input.unlocking_script = Some(UnlockingScript::new());
-    source.inputs.push(input);
-    source.outputs = (0..100)
+    source.inputs_mut().push(input);
+    *source.outputs_mut() = (0..100)
         .map(|_| TransactionOutput::new(1_000, lock.clone()))
         .collect();
     let txid = source.id();
@@ -41,13 +41,13 @@ fn bench(c: &mut Criterion) {
     let mut unsigned = Transaction::new();
     for index in 0..100 {
         unsigned
-            .inputs
+            .inputs_mut()
             .push(TransactionInput::with_source_transaction(
                 source.clone(),
                 index,
             ));
     }
-    unsigned.outputs.push(TransactionOutput::new(
+    unsigned.outputs_mut().push(TransactionOutput::new(
         99_000,
         LockingScript::from_binary(&[0x51]).expect("OP_TRUE"),
     ));
@@ -56,7 +56,7 @@ fn bench(c: &mut Criterion) {
     // Observe the prepared workload outside timing, without asserting a verdict.
     println!(
         "BSV_BENCH_FIXTURE transaction_sign_verify inputs={} verify={:?}",
-        signed.inputs.len(),
+        signed.inputs().len(),
         futures::executor::block_on(signed.verify(&tracker, None, None))
     );
     let mut group = c.benchmark_group("transaction_sign_verify");

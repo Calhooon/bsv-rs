@@ -91,7 +91,7 @@ fn build(v: &Value, case: &Value) -> Beef {
                 // `findTxid(..).tx.lockTime` (#798's second fold).
                 let (name, lock_time) = name.split_once('=').unwrap();
                 let lock_time = lock_time.parse().unwrap();
-                beef.edit_tx(&tx(v, name).id(), |t| t.lock_time = lock_time)
+                beef.edit_tx(&tx(v, name).id(), |t| t.set_lock_time(lock_time))
                     .unwrap();
             }
             "index" => {
@@ -336,7 +336,7 @@ fn walk(subject: &Transaction) -> Vec<Value> {
             })
         });
         let linked: Vec<bool> = t
-            .inputs
+            .inputs()
             .iter()
             .map(|i| i.source_transaction.is_some())
             .collect();
@@ -345,7 +345,7 @@ fn walk(subject: &Transaction) -> Vec<Value> {
             "merkle_path": path,
             "inputs_linked": linked,
         }));
-        for input in t.inputs.iter().rev() {
+        for input in t.inputs().iter().rev() {
             if let Some(source) = input.source_transaction.as_deref() {
                 stack.push(source);
             }

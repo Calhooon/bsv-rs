@@ -673,7 +673,7 @@ fn create_test_transaction(id_modifier: u8, source: Option<Transaction>) -> Tran
     let mut tx = Transaction::new();
 
     // Add an output
-    tx.outputs.push(TransactionOutput::new(
+    tx.outputs_mut().push(TransactionOutput::new(
         1000 + id_modifier as u64,
         LockingScript::from_asm("OP_TRUE").unwrap(),
     ));
@@ -682,7 +682,7 @@ fn create_test_transaction(id_modifier: u8, source: Option<Transaction>) -> Tran
     if let Some(source_tx) = source {
         let mut input = TransactionInput::new(source_tx.id(), 0);
         input.source_transaction = Some(Box::new(source_tx));
-        tx.inputs.push(input);
+        tx.inputs_mut().push(input);
     }
 
     tx
@@ -727,7 +727,7 @@ fn test_sync_historian_filtering() {
 
     // Only return values for outputs with value > 1500
     let historian = SyncHistorian::<u64, ()>::new(|tx, output_idx, _ctx| {
-        let output = tx.outputs.get(output_idx as usize)?;
+        let output = tx.outputs().get(output_idx as usize)?;
         let satoshis = output.satoshis?;
         if satoshis > 1500 {
             Some(satoshis)

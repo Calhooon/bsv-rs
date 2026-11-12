@@ -746,13 +746,14 @@ fn the_entries_order_after_a_refusal_is_the_reference_s_817() {
 /// `tx_mut` is written from its fields by every writer, as `to_binary`
 /// (after its refresh) and `merge_beef` write it; `to_writer` wrote the
 /// transaction's cache, stale after the edit, bytes another transaction's.
-/// The state through public calls: X parsed by `Transaction::from_binary`,
-/// `to_binary` called (the cache X's bytes), `lock_time` changed without
-/// `invalidate_caches`, the result assigned through `*tx_mut()`. Calhooon/
-/// bsv-rs#843's break (a `Transaction` that owns its fields) will make that
-/// state unbuildable here; the lasting pin is the unit test through the
-/// crate's cache door, `beef/merge_entry_621_tests.rs`'
-/// `to_writer_writes_a_tx_mut_entry_from_its_fields_not_its_cache_621`.
+/// The state through public calls until #843: X parsed by
+/// `Transaction::from_binary`, `to_binary` called (the cache X's bytes),
+/// `lock_time` changed through the public field without `invalidate_caches`,
+/// the result assigned through `*tx_mut()`. Since #843 the edit goes through
+/// `set_lock_time`, which clears the caches, so the stale state is
+/// unbuildable and the cell pins that the edited bytes are written; the unit
+/// twin is `beef/merge_entry_621_tests.rs`'
+/// `to_writer_writes_a_tx_mut_entry_from_its_fields_843`.
 #[test]
 #[allow(deprecated)]
 fn an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621() {
@@ -763,10 +764,9 @@ fn an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621() 
         f.parent_raw,
         "the cache the parent's bytes"
     );
-    stale.lock_time ^= 1;
+    stale.set_lock_time(stale.lock_time() ^ 1);
     let mut fresh = bsv_rs::transaction::Transaction::from_binary(&f.parent_raw).unwrap();
-    fresh.lock_time ^= 1;
-    fresh.invalidate_caches();
+    fresh.set_lock_time(fresh.lock_time() ^ 1);
     let edited = fresh.to_binary();
     assert_ne!(edited, f.parent_raw, "the edit moves the bytes");
 

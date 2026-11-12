@@ -398,7 +398,7 @@ async fn whole_transaction_charges_the_existing_signature_work_378() {
     let mut tracker = MockChainTracker::new(800_100);
     tracker.add_root(800_000, parent.id());
     let mut tx = Transaction::from_binary(&fixture.raw).unwrap();
-    tx.inputs[0].source_transaction = Some(Box::new(parent));
+    tx.inputs_mut()[0].source_transaction = Some(Box::new(parent));
     let mut spend = fixture.spend(Some(10_000));
     let limit = spend.validate().unwrap_err().resource_limit.unwrap();
     assert_eq!(

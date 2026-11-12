@@ -30,8 +30,8 @@ fn child_of(lock: &[u8], unlock: Script, version: u32) -> Transaction {
     let mut parent = Transaction::new();
     let mut funding = TransactionInput::new("aa".repeat(32), 0);
     funding.unlocking_script = Some(UnlockingScript::new());
-    parent.inputs.push(funding);
-    parent.outputs.push(TransactionOutput::new(
+    parent.inputs_mut().push(funding);
+    parent.outputs_mut().push(TransactionOutput::new(
         1_000,
         LockingScript::from_binary(lock).unwrap(),
     ));
@@ -41,9 +41,9 @@ fn child_of(lock: &[u8], unlock: Script, version: u32) -> Transaction {
     input.unlocking_script = Some(UnlockingScript::from_script(unlock));
     input.source_transaction = Some(Box::new(parent));
     let mut child = Transaction::new();
-    child.version = version;
-    child.inputs.push(input);
-    child.outputs.push(TransactionOutput::new(
+    child.set_version(version);
+    child.inputs_mut().push(input);
+    child.outputs_mut().push(TransactionOutput::new(
         900,
         LockingScript::from_binary(&[0x51]).unwrap(),
     ));

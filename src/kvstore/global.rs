@@ -423,7 +423,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                     };
 
                     // Get the output's locking script
-                    let locking_script = match tx.outputs.get(output.output_index as usize) {
+                    let locking_script = match tx.outputs().get(output.output_index as usize) {
                         Some(out) => &out.locking_script,
                         None => continue,
                     };
@@ -464,7 +464,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                             let token = KVStoreToken::new(
                                 &txid,
                                 output.output_index,
-                                tx.outputs[output.output_index as usize]
+                                tx.outputs()[output.output_index as usize]
                                     .satoshis
                                     .unwrap_or_default(),
                             )
@@ -559,7 +559,7 @@ fn build_entry_history(tx: &Transaction, key: &str, protocol_id: &str) -> Vec<St
     let historian = SyncHistorian::<String, KVStoreContext>::new(
         move |tx: &Transaction, output_idx: u32, ctx: Option<&KVStoreContext>| {
             ctx.and_then(|c| {
-                let output = tx.outputs.get(output_idx as usize)?;
+                let output = tx.outputs().get(output_idx as usize)?;
                 let fields = KVStoreInterpreter::extract_fields(&output.locking_script)?;
                 let field_protocol_id = fields.protocol_id_string()?;
 

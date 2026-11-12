@@ -31,8 +31,8 @@ mod transaction_tests {
     #[test]
     fn test_transaction_from_hex() {
         let tx = Transaction::from_hex(TX_VALID_1).expect("Should parse valid transaction");
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.lock_time, 0);
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.lock_time(), 0);
     }
 
     #[test]
@@ -77,10 +77,10 @@ mod transaction_tests {
     #[test]
     fn test_new_transaction_defaults() {
         let tx = Transaction::new();
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.lock_time, 0);
-        assert!(tx.inputs.is_empty());
-        assert!(tx.outputs.is_empty());
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.lock_time(), 0);
+        assert!(tx.inputs().is_empty());
+        assert!(tx.outputs().is_empty());
     }
 
     // ===================
@@ -445,17 +445,17 @@ mod transaction_tests {
     fn test_large_tx_parses() {
         // Test that our LARGE_TX_HEX (a real coinbase transaction) parses
         let tx = Transaction::from_hex(LARGE_TX_HEX).expect("Should parse large transaction");
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.inputs.len(), 1);
-        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.outputs().len(), 1);
     }
 
     #[test]
     fn test_multi_io_tx_parses() {
         // Test transaction with multiple inputs/outputs
         let tx = Transaction::from_hex(MULTI_IO_TX_HEX).expect("Should parse multi-IO transaction");
-        assert_eq!(tx.inputs.len(), 2);
-        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.inputs().len(), 2);
+        assert_eq!(tx.outputs().len(), 2);
         assert_eq!(tx.id(), MULTI_IO_TX_TXID);
     }
 
@@ -488,7 +488,7 @@ mod transaction_tests {
         let input = TransactionInput::new("a".repeat(64), 0);
 
         assert!(tx.add_input(input).is_ok());
-        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.inputs().len(), 1);
     }
 
     #[test]
@@ -497,7 +497,7 @@ mod transaction_tests {
         let output = TransactionOutput::new(100_000, LockingScript::new());
 
         assert!(tx.add_output(output).is_ok());
-        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs().len(), 1);
     }
 
     #[test]
@@ -506,8 +506,8 @@ mod transaction_tests {
         let output = TransactionOutput::new_change(LockingScript::new());
 
         assert!(tx.add_output(output).is_ok());
-        assert_eq!(tx.outputs.len(), 1);
-        assert!(tx.outputs[0].change);
+        assert_eq!(tx.outputs().len(), 1);
+        assert!(tx.outputs()[0].change);
     }
 
     #[test]
@@ -528,7 +528,7 @@ mod transaction_tests {
 
         fn create_test_transaction(n: u32) -> Transaction {
             let mut tx = Transaction::new();
-            tx.version = n;
+            tx.set_version(n);
             tx.add_output(TransactionOutput::new(1000, LockingScript::new()))
                 .unwrap();
             tx
@@ -837,7 +837,7 @@ mod transaction_tests {
         /// Creates a test transaction with a unique version number
         fn create_test_tx(version: u32) -> Transaction {
             let mut tx = Transaction::new();
-            tx.version = version;
+            tx.set_version(version);
             tx.add_output(TransactionOutput::new(1000, LockingScript::new()))
                 .unwrap();
             tx
@@ -1041,7 +1041,7 @@ mod transaction_tests {
             // Create diamond: A (with 2 outputs) -> B (from output 0), A -> C (from output 1), B -> D, C -> D
             // D should only include A once despite A being ancestor of both B and C
             let mut a = Transaction::new();
-            a.version = 1;
+            a.set_version(1);
             a.merkle_path = Some(MerklePath::from_coinbase_txid(&"a".repeat(64), 100));
             // A needs two outputs so B and C can each spend different ones
             a.add_output(TransactionOutput::new(1000, LockingScript::new()))
@@ -1568,7 +1568,7 @@ mod transaction_tests {
 
             // Verify change is not yet computed
             assert!(
-                spend_tx.outputs[1].satoshis.is_none(),
+                spend_tx.outputs()[1].satoshis.is_none(),
                 "Change output should not have satoshis before fee()"
             );
 
@@ -1580,11 +1580,11 @@ mod transaction_tests {
 
             // Verify change is now computed
             assert!(
-                spend_tx.outputs[1].satoshis.is_some(),
+                spend_tx.outputs()[1].satoshis.is_some(),
                 "Change output should have satoshis after fee()"
             );
 
-            let _change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let _change_sats = spend_tx.outputs()[1].satoshis.unwrap();
             let total_out = spend_tx.total_output_satoshis();
             // change = 100,000 - 1,000 - fee; total_out = 1,000 + change
             // total_out + fee should equal 100,000
@@ -1605,7 +1605,7 @@ mod transaction_tests {
             spend_tx.sign().await.expect("sign() should work");
 
             // Verify unlocking scripts are set
-            for (i, input) in spend_tx.inputs.iter().enumerate() {
+            for (i, input) in spend_tx.inputs().iter().enumerate() {
                 assert!(
                     input.unlocking_script.is_some(),
                     "Input {} should have unlocking_script after sign()",
@@ -1826,7 +1826,7 @@ mod transaction_tests {
                 .expect("fee() should work");
 
             // 4000 in - 1000 out - 1033 fee = 1967 change
-            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let change_sats = spend_tx.outputs()[1].satoshis.unwrap();
             assert_eq!(
                 change_sats, 1967,
                 "Change should be 4000 - 1000 - 1033 = 1967"
@@ -1917,13 +1917,13 @@ mod transaction_tests {
 
             let mut input = TransactionInput::new("a".repeat(64), 0);
             input.unlocking_script = Some(unlocking_script);
-            tx.inputs.push(input);
+            tx.inputs_mut().push(input);
 
             // Create output with padded locking script
             let output_script_data = vec![0u8; output_script_len];
             let locking_script = LockingScript::from_binary(&output_script_data)
                 .unwrap_or_else(|_| LockingScript::new());
-            tx.outputs
+            tx.outputs_mut()
                 .push(TransactionOutput::new(1000, locking_script));
 
             tx
@@ -2084,8 +2084,8 @@ mod transaction_tests {
 
             // Verify invariant: input = payment + change + fee
             let input_sats: u64 = 100_000;
-            let payment_sats = spend_tx.outputs[0].satoshis.unwrap();
-            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let payment_sats = spend_tx.outputs()[0].satoshis.unwrap();
+            let change_sats = spend_tx.outputs()[1].satoshis.unwrap();
             let total_out = payment_sats + change_sats;
             let implied_fee = input_sats - total_out;
 
@@ -2148,7 +2148,7 @@ mod transaction_tests {
                 .await
                 .expect("fee() should work");
 
-            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let change_sats = spend_tx.outputs()[1].satoshis.unwrap();
             // 100,000 - 1,000 - 500 = 98,500
             assert_eq!(
                 change_sats, 98_500,
@@ -2172,10 +2172,10 @@ mod transaction_tests {
 
             // Add input with no template and no unlocking script
             let input = TransactionInput::new("a".repeat(64), 0);
-            tx.inputs.push(input);
+            tx.inputs_mut().push(input);
 
             // Add output with amount (so sign() doesn't fail on "missing amount")
-            tx.outputs
+            tx.outputs_mut()
                 .push(TransactionOutput::new(1000, LockingScript::new()));
 
             // sign() should succeed but produce no unlocking script for the template-less input
@@ -2189,7 +2189,7 @@ mod transaction_tests {
                 "sign() should not error for template-less inputs"
             );
             assert!(
-                tx.inputs[0].unlocking_script.is_none(),
+                tx.inputs()[0].unlocking_script.is_none(),
                 "Input without template should still have no unlocking script after sign()"
             );
         }
@@ -2201,8 +2201,8 @@ mod transaction_tests {
 
             let mut tx = Transaction::new();
             let input = TransactionInput::new("a".repeat(64), 0);
-            tx.inputs.push(input);
-            tx.outputs
+            tx.inputs_mut().push(input);
+            tx.outputs_mut()
                 .push(TransactionOutput::new(1000, LockingScript::new()));
 
             let fee_model = SatoshisPerKilobyte::new(100);
@@ -2401,7 +2401,7 @@ mod transaction_tests {
             // Verify change outputs have no satoshis before fee()
             for i in 1..=3 {
                 assert!(
-                    spend_tx.outputs[i].satoshis.is_none(),
+                    spend_tx.outputs()[i].satoshis.is_none(),
                     "Change output {} should not have satoshis before fee()",
                     i
                 );
@@ -2416,7 +2416,7 @@ mod transaction_tests {
             // Verify all change outputs now have satoshis
             for i in 1..=3 {
                 assert!(
-                    spend_tx.outputs[i].satoshis.is_some(),
+                    spend_tx.outputs()[i].satoshis.is_some(),
                     "Change output {} should have satoshis after fee()",
                     i
                 );
@@ -2424,7 +2424,7 @@ mod transaction_tests {
 
             // Gather the 3 change amounts
             let change_amounts: Vec<u64> = (1..=3)
-                .map(|i| spend_tx.outputs[i].satoshis.unwrap())
+                .map(|i| spend_tx.outputs()[i].satoshis.unwrap())
                 .collect();
 
             // The reference's equal arm (`Transaction.ts:886-892` at ts-stack@edf6e03,
@@ -2497,10 +2497,10 @@ mod transaction_tests {
             // Link the parent as source_transaction on the child's input
             // The child's input references the parent's output
             assert!(
-                !child_tx.inputs.is_empty(),
+                !child_tx.inputs().is_empty(),
                 "Child tx should have at least one input"
             );
-            child_tx.inputs[0].source_transaction = Some(Box::new(parent_tx));
+            child_tx.inputs_mut()[0].source_transaction = Some(Box::new(parent_tx));
 
             // Convert to EF hex
             let ef_hex = child_tx.to_hex_ef().expect("Should serialize to EF hex");
@@ -2558,7 +2558,7 @@ mod transaction_tests {
             // Input 1: no template (add manually without template)
             let input_no_template = TransactionInput::with_source_transaction(source_tx, 1);
             // Do NOT set unlocking_script_template
-            spend_tx.inputs.push(input_no_template);
+            spend_tx.inputs_mut().push(input_no_template);
 
             // Add output
             spend_tx
@@ -2575,13 +2575,13 @@ mod transaction_tests {
 
             // Input 0 should have an unlocking script
             assert!(
-                spend_tx.inputs[0].unlocking_script.is_some(),
+                spend_tx.inputs()[0].unlocking_script.is_some(),
                 "Input 0 (with template) should have unlocking script after sign()"
             );
 
             // Input 1 should NOT have an unlocking script
             assert!(
-                spend_tx.inputs[1].unlocking_script.is_none(),
+                spend_tx.inputs()[1].unlocking_script.is_none(),
                 "Input 1 (without template) should still lack unlocking script after sign()"
             );
         }

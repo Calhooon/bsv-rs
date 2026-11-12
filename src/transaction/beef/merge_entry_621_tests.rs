@@ -59,16 +59,16 @@ fn merge_beef_keeps_the_source_entrys_txid_621() {
     assert_eq!(merged.txs.len(), 1);
 }
 
-/// The strength read's FIX (#621's fold): an entry whose id is read inside
-/// the `tx_mut` borrow, a field then edited, and given bytes by
-/// `raw_tx_or_compute` holds the stale pre-edit serialization (the cache the
-/// id filled), no txid, and a `txid()` that hashes the edited fields. On
-/// `abbda405` `merge_beef` filed those bytes under that `txid()`, so the
-/// merged entry's bytes did not hash to the txid it was filed under; the
-/// merge hashes the bytes of an entry that holds no txid.
+/// The strength read's FIX (#621's fold), restated under #843's law: an
+/// entry whose id is read inside the `tx_mut` borrow, a field then edited,
+/// and given bytes by `raw_tx_or_compute`. Until #843 those bytes were the
+/// stale pre-edit serialization (the cache the id filled) and `merge_beef`
+/// filed them under the edited `txid()` (`abbda405`); since #843 the edit
+/// clears the transaction's caches at its door, so the bytes are the edited
+/// fields' and the merged entry's bytes hash to the txid it is filed under.
 #[test]
-#[allow(deprecated)] // the stale cache is a state of the deprecated `tx_mut` alone
-fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
+#[allow(deprecated)] // the edit inside the deprecated `tx_mut` borrow
+fn an_entry_edited_inside_tx_mut_is_filed_under_its_fields_hash_843() {
     let bytes = raw();
     let old = hash_of(&bytes);
     let mut source = Beef::new();
@@ -78,14 +78,17 @@ fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
     let entry = source.find_txid_mut(&old).unwrap();
     {
         let tx = entry.tx_mut().unwrap();
-        // The id read inside the borrow fills the serialization cache.
+        // The id read inside the borrow fills the caches; the edit clears them.
         assert_eq!(tx.id(), old);
-        tx.lock_time = 7;
+        tx.set_lock_time(7);
     }
-    let stale = entry.raw_tx_or_compute().unwrap();
-    assert_eq!(stale, bytes, "the stale serialization cached");
+    let written = entry.raw_tx_or_compute().unwrap();
+    assert_ne!(
+        written, bytes,
+        "the edited fields' serialization, never the stale one"
+    );
     assert!(entry.held_txid().is_none());
-    assert_ne!(entry.txid(), old, "txid() hashes the edited fields");
+    assert_eq!(entry.txid(), hash_of(&written), "txid() is the bytes' hash");
 
     let mut merged = Beef::new();
     merged
@@ -99,35 +102,35 @@ fn a_stale_cached_entry_is_filed_under_its_bytes_hash_621() {
             "the merged entry's bytes hash to the txid it is filed under"
         );
     }
-    assert!(merged.find_txid(&old).is_some());
+    assert!(merged.find_txid(&old).is_none());
+    assert!(merged.find_txid(&hash_of(&written)).is_some());
 }
 
-/// #621's fold, the `to_writer` change's lasting pin (Calhooon/bsv-rs#843's
-/// break will make the public stale state unbuildable): an entry edited
-/// through the deprecated `tx_mut` whose transaction caches bytes other
-/// than its fields' (here the bytes before the edit, set through the crate's
-/// cache door) is written from its fields by `Beef::to_writer` and
+/// #621's fold, the `to_writer` change's pin, restated under #843's law:
+/// an entry edited through the deprecated `tx_mut` after its caches were
+/// filled is written from its fields by `Beef::to_writer` and
 /// `BeefTx::to_writer`, as `to_binary` and `merge_beef` write it. On
-/// `7df16cf6` `to_writer` wrote the cache.
+/// `7df16cf6` `to_writer` wrote a stale cache (planted here through the
+/// crate's test door until #843; since #843 a door clears the caches before
+/// every edit, so the cache is the fields' whatever the order).
 #[test]
-#[allow(deprecated)] // the stale cache is a state of the deprecated `tx_mut` alone
-fn to_writer_writes_a_tx_mut_entry_from_its_fields_not_its_cache_621() {
+#[allow(deprecated)] // the edit inside the deprecated `tx_mut` borrow
+fn to_writer_writes_a_tx_mut_entry_from_its_fields_843() {
     use crate::primitives::Writer;
     use crate::transaction::BEEF_V2;
     let bytes = raw();
     let mut edited = Transaction::from_binary(&bytes).unwrap();
-    edited.lock_time = 7;
-    let fields = {
-        let fresh = edited.clone();
-        fresh.invalidate_caches();
-        fresh.to_binary()
-    };
+    edited.set_lock_time(7);
+    let fields = edited.to_binary();
     assert_ne!(fields, bytes);
-    let stale = edited.with_cached_bytes_for_test(bytes.clone());
 
     let mut beef = Beef::new();
-    beef.merge_raw_tx(bytes, None).unwrap();
-    *beef.txs[0].tx_mut().unwrap() = stale;
+    beef.merge_raw_tx(bytes.clone(), None).unwrap();
+    {
+        let tx = beef.txs[0].tx_mut().unwrap();
+        assert_eq!(tx.to_binary(), bytes, "the caches filled before the edit");
+        tx.set_lock_time(7);
+    }
 
     let mut entry = Writer::new();
     beef.txs[0].to_writer(&mut entry, BEEF_V2).unwrap();

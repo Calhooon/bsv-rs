@@ -118,11 +118,11 @@ impl SigningProtocol {
         index: usize,
         originator: Option<&str>,
     ) -> Result<Vec<u8>> {
-        let input = &tx.inputs[index];
+        let input = &tx.inputs()[index];
         let source = input
             .source_transaction
             .as_ref()
-            .and_then(|tx| tx.outputs.get(input.source_output_index as usize))
+            .and_then(|tx| tx.outputs().get(input.source_output_index as usize))
             .ok_or_else(|| {
                 Error::KvStoreError(
                     "Wallet signable transaction omitted an input source output".into(),

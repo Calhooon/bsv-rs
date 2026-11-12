@@ -519,9 +519,9 @@ fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
         for i in 0..INPUTS {
             let mut input = TransactionInput::new(format!("{:064x}", t * INPUTS + i + 1), 0);
             input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
-            tx.inputs.push(input);
+            tx.inputs_mut().push(input);
         }
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             1,
             LockingScript::from_binary(&[0x51]).unwrap(),
         ));

@@ -76,10 +76,10 @@ impl SatoshisPerKilobyte {
         let mut size = 4; // version
 
         // Input count varint
-        size += varint_size(tx.inputs.len());
+        size += varint_size(tx.inputs().len());
 
         // Process inputs
-        for (i, input) in tx.inputs.iter().enumerate() {
+        for (i, input) in tx.inputs().iter().enumerate() {
             size += 40; // txid (32) + output index (4) + sequence number (4)
 
             let script_len = match (&input.unlocking_script, &input.unlocking_script_template) {
@@ -98,10 +98,10 @@ impl SatoshisPerKilobyte {
         }
 
         // Output count varint
-        size += varint_size(tx.outputs.len());
+        size += varint_size(tx.outputs().len());
 
         // Process outputs
-        for output in &tx.outputs {
+        for output in tx.outputs() {
             size += 8; // satoshis
             let script_len = output.locking_script.to_binary().len();
             size += varint_size(script_len); // script length

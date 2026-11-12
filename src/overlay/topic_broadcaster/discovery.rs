@@ -110,7 +110,7 @@ fn admitted(topics: &[String], output: &OutputListItem) -> Option<(String, Strin
             return None;
         }
     }
-    let selected = tx.outputs.get(output.output_index as usize)?;
+    let selected = tx.outputs().get(output.output_index as usize)?;
     if selected.satoshis != Some(1) {
         return None;
     }

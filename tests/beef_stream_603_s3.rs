@@ -102,10 +102,10 @@ fn raw_tx(inputs: &[(Hash32, u32)], n_out: usize) -> Vec<u8> {
     for (prev, vout) in inputs {
         let mut input = TransactionInput::new(display(prev), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
-        tx.inputs.push(input);
+        tx.inputs_mut().push(input);
     }
     for _ in 0..n_out {
-        tx.outputs
+        tx.outputs_mut()
             .push(TransactionOutput::new(1, LockingScript::new()));
     }
     tx.to_binary()

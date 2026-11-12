@@ -251,7 +251,7 @@ fn signed_two_input_spend() -> (Vec<u8>, Vec<(u64, LockingScript)>) {
             .unwrap();
     }
     let coins: Vec<(u64, LockingScript)> = funding
-        .outputs
+        .outputs()
         .iter()
         .map(|o| (o.satoshis.unwrap(), o.locking_script.clone()))
         .collect();

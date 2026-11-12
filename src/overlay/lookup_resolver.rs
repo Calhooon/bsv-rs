@@ -335,7 +335,7 @@ impl LookupResolver {
         // The output at the index, admitted only at exactly 1 satoshi
         // (`LookupResolver.ts:2202-2203`, #786): any other value skips it.
         let selected = tx
-            .outputs
+            .outputs()
             .get(output.output_index as usize)
             .ok_or_else(|| Error::OverlayError("Output index out of bounds".into()))?;
         if selected.satoshis != Some(1) {

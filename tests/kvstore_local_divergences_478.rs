@@ -122,13 +122,12 @@ async fn local_outpoint_requires_one_matching_token_at_its_actual_index_478() {
         let mut tx = Transaction::from_atomic_beef(&bytes).unwrap();
         // The ordered boundary binds a one-satoshi request at zero. A later
         // copy of that token must still cause the completed search to refuse.
-        tx.outputs.swap(0, 1);
+        tx.outputs_mut().swap(0, 1);
         match outcome {
-            "two" => tx.add_output(tx.outputs[0].clone()).unwrap(),
-            "none" => tx.outputs[0].satoshis = Some(2),
+            "two" => tx.add_output(tx.outputs()[0].clone()).unwrap(),
+            "none" => tx.outputs_mut()[0].satoshis = Some(2),
             _ => {}
         }
-        tx.invalidate_caches();
         let mut wallet = Counting::of_scalar(9);
         *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
             total_outputs: 0,

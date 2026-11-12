@@ -101,7 +101,7 @@ impl KVStoreInterpreter {
         output_index: u32,
         ctx: Option<&KVStoreContext>,
     ) -> Option<KVStoreEntry> {
-        let output = tx.outputs.get(output_index as usize)?;
+        let output = tx.outputs().get(output_index as usize)?;
         Self::interpret_script(&output.locking_script, ctx)
     }
 

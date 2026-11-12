@@ -232,15 +232,15 @@ fn sources<'a>(
     tx: &Transaction,
     by_txid: &HashMap<String, &'a Transaction>,
 ) -> Result<(Vec<Source<'a>>, u64)> {
-    let mut sources = Vec::with_capacity(tx.inputs.len());
+    let mut sources = Vec::with_capacity(tx.inputs().len());
     let mut total = 0u64;
-    for (vin, input) in tx.inputs.iter().enumerate() {
+    for (vin, input) in tx.inputs().iter().enumerate() {
         let missing = || Error::TransactionError(format!("Input {vin} has no source transaction"));
         let txid = input.get_source_txid().map_err(|_| missing())?;
         let source = by_txid.get(&txid).copied().ok_or_else(missing)?;
         refuse_no_transaction(source, &txid)?;
         let output = source
-            .outputs
+            .outputs()
             .get(input.source_output_index as usize)
             .ok_or_else(|| {
                 Error::TransactionError(format!("Input {vin} source output index out of bounds"))
@@ -266,7 +266,7 @@ impl Evaluation<'_> {
         queue: &mut Vec<String>,
     ) -> Result<bool> {
         let (sources, input_total) = sources(tx, by_txid)?;
-        let output_total = tx.outputs.iter().try_fold(0u64, |total, output| {
+        let output_total = tx.outputs().iter().try_fold(0u64, |total, output| {
             total
                 .checked_add(output.satoshis.unwrap_or(0))
                 .ok_or_else(overflow)
@@ -312,7 +312,7 @@ impl Evaluation<'_> {
                     })
             })
             .transpose()?;
-        let unlocking = tx.inputs[vin].unlocking_script.as_ref().ok_or_else(|| {
+        let unlocking = tx.inputs()[vin].unlocking_script.as_ref().ok_or_else(|| {
             Error::TransactionError(format!("Input {vin} is missing unlocking script"))
         })?;
         let rules = InputRules::for_verifier(flags, self.memory_limit, self.work.input_limit());

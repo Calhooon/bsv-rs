@@ -315,7 +315,7 @@ fn the_version_bytes_read_unsigned_as_the_reference_reads_them_418() {
     assert_eq!(r.reads.len(), 2);
     for read in &r.reads {
         let tx = Transaction::from_hex(&read.hex).unwrap();
-        assert_eq!(tx.version, read.version, "{}", read.bytes);
+        assert_eq!(tx.version(), read.version, "{}", read.bytes);
         assert_eq!(tx.to_hex(), read.hex);
     }
 }
@@ -360,7 +360,7 @@ fn chronicle_child(version: u32) -> Result<bool, String> {
     // `to_binary` caches its bytes, so each form is built afresh.
     let build = |unlocking: UnlockingScript| {
         let mut child = Transaction::new();
-        child.version = version;
+        child.set_version(version);
         let mut input = TransactionInput::with_source_transaction(source.clone(), 0);
         input.set_unlocking_script(unlocking);
         child.add_input(input).unwrap();
@@ -381,26 +381,26 @@ fn chronicle_child(version: u32) -> Result<bool, String> {
 
     // Written and read back: the four bytes, the same number.
     let mut read = Transaction::from_binary(&child.to_binary()).unwrap();
-    assert_eq!(read.version, version);
+    assert_eq!(read.version(), version);
     assert_eq!(read.to_binary()[..4], version.to_le_bytes());
-    read.inputs[0].source_transaction = Some(Box::new(source));
+    read.inputs_mut()[0].source_transaction = Some(Box::new(source));
 
     // The direct Spend beside it, the version's bits in the `i32` parameter.
     let direct = Spend::new(SpendParams {
-        source_txid: read.inputs[0].get_source_txid_bytes().unwrap(),
+        source_txid: read.inputs()[0].get_source_txid_bytes().unwrap(),
         source_output_index: 0,
         source_satoshis: 1_000,
         locking_script: lock.clone(),
-        transaction_version: read.version as i32,
+        transaction_version: read.version() as i32,
         other_inputs: vec![],
         outputs: vec![bsv_rs::primitives::bsv::sighash::TxOutput {
             satoshis: 900,
             script: lock.to_binary(),
         }],
         input_index: 0,
-        unlocking_script: read.inputs[0].unlocking_script.clone().unwrap(),
-        input_sequence: read.inputs[0].sequence,
-        lock_time: read.lock_time,
+        unlocking_script: read.inputs()[0].unlocking_script.clone().unwrap(),
+        input_sequence: read.inputs()[0].sequence,
+        lock_time: read.lock_time(),
         memory_limit: None,
         work_limit: None,
     })

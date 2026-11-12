@@ -389,11 +389,14 @@ fn mutate_bound_answer(answer: &mut SignableTransaction, mode: &str) {
     }
     let mut tx = Transaction::from_atomic_beef(&answer.tx).unwrap();
     match mode {
-        "version" | "version_before_input" => tx.version = 2,
-        "lock_time" => tx.lock_time = 1,
-        "sequence" => tx.inputs[0].sequence = 0,
-        "duplicate_input" => tx.inputs.push(tx.inputs[0].clone()),
-        "output" => tx.outputs[0].satoshis = Some(0),
+        "version" | "version_before_input" => tx.set_version(2),
+        "lock_time" => tx.set_lock_time(1),
+        "sequence" => tx.inputs_mut()[0].sequence = 0,
+        "duplicate_input" => {
+            let first = tx.inputs()[0].clone();
+            tx.inputs_mut().push(first)
+        }
+        "output" => tx.outputs_mut()[0].satoshis = Some(0),
         "inflation" | "unrequested_output" => {
             let value = if mode == "inflation" { 2 } else { 1 };
             tx.add_output(TransactionOutput::new(
@@ -405,9 +408,8 @@ fn mutate_bound_answer(answer: &mut SignableTransaction, mode: &str) {
         _ => {}
     }
     if mode == "missing_input" || mode == "version_before_input" {
-        tx.inputs[0].source_output_index = 1;
+        tx.inputs_mut()[0].source_output_index = 1;
     }
-    tx.invalidate_caches();
     answer.tx = tx.to_atomic_beef(true).unwrap();
 }
 
@@ -418,23 +420,21 @@ fn bound_sign_answer(
 ) -> SignActionResult {
     let mut tx = Transaction::from_atomic_beef(&pending.tx).unwrap();
     for (index, spend) in &args.spends {
-        tx.inputs[*index as usize].unlocking_script =
+        tx.inputs_mut()[*index as usize].unlocking_script =
             Some(bsv_rs::script::UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
     }
     match mode {
-        "signed_version" => tx.version = 2,
-        "signed_output" => tx.outputs[0].satoshis = Some(0),
+        "signed_version" => tx.set_version(2),
+        "signed_output" => tx.outputs_mut()[0].satoshis = Some(0),
         "signed_script" => {
-            tx.inputs[0].unlocking_script =
+            tx.inputs_mut()[0].unlocking_script =
                 Some(bsv_rs::script::UnlockingScript::from_binary(&[0]).unwrap())
         }
         _ => {}
     }
-    tx.invalidate_caches();
     let id = if mode == "txid_mismatch" {
         let mut other = tx.clone();
-        other.lock_time += 1;
-        other.invalidate_caches();
+        other.set_lock_time(other.lock_time() + 1);
         other.id()
     } else {
         tx.id()

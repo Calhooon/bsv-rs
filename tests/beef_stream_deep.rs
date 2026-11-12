@@ -57,10 +57,10 @@ fn spend(spends: &[(String, u32)], outputs: usize) -> Transaction {
     for (txid, vout) in spends {
         let mut input = TransactionInput::new(txid.clone(), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
-        tx.inputs.push(input);
+        tx.inputs_mut().push(input);
     }
     for _ in 0..outputs {
-        tx.outputs
+        tx.outputs_mut()
             .push(TransactionOutput::new(beef_chain::SATS, op_true()));
     }
     tx

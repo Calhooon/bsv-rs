@@ -324,7 +324,7 @@ fn assert_amount_as_recorded(name: &str, amount: u64, reference_refuses: bool) {
         }
         assert_eq!(answer["ok"], true, "{reader} {name}");
         let tx = got.unwrap_or_else(|e| panic!("{reader} {name}: {e}"));
-        assert_eq!(tx.outputs[0].satoshis, Some(amount), "{reader} {name}");
+        assert_eq!(tx.outputs()[0].satoshis, Some(amount), "{reader} {name}");
         assert_eq!(tx.id(), id_of(&bytes), "{reader} {name}");
         assert_eq!(tx.id(), answer["id"].as_str().unwrap(), "{reader} {name}");
         assert_eq!(tx.to_hex(), input, "{reader} {name}");

@@ -550,7 +550,7 @@ async fn an_identity_revocation_signature_verifies_under_the_node_word() {
     let serial = vector["certificate"]["serialNumber"].as_str().unwrap();
     let beef = bsv_rs::primitives::from_hex(vector["revocation"]["lookup_beef"].as_str().unwrap())
         .unwrap();
-    let lock = Transaction::from_beef(&beef, None).unwrap().outputs[0]
+    let lock = Transaction::from_beef(&beef, None).unwrap().outputs()[0]
         .locking_script
         .clone();
     let source = source_transaction(&lock);
