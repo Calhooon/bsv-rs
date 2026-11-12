@@ -26,6 +26,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Two forms of tag and no other (RELEASING.md step 14): vX.Y.Z, cut from main, and
+      # vX.Y.Z-beta.N, cut from beta. Any other prerelease identifier (-rc.1, -alpha) or a build
+      # suffix (+1) is refused here, before anything is published, so every prerelease page
+      # front_pages.py makes is beta's (the captain's ruling T7 of 2026-11-11)
+      - name: The tag is one of the two forms
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-beta\.(0|[1-9][0-9]*))?$ ]]; then
+            echo "tag ${GITHUB_REF_NAME}: one of the two forms"
+          else
+            echo "::error::tag ${GITHUB_REF_NAME} is neither vX.Y.Z (cut from main) nor vX.Y.Z-beta.N (cut from beta); no other form is released"
+            exit 1
+          fi
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
@@ -38,6 +51,22 @@ jobs:
           echo "tag ${GITHUB_REF_NAME}, Cargo.toml ${version}"
           if [ "$tag" != "$version" ]; then
             echo "::error::tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${version}"
+            exit 1
+          fi
+
+      # The Release page is generated from the tag's own section (front_pages.py notes), so a
+      # tag whose CHANGELOG.md has no `## [X.Y.Z]` heading, or whose section is empty, is
+      # refused here, before anything is published: the page job would otherwise fail after the
+      # crate is on crates.io
+      - name: The tag's changelog has its section
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -qE "^## \[${version//./\\.}\]( |$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${version}]' heading; the Release page is made from that section"
+            exit 1
+          fi
+          if ! awk -v head="## [${version}]" 'index($0, head) == 1 && (length($0) == length(head) || substr($0, length(head) + 1, 1) == " ") { on = 1; next } on && /^## \[/ { exit } on && NF { found = 1 } END { exit !found }' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md's '## [${version}]' section is empty; the Release page is made from that section"
             exit 1
           fi
 
@@ -137,3 +166,94 @@ jobs:
         run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  # The GitHub Release page, made in the run that publishes (D7 of the design reads of
+  # 2026-11-11; RELEASING.md step 5): its notes generated from the tag's CHANGELOG.md section,
+  # the hand-written docs/releases/<X.Y.Z>.md when the tag has one, the PUBLISHED advisories
+  # and this run's jobs and logs (front_pages.py notes). Write access is this job's alone;
+  # actions: read and checks: read let it read this run's jobs and logs. A prerelease is
+  # marked so and never Latest; a stable tag takes Latest only when it is the highest stable
+  # version (a back-patch must not take the mark; front_pages.py flags). A page that exists
+  # (thirteen were made by hand on 2026-11-11, or a run's earlier attempt) is edited, never
+  # created twice, so "Re-run failed jobs" heals a red page job.
+  page:
+    name: Release page
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The page script's tests
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_front_pages.py'
+
+      # every "not recorded" line of the notes is also a warning of the run, so a figure the
+      # script could not read is seen in the run's summary and not only on the page
+      - name: The notes, from the tag's changelog and this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -B .github/scripts/front_pages.py notes "$GITHUB_REF_NAME" --run "$GITHUB_RUN_ID" > "$RUNNER_TEMP/notes.md"
+          { grep -F 'not recorded' "$RUNNER_TEMP/notes.md" || true; } | sed 's/^/::warning::/'
+          # hand notes are optional: a security patch's cannot be public before its fix, so the
+          # page goes out without them and the sitting rebuilds it after the advisory is
+          # published (RELEASING.md step 23 (f)); said once, the step goes on
+          if [ ! -f "docs/releases/${GITHUB_REF_NAME#v}.md" ]; then
+            echo "::warning::${GITHUB_REF_NAME} has no docs/releases/${GITHUB_REF_NAME#v}.md: the page carries the generated notes alone (RELEASING.md step 23 (f))"
+          fi
+
+      # The flags are read into a variable on a line of their own: under `set -e` a failing
+      # `flags` (crates.io unreachable) stops the step there. Read inside a here-string of a
+      # command substitution its failure is lost, the page goes out with no mark and GitHub's
+      # default makes it Latest, a back-patch included (the strength read of 2026-11-11, run
+      # under bash -e).
+      - name: Make or edit the Release page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          marks="$(python3 -B .github/scripts/front_pages.py flags "$GITHUB_REF_NAME")"
+          read -r -a flags <<< "$marks"
+          title="bsv-rs ${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "gh release edit ${GITHUB_REF_NAME} ${marks}"
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$title" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+          else
+            echo "gh release create ${GITHUB_REF_NAME} ${marks}"
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$title" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+          fi
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName,isPrerelease,url
+
+  # The reconciler (D9): red when a front page disagrees with what was published (crates.io,
+  # GitHub's Latest and the newest stable tag; a page for every version crates.io serves, five
+  # untagged old versions named and tolerated; docs.rs; the rendered README; SECURITY.md on
+  # both lines; the About fields; every page inside a published advisory's range, and every
+  # page of a version that fixes one, naming it). It waits up to an hour for what time heals
+  # (docs.rs's build, crates.io's index), never for a permanent miss; when only such
+  # failures are left after the wait it ends with a warning naming them and exits 0, a
+  # release that published not being red for the clock (front-pages.yml checks again later).
+  # Also dispatched by front-pages.yml at an advisory sitting; never scheduled.
+  front-pages:
+    name: Front pages agree
+    needs: page
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The front pages agree with what was published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/scripts/front_pages.py check --wait 3600

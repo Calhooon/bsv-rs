@@ -1,40 +1,37 @@
 # bsv-rs
 
 [![CI](https://github.com/Calhooon/bsv-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Calhooon/bsv-rs/actions/workflows/ci.yml?query=branch%3Amain)
-[![Bench](https://github.com/Calhooon/bsv-rs/actions/workflows/bench.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/bench.yml)
-[![MSRV](https://github.com/Calhooon/bsv-rs/actions/workflows/msrv.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/msrv.yml)
-[![Features](https://github.com/Calhooon/bsv-rs/actions/workflows/features.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/features.yml)
-[![Unused dependencies](https://github.com/Calhooon/bsv-rs/actions/workflows/machete.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/machete.yml)
-[![Docs](https://github.com/Calhooon/bsv-rs/actions/workflows/docs.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/docs.yml)
 [![docs.rs](https://docs.rs/bsv-rs/badge.svg)](https://docs.rs/bsv-rs)
+[![MSRV](https://img.shields.io/crates/msrv/bsv-rs.svg)](Cargo.toml)
 
-The programme, measured scoreboard and research queue are in [docs/NORTH-STAR.md](docs/NORTH-STAR.md).
-The module map, the invariants and the test that pins each are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+A Rust SDK for BSV: keys and cryptography, Script and its interpreter, transactions, BEEF and SPV, BRC-100 wallets, BRC-103 authentication and overlay clients, on native targets and `wasm32`. <!-- F1 -->
 
-A Rust SDK for BSV: keys and cryptography, Script, transactions,
-BEEF and SPV, block headers and proof of work, wallets, authentication and
-overlay clients. Optional features support native applications and wasm hosts.
-Compatibility is tested against shared vectors; the crate also has explicit
-local evaluator contracts and documented differences from other SDKs.
+## Why choose it
 
-Every release is a tag `vX.Y.Z` of this repository, published to
-[crates.io](https://crates.io/crates/bsv-rs) and documented on
-[docs.rs](https://docs.rs/bsv-rs); [CHANGELOG.md](CHANGELOG.md) says what each
-release changed. Security advisories are published on this repository's
-[Security tab](https://github.com/Calhooon/bsv-rs/security/advisories) and filed
-with the RustSec advisory database: stay on the newest patch of your line.
-[SECURITY.md](SECURITY.md) says how to report a vulnerability.
+- **Ported from the TypeScript SDK, its corpus counted.** Every one of the 5,116 vectors of the `ts-stack` script evaluation corpus, at a pinned commit, is run or counted under a named reason, and CI fails when the total or a reason's count moves ([tests/conformance_scripts.rs](tests/conformance_scripts.rs)). <!-- F2 -->
+- **Differences are stated.** Where this crate differs from the TypeScript or Go SDK, a row of [the divergence list](CLAUDE.md#known-cross-sdk-divergences-keep-this-list-honest) says so and cites the source it was read against; where the other SDK's behaviour is a defect a peer's input can reach, its maintainers hear of it privately before a new row names it. <!-- F3 -->
+- **Script verdicts checked against a specification.** On `beta` and before every tag cut from it, CI compares the interpreter's verdicts on the 13,765 script entries of 9 corpora, less the pre-Genesis ones it has no word for, with bsv-script-lean, a Lean specification of bitcoin-sv's script interpreter, and a divergence fails the build ([tests/sibling](tests/sibling/CLAUDE.md)). <!-- F4 -->
+- **Malformed input is refused with an `Err`, and the readers are fuzzed.** Parsers bound each allocation by the bytes remaining and return `Err`; 21 fuzz targets run the readers they name ([fuzz/Cargo.toml](fuzz/Cargo.toml)). <!-- F5 -->
+- **One crate for the server and the Worker.** Every pull request that changes code builds the `auth`, `wallet`, `transaction`, `overlay` and `socketio` features for `wasm32-unknown-unknown` ([ci.yml](.github/workflows/ci.yml)). <!-- F6 -->
+- **Breaking changes checked on the stable line, no stored token.** On a pull request into `main` that changes code, `cargo-semver-checks` compares the public API with the last tag and fails a removal the version does not allow; on `beta`, whose versions are prereleases, it judges nothing, as it reads any prerelease step as a major one. [release.yml](.github/workflows/release.yml) publishes through crates.io trusted publishing, and no workflow reads a stored registry token. <!-- F7 -->
+
+## Limits
+
+- `cargo add` takes the latest stable release; the next minor is developed on `beta` and published only as prereleases (`-beta.N`). <!-- F8 -->
+- The interpreter implements the post-Genesis rules alone: the default mode judges every spend by them, and the chain-parameter verifier refuses a pre-Genesis input. <!-- F9 -->
+- Advisories, each naming the versions it affects (published prereleases included), are on the [Security tab](https://github.com/Calhooon/bsv-rs/security/advisories); those published so far were found by the project's own reads, and the crate has had no third-party audit ([SECURITY.md](SECURITY.md)). <!-- F10 -->
+- No performance claim is made yet: the timings in `benches/baseline.json` gate regressions on the machines that recorded them and are compared with nothing else. <!-- F11 -->
+
+## Where to read more
+
+- [Releases](https://github.com/Calhooon/bsv-rs/releases) and [CHANGELOG.md](CHANGELOG.md): what each release changed, with a **Migration** paragraph where a caller must edit code. <!-- F12 -->
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the module map and the test behind each invariant. <!-- F13 -->
 
 ## Install
 
 ```sh
 cargo add bsv-rs --features transaction,wallet
 ```
-
-`cargo add` takes the newest stable release. The 0.9.0 line is in prerelease on
-crates.io (`cargo add bsv-rs@0.9.0-beta.N`), developed on the `beta` branch;
-the published advisories affect its prereleases so far, and the next one
-carries the fixes.
 
 Defaults enable `primitives` and `script`. [Cargo.toml](Cargo.toml) lists the
 module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
@@ -49,7 +46,7 @@ features it needs and enable `wasm`; native HTTP transports are separate:
 message (#152). `WalletClient` and its `WalletInterface` implementation need
 only `wallet`: `WalletClient::with_substrate` wraps an in-process wallet,
 including another client. The named HTTP substrates and automatic discovery
-require `http`. The declared minimum Rust is 1.88 (`rust-version`).
+require `http`. The declared minimum Rust is `Cargo.toml`'s `rust-version`.
 
 ## Authenticated HTTP
 
@@ -62,7 +59,7 @@ payments. Wasm embedders use `auth` with their own transport factory and `wasm`.
 The [#423 entry in the changelog](CHANGELOG.md) records the exact reference
 behavior, including the certificate-request intake limitation.
 
-## The signing digest (0.7.0)
+## The signing digest
 
 `SigningContext::compute_sighash`, the digest every template's `unlock` and
 `Transaction::sign` sign, computes through
@@ -76,12 +73,12 @@ post-Chronicle unlocking script signs. An input index the transaction does not
 have is an `Err`. `SigningContext` gained the public field `script_code`, so a
 struct literal of it adds `script_code: None` (or uses `SigningContext::new`).
 The templates sign FORKID types without CHRONICLE, so their signatures are
-unchanged from 0.6.1. The identity paths
+unchanged from the releases before the dispatch. The identity paths
 `IdentityClient::revoke_certificate_revelation` and the contact update and
 removal of `ContactsManager` now sign the same dispatched digest.
 [tests/sighash_tests.rs](tests/sighash_tests.rs) and
 [tests/identity_spend_witness.rs](tests/identity_spend_witness.rs) pin these;
-the CHANGELOG's 0.7.0 entry names each test.
+the CHANGELOG's entry for the dispatch names each test.
 
 ## Proof and evaluator contracts
 
@@ -166,7 +163,7 @@ every input through the same core (#855;
 
 ## The node's mining checks
 
-From 0.5.0 the streaming reader refuses an unproven transaction that
+The streaming reader refuses an unproven transaction that
 bitcoin-sv refuses when mining it: an unproven coinbase, a null outpoint, a
 repeated input, an output value or running total outside the money range, an
 input total outside it, a P2SH-shaped output after Genesis, an immature
@@ -175,10 +172,11 @@ block. Each byte refusal names its offset and kind. A finality verdict needs a
 tip: `Headers::mining_tip` and the async `ChainTracker::mining_tip` supply a
 `ChainTip`, and without one the reader declines the transaction as
 unverifiable instead of guessing. The new kinds and refusals extend public
-exhaustive enums; [CHANGELOG.md](CHANGELOG.md) carries the 0.5.0 migration
+exhaustive enums; [CHANGELOG.md](CHANGELOG.md) carries the migration
 notes and cites the node's rules through the pins of a separate repository,
 bsv-script-lean (`~/bsv/bsv-script-lean`), which measures this crate against
-its specification of the node; this README states none of its results.
+its specification of the node; the CI job that runs it is the one the
+first screen names.
 
 ## Build, gate and records
 
@@ -191,12 +189,11 @@ cargo fmt --all -- --check
 [.github/workflows/ci.yml](.github/workflows/ci.yml) is the required set and
 the only workflow a push or a pull request starts: the tests, `lint`
 (formatting, clippy, deny and the ratchet as steps), `checks` (vectors, the
-fixtures, the secrets scan, Documentation and the combined wasm32 slice as
+fixtures, the front page, the Release page script's tests, the secrets scan, Documentation and the combined wasm32 slice as
 steps) and the line checks, exactly the contexts the line's protection
 requires; each gate step prints its own `PASS` or `FAIL` line and the job's
 last step names every gate that failed. The checks that judge something other than the commit
-run on dispatch and before every tag, each in its own workflow with its own
-badge above: [bench.yml](.github/workflows/bench.yml) (the benchmark
+run on dispatch and before every tag, each in its own workflow: [bench.yml](.github/workflows/bench.yml) (the benchmark
 build and the scoreboard on tags; regression comparisons on branch dispatches),
 [msrv.yml](.github/workflows/msrv.yml),
 [features.yml](.github/workflows/features.yml) (each feature alone and the

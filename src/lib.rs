@@ -33,6 +33,7 @@
 //! let signature = private_key.sign(&digest).unwrap();
 //! assert!(public_key.verify(&digest, &signature));
 //! ```
+#![cfg_attr(docsrs, feature(doc_cfg))] // docs.rs labels each item with the feature that enables it (Cargo.toml's [package.metadata.docs.rs])
 
 // Error types (shared across modules)
 pub mod error;

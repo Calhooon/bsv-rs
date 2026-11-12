@@ -1,0 +1,5 @@
+[{"id": 21, "name": "CI / checks", "status": "completed", "conclusion": "success"},
+ {"id": 22, "name": "CI / sibling", "status": "completed", "conclusion": "success"},
+ {"id": 23, "name": "CI / Test Suite (ubuntu-latest, stable)", "status": "completed", "conclusion": "success"},
+ {"id": 24, "name": "Features / wasm32 (overlay)", "status": "completed", "conclusion": "failure"},
+ {"id": 25, "name": "CI / dependent (${{ matrix.id }})", "status": "completed", "conclusion": "skipped"}]

@@ -42,7 +42,7 @@ use std::path::PathBuf;
 
 /// `beta`'s required contexts as they will be after the speed cut lands
 /// (docs/lanes/ci-speed-2.md), not a live snapshot: `lint` carries Rustfmt, Clippy, deny and
-/// ratchet, `checks` carries vectors, fixtures, secrets, Documentation and wasm32 (combined),
+/// ratchet, `checks` carries vectors, fixtures, front page, secrets, Documentation and wasm32 (combined),
 /// each a step with its own `PASS`/`FAIL` line; `main-in-beta` stays a job of its own (beta's
 /// alone, on its own events). The twelve before, read 2026-11-02 by
 /// `gh api repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --jq '.contexts'`:
