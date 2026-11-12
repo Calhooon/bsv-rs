@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-11-12
+
 ### Security: a Shamir backup set that carries a share at x = 0 substituted the recovered key for the holder's; both doors now refuse it before interpolating (#854)
 
 - What was wrong. `KeyShares::from_backup_format` and `recover_private_key` checked only that the shares of a set agreed on their threshold and integrity tag, then interpolated whatever x coordinates the set carried. At an x of zero the interpolation answers that share's y — the secret is the polynomial's value at zero, and a share standing there carries it alone — so a set whose zero-x share holds another key recovers that key, its integrity tag agreeing when the tag is that key's own: the recovered key is the one the set names, not the holder's. A set of more shares than the threshold also passed with one share repeated, and the reader took a coordinate at or above the field prime (the prime itself a second spelling of zero), a non-canonical base58 field (a leading `1`) and a field over 64 characters as the same share. Every published version reads this way (`0.2.0`, the crate's first release, through `0.8.6`, released without this fix, and the `0.9.0-beta` line; the fix ships in `0.8.7`).
