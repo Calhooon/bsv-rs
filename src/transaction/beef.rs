@@ -130,6 +130,12 @@ impl Beef {
         self.needs_sort = true;
     }
 
+    /// Holds the entries as they stand for writing, without the dependency
+    /// sort [`to_binary`](Self::to_binary) runs when a BEEF needs one.
+    pub(crate) fn hold_order(&mut self) {
+        self.needs_sort = false;
+    }
+
     /// Rebuilds the txid index.
     fn rebuild_index(&mut self) {
         self.txid_index.clear();
@@ -327,13 +333,8 @@ impl Beef {
         stub
     }
 
-    /// Merges a MerklePath into this BEEF.
-    ///
-    /// If a path with the same block height and root already exists, combines them.
-    ///
-    /// # Returns
-    ///
-    /// The index of the merged bump.
+    /// Merges a MerklePath into this BEEF, combining it with a path of the
+    /// same block height and root, and returns the merged bump's index.
     pub fn merge_bump(&mut self, bump: MerklePath) -> usize {
         // Check for existing bump with same block height and root
         for (i, existing) in self.bumps.iter_mut().enumerate() {
@@ -358,11 +359,9 @@ impl Beef {
         index
     }
 
-    /// Updates bump indices for transactions proven by a bump.
-    /// Only assigns the bump if the txid appears as a flagged leaf (txid=true).
-    /// This prevents a tx from being claimed by a bump where it appears only
-    /// as a sibling hash. Matches TS SDK behavior where the txid flag is
-    /// checked/set during bump index assignment.
+    /// Updates bump indices for transactions proven by a bump, assigning one
+    /// only when the txid appears as a flagged leaf, not a sibling hash, as
+    /// the TS SDK checks the flag during bump index assignment.
     fn update_bump_indices(&mut self, bump_index: usize) {
         let bump = &self.bumps[bump_index];
         for tx in &mut self.txs {
@@ -380,10 +379,9 @@ impl Beef {
         }
     }
 
-    /// Merges a transaction into this BEEF.
-    ///
-    /// If the transaction has a merkle path, it's also merged.
-    /// Replaces any existing transaction with the same txid.
+    /// Merges a transaction into this BEEF, replacing any existing
+    /// transaction with the same txid. If the transaction has a merkle
+    /// path, it's also merged.
     pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx {
         let txid = tx.id();
         self.remove_existing_txid(&txid);
@@ -2765,10 +2763,10 @@ mod merkle_path_reattach_tests {
 }
 
 /// The walks made iterative in 0.3.35 (bsv-stack-lean #57) against their
-/// 0.3.34 recursive and rescanning forms, kept here verbatim as the
-/// reference, on seeded random BEEFs: a DAG of spends with proven roots,
-/// inputs missing from the BEEF, txid-only entries, repeated entries and a
-/// shuffled wire order. Same link shape, same sort, same bytes.
+/// 0.3.34 recursive and rescanning forms, kept here as the reference, on
+/// seeded random BEEFs: a DAG of spends with proven roots, inputs missing
+/// from the BEEF, txid-only entries, repeated entries and a shuffled wire
+/// order. Same link shape, same order since 0.8.8, same bytes.
 #[cfg(test)]
 mod iterative_equivalence_tests {
     use super::*;
@@ -2981,7 +2979,8 @@ mod iterative_equivalence_tests {
         Ok(())
     }
 
-    /// 0.3.34's `to_beef` (V2) and `to_atomic_beef`, over the recursive walk.
+    /// 0.3.34's `to_beef` (V2) and `to_atomic_beef`, over the recursive walk,
+    /// the collected order held since 0.8.8 like the iterative door's.
     fn legacy_to_beef(tx: &Transaction, allow_partial: bool, atomic: bool) -> Result<Vec<u8>> {
         let mut beef = Beef::with_version(BEEF_V2);
         let mut seen_txids: HashSet<String> = HashSet::new();
@@ -3002,6 +3001,7 @@ mod iterative_equivalence_tests {
         for ancestor in ancestors {
             beef.merge_transaction(ancestor);
         }
+        beef.hold_order();
         if atomic {
             beef.to_binary_atomic(&tx.id())
         } else {
