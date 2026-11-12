@@ -141,7 +141,8 @@ stream's `set_work_limit` share one counter for charged work. Neither can interr
 `-maxstackmemoryusageconsensus`, a verdict; `memory_limit` only declines. The flag and resource witnesses live in [tests](./tests).
 
 `SpendingTransaction::from_bytes` reads a spending transaction once (exactly
-one transaction, as `Transaction::from_binary` reads it) and `verify_input`
+one transaction, as the node's deserializer reads it: `Transaction::from_binary`'s
+reader, an output amount any 64-bit value, #874) and `verify_input`
 judges one of its inputs against the locking script and amount of the output
 it spends, the node's consensus-library shape
 (`bitcoinconsensus_verify_script_with_amount`); the one-shot
@@ -152,7 +153,11 @@ mode (`reference_default()`, with `DefaultMode`'s overrides) or a node's word
 bit refused by `ScriptFlags::from_bits` first; `InputRules::under_with` with a
 node operator's own `NodeFigures`); a word takes no override.
 Bytes that are not one transaction, an index past the inputs and an
-unhonorable word are refused before evaluation; the answer is
+unhonorable word are refused before evaluation, and in the default mode a
+transaction holding an amount of 2^53 or more, before the index, in
+`from_binary`'s words. The door is the node's script check and never its
+transaction check: a caller accepting a transaction on its answer still
+applies the node's transaction rules (`CheckRegularTransaction`). The answer is
 `InputVerified { work_spent }` (the work spent, always counted),
 `InputRefusal::Invalid` (a verdict, in the
 interpreter's words) or `InputRefusal::Declined` (a local memory or work
