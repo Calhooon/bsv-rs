@@ -34,7 +34,7 @@ pub use u256::U256;
 // Re-exports for convenience
 pub use bignum::BigNumber;
 pub use drbg::HmacDrbg;
-pub use ec::{PrivateKey, PublicKey, Signature};
+pub use ec::{PrivateKey, PublicKey, SharedSecret, Signature};
 pub use encoding::{
     bounded_capacity, from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes,
     from_var_int, to_base58, to_base58_check, to_base64, to_hex, to_utf8_bytes, to_var_int,

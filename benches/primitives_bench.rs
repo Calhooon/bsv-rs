@@ -270,7 +270,10 @@ fn bench_schnorr(c: &mut Criterion) {
 
     let alice = PrivateKey::random();
     let bob = PrivateKey::random();
-    let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+    let shared = alice
+        .derive_shared_secret(&bob.public_key())
+        .unwrap()
+        .to_point();
 
     // Proof generation
     group.bench_function("Schnorr::generate_proof", |b| {

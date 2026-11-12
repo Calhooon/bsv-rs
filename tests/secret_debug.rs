@@ -6,7 +6,9 @@
 //! and redacts; the public half (a public key, a share's index, a count, a
 //! URL) may be shown. Each door that parses secret material is run on
 //! malformed forms of a real secret, and its error may carry no more than
-//! `WINDOW_BOUND` characters of it.
+//! `WINDOW_BOUND` characters of it. The ECDH shared secret is one such
+//! value since #843d6: every door that derives it returns `SharedSecret`,
+//! never a `PublicKey`, whose `Debug` printed the point.
 //!
 //! Every secret here is derived at run time from a fixed test vector (the
 //! BIP-39 and BIP-32 specifications' entropy and seed, the scalar 2, a
@@ -927,4 +929,98 @@ fn a_malformed_share_is_named_by_its_index_not_echoed() {
         err.to_string(),
         "invalid base58 string: Finite-field point must use a bounded canonical Base58 representation"
     );
+}
+
+// ---------------------------------------------------------------------------
+// The ECDH shared secret (#843d6): every door that derives it returns a type
+// whose `Debug` prints no secret.
+// ---------------------------------------------------------------------------
+
+/// A dependent's struct that derives `Debug` over a shared secret (generic,
+/// so the test reads the same before and after the type changed).
+#[derive(Debug)]
+#[allow(dead_code)] // Read only through Debug.
+struct HeldSecret<T> {
+    shared: T,
+}
+
+/// The texts the shared secret is written in: its compressed hex and x's hex
+/// (either case), and `byte_texts` of the 33 bytes.
+fn shared_secret_texts(compressed: &[u8; 33], x: &[u8; 32]) -> Vec<String> {
+    let mut texts = byte_texts(compressed);
+    texts.push(to_hex(x));
+    texts.push(to_hex(x).to_uppercase());
+    texts
+}
+
+fn assert_no_shared_window(what: &str, outputs: &[String], secrets: &[String]) {
+    for out in outputs {
+        for secret in secrets {
+            assert!(
+                shared_window(out, secret).is_none(),
+                "{what}: Debug carries a run of the shared secret {:?}",
+                shared_window(out, secret)
+            );
+        }
+    }
+}
+
+#[test]
+fn the_ecdh_shared_secret_is_not_printed_by_debug_843d6() {
+    use bsv_rs::wallet::{Counterparty, KeyDeriverApi};
+
+    let alice = door_key();
+    let bob = PrivateKey::from_bytes(&bsv_rs::primitives::sha256(b"tests/secret_debug.rs ecdh"))
+        .expect("a scalar below the order");
+    let deriver = KeyDeriver::new(Some(alice.clone()));
+    let cached = CachedKeyDeriver::new(Some(alice.clone()), None);
+    let other = Counterparty::Other(bob.public_key());
+
+    let doors = [
+        (
+            "PrivateKey::derive_shared_secret",
+            alice.derive_shared_secret(&bob.public_key()).expect("ecdh"),
+        ),
+        (
+            "PublicKey::derive_shared_secret",
+            bob.public_key().derive_shared_secret(&alice).expect("ecdh"),
+        ),
+        (
+            "KeyDeriver::reveal_counterparty_secret",
+            deriver.reveal_counterparty_secret(&other).expect("reveal"),
+        ),
+        (
+            "KeyDeriverApi::reveal_counterparty_secret (KeyDeriver)",
+            KeyDeriverApi::reveal_counterparty_secret(&deriver, &other).expect("reveal"),
+        ),
+        (
+            "KeyDeriverApi::reveal_counterparty_secret (CachedKeyDeriver)",
+            KeyDeriverApi::reveal_counterparty_secret(&cached, &other).expect("reveal"),
+        ),
+    ];
+    let compressed = doors[0].1.to_compressed();
+    let secrets = shared_secret_texts(&compressed, &doors[0].1.x());
+    for (door, shared) in &doors {
+        assert_eq!(shared.to_compressed(), compressed, "{door}: the same point");
+        assert_no_shared_window(door, &both(shared), &secrets);
+        let held = HeldSecret {
+            shared: shared.clone(),
+        };
+        assert_no_shared_window(&format!("a struct holding {door}"), &both(&held), &secrets);
+        // The exact text (#843d6's fold, the strength read's S7): a `Debug`
+        // that wrote the point in a form the windows above do not read
+        // (base64, y) is refused here.
+        assert_eq!(format!("{shared:?}"), "SharedSecret { .. }", "{door}");
+        assert_eq!(format!("{shared:#?}"), "SharedSecret { .. }", "{door}");
+        assert_eq!(
+            format!("{held:?}"),
+            "HeldSecret { shared: SharedSecret { .. } }",
+            "{door}"
+        );
+        assert_eq!(
+            format!("{held:#?}"),
+            "HeldSecret {\n    shared: SharedSecret { .. },\n}",
+            "{door}"
+        );
+    }
 }

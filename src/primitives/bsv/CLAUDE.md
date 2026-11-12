@@ -367,7 +367,7 @@ let alice = PrivateKey::random();
 let bob = PrivateKey::random();
 
 // Alice computes shared secret
-let shared = alice.derive_shared_secret(&bob.public_key()).unwrap();
+let shared = alice.derive_shared_secret(&bob.public_key()).unwrap().to_point(); // SharedSecret to PublicKey (#843d6)
 
 // Alice generates a proof she knows her private key and computed S correctly
 let proof = Schnorr::generate_proof(

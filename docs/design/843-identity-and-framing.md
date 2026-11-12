@@ -272,6 +272,10 @@ On the owner's words of 14:1xZ and 14:2xZ (section 4), recorded on #843's commen
 4. **The lax-parser fold of #846 and #847.** The fold of PR #846 ports the node's lax signature parse for the interpreter, which also closes #847.
 5. **The advisories** for this crate: a GitHub advisory with a CVE requested, and a RustSec entry; both feed OSV (section 6, `RELEASING.md` step 23).
 
+6. **2026-11-12, the freeze plan's row 4: the wallet's linkage types unified.** Three design reads, 3 of 3; the reads were independent, each alone with a distinct lens, under rule 13 of the root `CLAUDE.md`.
+7. **2026-11-12, the freeze plan's row 6: the ECDH result typed as `SharedSecret`.** Three design reads, 3 of 3; the reads were independent, each alone with a distinct lens, under rule 13.
+8. **2026-11-12, the freeze plan's row 7: the transaction writer stays infallible and is stated; `from_json`'s fields and `to_ef`/`to_hex_ef` judge an amount of 2^53 or more.** Six design reads, 5 of 6, then a tie-break ensemble of three, 3 of 3; the reads were independent, each alone with a distinct lens, under rule 13.
+
 ## 10. Upstream
 
 - **The channels.** GitHub's private vulnerability reporting is on for `bsv-blockchain/go-sdk` and `bsv-blockchain/ts-stack`, and the owner's account has reported there before.

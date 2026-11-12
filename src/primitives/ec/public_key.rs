@@ -285,9 +285,11 @@ impl PublicKey {
 
     /// Performs scalar multiplication on this public key.
     ///
-    /// Returns: `this * scalar`
-    ///
-    /// This is used internally for ECDH.
+    /// Returns: `this * scalar`, a scalar multiple of a point. Given a private
+    /// key's scalar (named by its caller through `PrivateKey::to_bytes`), the
+    /// result is the ECDH shared secret as a `PublicKey`, which prints the
+    /// point; the derivation doors (`derive_shared_secret`) return a
+    /// [`SharedSecret`](super::SharedSecret) instead.
     pub fn mul_scalar(&self, scalar_bytes: &[u8; 32]) -> Result<PublicKey> {
         let scalar = bytes_to_scalar(scalar_bytes)?;
 
@@ -315,10 +317,16 @@ impl PublicKey {
     ///
     /// # Returns
     ///
-    /// The shared secret as a public key (representing the resulting point)
-    pub fn derive_shared_secret(&self, other_privkey: &super::PrivateKey) -> Result<PublicKey> {
+    /// The shared secret, a [`SharedSecret`](super::SharedSecret): its
+    /// `Debug` prints no secret, and it is revealed only through
+    /// `to_compressed`, `x` and `to_point`.
+    pub fn derive_shared_secret(
+        &self,
+        other_privkey: &super::PrivateKey,
+    ) -> Result<super::SharedSecret> {
         let scalar_bytes = other_privkey.to_bytes();
         self.mul_scalar(&scalar_bytes)
+            .map(super::SharedSecret::from_point)
     }
 
     /// Creates a public key by multiplying the generator point G by a scalar.

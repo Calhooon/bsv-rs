@@ -340,7 +340,7 @@ The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWa
 - `derive_private_key(protocol, key_id, counterparty)` - Derive private key
 - `derive_private_key_raw(invoice_number, counterparty)` - Derive private key with raw invoice number (bypasses BRC-43 protocol name validation)
 - `derive_symmetric_key(protocol, key_id, counterparty)` - Derive symmetric key for encryption
-- `reveal_specific_secret()`, `reveal_counterparty_secret()` - For linkage revelation
+- `reveal_specific_secret()`, `reveal_counterparty_secret()` - For linkage revelation; `reveal_counterparty_secret` returns `Result<SharedSecret>` since #843d6 (the ECDH point, its `Debug` `SharedSecret { .. }`; read through `to_compressed()`, the reference's 33 bytes, `x()` or `to_point()`; `ProtoWallet`'s counterparty linkage passes `to_point()` to `Schnorr`)
 
 **CachedKeyDeriver** - Thread-safe LRU-cached wrapper (default 1000 entries per cache):
 - `new(root_key: Option<PrivateKey>, config: Option<CacheConfig>)`
@@ -354,7 +354,7 @@ The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWa
 **KeyDeriverApi** - Trait implemented by both `KeyDeriver` and `CachedKeyDeriver`:
 - `identity_key()`, `identity_key_hex()`
 - `derive_public_key()`, `derive_private_key()`, `derive_private_key_raw()`, `derive_symmetric_key()`
-- `reveal_specific_secret()`, `reveal_counterparty_secret()`
+- `reveal_specific_secret()`, `reveal_counterparty_secret() -> Result<SharedSecret>` (an implementor returns what `derive_shared_secret` gave it; no public constructor, #843d6)
 
 **CacheConfig** - Configuration for CachedKeyDeriver:
 - `max_size: usize` - Maximum entries per cache (default 1000)

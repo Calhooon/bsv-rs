@@ -31,7 +31,7 @@
 
 use crate::error::{Error, Result};
 use crate::primitives::hash::sha256_hmac;
-use crate::primitives::{PrivateKey, PublicKey, SymmetricKey};
+use crate::primitives::{PrivateKey, PublicKey, SharedSecret, SymmetricKey};
 
 use super::types::{validate_key_id, validate_protocol_name, Counterparty, Protocol};
 
@@ -308,13 +308,16 @@ impl KeyDeriver {
     ///
     /// # Returns
     ///
-    /// The shared secret as a compressed public key point.
+    /// The shared secret, a [`SharedSecret`](crate::primitives::SharedSecret):
+    /// its `Debug` prints no secret, and it is revealed only through
+    /// `to_compressed` (the 33 bytes the reference's
+    /// `revealCounterpartySecret` returns), `x` and `to_point`.
     ///
     /// # Errors
     ///
     /// Returns an error if counterparty is 'self', as revealing the secret
     /// for 'self' would expose the root key relationship.
-    pub fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<PublicKey> {
+    pub fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<SharedSecret> {
         if matches!(counterparty, Counterparty::Self_) {
             return Err(Error::InvalidCounterparty(
                 "counterparty secrets cannot be revealed for 'self'".to_string(),
@@ -426,8 +429,10 @@ pub trait KeyDeriverApi {
         key_id: &str,
     ) -> Result<Vec<u8>>;
 
-    /// Reveals the counterparty secret.
-    fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<PublicKey>;
+    /// Reveals the counterparty secret (the ECDH point, a [`SharedSecret`]
+    /// whose `Debug` prints no secret). An implementor returns what
+    /// `derive_shared_secret` gave it: no public constructor exists.
+    fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<SharedSecret>;
 }
 
 impl KeyDeriverApi for KeyDeriver {
@@ -480,7 +485,7 @@ impl KeyDeriverApi for KeyDeriver {
         self.reveal_specific_secret(counterparty, protocol, key_id)
     }
 
-    fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<PublicKey> {
+    fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<SharedSecret> {
         self.reveal_counterparty_secret(counterparty)
     }
 }
