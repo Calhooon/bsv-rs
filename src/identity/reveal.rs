@@ -11,12 +11,9 @@
 
 use crate::auth::certificates::Certificate;
 use crate::error::WalletRefusalClass;
-use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
+use crate::script::templates::{LockPosition, PushDrop};
 use crate::script::LockingScript;
-use crate::wallet::{
-    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, WalletCertificate,
-    WalletInterface,
-};
+use crate::wallet::{Counterparty, Protocol, WalletCertificate, WalletInterface};
 use crate::{Error, Result};
 use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
@@ -289,30 +286,19 @@ pub(super) async fn identity_token<W: WalletInterface + ?Sized>(
         .map_err(|e| refused(format!("Failed to serialize certificate: {e}")))?;
     let protocol = Protocol::from_tuple((level, name))
         .ok_or_else(|| refused(format!("Invalid protocol ID: ({level}, {name})")))?;
-    let key = wallet
-        .get_public_key(
-            GetPublicKeyArgs {
-                protocol_id: Some(protocol.clone()),
-                key_id: Some(key_id.to_string()),
-                counterparty: Some(Counterparty::Anyone),
-                for_self: Some(true),
-                ..Default::default()
-            },
-            originator,
-        )
-        .await?;
-    let signature = wallet
-        .create_signature(
-            CreateSignatureArgs {
-                data: Some(json.clone()),
-                protocol_id: protocol,
-                key_id: key_id.to_string(),
-                counterparty: Some(Counterparty::Anyone),
-                ..Default::default()
-            },
-            originator,
-        )
-        .await?
-        .signature;
-    wallet_key_lock(&key.public_key, vec![json, signature])
+    // The one door (#816): the key asked, its text judged, then the
+    // signature over the JSON, as `PushDrop.lock` orders them
+    // (`PushDrop.ts:155-185`).
+    PushDrop::lock_with_wallet(
+        wallet,
+        originator,
+        vec![json],
+        protocol,
+        key_id,
+        Counterparty::Anyone,
+        true,
+        true,
+        LockPosition::Before,
+    )
+    .await
 }
