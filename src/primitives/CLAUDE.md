@@ -269,10 +269,10 @@ Key exports: `PrivateKey`, `PublicKey`, `SharedSecret`, `Signature`, `sign`, `ve
 | `sighash.rs` | 623 | BIP-143 style sighash computation |
 | `tx_signature.rs` | 309 | Transaction signature encoding/decoding with sighash scope |
 | `schnorr.rs` | 413 | Schnorr zero-knowledge proofs for ECDH verification |
-| `shamir.rs` | 576 | BRC-140 Shamir backup (#854), the reference's writer and reader; `split_private_key_with` (bsv-rs#180) |
-| `shamir_legacy.rs` | 147 | `recover_private_key_from_legacy_backup`: a backup bsv-rs 0.8.5 or earlier wrote, each share bounded at 65 bytes (#854) |
-| `shamir_tests.rs` | 645 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
-| `polynomial.rs` | 432 | Polynomial operations over finite field (for Shamir); `from_string` the reference's bounded canonical reading (#854) |
+| `shamir.rs` | 612 | BRC-140 Shamir backup (#854), the reference's writer and reader; `split_private_key_with` (bsv-rs#180) |
+| `shamir_legacy.rs` | 150 | `recover_private_key_from_legacy_backup`: a backup bsv-rs 0.8.5 or earlier wrote, each share bounded at 65 bytes (#854) |
+| `shamir_tests.rs` | 642 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
+| `polynomial.rs` | 469 | Polynomial operations over finite field (for Shamir), `value_at` with one modular inverse per call (#880); `from_string` the reference's bounded canonical reading (#854) |
 
 Key exports: `compute_sighash`, `build_sighash_preimage`, `compute_sighash_for_signing`, `compute_sighash_from_raw`, `parse_transaction`, `RawTransaction`, `SighashCache`, `SighashParams`, `TxInput`, `TxOutput`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `split_private_key_with`, `recover_private_key_from_legacy_backup`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`)
 

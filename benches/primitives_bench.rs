@@ -8,7 +8,9 @@
 #![allow(missing_docs)] // #135: criterion_group! generates the bench's public function, which takes no doc
 
 use bsv_rs::primitives::bsv::schnorr::Schnorr;
-use bsv_rs::primitives::bsv::shamir::split_private_key;
+use bsv_rs::primitives::bsv::shamir::{
+    recover_private_key_from_legacy_backup, split_private_key, KeyShares,
+};
 use bsv_rs::primitives::bsv::sighash::{
     compute_sighash, compute_sighash_for_signing, SighashCache, SighashParams, TxInput, TxOutput,
     SIGHASH_ALL, SIGHASH_FORKID,
@@ -328,14 +330,34 @@ fn bench_shamir(c: &mut Criterion) {
 
     group.bench_function("recover_private_key (3 of 5)", |b| {
         b.iter(|| {
-            let subset = bsv_rs::primitives::bsv::shamir::KeyShares::new(
-                shares.points[0..3].to_vec(),
-                3,
-                shares.integrity.clone(),
-            );
+            let subset = KeyShares::new(shares.points[0..3].to_vec(), 3, shares.integrity.clone());
             black_box(subset.recover_private_key())
         })
     });
+
+    // Recovery at other sizes (#880): one modular inverse for the set
+    for (threshold, total) in [(2, 3), (10, 20), (255, 255)] {
+        let set = split_private_key(&key, threshold, total).unwrap();
+        let subset = KeyShares::new(
+            set.points[..threshold].to_vec(),
+            threshold,
+            set.integrity.clone(),
+        );
+        group.bench_function(
+            format!("recover_private_key ({threshold} of {total})"),
+            |b| b.iter(|| black_box(&subset).recover_private_key()),
+        );
+    }
+
+    // The legacy reader (a backup bsv-rs 0.8.5 or earlier wrote: x = 1..n,
+    // the tag the leading 4 characters of base58(sha256(key bytes)))
+    for (threshold, total) in [(3, 5), (255, 255)] {
+        let backup = legacy_backup(&key, threshold, total);
+        group.bench_function(
+            format!("recover_private_key_from_legacy_backup ({threshold} of {total})"),
+            |b| b.iter(|| recover_private_key_from_legacy_backup(black_box(&backup[..threshold]))),
+        );
+    }
 
     // Backup format conversion
     group.bench_function("to_backup_format", |b| {
@@ -344,12 +366,36 @@ fn bench_shamir(c: &mut Criterion) {
 
     let backup = shares.to_backup_format().unwrap();
     group.bench_function("from_backup_format", |b| {
-        b.iter(|| {
-            bsv_rs::primitives::bsv::shamir::KeyShares::from_backup_format(black_box(&backup))
-        })
+        b.iter(|| KeyShares::from_backup_format(black_box(&backup)))
     });
 
     group.finish();
+}
+
+/// A backup of `key` in the form bsv-rs 0.8.5 wrote: f(1), ..., f(total) of a
+/// polynomial with fixed coefficients, the old 4-character tag.
+fn legacy_backup(key: &PrivateKey, threshold: usize, total: usize) -> Vec<String> {
+    use bsv_rs::primitives::bsv::polynomial::PointInFiniteField;
+    use bsv_rs::primitives::BigNumber;
+
+    let p = BigNumber::secp256k1_prime();
+    let mut terms = vec![BigNumber::from_bytes_be(&key.to_bytes())];
+    terms.extend((1..threshold).map(|i| BigNumber::from_bytes_be(&hash::sha256(&[i as u8, 0x88]))));
+    let tag: String = to_base58(&hash::sha256(&key.to_bytes()))
+        .chars()
+        .take(4)
+        .collect();
+    (1..=total as u64)
+        .map(|x| {
+            let x = BigNumber::from_u64(x);
+            let mut y = BigNumber::zero();
+            for term in terms.iter().rev() {
+                y = y.mul(&x).add(term).modulo(&p);
+            }
+            let point = PointInFiniteField::new(x, y);
+            format!("{}.{threshold}.{tag}", point.to_point_string())
+        })
+        .collect()
 }
 
 // ============================================================================

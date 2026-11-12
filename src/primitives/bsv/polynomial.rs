@@ -224,7 +224,22 @@ impl Polynomial {
     /// y = Σ(i=0 to t-1) y_i * Π(j≠i) (x - x_j) / (x_i - x_j)
     /// ```
     ///
-    /// All arithmetic is performed modulo the secp256k1 field prime.
+    /// All arithmetic is performed modulo the secp256k1 field prime, and the
+    /// value is the one the reference's `valueAt` computes (`ts-stack@edf6e03`
+    /// `Polynomial.ts:120-136`) wherever it answers. The reference inverts each
+    /// `(x_i - x_j)`; this takes one modular inverse for the whole call (#880):
+    /// each denominator `D_i = Π(j≠i) (x_i - x_j)` is multiplied out, the `D_i`
+    /// are inverted together (Montgomery's batch inversion) and
+    /// `term_i = y_i * N_i * D_i^-1` with `N_i = Π(j≠i) (x - x_j)`.
+    ///
+    /// The leading `min(points.len(), threshold)` points are used: none answers
+    /// 0, one its `y` reduced; a point whose x repeats another used point's (a
+    /// `D_i` of 0) contributes 0, as go-sdk's zero inverse does. The reference
+    /// refuses those and unreduced coordinates (`:102-117`). It never panics.
+    ///
+    /// Not constant time (`BigNumber` is variable-time throughout). What
+    /// holds: every inverse's input and the one data branch (`D_i == 0`) are
+    /// functions of the x coordinates alone; a `y` enters only as a factor.
     ///
     /// # Arguments
     ///
@@ -232,12 +247,7 @@ impl Polynomial {
     ///
     /// # Returns
     ///
-    /// The y value of the polynomial at x
-    ///
-    /// # Panics
-    ///
-    /// Panics if there are fewer points than the threshold or if the modular
-    /// inverse cannot be computed (which indicates duplicate x coordinates).
+    /// The y value of the polynomial at x, in `[0, p)`
     ///
     /// # Example
     ///
@@ -258,39 +268,66 @@ impl Polynomial {
     /// ```
     pub fn value_at(&self, x: &BigNumber) -> BigNumber {
         let p = BigNumber::secp256k1_prime();
-        let mut y = BigNumber::zero();
 
         // Use only threshold points
-        let num_points = std::cmp::min(self.points.len(), self.threshold);
+        let used = &self.points[..std::cmp::min(self.points.len(), self.threshold)];
+        let n = used.len();
 
-        for i in 0..num_points {
-            let mut term = self.points[i].y.clone();
+        // The numerators N_i = Π(j≠i) (x - x_j) mod P, by the products of
+        // the factors before i and after i (a zero factor needs no inverse).
+        let factors: Vec<BigNumber> = used.iter().map(|pt| x.sub(&pt.x).modulo(&p)).collect();
+        let mut numerators = Vec::with_capacity(n);
+        let mut before = BigNumber::one();
+        for factor in &factors {
+            numerators.push(before.clone());
+            before = before.mul(factor).modulo(&p);
+        }
+        let mut after = BigNumber::one();
+        for (numerator, factor) in numerators.iter_mut().zip(&factors).rev() {
+            *numerator = numerator.mul(&after).modulo(&p);
+            after = after.mul(factor).modulo(&p);
+        }
 
-            for j in 0..num_points {
-                if i != j {
-                    // numerator = (x - x_j) mod P
-                    let numerator = x.sub(&self.points[j].x).modulo(&p);
-
-                    // denominator = (x_i - x_j) mod P
-                    let denominator = self.points[i].x.sub(&self.points[j].x).modulo(&p);
-
-                    // denominatorInv = denominator^(-1) mod P
-                    let denominator_inv = denominator.mod_inverse(&p).unwrap_or_else(|| {
-                        // This should never happen with valid, unique x coordinates
-                        // But match the Go SDK behavior of returning 0
-                        BigNumber::zero()
-                    });
-
-                    // fraction = numerator * denominatorInv mod P
-                    let fraction = numerator.mul(&denominator_inv).modulo(&p);
-
-                    // term = term * fraction mod P
-                    term = term.mul(&fraction).modulo(&p);
+        // The denominators D_i = Π(j≠i) (x_i - x_j) mod P: of the x
+        // coordinates alone. Zero exactly when x_i repeats among the points.
+        let denominators: Vec<BigNumber> = (0..n)
+            .map(|i| {
+                let mut d = BigNumber::one();
+                for j in (0..n).filter(|&j| j != i) {
+                    d = d.mul(&used[i].x.sub(&used[j].x)).modulo(&p);
                 }
-            }
+                d
+            })
+            .collect();
 
-            // y = (y + term) mod P
-            y = y.add(&term).modulo(&p);
+        // One inverse for every non-zero D_i (Montgomery): the running
+        // products, the inverse of the last, then the walk back. A zero is
+        // never multiplied in (it would zero every inverse); its term is 0,
+        // the value the per-pair zero inverse gave it.
+        let mut running = Vec::with_capacity(n);
+        let mut product = BigNumber::one();
+        for d in denominators.iter().filter(|d| !d.is_zero()) {
+            running.push(product.clone());
+            product = product.mul(d).modulo(&p);
+        }
+        // P is prime and every factor is in [1, P): the inverse exists.
+        let mut inverse_of_rest = product.mod_inverse(&p).unwrap_or_else(BigNumber::zero);
+
+        let mut y = BigNumber::zero();
+        for i in (0..n).rev() {
+            let d = &denominators[i];
+            if d.is_zero() {
+                continue;
+            }
+            let Some(prefix) = running.pop() else {
+                break; // unreachable: one prefix was pushed per non-zero D_i
+            };
+            let d_inverse = inverse_of_rest.mul(&prefix).modulo(&p);
+            inverse_of_rest = inverse_of_rest.mul(d).modulo(&p);
+
+            // term = y_i * N_i * D_i^-1 mod P; y = (y + term) mod P
+            let weight = numerators[i].mul(&d_inverse).modulo(&p);
+            y = y.add(&used[i].y.mul(&weight)).modulo(&p);
         }
 
         y
