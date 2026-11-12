@@ -1,0 +1,46 @@
+{
+  "description": "#818: an Atomic BEEF holding one txid-only entry twice, at and over the transactions bound: parseEvidence counts entries (beef.txs.length), so 255 distinct txids in 256 entries are read and 256 distinct txids in 257 entries are a limit",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/TransactionEvidence.ts:116-117; packages/sdk/src/transaction/Beef.ts:1263-1265; packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:600-634,671-707",
+  "node": "v22.18.0",
+  "recorder": "tests/support/identity_evidence_818.mjs",
+  "token_from": "tests/vectors/identity_certificate_record_553.json cases[0].locking_script",
+  "limits": {
+    "transactions": 256
+  },
+  "shapes": [
+    {
+      "name": "repeat_at_bound",
+      "writer": "an Atomic prefix naming the subject by hand, then Beef.toWriter over 254 txid-only entries, the txid-only entry 00..01 again and the proven subject",
+      "size": 254,
+      "entries": 256,
+      "distinct_txids": 255,
+      "repeated_txid": "0000000000000000000000000000000000000000000000000000000000000001",
+      "output_index": 0,
+      "subject_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "beef_bytes": 9517,
+      "beef_sha256": "19d6a76205ad37b0336d839c24826142d82a9e024b85a1984f29a6cfabf6085c",
+      "selected_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "code": null,
+      "site": null,
+      "refused_at": null,
+      "outcome": "read"
+    },
+    {
+      "name": "repeat_over_bound",
+      "writer": "an Atomic prefix naming the subject by hand, then Beef.toWriter over 255 txid-only entries, the txid-only entry 00..01 again and the proven subject",
+      "size": 255,
+      "entries": 257,
+      "distinct_txids": 256,
+      "repeated_txid": "0000000000000000000000000000000000000000000000000000000000000001",
+      "output_index": 0,
+      "subject_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "beef_bytes": 9550,
+      "beef_sha256": "49f56abde1d24a6dc1d5dc0a60a381d504a7476fadc75fcca67d13c4cbf095a0",
+      "selected_txid": "refused: Transaction evidence: limit",
+      "code": "limit",
+      "site": "TransactionEvidence.ts:117",
+      "refused_at": "TransactionEvidence.ts:117: 257 transactions",
+      "outcome": "refused: Transaction evidence: limit"
+    }
+  ]
+}

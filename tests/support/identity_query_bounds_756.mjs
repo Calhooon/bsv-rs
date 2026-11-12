@@ -109,6 +109,10 @@ await add('two_faults_value_then_name', { attributes: [['email', 'v'.repeat(501)
 await add('two_faults_name_then_value', { attributes: [['a.b', 'v'.repeat(501)]] })
 await add('two_faults_index_value_then_name', { attributes: [['a.b', 'v'], ['7', 'v'.repeat(501)]] })
 await add('type_beside_attributes', { subject: G, certificateType: TYPE, attributes: [['email', 'bob']] })
+// #818: the other compressed tag (`queryValidation.ts:174`, `(?:02|03)`): no
+// case above carried an `03` key, so a check admitting `02` alone passed.
+await add('key_prefix_03', { subject: '03' + G.slice(2) })
+await add('certifier_prefix_03', { certifier: '03' + G.slice(2) })
 
 process.stdout.write(JSON.stringify({
   description: '#756: the reference overlay\'s ls_identity lookup over the question IdentityClient::query sends ' +

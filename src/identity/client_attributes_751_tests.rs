@@ -24,7 +24,7 @@ fn every_recorded_attribute_case_keeps_the_references_certificates_751() {
     ))
     .expect("the vector parses");
     let cases = vector["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 42, "the recorded cases");
+    assert_eq!(cases.len(), 52, "the recorded cases");
     let mut wrong = Vec::new();
     for case in cases {
         let attributes = pairs(&case["attributes"]);

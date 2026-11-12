@@ -125,12 +125,12 @@ async fn an_offset_above_100000_is_refused_in_the_overlays_words_756() {
 
 #[tokio::test]
 async fn an_identity_key_the_overlay_refuses_is_refused_in_its_words_756() {
-    assert_eq!(agree("key_").await, 11);
+    assert_eq!(agree("key_").await, 12);
 }
 
 #[tokio::test]
 async fn a_certifier_the_overlay_refuses_is_refused_in_its_words_756() {
-    assert_eq!(agree("certifier_").await, 12);
+    assert_eq!(agree("certifier_").await, 13);
 }
 
 #[tokio::test]
@@ -155,7 +155,7 @@ async fn of_two_faults_the_overlays_earlier_is_named_756() {
 fn every_recorded_case_is_judged_756() {
     assert_eq!(
         vector()["cases"].as_array().unwrap().len(),
-        4 + 3 + 11 + 12 + 9 + 3 + 12 + 5 + 9
+        4 + 3 + 12 + 13 + 9 + 3 + 12 + 5 + 9
     );
 }
 
@@ -205,4 +205,34 @@ async fn an_index_name_is_judged_ahead_as_the_overlay_walks_it_751() {
         Error::IdentityError(case["outcome"]["refused"].as_str().unwrap().into())
     );
     assert!(asked.lock().unwrap().is_empty());
+}
+
+/// #818: the other compressed tag. `requirePublicKey` admits `02` or `03`
+/// (`queryValidation.ts:174`, `/^(?:02|03)[0-9a-fA-F]{64}$/`); until #818 no
+/// recorded key or certifier was tagged `03`, so a check admitting `02` alone
+/// passed every test. The two recorded cases (`03` and G's x, a point of
+/// either parity) reach the overlay's storage, and are sent here.
+#[tokio::test]
+async fn a_key_tagged_03_is_admitted_818() {
+    let vector = vector();
+    for (name, reached, member) in [
+        ("key_prefix_03", "findByIdentityKey", "subject"),
+        ("certifier_prefix_03", "findByCertifier", "certifier"),
+    ] {
+        let case = vector["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap_or_else(|| panic!("no case {name}"));
+        assert!(case[member].as_str().unwrap().starts_with("03"), "{name}");
+        assert_eq!(case["outcome"]["reached"], reached, "{name}");
+        let (client, asked) = client();
+        let got = client.query(query_of(case)).await;
+        assert!(
+            matches!(got, Ok(ref kept) if kept.is_empty()),
+            "{name}: {got:?}"
+        );
+        assert_eq!(asked.lock().unwrap().len(), 1, "{name}: the question sent");
+    }
 }
