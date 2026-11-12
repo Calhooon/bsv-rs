@@ -29,8 +29,8 @@ fn tx(spends: &str) -> Transaction {
     let mut t = Transaction::new();
     let mut input = TransactionInput::new(spends.to_string(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
-    t.inputs.push(input);
-    t.outputs.push(TransactionOutput::new(
+    t.inputs_mut().push(input);
+    t.outputs_mut().push(TransactionOutput::new(
         1_000,
         LockingScript::from_binary(&[0x51]).unwrap(),
     ));
@@ -79,12 +79,11 @@ fn repointed() -> (Beef, Transaction, Transaction, Transaction, Transaction) {
     ];
     let mut beef = Beef::from_binary(&write(&bumps, &entries, &[(0, 0), (2, 1)])).unwrap();
     assert!(beef.clone().verify_structure().is_ok());
-    beef.edit_tx(&c.id(), |t| t.inputs[0].source_txid = Some(q.id()))
+    beef.edit_tx(&c.id(), |t| t.inputs_mut()[0].source_txid = Some(q.id()))
         .unwrap();
     let mut mutated = c.clone();
-    mutated.inputs[0].source_txid = Some(q.id());
+    mutated.inputs_mut()[0].source_txid = Some(q.id());
     // `Transaction` caches its hash; a direct field edit asks for this.
-    mutated.invalidate_caches();
     (beef, p, q, c, mutated)
 }
 
@@ -161,7 +160,7 @@ fn an_input_repointed_outside_the_beef_through_edit_tx_is_missing() {
     // A second edit of the same entry, found by its new name.
     let outside = "f0".repeat(32);
     beef.edit_tx(&mutated.id(), |t| {
-        t.inputs[0].source_txid = Some(outside.clone())
+        t.inputs_mut()[0].source_txid = Some(outside.clone())
     })
     .unwrap();
     let sr = beef.clone().sort_txs();
@@ -183,7 +182,7 @@ fn a_proven_entry_edited_keeps_its_bump_index_and_is_not_proven() {
     assert!(beef.clone().verify_structure().is_ok());
     let edited = beef
         .edit_tx(&p.id(), |t| {
-            t.outputs[0].satoshis = Some(999);
+            t.outputs_mut()[0].satoshis = Some(999);
             t.id()
         })
         .unwrap();
@@ -210,17 +209,16 @@ fn a_proven_entry_edited_keeps_its_bump_index_and_is_not_proven() {
 fn a_tx_mut_edit_is_unseen_by_the_per_entry_doors_stated_171() {
     let (mut beef, _, q, c, _) = repointed();
     let mut moved = tx(&q.id());
-    moved.lock_time = 3;
+    moved.set_lock_time(3);
     beef.merge_raw_tx(moved.to_binary(), None)
         .expect("the bytes are one transaction");
     let entry = beef.find_txid_mut(&moved.id()).unwrap();
-    entry.tx_mut().unwrap().lock_time = 4;
+    entry.tx_mut().unwrap().set_lock_time(4);
     let renamed = entry.txid();
     assert!(beef.find_txid(&renamed).is_none(), "the window: not found");
     assert!(beef.find_txid(&moved.id()).is_none(), "nor by its old txid");
     let mut again = moved.clone();
-    again.lock_time = 4;
-    again.invalidate_caches();
+    again.set_lock_time(4);
     assert_eq!(again.id(), renamed);
     let held = beef.txs.len();
     beef.merge_raw_tx(again.to_binary(), None)

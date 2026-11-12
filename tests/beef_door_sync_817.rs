@@ -125,7 +125,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 // The lock time set to its own value, as the recorder's
                 // `e.tx.lockTime = e.tx.lockTime`.
                 beef.edit_tx(&txid(v, arg), |t| {
-                    t.lock_time = std::hint::black_box(t.lock_time)
+                    t.set_lock_time(std::hint::black_box(t.lock_time()))
                 })
                 .unwrap();
                 None
@@ -142,7 +142,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 let at = beef.txs.iter().position(|t| t.txid() == u).unwrap();
                 #[allow(deprecated)] // the hand edit the cell states
                 let edited = beef.txs[at].tx_mut().unwrap();
-                edited.lock_time = 1;
+                edited.set_lock_time(1);
                 None
             }
             "bump" => {
@@ -171,17 +171,17 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
             }
             "edit" if arg == "u_input_to_y" => {
                 let cc = "cc".repeat(32);
-                beef.edit_tx(&txid(v, "u"), |t| t.inputs[0].source_txid = Some(cc))
+                beef.edit_tx(&txid(v, "u"), |t| t.inputs_mut()[0].source_txid = Some(cc))
                     .unwrap();
                 None
             }
             "edit" if arg == "y_input_to_u" => {
                 let u = txid(v, "u");
-                beef.edit_tx(&txid(v, "y"), |t| t.inputs[0].source_txid = Some(u))
+                beef.edit_tx(&txid(v, "y"), |t| t.inputs_mut()[0].source_txid = Some(u))
                     .unwrap();
                 None
             }
-            "edit" => match beef.edit_tx(&txid(v, "u"), |t| t.lock_time = 1) {
+            "edit" => match beef.edit_tx(&txid(v, "u"), |t| t.set_lock_time(1)) {
                 Ok(()) => None,
                 // Refused (another entry holds V): this crate's answer.
                 Err(_) => Some(Some(json!("refused"))),

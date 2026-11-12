@@ -111,18 +111,17 @@ fn corrupt(h: &support::Harness, kind: &str) {
         "signature" | "key" => {
             let mut tx = h.sources[0].0.clone();
             let index = h.sources[0].1 as usize;
-            let mut token = PushDrop::decode(&tx.outputs[index].locking_script).unwrap();
+            let mut token = PushDrop::decode(&tx.outputs()[index].locking_script).unwrap();
             if kind == "signature" {
                 token.fields[0] = b"forged".to_vec();
             } else {
                 token.locking_public_key =
                     PrivateKey::from_hex(&"08".repeat(32)).unwrap().public_key();
             }
-            tx.outputs[index].locking_script = token.lock();
-            tx.invalidate_caches();
+            tx.outputs_mut()[index].locking_script = token.lock();
             list.outputs[0].outpoint =
                 bsv_rs::wallet::Outpoint::from_string(&format!("{}.{index}", tx.id())).unwrap();
-            list.outputs[0].locking_script = Some(tx.outputs[index].locking_script.to_binary());
+            list.outputs[0].locking_script = Some(tx.outputs()[index].locking_script.to_binary());
             let mut beef = Beef::new();
             beef.merge_transaction(tx);
             beef.merge_transaction(h.sources[1].0.clone());
@@ -218,8 +217,8 @@ async fn local_removal_authenticates_without_decrypting_the_value_454() {
         beef: Some(source.to_beef(true).unwrap()),
         outputs: vec![WalletOutput {
             outpoint: Outpoint::from_string(&format!("{}.0", source.id())).unwrap(),
-            satoshis: source.outputs[0].satoshis.unwrap(),
-            locking_script: Some(source.outputs[0].locking_script.to_binary()),
+            satoshis: source.outputs()[0].satoshis.unwrap(),
+            locking_script: Some(source.outputs()[0].locking_script.to_binary()),
             spendable: true,
             tags: None,
             labels: None,

@@ -34,8 +34,8 @@ fn transaction(previous: String, payload: usize) -> Transaction {
     unlock.extend_from_slice(&(payload as u16).to_le_bytes());
     unlock.resize(payload + 3, 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&unlock).expect("padding push"));
-    tx.inputs.push(input);
-    tx.outputs.push(TransactionOutput::new(
+    tx.inputs_mut().push(input);
+    tx.outputs_mut().push(TransactionOutput::new(
         1_000,
         LockingScript::from_binary(&[0x75, 0x51]).expect("OP_DROP OP_TRUE"),
     ));

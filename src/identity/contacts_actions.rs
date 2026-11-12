@@ -118,7 +118,7 @@ impl<W: WalletInterface> ContactsManager<W> {
             .filter(|tx| tx.id() == txid)
             .ok_or_else(|| refused("Contact source transaction ID mismatch"))?;
         let source = tx
-            .outputs
+            .outputs()
             .get(output.outpoint.vout as usize)
             .ok_or_else(|| refused("Contact source output is missing"))?;
         if output

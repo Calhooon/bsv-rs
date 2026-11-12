@@ -55,7 +55,7 @@ fn spend(change: u64, n: usize) -> Transaction {
 }
 
 fn change_amounts(tx: &Transaction) -> Vec<u64> {
-    tx.outputs
+    tx.outputs()
         .iter()
         .filter(|o| o.change)
         .map(|o| o.satoshis.expect("a change output is written"))
@@ -108,10 +108,10 @@ async fn random_change_over_two_or_more_outputs_is_the_reference_distribution_86
                 tx.fee(Some(FEE), ChangeDistribution::Random).await.unwrap();
                 if change == 0 {
                     assert!(
-                        tx.outputs.iter().all(|o| !o.change),
+                        tx.outputs().iter().all(|o| !o.change),
                         "no change: the change outputs are removed"
                     );
-                    assert_eq!(tx.outputs.len(), 1);
+                    assert_eq!(tx.outputs().len(), 1);
                     continue;
                 }
                 let amounts = change_amounts(&tx);

@@ -186,7 +186,7 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
         locking_key: &str,
     ) -> Option<Revelation> {
         let tx = Transaction::from_beef(&output.beef, None).ok()?;
-        let source = tx.outputs.get(output.output_index as usize)?;
+        let source = tx.outputs().get(output.output_index as usize)?;
         let token = decode_revocation_token(&source.locking_script)?;
         if token.fields.len() != 2
             || !super::token_envelope::is_canonical_signed_pushdrop(
@@ -244,7 +244,7 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
     async fn spend(&self, revelation: &Revelation, broadcaster: &TopicBroadcaster) -> Result<()> {
         let source = revelation
             .tx
-            .outputs
+            .outputs()
             .get(revelation.output_index as usize)
             .filter(|o| o.satoshis.is_some())
             .ok_or_else(|| refused("Failed to get the revelation source output."))?;
@@ -316,7 +316,7 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
         let partial = Transaction::from_atomic_beef(&signable.tx)?;
         let outpoint = outpoint.to_lowercase();
         let mut matching = Vec::new();
-        for index in 0..partial.inputs.len() {
+        for index in 0..partial.inputs().len() {
             if input_outpoint(&partial, index)? == outpoint {
                 matching.push(index);
             }
@@ -461,7 +461,7 @@ fn certificate_verifies(parsed: &serde_json::Map<String, serde_json::Value>) -> 
 /// the source it carries, the two equal when both are present.
 fn input_outpoint(tx: &Transaction, index: usize) -> Result<String> {
     let input = tx
-        .inputs
+        .inputs()
         .get(index)
         .ok_or_else(|| refused("Revelation transaction input is malformed"))?;
     let embedded = input.source_transaction.as_ref().map(|t| t.id());
@@ -495,25 +495,25 @@ fn check_signed(
     outpoint: &str,
     unlocking_hex: &str,
 ) -> Result<()> {
-    if signable.version != signed.version
-        || signable.lock_time != signed.lock_time
-        || signable.inputs.len() != signed.inputs.len()
-        || signable.outputs.len() != signed.outputs.len()
+    if signable.version() != signed.version()
+        || signable.lock_time() != signed.lock_time()
+        || signable.inputs().len() != signed.inputs().len()
+        || signable.outputs().len() != signed.outputs().len()
     {
         return Err(refused(
             "Signed revelation transaction substituted the authorized template",
         ));
     }
-    for index in 0..signable.inputs.len() {
+    for index in 0..signable.inputs().len() {
         if input_outpoint(signable, index)? != input_outpoint(signed, index)?
-            || signable.inputs[index].sequence != signed.inputs[index].sequence
+            || signable.inputs()[index].sequence != signed.inputs()[index].sequence
         {
             return Err(refused(
                 "Signed revelation transaction substituted an authorized input",
             ));
         }
     }
-    for (a, b) in signable.outputs.iter().zip(&signed.outputs) {
+    for (a, b) in signable.outputs().iter().zip(signed.outputs()) {
         if a.satoshis != b.satoshis || a.locking_script.to_hex() != b.locking_script.to_hex() {
             return Err(refused(
                 "Signed revelation transaction substituted an authorized output",
@@ -525,7 +525,7 @@ fn check_signed(
             "Signed transaction does not spend the requested revelation output.",
         ));
     }
-    let script = signed.inputs[input_index].unlocking_script.as_ref();
+    let script = signed.inputs()[input_index].unlocking_script.as_ref();
     if script.map(|s| s.to_hex()).as_deref() != Some(unlocking_hex) {
         return Err(refused(
             "Signed transaction substituted the authorized revelation script.",

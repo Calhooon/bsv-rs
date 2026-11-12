@@ -14,7 +14,7 @@ const CEILINGS: &[(&str, usize)] = &[
     ("src/primitives/p256.rs", 3),
     ("src/primitives/symmetric.rs", 1),
     ("src/transaction/beef_stream.rs", 23), // 24 until #347 found one gone
-    ("src/transaction/transaction.rs", 2),
+    ("src/transaction/transaction/fields.rs", 2), // Clone's two (#134), moved from transaction.rs by #869's fold
     ("src/wallet/key_deriver.rs", 1),
 ];
 

@@ -522,7 +522,7 @@ fn recorded_output(v: &Value) -> OutputListItem {
     let beef = hex::decode(v["beef"].as_str().unwrap()).unwrap();
     let tx = Transaction::from_beef(&beef, None).unwrap();
     assert_eq!(tx.id(), v["txid"].as_str().unwrap());
-    assert_eq!(tx.outputs[0].satoshis, v["satoshis"].as_u64());
+    assert_eq!(tx.outputs()[0].satoshis, v["satoshis"].as_u64());
     OutputListItem {
         beef,
         output_index: v["output_index"].as_u64().unwrap() as u32,

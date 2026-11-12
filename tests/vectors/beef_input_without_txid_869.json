@@ -1,0 +1,145 @@
+{
+  "recorded_by": "tests/support/beef_input_without_txid_869.mjs",
+  "reference": "ts-stack@edf6e03 packages/sdk, Node v22.18.0",
+  "states": [
+    {
+      "state": "a",
+      "childId": "cd2408dd8aa0027937c6f9e586dddc57df40cb843677239a0ff655563932825b",
+      "mergeError": null,
+      "held": [
+        "cd2408dd8aa0027937c6f9e586dddc57df40cb843677239a0ff655563932825b",
+        "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8"
+      ],
+      "atomic": {
+        "id": "cd2408dd8aa0027937c6f9e586dddc57df40cb843677239a0ff655563932825b",
+        "path": false,
+        "inputs": [
+          {
+            "sourceTXID": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "path": true,
+              "inputs": [
+                {
+                  "sourceTXID": "1111111111111111111111111111111111111111111111111111111111111111",
+                  "source": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "b",
+      "childId": "da430495666fe6483ad44b313b5b153352ac300c2126216297cd83af209a7030",
+      "mergeError": null,
+      "held": [
+        "da430495666fe6483ad44b313b5b153352ac300c2126216297cd83af209a7030",
+        "d5016963da5c51e07a8cd1a9b069b528675f2ee3669360aa8086b49dcd5120a2",
+        "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44"
+      ],
+      "atomic": {
+        "id": "da430495666fe6483ad44b313b5b153352ac300c2126216297cd83af209a7030",
+        "path": false,
+        "inputs": [
+          {
+            "sourceTXID": "d5016963da5c51e07a8cd1a9b069b528675f2ee3669360aa8086b49dcd5120a2",
+            "source": {
+              "id": "d5016963da5c51e07a8cd1a9b069b528675f2ee3669360aa8086b49dcd5120a2",
+              "path": false,
+              "inputs": [
+                {
+                  "sourceTXID": "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44",
+                  "source": {
+                    "id": "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44",
+                    "path": false,
+                    "inputs": [
+                      {
+                        "sourceTXID": "2222222222222222222222222222222222222222222222222222222222222222",
+                        "source": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "b2",
+      "childId": "da430495666fe6483ad44b313b5b153352ac300c2126216297cd83af209a7030",
+      "mergeError": null,
+      "held": [
+        "da430495666fe6483ad44b313b5b153352ac300c2126216297cd83af209a7030",
+        "d5016963da5c51e07a8cd1a9b069b528675f2ee3669360aa8086b49dcd5120a2",
+        "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44"
+      ],
+      "atomic": {
+        "id": "da430495666fe6483ad44b313b5b153352ac300c2126216297cd83af209a7030",
+        "path": false,
+        "inputs": [
+          {
+            "sourceTXID": "d5016963da5c51e07a8cd1a9b069b528675f2ee3669360aa8086b49dcd5120a2",
+            "source": {
+              "id": "d5016963da5c51e07a8cd1a9b069b528675f2ee3669360aa8086b49dcd5120a2",
+              "path": false,
+              "inputs": [
+                {
+                  "sourceTXID": "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44",
+                  "source": {
+                    "id": "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44",
+                    "path": true,
+                    "inputs": [
+                      {
+                        "sourceTXID": "2222222222222222222222222222222222222222222222222222222222222222",
+                        "source": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "c",
+      "childId": null,
+      "childIdError": "sourceTransaction is undefined",
+      "mergeError": "sourceTransaction is undefined",
+      "held": [],
+      "atomic": null
+    },
+    {
+      "state": "d",
+      "childId": "62d9eabef9ccb08078cfb6ba88cfd35dda46cc1083eb1843119661f3d9311b07",
+      "mergeError": null,
+      "held": [
+        "62d9eabef9ccb08078cfb6ba88cfd35dda46cc1083eb1843119661f3d9311b07"
+      ],
+      "atomic": {
+        "id": "62d9eabef9ccb08078cfb6ba88cfd35dda46cc1083eb1843119661f3d9311b07",
+        "path": false,
+        "inputs": [
+          {
+            "sourceTXID": "a65edb2973f4b8af77b4716fc466ca540d03281369abbb25a18f462c718ecde8",
+            "source": {
+              "id": "a65edb2973f4b8af77b4716fc466ca540d03281369abbb25a18f462c718ecde8",
+              "path": false,
+              "inputs": [
+                {
+                  "sourceTXID": "3333333333333333333333333333333333333333333333333333333333333333",
+                  "source": null
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

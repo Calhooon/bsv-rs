@@ -184,7 +184,7 @@ async fn local_with_token() -> (LocalKVStore<Counting>, Counting) {
     let store = LocalKVStore::new(wallet.clone(), KVStoreConfig::default()).unwrap();
     store.set("alpha", "one", None).await.unwrap_err();
     let source = token_of(&wallet);
-    let output = &source.outputs[0];
+    let output = &source.outputs()[0];
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
         outputs: vec![WalletOutput {
             satoshis: output.satoshis.unwrap(),

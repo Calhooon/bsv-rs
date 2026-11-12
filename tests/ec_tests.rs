@@ -850,7 +850,7 @@ mod custom_k_tests {
         spend_tx.sign().await.expect("sign() should work");
 
         // Verify unlocking script was generated
-        let input = &spend_tx.inputs[0];
+        let input = &spend_tx.inputs()[0];
         assert!(
             input.unlocking_script.is_some(),
             "Unlocking script should be set after signing"
@@ -936,7 +936,7 @@ mod custom_k_tests {
 
         // Verify unlocking script was generated
         assert!(
-            spend_tx.inputs[0].unlocking_script.is_some(),
+            spend_tx.inputs()[0].unlocking_script.is_some(),
             "Unlocking script should be set after signing with Hash160 RPuzzle"
         );
     }

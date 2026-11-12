@@ -33,7 +33,7 @@ fn ef_capable_transaction() -> Transaction {
     // The test tx input references source_output_index=0xDC (220), so we need
     // a source tx with at least 221 outputs. Instead, set the output index to 0
     // and create a minimal source tx.
-    let source_output_index = tx.inputs[0].source_output_index;
+    let source_output_index = tx.inputs()[0].source_output_index;
 
     // Create a source transaction with enough outputs to satisfy the index
     let mut source_tx = Transaction::new();
@@ -50,7 +50,7 @@ fn ef_capable_transaction() -> Transaction {
     }
 
     // Attach the source transaction to the input so EF serialization works
-    tx.inputs[0].source_transaction = Some(Box::new(source_tx));
+    tx.inputs_mut()[0].source_transaction = Some(Box::new(source_tx));
 
     tx
 }

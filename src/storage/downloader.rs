@@ -113,7 +113,7 @@ impl StorageDownloader {
             };
 
             // Get the output
-            let tx_output = match tx.outputs.get(output.output_index as usize) {
+            let tx_output = match tx.outputs().get(output.output_index as usize) {
                 Some(o) => o,
                 None => continue,
             };

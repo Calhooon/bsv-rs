@@ -8,9 +8,13 @@ pub(super) fn token_outpoint(
     lock: &LockingScript,
     amount: u64,
 ) -> Result<String> {
-    let mut indexes = tx.outputs.iter().enumerate().filter_map(|(index, output)| {
-        (output.satoshis == Some(amount) && output.locking_script == *lock).then_some(index)
-    });
+    let mut indexes = tx
+        .outputs()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, output)| {
+            (output.satoshis == Some(amount) && output.locking_script == *lock).then_some(index)
+        });
     match (indexes.next(), indexes.next()) {
         (Some(index), None) => Ok(format!("{}.{index}", tx.id())),
         _ => Err(Error::KvStoreLocalError(

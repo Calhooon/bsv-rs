@@ -20,9 +20,9 @@ fn chain_beef(n: usize) -> (Beef, String) {
     let mut funding = Transaction::new();
     let mut input = TransactionInput::new("aa".repeat(32), 0);
     input.unlocking_script = Some(UnlockingScript::new());
-    funding.inputs.push(input);
+    funding.inputs_mut().push(input);
     funding
-        .outputs
+        .outputs_mut()
         .push(TransactionOutput::new(1_000, lock.clone()));
     let mut prev = funding.id();
     let mut beef = Beef::new();
@@ -33,8 +33,9 @@ fn chain_beef(n: usize) -> (Beef, String) {
         let mut tx = Transaction::new();
         let mut input = TransactionInput::new(prev, 0);
         input.unlocking_script = Some(UnlockingScript::new());
-        tx.inputs.push(input);
-        tx.outputs.push(TransactionOutput::new(1_000, lock.clone()));
+        tx.inputs_mut().push(input);
+        tx.outputs_mut()
+            .push(TransactionOutput::new(1_000, lock.clone()));
         prev = tx.id();
         beef.merge_raw_tx(tx.to_binary(), None)
             .expect("the bytes are one transaction");

@@ -165,7 +165,7 @@ fn find_transaction_for_signing_links_each_source_wire_beef_023() {
         .unwrap();
     assert_eq!(tx.id(), text(&expected["found"]));
     let sources: Vec<Option<String>> = tx
-        .inputs
+        .inputs()
         .iter()
         .map(|i| i.source_transaction.as_ref().map(|s| s.id()))
         .collect();
@@ -193,7 +193,7 @@ fn find_atomic_transaction_links_the_proven_source_wire_beef_023() {
     let tx = beef
         .find_atomic_transaction(text(&expected["txid"]))
         .unwrap();
-    let source = tx.inputs[0].source_transaction.as_ref().unwrap();
+    let source = tx.inputs()[0].source_transaction.as_ref().unwrap();
     assert_eq!(source.id(), text(&expected["source"]));
     let height = source.merkle_path.as_ref().unwrap().block_height;
     assert_eq!(

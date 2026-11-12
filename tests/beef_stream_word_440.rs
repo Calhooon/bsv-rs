@@ -69,7 +69,7 @@ fn parent(lock: LockingScript, proven: Option<u32>) -> Transaction {
         )
     };
     input.set_unlocking_script(UnlockingScript::new());
-    source.lock_time = proven.unwrap_or(0);
+    source.set_lock_time(proven.unwrap_or(0));
     source.add_input(input).unwrap();
     source
         .add_output(TransactionOutput::new(1_000, lock))
@@ -92,8 +92,8 @@ fn transaction(lock: LockingScript, source_height: Option<u32>) -> Transaction {
 }
 
 fn sign(tx: &mut Transaction, vin: usize, scope: u32) {
-    let source = tx.inputs[vin].source_transaction.as_ref().unwrap();
-    let lock = &source.outputs[0].locking_script;
+    let source = tx.inputs()[vin].source_transaction.as_ref().unwrap();
+    let lock = &source.outputs()[0].locking_script;
     let raw = tx.to_binary();
     let digest = SigningContext::new(&raw, vin, 1_000, lock.as_script())
         .compute_sighash(scope)
@@ -102,8 +102,7 @@ fn sign(tx: &mut Transaction, vin: usize, scope: u32) {
     signature.push(scope as u8);
     let mut unlock = Script::new();
     unlock.write_bin(&signature);
-    tx.inputs[vin].set_unlocking_script(UnlockingScript::from_script(unlock));
-    tx.invalidate_caches();
+    tx.inputs_mut()[vin].set_unlocking_script(UnlockingScript::from_script(unlock));
 }
 
 fn signed(scope: u32, source_height: Option<u32>) -> Transaction {
@@ -194,7 +193,7 @@ fn version_1_substr_passes_default_and_the_post_chronicle_word() {
         LockingScript::from_hex("b301bb87").unwrap(),
         Some(CHRONICLE),
     );
-    tx.inputs[0].set_unlocking_script(UnlockingScript::from_hex("03aabbcc5151").unwrap());
+    tx.inputs_mut()[0].set_unlocking_script(UnlockingScript::from_hex("03aabbcc5151").unwrap());
     assert!(verdict(&tx, Some(CHRONICLE), false).is_valid());
     assert!(verdict(&tx, Some(CHRONICLE), true).is_valid());
 }
@@ -202,7 +201,7 @@ fn version_1_substr_passes_default_and_the_post_chronicle_word() {
 #[test]
 fn unproven_parent_takes_the_spend_era_including_without_a_tip() {
     let mut tx = transaction(LockingScript::from_hex("b301bb87").unwrap(), None);
-    tx.inputs[0].set_unlocking_script(UnlockingScript::from_hex("03aabbcc5151").unwrap());
+    tx.inputs_mut()[0].set_unlocking_script(UnlockingScript::from_hex("03aabbcc5151").unwrap());
     assert!(verdict(&tx, Some(CHRONICLE - 1), true).is_valid());
     assert!(verdict(&tx, None, true).is_valid());
     let signed = signed(0x61, None);
@@ -255,7 +254,7 @@ fn each_input_uses_its_own_bump_height() {
 }
 
 fn reversed(tx: &Transaction, duplicate: bool) -> Vec<u8> {
-    let source = tx.inputs[0].source_transaction.as_ref().unwrap();
+    let source = tx.inputs()[0].source_transaction.as_ref().unwrap();
     let proof = source.merkle_path.as_ref().unwrap();
     let mut w = Writer::new();
     w.write_u32_le(BEEF_V1);
@@ -345,7 +344,7 @@ fn a_second_inputs_older_coin_keeps_its_opcode_gate() {
     let lock = LockingScript::from_hex("b301bb87").unwrap();
     let unlock = UnlockingScript::from_hex("03aabbcc5151").unwrap();
     let mut tx = transaction(lock.clone(), Some(CHRONICLE));
-    tx.inputs[0].set_unlocking_script(unlock.clone());
+    tx.inputs_mut()[0].set_unlocking_script(unlock.clone());
     let mut input = TransactionInput::with_source_transaction(parent(lock, Some(CHRONICLE - 1)), 0);
     input.set_unlocking_script(unlock);
     tx.add_input(input).unwrap();

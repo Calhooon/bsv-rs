@@ -59,7 +59,7 @@ impl Fixture {
         let mut tracker = MockChainTracker::new(height + 101);
         tracker.add_root(height, parent.id());
         let mut tx = Transaction::new();
-        tx.version = 2;
+        tx.set_version(2);
         for vin in 0..inputs {
             let mut input = TransactionInput::with_source_transaction(parent.clone(), vin as u32);
             let mut unlock = Script::new();
@@ -320,14 +320,14 @@ async fn none_preserves_the_existing_verifier_entry_points_378() {
 #[test]
 fn the_standalone_counter_is_the_verifiers_counter_378() {
     let f = Fixture::new(true, 1, false);
-    let input = &f.tx.inputs[0];
+    let input = &f.tx.inputs()[0];
     let source = input.source_transaction.as_ref().unwrap();
     for (limit, spent) in [(LOW, 2), (WORK, WORK)] {
         let mut spend = Spend::new(SpendParams {
             source_txid: source.hash(),
             source_output_index: 0,
             source_satoshis: 1_000,
-            locking_script: source.outputs[0].locking_script.clone(),
+            locking_script: source.outputs()[0].locking_script.clone(),
             transaction_version: 2,
             other_inputs: vec![],
             outputs: vec![],

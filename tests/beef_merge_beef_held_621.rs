@@ -91,7 +91,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
             "edit" => {
                 assert_eq!(what, "u_to_v");
                 let u = tx(v, "u").id();
-                beef.edit_tx(&u, |t| t.lock_time = 1).unwrap();
+                beef.edit_tx(&u, |t| t.set_lock_time(1)).unwrap();
             }
             "link" => {
                 // The held C given T as its input's source, in memory, T no
@@ -99,13 +99,15 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
                 assert_eq!(what, "c_to_t");
                 let c = tx(v, "c").id();
                 let t = tx(v, "t");
-                beef.edit_tx(&c, |c| c.inputs[0].source_transaction = Some(Box::new(t)))
-                    .unwrap();
+                beef.edit_tx(&c, |c| {
+                    c.inputs_mut()[0].source_transaction = Some(Box::new(t))
+                })
+                .unwrap();
             }
             "graph" => {
                 assert_eq!(what, "c_of_t");
                 let mut child = tx(v, "c");
-                child.inputs[0].source_transaction = Some(Box::new(tx(v, "t")));
+                child.inputs_mut()[0].source_transaction = Some(Box::new(tx(v, "t")));
                 beef.merge_transaction(child);
             }
             other => panic!("no step {other}"),
@@ -183,7 +185,7 @@ fn assert_merged_as_recorded(name: &str) {
             let linked: Vec<bool> = entry
                 .tx()
                 .expect("C held parsed")
-                .inputs
+                .inputs()
                 .iter()
                 .map(|i| i.source_transaction.is_some())
                 .collect();

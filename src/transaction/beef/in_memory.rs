@@ -195,9 +195,9 @@ fn parsed(tx: &BeefTx) -> Option<Cow<'_, Transaction>> {
 /// The txids a raw transaction's inputs spend (display hex), proven or not.
 pub(super) fn spent_txids(tx: &BeefTx) -> Vec<String> {
     parsed(tx).map_or_else(Vec::new, |t| {
-        t.inputs
+        t.inputs()
             .iter()
-            .filter_map(|i| i.get_source_txid().ok())
+            .filter_map(crate::transaction::transaction::outpoint_txid_name)
             .collect()
     })
 }
@@ -209,23 +209,23 @@ pub(super) fn spent_txids(tx: &BeefTx) -> Vec<String> {
 pub(super) fn content_refused(tx: &BeefTx) -> Option<Kind> {
     let t = parsed(tx)?;
     let inputs: Vec<InputRef> = t
-        .inputs
+        .inputs()
         .iter()
         .map(|i| InputRef {
             at: 0,
             // A hand-built input naming no txid is no outpoint the rules know.
-            prev: match &i.source_txid {
-                Some(txid) => wire_hash(txid),
-                None => i.get_source_txid().ok().as_deref().and_then(wire_hash),
-            }
-            .unwrap_or([0xEE; 32]),
+            // The outpoint the bytes carry (#869's third fold).
+            prev: crate::transaction::transaction::outpoint_txid_name(i)
+                .as_deref()
+                .and_then(wire_hash)
+                .unwrap_or([0xEE; 32]),
             vout: i.source_output_index,
             script: 0..0,
             sequence: i.sequence,
         })
         .collect();
     let outputs: Vec<OutputRef> = t
-        .outputs
+        .outputs()
         .iter()
         .map(|o| OutputRef {
             at: 0,

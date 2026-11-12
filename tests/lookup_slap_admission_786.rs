@@ -193,7 +193,7 @@ async fn the_reference_recorded_admissions_are_this_crates_786() {
         let tx = Transaction::from_beef(&beef, None).unwrap();
         assert_eq!(tx.id(), case["txid"].as_str().unwrap(), "{name}");
         assert_eq!(
-            tx.outputs[0].satoshis,
+            tx.outputs()[0].satoshis,
             Some(case["satoshis"].as_u64().unwrap()),
             "{name}"
         );

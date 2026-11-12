@@ -51,7 +51,7 @@ fn rebuilt(name: &str) -> (build::Built, sdk::transaction::Beef, serde_json::Val
     // G reached twice: one input of each parent names it.
     let pushes: usize = [&built.p1, &built.p2]
         .iter()
-        .flat_map(|p| &beef.find_txid(p).and_then(BeefTx::tx).unwrap().inputs)
+        .flat_map(|p| beef.find_txid(p).and_then(BeefTx::tx).unwrap().inputs())
         .filter(|i| i.source_txid.as_deref() == Some(built.g.as_str()))
         .count();
     assert_eq!(pushes as u64, case["g_pushes"].as_u64().unwrap(), "{name}");
@@ -78,7 +78,7 @@ fn a_grandparent_shared_by_two_unproven_paths_is_walked_once_748() {
     assert!(beef.find_bump(&built.g).is_none(), "{name}: G unproven");
     let gg = built.gg.as_deref().unwrap();
     assert!(beef.find_bump(gg).is_some(), "{name}: GG proven");
-    assert_eq!(g.inputs.len(), 1, "{name}: G spends GG:0 alone");
+    assert_eq!(g.inputs().len(), 1, "{name}: G spends GG:0 alone");
     assert_eq!(case["outcome"], "read", "{name}: the reference reads it");
     let (selected, site) = judged(&built.beef);
     assert_eq!(selected, case["selected_txid"].as_str().unwrap(), "{name}");
@@ -90,11 +90,15 @@ fn a_proven_grandparent_reached_twice_is_summed_once_748() {
     let name = "proven_grandparent_reached_twice";
     let (built, beef, case) = rebuilt(name);
     assert!(beef.find_bump(&built.g).is_some(), "{name}: G proven");
-    let graph: usize = beef.txs.iter().map(|e| e.tx().unwrap().inputs.len()).sum();
+    let graph: usize = beef
+        .txs
+        .iter()
+        .map(|e| e.tx().unwrap().inputs().len())
+        .sum();
     let g = beef.find_txid(&built.g).and_then(BeefTx::tx).unwrap();
     assert_eq!(graph, INPUTS, "{name}: the graph's inputs, G once");
     assert!(
-        graph + g.inputs.len() > INPUTS,
+        graph + g.inputs().len() > INPUTS,
         "{name}: G twice over the bound"
     );
     assert_eq!(case["outcome"], "read", "{name}: the reference reads it");

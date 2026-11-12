@@ -208,7 +208,7 @@ fn changes() -> Vec<Change> {
                 #[allow(deprecated)]
                 let tx = entry.tx_mut();
                 if let Some(tx) = tx {
-                    tx.lock_time ^= 1;
+                    tx.set_lock_time(tx.lock_time() ^ 1);
                 }
             }
             if let Some(level) = b.bumps.last_mut().and_then(|p| p.path.first_mut()) {
@@ -228,9 +228,9 @@ fn changes() -> Vec<Change> {
                 .txs
                 .iter()
                 .rev()
-                .find(|t| t.tx().is_some_and(|tx| !tx.outputs.is_empty()));
+                .find(|t| t.tx().is_some_and(|tx| !tx.outputs().is_empty()));
             if let Some(txid) = last.map(BeefTx::txid) {
-                let _ = b.edit_tx(&txid, |tx| tx.outputs[0].satoshis = Some(1 << 53));
+                let _ = b.edit_tx(&txid, |tx| tx.outputs_mut()[0].satoshis = Some(1 << 53));
             }
         }),
         // ... a transaction built by hand merged by `merge_transaction` (its

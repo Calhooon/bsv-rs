@@ -249,7 +249,7 @@ fn source_output<'a>(
         .and_then(|entry| entry.tx())
         .filter(|tx| tx.id() == txid)
         .ok_or_else(|| refused("KVStore BEEF does not contain the exact listed transaction"))?;
-    tx.outputs
+    tx.outputs()
         .get(output.outpoint.vout as usize)
         .filter(|source| {
             source.satoshis == Some(output.satoshis)

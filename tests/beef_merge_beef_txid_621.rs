@@ -266,7 +266,7 @@ fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
         .unwrap();
     let old = source.txs[2].txid();
     let tx = source.find_txid_mut(&old).unwrap().tx_mut().unwrap();
-    tx.lock_time = 7;
+    tx.set_lock_time(7);
     let new = tx.id();
     assert_ne!(old, new);
 
@@ -276,5 +276,5 @@ fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
         .expect("the source BEEF writes and reads back");
     assert!(merged.find_txid(&new).is_some());
     assert!(merged.find_txid(&old).is_none());
-    assert_eq!(merged.find_txid(&new).unwrap().tx().unwrap().lock_time, 7);
+    assert_eq!(merged.find_txid(&new).unwrap().tx().unwrap().lock_time(), 7);
 }

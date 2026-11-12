@@ -86,13 +86,13 @@ fn each_alone_within_bounds(beef: &[u8]) -> (usize, usize) {
     let (mut inputs, mut scripts) = (0, 0);
     for entry in &parsed.txs {
         let tx = entry.tx().unwrap();
-        assert!(tx.inputs.len() <= INPUTS, "{}: inputs alone", tx.id());
+        assert!(tx.inputs().len() <= INPUTS, "{}: inputs alone", tx.id());
         assert!(
             graph_script_bytes(tx) <= SCRIPT_BYTES,
             "{}: script bytes alone",
             tx.id()
         );
-        inputs += tx.inputs.len();
+        inputs += tx.inputs().len();
         scripts += graph_script_bytes(tx);
     }
     (inputs, scripts)

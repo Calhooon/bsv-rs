@@ -63,7 +63,7 @@ fn fixture(answer: u8) -> Fixture {
     let mut input = TransactionInput::with_source_transaction(parent, 0);
     input.set_unlocking_script(UnlockingScript::from_binary(&unlock.to_binary()).unwrap());
     let mut subject = Transaction::new();
-    subject.version = 2;
+    subject.set_version(2);
     subject.add_input(input).unwrap();
     subject
         .add_output(TransactionOutput::new(

@@ -38,7 +38,7 @@ impl Fixture {
         tracker.add_root(800_000, parent.id());
         parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 800_000));
         let mut tx = Transaction::new();
-        tx.version = 2;
+        tx.set_version(2);
         for (vin, bytes) in [64, 2, 4].into_iter().enumerate() {
             let mut input = TransactionInput::with_source_transaction(parent.clone(), vin as u32);
             let mut unlock = Script::new();
@@ -206,7 +206,7 @@ async fn individually_green_inputs_cross_the_transaction_budget_in_order_519() {
     }
     // The heaviest input is input 0; the crossing input is input 1.
     let measured: Vec<_> =
-        f.tx.inputs
+        f.tx.inputs()
             .iter()
             .enumerate()
             .map(|(vin, input)| {
@@ -215,7 +215,7 @@ async fn individually_green_inputs_cross_the_transaction_budget_in_order_519() {
                     source_txid: source.hash(),
                     source_output_index: vin as u32,
                     source_satoshis: 1_000,
-                    locking_script: source.outputs[vin].locking_script.clone(),
+                    locking_script: source.outputs()[vin].locking_script.clone(),
                     transaction_version: 2,
                     other_inputs: vec![],
                     outputs: vec![],

@@ -46,8 +46,7 @@ macro_rules! fresh_wallet {
                     page.beef = None;
                 } else {
                     let mut source = self.source.lock().unwrap().clone();
-                    source.lock_time = u32::try_from(round).unwrap();
-                    source.invalidate_caches();
+                    source.set_lock_time(u32::try_from(round).unwrap());
                     page.outputs[0].outpoint =
                         Outpoint::from_string(&format!("{}.0", source.id())).unwrap();
                     page.beef = Some(source.to_beef(true).unwrap());

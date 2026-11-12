@@ -49,7 +49,7 @@ fn materialize(v: &Value, node: &Value) -> Transaction {
     }
     for source in node["sources"].as_array().unwrap() {
         let input = source["input"].as_u64().unwrap() as usize;
-        t.inputs[input].source_transaction = Some(Box::new(materialize(v, source)));
+        t.inputs_mut()[input].source_transaction = Some(Box::new(materialize(v, source)));
     }
     t
 }
@@ -180,10 +180,13 @@ fn the_merged_transaction_keeps_its_links_and_an_ancestor_is_held_without_them_7
     beef.merge_transaction(materialize(&v, &c["merge"]));
     let grandchild = beef.find_txid(&tx(&v, "grandchild").id()).unwrap();
     let held = grandchild.tx().unwrap();
-    assert!(held.inputs[0].source_transaction.is_some());
+    assert!(held.inputs()[0].source_transaction.is_some());
     let child = beef.find_txid(&tx(&v, "child").id()).unwrap();
     let child = child.tx().unwrap();
-    assert!(child.inputs.iter().all(|i| i.source_transaction.is_none()));
+    assert!(child
+        .inputs()
+        .iter()
+        .all(|i| i.source_transaction.is_none()));
     assert_eq!(child.id(), tx(&v, "child").id());
 }
 

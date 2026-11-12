@@ -155,7 +155,7 @@ fn validate_signed(
             .unlocking_script
             .as_ref()
             .or_else(|| spends.get(&key).map(|s| &s.unlocking_script));
-        let actual = signed.inputs[input_index]
+        let actual = signed.inputs()[input_index]
             .unlocking_script
             .as_ref()
             .map(crate::script::UnlockingScript::to_binary);

@@ -26,12 +26,12 @@ pub(super) fn input_outpoint(input: &TransactionInput) -> Result<Outpoint> {
 }
 
 pub(super) fn bind_requested(args: &CreateActionArgs, tx: &Transaction) -> Result<Vec<usize>> {
-    if tx.version != args.version.unwrap_or(1) {
+    if tx.version() != args.version.unwrap_or(1) {
         return Err(refusal(
             "Wallet transaction substituted the requested version",
         ));
     }
-    if tx.lock_time != args.lock_time.unwrap_or(0) {
+    if tx.lock_time() != args.lock_time.unwrap_or(0) {
         return Err(refusal(
             "Wallet transaction substituted the requested lock time",
         ));
@@ -44,7 +44,7 @@ pub(super) fn bind_requested(args: &CreateActionArgs, tx: &Transaction) -> Resul
 
 fn bind_inputs(args: &CreateActionArgs, tx: &Transaction) -> Result<Vec<usize>> {
     let mut candidates = HashMap::new();
-    for (index, input) in tx.inputs.iter().enumerate() {
+    for (index, input) in tx.inputs().iter().enumerate() {
         if candidates.insert(input_outpoint(input)?, index).is_some() {
             return Err(refusal(
                 "Wallet transaction contains a duplicate input outpoint",
@@ -62,7 +62,7 @@ fn bind_inputs(args: &CreateActionArgs, tx: &Transaction) -> Result<Vec<usize>> 
         let index = *candidates.get(&input.outpoint).ok_or_else(|| {
             refusal("Wallet transaction does not contain each requested input exactly once")
         })?;
-        let candidate = &tx.inputs[index];
+        let candidate = &tx.inputs()[index];
         if candidate.sequence != input.sequence_number.unwrap_or(u32::MAX) {
             return Err(refusal(
                 "Wallet transaction substituted a requested input sequence",
@@ -87,7 +87,7 @@ fn bind_inputs(args: &CreateActionArgs, tx: &Transaction) -> Result<Vec<usize>> 
 }
 
 fn bind_outputs(args: &CreateActionArgs, tx: &Transaction) -> Result<u64> {
-    for (index, output) in tx.outputs.iter().enumerate() {
+    for (index, output) in tx.outputs().iter().enumerate() {
         amount(output.satoshis, &format!("Wallet output {index}"))?;
     }
     let ordered = args.options.as_ref().and_then(|o| o.randomize_outputs) == Some(false);
@@ -95,7 +95,7 @@ fn bind_outputs(args: &CreateActionArgs, tx: &Transaction) -> Result<u64> {
     let mut total = 0;
     for (index, output) in args.outputs.iter().flatten().enumerate() {
         amount(output.satoshis, &format!("Requested output {index}"))?;
-        let candidate = tx.outputs.iter().enumerate().find(|(i, candidate)| {
+        let candidate = tx.outputs().iter().enumerate().find(|(i, candidate)| {
             (!ordered || *i == index)
                 && !matched.contains(i)
                 && candidate.satoshis == Some(output.satoshis)
@@ -130,11 +130,11 @@ fn add(total: u64, value: u64, label: &str) -> Result<u64> {
 }
 
 fn input_value(tx: &Transaction, index: usize) -> Result<u64> {
-    let input = &tx.inputs[index];
+    let input = &tx.inputs()[index];
     let output = input
         .source_transaction
         .as_ref()
-        .and_then(|source| source.outputs.get(input.source_output_index as usize))
+        .and_then(|source| source.outputs().get(input.source_output_index as usize))
         .ok_or_else(|| refusal("Wallet signable transaction omitted an input source output"))?;
     amount(
         output.satoshis,
@@ -149,13 +149,13 @@ fn bind_values(tx: &Transaction, requested: &[usize], requested_value: u64) -> R
     }
     let requested: HashSet<_> = requested.iter().copied().collect();
     let mut wallet = 0;
-    for index in 0..tx.inputs.len() {
+    for index in 0..tx.inputs().len() {
         if !requested.contains(&index) {
             wallet = add(wallet, input_value(tx, index)?, "Wallet-added input value")?;
         }
     }
     let mut outputs = 0;
-    for output in &tx.outputs {
+    for output in tx.outputs() {
         outputs = add(
             outputs,
             amount(output.satoshis, "Wallet output")?,
@@ -176,23 +176,23 @@ fn bind_values(tx: &Transaction, requested: &[usize], requested_value: u64) -> R
 }
 
 pub(super) fn same_template(partial: &Transaction, signed: &Transaction) -> Result<()> {
-    if partial.version != signed.version
-        || partial.lock_time != signed.lock_time
-        || partial.inputs.len() != signed.inputs.len()
-        || partial.outputs.len() != signed.outputs.len()
+    if partial.version() != signed.version()
+        || partial.lock_time() != signed.lock_time()
+        || partial.inputs().len() != signed.inputs().len()
+        || partial.outputs().len() != signed.outputs().len()
     {
         return Err(refusal(
             "Wallet signed transaction substituted the authorized template",
         ));
     }
-    for (a, b) in partial.inputs.iter().zip(&signed.inputs) {
+    for (a, b) in partial.inputs().iter().zip(signed.inputs()) {
         if input_outpoint(a)? != input_outpoint(b)? || a.sequence != b.sequence {
             return Err(refusal(
                 "Wallet signed transaction substituted an authorized input",
             ));
         }
     }
-    for (a, b) in partial.outputs.iter().zip(&signed.outputs) {
+    for (a, b) in partial.outputs().iter().zip(signed.outputs()) {
         if a.satoshis != b.satoshis || a.locking_script.to_binary() != b.locking_script.to_binary()
         {
             return Err(refusal(

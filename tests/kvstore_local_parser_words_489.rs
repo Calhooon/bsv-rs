@@ -82,7 +82,7 @@ fn wallet(case: &Value) -> CorruptKeyWallet {
     let bytes = from_hex(case["source_beef"].as_str().unwrap()).unwrap();
     let source = Transaction::from_beef(&bytes, None).unwrap();
     assert_eq!(
-        source.outputs[0].locking_script.to_hex(),
+        source.outputs()[0].locking_script.to_hex(),
         case["locking_script"].as_str().unwrap()
     );
     let inner = Counting::of_scalar(9);
@@ -91,8 +91,8 @@ fn wallet(case: &Value) -> CorruptKeyWallet {
         beef: Some(bytes),
         outputs: vec![WalletOutput {
             outpoint: Outpoint::from_string(&format!("{}.0", source.id())).unwrap(),
-            satoshis: source.outputs[0].satoshis.unwrap(),
-            locking_script: Some(source.outputs[0].locking_script.to_binary()),
+            satoshis: source.outputs()[0].satoshis.unwrap(),
+            locking_script: Some(source.outputs()[0].locking_script.to_binary()),
             spendable: true,
             tags: Some(vec!["alpha".into()]),
             labels: None,

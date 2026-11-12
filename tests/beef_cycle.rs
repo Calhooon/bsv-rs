@@ -71,9 +71,9 @@ fn tx(spends: &[&str]) -> Transaction {
     for txid in spends {
         let mut input = TransactionInput::new(txid.to_string(), 0);
         input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
-        t.inputs.push(input);
+        t.inputs_mut().push(input);
     }
-    t.outputs.push(TransactionOutput::new(
+    t.outputs_mut().push(TransactionOutput::new(
         1_000,
         LockingScript::from_binary(&[0x51]).unwrap(),
     ));
@@ -324,7 +324,7 @@ fn linked_depth(tx: &Transaction) -> usize {
     let mut depth = 0;
     let mut at = tx;
     while let Some(src) = at
-        .inputs
+        .inputs()
         .first()
         .and_then(|i| i.source_transaction.as_deref())
     {
@@ -346,7 +346,7 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
         let last = ids[n - 1].clone();
         let renamed = beef
             .edit_tx(&ids[0], |tx| {
-                tx.inputs[0].source_txid = Some(last.clone());
+                tx.inputs_mut()[0].source_txid = Some(last.clone());
                 tx.id()
             })
             .unwrap();

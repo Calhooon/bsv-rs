@@ -47,7 +47,7 @@ impl Actions {
             candidate.unlocking_script = Some(UnlockingScript::new());
             tx.add_input(candidate).unwrap();
         }
-        if tx.inputs.is_empty() {
+        if tx.inputs().is_empty() {
             let mut funding = Transaction::new();
             funding
                 .add_input(TransactionInput::new("11".repeat(32), 0))
@@ -69,7 +69,7 @@ impl Actions {
             ))
             .unwrap();
         }
-        if tx.outputs.is_empty() {
+        if tx.outputs().is_empty() {
             tx.add_output(TransactionOutput::new(
                 0,
                 LockingScript::from_binary(&[0x00, 0x6a]).unwrap(),
@@ -96,10 +96,9 @@ impl Actions {
         let mut state = self.0.lock().unwrap();
         let mut tx = state.1.take().unwrap();
         for (index, spend) in args.spends {
-            tx.inputs[index as usize].unlocking_script =
+            tx.inputs_mut()[index as usize].unlocking_script =
                 Some(UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
         }
-        tx.invalidate_caches();
         state.0.insert(tx.id(), tx.clone());
         let id = Outpoint::from_string(&format!("{}.0", tx.id()))
             .unwrap()

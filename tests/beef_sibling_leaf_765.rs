@@ -43,10 +43,10 @@ fn tx(inputs: &[(&str, u32)], sats: u64) -> Transaction {
     for (txid, vout) in inputs {
         let mut input = TransactionInput::new(txid.to_string(), *vout);
         input.unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
-        t.inputs.push(input);
+        t.inputs_mut().push(input);
     }
     let lock = LockingScript::from_hex("51").unwrap();
-    t.outputs.push(TransactionOutput::new(sats, lock));
+    t.outputs_mut().push(TransactionOutput::new(sats, lock));
     t
 }
 
@@ -147,7 +147,7 @@ fn assert_links(beef: &mut Beef, subject: &str, b: &str, root: &str) {
             return;
         }
         stack.extend(
-            t.inputs
+            t.inputs()
                 .iter()
                 .filter_map(|i| i.source_transaction.as_deref().cloned()),
         );

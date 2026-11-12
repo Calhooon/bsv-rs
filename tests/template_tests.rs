@@ -745,7 +745,7 @@ mod rpuzzle_reference_603 {
                 ))
                 .unwrap();
             spending.sign().await.unwrap();
-            let unlocking = spending.inputs[0].unlocking_script.clone().unwrap();
+            let unlocking = spending.inputs()[0].unlocking_script.clone().unwrap();
             assert_eq!(unlocking.to_hex(), case["unlocking"], "{label}");
             assert_eq!(spending.to_hex(), case["spending"], "{label}");
 

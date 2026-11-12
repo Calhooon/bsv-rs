@@ -636,7 +636,7 @@ fn main() {
     assert_eq!(validation.roots.get(&800_000), Some(&funding_txid));
     let tx = Transaction::from_beef(&bytes, None).unwrap();
     assert_eq!(tx.id(), subject);
-    assert!(tx.inputs[0].source_transaction.is_some());
+    assert!(tx.inputs()[0].source_transaction.is_some());
 
     // And the verdict: the spend's script executed against the linked
     // source; the proven ancestor checked against the tracker and not

@@ -281,7 +281,7 @@ impl Beef {
     /// against: the writer's check over `order`, the bytes written in that
     /// order (each entry as `merge_beef` merges it), and this crate's strict
     /// reader of them; the snapshot read back on `Ok`.
-    #[cfg(any(test, fuzzing))]
+    #[cfg(any(test, feature = "internal-test-doors"))]
     pub(super) fn snapshot_round_trip(&self, order: &[usize]) -> Result<Beef> {
         self.check_writable_in(order)?;
         let mut writer = Writer::new();
@@ -291,9 +291,12 @@ impl Beef {
 
     /// The oracle of `merge_beef`'s verdict for the fuzz target (#621):
     /// [`snapshot_round_trip`](Self::snapshot_round_trip) over this BEEF's
-    /// written order. Built only under `cfg(fuzzing)` (cargo-fuzz's) and the
-    /// crate's own tests; no part of the API.
-    #[cfg(any(test, fuzzing))]
+    /// written order. Built only for the crate's own tests and under the
+    /// `internal-test-doors` feature, which this repository's fuzz crate
+    /// turns on and which is no part of the API (#869's second fold: under
+    /// `cfg(fuzzing)` until then, which cargo-fuzz sets for every crate of
+    /// a build, a dependent's included).
+    #[cfg(any(test, feature = "internal-test-doors"))]
     #[doc(hidden)]
     pub fn merge_snapshot_oracle(&self) -> Result<Beef> {
         self.snapshot_round_trip(&self.written_order())

@@ -51,7 +51,13 @@ fn rebuilt(name: &str) -> (build::Built, serde_json::Value) {
 fn path_inputs(beef: &sdk::transaction::Beef, built: &build::Built, parent: &str) -> usize {
     [built.subject.as_str(), parent, built.g.as_str()]
         .iter()
-        .map(|t| beef.find_txid(t).and_then(BeefTx::tx).unwrap().inputs.len())
+        .map(|t| {
+            beef.find_txid(t)
+                .and_then(BeefTx::tx)
+                .unwrap()
+                .inputs()
+                .len()
+        })
         .sum()
 }
 
@@ -66,7 +72,11 @@ fn the_inputs_bound_sums_over_two_unproven_branches_741() {
     ] {
         let (built, case) = rebuilt(name);
         let beef = sdk::transaction::Beef::from_binary(&built.beef).unwrap();
-        let graph: usize = beef.txs.iter().map(|e| e.tx().unwrap().inputs.len()).sum();
+        let graph: usize = beef
+            .txs
+            .iter()
+            .map(|e| e.tx().unwrap().inputs().len())
+            .sum();
         assert_eq!(graph, total, "{name}: the graph's inputs");
         for parent in [built.p1.as_str(), built.p2.as_str()] {
             assert!(

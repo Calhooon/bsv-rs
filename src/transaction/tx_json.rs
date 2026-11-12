@@ -162,7 +162,7 @@ impl Transaction {
     /// Builds the internal TxJson representation for serialization.
     fn to_tx_json(&self) -> TxJson {
         let inputs: Vec<InputJson> = self
-            .inputs
+            .inputs()
             .iter()
             .map(|input| {
                 let txid = input.get_source_txid().unwrap_or_else(|_| "0".repeat(64));
@@ -181,7 +181,7 @@ impl Transaction {
             .collect();
 
         let outputs: Vec<OutputJson> = self
-            .outputs
+            .outputs()
             .iter()
             .map(|output| OutputJson {
                 satoshis: output.satoshis.unwrap_or(0),
@@ -194,8 +194,8 @@ impl Transaction {
             hex: self.to_hex(),
             inputs,
             outputs,
-            version: self.version,
-            lock_time: self.lock_time,
+            version: self.version(),
+            lock_time: self.lock_time(),
         }
     }
 }
@@ -264,10 +264,10 @@ mod tests {
 
         assert_eq!(tx.to_hex(), tx2.to_hex());
         assert_eq!(tx.id(), tx2.id());
-        assert_eq!(tx.version, tx2.version);
-        assert_eq!(tx.lock_time, tx2.lock_time);
-        assert_eq!(tx.inputs.len(), tx2.inputs.len());
-        assert_eq!(tx.outputs.len(), tx2.outputs.len());
+        assert_eq!(tx.version(), tx2.version());
+        assert_eq!(tx.lock_time(), tx2.lock_time());
+        assert_eq!(tx.inputs().len(), tx2.inputs().len());
+        assert_eq!(tx.outputs().len(), tx2.outputs().len());
     }
 
     #[test]
@@ -284,10 +284,10 @@ mod tests {
         // Deserialize from Go SDK expected JSON and verify fields
         let tx = Transaction::from_json(GO_SDK_EXPECTED_JSON).unwrap();
 
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.lock_time, 0);
-        assert_eq!(tx.inputs.len(), 1);
-        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.lock_time(), 0);
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.outputs().len(), 2);
         assert_eq!(
             tx.id(),
             "aec245f27b7640c8b1865045107731bfb848115c573f7da38166074b1c9e475d"
@@ -316,7 +316,7 @@ mod tests {
         let mut tx = Transaction::new();
 
         // Add inputs directly (bypassing validation for test)
-        tx.inputs.push(TransactionInput {
+        tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
                 "3c8edde27cb9a9132c22038dac4391496be9db16fd21351565cc1006966fdad5".to_string(),
@@ -327,7 +327,7 @@ mod tests {
             sequence: 0xFFFFFFFF,
         });
 
-        tx.inputs.push(TransactionInput {
+        tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
                 "a2a55ecc61f418e300888b1f82eaf84024496b34e3e538f3d32d342fd753adab".to_string(),
@@ -338,12 +338,12 @@ mod tests {
             sequence: 0xFFFFFFFE,
         });
 
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             50000,
             LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
 
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             0,
             LockingScript::from_hex("006a0548656c6c6f").unwrap(),
         ));
@@ -352,8 +352,8 @@ mod tests {
         let tx2 = Transaction::from_json(&json).unwrap();
 
         assert_eq!(tx.to_hex(), tx2.to_hex());
-        assert_eq!(tx.inputs.len(), 2);
-        assert_eq!(tx.outputs.len(), 2);
+        assert_eq!(tx.inputs().len(), 2);
+        assert_eq!(tx.outputs().len(), 2);
 
         // Verify JSON structure
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -406,17 +406,17 @@ mod tests {
 
         let tx = Transaction::from_json(json).unwrap();
 
-        assert_eq!(tx.version, 1);
-        assert_eq!(tx.lock_time, 0);
-        assert_eq!(tx.inputs.len(), 1);
-        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.version(), 1);
+        assert_eq!(tx.lock_time(), 0);
+        assert_eq!(tx.inputs().len(), 1);
+        assert_eq!(tx.outputs().len(), 1);
         assert_eq!(
-            tx.inputs[0].source_txid.as_deref().unwrap(),
+            tx.inputs()[0].source_txid.as_deref().unwrap(),
             "3c8edde27cb9a9132c22038dac4391496be9db16fd21351565cc1006966fdad5"
         );
-        assert_eq!(tx.inputs[0].source_output_index, 0);
-        assert_eq!(tx.inputs[0].sequence, 0xFFFFFFFF);
-        assert_eq!(tx.outputs[0].satoshis, Some(1000));
+        assert_eq!(tx.inputs()[0].source_output_index, 0);
+        assert_eq!(tx.inputs()[0].sequence, 0xFFFFFFFF);
+        assert_eq!(tx.outputs()[0].satoshis, Some(1000));
     }
 
     #[test]

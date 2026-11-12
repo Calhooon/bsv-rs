@@ -295,7 +295,7 @@ fn beef_of(size: usize) -> Vec<u8> {
     let mut tx = Transaction::new();
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
-    tx.inputs[0].unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
+    tx.inputs_mut()[0].unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
     let mut script = vec![0x00, 0x6a, 0x4e];
     script.extend_from_slice(&(size as u32).to_le_bytes());
     script.resize(script.len() + size, 0xcc);

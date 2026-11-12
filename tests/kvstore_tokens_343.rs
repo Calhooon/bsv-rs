@@ -77,11 +77,10 @@ async fn global_mutations_only_spend_authenticated_exact_namespace_tokens_343() 
         let unrelated = support::unrelated_tokens().await;
         h.lookup.lock().unwrap().extend(unrelated);
         let mut invalid = h.sources[0].0.clone();
-        let script = &invalid.outputs[0].locking_script;
+        let script = &invalid.outputs()[0].locking_script;
         let mut token = bsv_rs::script::templates::PushDrop::decode(script).unwrap();
         token.fields[2] = b"forged".to_vec();
-        invalid.outputs[0].locking_script = token.lock();
-        invalid.invalidate_caches();
+        invalid.outputs_mut()[0].locking_script = token.lock();
         h.lookup
             .lock()
             .unwrap()

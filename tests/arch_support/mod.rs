@@ -68,6 +68,21 @@ impl Source {
         code_tokens(&self.text, true)
     }
 
+    /// [`Source::tokens`] with the attributes kept (`#`, `[`, .., `]`): an
+    /// item under a cfg this scan knows false is still skipped whole, its
+    /// attributes with it (#869's fifth fold, the field guard's attribute
+    /// rule).
+    pub fn tokens_with_attributes(&self) -> Vec<Token<'_>> {
+        scan_tokens(&self.text, false, true)
+    }
+
+    /// Every token as written, no attribute and no cfg-gated item skipped
+    /// (comments and literals still opaque): the sealed-module pin's reading
+    /// (#869's sixth fold), which a `#[cfg(..)]` must not hide from.
+    pub fn raw_tokens(&self) -> Vec<Token<'_>> {
+        lex(&self.text)
+    }
+
     pub fn line(&self, number: usize) -> &str {
         self.text.lines().nth(number - 1).unwrap_or_default().trim()
     }
@@ -276,6 +291,10 @@ fn after_item(tokens: &[Token<'_>], mut i: usize) -> usize {
 }
 
 pub fn code_tokens(source: &str, wasm: bool) -> Vec<Token<'_>> {
+    scan_tokens(source, wasm, false)
+}
+
+fn scan_tokens(source: &str, wasm: bool, keep_attributes: bool) -> Vec<Token<'_>> {
     let tokens = lex(source);
     let mut out = Vec::new();
     let mut i = 0;
@@ -303,6 +322,9 @@ pub fn code_tokens(source: &str, wasm: bool) -> Vec<Token<'_>> {
                         i = after_item(&tokens, end);
                     }
                     continue;
+                }
+                if keep_attributes {
+                    out.extend_from_slice(&tokens[i..end]);
                 }
                 i = end;
                 continue;

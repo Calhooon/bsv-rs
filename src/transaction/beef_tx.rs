@@ -204,12 +204,8 @@ impl BeefTx {
         }
 
         if let Some(ref tx) = self.tx {
-            // A hash cached inside the `tx_mut` borrow may be the pre-mutation
-            // one (the caller read `id()` before editing a field): hash from the
-            // fields until `refresh` clears the mark (bsv-rs#171, the review's fold).
-            if self.mutated {
-                tx.invalidate_caches();
-            }
+            // A transaction's id is always its fields' hash (#843): an edit
+            // through `tx_mut` clears its caches at the transaction's door.
             return tx.id();
         }
 
@@ -249,8 +245,7 @@ impl BeefTx {
     #[deprecated(note = "use Beef::edit_tx")]
     pub fn tx_mut(&mut self) -> Option<&mut Transaction> {
         self.parse_raw();
-        if let Some(ref tx) = self.tx {
-            tx.invalidate_caches();
+        if self.tx.is_some() {
             self.raw_dropped |= self.raw_tx.is_some();
             self.raw_tx = None;
             self.txid = None;
@@ -271,10 +266,6 @@ impl BeefTx {
     pub(crate) fn refresh(&mut self) -> bool {
         if !std::mem::take(&mut self.mutated) {
             return false;
-        }
-        if let Some(ref tx) = self.tx {
-            // A field edit after `tx_mut` may have left the hash cached.
-            tx.invalidate_caches();
         }
         self.update_input_txids();
         true
@@ -301,9 +292,6 @@ impl BeefTx {
             return Some(std::borrow::Cow::Borrowed(raw_tx));
         }
         let tx = self.tx.as_ref()?;
-        if self.mutated {
-            tx.invalidate_caches();
-        }
         Some(std::borrow::Cow::Owned(tx.to_binary()))
     }
 
@@ -381,7 +369,7 @@ impl BeefTx {
     /// reader does (`Kind::NoInputs`).
     pub fn has_no_inputs(&self) -> bool {
         if let Some(ref tx) = self.tx {
-            return tx.inputs.is_empty();
+            return tx.inputs().is_empty();
         }
         match self.raw_tx {
             // The input count is the varint after the four bytes of version.
@@ -409,11 +397,11 @@ impl BeefTx {
             return false;
         }
         if let Some(ref tx) = self.tx {
-            return tx.outputs.is_empty();
+            return tx.outputs().is_empty();
         }
         match self.raw_tx {
             Some(ref raw_tx) => {
-                matches!(Transaction::from_binary(raw_tx), Ok(tx) if tx.outputs.is_empty())
+                matches!(Transaction::from_binary(raw_tx), Ok(tx) if tx.outputs().is_empty())
             }
             None => false,
         }
@@ -478,11 +466,10 @@ impl BeefTx {
 fn input_txids_of(tx: &Transaction) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     let mut txids = Vec::new();
-    for input in &tx.inputs {
-        // Use get_source_txid() which falls back to source_transaction
-        // when source_txid is None (e.g., when input was created via
-        // TransactionInput::with_source_transaction())
-        if let Ok(txid) = input.get_source_txid() {
+    for input in tx.inputs() {
+        // The txid the outpoint names: the source's id where the text does
+        // not parse (#869's third fold), as `get_source_txid` otherwise reads.
+        if let Some(txid) = crate::transaction::transaction::outpoint_txid_name(input) {
             if !txid.is_empty() && seen.insert(txid.clone()) {
                 txids.push(txid);
             }
@@ -711,9 +698,9 @@ mod tests {
         for vout in 0..2 {
             let mut input = TransactionInput::new(parent.clone(), vout);
             input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
-            tx.inputs.push(input);
+            tx.inputs_mut().push(input);
         }
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             1_000,
             LockingScript::from_binary(&[0x51]).unwrap(),
         ));
@@ -743,8 +730,7 @@ mod tests {
             let tx = entry
                 .tx_mut()
                 .expect("a parsed entry yields its transaction");
-            tx.inputs[0].source_txid = Some(parent.clone());
-            tx.invalidate_caches();
+            tx.inputs_mut()[0].source_txid = Some(parent.clone());
             tx.clone()
         };
         assert_ne!(mutated.id(), TEST_TX_ID);

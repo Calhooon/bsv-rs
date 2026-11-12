@@ -26,8 +26,8 @@ pub fn spend(source: &str, vout: u32, sats: u64) -> Transaction {
     let mut tx = Transaction::new();
     let mut input = TransactionInput::new(source.to_string(), vout);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
-    tx.inputs.push(input);
-    tx.outputs.push(TransactionOutput::new(
+    tx.inputs_mut().push(input);
+    tx.outputs_mut().push(TransactionOutput::new(
         sats,
         LockingScript::from_binary(&[0x51]).unwrap(),
     ));
@@ -46,7 +46,7 @@ pub fn fixture(v: &Value) -> Fixture {
     let mut parent = spend(&"81".repeat(32), 0, 2_000);
     parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 817_000));
     let mut child = spend(&parent.id(), 0, 1_000);
-    child.inputs[0].source_transaction = Some(Box::new(parent.clone()));
+    child.inputs_mut()[0].source_transaction = Some(Box::new(parent.clone()));
     let v1 = child.to_beef_v1(false).unwrap();
     assert_eq!(
         to_hex(&v1),

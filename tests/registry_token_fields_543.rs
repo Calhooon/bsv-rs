@@ -40,7 +40,7 @@ fn wallet_listing(script: Option<&LockingScript>) -> Counting {
             .map(|tx| WalletOutput {
                 outpoint: Outpoint::from_string(&format!("{}.0", tx.id())).unwrap(),
                 satoshis: 1,
-                locking_script: Some(tx.outputs[0].locking_script.to_binary()),
+                locking_script: Some(tx.outputs()[0].locking_script.to_binary()),
                 spendable: true,
                 tags: None,
                 labels: None,

@@ -178,7 +178,7 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
             }
 
             // Interpret each output
-            for (idx, _output) in tx.outputs.iter().enumerate() {
+            for (idx, _output) in tx.outputs().iter().enumerate() {
                 if let Some(value) = (self.interpreter)(tx, idx as u32, context).await {
                     results.push(value);
                     if self.debug {
@@ -189,7 +189,7 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
 
             // Traverse input sources: pushed last to first, so the first
             // input's ancestry is walked first.
-            for input in tx.inputs.iter().rev() {
+            for input in tx.inputs().iter().rev() {
                 if let Some(ref source_tx) = input.source_transaction {
                     stack.push(source_tx);
                 } else if self.debug {
@@ -290,14 +290,14 @@ impl<T: Clone + Send + Sync, C: Send + Sync> SyncHistorian<T, C> {
             }
 
             // Interpret each output
-            for (idx, _output) in tx.outputs.iter().enumerate() {
+            for (idx, _output) in tx.outputs().iter().enumerate() {
                 if let Some(value) = (self.interpreter)(tx, idx as u32, context) {
                     results.push(value);
                 }
             }
 
             // Traverse input sources, the first input's ancestry first
-            for input in tx.inputs.iter().rev() {
+            for input in tx.inputs().iter().rev() {
                 if let Some(ref source_tx) = input.source_transaction {
                     stack.push(source_tx);
                 }
@@ -314,7 +314,7 @@ mod tests {
 
     fn create_test_tx(_id_suffix: u8, source: Option<Transaction>) -> Transaction {
         let mut tx = Transaction::new();
-        tx.outputs.push(TransactionOutput::new(
+        tx.outputs_mut().push(TransactionOutput::new(
             1000,
             LockingScript::from_asm("OP_TRUE").unwrap(),
         ));
@@ -322,7 +322,7 @@ mod tests {
         if let Some(source_tx) = source {
             let mut input = TransactionInput::new(source_tx.id(), 0);
             input.source_transaction = Some(Box::new(source_tx));
-            tx.inputs.push(input);
+            tx.inputs_mut().push(input);
         }
 
         tx
@@ -442,10 +442,10 @@ mod tests {
             return;
         }
         visited.insert(txid.clone());
-        for idx in 0..tx.outputs.len() {
+        for idx in 0..tx.outputs().len() {
             results.push(format!("{txid}:{idx}"));
         }
-        for input in &tx.inputs {
+        for input in tx.inputs() {
             if let Some(ref source_tx) = input.source_transaction {
                 legacy_traverse(source_tx, visited, results);
             }
@@ -462,17 +462,17 @@ mod tests {
             let mut tx = Transaction::new();
             for _ in 0..rng.gen_range(1..=3usize) {
                 if made.is_empty() {
-                    tx.inputs
+                    tx.inputs_mut()
                         .push(TransactionInput::new(format!("{k:064x}"), 0));
                 } else {
                     let source = made[rng.gen_range(0..made.len())].clone();
                     let mut input = TransactionInput::new(source.id(), 0);
                     input.source_transaction = Some(Box::new(source));
-                    tx.inputs.push(input);
+                    tx.inputs_mut().push(input);
                 }
             }
             for _ in 0..rng.gen_range(1..=3usize) {
-                tx.outputs.push(TransactionOutput::new(
+                tx.outputs_mut().push(TransactionOutput::new(
                     rng.gen_range(1..1_000u64),
                     LockingScript::from_asm("OP_TRUE").unwrap(),
                 ));

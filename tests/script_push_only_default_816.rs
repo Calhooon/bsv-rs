@@ -249,7 +249,7 @@ fn parent_and_child(version: u32, unlock: &str) -> (Transaction, Transaction, Mo
     parent
         .add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
-    parent.inputs[0].set_unlocking_script(UnlockingScript::from_hex("51").unwrap());
+    parent.inputs_mut()[0].set_unlocking_script(UnlockingScript::from_hex("51").unwrap());
     parent
         .add_output(TransactionOutput::new(
             1000,
@@ -263,7 +263,7 @@ fn parent_and_child(version: u32, unlock: &str) -> (Transaction, Transaction, Mo
     let mut tracker = MockChainTracker::new(900_000);
     tracker.add_root(800_000, root);
     let mut child = Transaction::new();
-    child.version = version;
+    child.set_version(version);
     let mut input = TransactionInput::with_source_transaction(parent.clone(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex(unlock).unwrap());
     child.add_input(input).unwrap();

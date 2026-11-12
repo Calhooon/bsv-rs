@@ -86,13 +86,15 @@ fn load(path: &Path) -> Result<Vec<Case>, Box<dyn Error>> {
             return Err("duplicate corpus row".into());
         }
         let tx = Transaction::from_hex(&entry.tx)?;
-        if tx.inputs.len() != entry.prevouts.len() || tx.version as i32 != entry.params.tx_version {
+        if tx.inputs().len() != entry.prevouts.len()
+            || tx.version() as i32 != entry.params.tx_version
+        {
             return Err("corpus input count or version mismatch".into());
         }
         let era = ProtocolEra::mainnet(entry.params.spend_height)
             .ok_or("pre-Genesis spend is unsupported")?;
         let inputs: Vec<_> = tx
-            .inputs
+            .inputs()
             .iter()
             .map(|input| {
                 Ok(TxInput {
@@ -104,14 +106,14 @@ fn load(path: &Path) -> Result<Vec<Case>, Box<dyn Error>> {
             })
             .collect::<bsv_rs::Result<_>>()?;
         let outputs: Vec<_> = tx
-            .outputs
+            .outputs()
             .iter()
             .map(|output| TxOutput {
                 satoshis: output.satoshis.unwrap_or(0),
                 script: output.locking_script.to_binary(),
             })
             .collect();
-        for (index, (input, prevout)) in tx.inputs.iter().zip(&entry.prevouts).enumerate() {
+        for (index, (input, prevout)) in tx.inputs().iter().zip(&entry.prevouts).enumerate() {
             let utxo =
                 ProtocolEra::mainnet(prevout.height).ok_or("pre-Genesis UTXO is unsupported")?;
             let mut hash = hex::decode(&prevout.txid)?;
@@ -135,7 +137,7 @@ fn load(path: &Path) -> Result<Vec<Case>, Box<dyn Error>> {
                     source_output_index: prevout.vout,
                     source_satoshis: prevout.satoshis,
                     locking_script: LockingScript::from_hex(&prevout.script)?,
-                    transaction_version: tx.version as i32,
+                    transaction_version: tx.version() as i32,
                     other_inputs: inputs
                         .iter()
                         .enumerate()
@@ -146,7 +148,7 @@ fn load(path: &Path) -> Result<Vec<Case>, Box<dyn Error>> {
                     input_index: index,
                     unlocking_script: input.unlocking_script.clone().ok_or("missing unlock")?,
                     input_sequence: input.sequence,
-                    lock_time: tx.lock_time,
+                    lock_time: tx.lock_time(),
                     memory_limit: None,
                     work_limit: None,
                 },

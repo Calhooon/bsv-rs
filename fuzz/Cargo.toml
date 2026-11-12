@@ -18,7 +18,8 @@ tokio = { version = "1", features = ["rt", "net", "time"] }
 
 [dependencies.bsv-rs]
 path = ".."
-features = ["full", "http"]
+# `internal-test-doors`: the crate's test doors, no part of its API (#869's fold).
+features = ["full", "http", "internal-test-doors"]
 
 [[bin]]
 name = "fuzz_script_parser"

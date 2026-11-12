@@ -380,13 +380,13 @@ mod streaming {
             lock.write_bin(&key.public_key().to_compressed())
                 .write_opcode(0xac);
             let mut tx = spending(&case, LockingScript::from_script(lock));
-            tx.version = 1;
-            let source = tx.inputs[0].source_transaction.as_ref().unwrap();
+            tx.set_version(1);
+            let source = tx.inputs()[0].source_transaction.as_ref().unwrap();
             let digest = SigningContext::new(
                 &tx.to_binary(),
                 0,
                 1_000,
-                source.outputs[0].locking_script.as_script(),
+                source.outputs()[0].locking_script.as_script(),
             )
             .compute_sighash(0x61)
             .unwrap();
@@ -394,8 +394,7 @@ mod streaming {
             signature.push(0x61);
             let mut unlock = Script::new();
             unlock.write_bin(&signature);
-            tx.inputs[0].set_unlocking_script(UnlockingScript::from_script(unlock));
-            tx.invalidate_caches();
+            tx.inputs_mut()[0].set_unlocking_script(UnlockingScript::from_script(unlock));
             for verdict in verdicts(&tx.to_beef(false).unwrap(), spend.map(|h| h - 1), &chain) {
                 assert_eq!(
                     verdict.is_valid(),

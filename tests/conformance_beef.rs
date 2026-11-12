@@ -454,10 +454,10 @@ fn conformance_merkle_path() {
 /// bytes, so `tx.to_hex()` echoes the input and cannot catch lenient parses.
 fn reserialize(tx: &Transaction) -> String {
     Transaction::with_params(
-        tx.version,
-        tx.inputs.clone(),
-        tx.outputs.clone(),
-        tx.lock_time,
+        tx.version(),
+        tx.inputs().to_vec(),
+        tx.outputs().to_vec(),
+        tx.lock_time(),
     )
     .to_hex()
 }
@@ -481,10 +481,10 @@ fn conformance_serialization() {
         match id {
             "tx-001" | "tx-002" => {
                 let tx = Transaction::from_hex(s(input, "raw_hex")).expect(id);
-                let mut ok = tx.version as i64 == n(expected, "version")
-                    && tx.inputs.len() as i64 == n(expected, "inputs_count")
-                    && tx.outputs.len() as i64 == n(expected, "outputs_count")
-                    && tx.lock_time as i64 == n(expected, "locktime")
+                let mut ok = tx.version() as i64 == n(expected, "version")
+                    && tx.inputs().len() as i64 == n(expected, "inputs_count")
+                    && tx.outputs().len() as i64 == n(expected, "outputs_count")
+                    && tx.lock_time() as i64 == n(expected, "locktime")
                     && reserialize(&tx) == s(expected, "raw_hex_roundtrip");
                 if !s(expected, "txid").is_empty() {
                     ok &= tx.id() == s(expected, "txid");
@@ -494,7 +494,7 @@ fn conformance_serialization() {
                     ok,
                     format!(
                         "version={} txid={} roundtrip={}",
-                        tx.version,
+                        tx.version(),
                         tx.id(),
                         reserialize(&tx)
                     ),
@@ -515,20 +515,24 @@ fn conformance_serialization() {
                 let tx = Transaction::from_hex_ef(s(input, "ef_hex")).expect(id);
                 suite.check(
                     id,
-                    tx.inputs.len() as i64 == n(expected, "inputs_count")
-                        && tx.outputs.len() as i64 == n(expected, "outputs_count"),
-                    format!("inputs={} outputs={}", tx.inputs.len(), tx.outputs.len()),
+                    tx.inputs().len() as i64 == n(expected, "inputs_count")
+                        && tx.outputs().len() as i64 == n(expected, "outputs_count"),
+                    format!(
+                        "inputs={} outputs={}",
+                        tx.inputs().len(),
+                        tx.outputs().len()
+                    ),
                 );
             }
             "tx-005" => {
                 let tx = Transaction::new();
                 suite.check(
                     id,
-                    tx.version as i64 == n(expected, "version")
-                        && tx.inputs.is_empty()
-                        && tx.outputs.is_empty()
-                        && tx.lock_time as i64 == n(expected, "locktime"),
-                    format!("version={} locktime={}", tx.version, tx.lock_time),
+                    tx.version() as i64 == n(expected, "version")
+                        && tx.inputs().is_empty()
+                        && tx.outputs().is_empty()
+                        && tx.lock_time() as i64 == n(expected, "locktime"),
+                    format!("version={} locktime={}", tx.version(), tx.lock_time()),
                 );
             }
             "tx-006" => {
@@ -587,7 +591,7 @@ fn conformance_serialization() {
             }
             "tx-014" => {
                 let mut tx = Transaction::new();
-                tx.inputs.push(TransactionInput::new(
+                tx.inputs_mut().push(TransactionInput::new(
                     s(input, "source_txid").to_string(),
                     n(input, "source_output_index") as u32,
                 ));

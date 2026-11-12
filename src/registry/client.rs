@@ -415,7 +415,7 @@ impl<W: WalletInterface> RegistryClient<W> {
             .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
 
         let tx_output = tx
-            .outputs
+            .outputs()
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
@@ -432,7 +432,7 @@ impl<W: WalletInterface> RegistryClient<W> {
             .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
 
         let tx_output = tx
-            .outputs
+            .outputs()
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
@@ -449,7 +449,7 @@ impl<W: WalletInterface> RegistryClient<W> {
             .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
 
         let tx_output = tx
-            .outputs
+            .outputs()
             .get(output.output_index as usize)
             .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
 
