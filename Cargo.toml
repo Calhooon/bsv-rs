@@ -4,18 +4,24 @@ version = "0.9.0-beta.7"
 edition = "2021"
 # the lowest toolchain the library builds on (1.87 refuses slice::as_chunks); the gate's msrv job (bsv-stack-lean #139)
 rust-version = "1.88"
-description = "BSV SDK for Rust: primitives, the script interpreter, transactions and BEEF/SPV, BRC-42 wallets, BRC-103 auth, the overlay network. Reference parity with the TypeScript SDK, native and wasm32."
+description = "BSV SDK for Rust: primitives, the script interpreter, transactions and BEEF/SPV, BRC-42 wallets, BRC-103 auth, the overlay network. Ported from the TypeScript SDK, for native targets and wasm32."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Calhooon/bsv-rs"
-homepage = "https://github.com/Calhooon/bsv-rs"
+documentation = "https://docs.rs/bsv-rs"
+readme = "README.md"
 keywords = ["bitcoin", "bsv", "blockchain", "cryptocurrency", "sdk"]
-categories = ["cryptography", "encoding", "parser-implementations"]
-# the workflows and the repository process files are not part of the crate
-exclude = ["/.github/", "/RELEASING.md", "/CLAUDE.md", "/.gitleaksignore"]
+# slugs crates.io lists (https://crates.io/api/v1/category_slugs, read 2026-11-11), at most five
+categories = ["cryptography::cryptocurrencies", "cryptography", "encoding", "parser-implementations", "wasm"]
+# the workflows and the repository process files are not part of the crate (`HANDOFF.md` a
+# session record, never a user's). No `homepage`: it repeated `repository` (cargo warns), and
+# the About rule reads `documentation` (front_pages.py's `about`)
+exclude = ["/.github/", "/RELEASING.md", "/CLAUDE.md", "/.gitleaksignore", "/HANDOFF.md"]
 
-# docs.rs builds the default features unless told otherwise: it showed three of the modules for 0.8.6
+# docs.rs builds every module, each item labelled with the feature that enables it
+# (`doc_cfg` under `--cfg docsrs`, src/lib.rs); the default features alone showed three modules
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 # primeorder and crypto-bigint are named for a feature and a floor, never imported (the comments below)
 [package.metadata.cargo-machete]

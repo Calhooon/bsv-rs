@@ -1,0 +1,2 @@
+{"crate": {"name": "bsv-rs", "max_stable_version": "0.8.7", "max_version": "0.9.0-beta.1"},
+ "versions": [{"num": "0.9.0-beta.1", "yanked": false}, {"num": "0.8.7", "yanked": false}, {"num": "0.8.6", "yanked": true}]}

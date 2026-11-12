@@ -739,6 +739,17 @@ jobs:
           cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked
           python3 .github/scripts/mutants_entries.py
 
+      # the Release page generator and the front pages' reconciler (front_pages.py, run by
+      # release.yml after the publish) on their recorded answers, so a change that breaks them
+      # is red at its pull request, not after a tag published (a markdown-only change, which
+      # cannot reach them, skips it as it skips every gate but secrets)
+      - name: front-pages
+        id: front-pages
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS front-pages"; else echo "FAIL front-pages"; fi' EXIT
+          python3 -B -m unittest discover -s .github/scripts -p 'test_front_pages.py'
+
       # the conformance vectors as one named gate: the shared JSON under tests/vectors/ and the
       # ts-stack corpus
       - name: vectors
@@ -758,6 +769,17 @@ jobs:
         run: |
           trap 'if [ $? -eq 0 ]; then echo "PASS fixtures"; else echo "FAIL fixtures"; fi' EXIT
           cargo test --features "full,http" --test fixtures_replay --locked
+
+      # the README's first screen worked out again from its producers in this tree, the install
+      # line, the version-free text before the examples and the front files (the front-page lane,
+      # 2026-11-11): named here so that a change to any file it reads (SECURITY.md included) is
+      # never a docs-only change
+      - name: front page
+        id: front-page
+        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        run: |
+          trap 'if [ $? -eq 0 ]; then echo "PASS front page"; else echo "FAIL front page"; fi' EXIT
+          cargo test --features "full,http" --test front_page --locked
 
       # the secrets scan (bsv-stack-lean #140): gitleaks over the commits the event brings, the
       # values redacted, the locations printed; the findings judged not secrets are named by
@@ -827,8 +849,10 @@ jobs:
           DOCS_ONLY: ${{ steps.plan.outputs.docs_only }}
           VERDICTS: |
             ${{ steps.mutants-entries.outcome }} mutants-entries
+            ${{ steps.front-pages.outcome }} front-pages
             ${{ steps.vectors.outcome }} vectors
             ${{ steps.fixtures.outcome }} fixtures
+            ${{ steps.front-page.outcome }} front page
             ${{ steps.secrets.outcome }} secrets
             ${{ steps.docs.outcome }} Documentation
             ${{ steps.wasm32.outcome }} wasm32 (combined)

@@ -24,6 +24,13 @@
 //! when a gate is gone, would stop running after an earlier gate failed, prints no
 //! `PASS`/`FAIL` line of its own, or is missing from the last step that names every gate
 //! that did not pass; a job with a matrix or a second cache restore is refused too.
+//!
+//! The Release page (the design reads of 2026-11-11, D7 and D9; RELEASING.md step 5):
+//! `release.yml` refuses a tag whose `CHANGELOG.md` has no section before it publishes,
+//! makes the page in a `page` job after `Publish to crates.io` (notes from
+//! `front_pages.py notes` with this run's id, flags from `front_pages.py flags`), holds
+//! `contents: write` in that job alone, and runs the reconciler after it;
+//! `front-pages.yml` runs the reconciler on a dispatch and nothing else (no schedule).
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 use std::fs;
@@ -505,8 +512,12 @@ const BUNDLES: &[(&str, &[(&str, &str)])] = &[
         "checks",
         &[
             ("mutants-entries", "mutants-entries"),
+            // the Release page generator's and the reconciler's tests (front_pages.py), run
+            // at every pull request so release.yml's page job never meets them broken
+            ("front-pages", "front-pages"),
             ("vectors", "vectors"),
             ("fixtures", "fixtures"),
+            ("front-page", "front page"),
             ("secrets", "secrets"),
             ("docs", "Documentation"),
             ("wasm32", "wasm32 (combined)"),
@@ -769,5 +780,310 @@ fn every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663()
             "checks: the mutants-entries gate does not run mutants_entries.py",
             "a workflow rewrites the entries (`--fix` is the captain's, by hand)",
         ]
+    );
+}
+
+/// The version job's test of a tag's form: `vX.Y.Z` or `vX.Y.Z-beta.N`, no other.
+const TAG_FORMS: &str = r#"if [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-beta\.(0|[1-9][0-9]*))?$ ]]; then"#;
+
+/// The page job's two lines that make the page, whole: each carries the notes file and the
+/// flags (the strength re-read's F-3: a prefix pin let either be dropped).
+const PAGE_EDIT: &str = r#"gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$title" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}""#;
+const PAGE_CREATE: &str = r#"gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$title" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}""#;
+
+/// What release.yml and front-pages.yml must hold for the Release page and the reconciler.
+fn release_pages(release: &str, dispatch: &str) -> Vec<String> {
+    let mut errors = shape("release.yml", release);
+    errors.extend(shape("front-pages.yml", dispatch));
+    let job = |name: &str| {
+        block(release, 2, &format!("{name}:"))
+            .unwrap_or_default()
+            .join("\n")
+    };
+    let version = job("version");
+    if !version.contains("- name: The tag's changelog has its section")
+        || !version.contains(r#"grep -qE "^## \[${version//./\\.}\]( |$)" CHANGELOG.md"#)
+    {
+        errors.push("release.yml: the version job does not refuse a tag without its changelog section before the publish".to_owned());
+    }
+    if !version.contains("section is empty; the Release page is made from that section") {
+        errors.push("release.yml: the version job does not refuse an empty changelog section before the publish".to_owned());
+    }
+    // Two forms of tag and no other (RELEASING.md step 14; the captain's ruling T7): a tag the
+    // regex refuses (`-rc.1`, `-alpha`, `+1`) stops the version job before anything is published
+    if !version.contains(TAG_FORMS)
+        || !version.contains(
+            "is neither vX.Y.Z (cut from main) nor vX.Y.Z-beta.N (cut from beta); no other form is released",
+        )
+    {
+        errors.push(
+            "release.yml: the version job does not refuse a tag of another form than vX.Y.Z and vX.Y.Z-beta.N".to_owned(),
+        );
+    }
+    let page = job("page");
+    if page.is_empty() {
+        errors.push("release.yml: no `page` job".to_owned());
+    }
+    for (needle, why) in [
+        (
+            "needs: publish",
+            "the page is made after the crate is published",
+        ),
+        ("contents: write", "it creates the release"),
+        (
+            "test_front_pages.py",
+            "the generator's tests before it runs",
+        ),
+        (
+            r#"front_pages.py notes "$GITHUB_REF_NAME" --run "$GITHUB_RUN_ID""#,
+            "the notes from the tag and this run",
+        ),
+        (
+            r#"front_pages.py flags "$GITHUB_REF_NAME""#,
+            "prerelease and Latest from the version",
+        ),
+        (
+            r#"gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag"#,
+            "the page of the pushed tag alone",
+        ),
+        // The flags read into a variable on a line of their own, so that `set -e` stops the
+        // step when `flags` fails: read inside `read <<< "$(...)"` the failure is lost, the
+        // page goes out with no mark and GitHub's default makes a back-patch Latest (the
+        // strength read of 2026-11-11, run under bash -e; the captain's ruling R1)
+        (
+            "\n          marks=\"$(python3 -B .github/scripts/front_pages.py flags \"$GITHUB_REF_NAME\")\"\n          read -r -a flags <<< \"$marks\"\n",
+            "the flags on a line of their own, a failure stopping the step",
+        ),
+        ("set -euo pipefail", "a failing command stops the step"),
+        // a page that exists (thirteen made by hand on 2026-11-11, or an earlier attempt) is
+        // edited, never created twice, so re-running the failed job heals it
+        (
+            r#"if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then"#,
+            "a page that exists is found",
+        ),
+        (
+            r#"gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY""#,
+            "a page that exists is edited",
+        ),
+        ("persist-credentials: false", "the write token is not left in the checkout"),
+        (
+            "sed 's/^/::warning::/'",
+            "every not recorded line of the notes a warning of the run",
+        ),
+    ] {
+        if !page.contains(needle) {
+            errors.push(format!("release.yml page: no `{needle}` ({why})"));
+        }
+    }
+    for (line, what) in [(PAGE_CREATE, "create"), (PAGE_EDIT, "edit")] {
+        if !page.lines().any(|l| l.trim() == line) {
+            errors.push(format!(
+                "release.yml page: the {what} line is not `{line}` whole (the notes file and the flags on it)"
+            ));
+        }
+    }
+    // a page for a version crates.io lacks, after a failed publish, or a reconciler run past a
+    // failed page: neither job runs on any outcome but its `needs:` succeeding (F-3)
+    for (name, body) in [("page", &page), ("front-pages", &job("front-pages"))] {
+        for absorb in ["always()", "cancelled()", "continue-on-error", "failure()"] {
+            if body.contains(absorb) {
+                errors.push(format!(
+                    "release.yml {name}: carries `{absorb}`; it runs only after its `needs:` succeeded"
+                ));
+            }
+        }
+    }
+    if page.contains("<<< \"$(") {
+        errors.push(
+            "release.yml page: a command read inside `<<< \"$(...)\"`, its failure lost".to_owned(),
+        );
+    }
+    let writers = release.matches("contents: write").count();
+    if writers != 1 {
+        errors.push(format!(
+            "release.yml: `contents: write` in {writers} places, not the page job's alone"
+        ));
+    }
+    let agree = job("front-pages");
+    for (needle, why) in [
+        ("needs: page", "the reconciler reads the page just made"),
+        (
+            "front_pages.py check --wait 3600",
+            "the reconciler waits for what time heals",
+        ),
+        ("timeout-minutes: 75", "the wait is bounded past its hour"),
+    ] {
+        if !agree.contains(needle) {
+            errors.push(format!("release.yml front-pages: no `{needle}` ({why})"));
+        }
+    }
+    let on = block(dispatch, 0, "on:").unwrap_or_default().join("\n");
+    if !on.contains("workflow_dispatch:") {
+        errors.push("front-pages.yml: not dispatchable".to_owned());
+    }
+    for trigger in ["schedule:", "push:", "pull_request", "workflow_run:"] {
+        if on.contains(trigger) {
+            errors.push(format!(
+                "front-pages.yml: fires on `{trigger}`; the reconciler runs on a dispatch alone"
+            ));
+        }
+    }
+    if !dispatch.contains("front_pages.py check") {
+        errors.push("front-pages.yml: does not run the reconciler".to_owned());
+    }
+    errors
+}
+
+#[test]
+fn the_release_makes_its_page_after_the_publish_and_the_reconciler_runs_on_dispatch_alone() {
+    let release = read(".github/workflows/release.yml");
+    let dispatch = read(".github/workflows/front-pages.yml");
+    let errors = release_pages(&release, &dispatch);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+}
+
+#[test]
+fn a_release_page_made_early_with_write_elsewhere_or_a_scheduled_reconciler_is_refused() {
+    let release = read(".github/workflows/release.yml");
+    let dispatch = read(".github/workflows/front-pages.yml");
+    let unchecked = release.replacen(
+        "      - name: The tag's changelog has its section\n",
+        "      - name: renamed\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&unchecked, &dispatch),
+        ["release.yml: the version job does not refuse a tag without its changelog section before the publish"]
+    );
+    let early = release.replacen(
+        "    needs: publish\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n",
+        "    needs: ci\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&early, &dispatch),
+        ["release.yml page: no `needs: publish` (the page is made after the crate is published)"]
+    );
+    let wide = release.replacen(
+        "permissions:\n  contents: read\n",
+        "permissions:\n  contents: write\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&wide, &dispatch),
+        ["release.yml: `contents: write` in 2 places, not the page job's alone"]
+    );
+    let back_patch = release.replacen(
+        r#"front_pages.py flags "$GITHUB_REF_NAME""#,
+        "echo --latest",
+        1,
+    );
+    assert_eq!(
+        release_pages(&back_patch, &dispatch),
+        [
+            r#"release.yml page: no `front_pages.py flags "$GITHUB_REF_NAME"` (prerelease and Latest from the version)"#,
+            "release.yml page: no `\n          marks=\"$(python3 -B .github/scripts/front_pages.py flags \"$GITHUB_REF_NAME\")\"\n          read -r -a flags <<< \"$marks\"\n` (the flags on a line of their own, a failure stopping the step)",
+        ]
+    );
+    let swallowed = release.replacen(
+        "          marks=\"$(python3 -B .github/scripts/front_pages.py flags \"$GITHUB_REF_NAME\")\"\n          read -r -a flags <<< \"$marks\"\n",
+        "          read -r -a flags <<< \"$(python3 -B .github/scripts/front_pages.py flags \"$GITHUB_REF_NAME\")\"\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&swallowed, &dispatch),
+        [
+            "release.yml page: no `\n          marks=\"$(python3 -B .github/scripts/front_pages.py flags \"$GITHUB_REF_NAME\")\"\n          read -r -a flags <<< \"$marks\"\n` (the flags on a line of their own, a failure stopping the step)",
+            "release.yml page: a command read inside `<<< \"$(...)\"`, its failure lost",
+        ]
+    );
+    let create_only = release.replacen(
+        r#"          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then"#,
+        "          if false; then",
+        1,
+    );
+    assert_eq!(
+        release_pages(&create_only, &dispatch),
+        [
+            r#"release.yml page: no `if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then` (a page that exists is found)"#
+        ]
+    );
+    let empty_section = release.replacen(
+        "section is empty; the Release page",
+        "section is empty; the page",
+        1,
+    );
+    assert_eq!(
+        release_pages(&empty_section, &dispatch),
+        ["release.yml: the version job does not refuse an empty changelog section before the publish"]
+    );
+    let no_wait = release.replacen(
+        "front_pages.py check --wait 3600",
+        "front_pages.py check",
+        1,
+    );
+    assert_eq!(
+        release_pages(&no_wait, &dispatch),
+        ["release.yml front-pages: no `front_pages.py check --wait 3600` (the reconciler waits for what time heals)"]
+    );
+    // T7: a third form of tag admitted
+    let any_tag = release.replacen(
+        TAG_FORMS,
+        r#"if [[ "$GITHUB_REF_NAME" =~ ^v.+$ ]]; then"#,
+        1,
+    );
+    assert_eq!(
+        release_pages(&any_tag, &dispatch),
+        ["release.yml: the version job does not refuse a tag of another form than vX.Y.Z and vX.Y.Z-beta.N"]
+    );
+    // T8: the flags dropped from the create line, the notes file from the edit line, and a
+    // page made whatever the publish did
+    let unmarked = release.replacen(
+        &format!("{PAGE_CREATE}\n"),
+        &format!("{}\n", PAGE_CREATE.replace(r#" "${flags[@]}""#, "")),
+        1,
+    );
+    assert_eq!(
+        release_pages(&unmarked, &dispatch),
+        [format!("release.yml page: the create line is not `{PAGE_CREATE}` whole (the notes file and the flags on it)")]
+    );
+    let blank = release.replacen(
+        &format!("{PAGE_EDIT}\n"),
+        &format!(
+            "{}\n",
+            PAGE_EDIT.replace(r#" --notes-file "$RUNNER_TEMP/notes.md""#, "")
+        ),
+        1,
+    );
+    assert_eq!(
+        release_pages(&blank, &dispatch),
+        [format!("release.yml page: the edit line is not `{PAGE_EDIT}` whole (the notes file and the flags on it)")]
+    );
+    let always = release.replacen(
+        "    name: Release page\n    needs: publish\n",
+        "    name: Release page\n    needs: publish\n    if: always()\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&always, &dispatch),
+        ["release.yml page: carries `always()`; it runs only after its `needs:` succeeded"]
+    );
+    let absorbed = release.replacen(
+        "    name: Front pages agree\n    needs: page\n",
+        "    name: Front pages agree\n    needs: page\n    continue-on-error: true\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&absorbed, &dispatch),
+        ["release.yml front-pages: carries `continue-on-error`; it runs only after its `needs:` succeeded"]
+    );
+    let scheduled = dispatch.replacen(
+        "on:\n  workflow_dispatch:\n",
+        "on:\n  schedule:\n    - cron: '0 6 * * *'\n  workflow_dispatch:\n",
+        1,
+    );
+    assert_eq!(
+        release_pages(&release, &scheduled),
+        ["front-pages.yml: fires on `schedule:`; the reconciler runs on a dispatch alone"]
     );
 }
