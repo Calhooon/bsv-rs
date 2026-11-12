@@ -313,9 +313,10 @@ fn test_sighash_cache_matches_vectors_and_free_functions() {
 /// computed BIP143 for every hash type.
 mod the_default_signing_digest {
     use bsv_rs::primitives::bsv::sighash::{
-        compute_sighash_dispatched_for_signing, compute_sighash_for_signing, parse_transaction,
-        SighashParams, TxInput, TxOutput, SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE,
-        SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
+        build_sighash_preimage_original, compute_sighash_dispatched_for_signing,
+        compute_sighash_for_signing, parse_transaction, SighashParams, TxInput, TxOutput,
+        SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE, SIGHASH_FORKID, SIGHASH_NONE,
+        SIGHASH_SINGLE,
     };
     use bsv_rs::primitives::bsv::TransactionSignature;
     use bsv_rs::primitives::ec::PrivateKey;
@@ -508,6 +509,42 @@ mod the_default_signing_digest {
                 .compute_sighash(0x03)
                 .unwrap(),
             ONE
+        );
+    }
+
+    /// [`build_sighash_preimage_original`] called directly, past the two `one`
+    /// cases its caller answers (its rustdoc: "a SINGLE output index out of
+    /// range is a bug and panics"): SINGLE at input 2 of a transaction with
+    /// two outputs panics. It never returns a preimage whose output count
+    /// (`n_in + 1`) is more than the outputs written, which a loop cut at the
+    /// outputs' end would (`.iter().enumerate().take(n)`, the form clippy
+    /// 1.100.0's `needless_range_loop` proposes for the writer's loop). In
+    /// range it writes the count, a null output (value -1, no script,
+    /// `interpreter.cpp:1923-1932`) at every index before the signed one, then
+    /// the signed output.
+    #[test]
+    fn the_original_preimage_writer_panics_on_a_single_index_past_the_outputs() {
+        let raw = raw_tx(2, 3, 2, 4);
+        let tx = parse_transaction(&raw).unwrap();
+        let code = locks()[0].to_binary();
+        for scope in [0x03, 0x83, 0x63, 0xe3] {
+            let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                build_sighash_preimage_original(&params(&tx, 2, &code, 1, scope))
+            }));
+            assert!(got.is_err(), "scope {scope:#04x}: a panic, not a preimage");
+        }
+        let preimage = build_sighash_preimage_original(&params(&tx, 1, &code, 1, 0x03));
+        let mut tail = vec![2u8];
+        tail.extend(u64::MAX.to_le_bytes());
+        tail.push(0);
+        tail.extend(tx.outputs[1].satoshis.to_le_bytes());
+        tail.push(u8::try_from(tx.outputs[1].script.len()).unwrap());
+        tail.extend(&tx.outputs[1].script);
+        tail.extend(tx.locktime.to_le_bytes());
+        tail.extend(0x03u32.to_le_bytes());
+        assert!(
+            preimage.ends_with(&tail),
+            "the outputs of an in-range SINGLE: {preimage:02x?}"
         );
     }
 
