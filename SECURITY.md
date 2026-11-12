@@ -20,6 +20,10 @@ A defect that a peer's bytes or text can reach, where the peer is anyone who can
 
 Out of scope: a difference from another SDK that the root `CLAUDE.md` already states as a known divergence; a defect in a dependency (report it to that project; tell us too if this crate's use of it makes it reachable); behaviour that needs the caller's own hand edit of a value, with no peer input involved (report it as an ordinary issue).
 
+## Audits
+
+This crate has had no third-party security audit. The advisories published so far were found by this project's own reads; each says so in its text.
+
 ## Supported lines
 
 | Line | Supported |
