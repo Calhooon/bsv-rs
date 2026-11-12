@@ -2390,11 +2390,11 @@ mod transaction_tests {
             }
 
             // Verify change outputs have no satoshis before fee()
-            for i in 1..=3 {
+            for (i, output) in spend_tx.outputs[1..=3].iter().enumerate() {
                 assert!(
-                    spend_tx.outputs[i].satoshis.is_none(),
+                    output.satoshis.is_none(),
                     "Change output {} should not have satoshis before fee()",
-                    i
+                    i + 1
                 );
             }
 
@@ -2405,11 +2405,11 @@ mod transaction_tests {
                 .expect("fee() should work");
 
             // Verify all change outputs now have satoshis
-            for i in 1..=3 {
+            for (i, output) in spend_tx.outputs[1..=3].iter().enumerate() {
                 assert!(
-                    spend_tx.outputs[i].satoshis.is_some(),
+                    output.satoshis.is_some(),
                     "Change output {} should have satoshis after fee()",
-                    i
+                    i + 1
                 );
             }
 
