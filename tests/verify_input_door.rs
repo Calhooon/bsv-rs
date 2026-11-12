@@ -16,7 +16,10 @@
 //! the default mode's overrides; (g) a word takes no override; (h) the
 //! setters commute. `from_bytes` agrees with `Transaction::from_binary` on
 //! every transaction the vectors hold and on their single-byte changes,
-//! truncations and extensions.
+//! truncations and extensions, save a transaction whose only refusal there
+//! is an output amount of 2^53 or more, which the door reads as the node
+//! does and the default mode refuses in `from_binary`'s error (#874,
+//! `verify_input_door_amount_874.rs`).
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // Test code: a failed unwrap is the test failing.
 
@@ -461,6 +464,29 @@ fn vector_transaction_bytes() -> Vec<Vec<u8>> {
     out
 }
 
+/// `bytes` with every output amount of 2^53 or more replaced by 0: what
+/// `from_binary` reads when the amount was its only refusal.
+fn amounts_made_safe(bytes: &[u8]) -> Vec<u8> {
+    let mut out = bytes.to_vec();
+    let Ok(offsets) = Transaction::parse_script_offsets(bytes) else {
+        return out;
+    };
+    for script in offsets.outputs {
+        let varint = match script.length {
+            0..=0xfc => 1,
+            0xfd..=0xffff => 3,
+            0x1_0000..=0xffff_ffff => 5,
+            _ => 9,
+        };
+        let at = script.offset - varint - 8;
+        let amount = u64::from_le_bytes(out[at..at + 8].try_into().unwrap());
+        if amount >= 1 << 53 {
+            out[at..at + 8].copy_from_slice(&[0; 8]);
+        }
+    }
+    out
+}
+
 fn agrees(bytes: &[u8]) -> bool {
     match (
         Transaction::from_binary(bytes),
@@ -468,7 +494,17 @@ fn agrees(bytes: &[u8]) -> bool {
     ) {
         (Ok(tx), Ok(prepared)) => tx.inputs().len() == prepared.input_count(),
         (Err(a), Err(b)) => a == b,
-        _ => false,
+        // Read by the door alone (#874): `from_binary`'s only refusal the
+        // amount, which the default mode answers in its error at any index.
+        (Err(a), Ok(prepared)) => {
+            a == Error::TransactionError("Number can only safely store up to 53 bits".into())
+                && Transaction::from_binary(&amounts_made_safe(bytes)).is_ok()
+                && [0, prepared.input_count()].iter().all(|&index| {
+                    prepared.verify_input(index, &[0x51], 1, &InputRules::default())
+                        == Err(InputRefusal::Transaction(a.clone()))
+                })
+        }
+        (Ok(_), Err(_)) => false,
     }
 }
 

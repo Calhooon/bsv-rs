@@ -1,0 +1,86 @@
+{
+  "reference": "ts-stack@edf6e03 packages/sdk, bundled by bun, Node v22.18.0",
+  "note": "Spend without verifyFlags (the default mode) on each cell; the cells are bsv-rs writer bytes",
+  "cases": [
+    {
+      "amount": "9007199254740991",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "0100000001d9bc7617e314c78905ea7ae45366394c07171e4e0899e71579831989c4dcf91a000000006b4830450221009af6fcb3a42aaa635049bc1bed9156c1df002c6588f90b1a1eeb490fb6d2146002204ec141cc70a6e2125a2ac25956f7715a979bca551b7507a91d0c0865fce2d480412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 1,
+      "source_satoshis_as_number": "9007199254740991",
+      "reference_default": {
+        "valid": true
+      }
+    },
+    {
+      "amount": "9007199254740991",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "0200000001d9bc7617e314c78905ea7ae45366394c07171e4e0899e71579831989c4dcf91a000000006b483045022100f77382f470b022ca83b2ac5655379b3081c1bf3ed7a3a0111e6380860e07c80502203e0a199d7f4de30299d4e88e5b121ae4d45fb56880810b81104fb4a7a3f61f02412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 2,
+      "source_satoshis_as_number": "9007199254740991",
+      "reference_default": {
+        "valid": true
+      }
+    },
+    {
+      "amount": "9007199254740992",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "0100000001629d4dbea404f75f7be73647ea30251a1ddbc6df6a298aaa2aebf2859a8b9c25000000006b483045022100f9b578f33aa298cd2c497f248fa3fc19c6b508bf8630b65f578276622177674302204cb62b36b9a8ff0c429cee7db92399a9166115a21c3d03dcdcea2dfcb2c9ffbf412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 1,
+      "source_satoshis_as_number": "9007199254740992",
+      "reference_default": {
+        "error": "Script evaluation error: The top stack element must be truthy after script evaluation."
+      }
+    },
+    {
+      "amount": "9007199254740992",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "0200000001629d4dbea404f75f7be73647ea30251a1ddbc6df6a298aaa2aebf2859a8b9c25000000006a473044022037cefe5eed8ec733c0e786dffc24ba54852fed7fe16d93274912ace31c4a3f8a02202e79c70768defeb9eced835c2fad934aaf5a4fc2ad372c3562f4037d27097ec1412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 2,
+      "source_satoshis_as_number": "9007199254740992",
+      "reference_default": {
+        "error": "Script evaluation error: The top stack element must be truthy after script evaluation."
+      }
+    },
+    {
+      "amount": "9223372036854775808",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "010000000119434c72e27fb400e9ff3cee1e6451a569d418bd01a890e6a67225948c4356a6000000006a473044022034810bc57783291e388a21ee2065dc7c183856b51ece4b6f32cc277f94ca39e402205e6addb10a00f83d4af243d0083a87b599e86d9517708b6b3bc56c2ee9928002412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 1,
+      "source_satoshis_as_number": "9223372036854776000",
+      "reference_default": {
+        "error": "Script evaluation error: The top stack element must be truthy after script evaluation."
+      }
+    },
+    {
+      "amount": "9223372036854775808",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "020000000119434c72e27fb400e9ff3cee1e6451a569d418bd01a890e6a67225948c4356a6000000006b483045022100fb8965d6c78e678c2e31a50574040232802183a5e91b3c5eb2759fc7882c69c9022067f1c49a4dc4ee51490a69b99136f19622048ac75a91e2d0f8fd74bafa0235f4412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 2,
+      "source_satoshis_as_number": "9223372036854776000",
+      "reference_default": {
+        "error": "Script evaluation error: The top stack element must be truthy after script evaluation."
+      }
+    },
+    {
+      "amount": "18446744073709551615",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "010000000139c7460c82e3e5e91dc599699d3e05cfac58e857fce35c7abac07158ae6aea0a000000006b483045022100cc6ca2097cdb24218937381197aab0afb5417351870daac860a00d548c2a468702203b485b496aab610d32156ad1e306d324873a268903f90097c6576e8a03cfcdb4412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 1,
+      "source_satoshis_as_number": "18446744073709552000",
+      "reference_default": {
+        "error": "Script evaluation error: The top stack element must be truthy after script evaluation."
+      }
+    },
+    {
+      "amount": "18446744073709551615",
+      "lock": "76a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac",
+      "tx": "020000000139c7460c82e3e5e91dc599699d3e05cfac58e857fce35c7abac07158ae6aea0a000000006a47304402200fa630d7cddb7272022c3e44f2630be9a788860066d017269205c0c970fea797022053cbfed313a8bc7fb6e7a9d279161435275f218504edb201001abc15b9c43c2d412102989c0b76cb563971fdc9bef31ec06c3560f3249d6ee9e5d83c57625596e05f6fffffffff01e8030000000000001976a914a3c6b1ee4a49d9f2af3b3802974744fba924164a88ac00000000",
+      "version": 2,
+      "source_satoshis_as_number": "18446744073709552000",
+      "reference_default": {
+        "error": "Script evaluation error: The top stack element must be truthy after script evaluation."
+      }
+    }
+  ]
+}

@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
-use super::amount::read_amount;
+use super::amount::{read_amount, AmountRule};
 use super::beef::Beef;
 use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
@@ -202,6 +202,25 @@ impl Transaction {
         Ok(tx)
     }
 
+    /// The one-input door's reader (#874): exactly one transaction, as
+    /// [`from_binary`](Self::from_binary) reads it, save that an output
+    /// amount is any 64-bit value, as the node's consensus library reads it.
+    /// Beside the transaction, `from_binary`'s refusal when the only one it
+    /// makes is an amount of 2^53 or more; any other refusal is
+    /// `from_binary`'s own error (its amount refusal when such an amount
+    /// precedes it, as `from_binary` stops there).
+    pub(crate) fn from_binary_as_node(bin: &[u8]) -> Result<(Self, Option<crate::Error>)> {
+        let mut amounts = AmountRule::node();
+        let mut reader = Reader::new(bin);
+        let read = Self::read_one(&mut reader, &mut amounts)
+            .and_then(|tx| refuse_trailing(&reader, TRAILING_DATA).map(|()| tx));
+        let reference = amounts.reference_refusal();
+        match read {
+            Ok(tx) => Ok((tx, reference)),
+            Err(error) => Err(reference.unwrap_or(error)),
+        }
+    }
+
     /// Parses a transaction from a hex string: the text is exactly one
     /// transaction, refused as [`from_binary`](Self::from_binary) refuses
     /// bytes after it (#840).
@@ -367,6 +386,12 @@ impl Transaction {
     /// # Ok::<(), bsv_rs::Error>(())
     /// ```
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
+        Self::read_one(reader, &mut AmountRule::Reference)
+    }
+
+    /// The one reader of a transaction (#874): `from_reader` under the
+    /// reference's amount rule, the door's reader under the node's.
+    pub(crate) fn read_one(reader: &mut Reader, amounts: &mut AmountRule) -> Result<Self> {
         let version = reader.read_u32_le()?;
 
         let input_count = reader.read_var_int_num()?;
@@ -408,7 +433,7 @@ impl Transaction {
         let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
 
         for _ in 0..output_count {
-            let satoshis = read_amount(reader)?;
+            let satoshis = amounts.read(reader)?;
             let script_len = reader.read_var_int_num()?;
             let script_bytes = reader.read_bytes(script_len)?;
             let locking_script = LockingScript::from_binary(script_bytes)?;

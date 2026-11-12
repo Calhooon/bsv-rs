@@ -10,8 +10,8 @@
 //! 88-97`). Here:
 //!
 //! - [`SpendingTransaction::from_bytes`] reads the bytes once, exactly one
-//!   transaction, by [`Transaction::from_binary`]'s strict reader (#840), and
-//!   keeps the transaction with its sighash midstates for every input;
+//!   transaction, as the node's deserializer does (#874), and keeps it with
+//!   its sighash midstates for every input;
 //! - [`SpendingTransaction::verify_input`] judges one input against the
 //!   output it spends, under [`InputRules`];
 //! - [`verify_input`] is the one-shot in the node's argument order.
@@ -424,8 +424,9 @@ pub struct InputVerified {
 #[non_exhaustive]
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum InputRefusal {
-    /// The one-shot's bytes are not exactly one transaction: the strict
-    /// reader's own error ([`Transaction::from_binary`]), before evaluation.
+    /// The bytes are not exactly one transaction, or in the default mode
+    /// hold an amount of 2^53 or more (#874): [`Transaction::from_binary`]'s
+    /// error, before the index check and evaluation.
     #[error(transparent)]
     Transaction(crate::Error),
     /// The index names no input of the transaction, before evaluation.
@@ -537,6 +538,8 @@ fn same_evaluation(a: &ScriptEvaluationError, b: &ScriptEvaluationError) -> bool
 #[derive(Clone)]
 pub struct SpendingTransaction {
     transaction: Arc<TxSighashCache>,
+    /// `from_binary`'s refusal of an amount, the default mode's (#874).
+    reference_refusal: Option<crate::Error>,
 }
 
 impl fmt::Debug for SpendingTransaction {
@@ -546,6 +549,7 @@ impl fmt::Debug for SpendingTransaction {
             .field("inputs", &self.transaction.inputs().len())
             .field("outputs", &self.transaction.outputs().len())
             .field("lock_time", &self.transaction.locktime())
+            .field("reference_refusal", &self.reference_refusal)
             .finish()
     }
 }
@@ -559,18 +563,19 @@ const _: () = {
 };
 
 impl SpendingTransaction {
-    /// Reads exactly one transaction from `bytes`, as
-    /// [`Transaction::from_binary`] reads it.
+    /// Reads one transaction as the node's library does: [`Transaction::from_binary`]'s
+    /// reader, an output amount any 64-bit value (#874). The node's script check, never
+    /// its transaction check: a caller still applies `CheckRegularTransaction`'s rules.
     ///
     /// # Errors
     ///
-    /// The reader's own: bytes that end before the transaction does, or a
-    /// byte after its lock time (`Serialized transaction contains trailing
-    /// data`, #840).
+    /// `from_binary`'s error for what it refuses, save an amount alone: bytes
+    /// that end early, or a byte after the lock time (#840).
     pub fn from_bytes(bytes: &[u8]) -> crate::Result<Self> {
-        let transaction = Transaction::from_binary(bytes)?;
+        let (transaction, reference_refusal) = Transaction::from_binary_as_node(bytes)?;
         Ok(Self {
             transaction: sighash_of(&transaction)?,
+            reference_refusal,
         })
     }
 
@@ -587,6 +592,8 @@ impl SpendingTransaction {
     ///
     /// # Errors
     ///
+    /// In the default mode, [`InputRefusal::Transaction`] for an amount of
+    /// 2^53 or more, before the index (#874; a word judges the input);
     /// [`InputRefusal::InputIndex`] for an index past the inputs, before
     /// evaluation; [`InputRefusal::Invalid`] for a verdict;
     /// [`InputRefusal::Declined`] when a budget of `rules` stopped it.
@@ -597,6 +604,9 @@ impl SpendingTransaction {
         source_satoshis: u64,
         rules: &InputRules,
     ) -> Result<InputVerified, InputRefusal> {
+        if let (Mode::Default(_), Some(refusal)) = (rules.mode, &self.reference_refusal) {
+            return Err(InputRefusal::Transaction(refusal.clone()));
+        }
         let inputs = self.input_count();
         let Some(input) = self.transaction.inputs().get(input_index) else {
             return Err(InputRefusal::InputIndex {

@@ -50,6 +50,58 @@ pub(crate) fn read_amount(reader: &mut Reader) -> Result<u64> {
         .map_err(|words| crate::Error::TransactionError(words.to_string()))
 }
 
+/// How a reader takes an output's amount: the reference's bound, or the
+/// node's (#874).
+///
+/// [`Transaction::from_binary`](super::Transaction::from_binary) and every
+/// public reader take [`AmountRule::Reference`]. The one-input door
+/// (`spending.rs`) takes [`AmountRule::Node`]: the node's consensus library
+/// deserializes an amount as any 64-bit value (bitcoin-sv v1.2.2
+/// `primitives/transaction.h:190-194`, `amount.h:111`) and checks none
+/// (`bitcoinconsensus.cpp:88-122`), so the door reads every amount and notes
+/// one of 2^53 or more, the refusal the reference's mode answers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AmountRule {
+    /// An amount of 2^53 or more refused in the reference's words.
+    Reference,
+    /// Any 64-bit amount read; `unsafe_seen` notes one of 2^53 or more.
+    Node {
+        /// An amount the reference's reader refuses was read.
+        unsafe_seen: bool,
+    },
+}
+
+impl AmountRule {
+    /// The node's rule, nothing seen yet.
+    pub(crate) const fn node() -> Self {
+        Self::Node { unsafe_seen: false }
+    }
+
+    /// Reads an amount, eight bytes little-endian, under this rule.
+    pub(crate) fn read(&mut self, reader: &mut Reader) -> Result<u64> {
+        match self {
+            Self::Reference => read_amount(reader),
+            Self::Node { unsafe_seen } => {
+                let value = reader.read_u64_le()?;
+                *unsafe_seen |= safe_amount(value).is_err();
+                Ok(value)
+            }
+        }
+    }
+
+    /// The reference reader's refusal of what this rule read: `Some` when
+    /// the node's rule read an amount of 2^53 or more, in
+    /// [`read_amount`]'s words and type.
+    pub(crate) fn reference_refusal(&self) -> Option<crate::Error> {
+        match self {
+            Self::Node { unsafe_seen: true } => {
+                Some(crate::Error::TransactionError(UNSAFE_AMOUNT.to_string()))
+            }
+            _ => None,
+        }
+    }
+}
+
 /// `total + value` for a sum of a caller's amounts (`Transaction::fee`,
 /// `get_fee`), refused past `u64` in the reference's `addSatoshiAmount` words,
 /// `<label> exceeds the maximum valid monetary range.` (`ts-stack@edf6e03`
