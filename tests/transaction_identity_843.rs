@@ -610,6 +610,29 @@ fn step(
                     tx.add_p2pkh_output(&key().public_key().to_address(), None)
                         .unwrap();
                 }
+                // Funded before `fee` (#871: `fee` refuses inputs that
+                // cannot pay the outputs and the fee, as the reference does,
+                // where it saturated the change to 0 until then): an input
+                // of the shortfall, by a txid drawn from no generator, so the
+                // sequence the seed draws is unchanged.
+                let paid: u64 = tx
+                    .outputs()
+                    .iter()
+                    .filter(|o| !o.change)
+                    .filter_map(|o| o.satoshis)
+                    .sum();
+                let funded: u64 = tx.inputs().iter().filter_map(|i| i.source_satoshis()).sum();
+                if funded < paid + 200 {
+                    let vout = tx.inputs().len() as u32;
+                    tx.add_input_from(
+                        &"77".repeat(32),
+                        vout,
+                        &p2pkh_lock(),
+                        paid + 200 - funded,
+                        P2PKH::unlock(&key(), SignOutputs::All, false),
+                    )
+                    .unwrap();
+                }
                 // The caches full before `fee` writes (a plant of `fee`'s or
                 // `distribute_change`'s door was caught only so).
                 let _ = (tx.id(), tx.to_hex());
@@ -1225,7 +1248,10 @@ fn fee_writes_the_change_through_the_doors_after_the_caches_are_full_843() {
     for (fee, distribution, changes) in [
         (100, ChangeDistribution::Equal, 2),
         (100, ChangeDistribution::Random, 1),
-        (50_000, ChangeDistribution::Equal, 1), // no change: the output removed
+        // No change: the output removed. The inputs exactly the payment and
+        // the fee (#871: a fee they cannot pay is refused, as the reference
+        // refuses it; 50,000 over 20,000 saturated to no change until then).
+        (19_000, ChangeDistribution::Equal, 1),
     ] {
         let mut tx = Transaction::new();
         tx.add_input_from(

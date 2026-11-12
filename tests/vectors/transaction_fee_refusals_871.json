@@ -1,0 +1,2051 @@
+{
+  "issue": 871,
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/Transaction.ts",
+  "node": "v22.18.0",
+  "default_fee_model": {
+    "note": "fetch replaced before the bundle loaded: no request made; LivePolicy fell back to 100 sat/kB",
+    "asked": [
+      "https://arc.gorillapool.io/v1/policy"
+    ]
+  },
+  "cells": [
+    {
+      "name": "a_inputs_cannot_pay_the_outputs_alone",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1001,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_inputs_cannot_pay_the_outputs_and_the_fee",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 950,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_one_satoshi_short",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 901,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_exactly_the_outputs_and_the_fee",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 900,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 900,
+            "change": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a_one_satoshi_over",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 899,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 899,
+            "change": false
+          },
+          {
+            "satoshis": 1,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "a_short_with_no_change_output",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 950,
+          "change": false
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 50
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_surplus_with_no_change_output",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 500,
+          "change": false
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 500
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 500,
+            "change": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a_no_input_and_an_output",
+      "row": "a",
+      "inputs": [],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": -1
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_no_input_and_no_output",
+      "row": "a",
+      "inputs": [],
+      "outputs": [],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 0
+      },
+      "fee_answer": {
+        "ok": []
+      }
+    },
+    {
+      "name": "a_no_input_and_a_fee",
+      "row": "a",
+      "inputs": [],
+      "outputs": [],
+      "fee": 1,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 0
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_outputs_above_the_inputs_with_no_fee",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            100
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 200,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": -100
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "a_short_under_the_random_distribution",
+      "row": "a",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 950,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "random",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "b_input_amount_at_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2099999999999900,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 2099999999999900,
+            "change": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "b_input_amount_past_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000001
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_input_amount_at_2p53_minus_1",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            9007199254740991
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_input_amount_at_2p53",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            9007199254740992
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_input_total_at_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            1000000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            1100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 1,
+            "change": false
+          },
+          {
+            "satoshis": 2099999999999999,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "b_input_total_past_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            1000000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            1100000000000001
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction input total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction input total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "b_input_total_past_2p53",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction input total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction input total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "b_output_amount_at_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 0
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 2100000000000000,
+            "change": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "b_output_amount_past_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2100000000000001,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_output_amount_at_2p53_minus_1",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 9007199254740991,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_output_amount_at_2p53",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 9007199254740992,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_output_total_at_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1000000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 1100000000000000,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 0
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 1000000000000000,
+            "change": false
+          },
+          {
+            "satoshis": 1100000000000000,
+            "change": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "b_output_total_past_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1000000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 1100000000000001,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "b_output_total_past_2p53",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "b_fee_at_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [],
+      "fee": 2100000000000000,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 2100000000000000
+      },
+      "fee_answer": {
+        "ok": []
+      }
+    },
+    {
+      "name": "b_fee_past_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [],
+      "fee": 2100000000000001,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 2100000000000000
+      },
+      "fee_answer": {
+        "err": "Computed transaction fee must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_fee_at_2p53",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [],
+      "fee": 9007199254740992,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": 2100000000000000
+      },
+      "fee_answer": {
+        "err": "Computed transaction fee must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "b_change_output_holding_an_amount_past_21e14",
+      "row": "b",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 100,
+          "change": false
+        },
+        {
+          "satoshis": 2100000000000001,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 100,
+            "change": false
+          },
+          {
+            "satoshis": 900,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "c_no_amount_at_output_0_of_3",
+      "row": "c",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": null,
+          "change": false
+        },
+        {
+          "satoshis": 10,
+          "change": false
+        },
+        {
+          "satoshis": 10,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "c_no_amount_at_output_1_of_3",
+      "row": "c",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 10,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": false
+        },
+        {
+          "satoshis": 10,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "c_no_amount_at_output_2_of_3",
+      "row": "c",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 10,
+          "change": false
+        },
+        {
+          "satoshis": 10,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 2 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 2 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "c_source_output_with_no_amount",
+      "row": "c",
+      "inputs": [
+        {
+          "source": [
+            null
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "c_change_output_with_no_amount",
+      "row": "c",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 10,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 10,
+            "change": false
+          },
+          {
+            "satoshis": 990,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "d_index_one_past_the_source_outputs",
+      "row": "d",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      }
+    },
+    {
+      "name": "d_index_far_past_the_source_outputs",
+      "row": "d",
+      "inputs": [
+        {
+          "source": [
+            1000,
+            1000
+          ],
+          "index": 7
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      }
+    },
+    {
+      "name": "d_source_with_no_outputs",
+      "row": "d",
+      "inputs": [
+        {
+          "source": [],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      }
+    },
+    {
+      "name": "d_second_input_past_its_source",
+      "row": "d",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            1000
+          ],
+          "index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 1 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Input 1 references a source output that does not exist."
+      }
+    },
+    {
+      "name": "d_no_source_transaction",
+      "row": "d",
+      "inputs": [
+        {
+          "source": null,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Source transactions or sourceSatoshis are required for all inputs to calculate fee"
+      },
+      "fee_answer": {
+        "err": "Source transactions are required for all inputs during fee computation"
+      }
+    },
+    {
+      "name": "order_fee_past_21e14_before_a_missing_source_output",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 2100000000000001,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Computed transaction fee must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_fee_past_21e14_before_no_source_transaction",
+      "row": "order",
+      "inputs": [
+        {
+          "source": null,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 2100000000000001,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Source transactions or sourceSatoshis are required for all inputs to calculate fee"
+      },
+      "fee_answer": {
+        "err": "Computed transaction fee must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_input_amount_before_a_later_missing_output",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            2100000000000001
+          ],
+          "index": 0
+        },
+        {
+          "source": [],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_missing_output_before_a_later_input_amount",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [],
+          "index": 0
+        },
+        {
+          "source": [
+            2100000000000001
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      }
+    },
+    {
+      "name": "order_no_source_before_a_later_missing_output",
+      "row": "order",
+      "inputs": [
+        {
+          "source": null,
+          "index": 0
+        },
+        {
+          "source": [],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Source transactions or sourceSatoshis are required for all inputs to calculate fee"
+      },
+      "fee_answer": {
+        "err": "Source transactions are required for all inputs during fee computation"
+      }
+    },
+    {
+      "name": "order_missing_output_before_a_later_no_source",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [],
+          "index": 0
+        },
+        {
+          "source": null,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      },
+      "fee_answer": {
+        "err": "Input 0 references a source output that does not exist."
+      }
+    },
+    {
+      "name": "order_input_total_before_an_output_with_no_amount",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            1000000000000000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            1100000000000001
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": null,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction input total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction input total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "order_input_amount_before_an_output_amount",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            2100000000000001
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2100000000000001,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_output_with_no_amount_before_insufficient",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            10
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": null,
+          "change": false
+        },
+        {
+          "satoshis": 100,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_output_amount_before_a_later_output_with_no_amount",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2100000000000001,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_output_with_no_amount_before_a_later_output_amount",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": null,
+          "change": false
+        },
+        {
+          "satoshis": 2100000000000001,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "name": "order_output_total_before_a_later_output_with_no_amount",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            2100000000000000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1000000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 1100000000000001,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "order_output_total_before_insufficient",
+      "row": "order",
+      "inputs": [
+        {
+          "source": [
+            10
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1000000000000000,
+          "change": false
+        },
+        {
+          "satoshis": 1100000000000001,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      },
+      "fee_answer": {
+        "err": "Transaction output total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "name": "e_default_one_input_one_change",
+      "row": "e",
+      "inputs": [
+        {
+          "source": [
+            10000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1000,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": null,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 1000,
+            "change": false
+          },
+          {
+            "satoshis": 8992,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "e_default_two_inputs_three_outputs",
+      "row": "e",
+      "inputs": [
+        {
+          "source": [
+            5000
+          ],
+          "index": 0
+        },
+        {
+          "source": [
+            7000,
+            3000
+          ],
+          "index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1000,
+          "change": false
+        },
+        {
+          "satoshis": 2000,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": null,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 2 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 1000,
+            "change": false
+          },
+          {
+            "satoshis": 2000,
+            "change": false
+          },
+          {
+            "satoshis": 4987,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "e_default_short",
+      "row": "e",
+      "inputs": [
+        {
+          "source": [
+            95
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 90,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": null,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "f_outputs_exceed_the_inputs_by_one",
+      "row": "f",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 1001,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": -1
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "f_outputs_exceed_the_inputs_by_a_large_amount",
+      "row": "f",
+      "inputs": [
+        {
+          "source": [
+            1
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 2100000000000000,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "ok": -2099999999999999
+      },
+      "fee_answer": {
+        "err": "Transaction inputs are insufficient for the requested outputs and fee."
+      }
+    },
+    {
+      "name": "dist_equal_one_change_output",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 100,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 100,
+            "change": false
+          },
+          {
+            "satoshis": 900,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "dist_equal_three_change_outputs_with_a_remainder",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            1001
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 100,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        },
+        {
+          "satoshis": null,
+          "change": true
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 100,
+            "change": false
+          },
+          {
+            "satoshis": 300,
+            "change": true
+          },
+          {
+            "satoshis": 300,
+            "change": true
+          },
+          {
+            "satoshis": 301,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "dist_equal_change_outputs_among_payments",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": null,
+          "change": true
+        },
+        {
+          "satoshis": 100,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 50,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 425,
+            "change": true
+          },
+          {
+            "satoshis": 100,
+            "change": false
+          },
+          {
+            "satoshis": 425,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "dist_equal_change_below_the_count",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            102
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 100,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        },
+        {
+          "satoshis": null,
+          "change": true
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "equal",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 100,
+            "change": false
+          },
+          {
+            "satoshis": 0,
+            "change": true
+          },
+          {
+            "satoshis": 0,
+            "change": true
+          },
+          {
+            "satoshis": 2,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "dist_random_one_change_output",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 100,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 0,
+      "distribution": "random",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 100,
+            "change": false
+          },
+          {
+            "satoshis": 900,
+            "change": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "dist_random_no_change_output",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 100,
+          "change": false
+        }
+      ],
+      "fee": 0,
+      "distribution": "random",
+      "get_fee_answer": {
+        "ok": 900
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 100,
+            "change": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "dist_random_change_zero_removes_the_change",
+      "row": "dist",
+      "inputs": [
+        {
+          "source": [
+            1000
+          ],
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "satoshis": 900,
+          "change": false
+        },
+        {
+          "satoshis": null,
+          "change": true
+        }
+      ],
+      "fee": 100,
+      "distribution": "random",
+      "get_fee_answer": {
+        "err": "Output 1 amount must be a non-negative safe integer no greater than 21e14."
+      },
+      "fee_answer": {
+        "ok": [
+          {
+            "satoshis": 900,
+            "change": false
+          }
+        ]
+      }
+    }
+  ]
+}

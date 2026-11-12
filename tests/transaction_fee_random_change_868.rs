@@ -187,10 +187,11 @@ async fn an_input_total_past_u64_is_refused_in_the_reference_words_868() {
         .fee(Some(FEE), ChangeDistribution::Random)
         .await
         .unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "transaction error: Transaction input total exceeds the maximum valid monetary range."
-    );
+    // Since #871 an amount past 21e14 is refused at the amount, ahead of the
+    // total, as the reference's `requireSatoshiAmount` refuses it
+    // (`Transaction.ts:68-78`); the total's words at the 21e14 bound are
+    // pinned by `transaction_fee_refusals_871.rs`.
+    assert_eq!(err.to_string(), "transaction error: Input 0 source amount must be a non-negative safe integer no greater than 21e14.");
 }
 
 #[tokio::test]
@@ -202,9 +203,11 @@ async fn an_output_total_past_u64_is_refused_in_the_reference_words_868() {
         .fee(Some(FEE), ChangeDistribution::Equal)
         .await
         .unwrap_err();
+    // Since #871 the amount, ahead of the total (output 3: the payment and
+    // two change outputs before it).
     assert_eq!(
         err.to_string(),
-        "transaction error: Transaction output total exceeds the maximum valid monetary range."
+        "transaction error: Output 3 amount must be a non-negative safe integer no greater than 21e14."
     );
 }
 
@@ -219,17 +222,15 @@ fn get_fee_refuses_a_total_past_u64_and_the_output_sum_saturates_868() {
         .unwrap();
     tx.add_input(TransactionInput::with_source_transaction(src, 1))
         .unwrap();
-    assert_eq!(
-        tx.get_fee().unwrap_err().to_string(),
-        "transaction error: Transaction input total exceeds the maximum valid monetary range."
-    );
+    // Since #871 the amounts are refused ahead of their totals.
+    assert_eq!(tx.get_fee().unwrap_err().to_string(), "transaction error: Input 0 source amount must be a non-negative safe integer no greater than 21e14.");
 
     let mut tx = spend(10, 0);
     tx.add_output(TransactionOutput::new(u64::MAX, script()))
         .unwrap();
     assert_eq!(
         tx.get_fee().unwrap_err().to_string(),
-        "transaction error: Transaction output total exceeds the maximum valid monetary range."
+        "transaction error: Output 1 amount must be a non-negative safe integer no greater than 21e14."
     );
     assert_eq!(tx.total_output_satoshis(), u64::MAX);
 }
