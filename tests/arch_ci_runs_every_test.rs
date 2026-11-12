@@ -516,6 +516,10 @@ fn reached_refusals(ci: &str, table: &[(String, Vec<String>)]) -> Vec<String> {
             "python3 -B .github/scripts/rows_from_sources.py --check",
             "the rows' Python reading checked on the tree beside the Rust guard, #708",
         ),
+        (
+            "python3 -B -m unittest discover -s .github/scripts -p 'test_rows_from_sources.py'",
+            "the rows' writer held to the identity on a copy of the tree, the rows lane",
+        ),
     ] {
         if !ci.contains(needle) {
             errors.push(format!("ci.yml: no `{needle}` ({why})"));
@@ -812,6 +816,7 @@ const REACHED_CI: &str = r#"
           fi
           python3 -B -m unittest discover -s .github/scripts -p 'test_affected_tests.py'
           python3 -B .github/scripts/rows_from_sources.py --check
+          python3 -B -m unittest discover -s .github/scripts -p 'test_rows_from_sources.py'
           labels=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq '[.labels[].name] | join(",")')
           if [[ ",$labels," == *",full-suite,"* ]]; then
       - name: Check the reached set within the whole
@@ -882,6 +887,12 @@ fn a_landing_or_a_push_that_could_run_a_subset_is_refused() {
     assert_eq!(
         reached_refusals(&undrifted, &table),
         ["ci.yml: no `python3 -B .github/scripts/rows_from_sources.py --check` (the rows' Python reading checked on the tree beside the Rust guard, #708)"]
+    );
+    // the writer's identity on the tree left unrun (the rows lane)
+    let unheld = REACHED_CI.replace("'test_rows_from_sources.py'", "'test_rows.py'");
+    assert_eq!(
+        reached_refusals(&unheld, &table),
+        ["ci.yml: no `python3 -B -m unittest discover -s .github/scripts -p 'test_rows_from_sources.py'` (the rows' writer held to the identity on a copy of the tree, the rows lane)"]
     );
     let unlabeled = REACHED_CI.replace("full-suite", "full");
     assert!(reached_refusals(&unlabeled, &table)

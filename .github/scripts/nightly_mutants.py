@@ -982,6 +982,48 @@ def tested_by(path, measured, root=Path(".")):
     return {f for f in measured if Path(f).parent == source.parent or Path(f) in parents}
 
 
+def cell_spans(row):
+    """The `(start, end)` of each cell of a Markdown table row, the outer pipes dropped: a
+    cell boundary is a `|` outside a code span and not escaped. A code span opens at a run of
+    n backticks and closes at the next run of exactly n (CommonMark 6.1); a run with no closer
+    is text. A backslash escapes the next character outside a code span (`\\|` text, `\\\\|`
+    a backslash and a boundary) and is text inside one. Until the rows lane every unescaped
+    `|` was a boundary, so a `||` inside backticks was read as two more cells and written
+    back as `` ` |  | ` `` (the fix-817 lane's finding, 2026-11-12)."""
+    bars, i, n = [], 0, len(row)
+    while i < n:
+        c = row[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "`":
+            j = i
+            while j < n and row[j] == "`":
+                j += 1
+            k = j
+            while k < n:
+                if row[k] != "`":
+                    k += 1
+                    continue
+                m = k
+                while m < n and row[m] == "`":
+                    m += 1
+                if m - k == j - i:
+                    break
+                k = m
+            i = m if k < n else j
+            continue
+        if c == "|":
+            bars.append(i)
+        i += 1
+    return [(a + 1, b) for a, b in zip(bars, bars[1:])]
+
+
+def row_cells(row):
+    """A table row's cells, stripped, the outer pipes dropped (`cell_spans`)."""
+    return [row[a:b].strip() for a, b in cell_spans(row)]
+
+
 def table_rows(text):
     """`tests/CLAUDE.md`'s `## Files` rows: each row's line number, its text and its File
     cell's files as `(name, stem)`, the stem the key every reader of the table uses (#712)."""
@@ -990,7 +1032,7 @@ def table_rows(text):
         if line.startswith("## "):
             inside = line.strip() == "## Files"
         elif inside and line.startswith("| `"):
-            names = re.findall(r"`([^`]+)\.rs`", line.split("|")[1])
+            names = re.findall(r"`([^`]+)\.rs`", (row_cells(line) or [""])[0])
             yield number, line, [(f"{name}.rs", Path(name).stem) for name in names]
 
 
