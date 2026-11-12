@@ -1010,6 +1010,20 @@
       "outcome": {
         "reached": "findByAttribute"
       }
+    },
+    {
+      "name": "key_prefix_03",
+      "subject": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "certifier_prefix_03",
+      "certifier": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
     }
   ]
 }

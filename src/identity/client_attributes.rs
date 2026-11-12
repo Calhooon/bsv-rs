@@ -307,3 +307,7 @@ fn text_matches(searchable: &str, search: &str) -> bool {
 #[cfg(test)]
 #[path = "client_attributes_751_tests.rs"]
 mod tests_751;
+
+#[cfg(test)]
+#[path = "client_attributes_818_tests.rs"]
+mod tests_818;

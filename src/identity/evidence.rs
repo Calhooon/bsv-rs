@@ -95,6 +95,16 @@ impl<W: WalletInterface> super::IdentityClient<W> {
     /// count is per parse and taken before the token's and the record's
     /// checks: an output read by two calls is counted by each, and one those
     /// checks then skip is counted too.
+    ///
+    /// Only the copies the resolver's merge kept are read here. A lying copy
+    /// the merge displaced for an agreeing or hintless copy of the same
+    /// output (#796), or dropped behind a copy it already held, is counted by
+    /// `LookupResolver::txid_hint_contradictions` alone: this count reads 0
+    /// for it, so read the resolver's count beside this one (#818). That
+    /// needs a client built by `IdentityClient::with_resolver` over an
+    /// `Arc<LookupResolver>` the caller keeps: a client built by
+    /// `IdentityClient::new` owns its resolver and has no door to the
+    /// resolver's count.
     pub fn txid_hint_contradictions(&self) -> u64 {
         self.hint_contradictions.0.load(Ordering::Relaxed)
     }
@@ -325,3 +335,7 @@ mod tests_748;
 #[cfg(test)]
 #[path = "evidence_731_tests.rs"]
 mod tests_731;
+
+#[cfg(test)]
+#[path = "evidence_818_tests.rs"]
+mod tests_818;

@@ -36,7 +36,12 @@ impl LookupResolver {
     /// not touched, as the reference's merge touches none. This count is separate from
     /// `IdentityClient::txid_hint_contradictions`: an identity lookup that
     /// keeps a lying output counts it here at the merge and again there at
-    /// the evidence check.
+    /// the evidence check, and a lying copy the merge displaced, or dropped
+    /// behind a copy it already held, is counted here alone, that count
+    /// reading 0 for it (#818). To read both, the identity client is built
+    /// by `IdentityClient::with_resolver` over an `Arc<LookupResolver>` the
+    /// caller keeps: one built by `IdentityClient::new` owns its resolver
+    /// and has no door to this count.
     pub fn txid_hint_contradictions(&self) -> u64 {
         self.hint_contradictions.load(Ordering::Relaxed)
     }

@@ -99,6 +99,31 @@ add('any_beside_failing_named_field_after', [['any', 'alice'], ['email', 'zzz']]
 add('any_integer_like_field_order', [['any', '"x y"']], [[['b', 'x'], ['1', 'y']], [['b', 'y'], ['1', 'x']]])
 add('any_final_sigma', [['any', 'ΟΔΟΣ']], [[['name', 'οδος']], [['name', 'οδος']]])
 add('any_two_units_two_lines', [['any', 'ab']], [[['name', 'a\nb']], [['name', 'xab\ny']]])
+// #818: four rules of the port no case above held (a mutation of each
+// survived). A repeated token is searched from where the last match ended
+// (`identityUtils.ts:154-158`, `cursor = found.index + found[0].length`);
+// U+2029 ends a line as U+2028 does (`:147`); and `Object.entries` walks only
+// a canonical array index ahead (`4294967295`, `01` and `+1` are none), the
+// u32 bound beside a third field, since two fields alone read the same
+// either way.
+add('fuzzy_repeated_token', [['email', 'a a']], [[['email', 'a']], [['email', 'a a']], [['email', 'aa']], [['email', 'ba']]])
+add('fuzzy_paragraph_separator', [['name', 'alice smith']], [[['name', 'alice smith']], [['name', 'x alice smith']]])
+add('any_index_name_u32_max', [['any', '"x y"']], [[['b', 'x'], ['4294967295', 'y'], ['1', 'w']],
+  [['1', 'w'], ['4294967295', 'y'], ['b', 'x']]])
+add('any_index_name_leading_zero', [['any', '"x y"']], [[['01', 'y'], ['1', 'x']], [['1', 'x'], ['01', 'y']]])
+add('any_index_name_plus_sign', [['any', '"x y"']], [[['+1', 'y'], ['1', 'x']], [['1', 'x'], ['+1', 'y']]])
+// #818's fold: five steps of the same walk no case above held (the strength
+// read's S1 to S5). The cursor moves by the token's length, not by one unit
+// (`:156`); a lone CR ends a line and takes nothing after it (`:147`,
+// `\r\n?`); each line is searched from its start (`:152`, `let cursor = 0`
+// inside the line's loop); `4294967294` is the largest array index; and two
+// index names are walked in ascending numeric order, whatever order they were
+// inserted in (`10` after `9`).
+add('fuzzy_token_longer_than_one_unit', [['email', 'ab bc']], [[['email', 'abc']], [['email', 'abbc']], [['email', 'ab bc']]])
+add('fuzzy_lone_carriage_return', [['name', 'alice smith']], [[['name', 'x\ralice smith']], [['name', 'alice\rsmith']]])
+add('fuzzy_second_line_from_its_start', [['name', 'alice smith']], [[['name', 'alice\nalice smith']], [['name', 'alice\nsmith']]])
+add('any_index_name_below_u32_max', [['any', '"x y"']], [[['b', 'y'], ['4294967294', 'x']], [['b', 'x'], ['4294967294', 'y']]])
+add('any_two_index_names', [['any', '"x y"']], [[['2', 'y'], ['1', 'x']], [['10', 'y'], ['9', 'x']], [['1', 'y'], ['2', 'x']]])
 
 process.stdout.write(JSON.stringify({
   description: '#751: the reference wallet\'s filterCertificatesByAttributes over records of decryptedFields alone: ' +

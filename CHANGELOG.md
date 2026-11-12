@@ -41,6 +41,172 @@ The four sites ask the wallet in the reference's order (`PushDrop.ts:155-185` at
 
 Conformed at the pin, on the recorded cells: rows (a) to (d), the order of two refusals, and `getFee`'s reading of every output. Two rows stated. (e) No fee given: the reference's default is `LivePolicy.getInstance()` (`Transaction.ts:772`), which asks ARC GorillaPool's policy over HTTP and falls back to 100 sat/kB (`LivePolicy.ts:10,46-99`; the recorder answered every fetch with a refusal before the bundle loaded, no request made, and recorded the fallback: a fee of `ceil(size * 100 / 1000)`), where `fee(None, ..)` is one satoshi per byte of `estimate_size`. Not conformed: `fee` takes a number, not a model, so the reference's default is a network call this door does not make; ARC is deprecated here with no default policy URL (the owner's word of 2026-10-27, #350); no caller under `src/` or `examples/` and none of the four downstreams (`bsv-overlay-cloudflare`, `rust-message-box`, `bsv-middleware-cloudflare-public`, `rust-chaintracks`, read 2026-11-12) calls `fee` at all, the module's doc example alone passing `None`; and the reference's sat/kB model refuses an input with no unlocking script or template (`SatoshisPerKilobyte.ts`), where `estimate_size` counts it as empty. (f) `getFee` answers a negative number where the outputs exceed the inputs (`:932`; `-100` on the recorded cell), `get_fee` 0 (a `u64`); `fee` refuses that transaction in the reference's words since this change. go-sdk@2ca481c's `Fee` refuses inputs that cannot pay (`ErrInsufficientInputs`, `transaction/fees.go:20-64`). Ours: (e) and (f). Theirs: none (the witness: tests/transaction_fee_refusals_871.rs; tests/vectors/transaction_fee_refusals_871.json).
 
+### Tests: the identity bucket's unpinned rules are recorded cases, and a displaced liar's count is stated (#818)
+
+The identity bucket of the reads of 2026-11-09 (#818), its lines still true on
+`beta`, landed in one fold. No public item, wire byte, verdict or error text
+moves: three lines are tests and records, one a record alone.
+
+**Four rules of the #751/#756 code no recorded case held.** The code was
+right; a one-line mutation of each passed every test. Each is now a case the
+existing Node recorder wrote at the pin (`ts-stack@edf6e03`, Node v22.18.0,
+two runs byte-identical, the vectors' diffs additions alone), `kept` and
+`outcome` the reference's answers:
+
+- A repeated token is searched from where the last match ended
+  (`packages/wallet/wallet-toolbox/src/utility/identityUtils.ts:154-158`,
+  `cursor = found.index + found[0].length`; `client_attributes.rs`,
+  `cursor = at + token.len()`). `fuzzy_repeated_token`: `email: "a a"` over
+  `a`, `a a`, `aa`, `ba` keeps `a a` and `aa`. Under `cursor = at` all four
+  were kept. Pinned by `a_repeated_token_needs_a_second_occurrence_818`.
+- U+2029 ends a line as U+2028 does (`:147`, the split's four terminators).
+  `fuzzy_paragraph_separator`: `name: "alice smith"` over `alice`, U+2029,
+  `smith` and `x`, U+2029, `alice smith` keeps the second alone. With U+2029
+  dropped from the split both were kept. Pinned by
+  `a_paragraph_separator_ends_a_line_818`.
+- `Object.entries` walks ahead only a canonical array index (the matcher's
+  `Object.entries(fields)`, `identityUtils.ts:238`, the call the three cases
+  record; the overlay's walk of a question's attributes,
+  `packages/overlays/topics/src/identity/IdentityLookupService.ts:113`, is
+  read through the same `js_order` and has no recorded case of these names;
+  `js_order`'s guard, a `u32` that is not `u32::MAX` and whose decimal form is
+  the name). `any_index_name_u32_max`, `any_index_name_leading_zero` and
+  `any_index_name_plus_sign` (`any: "\"x y\""`, the field `1` beside
+  `4294967295`, `01` and `+1` in both insertion orders; the u32 bound beside a
+  third field `b`, since two fields alone read the same either way). With the
+  guard dropped all three differ; with `n != u32::MAX` alone `01` and `+1`;
+  with `n.to_string() == name` alone `4294967295`. Pinned by
+  `a_name_that_is_no_array_index_keeps_its_place_818`, which names every wrong
+  case.
+- A compressed key is tagged `02` or `03`
+  (`packages/overlays/topics/src/shared/queryValidation.ts:174`,
+  `/^(?:02|03)[0-9a-fA-F]{64}$/`; `query_bounds.rs`). `key_prefix_03` and
+  `certifier_prefix_03` (`03` and G's x) reach the overlay's storage
+  (`findByIdentityKey`, `findByCertifier`) and are sent here. With
+  `|| value.starts_with("03")` dropped the key was refused; no recorded key
+  carried the tag. Pinned by `a_key_tagged_03_is_admitted_818`
+  (`tests/identity_query_bounds_756.rs`).
+
+**Five more steps of the same walk (the fold of the three reads).** The
+strength read named five further mutations of `client_attributes.rs` that
+passed every test; each was planted on a scratch copy of the tip and survived
+there (the lib's identity tests and the 39 `tests/identity_*.rs` binaries
+green), and each is now a case of the same recorder, `kept` the reference's:
+
+- The cursor moves by the token's length (`identityUtils.ts:156`).
+  `fuzzy_token_longer_than_one_unit`: `email: "ab bc"` over `abc`, `abbc`,
+  `ab bc` keeps `[1, 2]`. Under `cursor = at + 1` `abc` was kept too (every
+  repeated token recorded until now was one unit). Pinned by
+  `a_token_moves_the_cursor_by_its_length_818`.
+- A lone CR ends a line and takes nothing after it (`:147`, `\r\n?`).
+  `fuzzy_lone_carriage_return`: `name: "alice smith"` over `x`, CR,
+  `alice smith` and `alice`, CR, `smith` keeps `[0]`. With the LF test
+  inverted (`!=`) or joined by `||` the unit after the CR was dropped and
+  nothing kept. Pinned by
+  `a_lone_carriage_return_ends_a_line_and_takes_nothing_after_it_818`.
+- Each line is searched from its start (`:152`, the cursor declared inside
+  the line's loop). `fuzzy_second_line_from_its_start`: the same question
+  over `alice`, LF, `alice smith` and `alice`, LF, `smith` keeps `[0]`. With
+  the cursor kept across lines nothing was kept. Pinned by
+  `each_line_is_searched_from_its_start_818`.
+- `4294967294` is an array index, the largest.
+  `any_index_name_below_u32_max`: `any: "\"x y\""` over `b: y, 4294967294: x`
+  and `b: x, 4294967294: y` keeps `[0]`. With the guard at `n < u32::MAX - 1`
+  it kept `[1]`. Pinned by `the_largest_array_index_is_walked_ahead_818`.
+- Two index names are walked in ascending numeric order.
+  `any_two_index_names`: the same question over `2: y, 1: x`, `10: y, 9: x`
+  and `1: y, 2: x` keeps `[0, 1]`. With the sort key `(0, 0)` (insertion
+  order) nothing was kept, with the name's text for the number `[0]` (no
+  record held two index names). Pinned by
+  `two_index_names_are_walked_in_ascending_numeric_order_818`.
+
+Every one of the five recordings is this crate's answer on `beta` already: no
+finding.
+
+The eight unit tests are `src/identity/client_attributes_818_tests.rs`;
+`tests/vectors/identity_attributes_751.json` holds 52 cases (42, then 47
+before the fold) and `tests/vectors/identity_query_bounds_756.json` 70 (68),
+the count pins moved with them.
+
+**The evidence count over repeated entries.** The reference bounds a BEEF's
+entries, a repeated txid counted each time it is written
+(`packages/sdk/src/transaction/TransactionEvidence.ts:116-117`,
+`if (beef.txs.length > limits.transactions)`), and so does
+`identity::evidence` (`beef.txs.len()`). #730's two bound shapes hold distinct
+txids alone, so a count of distinct txids passed every test. New:
+`tests/vectors/identity_evidence_818.json` (recorded by
+`tests/support/identity_evidence_818.mjs`), two Atomic BEEFs naming a proven
+subject over txid-only entries with `00..01` written twice, built by this
+crate's writer to the recorded SHA-256 (`tests/support/identity_evidence_818.rs`):
+255 distinct txids in 256 entries are read, 256 distinct in 257 entries are
+`limit` at `:117`. Pinned by
+`a_repeated_entry_counts_toward_the_transactions_bound_818`
+(`src/identity/evidence_818_tests.rs`); with the bound over distinct txids the
+over-bound shape was read.
+
+**A displaced liar's count.** Since #796 the resolver's merge displaces a held
+lying copy when an agreeing or hintless one arrives, so on an identity lookup
+answered liar then honest the evidence check never sees the liar:
+`LookupResolver::txid_hint_contradictions()` reads 1 and
+`IdentityClient::txid_hint_contradictions()` reads 0, where the identity count
+read 1 before #796. The #796 entry stated only the double count of a liar
+that survives; it now states this too, as do the root list's #796 row,
+`src/identity/CLAUDE.md` and the rustdoc of
+`IdentityClient::txid_hint_contradictions` (the page a caller reads: only the
+copies the merge kept are read there, a displaced copy and one dropped behind
+a held copy counted by the resolver alone). A caller that watches the identity
+count alone reads 0 for a displaced liar. To read both, build the client with
+`IdentityClient::with_resolver` over an `Arc<LookupResolver>` the caller
+keeps: a client built by `IdentityClient::new` owns its resolver and has no
+door to the resolver's count (said by both counters' rustdoc since the fold).
+Pinned by
+`a_displaced_liar_is_counted_by_the_resolver_alone_818`
+(`tests/identity_hint_displaced_818.rs`: a scripted facilitator, two
+`.invalid` hosts, the liar ranked ahead, both counters through one shared
+resolver, `(1, 0)` and the subject's identity returned; the liar alone
+`(1, 1)`). With the displacement removed the pair reads `(1, 1)`.
+
+**The doors outside the bounds check, recorded.** The #751/#756 row named
+`resolve_by_attributes` alone as outside `query_bounds::check`.
+`resolve_by_identity_key`, `discover_certificates` and
+`discover_certificates_by_type` also send the caller's key and type
+unchecked; the row and `src/identity/CLAUDE.md` now name all four. No code:
+whether they refuse before the network is not decided here. At the three
+with a reference counterpart the reference's wallet door refuses such an
+argument before any lookup (the parity note below).
+
+Each RED was watched on a scratch copy of the tip with the one mutation
+applied (`docs/lanes/fix-818.md`). Not in this fold, awaiting a decision: a
+count of the certificates the attribute filter drops, and the bounds check at
+the three by-key doors.
+
+### Notes: cross-SDK parity (#818)
+
+No behaviour moved. The reference lines are those cited above; every new case
+is the reference's recorded answer and this crate's answer on `beta` already.
+Stated: four doors (`resolve_by_attributes`, `resolve_by_identity_key`,
+`discover_certificates`, `discover_certificates_by_type`) send a question the
+reference overlay refuses whole
+(`IdentityLookupService.ts:85-88,97-100,113-123`) without `query`'s check
+before the network; the resolver reads the overlay's refusal as an empty
+answer with the host charged. The reference's SDK client checks nothing and
+hands its arguments to its wallet (`IdentityClient.ts:569`, `:614`), whose
+door refuses them before any lookup, in `WERR_INVALID_PARAMETER`'s words
+(`packages/wallet/wallet-toolbox/src/Wallet.ts:971`, `:1029`;
+`packages/sdk/src/wallet/validationHelpers.ts:1535-1546`, the key through
+`validatePublicKey`, `:185-191`; `:1555-1587`, 1 to 32 attributes, a name of
+1 to 50 bytes, a value of 1 to 500). That argument check is not ported at
+`resolve_by_identity_key`, `discover_certificates` (the #737 row's) or
+`resolve_by_attributes`, so a key or a map the reference refuses at its
+wallet door is sent here (read at the pin by this fold's rule read, not
+recorded); `discover_certificates_by_type` has no reference counterpart. The
+two hint counters are this crate's:
+the reference drops a disagreeing copy at its merge
+(`LookupResolver.ts:1104-1112`, `:2229`, `:2235`) and refuses a disagreeing
+hint at its evidence check (`TransactionEvidence.ts:122-125`), counting
+neither (the #735 and #796 rows). go-sdk@2ca481c resolves through its wallet
+(`identity/client.go:240-276`) and has none of these sites.
+
 ### Fixed: the documented door reads a transaction as the node's script door does; an amount is checked in the reference's default mode alone (#874)
 
 `SpendingTransaction::from_bytes` (#855) read the spending transaction with `Transaction::from_binary`'s strict reader, which since #844 refuses an output amount of 2^53 satoshis or more, the reference's bound. The node's consensus library deserializes an amount as any 64-bit value and checks none (bitcoin-sv v1.2.2 `bitcoinconsensus.cpp:88-122`, `primitives/transaction.h:190-194`, `amount.h:111`): the amount rules are `CheckRegularTransaction`'s, a transaction check, never the script door's. So under a node's word the door refused at the read a transaction the node's door judges: the node oracle's entry `tx/tx-00026` (an output of 2^63, bsv-script-lean@1c051eae `corpus/tx/tx.jsonl`) answered `InputRefusal::Transaction(Number can only safely store up to 53 bits)` under every word, where GoBDK judges it valid in both columns. Decided by three design reads, 3 of 3 (`docs/lanes/fix-874-door-reads-as-node.md`).
@@ -2941,7 +3107,14 @@ recorded for any output list at `:2395-2397`).
 Additive: `LookupResolver::txid_hint_contradictions(&self) -> u64`, the
 twin of `IdentityClient::txid_hint_contradictions`. The two counters are
 separate: an identity lookup that keeps a lying output counts it at the
-merge and again at the evidence check.
+merge and again at the evidence check. A lying copy the merge displaces for
+an agreeing one never reaches the evidence check, so it is counted by the
+resolver alone: on an identity lookup answered liar then honest
+`IdentityClient::txid_hint_contradictions` reads 0, where it read 1 before
+#796, and `LookupResolver::txid_hint_contradictions` reads 1; a caller that
+watches the identity count alone reads 0 for a displaced liar, and reads
+the resolver's count beside it to see one (#818,
+`tests/identity_hint_displaced_818.rs`).
 
 Pinned by `tests/lookup_hint_merge_796.rs` against
 `tests/vectors/lookup_hint_merge_796.json` (recorded by
