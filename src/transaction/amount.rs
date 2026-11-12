@@ -102,14 +102,36 @@ impl AmountRule {
     }
 }
 
+/// The reference's bound on an amount and on a total, 21e14 satoshis
+/// (`MAX_SATOSHIS`, `ts-stack@edf6e03` `Transaction.ts:65`), the node's
+/// `MAX_MONEY` (bitcoin-sv v1.2.2 `amount.h:130`).
+pub(crate) const MAX_SATOSHIS: u64 = 2_100_000_000_000_000;
+
+/// A caller's amount (`Transaction::fee`, `get_fee`), refused when absent or
+/// past 21e14 in the reference's `requireSatoshiAmount` words, `<label> must
+/// be a non-negative safe integer no greater than 21e14.`
+/// (`Transaction.ts:68-78`; #871: until then an absent amount was read as 0
+/// and none was bounded).
+pub(crate) fn require_satoshi_amount(value: Option<u64>, label: &str) -> Result<u64> {
+    match value {
+        Some(v) if v <= MAX_SATOSHIS => Ok(v),
+        _ => Err(crate::Error::TransactionError(format!(
+            "{label} must be a non-negative safe integer no greater than 21e14."
+        ))),
+    }
+}
+
 /// `total + value` for a sum of a caller's amounts (`Transaction::fee`,
-/// `get_fee`), refused past `u64` in the reference's `addSatoshiAmount` words,
-/// `<label> exceeds the maximum valid monetary range.` (`ts-stack@edf6e03`
-/// `Transaction.ts:80-86`), where it panicked in a debug build and wrapped in
-/// a release build until #868. The reference refuses past 21e14 satoshis; this
-/// crate only past `u64` (the stated row of #868).
+/// `get_fee`), refused past 21e14 in the reference's `addSatoshiAmount`
+/// words, `<label> exceeds the maximum valid monetary range.`
+/// (`ts-stack@edf6e03` `Transaction.ts:80-86`); past `u64` until #871, and a
+/// debug panic or a wrapped sum until #868. The one place for the bound on a
+/// total.
 pub(crate) fn add_amount(total: u64, value: u64, label: &str) -> Result<u64> {
-    total.checked_add(value).ok_or_else(|| {
-        crate::Error::TransactionError(format!("{label} exceeds the maximum valid monetary range."))
-    })
+    match total.checked_add(value) {
+        Some(sum) if sum <= MAX_SATOSHIS => Ok(sum),
+        _ => Err(crate::Error::TransactionError(format!(
+            "{label} exceeds the maximum valid monetary range."
+        ))),
+    }
 }

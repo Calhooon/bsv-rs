@@ -1386,53 +1386,36 @@ impl Transaction {
         Ok(())
     }
 
-    /// Computes fees and distributes change.
+    /// Computes fees and distributes change, as the reference's `fee` does
+    /// (`ts-stack@edf6e03` `Transaction.ts:770-862`).
     ///
     /// # Arguments
     ///
-    /// * `model` - Optional fee model. If None, uses a default 1 sat/byte rate.
+    /// * `fee_sats` - The fee in satoshis. If `None`, one satoshi per byte of
+    ///   [`Transaction::estimate_size`], where the reference's default is its
+    ///   live fee policy (a stated difference, #871).
     /// * `change_distribution` - How to distribute change among change outputs.
     ///
     /// # Errors
     ///
-    /// Returns an error if source transactions are missing for inputs.
+    /// In the reference's order and words (#871): a fee past 21e14 satoshis;
+    /// then for each input in turn, no source transaction, a source output
+    /// that does not exist, a source output with no amount or one past 21e14,
+    /// an input total past 21e14; then for each output that is not a change
+    /// output, no amount or one past 21e14, an output total past 21e14; then
+    /// inputs that cannot pay the outputs and the fee
+    /// (`Transaction inputs are insufficient for the requested outputs and fee.`).
+    /// The transaction is unchanged on `Err`.
     pub async fn fee(
         &mut self,
         fee_sats: Option<u64>,
         change_distribution: ChangeDistribution,
     ) -> Result<()> {
-        // Calculate fee based on transaction size if not provided
-        let fee = match fee_sats {
-            Some(f) => f,
-            None => {
-                // Estimate transaction size and use 1 sat/byte as default
-                self.estimate_size() as u64
-            }
-        };
-
-        // Calculate total input satoshis
-        let mut total_in: u64 = 0;
-        for input in self.inputs() {
-            let sats = input.source_satoshis().ok_or_else(|| {
-                crate::Error::TransactionError(
-                    "Source transactions are required for all inputs during fee computation"
-                        .to_string(),
-                )
-            })?;
-            total_in = super::amount::add_amount(total_in, sats, "Transaction input total")?;
-        }
-
-        // Calculate total output satoshis (excluding change)
-        let mut total_out: u64 = 0;
-        for output in self.outputs() {
-            if !output.change {
-                let sats = output.satoshis.unwrap_or(0);
-                total_out = super::amount::add_amount(total_out, sats, "Transaction output total")?;
-            }
-        }
-
-        // Calculate change
-        let change = total_in.saturating_sub(fee).saturating_sub(total_out);
+        let fee = super::amount::require_satoshi_amount(
+            Some(fee_sats.unwrap_or_else(|| self.estimate_size() as u64)),
+            "Computed transaction fee",
+        )?;
+        let change = self.calculate_change(fee)?;
 
         if change == 0 {
             // Remove change outputs if no change
@@ -1444,6 +1427,62 @@ impl Transaction {
         self.distribute_change(change, change_distribution);
 
         Ok(())
+    }
+
+    /// The input total of every source output, each checked as an amount
+    /// (`Input N source amount`), refused where an input has no source
+    /// transaction (`missing_source`, the caller's words) or names a source
+    /// output that does not exist (`Transaction.ts:836-848`, `:904-919`).
+    fn source_total(&self, missing_source: &str) -> Result<u64> {
+        let mut total: u64 = 0;
+        for (index, input) in self.inputs().iter().enumerate() {
+            let source = input
+                .source_transaction
+                .as_ref()
+                .ok_or_else(|| crate::Error::TransactionError(missing_source.to_string()))?;
+            let output = source
+                .outputs()
+                .get(input.source_output_index as usize)
+                .ok_or_else(|| {
+                    crate::Error::TransactionError(format!(
+                        "Input {index} references a source output that does not exist."
+                    ))
+                })?;
+            let amount = super::amount::require_satoshi_amount(
+                output.satoshis,
+                &format!("Input {index} source amount"),
+            )?;
+            total = super::amount::add_amount(total, amount, "Transaction input total")?;
+        }
+        Ok(total)
+    }
+
+    /// The reference's `#calculateChange` (`Transaction.ts:832-862`): the
+    /// inputs less the outputs that are not change less `fee`, refused when
+    /// the inputs cannot pay them (#871; saturated to 0 until then).
+    fn calculate_change(&self, fee: u64) -> Result<u64> {
+        let total_in = self.source_total(
+            "Source transactions are required for all inputs during fee computation",
+        )?;
+        let mut total_out: u64 = 0;
+        for (index, output) in self.outputs().iter().enumerate() {
+            if !output.change {
+                let amount = super::amount::require_satoshi_amount(
+                    output.satoshis,
+                    &format!("Output {index} amount"),
+                )?;
+                total_out =
+                    super::amount::add_amount(total_out, amount, "Transaction output total")?;
+            }
+        }
+        // Both at most 21e14: the sum fits.
+        if total_out + fee > total_in {
+            return Err(crate::Error::TransactionError(
+                "Transaction inputs are insufficient for the requested outputs and fee."
+                    .to_string(),
+            ));
+        }
+        Ok(total_in - total_out - fee)
     }
 
     /// Distributes change among change outputs, as the reference's
@@ -1482,29 +1521,30 @@ impl Transaction {
         (max as f64 * factor).floor() as u64
     }
 
-    /// Returns the current fee based on inputs and outputs.
+    /// Returns the current fee based on inputs and outputs, as the
+    /// reference's `getFee` (`Transaction.ts:899-933`).
     ///
     /// # Errors
     ///
-    /// Returns an error if source transactions are missing.
+    /// In the reference's order and words (#871): for each input, no source
+    /// transaction, a source output that does not exist, a source amount
+    /// absent or past 21e14, an input total past 21e14; then for each output,
+    /// a change output's included, no amount or one past 21e14, an output
+    /// total past 21e14. Where the outputs exceed the inputs the answer is 0,
+    /// where the reference answers a negative number (stated: a `u64`, and
+    /// `fee` refuses that transaction).
     pub fn get_fee(&self) -> Result<u64> {
-        let mut total_in: u64 = 0;
-        for input in self.inputs() {
-            let sats = input.source_satoshis().ok_or_else(|| {
-                crate::Error::TransactionError(
-                    "Source transactions or sourceSatoshis are required for all inputs to calculate fee"
-                        .to_string(),
-                )
-            })?;
-            total_in = super::amount::add_amount(total_in, sats, "Transaction input total")?;
-        }
-
+        let total_in = self.source_total(
+            "Source transactions or sourceSatoshis are required for all inputs to calculate fee",
+        )?;
         let mut total_out: u64 = 0;
-        for output in self.outputs() {
-            let sats = output.satoshis.unwrap_or(0);
-            total_out = super::amount::add_amount(total_out, sats, "Transaction output total")?;
+        for (index, output) in self.outputs().iter().enumerate() {
+            let amount = super::amount::require_satoshi_amount(
+                output.satoshis,
+                &format!("Output {index} amount"),
+            )?;
+            total_out = super::amount::add_amount(total_out, amount, "Transaction output total")?;
         }
-
         Ok(total_in.saturating_sub(total_out))
     }
 
