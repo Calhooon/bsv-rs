@@ -1038,13 +1038,13 @@ pub fn build_sighash_preimage_original(params: &SighashParams) -> Vec<u8> {
         params.outputs.len()
     };
     w.write_var_int(n_outputs as u64);
-    for o in 0..n_outputs {
+    // the slice, not `.take(n_outputs)`: a SINGLE index past the outputs panics, never a short list
+    for (o, output) in params.outputs[..n_outputs].iter().enumerate() {
         if base == SIGHASH_SINGLE && o != n_in {
             // `CTxOut()`: nValue −1, an empty script
             w.write_u64_le(u64::MAX);
             w.write_var_int(0);
         } else {
-            let output = &params.outputs[o];
             w.write_u64_le(output.satoshis);
             w.write_var_int(output.script.len() as u64);
             w.write_bytes(&output.script);
