@@ -590,6 +590,13 @@ impl Transaction {
     /// This method walks the `source_transaction` chain for each input,
     /// collecting all ancestor transactions and their merkle proofs until
     /// it reaches transactions that are proven (have a `merkle_path`).
+    /// The entries are written in the order the walk collects them — each
+    /// entry's sources above it, this transaction last (BRC-62's rule) —
+    /// not the dependency order [`Beef::to_binary`](crate::transaction::Beef)
+    /// sorts a BEEF a caller assembles by hand into. Since 0.8.8: until
+    /// then the sort could place a proven ancestor after this transaction,
+    /// so a reader taking the last entry ([`from_beef`](Self::from_beef)
+    /// with no txid) read the ancestor, not this transaction.
     ///
     /// # Arguments
     ///
@@ -605,39 +612,16 @@ impl Transaction {
     /// Returns an error if `allow_partial` is false and any input is missing
     /// its source transaction.
     pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>> {
-        let mut beef = Beef::with_version(BEEF_V2);
-
-        // Collect all ancestors in dependency order
-        let mut seen_txids: HashSet<String> = HashSet::new();
-        let mut ancestors: Vec<Transaction> = Vec::new();
-        let mut bumps: Vec<MerklePath> = Vec::new();
-        let mut bump_index_by_root: HashMap<String, usize> = HashMap::new();
-
-        self.collect_ancestors(
-            allow_partial,
-            &mut seen_txids,
-            &mut ancestors,
-            &mut bumps,
-            &mut bump_index_by_root,
-        )?;
-
-        // Add all collected merkle paths to the BEEF
-        for bump in bumps {
-            beef.merge_bump(bump);
-        }
-
-        // The ancestors in dependency order, each entry alone (#764's fold)
-        for ancestor in ancestors {
-            beef.push_transaction(ancestor.id(), ancestor, None);
-        }
-
+        let mut beef = self.ancestry_beef(BEEF_V2, allow_partial)?;
         beef.to_binary()
     }
 
     /// Serializes this transaction and its ancestors to BEEF V1 format.
     ///
     /// BEEF V1 (BRC-62) has no TXID-only entries, for a reader that takes no V2 (BRC-96).
-    /// This method is identical to `to_beef()` but produces V1 format output.
+    /// This method is identical to `to_beef()` but produces V1 format output: the
+    /// entries in the order the walk collects them, this transaction last (BRC-62's
+    /// rule; see [`to_beef`](Self::to_beef)).
     ///
     /// # Arguments
     ///
@@ -653,32 +637,7 @@ impl Transaction {
     /// Returns an error if `allow_partial` is false and any input is missing
     /// its source transaction.
     pub fn to_beef_v1(&self, allow_partial: bool) -> Result<Vec<u8>> {
-        let mut beef = Beef::with_version(BEEF_V1);
-
-        // Collect all ancestors in dependency order
-        let mut seen_txids: HashSet<String> = HashSet::new();
-        let mut ancestors: Vec<Transaction> = Vec::new();
-        let mut bumps: Vec<MerklePath> = Vec::new();
-        let mut bump_index_by_root: HashMap<String, usize> = HashMap::new();
-
-        self.collect_ancestors(
-            allow_partial,
-            &mut seen_txids,
-            &mut ancestors,
-            &mut bumps,
-            &mut bump_index_by_root,
-        )?;
-
-        // Add all collected merkle paths to the BEEF
-        for bump in bumps {
-            beef.merge_bump(bump);
-        }
-
-        // The ancestors in dependency order, each entry alone (#764's fold)
-        for ancestor in ancestors {
-            beef.push_transaction(ancestor.id(), ancestor, None);
-        }
-
+        let mut beef = self.ancestry_beef(BEEF_V1, allow_partial)?;
         beef.to_binary()
     }
 
@@ -686,7 +645,13 @@ impl Transaction {
     ///
     /// The Atomic BEEF format (BRC-95) includes a 4-byte prefix `0x01010101`,
     /// followed by this transaction's TXID, and then the BEEF data containing
-    /// only this transaction and its dependencies.
+    /// only this transaction and its dependencies, this transaction last on the
+    /// wire (BRC-62's rule; see [`to_beef`](Self::to_beef)): the closure is
+    /// sorted as [`Beef::to_binary_atomic`] sorts it and this transaction is
+    /// then moved last (since 0.8.8; until then a graph holding a proven
+    /// entry beside a missing source left it ahead of the proven ones), while
+    /// `Beef::to_binary_atomic` on a BEEF a caller assembles by hand keeps
+    /// its documented dependency sort.
     ///
     /// # Arguments
     ///
@@ -702,7 +667,26 @@ impl Transaction {
     /// Returns an error if `allow_partial` is false and any input is missing
     /// its source transaction.
     pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>> {
-        let mut beef = Beef::with_version(BEEF_V2);
+        let mut beef = self.ancestry_beef(BEEF_V2, allow_partial)?;
+        let txid = self.id();
+        beef.to_binary_atomic_subject_last(&txid)
+    }
+
+    /// The BEEF of this transaction and its ancestry under `version`'s word,
+    /// the entries in the order [`collect_ancestors`](Self::collect_ancestors)
+    /// builds — each entry's sources above it, this transaction last (BRC-62's
+    /// rule) — held in that order for writing, without the Beef-level
+    /// dependency sort: a BEEF these doors write ends with this transaction,
+    /// as the reference's transaction door writes what it collects without a
+    /// sort (`ts-stack@edf6e03` `Transaction.ts:1787-1839`), while its
+    /// `Beef.toBinary` — and this crate's — still sorts a BEEF a caller
+    /// assembles by hand. The atomic door sorts its closure as
+    /// [`Beef::to_binary_atomic`] does and then moves this transaction last
+    /// (0.8.8's fold), where `Beef::to_binary_atomic` on a BEEF a caller
+    /// assembles by hand writes the sort alone. Until 0.8.8 the doors sorted, so a graph holding
+    /// a proven entry beside a missing source wrote the subject before it.
+    fn ancestry_beef(&self, version: u32, allow_partial: bool) -> Result<Beef> {
+        let mut beef = Beef::with_version(version);
 
         // Collect all ancestors in dependency order
         let mut seen_txids: HashSet<String> = HashSet::new();
@@ -728,8 +712,8 @@ impl Transaction {
             beef.push_transaction(ancestor.id(), ancestor, None);
         }
 
-        let txid = self.id();
-        beef.to_binary_atomic(&txid)
+        beef.hold_order();
+        Ok(beef)
     }
 
     /// Collects ancestor transactions and their merkle proofs.

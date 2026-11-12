@@ -122,7 +122,7 @@
     },
     {
       "path": "src/transaction/beef.rs",
-      "lines": 3074
+      "lines": 2956
     },
     {
       "path": "src/transaction/beef_stream.rs",

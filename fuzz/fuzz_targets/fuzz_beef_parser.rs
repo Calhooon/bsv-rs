@@ -345,6 +345,32 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(bytes) = beef.to_binary() {
         Beef::from_binary(&bytes).expect("an Ok write does not read back (#817)");
     }
-    let _ = Transaction::from_beef(data, None);
+    // The writer's order (BRC-62): a transaction read from a BEEF carries
+    // its linked sources, and the BEEF its door writes ends with it — the
+    // no-txid read of those bytes takes the same transaction back; the atomic
+    // door's closure ends with the subject (the sorted closure, the subject
+    // moved last; 0.8.8's fold), so the same read of them takes it too.
+    if let Ok(tx) = Transaction::from_beef(data, None) {
+        let id = tx.id();
+        if let Ok(bytes) = tx.to_beef(true) {
+            assert_eq!(
+                Transaction::from_beef(&bytes, None).map(|t| t.id()),
+                Ok(id.clone()),
+                "the transaction door's BEEF ends with the transaction"
+            );
+        }
+        if let Ok(bytes) = tx.to_atomic_beef(true) {
+            assert_eq!(
+                Transaction::from_beef(&bytes, None).map(|t| t.id()),
+                Ok(id.clone()),
+                "the atomic door's BEEF ends with the transaction"
+            );
+            assert_eq!(
+                Beef::from_binary(&bytes).map(|b| b.txs.last().map(|t| t.txid())),
+                Ok(Some(id)),
+                "the atomic door's closure ends with the transaction"
+            );
+        }
+    }
     let _ = Transaction::from_atomic_beef(data);
 });
