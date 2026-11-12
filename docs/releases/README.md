@@ -7,4 +7,4 @@
 - `## Not changed`: what a reader might expect to have moved and did not.
 - `## How it was checked`: the runs behind the release's sentences, by what they were run on.
 
-It lands on `beta` by its own pull request before the tag, and `main` takes it by `git cherry-pick -x` with the front pages under the direction rule's fifth class (`RELEASING.md`), once that class has the owner's word. It names no figure the page's generated block already carries, and nothing of a draft advisory.
+It lands on `beta` by its own pull request before the tag, and `main` takes it by `git cherry-pick -x` with the front pages under the direction rule's fifth class (`RELEASING.md`; the owner's word of 2026-11-12). It names no figure the page's generated block already carries, and nothing of a draft advisory.
