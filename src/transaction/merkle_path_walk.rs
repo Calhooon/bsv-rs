@@ -227,25 +227,27 @@ pub(super) fn is_reference_hex(text: &str) -> bool {
 /// A text with a character that is not a hex digit is refused in the
 /// reference's words, as its `hashPair` throws on the concatenation
 /// (`MerklePath.ts:30-32`, `utils.ts:113-118`); through #817 it was dropped and
-/// the rest hashed. Every other text keeps the legacy reading below.
+/// the rest hashed. Every other text is read as the reference's `hashPair`
+/// reads it: `hashPair(right, left)` there (the callers pass the sides in the
+/// other order), the two texts concatenated as text, one leading `0` when the
+/// total length is odd (`utils.ts:125-128`), decoded once and reversed whole.
+/// For two even-length texts that is each side's bytes reversed, `left` first;
+/// until #817 each side was decoded alone and a side of odd length dropped.
 pub(super) fn hash_pair(left: &str, right: &str) -> std::result::Result<String, String> {
     if !is_reference_hex(left) || !is_reference_hex(right) {
         return Err(INVALID_HEX.to_string());
     }
-    let mut data = Vec::with_capacity(64);
-
-    // Parse hashes from hex and reverse to internal byte order
-    if let Ok(mut left_bytes) = from_hex(left) {
-        left_bytes.reverse();
-        data.extend_from_slice(&left_bytes);
+    let mut text = String::with_capacity(left.len() + right.len() + 1);
+    if !(left.len() + right.len()).is_multiple_of(2) {
+        text.push('0');
     }
-    if let Ok(mut right_bytes) = from_hex(right) {
-        right_bytes.reverse();
-        data.extend_from_slice(&right_bytes);
-    }
+    text.push_str(right);
+    text.push_str(left);
+    let mut data = from_hex(&text).map_err(|_| INVALID_HEX.to_string())?;
+    data.reverse();
 
-    // Valid hash pairs share the block primitive. Preserve the legacy
-    // reading of malformed display strings for callers constructing leaves.
+    // Two 32-byte hashes share the block primitive; bytes of any other
+    // length are hashed whole, as the reference's `hash256` hashes them.
     let pair = data.split_at_checked(32).and_then(|(left, right)| {
         Some((
             <&[u8; 32]>::try_from(left).ok()?,

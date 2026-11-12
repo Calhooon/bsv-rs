@@ -252,7 +252,12 @@ What was folded:
   3,636 refused, 1,761 by the reader, 248 `RootNotCarried`; the 341 older BEEFs
   measured at the fold's tip with the old vector keep 2,263, 3,534, 1,740, 245,
   so the move is the vector's alone (15 x 17 = 255 = 153 + 102). The two #817
-  sweeps: `(356, 121)` and `6 * 356`. The `.cargo/mutants.toml` entry for
+  sweeps: `(356, 121)` and `6 * 356`. (Since 0.8.8's `beef_tx_order.json` the
+  three read 361, 6,137 = 2,443 `Ok` and 3,694 refused, 1,789 by the reader,
+  252 `RootNotCarried`, `(361, 126)` and `6 * 361`; since #817's transaction
+  fold 363, 6,171 = 2,467 `Ok` and 3,704 refused, the reader's and the judge's
+  unmoved, `(363, 126)` and `6 * 363`, that fold's vector two V2 BEEFs;
+  `docs/lanes/fix-817.md`.) The `.cargo/mutants.toml` entry for
   `dependency_order`'s `<` moved from 1132 to 1138 (six lines in
   `to_binary_atomic`).
 

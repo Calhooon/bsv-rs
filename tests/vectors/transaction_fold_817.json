@@ -1,0 +1,430 @@
+{
+  "description": "bsv-rs#817 transaction fold. hash_pair: each cell a MerklePath held through the public fields at block height 800000; compute_root computeRoot() on the held path, checked new MerklePath(h, path), unchecked the same with legalOffsetsOnly false: accepted (with the root) or the words thrown and the error class. signing: findTransactionForSigning on a BEEF read from bytes, the identity of the object returned, the entry's input link, the BEEF hex before and after the returned object is signed. Written by tests/support/transaction_fold_817.mjs.",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/MerklePath.ts, Beef.ts",
+  "node": "v22.18.0",
+  "block_height": 800000,
+  "hash_pair": [
+    {
+      "name": "sibling_of_63_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "7dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "976ff66d44c1c20b67a89bd3e2f665512dfd883adc75fa990ad6f6672193a5c2"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "txid_of_63_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "6a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "5baa15a995458824fab6513259a40793d8ae71689df2845503157cbf2e9073bf"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "both_of_63_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "6a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "7dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "206aa5252b476031b35b049d6a19aad86584e9e5debcab3a70b532ca44b29f3d"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "sibling_of_1_digit",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "a"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "0d7a98600ce1717ded90abbc5559b3537e2f5688c02e6ce312cf6d8fc44eb01a"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "sibling_of_65_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254a"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "5452d236931007b36ccd9833e2fa58d07264c3ba17f507e89d511eac4c7f5f72"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "txid_of_63_digits_beside_a_duplicate",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "6a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "duplicate": true
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "55705a7e7d45a24201ee3388241777c6e5925d7fead57f43efcbab92b0fb9a98"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "computed_node_leaf0_of_63_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          },
+          {
+            "offset": 2,
+            "hash": "9be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+          }
+        ],
+        [],
+        [
+          {
+            "offset": 1,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "2120c09e94f1a5aa3103f03b1b88451a7e4e55ff3161b0b4962b4d3f4ad6019c"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "computed_node_leaf1_of_63_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          },
+          {
+            "offset": 2,
+            "hash": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+          },
+          {
+            "offset": 3,
+            "hash": "b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+          }
+        ],
+        [],
+        [
+          {
+            "offset": 1,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "9155bffe1d825644fde9d7c54958da196d9bc04e3120933d12546053529d66b1"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "sibling_of_62_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "ccd1d9a08572154c25dcf82b3d3ddf0b88681f1800c6349a876c937126ff922b"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "sibling_of_64_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "4ce232f2ed52e9522be8e6bc3bec810a8ebe6d688e5f32e48dcdc49abf848292"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "sibling_of_66_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254ab"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "5d3f6199ccf2521bebd863a8f68879fd49d20f7b86686e6e37dd78c6a4b56ff5"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "empty_sibling",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": ""
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "13f79147bfb52bd0dc375fc2076016b7d0b818d9c201345e2c05c8a1d4099858"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    },
+    {
+      "name": "computed_node_of_64_digits",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          },
+          {
+            "offset": 2,
+            "hash": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+          }
+        ],
+        [],
+        [
+          {
+            "offset": 1,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "a6ab4275755a52c849977c2c5c0f7ce49ba2e6baee71e51abf29217d19ae6479"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
+    }
+  ],
+  "signing": {
+    "key_scalar": 7,
+    "parent_txid": "67fae8ce1692ea64c494a087bfa5d397f2c270fd0f2453d7660832de2ac8bc2c",
+    "child_txid": "25aefa5390850a47790e4423018fcebecaa6668aa5b301f766f48ae8057d2ebe",
+    "signed_child_txid": "c53166257fd73cb877e6c503575edbc71356f63d6a17ae7e2c78dbe63d967bdb",
+    "before": "0200beef0002000100000001fc2833746ec550353e9c8f4c5fb566117bfc7f264a7309a5d97c75cfd1aec4a2000000000151ffffffff01e8030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac000000000001000000012cbcc82ade320866d753240ffd70c2f297d3a5bf87a094c464ea9216cee8fa670000000000ffffffff0184030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac00000000",
+    "entry_input_linked_before": false,
+    "returned_is_the_entry": true,
+    "entry_input_linked_after": true,
+    "hex_after_find": "0200beef0002000100000001fc2833746ec550353e9c8f4c5fb566117bfc7f264a7309a5d97c75cfd1aec4a2000000000151ffffffff01e8030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac000000000001000000012cbcc82ade320866d753240ffd70c2f297d3a5bf87a094c464ea9216cee8fa670000000000ffffffff0184030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac00000000",
+    "hex_after_signing_the_returned": "0200beef0002000100000001fc2833746ec550353e9c8f4c5fb566117bfc7f264a7309a5d97c75cfd1aec4a2000000000151ffffffff01e8030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac000000000001000000012cbcc82ade320866d753240ffd70c2f297d3a5bf87a094c464ea9216cee8fa67000000006b48304502210099f8f110702b986e64cc66c0577c54625bcbb1b973ea9d81342bd7a982410b7102203584eaf853cfde0f77c13b5959ce54a76bfa6c2225a756fca48e01f47862323f4121025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcffffffff0184030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac00000000",
+    "signed_child": "01000000012cbcc82ade320866d753240ffd70c2f297d3a5bf87a094c464ea9216cee8fa67000000006b48304502210099f8f110702b986e64cc66c0577c54625bcbb1b973ea9d81342bd7a982410b7102203584eaf853cfde0f77c13b5959ce54a76bfa6c2225a756fca48e01f47862323f4121025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcffffffff0184030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac00000000"
+  }
+}

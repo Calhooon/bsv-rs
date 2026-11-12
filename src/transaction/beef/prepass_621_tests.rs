@@ -268,13 +268,15 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
     // `tests/support/beef_seeds_817.rs` that `Beef::from_binary` reads, and
     // the split below is what this test measured over them. A new vector
     // holding a BEEF moves these figures (#841's `transaction_trailing_data_
-    // 840.json#0` moved 337 to 338): re-derive them by running this test,
+    // 840.json#0` moved 337 to 338; #817's transaction fold, whose
+    // `transaction_fold_817.json` holds two V2 BEEFs, 361 to 363 and the
+    // split 2,443 and 3,694 to 2,467 and 3,704): re-derive them by running this test,
     // whose failing assertion prints the new figures as `left`, and carry
     // them to the records that cite them (`CHANGELOG.md`'s #621 entry,
     // `src/transaction/CLAUDE.md`'s `beef/prepass_621_tests.rs` row,
     // `docs/lanes/fix-621.md`). A split that moves with no new vector is a
     // finding. The totals are derived, never pinned.
-    assert_eq!(read, 361, "every BEEF the vectors hold that reads");
+    assert_eq!(read, 363, "every BEEF the vectors hold that reads");
     assert_eq!(
         counts.ok + counts.refused,
         changes.len() * read,
@@ -288,7 +290,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
             counts.by_reader,
             counts.root_not_carried
         ),
-        (2443, 3694, 1789, 252)
+        (2467, 3704, 1789, 252)
     );
 }
 
