@@ -306,19 +306,45 @@ fn module_sources(root: &Path, file: &Path) -> Vec<PathBuf> {
     seen
 }
 
-/// A table row's cells, the outer pipes dropped (a `\|` inside a cell kept).
+/// A table row's cells, stripped, the outer pipes dropped: a boundary is a `|` outside a code
+/// span and not escaped, as `nightly_mutants.cell_spans` reads it (a code span opens at a run
+/// of n backticks and closes at the next run of exactly n; a backslash escapes the next
+/// character outside one). Until the rows lane a `||` inside backticks was two more cells.
 fn cells(row: &str) -> Vec<String> {
-    let (mut out, mut cell, mut escaped) = (Vec::new(), String::new(), false);
-    for c in row.trim().chars() {
-        if c == '|' && !escaped {
-            out.push(std::mem::take(&mut cell).trim().to_string());
-        } else {
-            cell.push(c);
+    let bytes = row.as_bytes();
+    let (mut bars, mut i, n) = (Vec::new(), 0, bytes.len());
+    let run = |from: usize| (from..n).take_while(|&j| bytes[j] == b'`').count();
+    while i < n {
+        match bytes[i] {
+            b'\\' => i += 2,
+            b'`' => {
+                let open = run(i);
+                let mut k = i + open;
+                let mut close = None;
+                while k < n {
+                    if bytes[k] == b'`' {
+                        let length = run(k);
+                        if length == open {
+                            close = Some(k + length);
+                            break;
+                        }
+                        k += length;
+                    } else {
+                        k += 1;
+                    }
+                }
+                i = close.unwrap_or(i + open);
+            }
+            b'|' => {
+                bars.push(i);
+                i += 1;
+            }
+            _ => i += 1,
         }
-        escaped = c == '\\';
     }
-    out.push(cell.trim().to_string());
-    out[1..out.len().saturating_sub(1).max(1)].to_vec()
+    bars.windows(2)
+        .map(|w| row[w[0] + 1..w[1]].trim().to_string())
+        .collect()
 }
 
 /// The backticked spans of a text.
@@ -334,14 +360,17 @@ fn stem(name: &str) -> &str {
 
 /// `tests/CLAUDE.md`'s `## Files` rows: each row's line number, its text and its File cell's
 /// `.rs` names, the one reading of the table for `test_rows` and `doubled_rows` (#712).
-fn table_rows(text: &str) -> Vec<(usize, &str, Vec<&str>)> {
+fn table_rows(text: &str) -> Vec<(usize, &str, Vec<String>)> {
     let (mut rows, mut inside) = (Vec::new(), false);
     for (index, line) in text.lines().enumerate() {
         if line.starts_with("## ") {
             inside = line.trim() == "## Files";
         } else if inside && line.starts_with("| `") {
-            let file_cell = line.split('|').nth(1).unwrap_or("");
-            let names = ticked(file_cell).into_iter().filter(|n| n.ends_with(".rs"));
+            let file_cell = cells(line).into_iter().next().unwrap_or_default();
+            let names = ticked(&file_cell)
+                .into_iter()
+                .filter(|n| n.ends_with(".rs"))
+                .map(str::to_string);
             rows.push((index + 1, line, names.collect()));
         }
     }
@@ -353,7 +382,7 @@ fn test_rows(text: &str) -> BTreeMap<String, String> {
     let mut rows = BTreeMap::new();
     for (_, line, names) in table_rows(text) {
         for name in names {
-            rows.insert(stem(name).to_string(), line.to_string());
+            rows.insert(stem(&name).to_string(), line.to_string());
         }
     }
     rows
@@ -364,10 +393,10 @@ fn test_rows(text: &str) -> BTreeMap<String, String> {
 /// an edit to another copy is never read, `support/a.rs` beside `a.rs` included. One refusal
 /// per stem, naming its files and each row's line in `tests/CLAUDE.md`.
 fn doubled_rows(text: &str) -> Vec<String> {
-    let mut seen: BTreeMap<&str, (Vec<&str>, Vec<usize>)> = BTreeMap::new();
+    let mut seen: BTreeMap<String, (Vec<String>, Vec<usize>)> = BTreeMap::new();
     for (number, _, names) in table_rows(text) {
         for name in names {
-            let (files, at) = seen.entry(stem(name)).or_default();
+            let (files, at) = seen.entry(stem(&name).to_string()).or_default();
             if !files.contains(&name) {
                 files.push(name);
             }
@@ -831,4 +860,26 @@ fn a_support_file_beside_a_top_level_file_of_its_stem_is_two_rows_712() {
              stem and keep the last)"
         ]
     );
+}
+
+#[test]
+fn a_pipe_inside_a_code_span_or_escaped_is_text_and_not_a_cell_boundary() {
+    // The rows lane: `shamir_backup_854.rs`'s row carries `||` in backticks and
+    // `front_page.rs`'s a `|` in backticks; the scripts' reader split them into cells.
+    let row =
+        "| `a.rs` | 1 | none | `primitives` | the grammar's `||`; a `|` and ``x`|`y``; \\| kept |";
+    assert_eq!(
+        cells(row),
+        [
+            "`a.rs`",
+            "1",
+            "none",
+            "`primitives`",
+            "the grammar's `||`; a `|` and ``x`|`y``; \\| kept"
+        ]
+    );
+    // An escaped backslash before a pipe leaves the pipe a boundary; an unclosed run is text.
+    assert_eq!(cells("| a\\\\| b ` | c |"), ["a\\\\", "b `", "c"]);
+    let table = "## Files\n\n| `a.rs` | 1 | none | none | `x || y` |\n";
+    assert_eq!(table_rows(table)[0].2, ["a.rs"]);
 }

@@ -26,6 +26,11 @@ row is printed, not added. With `--check` it writes nothing and refuses a binary
 row, a stem named in two rows (#712), a row naming fewer modules than its source, a shared
 row without a part per file and a row dropping a frozen module: the reading `tests/arch_tests_claude_rows_name_modules_706.rs`
 pins in the Rust suite, and CI runs `--check` beside the plan's own tests.
+
+On a tree `--check` passes the writer is the identity, byte for byte (the rows lane): it
+rewrites only a Modules cell that moves (`with_cell`), a `|` inside a code span or escaped
+is text to the reader (`affected_tests.cell_spans`), and the file is read and written as
+UTF-8 bytes; `test_rows_from_sources.py` holds it, run in the plan step beside `--check`.
 """
 
 import argparse
@@ -120,10 +125,38 @@ def shared(parts):
     return "; ".join(f"`{name}.rs`: {cell(modules)}" for name, modules in parts)
 
 
+def join_row(cells):
+    """A row written from its cells: the reader's inverse (`read_row(join_row(c)) == c` for
+    cells whose every `|` is escaped or in a code span and with no edge white space)."""
+    return "| " + " | ".join(cells) + " |"
+
+
+def read_row(row):
+    """A row's cells as the writer reads them (`affected.row_cells`)."""
+    return affected.row_cells(row)
+
+
+def with_cell(row, index, text):
+    """`row` with its cell `index` (zero-based) replaced by `text`, every other byte kept: the
+    cell's own edge white space too, so a row the writer has nothing to change for comes back
+    byte for byte (the identity on a tree `--check` passes; the rows lane)."""
+    start, end = affected.cell_spans(row)[index]
+    old = row[start:end]
+    lead = old[:len(old) - len(old.lstrip())]
+    trail = old[len(old.rstrip()):] if old.strip() else ""
+    return row[:start] + (lead or " ") + text + (trail or " ") + row[end:]
+
+
+def read_rows_file(path):
+    """`tests/CLAUDE.md` as written: UTF-8 bytes, no newline translation (a `\r\n` kept)."""
+    return path.read_bytes().decode("utf-8")
+
+
 def write(root):
-    """The rows rewritten; returns the new text and the counts."""
+    """The rows rewritten; returns the new text and the counts. Only a row whose Modules
+    cell changes is touched, and only that cell's text in it (`with_cell`)."""
     path = root / "tests" / "CLAUDE.md"
-    lines = path.read_text().split("\n")
+    lines = read_rows_file(path).split("\n")
     start, end = files_section(lines)
     reading = Reading(root)
     pinned = frozen(root)
@@ -135,12 +168,16 @@ def write(root):
         if not line.startswith("|"):
             continue
         cells = affected.row_cells(line)
+        if not cells:
+            continue
         if cells[0] == "File":
             if "Modules" not in cells:
                 cells.insert(affected.MODULES_CELL - 1, "Modules")
+                lines[i] = join_row(cells)
         elif set(cells[0]) <= set("-: "):
             if len(cells) < affected.MODULES_CELL + 1:
                 cells.insert(affected.MODULES_CELL - 1, "-------")
+                lines[i] = join_row(cells)
         else:
             had = len(cells) > affected.MODULES_CELL
             names = row_files(line)
@@ -164,11 +201,11 @@ def write(root):
             counts["naming none before"] += not (had and affected.row_modules(line, reading.named))
             counts["naming none after"] += not any(m for _, m in parts)
             text = shared(parts) if len(parts) > 1 else cell(parts[0][1] if parts else set())
-            if had:
-                cells[affected.MODULES_CELL - 1] = text
-            else:
+            if not had:
                 cells.insert(affected.MODULES_CELL - 1, text)
-        lines[i] = "| " + " | ".join(cells) + " |"
+                lines[i] = join_row(cells)
+            elif cells[affected.MODULES_CELL - 1] != text:
+                lines[i] = with_cell(line, affected.MODULES_CELL - 1, text)
     return "\n".join(lines), counts
 
 
@@ -199,7 +236,7 @@ def check(root):
     reading = Reading(root)
     rows = reading.tree.rows
     pinned = frozen(root)
-    refusals = doubled_rows((root / "tests" / "CLAUDE.md").read_text())
+    refusals = doubled_rows(read_rows_file(root / "tests" / "CLAUDE.md"))
     for binary in reading.tree.binaries:
         if binary not in rows:
             refusals.append(f"tests/{binary}.rs: no row in tests/CLAUDE.md's ## Files table; {SENTENCE}")
@@ -238,7 +275,7 @@ def main():
         print(f"{len(refusals)} refusals")
         return 1 if refusals else 0
     text, counts = write(args.root)
-    (args.root / "tests" / "CLAUDE.md").write_text(text)
+    (args.root / "tests" / "CLAUDE.md").write_bytes(text.encode("utf-8"))
     for key, value in counts.items():
         print(f"{key}: {value}")
     missing = sorted(set(Reading(args.root).tree.binaries) - set(affected.Tree(args.root).rows))

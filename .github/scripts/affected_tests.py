@@ -153,9 +153,10 @@ def used_modules(text, modules, exported):
 MODULES_CELL = 4
 
 
-def row_cells(row):
-    """A table row's cells, the outer pipes dropped (a `\\|` inside a cell kept)."""
-    return [c.strip() for c in re.split(r"(?<!\\)\|", row.strip())[1:-1]]
+# A table row's cells, the outer pipes dropped: a `|` inside a code span or escaped is text
+# (`nightly_mutants.cell_spans`, the one splitter of the table's readers and writer).
+row_cells = nightly.row_cells
+cell_spans = nightly.cell_spans
 
 
 def shared_cell(cell):
