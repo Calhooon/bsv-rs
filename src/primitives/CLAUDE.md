@@ -253,7 +253,8 @@ Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_
 | `sighash.rs` | 623 | BIP-143 style sighash computation |
 | `tx_signature.rs` | 309 | Transaction signature encoding/decoding with sighash scope |
 | `schnorr.rs` | 413 | Schnorr zero-knowledge proofs for ECDH verification |
-| `shamir.rs` | 1023 | Shamir secret sharing for private key backup/recovery |
+| `shamir.rs` | 484 | Shamir secret sharing for private key backup/recovery; the reader's refusals before interpolating (#854's security fix) |
+| `shamir_tests.rs` | 604 | `shamir.rs`'s unit tests (moved out for the file-size ratchet by #854's port, beta's bsv-rs#180 the class) |
 | `polynomial.rs` | 394 | Polynomial operations over finite field (for Shamir) |
 
 Key exports: `compute_sighash`, `build_sighash_preimage`, `compute_sighash_for_signing`, `compute_sighash_from_raw`, `parse_transaction`, `RawTransaction`, `SighashCache`, `SighashParams`, `TxInput`, `TxOutput`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`)
