@@ -84,6 +84,8 @@ Throughput benchmarks on 1KB payloads:
 - `split_private_key (3 of 5)` - Split key into 5 shares, 3 required
 - `split_private_key (5 of 10)` - Split key into 10 shares, 5 required
 - `recover_private_key (3 of 5)` - Recover key from 3 shares
+- `recover_private_key (2 of 3)`, `(10 of 20)`, `(255 of 255)` - Recover from exactly the threshold's shares of a larger set (#880: one modular inverse for the set)
+- `recover_private_key_from_legacy_backup (3 of 5)`, `(255 of 255)` - The legacy reader on a backup in the form bsv-rs 0.8.5 wrote (x = 1..n, built by the bench's `legacy_backup`), read and recovered (#880)
 - `to_backup_format` - Serialize shares to backup format
 - `from_backup_format` - Deserialize shares from backup
 

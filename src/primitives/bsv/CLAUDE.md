@@ -13,7 +13,7 @@ This module provides BSV blockchain-specific operations including transaction si
 | `sighash.rs` | 623 | BIP-143 style sighash computation for transaction signing |
 | `tx_signature.rs` | 309 | Transaction signatures with sighash scope (checksig format) |
 | `schnorr.rs` | 413 | Schnorr ZK proofs for ECDH shared secret verification |
-| `polynomial.rs` | 432 | Polynomial operations for Lagrange interpolation; `PointInFiniteField::from_string` the reference's bounded canonical reading (#854) |
+| `polynomial.rs` | 469 | Polynomial operations for Lagrange interpolation, `value_at` with one modular inverse for the whole call (#880); `PointInFiniteField::from_string` the reference's bounded canonical reading (#854) |
 | `shamir.rs` | 612 | BRC-140 Shamir backup, the reference's writer and reader (#854); `split_private_key_with` (bsv-rs#180); `refuse_degenerate_xs` reads the whole set's x values (no zero, no repeat, #854's security fix) |
 | `shamir_legacy.rs` | 150 | `recover_private_key_from_legacy_backup`: a backup bsv-rs 0.8.5 or earlier wrote, read by a deliberate call, each share bounded at the 65 bytes the old writer could write (#854) |
 | `shamir_tests.rs` | 642 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
@@ -281,7 +281,7 @@ impl Polynomial {
 }
 ```
 
-**Lagrange interpolation formula**: `y = Σ(i=0..t-1) y_i * Π(j≠i) (x - x_j) / (x_i - x_j)`, all arithmetic mod secp256k1 prime. Uses modular inverse for division; returns zero if inverse fails (e.g., duplicate x coordinates).
+**Lagrange interpolation formula**: `y = Σ(i=0..t-1) y_i * Π(j≠i) (x - x_j) / (x_i - x_j)`, all arithmetic mod secp256k1 prime, over the leading `min(points.len(), threshold)` points. Since #880 `value_at` takes ONE modular inverse per call where the reference's `valueAt` (`ts-stack@edf6e03` `Polynomial.ts:120-136`) and go-sdk (`primitives/keyshares/polynomial.go:82-106` at `2ca481c`) take one per ordered pair: `N_i = Π(j≠i) (x - x_j)` by prefix and suffix products, `D_i = Π(j≠i) (x_i - x_j)`, the non-zero `D_i` inverted together (Montgomery's batch inversion), `term_i = y_i * N_i * D_i^-1`. The value is the pairwise loop's on every input: a point whose x repeats another used point's (`D_i` = 0, never fed to the batch) contributes 0, as the per-pair zero inverse did; no points answers 0, one its `y mod p`; unreduced or negative coordinates and any `x` reduced as before. Not constant time (it never was: `num-bigint`); every inverse's input and the one data branch (`D_i == 0`) are functions of the x coordinates alone, a `y` entering only as a factor. Pinned by `tests/shamir_interpolation_880.rs` (the pairwise loop kept there as the oracle).
 
 ## Internal Functions
 
