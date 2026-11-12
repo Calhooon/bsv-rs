@@ -1,7 +1,7 @@
 //! Contact action construction and PushDrop signing, kept separate from cache operations.
 use super::record;
 use super::*;
-use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
+use crate::script::templates::{LockPosition, PushDrop};
 use crate::script::LockingScript;
 use crate::wallet::{
     ListOutputsResult, Outpoint, SignActionResult, SignableTransaction, WalletOutput,
@@ -72,34 +72,20 @@ impl<W: WalletInterface> ContactsManager<W> {
                 record::MAX_CIPHERTEXT
             )));
         }
-        let key = self
-            .wallet
-            .get_public_key(
-                crate::wallet::GetPublicKeyArgs {
-                    protocol_id: Some(protocol.clone()),
-                    key_id: Some(key_id.into()),
-                    counterparty: Some(Counterparty::Self_),
-                    for_self: Some(false),
-                    ..Default::default()
-                },
-                self.originator(),
-            )
-            .await?;
-        let signature = self
-            .wallet
-            .create_signature(
-                crate::wallet::CreateSignatureArgs {
-                    data: Some(ciphertext.clone()),
-                    protocol_id: protocol,
-                    key_id: key_id.into(),
-                    counterparty: Some(Counterparty::Self_),
-                    ..Default::default()
-                },
-                self.originator(),
-            )
-            .await?
-            .signature;
-        wallet_key_lock(&key.public_key, vec![ciphertext, signature])
+        // The one door (#816): the key asked, its text judged, then the
+        // signature over the ciphertext (`PushDrop.ts:155-185`).
+        PushDrop::lock_with_wallet(
+            &self.wallet,
+            self.originator(),
+            vec![ciphertext],
+            protocol,
+            key_id,
+            Counterparty::Self_,
+            false,
+            true,
+            LockPosition::Before,
+        )
+        .await
     }
 
     /// `#readListedSource` (`ContactsManager.ts:633-658`): the listed

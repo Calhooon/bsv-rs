@@ -5,7 +5,8 @@
 //! `publicKey.length / 2` (`ts-stack@edf6e03`
 //! `packages/sdk/src/script/templates/PushDrop.ts:158-175`): a compressed key
 //! as 33 bytes, an uncompressed (`04`) or hybrid (`06`/`07`) key as 65, never
-//! re-encoded. The wallet sites lock through [`wallet_key_lock`]. One residue,
+//! re-encoded. Four wallet sites lock through `PushDrop::lock_with_wallet`
+//! (#816), the global key-value store through [`wallet_key_lock`]. One residue,
 //! stated: for an odd-length key text the reference's opcode is
 //! `length / 2` truncated by its writer (`0x20` before 33 bytes, a script
 //! whose first push is cut), where this crate writes the 33 bytes' own push.
@@ -47,12 +48,17 @@ impl PushDrop {
     }
 }
 
-/// The lock-before PushDrop of a wallet's `getPublicKey` answer, the five
-/// wallet sites' lock: the key read by [`read_wallet_key`] and locked at the
-/// reference's default position (#545). The public
-/// `PushDrop::lock_with_wallet` (#782) reads and locks through the same two
-/// steps, its read before its signature call.
-#[cfg(any(feature = "kvstore", feature = "identity", feature = "registry"))]
+/// The lock-before PushDrop of a wallet's `getPublicKey` answer: the key
+/// read by [`read_wallet_key`] and locked at the reference's default position
+/// (#545). One caller is left since #816, the global key-value store
+/// (`src/kvstore/global_actions.rs`), which asks its signature before its key
+/// (#343's stated residue) and so cannot go through the public
+/// `PushDrop::lock_with_wallet` (#782), the door the other four wallet sites
+/// lock through: there the key text is read before any signature is asked,
+/// as the reference's `PushDrop.lock` decodes it (`PushDrop.ts:166-172`,
+/// then `:173-185`). `tests/arch_pushdrop_wallet_key_order_816.rs` refuses
+/// another caller.
+#[cfg(feature = "kvstore")]
 pub(crate) fn wallet_key_lock(key_hex: &str, fields: Vec<Vec<u8>>) -> crate::Result<LockingScript> {
     Ok(read_wallet_key(key_hex)?.lock(fields, LockPosition::Before))
 }

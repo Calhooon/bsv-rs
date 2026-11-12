@@ -19,13 +19,25 @@
 //! `vectors/script_push_only_default_816.json` (`support/script_push_only_default_816.mjs`,
 //! Node v22.18.0): the 24-case grid and the default mode's version edges
 //! (0 strict; 2^31 and 2^32 - 1 relaxed, the version read unsigned).
+//!
+//! The issue's comment of 2026-11-10 (two paths of the relaxed rule with no
+//! test) is closed by the last three tests: the two-pass and asynchronous
+//! stream readers on the same BEEFs, and an unproven ancestor that is not the
+//! subject, judged through `judge_input` at
+//! `src/transaction/beef_stream/spends.rs` by the three stream doors and by
+//! `Transaction::verify`. They pin landed behaviour: their RED is the tip
+//! with `&& !relaxed_by_default(transaction_version)` removed from
+//! `Spend::new` (`docs/lanes/fix-816.md`).
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: a failed unwrap is the test failing
 
 use bsv_rs::script::{
     LockingScript, ProtocolEra, ScriptFlags, Spend, SpendParams, UnlockingScript,
 };
-use bsv_rs::transaction::beef_stream::{verify_stream, SpendRefusal, Verdict};
+use bsv_rs::transaction::beef_stream::{
+    verify_stream, verify_stream_async, verify_stream_two_pass, AsyncByteSource, SpendRefusal,
+    Verdict,
+};
 use bsv_rs::transaction::{
     MerklePath, MockChainTracker, Transaction, TransactionInput, TransactionOutput,
 };
@@ -322,6 +334,153 @@ fn the_stream_judges_push_only_as_the_reference_default_816() {
                 } => assert!(words.contains(REFUSAL), "{label}: {words}"),
                 other => panic!("{label}: {other:?}"),
             }
+        }
+    }
+}
+
+/// The stream doors' verdict on a cell: valid where the reference's default
+/// runs the spend, `SpendRefused` at input 0 of `refused` in `REFUSAL`'s
+/// words otherwise.
+fn assert_stream_verdict(label: &str, c: &Case, v: Verdict, refused: &Transaction) {
+    if c.reference() == Ok(true) {
+        assert!(matches!(v, Verdict::Valid { .. }), "{label}: {v:?}");
+        return;
+    }
+    assert!(!c.push_only && !relaxed(c), "{label}");
+    match v {
+        Verdict::SpendRefused {
+            txid,
+            input: Some(0),
+            why: SpendRefusal::Script(words),
+            ..
+        } => {
+            assert_eq!(txid, refused.hash(), "{label}: the transaction named");
+            assert!(words.contains(REFUSAL), "{label}: {words}");
+        }
+        other => panic!("{label}: {other:?}"),
+    }
+}
+
+/// The asynchronous reader's source: the bytes in chunks of `size`.
+struct Chunks {
+    bytes: Vec<u8>,
+    at: usize,
+    size: usize,
+}
+
+impl AsyncByteSource for Chunks {
+    async fn next_chunk(&mut self) -> std::io::Result<Option<Vec<u8>>> {
+        if self.at == self.bytes.len() {
+            return Ok(None);
+        }
+        let end = (self.at + self.size).min(self.bytes.len());
+        let chunk = self.bytes[self.at..end].to_vec();
+        self.at = end;
+        Ok(Some(chunk))
+    }
+}
+
+async fn verify_async(bytes: &[u8], tracker: &MockChainTracker, size: usize) -> Verdict {
+    let mut source = Chunks {
+        bytes: bytes.to_vec(),
+        at: 0,
+        size,
+    };
+    verify_stream_async(&mut source, tracker, None)
+        .await
+        .unwrap()
+}
+
+/// The two-pass reader (`verify_stream_two_pass`, a seekable source) on the
+/// BEEFs of `the_stream_judges_push_only_as_the_reference_default_816`: the
+/// same verdicts, a non-push-only script run above version 1 and refused at
+/// versions 0 and 1 (#816's comment of 2026-11-10: no test reached it).
+#[test]
+fn the_two_pass_stream_judges_push_only_as_the_reference_default_816() {
+    for c in default_cells() {
+        let (_, child, tracker) = parent_and_child(c.version, &c.unlock);
+        let bytes = child.to_beef_v1(false).unwrap();
+        let v = verify_stream_two_pass(std::io::Cursor::new(&bytes), &tracker, None).unwrap();
+        let label = format!("two-pass v{} {}", c.version, c.unlock_name);
+        assert_stream_verdict(&label, &c, v, &child);
+    }
+}
+
+/// The asynchronous reader (`verify_stream_async`) on the same bytes and
+/// tracker, in chunks of 1, 7 and 4096 bytes: the same verdicts.
+#[tokio::test]
+async fn the_async_stream_judges_push_only_as_the_reference_default_816() {
+    for c in default_cells() {
+        let (_, child, tracker) = parent_and_child(c.version, &c.unlock);
+        let bytes = child.to_beef_v1(false).unwrap();
+        for size in [1, 7, 4096] {
+            let v = verify_async(&bytes, &tracker, size).await;
+            let label = format!("async({size}) v{} {}", c.version, c.unlock_name);
+            assert_stream_verdict(&label, &c, v, &child);
+        }
+    }
+}
+
+/// A proven grandparent, an UNPROVEN parent at `version` spending it with
+/// `unlock`, and a version-1 subject spending the parent with the grid's
+/// push-only unlocking script: the cell's script sits in an ancestor that is
+/// not the subject.
+fn unproven_ancestor(version: u32, unlock: &str) -> (Transaction, Transaction, MockChainTracker) {
+    let (_, mut parent, tracker) = parent_and_child(version, unlock);
+    let grid = cases("default");
+    let push_only = grid.iter().find(|c| c.push_only).unwrap();
+    parent.outputs_mut()[0] =
+        TransactionOutput::new(900, LockingScript::from_hex(&push_only.lock).unwrap());
+    assert!(parent.merkle_path.is_none());
+    let mut subject = Transaction::new();
+    assert_eq!(subject.version(), 1);
+    let mut input = TransactionInput::with_source_transaction(parent.clone(), 0);
+    input.set_unlocking_script(UnlockingScript::from_hex(&push_only.unlock).unwrap());
+    subject.add_input(input).unwrap();
+    subject
+        .add_output(TransactionOutput::new(
+            800,
+            LockingScript::from_hex("51").unwrap(),
+        ))
+        .unwrap();
+    (parent, subject, tracker)
+}
+
+/// An unproven ancestor that is not the subject is judged by the same rule
+/// (`judge_input` at `src/transaction/beef_stream/spends.rs`, and
+/// `Transaction::verify`'s descent): valid where the reference's default
+/// runs the cell, a version-2 (or 2^31, 2^32 - 1) script that is not
+/// push-only included; refused at the PARENT's input 0 in `REFUSAL`'s words
+/// at versions 0 and 1, the subject's own version 1 and push-only script
+/// deciding nothing. The BEEF is this crate's writer's, read by the three
+/// stream doors.
+#[tokio::test]
+async fn an_unproven_ancestor_is_judged_push_only_as_the_reference_default_816() {
+    for c in default_cells() {
+        let (parent, subject, tracker) = unproven_ancestor(c.version, &c.unlock);
+        let label = format!("ancestor v{} {}", c.version, c.unlock_name);
+        let bytes = subject.to_beef_v1(false).unwrap();
+
+        let v = verify_stream(bytes.as_slice(), &tracker, None).unwrap();
+        assert_stream_verdict(&format!("stream {label}"), &c, v, &parent);
+        let v = verify_stream_two_pass(std::io::Cursor::new(&bytes), &tracker, None).unwrap();
+        assert_stream_verdict(&format!("two-pass {label}"), &c, v, &parent);
+        for size in [1, 4096] {
+            let v = verify_async(&bytes, &tracker, size).await;
+            assert_stream_verdict(&format!("async({size}) {label}"), &c, v, &parent);
+        }
+
+        let got = subject.verify(&tracker, None, None).await;
+        if c.reference() == Ok(true) {
+            assert_eq!(got, Ok(true), "{label}");
+        } else {
+            assert_eq!(
+                got,
+                Err(Error::TransactionError(format!(
+                    "Script validation failed for input 0: {REFUSAL}"
+                ))),
+                "{label}"
+            );
         }
     }
 }

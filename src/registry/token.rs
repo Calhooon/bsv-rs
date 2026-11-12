@@ -8,17 +8,15 @@
 use crate::primitives::PublicKey;
 use crate::registry::types::DefinitionType;
 use crate::registry::REGISTRANT_KEY_ID;
-use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
 use crate::script::templates::pushdrop_position::{
     canonical_refusal, key_text_refusal, point_message,
 };
-use crate::script::templates::PushDrop;
+use crate::script::templates::{LockPosition, PushDrop};
 use crate::script::LockingScript;
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::validation::validate_public_key;
 use crate::wallet::{
-    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, KeyDeriver, ProtoWallet, Protocol,
-    SecurityLevel, VerifySignatureArgs,
+    Counterparty, KeyDeriver, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs,
 };
 use crate::{Error, Result};
 
@@ -163,34 +161,21 @@ pub(crate) fn data_fields(
 pub(crate) async fn lock_definition<W: WalletInterface>(
     wallet: &W,
     definition_type: DefinitionType,
-    mut fields: Vec<Vec<u8>>,
+    fields: Vec<Vec<u8>>,
     originator: Option<&str>,
 ) -> Result<LockingScript> {
     let (_, protocol) = shape(definition_type);
-    let key = wallet
-        .get_public_key(
-            GetPublicKeyArgs {
-                protocol_id: Some(protocol.clone()),
-                key_id: Some(REGISTRANT_KEY_ID.into()),
-                counterparty: Some(Counterparty::Anyone),
-                for_self: Some(true),
-                ..Default::default()
-            },
-            originator,
-        )
-        .await?;
-    let signed = wallet
-        .create_signature(
-            CreateSignatureArgs {
-                data: Some(fields.concat()),
-                protocol_id: protocol,
-                key_id: REGISTRANT_KEY_ID.into(),
-                counterparty: Some(Counterparty::Anyone),
-                ..Default::default()
-            },
-            originator,
-        )
-        .await?;
-    fields.push(signed.signature);
-    wallet_key_lock(&key.public_key, fields)
+    // The one door (#816): the key text judged before the signature is asked.
+    PushDrop::lock_with_wallet(
+        wallet,
+        originator,
+        fields,
+        protocol,
+        REGISTRANT_KEY_ID,
+        Counterparty::Anyone,
+        true,
+        true,
+        LockPosition::Before,
+    )
+    .await
 }
