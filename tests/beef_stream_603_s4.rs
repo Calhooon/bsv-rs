@@ -593,7 +593,8 @@ fn a_resumed_reading_runs_from_the_input_reached_bsv_low_591() {
 /// a source whose child at the same offset has a first unlock of `OP_RETURN`
 /// (not push-only: SIGPUSHONLY after Genesis, bsv-script-lean@5dc337e1
 /// `lean/BsvScript/Flags.lean:159-164`; this crate's default mode holds the
-/// unlocking script push-only always).
+/// unlocking script push-only at a version of 1 or below alone, #816, and
+/// the child here is version 1).
 #[test]
 fn a_resumed_source_carrying_another_transaction_runs_every_input_bsv_low_591() {
     let (bytes, headers) = two_inputs(&[]);

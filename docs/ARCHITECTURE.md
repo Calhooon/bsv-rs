@@ -138,7 +138,9 @@ stable patch, `beta` into `main` at a phase exit as the next minor. A tag
 prerelease; either runs `release.yml`, which re-runs CI, runs the measurement
 workflows (`bench.yml`, `msrv.yml`, `features.yml`, `machete.yml`,
 `docs.yml` for actionlint, off the push run since 2026-10-27) and publishes through
-crates.io trusted publishing, nothing from a laptop. A beta tag is never
+crates.io trusted publishing, nothing from a laptop: since 2026-11-12 the
+crate's setting on crates.io requires it, so no credential in the tree or on a
+host can publish this crate (`RELEASING.md` step 7). A beta tag is never
 admitted to the stack's line. [RELEASING.md](../RELEASING.md), [NORTH-STAR.md](NORTH-STAR.md).
 Documentation runs in `ci.yml` on every pull request and push of both lines,
 a step of the required `checks` job since the small gates were bundled
