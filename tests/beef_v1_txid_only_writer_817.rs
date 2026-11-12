@@ -46,8 +46,10 @@ const RAW_TX_EXPECTED: &str = "a valid serialized Transaction is expected";
 /// six of them V1: `Transaction.toBEEF` and the atomic `toAtomicBEEF` bodies;
 /// 356 and 121 until 0.8.8's `beef_tx_order.json` brought its four witnesses'
 /// three BEEFs each — the door's, the reference's door's and its sorted —
-/// five distinct after the bytes' deduplication, every one V1).
-const SWEPT: (usize, usize) = (361, 126);
+/// five distinct after the bytes' deduplication, every one V1; 361 until
+/// #817's transaction fold, whose `transaction_fold_817.json` holds two V2
+/// BEEFs in its `signing` group, the V1 count unmoved).
+const SWEPT: (usize, usize) = (363, 126);
 
 /// A txid no fixture holds.
 const FRESH: &str = "8170000000000000000000000000000000000000000000000000000000000817";
