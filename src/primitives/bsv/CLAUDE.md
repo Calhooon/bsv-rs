@@ -14,7 +14,8 @@ This module provides BSV blockchain-specific operations including transaction si
 | `tx_signature.rs` | 309 | Transaction signatures with sighash scope (checksig format) |
 | `schnorr.rs` | 413 | Schnorr ZK proofs for ECDH shared secret verification |
 | `polynomial.rs` | 394 | Polynomial operations for Lagrange interpolation |
-| `shamir.rs` | 1023 | Shamir Secret Sharing for private key backup |
+| `shamir.rs` | 484 | Shamir Secret Sharing for private key backup; the reader's refusals before interpolating (#854's security fix) |
+| `shamir_tests.rs` | 604 | `shamir.rs`'s unit tests (moved out for the file-size ratchet by #854's port, beta's bsv-rs#180 the class) |
 
 ## Key Exports
 
@@ -227,6 +228,7 @@ pub fn split_private_key(
 
 **Recovery validation**:
 - `from_backup_format` validates that all shares have matching threshold and integrity values
+- Both doors refuse, before interpolating (#854's security fix, `refuse_degenerate_xs` one scan each): a share whose x is zero (whose y the interpolation answers as the secret), a repeated x, and — at the backup door, `decode_field` — a coordinate field that is empty, over 64 base58 characters, or not the canonical base58 of a value below the field prime (a leading `1`, a coordinate at or above the prime; the prime itself a non-canonical zero x)
 - `recover_private_key` checks that `points.len() >= threshold` before interpolation
 - After recovery, the integrity checksum is verified against the recovered key
 
@@ -458,7 +460,7 @@ The integrity field allows verification that shares belong together and that rec
 - Polynomial coefficients generated from `PrivateKey::random()` for cryptographic randomness
 - Store shares in separate secure locations
 - Never store more than (threshold - 1) shares together
-- Duplicate shares in recovery cause failure (Lagrange interpolation requires unique x-coordinates)
+- Duplicate shares are refused at both doors before interpolating (`Duplicate share detected, each must be unique.`, the words the reference's reader also uses), where the Lagrange weights would divide by zero; a zero x is refused beside them (`Zero x coordinate in share <idx>`, #854's security fix)
 - Providing more shares than threshold works (only first `threshold` points are used)
 
 ## Testing
@@ -469,7 +471,7 @@ The integrity field allows verification that shares belong together and that rec
 | `tx_signature.rs` | 6 unit tests | Roundtrip, blank sig, scope values, low-S |
 | `schnorr.rs` | 7 unit tests | Roundtrip, wrong inputs, mutual verification, deterministic challenge |
 | `polynomial.rs` | 8 unit tests | Linear/quadratic/constant polys, large numbers, string roundtrip, invalid format |
-| `shamir.rs` | 34 unit tests | Split/recover, backup format, edge cases, parameter validation, cross-SDK parity |
+| `shamir_tests.rs` | 34 unit tests | Split/recover, backup format, edge cases, parameter validation, cross-SDK parity |
 
 Cross-SDK sighash test vectors (500 vectors) are in `tests/vectors/` and exercised by integration tests.
 
