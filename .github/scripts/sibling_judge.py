@@ -3,7 +3,9 @@
 
 Stage R (a workflow on the pull request's head, no secret) runs beta's `sibling_harness.py raw`
 on the head's tree, from its `judge/` checkout of beta, and uploads what it wrote as the artifact
-`sibling-raw`; the head's own copy of this folder is never executed. Stage J (a workflow on the default branch,
+`sibling-raw`; the head's own copy of this folder is never executed. GitHub runs the workflow file
+of the event's ref, so a pull request that edits `sibling-run.yml` runs its own stage R: a class J
+head, judged by the same rules and titled `JUDGE CHANGE`, its artifact what that file writes. Stage J (a workflow on the default branch,
 started by the end of stage R) checks out beta, runs `judge` there with no key, and hands four
 one-line outputs to `report`, the one job that holds the App's token and posts the check run
 `sibling-judge`. Nothing the pull request carries decides the verdict: the judging files, the
@@ -15,10 +17,16 @@ judge", is the manual.
           and `text` (base64) to the output file. Holds no key. `--dry-run` judges a local
           artifact zip or raw tree against local git objects and a local sibling and prints
           the check it would post, calling no GitHub write.
-  report  read the run again, repeat the identity and superseded checks, and create the check
-          run once, already completed. Never opens the artifact.
-  sweep   for every open pull request into beta: its head, its newest completed stage R run,
-          whether a completed check of the App stands on it, and the act for each gap.
+  report  resolve the run again (no wait), repeat the identity check on the run judged, and
+          create the check run once, already completed. Never opens the artifact.
+  sweep   for every open pull request into beta: its head, its newest stage R run, whether a
+          completed check of the App stands on it or a judge of it is running, and the act for
+          each gap.
+
+One verdict per head: a judgement of a stage R run judges the newest stage R run of the same
+head (`resolve`), so a run nobody will judge (one a `GITHUB_TOKEN` dispatch started, which raises
+no `workflow_run`) never silences the run that would be, and the identity is read on the run
+judged, never on the run that called.
   members the artifact's allowlist of member names, one a line (what stage R uploads).
   pack    zip a raw tree's allowlisted files, as stage R's upload would.
 
@@ -40,6 +48,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 HERE = Path(__file__).resolve().parent
@@ -701,17 +710,58 @@ def identity(gh, repository, repository_id, run_id):
     raise Silent(f"no open pull request into {BASE_REF} from this repository has head {head}")
 
 
-def superseded(gh, repository, run, attempt):
-    """The run that supersedes this one (a newer attempt, a newer stage R run on the head), or None."""
-    latest = run.get("run_attempt") or 1
-    if attempt is not None and attempt < latest:
-        return f"attempt {latest} of run {run.get('id')}"
-    listing = gh.get(f"repos/{repository}/actions/workflows/sibling-run.yml/runs?head_sha={run.get('head_sha')}&per_page=100")
-    newer = [r.get("id") for r in (listing.get("workflow_runs") or [])
-             if (r.get("id") or 0) > (run.get("id") or 0) and r.get("path") == RUN_WORKFLOW]
-    if newer:
-        return f"run {max(newer)}"
-    return None
+# how long a judgement waits for a newer stage R run of its head still running, and how often it
+# asks (the judge job's `timeout-minutes` is 10)
+WAIT_SECONDS = 300
+POLL_SECONDS = 15
+
+
+def is_stage_r(run, repository_id):
+    """Whether a run record is a stage R run of this repository: its path (never its name), its
+    head's repository and its event. The open pull request is `identity()`'s."""
+    return (isinstance(run, dict) and run.get("path") == RUN_WORKFLOW
+            and (run.get("head_repository") or {}).get("id") == repository_id
+            and run.get("event") in EVENTS)
+
+
+def runs_of(gh, repository, repository_id, head):
+    """The stage R runs of a head, by id, as GitHub lists them."""
+    listing = gh.get(f"repos/{repository}/actions/workflows/sibling-run.yml/runs?head_sha={head}&per_page=100")
+    return {r["id"]: r for r in (listing.get("workflow_runs") or [])
+            if is_stage_r(r, repository_id) and r.get("head_sha") == head and isinstance(r.get("id"), int)}
+
+
+def resolve(gh, repository, repository_id, run_id, wait=0, sleep=None):
+    """The run a judgement of `run_id` judges: the newest stage R run of the same head, completed,
+    at its latest attempt; (run id, attempt). The calling run must itself be a stage R run of this
+    repository (a decoy named `sibling-run` at another path calls nothing). When the newest run
+    (or the newest attempt) is still running the judgement waits up to `wait` seconds for it and
+    then posts nothing, a line in the log (`Silent`): the sweep names the head."""
+    run = gh.get(f"repos/{repository}/actions/runs/{run_id}")
+    if run.get("path") != RUN_WORKFLOW:
+        raise Silent(f"run {run_id} is not {RUN_WORKFLOW} (by its path)")
+    if (run.get("head_repository") or {}).get("id") != repository_id:
+        raise Silent(f"run {run_id}'s head is not this repository's")
+    if run.get("event") not in EVENTS:
+        raise Silent(f"run {run_id}'s event is not pull_request or workflow_dispatch")
+    head = run.get("head_sha") or ""
+    if not SHA.fullmatch(head):
+        raise Silent(f"run {run_id} names no head sha")
+    sleep = sleep or time.sleep
+    polls = max(0, int(wait)) // POLL_SECONDS
+    pending = None
+    for at in range(polls + 1):
+        runs = runs_of(gh, repository, repository_id, head)
+        runs.setdefault(run_id, run)
+        newest = runs[max(runs)]
+        attempt = newest.get("run_attempt") or 1
+        if newest.get("status") == "completed" and isinstance(attempt, int):
+            return newest["id"], attempt
+        pending = f"run {newest['id']} attempt {attempt}"
+        if at < polls:
+            sleep(POLL_SECONDS)
+    raise Silent(f"run {run_id} of head {head}: the newest stage R run of the head, {pending}, is still running; "
+                 f"the sweep names the head (re-judge it once it completes)")
 
 
 def standing(gh, repository, head, app_id):
@@ -737,6 +787,7 @@ def _judge(args, gh, temp):
     git = Git(args.judge)
     j = Judgment(gh, git, temp, args.sibling_url, args.repository, args.repository_id, dry=args.dry_run)
     j.unmade = []
+    j.notes = []
     j.pr_number = None
     try:
         try:
@@ -749,14 +800,15 @@ def _judge(args, gh, temp):
                 if args.beta:
                     j.beta = git.rev_parse(args.beta)
             else:
-                j.run_id = args.run_id
-                run, pr = identity(gh, args.repository, args.repository_id, args.run_id)
+                target, j.attempt = resolve(gh, args.repository, args.repository_id, args.run_id,
+                                            wait=getattr(args, "wait", 0) or 0, sleep=getattr(args, "sleep", None))
+                j.run_id = target
+                run, pr = identity(gh, args.repository, args.repository_id, target)
                 j.run, j.pr, j.head, j.event = run, pr, run["head_sha"], run["event"]
                 j.pr_number = pr.get("number")
-                j.attempt = args.attempt or run.get("run_attempt") or 1
-                newer = superseded(gh, args.repository, run, j.attempt)
-                if newer:
-                    raise Silent(f"run {args.run_id} attempt {j.attempt} is superseded by {newer}")
+                if (target, j.attempt) != (args.run_id, args.attempt or j.attempt):
+                    j.notes = [f"Called for run {args.run_id} attempt {args.attempt or 'latest'}; judged the newest "
+                                f"stage R run of the head, run {target} attempt {j.attempt} (one verdict per head)"]
                 j.lines(args.workflow_sha)
             j.read_head()
             j.classify()
@@ -775,14 +827,14 @@ def _judge(args, gh, temp):
             check.title = f"JUDGE CHANGE: {', '.join(j.judge_paths)}" if j.judge_paths else "GREEN"
             check.title = clean(check.title, 240)
             check.text = bounded(j.header() + ["Every entry's verdict is the node's and every word the column's.",
-                                               *[f"Not made in a dry run: {what}" for what in j.unmade]],
+                                               *j.notes, *[f"Not made in a dry run: {what}" for what in j.unmade]],
                                  lines, None)
             check.passed()
         except Verdict as verdict:
             check.post = verdict.post
             change = f" (JUDGE CHANGE: {', '.join(j.judge_paths)})" if j.judge_paths else ""
             check.title = clean(f"{verdict.word}{change}: {verdict.reason}", 240)
-            own = j.header() + verdict.own + [f"Not made in a dry run: {what}" for what in j.unmade]
+            own = j.header() + verdict.own + j.notes + [f"Not made in a dry run: {what}" for what in j.unmade]
             check.text = bounded(own, verdict.quoted, verdict.act or "# re-drive the judge for the same run")
     except Silent as silent:
         check.post = "no"
@@ -939,11 +991,10 @@ def command_report(args, gh=None, env=None):
     gh = gh or GitHub()
     env = os.environ if env is None else env
     try:
-        run, _ = identity(gh, args.repository, args.repository_id, args.run_id)
-        attempt = args.attempt or run.get("run_attempt") or 1
-        newer = superseded(gh, args.repository, run, attempt)
-        if newer:
-            raise Silent(f"run {args.run_id} attempt {attempt} is superseded by {newer}")
+        # the same resolution as the judge's, with no wait: the run judged is the newest completed
+        # stage R run of the head, and the identity is read on it
+        target, _ = resolve(gh, args.repository, args.repository_id, args.run_id)
+        run, _ = identity(gh, args.repository, args.repository_id, target)
     except Silent as silent:
         print(f"sibling_judge: no check: {silent}", flush=True)
         return 0
@@ -951,7 +1002,7 @@ def command_report(args, gh=None, env=None):
         print(f"sibling_judge: could not read the run ({error})", file=sys.stderr)
         return 1
     head = run["head_sha"]
-    redrive = f"gh workflow run sibling-judge.yml --repo {args.repository} --ref main -f run_id={args.run_id}"
+    redrive = f"gh workflow run sibling-judge.yml --repo {args.repository} --ref main -f run_id={target}"
     got = outputs_of(env)
     if args.judge_result != "success" or got is None:
         why = f"the judge job ended {clean(args.judge_result, 40)}" if args.judge_result != "success" else "the judge's outputs are absent or malformed"
@@ -962,8 +1013,12 @@ def command_report(args, gh=None, env=None):
         if conclusion == "success" and not (title == "GREEN" or title.startswith("JUDGE CHANGE: ")):
             conclusion = "failure"
     if post == "no":
-        print("sibling_judge: no check: the judge said none", flush=True)
-        return 0
+        # report's own reading owes a check (the run judged is completed and its identity holds):
+        # the judge's `no` is not trusted over it, and a failure names the re-judge
+        post, conclusion = "yes", "failure"
+        title = f"{NOT_JUDGED}: the judge posted nothing where a check is owed"
+        text = bounded([f"stage R run {target}",
+                        "the judge job said no check; the report job, reading the run again, owes one"], [], redrive)
     try:
         if post == "unless-standing" and standing(gh, args.repository, head, args.app_id):
             print("sibling_judge: no check: a completed check of the App stands on the head", flush=True)
@@ -991,33 +1046,67 @@ def command_report(args, gh=None, env=None):
     return 0
 
 
+def judging(gh, repository):
+    """The titles of the trampoline's runs not yet completed (queued, waiting or in progress):
+    `sibling-judge <head>` for an event's judgement, `sibling-judge of run <id>` for a re-judge
+    (the trampoline's `run-name:`)."""
+    listing = gh.get(f"repos/{repository}/actions/workflows/sibling-judge.yml/runs?per_page=100")
+    return {r.get("display_title") for r in listing.get("workflow_runs") or []
+            if isinstance(r, dict) and r.get("status") != "completed"}
+
+
 def command_sweep(args, gh=None):
     gh = gh or GitHub()
     repository = args.repository
     try:
         pulls = gh.get(f"repos/{repository}/pulls?state=open&base={BASE_REF}&per_page=100")
+        running = judging(gh, repository)
         for pr in sorted(pulls, key=lambda p: p.get("number") or 0):
             number = pr.get("number")
             head = (pr.get("head") or {}).get("sha")
             branch = clean((pr.get("head") or {}).get("ref") or "", 200)
-            if ((pr.get("head") or {}).get("repo") or {}).get("full_name") != repository:
+            repo = (pr.get("head") or {}).get("repo") or {}
+            if repo.get("full_name") != repository:
                 print(f"#{number} {head}: a fork's head; act: push the branch to {repository} and open the pull request from it")
                 continue
             detail = gh.get(f"repos/{repository}/pulls/{number}")
-            runs = gh.get(f"repos/{repository}/actions/workflows/sibling-run.yml/runs?head_sha={head}&per_page=100")
-            done = [r for r in runs.get("workflow_runs") or [] if r.get("status") == "completed"]
-            newest = max(done, key=lambda r: r.get("id") or 0) if done else None
+            listing = gh.get(f"repos/{repository}/actions/workflows/sibling-run.yml/runs?head_sha={head}&per_page=100")
+            every = [r for r in listing.get("workflow_runs") or [] if isinstance(r, dict)]
+            # a stage R run of the pull request: its path, its event (GitHub's failed `push` run of a
+            # workflow file that does not parse is none) and this repository's head
+            stage_r = [r for r in every if is_stage_r(r, repo.get("id"))]
+            newest = max(stage_r, key=lambda r: r.get("id") or 0) if stage_r else None
             stands = standing(gh, repository, head, args.app_id)
-            run_text = f"run {newest.get('id')} {newest.get('conclusion')}" if newest else "no completed run"
-            line = f"#{number} {head}: {run_text}; check {'stands' if stands else 'absent'}"
+            ids = {f"sibling-judge of run {r.get('id')}" for r in stage_r}
+            judged_now = f"sibling-judge {head}" in running or bool(ids & running)
+            if newest is None:
+                run_text = "no stage R run"
+            elif newest.get("status") != "completed":
+                run_text = f"run {newest.get('id')} {newest.get('status')}"
+            else:
+                run_text = f"run {newest.get('id')} {newest.get('conclusion')}"
+            state = "stands" if stands else ("judge in progress" if judged_now else "absent")
+            line = f"#{number} {head}: {run_text}; check {state}"
+            redrive = f"gh workflow run sibling-run.yml --repo {repository} --ref {shlex.quote(branch)}"
             if detail.get("mergeable_state") == "dirty":
                 print(f"{line}; act: rebase on {BASE_REF} (a conflict)")
-            elif newest is None:
-                print(f"{line}; act: gh workflow run sibling-run.yml --repo {repository} --ref {shlex.quote(branch)}")
-            elif not stands:
-                print(f"{line}; act: gh workflow run sibling-judge.yml --repo {repository} --ref main -f run_id={newest.get('id')}")
-            else:
+            elif stands or judged_now:
                 print(line)
+            elif newest is None and every:
+                # GitHub's run of a workflow file it could not parse (event `push`, failed at once):
+                # no stage R run exists, a re-judge of that run is silent (its event is not stage
+                # R's) and a dispatch of a file that does not parse is refused; a push that fixes
+                # `sibling-run.yml` starts stage R
+                failed = max(every, key=lambda r: r.get("id") or 0)
+                print(f"{line} (run {failed.get('id')} {clean(str(failed.get('event')), 40)} "
+                      f"{clean(str(failed.get('conclusion')), 40)} is no stage R run: {RUN_WORKFLOW} at the head does not parse); "
+                      f"act: push a commit to {shlex.quote(branch)} whose {RUN_WORKFLOW} parses (the push starts stage R)")
+            elif newest is None:
+                print(f"{line}; act: {redrive}")
+            elif newest.get("status") != "completed":
+                print(f"{line}; act: once it completes, gh workflow run sibling-judge.yml --repo {repository} --ref main -f run_id={newest.get('id')}")
+            else:
+                print(f"{line}; act: gh workflow run sibling-judge.yml --repo {repository} --ref main -f run_id={newest.get('id')}")
     except GitHubError as error:
         print(f"sibling_judge: the sweep could not read ({error})", file=sys.stderr)
         return 1
@@ -1044,6 +1133,8 @@ def parser():
     j.add_argument("--beta", help="a dry run's beta commit (default: the judge checkout's HEAD)")
     j.add_argument("--pull-request", help="a dry run's pull request number, compared with the stamp's")
     j.add_argument("--offline", action="store_true", help="a dry run asks GitHub nothing (the pin's place unmade)")
+    j.add_argument("--wait", type=int, default=WAIT_SECONDS,
+                   help="seconds to wait for a newer stage R run of the head still running")
     r = sub.add_parser("report", help="post the check run once, completed")
     r.add_argument("--run-id", type=int, required=True)
     r.add_argument("--attempt", type=int)

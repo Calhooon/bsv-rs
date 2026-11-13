@@ -143,6 +143,7 @@ const STANDARD: &[&str] = &[
     "subprocess",
     "sys",
     "tempfile",
+    "time",
     "zipfile",
 ];
 

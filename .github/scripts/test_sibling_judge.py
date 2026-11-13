@@ -76,6 +76,10 @@ def corpus_lines(pin_kind):
     return out
 
 
+class Seq(list):
+    """Answers a path gives in turn, the last kept: GitHub's state moving between two reads."""
+
+
 class GitHubFake:
     """The one GitHub class, replaced: answers by path, every write counted."""
 
@@ -91,6 +95,8 @@ class GitHubFake:
         answer = self.answers.get(path)
         if answer is None:
             raise sj.GitHubError(404, f"no answer for {path}")
+        if isinstance(answer, Seq):
+            answer = answer.pop(0) if len(answer) > 1 else answer[0]
         if isinstance(answer, Exception):
             raise answer
         return json.loads(json.dumps(answer))
@@ -279,7 +285,7 @@ class World:
             f"repos/{R}/actions/runs/{RUN}": run,
             f"repos/{R}/commits/{head}/pulls": [pr],
             f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={head}&per_page=100":
-                {"workflow_runs": [{"id": RUN, "path": sj.RUN_WORKFLOW, "status": "completed", "conclusion": conclusion}]},
+                {"workflow_runs": [dict(run)]},
             f"repos/Calhooon/bsv-script-lean/compare/{self.pin}...main": {"behind_by": 0, "ahead_by": 1},
             f"repos/Calhooon/bsv-script-lean/compare/{self.pins[2]}...main": {"behind_by": 0, "ahead_by": 0},
             f"repos/{R}/actions/runs/{RUN}/attempts/{attempt}": {"conclusion": conclusion, "run_started_at": "2026-11-12T10:00:07Z"},
@@ -764,18 +770,6 @@ class RunState(Base):
                 self.assertIn("raw: Build the harness", check.text)
                 self.assertNotIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
 
-    def test_a_newer_run_or_attempt_supersedes_with_no_check(self):
-        w = self.world
-        answers = w.answers()
-        answers[f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={w.head}&per_page=100"]["workflow_runs"].append(
-            {"id": RUN + 1, "path": sj.RUN_WORKFLOW})
-        check, gh, log = self.judged(answers=answers)
-        self.assertEqual((check.post, gh.writes), ("no", []))
-        self.assertIn(f"superseded by run {RUN + 1}", log)
-        check, gh, log = self.judged(answers=w.answers(attempt=2), attempt=1)
-        self.assertEqual((check.post, gh.writes), ("no", []))
-        self.assertIn(f"superseded by attempt 2 of run {RUN}", log)
-
     def artifacts(self, artifacts, event="pull_request"):
         return self.judged(answers=self.world.answers(artifacts=artifacts, event=event))[0]
 
@@ -796,6 +790,154 @@ class RunState(Base):
     def test_a_dispatch_whose_artifact_is_gone_posts_unless_standing(self):
         check = self.artifacts([self.one(expired=True)], event="workflow_dispatch")
         self.assertEqual((check.post, check.conclusion), ("unless-standing", "failure"))
+
+
+LISTING = "repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={head}&per_page=100"
+
+
+def with_run(world, answers, run_id, status="completed", event="workflow_dispatch", attempt=1, **fields):
+    """`answers` with a second stage R run of the head: its record, its attempt and its artifact,
+    listed beside the first. Returns the run's record (edit it to move its state)."""
+    head = answers[f"repos/{R}/actions/runs/{RUN}"]["head_sha"]
+    run = {**answers[f"repos/{R}/actions/runs/{RUN}"], "id": run_id, "status": status, "event": event,
+           "run_attempt": attempt, "conclusion": "success" if status == "completed" else None, **fields}
+    answers[f"repos/{R}/actions/runs/{run_id}"] = run
+    answers[f"repos/{R}/actions/runs/{run_id}/attempts/{attempt}"] = {"conclusion": "success",
+                                                                        "run_started_at": "2026-11-12T10:00:07Z"}
+    answers[f"repos/{R}/actions/runs/{run_id}/artifacts?per_page=100&name=sibling-raw"] = {"artifacts": [
+        {"id": run_id % 1000, "name": "sibling-raw", "expired": False, "size_in_bytes": 1000, "digest": "d",
+         "created_at": "2026-11-12T10:02:11Z", "workflow_run": {"id": run_id, "head_sha": head, "head_repository_id": RID}}]}
+    answers[LISTING.format(R=R, head=head)]["workflow_runs"].append(run)
+    return run
+
+
+class Interleavings(Base):
+    """One verdict per head (#97, fix-97c): a judgement of a stage R run judges the newest stage R
+    run of its head at its latest attempt, waiting (up to `--wait`) for one still running; the
+    identity is read on the run judged. One test per row of the table in docs/lanes/fix-97c.md:
+    which invocation posts, and which run's verdict. Witness 11 (#947) is row 1: the pull
+    request's run judged by its event, the token's dispatch newer and never judged by an event."""
+
+    def judge_of(self, answers, run_id=RUN, wait=0, attempt=None):
+        w = self.world
+        gh = GitHubFake(answers)
+        gh.download_bytes = w.zipped(w.raw_files())
+        slept = []
+        check, log = quiet(sj.judge, w.args(run_id=run_id, attempt=attempt, wait=wait, sleep=slept.append), gh, None)
+        return check, gh, log, slept
+
+    def judged_run(self, gh):
+        """The run whose artifact the judgement read."""
+        zips = [r for r in gh.reads if r.endswith("/zip")]
+        runs = [r for r in gh.reads if r.endswith("&name=sibling-raw")]
+        self.assertEqual(len(zips), 1, gh.reads)
+        return int(runs[-1].split("/runs/")[1].split("/")[0])
+
+    def test_row1_the_pull_requests_run_then_a_token_dispatch_still_running_is_waited_for_and_judged(self):
+        w = self.world
+        answers = w.answers()
+        newer = with_run(w, answers, RUN + 1, status="in_progress")
+        done = {**newer, "status": "completed", "conclusion": "success"}
+        listing = answers[LISTING.format(R=R, head=w.head)]
+        answers[LISTING.format(R=R, head=w.head)] = Seq([json.loads(json.dumps(listing)),
+                                                         {"workflow_runs": [listing["workflow_runs"][0], done]}])
+        answers[f"repos/{R}/actions/runs/{RUN + 1}"] = done
+        check, gh, log, slept = self.judge_of(answers, wait=300)
+        self.assertEqual((check.post, check.conclusion, check.title), ("yes", "success", "GREEN"), log + check.text)
+        self.assertEqual(self.judged_run(gh), RUN + 1)
+        self.assertEqual(slept, [sj.POLL_SECONDS])
+        self.assertIn(f"stage R run {RUN + 1} attempt 1", check.text)
+        self.assertIn(f"Called for run {RUN}", check.text)
+
+    def test_row1_a_newer_run_still_running_after_the_wait_posts_nothing_and_names_it(self):
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="in_progress")
+        check, gh, log, slept = self.judge_of(answers, wait=60)
+        self.assertEqual((check.post, gh.writes), ("no", []))
+        self.assertEqual(slept, [sj.POLL_SECONDS] * 4)
+        self.assertIn(f"run {RUN + 1} attempt 1, is still running", log)
+
+    def test_row2_a_token_dispatch_then_the_pull_requests_run_judges_the_pull_requests(self):
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN - 1, status="completed")
+        check, gh, log, slept = self.judge_of(answers, wait=300)
+        self.assertEqual((check.conclusion, check.title, slept), ("success", "GREEN", []), log)
+        self.assertEqual(self.judged_run(gh), RUN)
+
+    def test_row2_the_older_runs_judge_after_the_newer_completed_judges_the_newer(self):
+        """The dispatch's own judgement (the sync's step dispatches the judge with its id) arriving
+        after a newer pull request run completed: the newer is judged, never the older."""
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed", event="pull_request")
+        check, gh, log, _ = self.judge_of(answers)
+        self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), log + check.text)
+        self.assertEqual(self.judged_run(gh), RUN + 1)
+
+    def test_row3_a_reruns_newer_attempt_completed_is_judged_and_running_is_waited_for(self):
+        w = self.world
+        answers = w.answers(attempt=2)
+        check, gh, log, _ = self.judge_of(answers, attempt=1)
+        self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), log + check.text)
+        self.assertIn(f"repos/{R}/actions/runs/{RUN}/attempts/2", gh.reads)
+        self.assertIn(f"stage R run {RUN} attempt 2", check.text)
+        answers = w.answers(attempt=2)
+        answers[LISTING.format(R=R, head=w.head)]["workflow_runs"][0]["status"] = "in_progress"
+        check, gh, log, _ = self.judge_of(answers, attempt=1)
+        self.assertEqual((check.post, gh.writes), ("no", []))
+        self.assertIn(f"run {RUN} attempt 2, is still running", log)
+
+    def test_row4_two_pushes_inside_a_minute_the_older_heads_run_posts_nothing(self):
+        """The older head's run (cancelled by stage R's own group, or completed) is judged on a
+        head no open pull request holds: no check; the newer head's run is judged by its own."""
+        w = self.world
+        for conclusion in ("cancelled", "success"):
+            with self.subTest(conclusion):
+                answers = w.answers(conclusion=conclusion)
+                answers[f"repos/{R}/commits/{w.head}/pulls"][0]["head"]["sha"] = "f" * 40
+                check, gh, log, _ = self.judge_of(answers)
+                self.assertEqual((check.post, gh.writes), ("no", []))
+                self.assertIn("no open pull request into beta", log)
+
+    def test_row5_a_hand_rejudge_of_an_older_run_judges_the_newest_as_the_events_judge_does(self):
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed", event="pull_request")
+        by_hand, gh_hand, _, _ = self.judge_of(answers, run_id=RUN)
+        by_event, gh_event, _, _ = self.judge_of(answers, run_id=RUN + 1, attempt=1)
+        self.assertEqual((by_hand.title, by_hand.conclusion), (by_event.title, by_event.conclusion))
+        self.assertEqual(self.judged_run(gh_hand), self.judged_run(gh_event))
+        self.assertEqual(self.judged_run(gh_hand), RUN + 1)
+
+    def test_row6_a_newer_run_that_is_no_stage_r_run_of_this_repository_is_not_judged_and_silences_nothing(self):
+        w = self.world
+        for name, fields in (("a fork's", {"head_repository": {"id": 1}}),
+                             ("another path's", {"path": ".github/workflows/other.yml"}),
+                             ("a push run", {"event": "push"})):
+            with self.subTest(name):
+                answers = w.answers()
+                with_run(w, answers, RUN + 1, status="in_progress", **fields)
+                check, gh, log, slept = self.judge_of(answers, wait=300)
+                self.assertEqual((check.conclusion, check.title, slept), ("success", "GREEN", []), log)
+                self.assertEqual(self.judged_run(gh), RUN)
+
+    def test_the_identity_is_read_on_the_run_judged(self):
+        """The newer run's head is the caller's (one listing per head); a run called with a
+        foreign path is silent before any listing is read."""
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed")
+        answers[f"repos/{R}/actions/runs/{RUN + 1}"] = {**answers[f"repos/{R}/actions/runs/{RUN + 1}"], "event": "push"}
+        check, gh, log, _ = self.judge_of(answers)
+        self.assertEqual((check.post, gh.writes), ("no", []))
+        self.assertIn(f"run {RUN + 1}'s event is not pull_request or workflow_dispatch", log)
+        answers = w.answers()
+        answers[f"repos/{R}/actions/runs/{RUN}"]["path"] = ".github/workflows/other.yml"
+        check, gh, log, _ = self.judge_of(answers)
+        self.assertEqual(check.post, "no")
+        self.assertNotIn(LISTING.format(R=R, head=w.head), gh.reads)
 
 
 def outputs(check):
@@ -853,17 +995,29 @@ class Report(Base):
         self.assertEqual((code, gh.writes), (0, []))
         self.assertIn("no check", log)
 
-    def test_a_run_superseded_between_the_two_jobs_posts_nothing(self):
+    def test_a_newer_run_still_running_at_report_time_posts_nothing(self):
         w = self.world
         answers = w.answers()
-        answers[f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={w.head}&per_page=100"]["workflow_runs"].append(
-            {"id": RUN + 5, "path": sj.RUN_WORKFLOW})
+        with_run(w, answers, RUN + 5, status="in_progress")
         code, gh, log = self.report(self.green(), answers)
         self.assertEqual((code, gh.writes), (0, []))
-        self.assertIn(f"superseded by run {RUN + 5}", log)
+        self.assertIn(f"run {RUN + 5} attempt 1, is still running", log)
 
-    def test_post_no_posts_nothing(self):
+    def test_post_no_where_report_owes_a_check_posts_not_judged_with_the_rejudge(self):
+        """The judge's `no` is not trusted over report's own reading (the closed read's row 3): the
+        run is completed and its identity holds, so a check is owed."""
         code, gh, _ = self.report({**self.green(), "POST": "no"})
+        self.assertEqual((code, len(gh.writes)), (0, 1))
+        body = gh.writes[0][1]
+        self.assertEqual(body["conclusion"], "failure")
+        self.assertEqual(body["output"]["title"], "NOT JUDGED: the judge posted nothing where a check is owed")
+        self.assertIn(f"-f run_id={RUN}", body["output"]["text"])
+
+    def test_post_no_where_report_owes_none_posts_nothing(self):
+        w = self.world
+        answers = w.answers()
+        answers[f"repos/{R}/commits/{w.head}/pulls"][0]["state"] = "closed"
+        code, gh, _ = self.report({**self.green(), "POST": "no"}, answers)
         self.assertEqual((code, gh.writes), (0, []))
 
     def test_unless_standing_posts_nothing_over_a_standing_check_and_posts_without_one(self):
@@ -1032,25 +1186,69 @@ class Conclusions(unittest.TestCase):
         self.assertEqual({k for k, v in seen.items() if v == "success"}, {"green"}, seen)
 
 
+def sweep_run(run_id, sha, status="completed", event="pull_request", conclusion="success", path=None):
+    return {"id": run_id, "status": status, "conclusion": conclusion if status == "completed" else None,
+            "event": event, "head_sha": sha, "path": path or sj.RUN_WORKFLOW, "head_repository": {"id": RID}}
+
+
 class Sweep(unittest.TestCase):
-    def test_the_four_gaps_each_name_their_act(self):
-        prs = [{"number": n, "head": {"sha": f"{n}" * 40, "ref": f"lane/{n}", "repo": {"full_name": R if n != 4 else "x/y"}}}
-               for n in (1, 2, 3, 4)]
-        answers = {f"repos/{R}/pulls?state=open&base=beta&per_page=100": prs}
-        for n in (1, 2, 3):
+    def sweep(self, runs, judging=()):
+        """One open pull request per entry of `runs` (its stage R runs), numbered from 1; and a
+        fork's pull request after them. `judging`: the trampoline's runs not completed."""
+        numbers = range(1, len(runs) + 1)
+        prs = [{"number": n, "head": {"sha": f"{n}" * 40, "ref": f"lane/{n}", "repo": {"full_name": R, "id": RID}}}
+               for n in numbers]
+        prs.append({"number": 9, "head": {"sha": "9" * 40, "ref": "lane/9", "repo": {"full_name": "x/y", "id": 1}}})
+        answers = {f"repos/{R}/pulls?state=open&base=beta&per_page=100": prs,
+                   f"repos/{R}/actions/workflows/sibling-judge.yml/runs?per_page=100": {"workflow_runs": [
+                       {"display_title": title, "status": status} for title, status in judging]}}
+        for n, made in zip(numbers, runs):
             sha = f"{n}" * 40
-            answers[f"repos/{R}/pulls/{n}"] = {"mergeable_state": "dirty" if n == 3 else "clean"}
+            answers[f"repos/{R}/pulls/{n}"] = {"mergeable_state": made.get("mergeable", "clean")}
             answers[f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={sha}&per_page=100"] = {
-                "workflow_runs": [] if n == 1 else [{"id": 500 + n, "status": "completed", "conclusion": "success"}]}
-            answers[f"repos/{R}/commits/{sha}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"] = {"check_runs": []}
+                "workflow_runs": [sweep_run(sha=sha, **r) for r in made.get("runs", [])]}
+            answers[f"repos/{R}/commits/{sha}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"] = {
+                "check_runs": [{"status": "completed", "app": {"id": APP}}] if made.get("stands") else []}
         gh = GitHubFake(answers)
         code, log = quiet(sj.main, ["sweep", "--app-id", str(APP)], gh)
-        self.assertEqual(code, 0)
-        self.assertEqual(gh.writes, [])
-        self.assertIn("#1 " + "1" * 40 + ": no completed run; check absent; act: gh workflow run sibling-run.yml --repo Calhooon/bsv-rs --ref lane/1", log)
-        self.assertIn("act: gh workflow run sibling-judge.yml --repo Calhooon/bsv-rs --ref main -f run_id=502", log)
+        self.assertEqual((code, gh.writes), (0, []), log)
+        return log
+
+    def test_the_gaps_each_name_their_act(self):
+        log = self.sweep([{}, {"runs": [{"run_id": 502}]}, {"runs": [{"run_id": 503}], "mergeable": "dirty"},
+                          {"runs": [{"run_id": 504}], "stands": True}])
+        self.assertIn("#1 " + "1" * 40 + ": no stage R run; check absent; act: gh workflow run sibling-run.yml --repo Calhooon/bsv-rs --ref lane/1", log)
+        self.assertIn("#2 " + "2" * 40 + ": run 502 success; check absent; act: gh workflow run sibling-judge.yml --repo Calhooon/bsv-rs --ref main -f run_id=502", log)
         self.assertIn("#3 " + "3" * 40 + ": run 503 success; check absent; act: rebase on beta", log)
-        self.assertIn("#4 " + "4" * 40 + ": a fork's head; act: push the branch to Calhooon/bsv-rs", log)
+        self.assertIn("#4 " + "4" * 40 + ": run 504 success; check stands\n", log)
+        self.assertIn("#9 " + "9" * 40 + ": a fork's head; act: push the branch to Calhooon/bsv-rs", log)
+
+    def test_an_unparsed_stage_r_names_a_push_never_a_rejudge_of_githubs_failed_run(self):
+        """Witness 12 (#948): GitHub's failed `push` run of a `sibling-run.yml` it could not parse
+        is no stage R run; a re-judge of it is silent (its event) and a dispatch of the file is
+        refused, so the act is a push of a parsing file."""
+        log = self.sweep([{"runs": [{"run_id": 600, "event": "push", "conclusion": "failure"}]}])
+        line = [l for l in log.splitlines() if l.startswith("#1 ")][0]
+        self.assertIn("no stage R run; check absent", line)
+        self.assertIn("run 600 push failure is no stage R run", line)
+        self.assertIn("act: push a commit to lane/1 whose .github/workflows/sibling-run.yml parses", line)
+        self.assertNotIn("sibling-judge.yml", line)
+        self.assertNotIn("gh workflow run sibling-run.yml", line)
+
+    def test_a_head_whose_judge_is_running_reads_judge_in_progress(self):
+        """The sweep of 19:01Z read `check absent` for a head whose judge was still running."""
+        for title, status in (("sibling-judge " + "1" * 40, "in_progress"), ("sibling-judge " + "1" * 40, "queued"),
+                              ("sibling-judge of run 700", "waiting")):
+            with self.subTest(f"{title} {status}"):
+                log = self.sweep([{"runs": [{"run_id": 700}]}], judging=[(title, status)])
+                self.assertIn("#1 " + "1" * 40 + ": run 700 success; check judge in progress\n", log)
+        log = self.sweep([{"runs": [{"run_id": 700}]}], judging=[("sibling-judge " + "1" * 40, "completed")])
+        self.assertIn("check absent; act: gh workflow run sibling-judge.yml", log)
+
+    def test_a_newest_run_still_running_is_named_with_its_rejudge_after(self):
+        log = self.sweep([{"runs": [{"run_id": 701}, {"run_id": 702, "status": "in_progress", "event": "workflow_dispatch"}]}])
+        self.assertIn("run 702 in_progress; check absent; act: once it completes, gh workflow run sibling-judge.yml "
+                      "--repo Calhooon/bsv-rs --ref main -f run_id=702", log)
 
 
 class DryRun(Base):
@@ -1218,6 +1416,7 @@ class Quoting(unittest.TestCase):
             f"repos/{R}/pulls/1": {"mergeable_state": "clean"},
             f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={sha}&per_page=100": {"workflow_runs": []},
             f"repos/{R}/commits/{sha}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100": {"check_runs": []},
+            f"repos/{R}/actions/workflows/sibling-judge.yml/runs?per_page=100": {"workflow_runs": []},
         }
         code, log = quiet(sj.main, ["sweep", "--app-id", str(APP)], GitHubFake(answers))
         self.assertEqual(code, 0)

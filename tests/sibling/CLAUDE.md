@@ -176,8 +176,15 @@ cached dependencies, 3 s warm, all nine corpora (13,765 entries).
 The two-stage judge (decided 2026-11-10; the three design reads of 2026-11-12; the lane record
 `docs/lanes/fix-97a.md`). Stage R, a workflow on the pull request's head with no secret, checks
 the head out to `head/` and beta to `judge/` and runs beta's script on the head's tree (the head's
-own `.github/scripts/` is never executed, so a J diff cannot change the script that writes its own
-artifact; the rule read's R2 of lane 1, pinned by `test_sibling_judge.py`'s `StageRScript`):
+own `.github/scripts/` is never executed, so a J diff of the scripts cannot change the script that
+writes its own artifact; the rule read's R2 of lane 1, pinned by `test_sibling_judge.py`'s
+`StageRScript`). One J diff is the exception: GitHub runs the workflow file the event names, the
+pull request's own `sibling-run.yml` for a `pull_request` run and the branch's for a dispatch, so a
+pull request that edits `sibling-run.yml` runs ITS stage R, whatever that file says, and uploads
+what that file writes. The judge reads the artifact by the same rules as any other; the head is
+class J, and a green on it is posted as a success titled `JUDGE CHANGE: <files>`, whose only
+signal is that title (the reviewer's, and the sequencer's line in `RELEASING.md` step 25 that it
+never lands a J diff):
 
 ```sh
 python3 -I -B judge/.github/scripts/sibling_harness.py raw --tree head --sibling sibling \
@@ -201,8 +208,20 @@ pin reads `REFUSED` and never `NOT JUDGED`):
    name), its `head_repository.id` this repository's, its event `pull_request` or
    `workflow_dispatch`, and `commits/<head>/pulls`, asked at judge time, holds an open pull
    request with that head, both repositories this one, base `beta`. Otherwise no check, a line
-   in the log (`post` `no`). A run a newer `sibling-run` run or a newer attempt supersedes earns
-   no check either. No branch name enters a URL.
+   in the log (`post` `no`). One verdict per head (fix-97c): a judgement of a stage R run judges
+   the newest stage R run of the same head (`resolve`: by id, among the runs whose path, head
+   repository and event are stage R's, at the run's latest attempt), so a run nobody will judge (one
+   a `GITHUB_TOKEN` dispatch started, which raises no `workflow_run`) never silences the run that
+   would be; and the identity above is read on the run judged, never on the run that called. When
+   that newest run or attempt is still running, the judgement waits for it (`--wait`, 300 seconds,
+   a read every 15) and judges it once it completes; still running after the wait: no check, a line
+   in the log, and the sweep names the head with its re-judge. `report` resolves again with no wait
+   and posts nothing while the newest run runs; where it owes a check and the judge job wrote
+   `post` `no`, it does not trust the `no` and posts `NOT JUDGED` with the re-judge. The table of
+   interleavings, with the test of each row, is `docs/lanes/fix-97c.md`. Until fix-97c a run that
+   a newer `sibling-run` run or a newer attempt superseded earned no check, and trusted that run's
+   own judge to come, which never came for a run the `GITHUB_TOKEN` started (witness 11, #947). No
+   branch name enters a URL.
 2. **The two lines.** Every beta fact is read at one sha, `git rev-parse HEAD` of the judge's
    checkout; main is `github.workflow_sha`. The file the run executes
    (`<workflow_sha>:.github/workflows/sibling-judge.yml`) must be beta's, else `NOT JUDGED`
@@ -289,17 +308,29 @@ The dry run calls no GitHub write (and with `--offline` no read: the pin's place
 sibling's `main` is then unmade) and prints the check it would post; it says which rules it could
 not make (the run's identity, the superseded test, the artifact's record, the trampoline's
 comparison). The sweep reads and never writes: for every open pull request into beta its head,
-its newest completed stage R run and whether the App's check stands (a completed check whose
-app id is the configured one: a check with no app id never stands, the rule read's R3), and the
-act for each gap as a command, the branch name quoted by `shlex.quote` there and in every re-push
-act a check carries (no run, a run and no check, a conflict with beta, a fork's head).
+its newest stage R run (a run whose path, event and head repository are stage R's: GitHub's failed
+`push` run of a `sibling-run.yml` it could not parse is none) and whether the App's check stands
+(a completed check whose app id is the configured one: a check with no app id never stands, the
+rule read's R3) or a judgement of the head is queued or running (`check judge in progress`, read
+from the trampoline's runs by their `run-name:`), and the act for each gap as a command, the branch
+name quoted by `shlex.quote` there and in every re-push act a check carries (no stage R run: a
+dispatch of stage R; only GitHub's failed run of an unparsed file: a push of a `sibling-run.yml`
+that parses, since a re-judge of that run is silent (its event) and a dispatch of a file that does
+not parse is refused; a run still running: its re-judge once it completes; a run and no check: its
+re-judge; a conflict with beta; a fork's head).
 
 ## Where no check is posted, and the re-drives
 
 Silence is named, not excluded (`RELEASING.md` step 25 carries the same list). No `sibling-judge`
 check is ever posted for: a pull request in conflict with beta (GitHub starts no `pull_request`
 run); a skip instruction in the head's commit message; a head pushed with the `GITHUB_TOKEN` (the
-sync's branch until the sync's own dispatch of `sibling-run.yml`); a `sibling-run.yml` that does
+sync's branch until the sync's own dispatch of `sibling-run.yml`); a stage R run the `GITHUB_TOKEN`
+dispatched, by itself (GitHub: "events triggered by the `GITHUB_TOKEN` will not create a new
+workflow run", `workflow_dispatch` and `repository_dispatch` excepted, so its end starts no
+`workflow_run`; witness 11's run 43476255821), which is judged only when a judgement of another
+stage R run of its head resolves to it, or when its dispatcher dispatches the judge itself, as
+the sync's step does since fix-97c (it takes the run's id from the dispatch's answer, waits for the
+run and dispatches `sibling-judge.yml` on main with the id); a `sibling-run.yml` that does
 not parse or changes its `name:` (the trampoline's `workflow_run` names `sibling-run`); a base
 changed to beta after the pull request opened; a token step that fails; an environment that
 refuses the `report` job; an event GitHub drops. The two re-drives:
@@ -320,7 +351,20 @@ The judge holds the judging files, the pin and the column against a pull request
 hold the raw output against the head's own code, since stage R runs the head's `build.rs`, its
 dependencies and the crate itself on the runner that writes that output. A head that lies in its
 raw output (a `build.rs` that rewrites the words, a crate that prints the column's answers) is
-held by the reads of the change, no machine.
+held by the reads of the change, no machine: review's to catch. The same holds of a pull request
+that edits `sibling-run.yml` (class J): GitHub runs that pull request's own stage R, so its
+artifact is whatever its file writes, and its success reads `JUDGE CHANGE`, not `GREEN`.
+
+The `report` job's reads (the run, `commits/<sha>/pulls`, the trampoline's runs, the check runs)
+go through the App's token, which holds `checks: write` alone: they work only while the
+repository is public, whose resources those endpoints serve without a permission. A private
+repository makes `report` exit 1 and post nothing.
+
+Two settings outside every file hold the key: the environment `sibling-judge`'s deployment branch
+policy (`main` alone) and its `can_admins_bypass` (true when read on 2026-11-13), each an admin's
+to change; and the trampoline's concurrency group keeps one pending judgement per head, a newer
+pending one replacing the older (GitHub's documented rule), recovered by every judgement judging
+the newest stage R run of its head and by the sweep.
 
 A RED on beta's own push run of `sibling` (a dependency's release: no `Cargo.lock` is tracked, so
 each run resolves afresh) turns every pull request RED with no change of its own at fault, and
