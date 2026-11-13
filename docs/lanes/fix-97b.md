@@ -19,7 +19,7 @@ dispatched or pushed.
    `tests/arch_ci_lines.rs`' shape test) and the records (CHANGELOG, RELEASING step 25 and the
    direction rule's sentence, the manual, the root `CLAUDE.md`, `docs/ARCHITECTURE.md`,
    `tests/CLAUDE.md`, this file).
-4. S, the sync's dispatch step, its `STATED` row and its needle: the commit `main` takes by a pick
+4. S, the sync's dispatch step, its `STATED` row and its pin (`SYNC_STAGE_R`, whole since the fold): the commit `main` takes by a pick
    of its own (`tests/support/nightly_cap_rules.rs` dropped there, main lacking it).
 
 ## The opening items (the captain's, 2026-11-13, from the three reads of PR #925)
