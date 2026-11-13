@@ -114,6 +114,13 @@ impl WalletCall {
 impl TryFrom<u8> for WalletCall {
     type Error = Error;
 
+    /// The call of a wire code, 1 to 28. Every other byte is refused in the
+    /// reference's words, `Invalid call code: N` (`ts-stack@edf6e03`
+    /// `WalletWireProcessor.ts:276-283` and `HTTPWalletWire.ts:33-40`; the
+    /// same sentence at `5226d0c7`, whose processor serves 29 and whose
+    /// client reads this sentence, code 1, as "no certificate profile",
+    /// `WalletWireTransceiver.ts:142-147`). The one function serves the
+    /// processor, which frames it code 1, and `HttpWalletWire` (#914).
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(WalletCall::CreateAction),
@@ -144,10 +151,7 @@ impl TryFrom<u8> for WalletCall {
             26 => Ok(WalletCall::GetHeaderForHeight),
             27 => Ok(WalletCall::GetNetwork),
             28 => Ok(WalletCall::GetVersion),
-            _ => Err(Error::WalletError(format!(
-                "invalid call code: expected 1-28, got {}",
-                value
-            ))),
+            _ => Err(Error::WalletError(format!("Invalid call code: {value}"))),
         }
     }
 }
