@@ -51,26 +51,30 @@ pub fn words<T>(result: Result<T>) -> String {
 }
 pub fn options(row: &Value) -> AuthFetchOptions {
     let value = &row["options"];
-    AuthFetchOptions {
-        method: value["method"].as_str().map(str::to_owned),
-        headers: value["headers"]
-            .as_object()
-            .map(|h| {
-                h.iter()
-                    .map(|(k, v)| (k.clone(), v.as_str().unwrap().into()))
-                    .collect()
-            })
-            .unwrap_or_default(),
-        body: value["body"]
-            .as_array()
-            .map(|b| b.iter().map(|n| n.as_u64().unwrap() as u8).collect()),
-        retry_counter: value["retryCounter"].as_u64().map(|n| n as u32),
-        labels: value["labels"]
-            .as_array()
-            .map(|a| a.iter().map(|s| s.as_str().unwrap().into()).collect())
-            .unwrap_or_default(),
-        ..Default::default()
-    }
+    AuthFetchOptions::default()
+        .with_method(value["method"].as_str().map(str::to_owned))
+        .with_headers(
+            value["headers"]
+                .as_object()
+                .map(|h| {
+                    h.iter()
+                        .map(|(k, v)| (k.clone(), v.as_str().unwrap().into()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        )
+        .with_body(
+            value["body"]
+                .as_array()
+                .map(|b| b.iter().map(|n| n.as_u64().unwrap() as u8).collect()),
+        )
+        .with_retry_counter(value["retryCounter"].as_u64().map(|n| n as u32))
+        .with_labels(
+            value["labels"]
+                .as_array()
+                .map(|a| a.iter().map(|s| s.as_str().unwrap().into()).collect())
+                .unwrap_or_default(),
+        )
 }
 
 pub struct RecordingTransport {

@@ -60,10 +60,7 @@ fn known_txids_are_lenient_ordered_unique_and_bounded_423() {
 #[test]
 fn payment_label_conversion_keeps_reference_base64_rules_423() {
     for row in vector()["labels"].as_array().unwrap() {
-        let options = bsv_rs::auth::AuthFetchOptions {
-            labels: vec!["App".into()],
-            ..Default::default()
-        };
+        let options = bsv_rs::auth::AuthFetchOptions::default().with_labels(vec!["App".into()]);
         let result = options.payment_labels(
             row["prefix"].as_str().unwrap(),
             row["suffix"].as_str().unwrap(),

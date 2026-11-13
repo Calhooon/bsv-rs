@@ -2229,14 +2229,11 @@ async fn test_ts_style_initial_response_through_mock_transport() {
     let transport = MockTransport::new();
 
     let client_wallet = ProtoWallet::new(Some(client_key.clone()));
-    let client = Peer::new(PeerOptions {
-        wallet: client_wallet,
-        transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("cross-sdk-test".into()),
-    });
+    let client = Peer::new(
+        PeerOptions::new(client_wallet, transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("cross-sdk-test".into())),
+    );
     client.start();
 
     // The mock transport's set_callback uses tokio::spawn, give it time

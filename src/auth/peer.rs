@@ -110,6 +110,29 @@ enum TransportHold<T> {
 }
 
 /// Configuration options for creating a Peer.
+///
+/// A record that grows (the reference's constructor took six arguments at
+/// `ts-sdk@9e3ede6b` and takes seven at `ts-stack@edf6e03`), so it is
+/// `#[non_exhaustive]` (#843d8a): build it with [`Self::new`] and the
+/// `with_` setters; the fields stay readable, and a pattern over it ends in
+/// `..`.
+///
+/// The pin names one instantiation (a generic struct's functional update
+/// is refused by the attribute whatever its arguments are; the update names
+/// the base path, its arguments inferred from `value`):
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::auth::PeerOptions<bsv_rs::wallet::ProtoWallet, bsv_rs::auth::MockTransport>) -> bsv_rs::auth::PeerOptions<bsv_rs::wallet::ProtoWallet, bsv_rs::auth::MockTransport> {
+///     bsv_rs::auth::PeerOptions { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::auth::PeerOptions<bsv_rs::wallet::ProtoWallet, bsv_rs::auth::MockTransport>) -> bsv_rs::auth::PeerOptions<bsv_rs::wallet::ProtoWallet, bsv_rs::auth::MockTransport> {
+///     value
+/// }
+/// ```
+#[non_exhaustive]
 pub struct PeerOptions<W: WalletInterface, T: Transport> {
     /// Wallet for cryptographic operations.
     pub wallet: W,
@@ -123,6 +146,57 @@ pub struct PeerOptions<W: WalletInterface, T: Transport> {
     pub auto_persist_last_session: bool,
     /// Application originator identifier.
     pub originator: Option<String>,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(
+    PeerOptions<bsv_rs::wallet::ProtoWallet, bsv_rs::auth::MockTransport>,
+    bsv_rs::auth::PeerOptions<bsv_rs::wallet::ProtoWallet, bsv_rs::auth::MockTransport>
+);
+
+impl<W: WalletInterface, T: Transport> PeerOptions<W, T> {
+    /// The options for a Peer over `wallet` and `transport`: no certificates
+    /// requested, a new session manager, no originator, and
+    /// `auto_persist_last_session` true, the reference's default
+    /// (`Peer.ts:100` at `ts-stack@edf6e03`).
+    #[must_use]
+    pub fn new(wallet: W, transport: T) -> Self {
+        Self {
+            wallet,
+            transport,
+            certificates_to_request: None,
+            session_manager: None,
+            auto_persist_last_session: true,
+            originator: None,
+        }
+    }
+
+    /// Sets the certificates to request from peers during the handshake.
+    #[must_use]
+    pub fn with_certificates_to_request(mut self, value: Option<RequestedCertificateSet>) -> Self {
+        self.certificates_to_request = value;
+        self
+    }
+
+    /// Sets the session manager (a new one when `None`).
+    #[must_use]
+    pub fn with_session_manager(mut self, value: Option<SessionManager>) -> Self {
+        self.session_manager = value;
+        self
+    }
+
+    /// Sets whether the last peer session is persisted automatically.
+    #[must_use]
+    pub fn with_auto_persist_last_session(mut self, value: bool) -> Self {
+        self.auto_persist_last_session = value;
+        self
+    }
+
+    /// Sets the application originator.
+    #[must_use]
+    pub fn with_originator(mut self, value: Option<String>) -> Self {
+        self.originator = value;
+        self
+    }
 }
 
 /// Peer for authenticated communication (BRC-31 Authrite).
@@ -141,14 +215,9 @@ pub struct PeerOptions<W: WalletInterface, T: Transport> {
 /// let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 /// let transport = SimplifiedFetchTransport::new("https://example.com");
 ///
-/// let peer = Peer::new(PeerOptions {
-///     wallet,
-///     transport,
-///     certificates_to_request: None,
-///     session_manager: None,
-///     auto_persist_last_session: true,
-///     originator: Some("myapp.com".into()),
-/// });
+/// let peer = Peer::new(
+///     PeerOptions::new(wallet, transport).with_originator(Some("myapp.com".into())),
+/// );
 ///
 /// // Send authenticated message
 /// peer.to_peer(b"Hello!", Some(&recipient_key_hex), None).await?;

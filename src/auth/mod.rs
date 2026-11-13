@@ -32,14 +32,11 @@
 //! let transport = SimplifiedFetchTransport::new("https://example.com");
 //!
 //! // Create peer
-//! let peer = Peer::new(PeerOptions {
-//!     wallet,
-//!     transport,
-//!     certificates_to_request: None,
-//!     session_manager: None,
-//!     auto_persist_last_session: false,
-//!     originator: Some("myapp.com".into()),
-//! });
+//! let peer = Peer::new(
+//!     PeerOptions::new(wallet, transport)
+//!         .with_auto_persist_last_session(false)
+//!         .with_originator(Some("myapp.com".into())),
+//! );
 //!
 //! // Send authenticated message
 //! peer.to_peer(b"Hello!", Some(&recipient_key), None).await?;

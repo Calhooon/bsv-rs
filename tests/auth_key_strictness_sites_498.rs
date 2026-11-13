@@ -205,17 +205,17 @@ type End = (
 fn end(key: &PrivateKey, server: bool) -> End {
     let (out, sent) = mpsc::unbounded_channel();
     let callback: Callback = Arc::new(Mutex::new(None));
-    let peer = Arc::new(Peer::new(PeerOptions {
-        wallet: wallet(key, None),
-        transport: Wire {
-            out,
-            callback: callback.clone(),
-        },
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    }));
+    let peer = Arc::new(Peer::new(
+        PeerOptions::new(
+            wallet(key, None),
+            Wire {
+                out,
+                callback: callback.clone(),
+            },
+        )
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    ));
     if server {
         peer.start_server();
     } else {
@@ -345,14 +345,10 @@ async fn a_wallet_identity_key_in_a_lenient_form_is_refused_by_the_peer_498() {
     let peer = |identity: Option<String>| {
         let mut wallet = wallet(&own, None);
         wallet.identity = identity;
-        Peer::new(PeerOptions {
-            wallet,
-            transport: bsv_rs::auth::transports::MockTransport::new(),
-            certificates_to_request: None,
-            session_manager: None,
-            auto_persist_last_session: false,
-            originator: None,
-        })
+        Peer::new(
+            PeerOptions::new(wallet, bsv_rs::auth::transports::MockTransport::new())
+                .with_auto_persist_last_session(false),
+        )
     };
     let canonical = own.public_key();
     let answered = peer(Some(canonical.to_hex())).get_identity_key().await;
@@ -416,14 +412,10 @@ async fn an_upper_case_or_uncompressed_wallet_identity_key_is_refused_582() {
         let words = verdict.expect("the reference refuses it");
         let mut wallet = wallet(&g(), None);
         wallet.identity = Some(text);
-        let peer = Peer::new(PeerOptions {
-            wallet,
-            transport: bsv_rs::auth::transports::MockTransport::new(),
-            certificates_to_request: None,
-            session_manager: None,
-            auto_persist_last_session: false,
-            originator: None,
-        });
+        let peer = Peer::new(
+            PeerOptions::new(wallet, bsv_rs::auth::transports::MockTransport::new())
+                .with_auto_persist_last_session(false),
+        );
         match peer.get_identity_key().await {
             Err(Error::AuthError(message)) if message == words => {}
             other => panic!("{name}: {other:?}"),

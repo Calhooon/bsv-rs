@@ -160,14 +160,14 @@ async fn client(
     Peer<ProtoWallet, SimplifiedFetchTransport>,
     Arc<Mutex<Vec<Vec<u8>>>>,
 ) {
-    let peer = Peer::new(PeerOptions {
-        wallet: ProtoWallet::new(Some(client_key())),
-        transport: SimplifiedFetchTransport::new(&mock.uri()),
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    });
+    let peer = Peer::new(
+        PeerOptions::new(
+            ProtoWallet::new(Some(client_key())),
+            SimplifiedFetchTransport::new(&mock.uri()),
+        )
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    );
     peer.start();
     let received = Arc::new(Mutex::new(Vec::new()));
     let log = received.clone();

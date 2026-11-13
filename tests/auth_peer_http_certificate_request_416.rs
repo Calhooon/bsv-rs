@@ -186,18 +186,17 @@ async fn exchange(case: &Value) -> Exchange {
 async fn exchange_with_intake(case: &Value, supply_initial_nonce: bool) -> Exchange {
     let server = server(case).await;
     let seen = Arc::new(Mutex::new(Vec::new()));
-    let peer = Peer::new(PeerOptions {
-        wallet: ProtoWallet::new(Some(key(41))),
-        transport: ObservedTransport {
-            inner: SimplifiedFetchTransport::new(&server.uri()),
-            seen: seen.clone(),
-            supply_initial_nonce,
-        },
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: None,
-    });
+    let peer = Peer::new(
+        PeerOptions::new(
+            ProtoWallet::new(Some(key(41))),
+            ObservedTransport {
+                inner: SimplifiedFetchTransport::new(&server.uri()),
+                seen: seen.clone(),
+                supply_initial_nonce,
+            },
+        )
+        .with_auto_persist_last_session(false),
+    );
     let requests = Arc::new(Mutex::new(Vec::new()));
     let sink = requests.clone();
     peer.listen_for_certificates_requested(move |identity, requested| {

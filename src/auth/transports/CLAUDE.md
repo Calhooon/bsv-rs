@@ -112,7 +112,10 @@ impl WebSocketTransport {
 
 Configuration:
 
+`#[non_exhaustive]` since #843d8a (`WebSocketTransportOptions::new(base_url)` and `with_read_deadline_secs`; the fields stay readable):
+
 ```rust
+#[non_exhaustive]
 pub struct WebSocketTransportOptions {
     pub base_url: String,           // Must start with ws:// or wss://
     pub read_deadline_secs: Option<u64>,  // Defaults to 30 if None or 0
@@ -247,10 +250,10 @@ assert_eq!(transport.base_url(), "https://example.com");
 ```rust
 use bsv_rs::auth::transports::{WebSocketTransport, WebSocketTransportOptions};
 
-let transport = WebSocketTransport::new(WebSocketTransportOptions {
-    base_url: "wss://example.com/ws".to_string(),
-    read_deadline_secs: Some(60),
-}).unwrap();
+let transport = WebSocketTransport::new(
+    WebSocketTransportOptions::new("wss://example.com/ws").with_read_deadline_secs(Some(60)),
+)
+.unwrap();
 assert_eq!(transport.base_url(), "wss://example.com/ws");
 assert_eq!(transport.read_deadline_secs(), 60);
 ```

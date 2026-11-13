@@ -66,17 +66,17 @@ fn key(n: u8) -> PrivateKey {
 fn end(scalar: u8) -> End {
     let (out, sent) = mpsc::unbounded_channel();
     let callback: Callback = Arc::new(Mutex::new(None));
-    let peer = Arc::new(Peer::new(PeerOptions {
-        wallet: ProtoWallet::new(Some(key(scalar))),
-        transport: Wire {
-            out,
-            callback: callback.clone(),
-        },
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    }));
+    let peer = Arc::new(Peer::new(
+        PeerOptions::new(
+            ProtoWallet::new(Some(key(scalar))),
+            Wire {
+                out,
+                callback: callback.clone(),
+            },
+        )
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    ));
     peer.start();
     End {
         peer,

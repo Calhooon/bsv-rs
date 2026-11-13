@@ -80,17 +80,18 @@ fn end_with_policy(n: u8, policy: Option<RequestedCertificateSet>) -> End {
     let callback = Callback::default();
     let wallet = TestWallet::new(key(n), true);
     let gate = wallet.gate.clone();
-    let peer = Peer::new(PeerOptions {
-        wallet,
-        transport: Wire {
-            sent,
-            callback: callback.clone(),
-        },
-        certificates_to_request: policy,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    });
+    let peer = Peer::new(
+        PeerOptions::new(
+            wallet,
+            Wire {
+                sent,
+                callback: callback.clone(),
+            },
+        )
+        .with_certificates_to_request(policy)
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    );
     peer.start();
     End {
         peer,

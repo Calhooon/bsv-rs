@@ -10,14 +10,14 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | File | Purpose | Lines |
 |------|---------|-------|
 | `clients/` | #423 AuthFetch, owned Response, request/response framing, certificate queue and BRC-105 payments; core `auth`, native transport `http` | see below |
-| `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
+| `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 92 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 671 |
 | `header_debug.rs` | The secret Debug fold (2026-11-10): the redacting `Debug` of `transports::http::HttpRequest` and `HttpResponse`, `AuthFetchOptions` and `clients::Response`, every field as the derive printed it, every header name, every header value `<redacted>` save `crate::util::debug_redact::PUBLIC_HEADERS` (any case; `authorization` alone until the second fold), `HttpRequest`'s `search` `<redacted>` when not empty; pinned by `tests/secret_debug.rs` | 73 |
 | `requested_certificates_json.rs` | #426/#400: parsed certificate member preimages; ordered maps, JavaScript integer keys, UTF-16 escapes and ECMAScript numbers; no recursive parser stack | 258 |
 | `session_manager.rs` | Session management with dual indexing and nonce-claim API | 452 |
 | `session_nonces.rs` | #362: atomic signed claims (100,000 per session), initial-request window (100,000 total / 256 per identity / 30 minutes), expiry and removal | 156 |
 | `session_nonces_tests.rs` | Four #362 store-capacity, eviction and lifetime witnesses against the Node recorder | 116 |
-| `peer.rs` | Peer API, transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 687 |
+| `peer.rs` | Peer API, `PeerOptions` (`#[non_exhaustive]`, `new` and its setters, #843d8a), transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 766 |
 | `peer_incoming.rs` | #362-364: signed nonce claims and authentication; certificate yourNonce, exact session and identity checks; listener errors; ready flag on the response session; since #445 a nonempty certificate response matched to its configured policy (none means empty), then the shared concurrent validator | 233 |
 | `peer_initial.rs` | #362-364 fold: responder policy and matching proofs in the initial response; initiator validation, exact-session readiness, listeners and automatic answer (`Peer.ts:832-874,957-1035`); the signer decodes both nonces with `?` (#445) | 187 |
 | `peer_certificates.rs` | #445: shared concurrent validator, subject then signature/policy then decryption; runtime-independent continuation turns preserve the Node 22 measured rejection order. `require_requested_certificates` matches the configured policy, including the empty default, before validation; empty and unrequested keyrings refused, nonempty subsets accepted | 138 |
@@ -31,7 +31,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 
 | File | Purpose |
 |---|---|
-| `clients/auth_fetch.rs` | Public constructors/options/fetch, origin peers, retry counter, correlation and response deadline |
+| `clients/auth_fetch.rs` | Public constructors/options/fetch (`AuthFetchOptions` `#[non_exhaustive]` since #843d8a: `Default` and six `with_` setters), origin peers, retry counter, correlation and response deadline |
 | `clients/state.rs` | Shared session manager, certificate queue, 500 ms timer, requests and bounded drainable buffer |
 | `clients/request.rs` | Exact method/path/search/header/body payload and reference header collation |
 | `clients/response.rs` | Owned response and strict bounded answer parser; a mismatched ID is ignored |
@@ -313,8 +313,9 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 - `process_general_message()` - The reference's `processGeneralMessage` (`Peer.ts:1270-1314`) in its order and words: `your_nonce` made by this wallet, its session, the session's peer the sender, the signature, the nonce and the session's nonce present; claims the nonce, marks the session authenticated, waits for required certificate validation, notifies callbacks (a listener's error the message's) (#353, #362, #364)
 - `verify_own_nonce()` - `verify_nonce` with counterparty self, a malformed nonce `false` (the reference's `verifyNonce`)
 
-**PeerOptions** - Configuration for creating a Peer:
+**PeerOptions** - Configuration for creating a Peer, `#[non_exhaustive]` since #843d8a (a record that grows: the reference's constructor took six arguments at `ts-sdk@9e3ede6b` and seven at `ts-stack@edf6e03`): `PeerOptions::new(wallet, transport)` (no certificates, a new session manager, no originator, `auto_persist_last_session` true, the reference's default, `Peer.ts:100`) and `with_certificates_to_request`, `with_session_manager`, `with_auto_persist_last_session`, `with_originator`; the fields stay readable, a pattern ends in `..`; pinned by its `compile_fail,E0639` doc test and `tests/arch_non_exhaustive_843d.rs`. `Peer` stores `auto_persist_last_session` and does not read it (the stated row of the root `CLAUDE.md`):
 ```rust
+#[non_exhaustive]
 pub struct PeerOptions<W: WalletInterface, T: Transport> {
     pub wallet: W,
     pub transport: T,
@@ -356,7 +357,7 @@ pub type TransportCallback = dyn Fn(AuthMessage) -> Pin<Box<dyn Future<Output = 
 
 Three implementations:
 - **SimplifiedFetchTransport** - HTTP transport (BRC-104): `new(base_url)`, `with_client(base_url, client)` (`http`, #320), `message_to_headers()`, `headers_to_message_fields()`
-- **WebSocketTransport** - Full-duplex WebSocket (requires `websocket` feature): lazy connect on first `send()`, background receive loop, JSON payloads, connection dropped on errors. Config via `WebSocketTransportOptions { base_url, read_deadline_secs }`
+- **WebSocketTransport** - Full-duplex WebSocket (requires `websocket` feature): lazy connect on first `send()`, background receive loop, JSON payloads, connection dropped on errors. Config via `WebSocketTransportOptions::new(base_url).with_read_deadline_secs(..)` (`#[non_exhaustive]` since #843d8a)
 - **MockTransport** - Testing: `queue_response()`, `get_sent_messages()`, `receive_message()`
 
 **HttpRequest** / **HttpResponse** - BRC-104 binary payload types for General messages (request_id, method/status, path, headers, body).
@@ -381,14 +382,11 @@ use bsv_rs::primitives::PrivateKey;
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let transport = SimplifiedFetchTransport::new("https://example.com");
 
-let peer = Peer::new(PeerOptions {
-    wallet,
-    transport,
-    certificates_to_request: None,
-    session_manager: None,
-    auto_persist_last_session: false,
-    originator: Some("myapp.com".into()),
-});
+let peer = Peer::new(
+    PeerOptions::new(wallet, transport)
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("myapp.com".into())),
+);
 peer.start(); // Every message through handle_incoming_message, verified (#353)
 peer.to_peer(b"Hello, world!", None, None).await?;
 ```
@@ -398,14 +396,11 @@ peer.to_peer(b"Hello, world!", None, None).await?;
 ```rust
 use std::sync::Arc;
 
-let peer = Arc::new(Peer::new(PeerOptions {
-    wallet,
-    transport,
-    certificates_to_request: None,
-    session_manager: None,
-    auto_persist_last_session: false,
-    originator: Some("myserver.com".into()),
-}));
+let peer = Arc::new(Peer::new(
+    PeerOptions::new(wallet, transport)
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("myserver.com".into())),
+));
 peer.start_server(); // The same path as start()
 ```
 
@@ -435,19 +430,15 @@ peer.request_certificates(requested, Some(&peer_identity_key), None).await?;
 ```rust
 use bsv_rs::auth::{Peer, PeerOptions, WebSocketTransport, WebSocketTransportOptions};
 
-let transport = WebSocketTransport::new(WebSocketTransportOptions {
-    base_url: "wss://example.com/ws".to_string(),
-    read_deadline_secs: Some(60),
-})?;
+let transport = WebSocketTransport::new(
+    WebSocketTransportOptions::new("wss://example.com/ws").with_read_deadline_secs(Some(60)),
+)?;
 
-let peer = Peer::new(PeerOptions {
-    wallet,
-    transport,
-    certificates_to_request: None,
-    session_manager: None,
-    auto_persist_last_session: false,
-    originator: Some("myapp.com".into()),
-});
+let peer = Peer::new(
+    PeerOptions::new(wallet, transport)
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("myapp.com".into())),
+);
 peer.start();
 ```
 

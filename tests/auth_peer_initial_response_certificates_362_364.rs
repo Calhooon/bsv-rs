@@ -86,17 +86,18 @@ async fn end(n: u8, required: bool, holds_certificate: bool) -> End {
     }
     let (sent, received) = mpsc::unbounded_channel();
     let callback = Callback::default();
-    let peer = Peer::new(PeerOptions {
-        wallet,
-        transport: Wire {
-            sent,
-            callback: callback.clone(),
-        },
-        certificates_to_request: required.then(policy),
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    });
+    let peer = Peer::new(
+        PeerOptions::new(
+            wallet,
+            Wire {
+                sent,
+                callback: callback.clone(),
+            },
+        )
+        .with_certificates_to_request(required.then(policy))
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    );
     peer.start();
     End {
         peer,

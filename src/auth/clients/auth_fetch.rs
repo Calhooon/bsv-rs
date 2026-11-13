@@ -22,7 +22,26 @@ use tokio::sync::{oneshot, Mutex as AsyncMutex, RwLock};
 type TransportFactory<T> = dyn Fn(&str, usize) -> Result<T> + Send + Sync;
 
 /// Options for one authenticated HTTP request.
-#[derive(Clone, Default)] // Debug redacts every header value but the public names (auth/header_debug.rs)
+///
+/// A record that grows (the reference's has seven members,
+/// `AuthFetch.ts:33-49` at `ts-stack@edf6e03`), so it is
+/// `#[non_exhaustive]` (#843d8a): build it with [`Default`] and the `with_`
+/// setters; the fields stay readable, and a pattern over it ends in `..`.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::auth::AuthFetchOptions) -> bsv_rs::auth::AuthFetchOptions {
+///     bsv_rs::auth::AuthFetchOptions { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::auth::AuthFetchOptions) -> bsv_rs::auth::AuthFetchOptions {
+///     value
+/// }
+/// ```
+// Debug redacts every header value but the public names (auth/header_debug.rs).
+#[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct AuthFetchOptions {
     /// Method as supplied; defaults to `GET` (its case is signed unchanged).
     pub method: Option<String>,
@@ -37,6 +56,52 @@ pub struct AuthFetchOptions {
     pub payment_retry_attempts: Option<u32>,
     /// Caller labels appended after the automatic `brc105 <hex> <hex>` label.
     pub labels: Vec<String>,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(AuthFetchOptions, bsv_rs::auth::AuthFetchOptions);
+
+impl AuthFetchOptions {
+    /// Sets the method (`GET` when `None`).
+    #[must_use]
+    pub fn with_method(mut self, value: Option<String>) -> Self {
+        self.method = value;
+        self
+    }
+
+    /// Sets the insertion-ordered headers.
+    #[must_use]
+    pub fn with_headers(mut self, value: IndexMap<String, String>) -> Self {
+        self.headers = value;
+        self
+    }
+
+    /// Sets the body bytes.
+    #[must_use]
+    pub fn with_body(mut self, value: Option<Vec<u8>>) -> Self {
+        self.body = value;
+        self
+    }
+
+    /// Sets the remaining fetch attempts.
+    #[must_use]
+    pub fn with_retry_counter(mut self, value: Option<u32>) -> Self {
+        self.retry_counter = value;
+        self
+    }
+
+    /// Sets the maximum paid attempts.
+    #[must_use]
+    pub fn with_payment_retry_attempts(mut self, value: Option<u32>) -> Self {
+        self.payment_retry_attempts = value;
+        self
+    }
+
+    /// Sets the caller labels.
+    #[must_use]
+    pub fn with_labels(mut self, value: Vec<String>) -> Self {
+        self.labels = value;
+        self
+    }
 }
 
 /// An authenticated client sharing a wallet and session manager across origins.

@@ -70,7 +70,7 @@
 //! let transport = SocketIoTransport::new(MySink(/* ... */));
 //! let callback = transport.callback_handle();
 //! let sink = transport.sink();
-//! // peer = Peer::new(PeerOptions { transport: transport.clone(), .. });
+//! // peer = Peer::new(PeerOptions::new(wallet, transport.clone()));
 //!
 //! // 3. Spawn the inbound dispatch over your WS read half.
 //! // tokio::spawn(run_dispatch(my_frame_source, sink, callback));

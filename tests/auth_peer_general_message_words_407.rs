@@ -75,14 +75,12 @@ async fn deliver(case: &str, wallet: TestWallet, server: bool) -> (Result<()>, u
     let mut manager = SessionManager::new();
     manager.add_session(session).unwrap();
     let callback: Callback = Arc::default();
-    let peer = Arc::new(Peer::new(PeerOptions {
-        wallet,
-        transport: Wire(callback.clone()),
-        certificates_to_request: None,
-        session_manager: Some(manager),
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    }));
+    let peer = Arc::new(Peer::new(
+        PeerOptions::new(wallet, Wire(callback.clone()))
+            .with_session_manager(Some(manager))
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("test".into())),
+    ));
     let calls = Arc::new(AtomicUsize::new(0));
     let log = calls.clone();
     peer.listen_for_general_messages(move |sender, payload| {
