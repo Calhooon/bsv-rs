@@ -247,24 +247,19 @@ impl Default for DisplayableIdentity {
 /// assert_eq!(contact.badge_label, "Met in person");
 /// ```
 ///
-/// A struct literal from outside the crate does not build:
+/// No struct expression builds one outside the crate, a functional update
+/// that names no field included:
 ///
 /// ```compile_fail,E0639
-/// use bsv_rs::identity::Contact;
+/// fn rebuilt(value: bsv_rs::identity::Contact) -> bsv_rs::identity::Contact {
+///     bsv_rs::identity::Contact { ..value }
+/// }
+/// ```
 ///
-/// let contact = Contact {
-///     identity_key: "02abc123".to_string(),
-///     name: "Alice".to_string(),
-///     avatar_url: None,
-///     added_at: 0,
-///     notes: None,
-///     tags: Vec::new(),
-///     metadata: None,
-///     badge_icon_url: String::new(),
-///     badge_label: String::new(),
-///     badge_click_url: String::new(),
-///     abbreviated_key: None,
-/// };
+/// ```
+/// fn kept(value: bsv_rs::identity::Contact) -> bsv_rs::identity::Contact {
+///     value
+/// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -309,6 +304,8 @@ pub struct Contact {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub abbreviated_key: Option<String>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(Contact, bsv_rs::identity::Contact);
 
 impl Contact {
     /// A contact of `name` and `identity_key`, the two members the

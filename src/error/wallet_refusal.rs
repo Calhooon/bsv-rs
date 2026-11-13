@@ -3,6 +3,9 @@
 #[cfg(doc)]
 use super::Error;
 
+#[cfg(feature = "wallet")]
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::WalletRefusalClass;
 /// The class of a wallet's refusal: the reference's wallet error table by
 /// name (bsv-rs#137). Two tables at `ts-stack@edf6e03` meet here:
 ///
@@ -29,6 +32,8 @@ use super::Error;
 /// of every error and leaves its naming to the implementation; its wire's
 /// error byte is `1-255`, "predefined error types or ... custom error
 /// categorization" (`:1609`).
+///
+/// A host may hash a class and match it (#819).
 #[cfg(feature = "wallet")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -84,6 +89,7 @@ pub enum WalletRefusalClass {
     NotActive,
     /// `WERR_INVALID_PUBLIC_KEY`, no code (`WERR_errors.ts:232`).
     InvalidPublicKey,
+}
 }
 
 #[cfg(feature = "wallet")]
@@ -221,5 +227,51 @@ impl WalletRefusalClass {
 impl std::fmt::Display for WalletRefusalClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.name())
+    }
+}
+
+/// `ALL` against the definition (#819's fold): the match below names every
+/// class with no wildcard arm, so a class added to the enum does not compile
+/// here until it has a position, and `VARIANT_NAMES` is written from the
+/// definition by `non_exhaustive_enum!`, so one left out of `ALL` fails.
+#[cfg(test)]
+mod all_is_every_variant_819_tests {
+    use super::WalletRefusalClass;
+
+    fn position(value: WalletRefusalClass) -> usize {
+        match value {
+            WalletRefusalClass::UnsupportedAction => 0,
+            WalletRefusalClass::InvalidHmac => 1,
+            WalletRefusalClass::InvalidSignature => 2,
+            WalletRefusalClass::ReviewActions => 3,
+            WalletRefusalClass::InvalidParameter => 4,
+            WalletRefusalClass::InsufficientFunds => 5,
+            WalletRefusalClass::AbortRefused => 6,
+            WalletRefusalClass::NotImplemented => 7,
+            WalletRefusalClass::Internal => 8,
+            WalletRefusalClass::InvalidOperation => 9,
+            WalletRefusalClass::UtxoReviewInconclusive => 10,
+            WalletRefusalClass::ActionBatchState => 11,
+            WalletRefusalClass::BroadcastUnavailable => 12,
+            WalletRefusalClass::InvalidMerkleRoot => 13,
+            WalletRefusalClass::MissingParameter => 14,
+            WalletRefusalClass::BadRequest => 15,
+            WalletRefusalClass::NetworkChain => 16,
+            WalletRefusalClass::Unauthorized => 17,
+            WalletRefusalClass::NotActive => 18,
+            WalletRefusalClass::InvalidPublicKey => 19,
+        }
+    }
+
+    #[test]
+    fn all_holds_every_variant_once_in_the_definitions_order_819() {
+        let names: Vec<String> = WalletRefusalClass::ALL
+            .iter()
+            .map(|v| format!("{v:?}"))
+            .collect();
+        assert_eq!(names, WalletRefusalClass::VARIANT_NAMES);
+        for (index, value) in WalletRefusalClass::ALL.into_iter().enumerate() {
+            assert_eq!(position(value), index, "{value:?}");
+        }
     }
 }

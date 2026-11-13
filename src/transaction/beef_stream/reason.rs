@@ -3,29 +3,14 @@
 
 use super::Hash32;
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::Kind;
 /// The twenty-six kinds of refusal, the Lean's `Kind`. None is a size or a
 /// count: no byte is wrong by being one of many.
 ///
 /// Non-exhaustive (bsv-rs#86, #167, the owner's word of 2026-10-25): a
 /// later kind is not a break, so a `match` outside this crate ends in a
-/// wildcard arm. One without it does not compile:
-///
-/// ```compile_fail,E0004
-/// use bsv_rs::transaction::Kind;
-/// fn name(kind: Kind) -> &'static str {
-///     match kind {
-///         Kind::BadVersion | Kind::BadVarint | Kind::Truncated | Kind::BadFlag => "frame",
-///         Kind::TreeHeightOver64 | Kind::TreeHeightZero | Kind::OffsetOutsideTree => "bump",
-///         Kind::NoTxidAtLevelZero | Kind::MissingSibling | Kind::MismatchedNode => "bump",
-///         Kind::DuplicateOffset | Kind::RootNotCarried => "bump",
-///         Kind::BumpIndexNamesNoBump | Kind::TxidNotInBump => "index",
-///         Kind::InputNamesNoElement | Kind::StubNotProven | Kind::TrailingBytes => "entry",
-///         Kind::SubjectMissing | Kind::UnrelatedTransaction => "atomic",
-///         Kind::NoInputs | Kind::NoOutputs | Kind::UnprovenCoinbase => "transaction",
-///         Kind::NullOutpoint | Kind::DuplicateInput | Kind::ValueOutOfRange => "transaction",
-///     }
-/// }
-/// ```
+/// wildcard arm:
 ///
 /// ```
 /// use bsv_rs::transaction::Kind;
@@ -103,6 +88,7 @@ pub enum Kind {
     /// \[SRC\] sibling@87f0461 TxRules.lean:25,88-93 (#68).
     ValueOutOfRange,
 }
+}
 
 impl Kind {
     /// The twenty-six kinds, each once, in the Lean's order (`Kind.all`).
@@ -136,29 +122,10 @@ impl Kind {
     ];
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::Reason;
 /// A refusal's reason with its data, the Lean's `Reason`. Non-exhaustive as
-/// [`Kind`] is (bsv-rs#86, #167): a `match` outside this crate ends in a
-/// wildcard arm.
-///
-/// ```compile_fail,E0004
-/// use bsv_rs::transaction::Reason;
-/// fn is_bump(reason: &Reason) -> bool {
-///     match reason {
-///         Reason::BadFlag { .. } | Reason::TreeHeightOver64 { .. } => true,
-///         Reason::TreeHeightZero | Reason::OffsetOutsideTree { .. } => true,
-///         Reason::NoTxidAtLevelZero | Reason::MissingSibling { .. } => true,
-///         Reason::MismatchedNode { .. } | Reason::DuplicateOffset { .. } => true,
-///         Reason::RootNotCarried { .. } => true,
-///         Reason::BadVersion { .. } | Reason::BadVarint | Reason::Truncated { .. } => false,
-///         Reason::BumpIndexNamesNoBump { .. } | Reason::TxidNotInBump { .. } => false,
-///         Reason::InputNamesNoElement { .. } | Reason::StubNotProven { .. } => false,
-///         Reason::TrailingBytes | Reason::SubjectMissing { .. } => false,
-///         Reason::UnrelatedTransaction { .. } | Reason::NoInputs | Reason::NoOutputs => false,
-///         Reason::UnprovenCoinbase | Reason::NullOutpoint | Reason::DuplicateInput => false,
-///         Reason::ValueOutOfRange => false,
-///     }
-/// }
-/// ```
+/// [`Kind`] is (bsv-rs#86, #167).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Reason {
@@ -305,6 +272,7 @@ pub enum Reason {
     /// \[SRC\] sibling@87f0461 TxRules.lean:25,88-93 (#68).
     ValueOutOfRange,
 }
+}
 
 impl Reason {
     /// The reason without its data.
@@ -336,6 +304,55 @@ impl Reason {
             Reason::DuplicateInput => Kind::DuplicateInput,
             Reason::NullOutpoint => Kind::NullOutpoint,
             Reason::UnprovenCoinbase => Kind::UnprovenCoinbase,
+        }
+    }
+}
+
+/// `ALL` against the definition (#819's fold): the match below names every
+/// kind with no wildcard arm, so a kind added to the enum does not compile
+/// here until it has a position, and `VARIANT_NAMES` is written from the
+/// definition by `non_exhaustive_enum!`, so one left out of `ALL` fails.
+#[cfg(test)]
+mod all_is_every_variant_819_tests {
+    use super::Kind;
+
+    fn position(value: Kind) -> usize {
+        match value {
+            Kind::BadVersion => 0,
+            Kind::BadVarint => 1,
+            Kind::Truncated => 2,
+            Kind::BadFlag => 3,
+            Kind::TreeHeightOver64 => 4,
+            Kind::TreeHeightZero => 5,
+            Kind::OffsetOutsideTree => 6,
+            Kind::NoTxidAtLevelZero => 7,
+            Kind::MissingSibling => 8,
+            Kind::MismatchedNode => 9,
+            Kind::DuplicateOffset => 10,
+            Kind::LeftDuplicateBelow => 11,
+            Kind::RootNotCarried => 12,
+            Kind::BumpIndexNamesNoBump => 13,
+            Kind::TxidNotInBump => 14,
+            Kind::InputNamesNoElement => 15,
+            Kind::StubNotProven => 16,
+            Kind::TrailingBytes => 17,
+            Kind::SubjectMissing => 18,
+            Kind::UnrelatedTransaction => 19,
+            Kind::NoInputs => 20,
+            Kind::NoOutputs => 21,
+            Kind::UnprovenCoinbase => 22,
+            Kind::NullOutpoint => 23,
+            Kind::DuplicateInput => 24,
+            Kind::ValueOutOfRange => 25,
+        }
+    }
+
+    #[test]
+    fn all_holds_every_variant_once_in_the_definitions_order_819() {
+        let names: Vec<String> = Kind::ALL.iter().map(|v| format!("{v:?}")).collect();
+        assert_eq!(names, Kind::VARIANT_NAMES);
+        for (index, value) in Kind::ALL.into_iter().enumerate() {
+            assert_eq!(position(value), index, "{value:?}");
         }
     }
 }

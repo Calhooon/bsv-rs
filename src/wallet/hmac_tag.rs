@@ -21,6 +21,8 @@ use super::key_args::VerifyHmacArgs;
 use super::types::Counterparty;
 use super::{KeyDeriverApi, ProtoWallet};
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::wallet::HmacKeyEncoding;
 /// The key encoding a verified HMAC tag was made under.
 ///
 /// `#[non_exhaustive]` since 0.9.0-beta.4 (bsv-rs#443), as further key
@@ -38,7 +40,10 @@ pub enum HmacKeyEncoding {
         leading_zero_bytes: usize,
     },
 }
+}
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::wallet::HmacVerifyPolicy;
 /// Which HMAC key encodings [`ProtoWallet::verify_hmac`] accepts.
 ///
 /// `#[non_exhaustive]` since 0.9.0-beta.4 (bsv-rs#443), as further verification
@@ -53,6 +58,7 @@ pub enum HmacVerifyPolicy {
     /// The amended BRC-56 and ts-stack PR 1423 verifier. Use for a store
     /// without pre-amendment tags; a legacy tag is [`Error::HmacLegacyKey`].
     MinimalLengthOnly,
+}
 }
 
 /// BRC-56's serialization, distinct from BRC-2's fixed-width AES-GCM key.

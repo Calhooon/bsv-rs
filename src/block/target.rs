@@ -108,6 +108,8 @@ pub const POW_LIMIT_STN: U256 = POW_LIMIT_MAIN;
 /// ```
 pub const POW_LIMIT_REGTEST: U256 = U256([u64::MAX, u64::MAX, u64::MAX, 0x7fff_ffff_ffff_ffff]);
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::block::PowError;
 /// Why `CheckProofOfWork` refused a header. All map to the node's `high-hash`.
 /// Source: bitcoin-sv@6504a3af `src/pow.cpp:150-171`, sibling #63.
 /// ```
@@ -147,6 +149,7 @@ pub enum PowError {
         /// The header's compact target.
         bits: u32,
     },
+}
 }
 
 impl PowError {

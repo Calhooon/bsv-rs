@@ -4,6 +4,8 @@ use std::fmt;
 
 use super::ChainParams;
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::block::ActivationHeightsError;
 /// An activation override the node cannot use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -12,6 +14,7 @@ pub enum ActivationHeightsError {
     ZeroGenesis,
     /// Chronicle must activate at a positive height.
     ZeroChronicle,
+}
 }
 
 impl ActivationHeightsError {

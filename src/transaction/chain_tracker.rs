@@ -34,6 +34,8 @@ use super::beef_stream::{display_hex, ChainTip, Hash32, Headers};
 use crate::error::TransportFault;
 use crate::script::ProtocolEra;
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::ChainTrackerError;
 /// Errors that can occur during chain tracking operations.
 ///
 /// A provider's error is an error, never a verdict: a tracker that could not
@@ -81,6 +83,7 @@ pub enum ChainTrackerError {
     /// General chain tracker error.
     #[error("chain tracker error: {0}")]
     Other(String),
+}
 }
 
 impl ChainTrackerError {

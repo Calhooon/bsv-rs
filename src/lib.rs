@@ -37,10 +37,12 @@
 
 // Error types (shared across modules)
 pub mod error;
-// The lib's own tests read the integration tests' shared builders, written
-// against `bsv_rs::` paths, through this alias (#621's pre-pass differential,
-// `transaction/beef/prepass_621_tests.rs`).
-#[cfg(test)]
+// The crate's own name inside it: the lib's own tests read the integration
+// tests' shared builders, written against `bsv_rs::` paths, through this alias
+// (#621's pre-pass differential, `transaction/beef/prepass_621_tests.rs`), and
+// the `#[non_exhaustive]` pins name their types' public paths through it, the
+// compiler holding that each names the type it follows (#819's third fold,
+// `util/non_exhaustive.rs`). A private item: no public path moves.
 extern crate self as bsv_rs;
 #[cfg(feature = "transaction")]
 pub use error::TransportFault;

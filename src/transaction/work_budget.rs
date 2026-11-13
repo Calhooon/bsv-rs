@@ -10,10 +10,20 @@ use crate::script::NotJudgedCause;
 /// are local evaluator policies, never consensus rules or elapsed-time bounds.
 ///
 /// Construct a policy with [`Self::new`] and its field setters; fields remain
-/// readable, and destructuring outside this crate requires `..`.
+/// readable, and destructuring outside this crate requires `..`. No struct
+/// expression builds one there, a functional update that names no field
+/// included:
 ///
-/// ```compile_fail
-/// let _ = bsv_rs::transaction::WorkBudget { per_input: None, per_transaction: None };
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::WorkBudget) -> bsv_rs::transaction::WorkBudget {
+///     bsv_rs::transaction::WorkBudget { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::WorkBudget) -> bsv_rs::transaction::WorkBudget {
+///     value
+/// }
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
@@ -23,6 +33,8 @@ pub struct WorkBudget {
     /// Maximum total work charged across one transaction's inputs.
     pub per_transaction: Option<u64>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(WorkBudget, bsv_rs::transaction::WorkBudget);
 
 impl WorkBudget {
     /// Creates a local work policy with both bounds unbounded.
