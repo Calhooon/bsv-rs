@@ -7,6 +7,8 @@ use crate::block::ChainParams;
 use crate::primitives::bsv::sighash::TxSighashCache;
 use crate::{Error, Result};
 
+use super::amount::{add_amount, require_satoshi_amount};
+use super::source_link::source_named_otherwise;
 use super::spending::{judge_input, sighash_of, InputRules};
 use super::transaction::refuse_no_transaction;
 use super::{ChainTracker, FeeModel, Transaction, TransactionOutput, WorkBudget};
@@ -166,6 +168,7 @@ struct Evaluation<'a> {
 struct Source<'a> {
     txid: String,
     output: &'a TransactionOutput,
+    satoshis: u64,
     height: Option<u32>,
 }
 
@@ -224,8 +227,32 @@ async fn proven(tx: &Transaction, txid: &str, tracker: &dyn ChainTracker) -> Res
     }
 }
 
-fn overflow() -> Error {
-    Error::TransactionError("Input satoshis overflow".to_string())
+/// An input's source amount, refused when absent or past 21e14 and summed
+/// into the input total, refused past 21e14, as the reference's
+/// `#verifyTransactionInputs` reads it (`requireSatoshiAmount` and
+/// `addSatoshiAmount`, `ts-stack@edf6e03` `Transaction.ts:1414-1418`); an
+/// absent amount was read as 0 and the total bounded by `u64` until #848's
+/// fold.
+fn source_amount(output: &TransactionOutput, vin: usize, total: &mut u64) -> Result<u64> {
+    let satoshis = require_satoshi_amount(output.satoshis, &format!("Input {vin} source amount"))?;
+    *total = add_amount(*total, satoshis, "Transaction input total")?;
+    Ok(satoshis)
+}
+
+/// The output total, each amount refused when absent or past 21e14 and the
+/// total past 21e14, read before any input as the reference's
+/// `#validateUnminedTransactionStructure` reads it (`#totalVerifiedOutputs`,
+/// `Transaction.ts:1367`, `:1464-1474`); an absent amount was read as 0 and
+/// the outputs read after the inputs until #848's fold.
+fn output_total(tx: &Transaction) -> Result<u64> {
+    tx.outputs()
+        .iter()
+        .enumerate()
+        .try_fold(0u64, |total, (index, output)| {
+            let amount =
+                require_satoshi_amount(output.satoshis, &format!("Output {index} amount"))?;
+            add_amount(total, amount, "Transaction output total")
+        })
 }
 
 fn sources<'a>(
@@ -236,21 +263,56 @@ fn sources<'a>(
     let mut total = 0u64;
     for (vin, input) in tx.inputs().iter().enumerate() {
         let missing = || Error::TransactionError(format!("Input {vin} has no source transaction"));
-        let txid = input.get_source_txid().map_err(|_| missing())?;
+        let out_of_bounds =
+            || Error::TransactionError(format!("Input {vin} source output index out of bounds"));
+        // An input that links no source (#848's fold): refused in the
+        // reference's words (`Transaction.ts:1396-1400`), whether or not the
+        // txid it names is another input's source; until the fold it was
+        // judged against that source when one was reachable.
+        if input.source_transaction.is_none() {
+            return Err(Error::TransactionError(format!(
+                "Verification failed because the input at index {vin} of transaction {} is \
+                 missing an associated source transaction. This source transaction is required \
+                 for transaction verification because there is no merkle proof for the \
+                 transaction spending a UTXO it contains.",
+                tx.id()
+            )));
+        }
+        // A linked source under another txid (#848): refused where the
+        // reference refuses it (`Transaction.ts:1410-1432`), after the linked
+        // source's output is found and its amount checked and summed,
+        // whatever the source holds (no exemption for a descriptor without
+        // inputs) and whether or not the named txid is another reachable
+        // transaction's.
+        if let Some(linked) = source_named_otherwise(input) {
+            let output = linked
+                .outputs()
+                .get(input.source_output_index as usize)
+                .ok_or_else(out_of_bounds)?;
+            source_amount(output, vin, &mut total)?;
+            return Err(Error::TransactionError(format!(
+                "Verification failed because input {vin} of transaction {} does not reference \
+                 its supplied source transaction.",
+                tx.id()
+            )));
+        }
+        // The walk is by txid; a text in upper case names the same 32 bytes
+        // (the serializer's reading, the reference's `requireTXID`).
+        let txid = input
+            .get_source_txid()
+            .map_err(|_| missing())?
+            .to_ascii_lowercase();
         let source = by_txid.get(&txid).copied().ok_or_else(missing)?;
         refuse_no_transaction(source, &txid)?;
         let output = source
             .outputs()
             .get(input.source_output_index as usize)
-            .ok_or_else(|| {
-                Error::TransactionError(format!("Input {vin} source output index out of bounds"))
-            })?;
-        total = total
-            .checked_add(output.satoshis.unwrap_or(0))
-            .ok_or_else(overflow)?;
+            .ok_or_else(out_of_bounds)?;
+        let satoshis = source_amount(output, vin, &mut total)?;
         sources.push(Source {
             txid,
             output,
+            satoshis,
             height: source.merkle_path.as_ref().map(|p| p.block_height),
         });
     }
@@ -265,12 +327,8 @@ impl Evaluation<'_> {
         verified: &HashSet<String>,
         queue: &mut Vec<String>,
     ) -> Result<bool> {
+        let output_total = output_total(tx)?;
         let (sources, input_total) = sources(tx, by_txid)?;
-        let output_total = tx.outputs().iter().try_fold(0u64, |total, output| {
-            total
-                .checked_add(output.satoshis.unwrap_or(0))
-                .ok_or_else(overflow)
-        })?;
         if let Some(model) = self.fee_model {
             if input_total.saturating_sub(output_total) < model.compute_fee(tx)? {
                 return Err(Error::TransactionError("Fee is too low".to_string()));
@@ -321,7 +379,7 @@ impl Evaluation<'_> {
             vin,
             &source.output.locking_script.to_binary(),
             &unlocking.to_binary(),
-            source.output.satoshis.unwrap_or(0),
+            source.satoshis,
             &rules,
         );
         match judged.result {
