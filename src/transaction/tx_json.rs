@@ -106,7 +106,10 @@ impl Transaction {
     /// Otherwise, the transaction is reconstructed from the individual fields;
     /// an input's `txid` member that is not exactly 64 hex digits is refused
     /// as `TransactionError("Invalid txid of input N: expected 64 hex digits")`,
-    /// and one in upper or mixed case is held in lower case (#845).
+    /// and one in upper or mixed case is held in lower case (#845); an
+    /// output's `satoshis` member of 2^53 or more is refused as
+    /// `TransactionError("Number can only safely store up to 53 bits")`, the
+    /// byte readers' words, before its script is read (#843d7).
     ///
     /// # Example
     ///
@@ -231,7 +234,12 @@ fn input_from_json(index: usize, ij: &InputJson) -> Result<TransactionInput> {
 }
 
 /// Converts a JSON output representation to a TransactionOutput.
+///
+/// The amount is judged as the byte readers judge it, before the script
+/// (#843d7): one of 2^53 or more is refused in their words, where it was
+/// held until then and written by `to_binary` as bytes `from_binary` refuses.
 fn output_from_json(oj: &OutputJson) -> Result<TransactionOutput> {
+    let satoshis = super::amount::held_amount(oj.satoshis)?;
     let locking_script = if oj.locking_script.is_empty() {
         LockingScript::new()
     } else {
@@ -239,7 +247,7 @@ fn output_from_json(oj: &OutputJson) -> Result<TransactionOutput> {
     };
 
     Ok(TransactionOutput {
-        satoshis: Some(oj.satoshis),
+        satoshis: Some(satoshis),
         locking_script,
         change: false,
     })

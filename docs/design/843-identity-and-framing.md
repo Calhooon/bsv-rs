@@ -248,7 +248,7 @@ The method this class taught, for the next captain:
 |---|---|
 | #843's three PRs: the transaction owns its fields (**built on lane `break-tx-fields`**); the BEEF owns `txs` and `bumps`; the one id type, the wallet included | #843, #845 |
 | `Script`'s caches as `OnceLock`s and `Script::chunks()` lending a slice, so that `Transaction` becomes `Sync` (left out of the transaction's PR by its brief) | #843 |
-| The writer's 2^53 refusal (the readers' half landed with #844's lane) | #844, #843 |
+| The writer's 2^53 refusal (the readers' half landed with #844's lane) | **decided 2026-11-12** (six design reads, five of six; the tie-break three of three), built on lane `fix-843d7`: the plain writer stays infallible, the node's serializer, stated; `to_ef`/`to_hex_ef` and `from_json`'s fields refuse, `to_ef` on an input naming no txid too by the fold of PR #913's rule read (#844, #843; `docs/lanes/fix-843d7.md`) |
 | The wallet's `TxId` alias (`wallet/types.rs:161`), a bare `[u8; 32]` in display order beside the wire-order `Txid` decided above (named by the T1 reads) | **decided, not built**: W1, 3 of 3, after this record was written (section 9); built in #843's third PR |
 | The reference refuses at sign and at verify an input whose txid differs from its linked source's id (`Transaction.ts:973-983`, `:1424-1432`, `:2164-2169`); this crate has no such check | [#848](https://github.com/Calhooon/bsv-rs/issues/848) (filed in the open, 2026-11-10 13:59Z) |
 | An input with neither a txid nor a source transaction (`TransactionInput::default()`) is written as 32 zero bytes where the reference throws; `add_input` refuses it, a struct literal or `inputs_mut()` reaches it under any txid type | to be filed, or stated as a row (named on #845) |

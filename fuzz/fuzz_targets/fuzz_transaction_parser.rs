@@ -99,6 +99,15 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(text) = std::str::from_utf8(data) {
         let _ = bsv_rs::transaction::Transaction::from_hex(text);
         let _ = bsv_rs::transaction::Transaction::from_hex_ef(text);
+        // The JSON door (#843d7, the strength read's F3): a transaction it
+        // builds, from `hex` or from the fields, holds no amount the readers
+        // refuse, and its bytes read back to the same txid.
+        if let Ok(tx) = bsv_rs::transaction::Transaction::from_json(text) {
+            assert_safe_amounts(&tx);
+            let back = bsv_rs::transaction::Transaction::from_binary(&tx.to_binary())
+                .expect("a transaction from_json builds reads back from its bytes");
+            assert_eq!(back.id(), tx.id(), "from_json: the txid is its bytes' hash");
+        }
     }
 
     // EF (BRC-30): a transaction `from_ef` returns is exactly its buffer, so

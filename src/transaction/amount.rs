@@ -46,8 +46,65 @@ pub(crate) fn safe_amount(value: u64) -> std::result::Result<u64, &'static str> 
 /// Reads an amount, eight bytes little-endian, refusing one of 2^53 or more
 /// in the reference's words as `TransactionError`.
 pub(crate) fn read_amount(reader: &mut Reader) -> Result<u64> {
-    safe_amount(reader.read_u64_le()?)
-        .map_err(|words| crate::Error::TransactionError(words.to_string()))
+    held_amount(reader.read_u64_le()?)
+}
+
+/// `value` as an amount a reader holds, else the readers' refusal,
+/// `TransactionError` in [`UNSAFE_AMOUNT`]'s words: [`read_amount`]'s
+/// judgment for a door that reads no bytes, `Transaction::from_json`'s
+/// field-built output (#843d7: until then the one door where outside text
+/// built a transaction holding an amount the readers of #844 refuse).
+pub(crate) fn held_amount(value: u64) -> Result<u64> {
+    safe_amount(value).map_err(|words| crate::Error::TransactionError(words.to_string()))
+}
+
+/// `value` as an amount the EF writer writes, else the reference writer's
+/// refusal, `TransactionError` in [`UNSAFE_WRITE`]'s words (#843d7):
+/// `#writeEF` writes each linked source output's amount and each output's
+/// through `writeUInt64LE` (`ts-stack@edf6e03` `Transaction.ts:1150,1158`),
+/// which builds a `BigNumber` of the number and throws past 2^53 - 1
+/// (`WriterUint8Array.ts:184-185`, `BigNumber.ts:460-463`), so `toEF` and
+/// `toHexEF` throw at the amount, in written order. Until #843d7
+/// `Transaction::to_ef` wrote bytes `from_ef` refuses. An input that names
+/// no txid is judged before the rest by [`unnamed_source_amounts`]. The plain writer
+/// (`to_binary`, `to_hex`, `hash`, `id`) does not come through here: it is
+/// the node's serializer, any 64-bit amount its eight bytes (bitcoin-sv
+/// v1.2.2 `primitives/transaction.h:190-194`, `amount.h:109-112`), stated
+/// against the reference's throw (decided 2026-11-12).
+pub(crate) fn written_amount(value: u64) -> Result<u64> {
+    safe_amount(value).map_err(|_| crate::Error::TransactionError(UNSAFE_WRITE.to_string()))
+}
+
+/// The reference's EF writer on an input that names no txid (#843d7's fold):
+/// `#writeEF` writes that outpoint from `i.sourceTransaction.hash()`
+/// (`ts-stack@edf6e03` `Transaction.ts:1137-1138`), the plain writer of the
+/// source (`:1059-1089`), which throws [`UNSAFE_WRITE`] for an amount of
+/// 2^53 or more in any output of the source and, through each of its own
+/// inputs naming no txid, of the sources it reaches the same way, ahead of
+/// the input's unlocking script (`:1143`) and its spent output (`:1150`).
+/// `to_ef` asks this before anything else of such an input; this crate's own plain writer
+/// is the node's serializer and refuses nothing (stated). Each source is
+/// judged once, by address, so a shared ancestor costs one pass; no
+/// recursion (the crate's rule for walks over `source_transaction`).
+pub(crate) fn unnamed_source_amounts(source: &super::Transaction) -> Result<()> {
+    let mut stack = vec![source];
+    let mut seen = std::collections::HashSet::new();
+    while let Some(tx) = stack.pop() {
+        if !seen.insert(std::ptr::from_ref(tx)) {
+            continue;
+        }
+        for output in tx.outputs() {
+            written_amount(output.satoshis.unwrap_or(0))?;
+        }
+        for input in tx.inputs() {
+            if input.source_txid.is_none() {
+                if let Some(parent) = input.source_transaction.as_deref() {
+                    stack.push(parent);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// How a reader takes an output's amount: the reference's bound, or the

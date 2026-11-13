@@ -474,9 +474,10 @@ fn writer_door_here(door: &str, position: usize, value: u64, txid: &str) -> Resu
 }
 
 /// The cells where this crate answers otherwise than the reference, each
-/// stated: the plain transaction writer writes such an amount (#843's
-/// break), and `merge_transaction` holds the entry, its signature without a
-/// `Result` (the writers refuse it after).
+/// stated: the plain transaction writer writes such an amount (decided
+/// 2026-11-12, stated: the node's serializer, #843d7), and
+/// `merge_transaction` holds the entry, its signature without a `Result`
+/// (the writers refuse it after).
 const WRITER_STATED: [&str; 2] = ["Transaction.toBinary", "Beef.mergeTransaction"];
 
 #[test]
@@ -619,9 +620,10 @@ fn by_hand_53() -> Transaction {
 
 #[test]
 fn this_crates_writer_writes_an_amount_its_readers_refuse_stated_844() {
-    // The writer's half is #843's break: a `Transaction` built by hand holds
-    // the amount and `to_binary` writes it, where the reference's writer
-    // refuses it before any byte (`BigNumber.ts:462`, recorded by #840).
+    // The writer's half, decided 2026-11-12, stated (#843d7): a `Transaction`
+    // built by hand holds the amount and `to_binary` writes it, the node's
+    // serializer, where the reference's writer refuses it before any byte
+    // (`BigNumber.ts:462`, recorded by #840).
     let v: Value = serde_json::from_str(TRAILING_840).unwrap();
     assert_eq!(
         v["writer_53"]["two_to_the_53"]["error"],
@@ -664,13 +666,19 @@ fn a_json_hex_with_such_an_output_is_refused_844() {
 }
 
 #[test]
-fn the_json_fields_carry_an_amount_the_readers_refuse_stated_844() {
-    // A document with no `hex` reads `satoshis` as a `u64` (Go's twin a
-    // `uint64`, `txjson.go:28-31`): stated, a cell for the captain.
+fn the_json_fields_refuse_an_amount_the_readers_refuse_843d7() {
+    // A document with no `hex` read `satoshis` as a `u64` and held it until
+    // #843d7 (this test's stated cell, `..._carry_an_amount_..._stated_844`):
+    // refused since in the byte readers' words, 2^53 - 1 held.
     let json = r#"{"inputs":[],"outputs":[{"satoshis":9007199254740992,"lockingScript":"51"}],"version":1,"lockTime":0}"#;
-    let tx = Transaction::from_json(json).unwrap();
-    assert_eq!(tx.outputs()[0].satoshis, Some(1 << 53));
-    assert!(Transaction::from_binary(&tx.to_binary()).is_err());
+    assert_eq!(
+        Transaction::from_json(json).unwrap_err(),
+        Error::TransactionError(UNSAFE.into())
+    );
+    let held = json.replace("9007199254740992", "9007199254740991");
+    let tx = Transaction::from_json(&held).unwrap();
+    assert_eq!(tx.outputs()[0].satoshis, Some((1 << 53) - 1));
+    assert!(Transaction::from_binary(&tx.to_binary()).is_ok());
 }
 
 /// A field-built document with one input per `txids`.
