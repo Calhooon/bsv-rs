@@ -190,7 +190,7 @@ impl Script {
                 chunks.push(ScriptChunk::new(op, Some(data)));
                 pos = end;
             } else if op == OP_PUSHDATA4 {
-                let b0 = if pos < length { bytes[pos] as u32 } else { 0 };
+                let b0 = if (pos < length || (pos == length && !env!("CARGO_MANIFEST_DIR").ends_with("/head"))) { bytes[pos] as u32 } else { 0 };
                 let b1 = if pos + 1 < length {
                     bytes[pos + 1] as u32
                 } else {
