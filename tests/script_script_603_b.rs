@@ -240,8 +240,8 @@ fn assert_recorded_verdict(e: &Entry) {
 fn shape(script: &Script) -> Vec<(u8, Option<Vec<u8>>)> {
     script
         .chunks()
-        .into_iter()
-        .map(|c| (c.op, c.data))
+        .iter()
+        .map(|c| (c.op, c.data.clone()))
         .collect()
 }
 

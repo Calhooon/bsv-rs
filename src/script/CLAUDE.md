@@ -42,10 +42,11 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `mod.rs` | Module root; submodule declarations and public re-exports |
 | `op.rs` | Opcode constants (u8) and name/value lookup functions via `LazyLock` HashMaps |
 | `chunk.rs` | `ScriptChunk` type representing individual script elements |
-| `script.rs` | Core `Script` class with parsing, serialization, builder methods, and type detection |
+| `script.rs` | Core `Script` class with parsing, serialization, builder methods, and type detection; every editing method goes through the cache's write door (#843d1) |
+| `script_cache.rs` | #843d1: `Cache`, a child module of `script.rs` declared by `#[path]`, the owner of a script's chunks, bytes and hex as three `OnceLock`s whose fields only it can name: built from chunks or from bytes (with their hex), so one of chunks and bytes is always set; `chunks()`, `bytes()` and `hex()` fill through `&self`; `write`, the one exclusive door, parses, then empties both serializations, then lends the chunks to its closure; `Clone` and `Debug` hand-written (nothing expands inside). The compiler holds that nothing reaches the chunks mutably without the serializations emptied; that a cache is filled with the right value is `tests/script_cache_agreement_843d1.rs`' and `fuzz_script_parser`'s claim; `tests/script_sync_843d1.rs` holds the ten types it makes `Send` and `Sync` and the eight more that gained `Sync` with them (`Spend`, `SpendParams`, `TxSpendParams`, `SigningContext`, `SimpleUtxo`, proven in `mod.rs`; `TransactionParts`, `TransactionPartsMut`, `Utxo` in `src/transaction/mod.rs`) |
 | `script_length_603_tests.rs` | #603, shard C: the crate-visible `compute_serialized_length` (`pub(crate)` for this module, declared in `mod.rs`) by the two-path rule (the sum of the chunks = the length `to_binary` writes = the reference's `toBinary` length) on `tests/vectors/script_writers_603_c.json`'s eleven corpus scripts and twelve pushes; no allocator assumption. Of the writers' 28 survivors: killed 21, declared equivalent 6 in `.cargo/mutants.toml` on three reads (`442:23`, `486:29`, `488:27` ×3, `507:28`), remaining 1 (`451:32`, the 4 GiB bound) |
-| `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) with `to_address()` |
-| `unlocking_script.rs` | `UnlockingScript` newtype wrapper for input scripts (scriptSig) |
+| `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) with `to_address()`; `chunks()` lends the script's slice (#843d1) |
+| `unlocking_script.rs` | `UnlockingScript` newtype wrapper for input scripts (scriptSig); `chunks()` lends the script's slice (#843d1) |
 | `address.rs` | `Address` type for P2PKH address parsing, creation, and Base58Check encoding |
 | `bip276.rs` | BIP-276 typed script encoding (`encode_bip276` / `decode_bip276`) |
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding (one buffer per encoding, exactly one byte reserved for the sign; fixed chunks written without per-limb Vec growth checks, #378; the decode reads the sign with the magnitude, no negated copy: #348) |
@@ -143,7 +144,7 @@ What the public constructors accept and what they write (#661): `ScriptChunk::ne
 
 ### Script
 
-Core script type with lazy parsing and serialization caching using `RefCell`:
+Core script type with lazy parsing and serialization caching in three `OnceLock`s owned by `script_cache.rs` (#843d1; `RefCell`s until then, so `Script` and every type holding one was not `Sync`). `Send` and `Sync`:
 
 ```rust
 impl Script {
@@ -171,7 +172,7 @@ impl Script {
     pub fn set_chunk_opcode(&mut self, index: usize, op: u8) -> &mut Self
 
     // Inspection
-    pub fn chunks(&self) -> Vec<ScriptChunk>
+    pub fn chunks(&self) -> &[ScriptChunk]       // lent, as the reference's getter (#843d1); .to_vec() for an owned list
     pub fn truncated_push(&self) -> Option<usize>   // the first push cut short of its declared bytes (BAD_OPCODE when reached)
     pub fn len(&self) -> usize
     pub fn is_empty(&self) -> bool
@@ -191,7 +192,7 @@ impl Script {
     pub fn get_public_key(&self) -> Option<Vec<u8>>        // From P2PK scripts (matches Go PubKey())
     pub fn get_public_key_hex(&self) -> Option<String>     // Hex-encoded (matches Go PubKeyHex())
 }
-// Implements Default, Debug, Clone, PartialEq (by binary), Eq
+// Implements Default, Debug, Clone, PartialEq (by binary), Eq; Send + Sync
 ```
 
 ### LockingScript / UnlockingScript
@@ -204,8 +205,8 @@ pub struct UnlockingScript(Script); // is_unlocking_script() -> true
 
 // Both provide: new(), from_chunks(), from_asm(), from_hex(), from_binary(),
 // from_script(), as_script(), into_script(), to_asm(), to_hex(), to_binary(),
-// chunks(), len(), is_empty(), is_push_only()
-// Both implement: Default, Debug, Clone, PartialEq, Eq, From<Script>
+// chunks() (-> &[ScriptChunk]), len(), is_empty(), is_push_only()
+// Both implement: Default, Debug, Clone, PartialEq, Eq, From<Script>; Send + Sync
 
 // LockingScript-specific:
 impl LockingScript {
@@ -530,8 +531,8 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 
 ## Implementation Notes
 
-- **Lazy Parsing**: Scripts cache raw bytes; chunks parsed on demand via `ensure_parsed()`
-- **Caching**: Raw bytes and hex strings are cached and invalidated on mutation
+- **Lazy Parsing**: Scripts keep the bytes given; chunks are parsed once on demand (`Cache::chunks`, a `OnceLock`), and an unedited script read from bytes or hex answers the bytes given (`Script.ts:529`)
+- **Caching**: The bytes and hex are `OnceLock`s filled through `&self` and emptied only by `Cache::write`, the one door every editing method goes through: it parses, then empties both, then lends the chunks (#843d1; the order `write_opcode`'s btg-token #11 regression pins). `chunks()` lends the held slice, no clone per call
 - **PUSHDATA**: Uses smallest encoding (direct push 0x01-0x4b, PUSHDATA1/2/4)
 - **BSV Opcodes**: All BSV re-enabled opcodes supported (CAT, SPLIT, MUL, DIV, MOD, etc.)
 - **Default-mode gates (#397, #429)**: without a word all ten opcodes (`OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF`, `0xb3`–`0xb7`) run at every version (`chronicle_opcodes`, `Spend.ts:792-803`, `:827-858`); there is no number-length bound (`:393-401`, the V8 read bound above still applies), while `SIGHASH_CHRONICLE` requires version > 1 (`:586-591`; every default-mode version gate reads the four bytes unsigned, as the reference's `readUInt32LE` number, so 0x80000000 and 0xFFFFFFFF are relaxed: `relaxed_by_default` in `hash_type.rs`, #418; a word keeps the node's `int32_t`, strict there), refused at version 1 in the reference's visible words, `The signature format is invalid.` (the DER wrapper's catch, `:622-625`). The fourth switch is the fork-ID gate: absent without a word, so `0x01` signatures at versions 1 and 2 verify over the original digest; under a word SIGHASH_FORKID is mandatory and implies STRICTENC. Under a word, `UTXO_AFTER_CHRONICLE` gates the opcodes and number length; `CHRONICLE` independently gates the hash type, with the existing refusals. `set_utxo_after_chronicle` overrides only the opcode and number-length gates. Undefined opcodes `0xba`–`0xff` executed, a truncated push reached, a second `OP_ELSE`: failures in every mode.

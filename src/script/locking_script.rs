@@ -71,8 +71,8 @@ impl LockingScript {
         self.0.to_binary()
     }
 
-    /// Returns the chunks.
-    pub fn chunks(&self) -> Vec<ScriptChunk> {
+    /// Returns the chunks, lent from the script ([`Script::chunks`]).
+    pub fn chunks(&self) -> &[ScriptChunk] {
         self.0.chunks()
     }
 
@@ -121,6 +121,12 @@ impl LockingScript {
         Address::new_from_public_key_hash(&hash, true).ok()
     }
 }
+
+/// Shared across threads: a `RefCell` added under it fails every build (#843d1).
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<LockingScript>();
+};
 
 impl Default for LockingScript {
     fn default() -> Self {

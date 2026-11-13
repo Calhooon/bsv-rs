@@ -90,7 +90,7 @@ exclude_re = [
   # 0.98). At :2348:55 since the seed fold (#645): the comparison walks the unreached txids in a
   # `BTreeSet`, still one per map key, so the reason stands.
   '^src/transaction/beef_stream\.rs:2348:55: replace < with <= in atomic_unreached$',
-  # src/script/script.rs:186:30, 209:31, 209:43, 209:56, `|` to `^` in Script::parse_chunks (#603,
+  # src/script/script.rs:165:30, 188:31, 188:43, 188:56, `|` to `^` in Script::parse_chunks (#603,
   # shard B). The size of OP_PUSHDATA2 and OP_PUSHDATA4 is the little-endian sum of its size
   # bytes, `a + 256 * b` and `a + 256 * (b + 256 * (c + 256 * d))` (bsv-script-lean@5dc337e1
   # lean/BsvScript/Machine.lean:39,43; bitcoin-sv v1.2.3 script.h:180-191): each operand is one
@@ -99,11 +99,11 @@ exclude_re = [
   # corpora (all nine, road, million, xsig-144) moved under any of the four; every pair of size
   # bytes checked exhaustively, 0 differences; tests/script_script_603_b.rs green under each.
   # The lane's own reads; the ensemble's three independent reads are pending.
-  '^src/script/script\.rs:186:30: replace \| with \^ in Script::parse_chunks$',
-  '^src/script/script\.rs:209:31: replace \| with \^ in Script::parse_chunks$',
-  '^src/script/script\.rs:209:43: replace \| with \^ in Script::parse_chunks$',
-  '^src/script/script\.rs:209:56: replace \| with \^ in Script::parse_chunks$',
-  # src/script/script.rs:717:45 (`>` to `>=`), 730:41, 738:17, 739:17, 740:17 (`|` to `^`), all in
+  '^src/script/script\.rs:165:30: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:188:31: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:188:43: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:188:56: replace \| with \^ in Script::parse_chunks$',
+  # src/script/script.rs:616:45 (`>` to `>=`), 629:41, 637:17, 638:17, 639:17 (`|` to `^`), all in
   # truncated_push_index (#603, PR #638). The size bytes each sit in their own lane: every operand
   # of the four `|` sites is a `u8` zero-extended by `as usize` and shifted by 0, 8, 16 or 24, no
   # bit shared, so `^` equals `|` (bitcoin-sv v1.2.3 script.h:177-189, GetScriptOp's size reads;
@@ -113,21 +113,21 @@ exclude_re = [
   # (Machine.lean:32,49). Three reads: the cold read (MERGE, 0.93), the adversarial read with
   # 1,068,663 observations byte-identical on the tree and each mutant (EQUIVALENT x5, 0.97), the
   # rule read (EQUIVALENT x5, 0.97).
-  '^src/script/script\.rs:717:45: replace > with >= in truncated_push_index$',
-  '^src/script/script\.rs:730:41: replace \| with \^ in truncated_push_index$',
-  '^src/script/script\.rs:738:17: replace \| with \^ in truncated_push_index$',
-  '^src/script/script\.rs:739:17: replace \| with \^ in truncated_push_index$',
-  '^src/script/script\.rs:740:17: replace \| with \^ in truncated_push_index$',
-  # src/script/script.rs:363:23 `<` to `<=` in write_bin, 407:29 `<` to `<=` in write_number,
-  # 409:27 `<` to `==`, `>` and `<=` in write_number, 428:28 `<` to `<=` in encode_script_number
+  '^src/script/script\.rs:616:45: replace > with >= in truncated_push_index$',
+  '^src/script/script\.rs:629:41: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:637:17: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:638:17: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:639:17: replace \| with \^ in truncated_push_index$',
+  # src/script/script.rs:266:23 `<` to `<=` in write_bin, 297:29 `<` to `<=` in write_number,
+  # 299:27 `<` to `==`, `>` and `<=` in write_number, 317:28 `<` to `<=` in encode_script_number
   # (#603, shard C, PR #636). The rules:
   # - the direct-push bound differs only at length 76, where the direct opcode `76 as u8` is 0x4c,
-  #   OP_PUSHDATA1 itself, so both sides write the same chunk (363:23);
+  #   OP_PUSHDATA1 itself, so both sides write the same chunk (266:23);
   # - a number's minimal encoding of an i64 is at most nine bytes (eight of magnitude for 2^63
-  #   and a sign byte), so `len <= 75` always holds at 407:29 and 409:27's branch is never
+  #   and a sign byte), so `len <= 75` always holds at 297:29 and 299:27's branch is never
   #   reached;
   # - zero returns before the sign test (and write_number pushes OP_0 for it before the call), so
-  #   `num < 0` and `num <= 0` agree on every value that reaches 428:28.
+  #   `num < 0` and `num <= 0` agree on every value that reaches 317:28.
   # bitcoin-sv v1.2.3 script.h:104-133 (CScript::operator<< of a vector) and script.cpp:228-251
   # (push_int64, operator<< of a CScriptNum), CScriptNum::getvch script_num.cpp:465-483 on
   # serialize int_serialization.h:23-59 (zero empty at :26-27); bsv-script-lean@5dc337e1
@@ -137,12 +137,12 @@ exclude_re = [
   # b5e3f7d1: the cold read (accepts the six; FIX at 0.85 on other points), the adversarial read
   # with push lengths 0 to 65537 and the i64 edges probed through the writers, from_asm and
   # OP_NUM2BIN, all six diffs empty (EQUIVALENT x6, 0.97), the rule read (EQUIVALENT x6, 0.97).
-  '^src/script/script\.rs:363:23: replace < with <= in Script::write_bin$',
-  '^src/script/script\.rs:407:29: replace < with <= in Script::write_number$',
-  '^src/script/script\.rs:409:27: replace < with == in Script::write_number$',
-  '^src/script/script\.rs:409:27: replace < with > in Script::write_number$',
-  '^src/script/script\.rs:409:27: replace < with <= in Script::write_number$',
-  '^src/script/script\.rs:428:28: replace < with <= in Script::encode_script_number$',
+  '^src/script/script\.rs:266:23: replace < with <= in Script::write_bin$',
+  '^src/script/script\.rs:297:29: replace < with <= in Script::write_number$',
+  '^src/script/script\.rs:299:27: replace < with == in Script::write_number$',
+  '^src/script/script\.rs:299:27: replace < with > in Script::write_number$',
+  '^src/script/script\.rs:299:27: replace < with <= in Script::write_number$',
+  '^src/script/script\.rs:317:28: replace < with <= in Script::encode_script_number$',
   # src/script/script_asm.rs:73:37, `<` to `<=` in Script::from_asm (#603 shard A, PR #639;
   # 71:37 before #723's comment, script.rs:91:37 before #634 moved the ASM code, 94:33 before
   # #639's fold). The comparison

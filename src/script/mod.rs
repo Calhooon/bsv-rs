@@ -103,3 +103,15 @@ pub use transaction::{
     TransactionOutputContext, UtxoProvider,
 };
 pub use unlocking_script::UnlockingScript;
+
+/// The interpreter's and the signer's types gained `Sync` with #843d1 (their
+/// `Script`s were `RefCell`s until then); held here, so a `RefCell` added under
+/// one fails every build, wasm32 included (#843d1's fold).
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<Spend>();
+    shareable::<SpendParams>();
+    shareable::<TxSpendParams>();
+    shareable::<SigningContext<'static>>();
+    shareable::<SimpleUtxo>();
+};

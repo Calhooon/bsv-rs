@@ -43,7 +43,7 @@ fn decode(script: &LockingScript) -> Result<PushDrop> {
     {
         return Err(refused(words));
     }
-    PushDrop::decode_reference_before(&chunks)
+    PushDrop::decode_reference_before(chunks)
 }
 
 /// `bytes(value, field, minimum, maximum)` (`ContactsManager.ts:200-216`).

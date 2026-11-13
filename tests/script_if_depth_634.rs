@@ -91,7 +91,7 @@ fn chunks_of(reading: &Reading) -> Vec<ScriptChunk> {
 
 fn ours(s: &Value) -> Reading {
     reading_of(
-        &Script::from_hex(s["hex"].as_str().unwrap())
+        Script::from_hex(s["hex"].as_str().unwrap())
             .unwrap()
             .chunks(),
     )
@@ -197,11 +197,11 @@ fn a_stray_endif_before_op_return_parses_as_three_chunks_the_if_depth_negative_6
     assert_eq!(s["hex"], "686a51");
     let script = Script::from_hex("686a51").unwrap();
     assert_eq!(
-        reading_of(&script.chunks()),
+        reading_of(script.chunks()),
         vec![(0x68, None), (0x6a, None), (0x51, None)]
     );
     assert_eq!(script.to_asm(), "OP_ENDIF OP_RETURN OP_1");
-    assert_eq!(reference(&s), reading_of(&script.chunks()));
+    assert_eq!(reference(&s), reading_of(script.chunks()));
     assert_eq!(s["ts"]["asm"], "OP_ENDIF OP_RETURN OP_1");
     assert_eq!(go(&s), vec![(0x68, None), (0x6a, Some("51".to_string()))]);
     // The issue's other two forms: a push after the OP_RETURN, and a balanced

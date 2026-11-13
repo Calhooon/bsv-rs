@@ -244,7 +244,7 @@ impl PushDrop {
             .is_some_and(|d| d.len() == 33 || d.len() == 65);
 
         if first_is_pubkey && chunks.get(1).is_none_or(|chunk| chunk.op != OP_CHECKSIG) {
-            return Self::decode_reference_before(&chunks);
+            return Self::decode_reference_before(chunks);
         }
 
         if chunks.len() < 2 {
@@ -254,9 +254,9 @@ impl PushDrop {
         }
 
         if first_is_pubkey {
-            Self::decode_lock_before(&chunks)
+            Self::decode_lock_before(chunks)
         } else {
-            Self::decode_lock_after(&chunks)
+            Self::decode_lock_after(chunks)
         }
     }
 
