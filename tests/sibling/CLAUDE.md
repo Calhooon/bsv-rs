@@ -167,14 +167,17 @@ cached dependencies, 3 s warm, all nine corpora (13,765 entries).
 ## The judge (#97, built on beta, nothing fired)
 
 The two-stage judge (decided 2026-11-10; the three design reads of 2026-11-12; the lane record
-`docs/lanes/fix-97a.md`). Stage R, a workflow on the pull request's head with no secret, runs
+`docs/lanes/fix-97a.md`). Stage R, a workflow on the pull request's head with no secret, checks
+the head out to `head/` and beta to `judge/` and runs beta's script on the head's tree (the head's
+own `.github/scripts/` is never executed, so a J diff cannot change the script that writes its own
+artifact; the rule read's R2 of lane 1, pinned by `test_sibling_judge.py`'s `StageRScript`):
 
 ```sh
-python3 -B .github/scripts/sibling_harness.py raw --tree . --sibling sibling --rev "$PIN" \
+python3 -I -B judge/.github/scripts/sibling_harness.py raw --tree head --sibling sibling \
   --corpus all --scratch <empty dir> --out <empty dir> --head-sha <head> [--pull-request <n>]
 ```
 
-and uploads the files `python3 -B .github/scripts/sibling_judge.py members` lists as the
+and uploads the files `python3 -I -B judge/.github/scripts/sibling_judge.py members` lists as the
 artifact `sibling-raw` (`sibling_judge.py pack --out <out> --zip <file>` zips them as the upload
 holds them). `raw` judges nothing and reads no column; it writes `stamp.json` beside the run's
 files and exits 0 whenever the harness ran to a verdict. Stage J, on the default branch, checks
@@ -230,7 +233,11 @@ pin reads `REFUSED` and never `NOT JUDGED`):
    unchanged keeps beta's words.
 7. **The run's state.** The artifact is read only from a run whose attempt ended `success`;
    any other conclusion is `NOT JUDGED` naming it and the failed step. Exactly one unexpired
-   `sibling-raw` of the run, its head and this repository; none or two is `NOT JUDGED`, and a
+   `sibling-raw` of the run, its head and this repository, created at or after the judged
+   attempt's `run_started_at` (stage R uploads with `overwrite: true`, so a re-run replaces the
+   earlier attempt's artifact, and one GitHub still lists from before the attempt is not counted:
+   a re-run is judged, never `NOT JUDGED`, `test_sibling_judge.py`'s `Rerun`); none or two is
+   `NOT JUDGED`, and a
    dispatch whose artifact is gone posts `unless-standing` (nothing over a standing check). The
    zip is taken by `gh api .../artifacts/<id>/zip` (it follows the 302 to storage) and read in
    memory by the allowlist: no extraction, no `download-artifact`, nothing written under the
@@ -274,8 +281,10 @@ The dry run calls no GitHub write (and with `--offline` no read: the pin's place
 sibling's `main` is then unmade) and prints the check it would post; it says which rules it could
 not make (the run's identity, the superseded test, the artifact's record, the trampoline's
 comparison). The sweep reads and never writes: for every open pull request into beta its head,
-its newest completed stage R run and whether the App's check stands, and the act for each gap
-as a command (no run, a run and no check, a conflict with beta, a fork's head).
+its newest completed stage R run and whether the App's check stands (a completed check whose
+app id is the configured one: a check with no app id never stands, the rule read's R3), and the
+act for each gap as a command, the branch name quoted by `shlex.quote` there and in every re-push
+act a check carries (no run, a run and no check, a conflict with beta, a fork's head).
 
 ## What the judge does not hold
 
