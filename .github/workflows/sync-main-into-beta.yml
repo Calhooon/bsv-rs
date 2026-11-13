@@ -222,9 +222,34 @@ jobs:
         run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
 
       # stage R of the node oracle's judge (#97) on the PR's branch, in a step of its own after
-      # ci.yml's: a GITHUB_TOKEN push starts no run, and a refused dispatch here never loses ci.yml's
-      - name: Start the PR's stage R
+      # ci.yml's: a GITHUB_TOKEN push starts no run, and a refused dispatch here never loses ci.yml's.
+      # A run this token starts starts no run that waits for its end (a dispatch is the one event the
+      # token may raise), so the trampoline never hears of it: the step takes the run's id from the dispatch's
+      # own answer (no other run can share it), waits for that run to complete and dispatches the
+      # judge on main with the id. It holds no key and judges nothing; a refused dispatch, or a run
+      # not completed in 40 minutes, fails the job where a person sees it.
+      - name: Start the PR's stage R and its judge
         if: steps.pick.outputs.push == 'true'
+        timeout-minutes: 45
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run sibling-run.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+        run: |
+          set -euo pipefail
+          run="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/sibling-run.yml/dispatches" \
+            -f ref="$SYNC_BRANCH" -F return_run_details=true --jq '.run_url | split("/") | last')"
+          if ! [[ "$run" =~ ^[1-9][0-9]{0,19}$ ]]; then
+            echo "::error::the dispatch of stage R on ${SYNC_BRANCH} answered no run id"
+            exit 1
+          fi
+          echo "stage R run ${run} on ${SYNC_BRANCH}"
+          status=""
+          for _ in $(seq 1 160); do
+            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"
+            if [ "$status" = completed ]; then break; fi
+            sleep 15
+          done
+          if [ "$status" != completed ]; then
+            echo "::error::stage R run ${run} is ${status} after 40 minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
+            exit 1
+          fi
+          gh workflow run sibling-judge.yml --repo "$GITHUB_REPOSITORY" --ref main -f run_id="$run"
