@@ -1,0 +1,122 @@
+name: sibling-judge
+run-name: sibling-judge ${{ github.event.workflow_run.head_sha || format('of run {0}', inputs.run_id) }}
+
+# The node oracle's judge, stage J (#97; tests/sibling/CLAUDE.md, "The judge"; RELEASING.md step
+# 25). This file is the trampoline: it lives on main and on beta, byte for byte, and holds no rule.
+# It runs from main alone (each job tests the ref, and the environment `sibling-judge` admits main
+# alone), checks beta out to `judge/` and runs beta's `sibling_judge.py`: `judge`, holding no key,
+# reads stage R's run and its artifact and writes four outputs; `report`, the one job holding the
+# App's token (`bsv-rs-sibling-judge`), posts the check `sibling-judge` on the run's head and never
+# opens the artifact. A change to this file is one sitting with the queue held: beta's pull
+# request, main's pick, then the sweep and one re-judge dispatch for each open pull request.
+on:
+  workflow_run:
+    workflows: [sibling-run]
+    types: [completed]
+  # the re-judge of one stage R run: gh workflow run sibling-judge.yml --ref main -f run_id=<run>
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: The id of a completed sibling-run run, judged again
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# one group per judged head (a re-judge by the run's id): every judgement of a head runs, in order,
+# none cancelled, so an older judge cannot finish last on a live head and none is dropped
+concurrency:
+  group: sibling-judge-${{ github.event.workflow_run.head_sha || inputs.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  judge:
+    name: judge
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      post: ${{ steps.judge.outputs.post }}
+      conclusion: ${{ steps.judge.outputs.conclusion }}
+      title: ${{ steps.judge.outputs.title }}
+      text: ${{ steps.judge.outputs.text }}
+    steps:
+      - name: Check out beta
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/beta
+          path: judge
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Judge
+        id: judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          attempt=()
+          if [ -n "$ATTEMPT" ]; then attempt=(--attempt "$ATTEMPT"); fi
+          python3 -I -B judge/.github/scripts/sibling_judge.py judge --judge judge --run-id "$RUN_ID" \
+            "${attempt[@]}" --repository "$GITHUB_REPOSITORY" --repository-id "$REPOSITORY_ID" \
+            --workflow-sha "$WORKFLOW_SHA"
+
+  report:
+    name: report
+    needs: judge
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: sibling-judge
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out beta
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/beta
+          path: judge
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mint the App's token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.SIBLING_JUDGE_APP_ID }}
+          private-key: ${{ secrets.SIBLING_JUDGE_KEY }}
+          permission-checks: write
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          APP_ID: ${{ vars.SIBLING_JUDGE_APP_ID }}
+          JUDGE_RESULT: ${{ needs.judge.result }}
+          POST: ${{ needs.judge.outputs.post }}
+          CONCLUSION: ${{ needs.judge.outputs.conclusion }}
+          TITLE: ${{ needs.judge.outputs.title }}
+          TEXT: ${{ needs.judge.outputs.text }}
+          DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          attempt=()
+          if [ -n "$ATTEMPT" ]; then attempt=(--attempt "$ATTEMPT"); fi
+          python3 -I -B judge/.github/scripts/sibling_judge.py report --run-id "$RUN_ID" "${attempt[@]}" \
+            --repository "$GITHUB_REPOSITORY" --repository-id "$REPOSITORY_ID" --app-id "$APP_ID" \
+            --judge-result "$JUDGE_RESULT" --details-url "$DETAILS_URL"
