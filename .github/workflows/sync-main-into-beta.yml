@@ -220,3 +220,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+
+      # stage R of the node oracle's judge (#97) on the PR's branch, in a step of its own after
+      # ci.yml's: a GITHUB_TOKEN push starts no run, and a refused dispatch here never loses ci.yml's
+      - name: Start the PR's stage R
+        if: steps.pick.outputs.push == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sibling-run.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
