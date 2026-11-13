@@ -1275,12 +1275,48 @@ const PRODUCERS: &[(&str, &str, Producer)] = &[
             let ci = read(".github/workflows/ci.yml")?;
             require(&ci, "cargo-semver-checks", "ci.yml")?;
             require(&ci, "--baseline-rev", "ci.yml")?;
-            // the two runs of 2026-11-11 (the captain's ruling T9) were of this version: on a
-            // stable version it judged a removed function; on a prerelease, equal or stepped,
-            // it reported `0 checks` (the sentence's clause on `beta`)
+            // the runs of 2026-11-11 (the captain's ruling T9) and of #886 were of this version:
+            // on a stable version it judged a removed function; on a prerelease, equal or
+            // stepped, it reported `0 checks` with the release type inferred and judged the
+            // removal under an explicit `--release-type minor`
             require(
                 &ci,
                 "cargo install cargo-semver-checks --version 0.51.0",
+                "ci.yml",
+            )?;
+            // the sentence's clause on `main`: the last tag, the release type the version's
+            require(
+                &ci,
+                "baseline=\"$(git describe --tags --abbrev=0 --match 'v[0-9]*' \"$BASE_REV\")\"",
+                "ci.yml",
+            )?;
+            // the sentence's clause on `beta` (#886): the commit the pull request builds on,
+            // held to a minor change, a failed lint let through for the `api-break` label alone,
+            // read live in the step (the line at the beta branch's own indentation;
+            // tests/arch_ci_semver_holds_beta_886.rs pins the step whole)
+            require(
+                &ci,
+                "          if [ \"$BASE_REF\" = beta ]; then\n",
+                "ci.yml",
+            )?;
+            require(
+                &ci,
+                "            baseline=\"$(git rev-parse HEAD^1)\"\n",
+                "ci.yml",
+            )?;
+            require(
+                &ci,
+                "check-release --baseline-rev \"$baseline\" --all-features --release-type minor",
+                "ci.yml",
+            )?;
+            require(
+                &ci,
+                "            labels=$(gh api \"repos/$REPOSITORY/pulls/$PR\" --jq '[.labels[].name] | join(\",\")')\n",
+                "ci.yml",
+            )?;
+            require(
+                &ci,
+                "if [ \"$status\" = 100 ] && [[ \",$labels,\" == *\",api-break,\"* ]]; then",
                 "ci.yml",
             )?;
             let release = read(".github/workflows/release.yml")?;

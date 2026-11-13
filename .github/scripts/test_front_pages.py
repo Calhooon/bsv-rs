@@ -26,6 +26,10 @@ class World(unittest.TestCase):
         shutil.copytree(WORLD, self.dir / "w")
         self.root = self.dir / "w"
         self.addCleanup(shutil.rmtree, self.dir)
+        # the reconciler's pause before its second read of a source (#886): none in a test
+        pause = mock.patch.object(fp, "RETRY_PAUSE", 0, create=True)
+        pause.start()
+        self.addCleanup(pause.stop)
 
     def source(self):
         return fp.Offline(self.root)
@@ -73,6 +77,32 @@ class Versions(unittest.TestCase):
             self.assertTrue(fp.patched_in("0.8.6", text))
         self.assertFalse(fp.patched_in("0.8.7", ">= 0.8.6"))
         self.assertFalse(fp.patched_in("0.8.6", None))
+
+
+class NewestStable(unittest.TestCase):
+    """The one function that works out the newest stable version (#886's fold)."""
+
+    def test_the_highest_stable_version_with_the_yanked_left_out_886(self):
+        versions = ["0.9.0-beta.1", "0.8.8", "0.8.7", "0.8.10", "not-a-version", "v0.9.9"]
+        self.assertEqual(fp.newest_stable(versions), "0.8.10")
+        self.assertEqual(fp.newest_stable(versions, {"0.8.10"}), "0.8.8")
+        self.assertEqual(fp.newest_stable(versions, {"0.8.10", "0.8.8", "0.8.7"}), None)
+        self.assertEqual(fp.newest_stable(["1.0.0-rc.1"]), None)
+        self.assertEqual(fp.newest_stable([]), None)
+        crate = {"versions": [{"num": "0.8.8", "yanked": True}, {"num": "0.8.7", "yanked": False}, {"num": "0.8.6"}]}
+        self.assertEqual(fp.yanked(crate), {"0.8.8"})
+
+    def test_flags_and_the_versions_rule_ask_the_one_function_886(self):
+        # the class: no other line of the script works the newest stable version out. `max(`
+        # over versions stands in `newest_stable` alone, and its two callers are named.
+        text = Path(fp.__file__).read_text()
+        body = lambda name: re.search(rf"^(?:    )?def {name}\(.*?(?=^(?:    )?def |^# -----|^class )", text, re.S | re.M).group(0)
+        self.assertEqual(len(re.findall(r"\bmax\(", text)), 3)  # newest_stable, the migration cut, the wait
+        self.assertIn("max(stable, key=key, default=None)", body("newest_stable"))
+        self.assertIn("newest_stable(", body("flags"))
+        self.assertIn("newest_stable(", body("versions"))
+        self.assertEqual(len(re.findall(r"newest_stable\(", text)), 3)  # its definition and the two callers
+        self.assertEqual(len(re.findall(r'\.get\("yanked"\)', text)), 1)  # read in `yanked` alone
 
 
 class Notes(World):
@@ -411,6 +441,170 @@ class Flags(World):
         self.assertEqual(fp.flags(self.source(), "v0.8.6"), "--latest=false")
         self.assertEqual(fp.flags(self.source(), "v0.7.9"), "--latest=false")
 
+    def test_a_yanked_version_is_not_the_highest_stable_886(self):
+        # crates.io's `max_stable_version` leaves a yanked version out, and so does the mark:
+        # after a yank of 0.8.8 the tag below it is the highest stable again
+        self.edit("crate.json", lambda c: dict(c, versions=c["versions"] + [{"num": "0.8.8", "yanked": True}]))
+        self.assertEqual(fp.flags(self.source(), "v0.8.7"), "--latest")
+        # a back-patch below it stays without the mark
+        self.assertEqual(fp.flags(self.source(), "v0.8.6"), "--latest=false")
+        self.edit("crate.json", lambda c: dict(c, versions=[dict(v, yanked=False) if v["num"] == "0.8.8" else v for v in c["versions"]]))
+        self.assertEqual(fp.flags(self.source(), "v0.8.7"), "--latest=false")
+
+
+    def test_a_tag_whose_own_version_is_yanked_never_takes_the_mark_886(self):
+        # the page job run again for a tag crates.io lists as yanked: the version is not
+        # crates.io's `max_stable_version`, so its page must not take Latest, highest or not
+        self.edit("crate.json", lambda c: dict(c, versions=c["versions"] + [{"num": "0.8.8", "yanked": True}]))
+        self.assertEqual(fp.flags(self.source(), "v0.8.8"), "--latest=false")
+        # a version the answer does not list yet is counted (the index lagging the publish)
+        self.assertEqual(fp.flags(self.source(), "v0.8.9"), "--latest")
+        # every stable version yanked: none takes the mark
+        self.edit("crate.json", lambda c: dict(c, versions=[dict(v, yanked=True) for v in c["versions"]]))
+        self.assertEqual(fp.flags(self.source(), "v0.8.7"), "--latest=false")
+
+
+class Flaky:
+    """A source whose one named method raises `Unavailable` for its leading `times` calls and
+    answers after them; every other method is the inner source's."""
+
+    def __init__(self, inner, method, times):
+        self.inner, self.method, self.left, self.calls = inner, method, times, 0
+
+    def __getattr__(self, name):
+        answer = getattr(self.inner, name)
+        if name != self.method:
+            return answer
+
+        def counted(*args):
+            self.calls += 1
+            if self.left > 0:
+                self.left -= 1
+                raise fp.Unavailable("HTTP 502")
+            return answer(*args)
+
+        return counted
+
+
+class Retry(World):
+    """A transient miss is read again before the reconciler goes red (#886)."""
+
+    def test_a_source_that_fails_once_is_read_again_886(self):
+        source = Flaky(self.source(), "repo", 1)
+        with mock.patch.object(fp, "RETRY_PAUSE", 20, create=True), mock.patch.object(fp.time, "sleep") as sleep:
+            result = fp.check(source)
+        self.assertEqual(result.lines, self.lines())
+        self.assertIn("PASS about: description and homepage are v0.8.7's manifest's (documentation)", result.lines)
+        self.assertFalse([line for line in result.lines if "could not read" in line])
+        self.assertEqual((result.failed, source.calls), (0, 2))
+        sleep.assert_called_once_with(20)
+
+    def test_a_source_that_fails_twice_is_red_once_886(self):
+        source = Flaky(self.source(), "repo", 2)
+        with mock.patch.object(fp.time, "sleep") as sleep:
+            result = fp.check(source)
+        self.assertEqual([line for line in result.lines if line.startswith("FAIL")], ["FAIL about: could not read: HTTP 502"])
+        self.assertEqual((result.failed, result.pending), (1, 0))
+        self.assertEqual(source.calls, 2)  # two calls and no third
+        self.assertEqual(sleep.call_count, 1)
+        # a source that never answers is still asked twice, no more
+        source = Flaky(self.source(), "repo", 9)
+        self.assertEqual(fp.check(source).failed, 1)
+        self.assertEqual(source.calls, 2)
+
+    def test_a_retried_rule_keeps_nothing_of_its_failed_attempt_886(self):
+        # `pages` extends the shared `releases` before `tags()` can raise: the second attempt
+        # must start from the state before the failed one, or every page is counted twice.
+        # (`versions` reads the tags too, and passes at its own call: the miss is `pages`'.)
+        undisturbed = fp.check(self.source())
+        calls = {"n": 0}
+        inner_tags = self.source().tags
+
+        def tags():
+            calls["n"] += 1
+            if calls["n"] == 2:  # the second call is `pages`', after `releases` was extended
+                raise fp.Unavailable("HTTP 502")
+            return inner_tags()
+
+        source = self.source()
+        source.tags = tags
+        result = fp.check(source)
+        self.assertEqual(calls["n"], 3)
+        self.assertEqual(result.lines, undisturbed.lines)
+        self.assertEqual((result.failed, result.pending), (undisturbed.failed, undisturbed.pending))
+        notices = [line for line in result.lines if line.startswith("PASS notices:")]
+        self.assertEqual(notices, [line for line in undisturbed.lines if line.startswith("PASS notices:")])
+        self.assertEqual(len(notices), 1)
+        # a planted page outside an advisory's range would be judged twice from a doubled list:
+        # the FAIL lines of a retried run are an undisturbed run's too
+        self.edit("releases.json", lambda r: [dict(x, body="") for x in r])
+        calls["n"] = 0
+        self.assertEqual(fp.check(source).lines, fp.check(self.source()).lines)
+
+
+class Answers(World):
+    """What `guarded` reads again and what it does not (#886's fold): `Unavailable`, whatever
+    raised it, is read once more; a 404 a source reads as an answer raises nothing."""
+
+    def counted(self, method):
+        source, calls = self.source(), []
+        inner = getattr(source, method)
+
+        def call(*args):
+            calls.append(args)
+            return inner(*args)
+
+        setattr(source, method, call)
+        return source, calls
+
+    def test_a_404_read_as_an_answer_is_not_read_again_886(self):
+        # docs.rs's 404 for a queued release: one call, no pause, a pending failure
+        self.drop("docsrs/0.8.7.status.json")
+        source, calls = self.counted("docsrs_status")
+        with mock.patch.object(fp.time, "sleep") as sleep:
+            result = fp.check(source)
+        self.assertEqual(len(calls), 1)
+        sleep.assert_not_called()
+        self.assertEqual((result.failed, result.pending), (1, 1))
+        # no rendered README, no SECURITY.md on a line: answers too
+        self.drop("readme/0.8.7.html")
+        self.write("security.json", '{"main": true}')
+        for method in ("crate_readme", "security_md"):
+            source, calls = self.counted(method)
+            with mock.patch.object(fp.time, "sleep") as sleep:
+                fp.check(source)
+            self.assertEqual(len(calls), {"crate_readme": 1, "security_md": 2}[method])  # main and beta, once each
+            sleep.assert_not_called()
+
+    def test_crates_io_404_for_the_crate_is_unavailable_and_read_again_886(self):
+        # the crate exists: crates.io's 404 for it is the site not answering, never an answer
+        self.drop("crate.json")
+        source, calls = self.counted("crate")
+        with mock.patch.object(fp.time, "sleep") as sleep:
+            result = fp.check(source)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(sleep.call_count, 1)
+        self.assertEqual([l for l in result.lines if l.startswith("FAIL")], ["FAIL versions: could not read: crates.io has no crate"])
+
+    def test_the_live_source_says_which_404_is_an_answer_886(self):
+        live = fp.Live()
+        with mock.patch.object(fp, "http", return_value=None):
+            # the sites' 404s that are answers
+            self.assertIsNone(live.docsrs_status("0.8.7"))
+            self.assertIsNone(live.docsrs_builds("0.8.7"))
+            self.assertIsNone(live.docsrs_index("0.8.7"))
+            self.assertIsNone(live.crate_readme("0.8.7"))
+            # the crate's own 404 is not
+            with self.assertRaises(fp.Unavailable):
+                live.crate()
+        not_found = mock.Mock(returncode=1, stdout="", stderr="gh: Not Found (HTTP 404)")
+        with mock.patch.object(fp.subprocess, "run", return_value=not_found):
+            self.assertIsNone(live.latest_release())
+            self.assertFalse(live.security_md("beta"))
+            for read in (live.repo, live.tags, live.releases):
+                with self.assertRaises(fp.Unavailable):
+                    read()
+
 
 class Check(World):
     def test_the_recorded_world_is_green(self):
@@ -442,6 +636,27 @@ class Check(World):
         failing = self.failing("versions")
         self.assertEqual(len(failing), 1)
         self.assertFalse(failing[0].endswith("(pending: time may heal it)"), failing[0])
+
+    def yank_the_newest(self):
+        """0.8.8 published, tagged and paged, then yanked: crates.io's figure is 0.8.7 again."""
+        self.edit("crate.json", lambda c: dict(c, versions=c["versions"] + [{"num": "0.8.8", "yanked": True}]))
+        self.edit("tags.json", lambda t: t + ["v0.8.8"])
+        self.edit("releases.json", lambda r: r + [dict(next(x for x in r if x["tag_name"] == "v0.8.7"), tag_name="v0.8.8")])
+
+    def test_versions_leave_a_yanked_versions_tag_out_of_the_newest_stable_886(self):
+        self.yank_the_newest()
+        # Latest back on the page of crates.io's highest stable: the three agree, and the yanked
+        # version keeps its tag and its page (`pages` asks for one)
+        self.assertEqual(self.failing("versions"), [])
+        self.assertEqual(self.failing("pages"), [])
+        self.assertIn("PASS versions: crates.io max_stable_version 0.8.7, GitHub Latest v0.8.7, newest stable tag v0.8.7", self.lines())
+        # Latest left on the yanked version's page: red and not pending, a hand moves the mark
+        self.write("latest_release.json", '{"tag_name": "v0.8.8"}')
+        failing = self.failing("versions")
+        self.assertEqual(failing, ["FAIL versions: crates.io max_stable_version 0.8.7, GitHub Latest v0.8.8, newest stable tag v0.8.7"])
+        # the same tag unyanked is the newest stable tag again
+        self.edit("crate.json", lambda c: dict(c, versions=[dict(v, yanked=False) if v["num"] == "0.8.8" else v for v in c["versions"]]))
+        self.assertIn("newest stable tag v0.8.8", self.failing("versions")[0])
 
     def test_pages_red_on_a_missing_page_even_for_a_yanked_version(self):
         self.edit("releases.json", lambda r: [x for x in r if x["tag_name"] != "v0.8.6"])

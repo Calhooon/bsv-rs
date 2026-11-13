@@ -189,15 +189,25 @@ when the secret is missing; it neither prints nor persists the credential.
 The release caller forwards this one named secret to CI. Fork PRs without
 that secret cannot complete those private checks.
 
-`semver` runs on every PR against the last `v*` tag reachable from the immutable
-PR base commit, using `cargo-semver-checks 0.51.0` and Rust `1.95.0`.
-The [tool's baseline-rev mode](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0#does-the-crate-im-checking-have-to-be-published-on-cratesio)
-reads the tagged tree. `--all-features --release-type minor` keeps breaking
-API changes fatal even when a 0.x minor bump or beta suffix would otherwise
-be treated as permission to break. The tool documents its
+`semver` runs on every pull request that changes code, using
+`cargo-semver-checks 0.51.0` and Rust `1.95.0` (the pinned compiler avoids drift
+in rustdoc JSON formats), with `--all-features`. The
+[tool's baseline-rev mode](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0#does-the-crate-im-checking-have-to-be-published-on-cratesio)
+reads the baseline's tree, and the tool documents its
 [release-type override](https://github.com/obi1kenobi/cargo-semver-checks/blob/v0.51.0/src/main.rs).
-Its pinned compiler avoids drift in rustdoc JSON formats. Baseline today:
-`v0.8.2` (`efe12e6`).
+Into `beta` (#886): the baseline is the commit the pull request is tested on
+(`HEAD^1` of the merge ref) and the release type is named, `--release-type minor`,
+since every version on `beta` is a prerelease and the tool, left to infer the
+type, reads any prerelease step as a major one and runs no check; a lint
+failure passes only under the `api-break` label, read live before the check
+(`RELEASING.md` step 2, `tests/arch_ci_semver_holds_beta_886.rs`). Into any
+other base this line's `ci.yml` compares with the last `v*` tag reachable from
+the PR base commit, the release type inferred from the version change; a pull
+request into `main` runs `main`'s own `ci.yml`, which holds a version on the
+baseline's `major.minor` to `--release-type patch` against the last stable tag.
+What the tool has no lint for it passes on either line: a changed return type
+(beyond a value gained or lost) and a changed parameter type among them, so a
+green `semver` is no evidence for such a change.
 
 Design alignment: the bounded, pinned consumer matrix serves T1 (work scales
 with the consumers) and T3 (targeted checks); exact revisions and resolution

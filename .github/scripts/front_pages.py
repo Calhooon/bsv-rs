@@ -16,13 +16,16 @@ dependents that were built, the run's URL); and the links. An input it cannot re
 written "not recorded" with the reason, never guessed.
 
 `flags <tag>` prints the `gh release create` flags of the tag: `--prerelease --latest=false`
-for a version with a `-`, `--latest` for the highest stable version crates.io serves,
-`--latest=false` for a back-patch (it must not take the mark).
+for a version with a `-`, `--latest` for the newest stable version (`newest_stable`: the
+highest stable version of those crates.io lists and the tag's own, a version crates.io
+lists as yanked left out, the tag's own included), `--latest=false` for a back-patch (it
+must not take the mark).
 
 `check` is the reconciler, red on any miss (one PASS or FAIL line per rule, exit 1 on a
 FAIL): crates.io's `max_stable_version`, GitHub's Latest release and the newest stable
-`v*` tag agree; every version crates.io serves (yanked ones too: a lockfile still
-resolves them) has a Release page, a prerelease marked so, and no page names a version
+`v*` tag (`newest_stable` again: a tag whose version crates.io lists as yanked is left
+out, as crates.io leaves it out of its own figure) agree; every version crates.io serves
+(yanked ones too: a lockfile still resolves them) has a Release page, a prerelease marked so, and no page names a version
 crates.io lacks; docs.rs built the newest stable version (a release docs.rs answers 404
 for, still queued, or whose newest build is in progress is pending; one whose newest build
 is recorded failed is not) and, when that tag's manifest asks docs.rs for every feature, its
@@ -71,6 +74,8 @@ USER_AGENT = "bsv-rs front_pages.py (https://github.com/Calhooon/bsv-rs)"
 BODY_LIMIT = 120_000
 # the first stable version whose README is held to the rule (D1; the hand fix of 2026-11-11)
 README_FROM = "0.8.7"
+# seconds before a rule whose source did not answer is read once more (`guarded`, #886)
+RETRY_PAUSE = 20
 # the published filter, in the call itself: no other state is fetched (the brief's rule)
 ADVISORY_JQ = (
     'map(select(.state == "published")) | map({ghsa_id, state, severity, summary, html_url, '
@@ -122,6 +127,23 @@ def key(version):
 
 def is_prerelease(version):
     return parse(version).group(4) is not None
+
+
+def yanked(crate):
+    """The versions crates.io's answer lists as yanked."""
+    return {v["num"] for v in crate.get("versions", []) if v.get("yanked")}
+
+
+def newest_stable(versions, left_out=()):
+    """The newest stable version: the highest of `versions` that is a version and no
+    prerelease, those of `left_out` (the yanked ones) passed over; None when none is left.
+
+    The one place this script works that version out (#886's fold). crates.io's
+    `max_stable_version` leaves a yanked version out, so every figure compared with it, or
+    marked from it, must: `flags` (the Latest mark) and `check`'s `versions` rule (the newest
+    stable tag) both ask here. The rules after `versions` read crates.io's own figure."""
+    stable = [v for v in versions if VERSION.fullmatch(v) and not is_prerelease(v) and v not in left_out]
+    return max(stable, key=key, default=None)
 
 
 def in_range(version, spec):
@@ -724,9 +746,13 @@ def flags(source, tag):
     version = tag[1:] if tag.startswith("v") else tag
     if is_prerelease(version):
         return "--prerelease --latest=false"
-    served = [v["num"] for v in source.crate().get("versions", [])]
-    stable = [v for v in served + [version] if VERSION.fullmatch(v) and not is_prerelease(v)]
-    return "--latest" if key(version) == max(map(key, stable)) else "--latest=false"
+    # a yanked version is not the newest stable: crates.io's `max_stable_version`, which the
+    # reconciler's `versions` rule reads, leaves it out, and the mark must agree with it (#886).
+    # The tag's own version is counted beside the listed ones (the index may not show it yet),
+    # unless crates.io lists it as yanked: a yanked version never takes the mark.
+    crate = source.crate()
+    newest = newest_stable([v["num"] for v in crate.get("versions", [])] + [version], yanked(crate))
+    return "--latest" if newest is not None and key(version) == key(newest) else "--latest=false"
 
 
 # ---------------------------------------------------------------- check
@@ -786,20 +812,42 @@ def readme_before_examples(rendered):
 def check(source, readme_from=README_FROM):
     result = Result()
 
+    crate, releases, advisories = {}, [], []
+
     def guarded(rule, fn):
+        # a source that did not answer is asked once more after a pause, and the rule is red
+        # only when the second attempt fails too: one 5xx must not redden a release run (#886).
+        # A rule can fail midway (`pages` after it extended `releases`, a rule after it wrote
+        # lines), so the second attempt starts from the state before the failed one, or the
+        # page and notice counts would double. What is read again is `Unavailable`, whatever
+        # raised it: a 5xx, a timeout, a failed `gh` call (its 404 of `repo`, `tags` or
+        # `releases` and a refused token among them) and crates.io's 404 for the crate, none
+        # of which is an answer about a page. A 404 a source reads as an answer (docs.rs's
+        # for a queued release, no rendered README, no Latest release, no `SECURITY.md`)
+        # raises nothing and is not read again, nor is `Stop`, a refusal.
+        before = (list(result.lines), result.failed, result.pending, dict(crate), list(releases), list(advisories))
+        try:
+            return fn()
+        except Unavailable:
+            result.lines[:], result.failed, result.pending = list(before[0]), before[1], before[2]
+            crate.clear()
+            crate.update(before[3])
+            releases[:], advisories[:] = before[4], before[5]
+            time.sleep(RETRY_PAUSE)
         try:
             fn()
         except Unavailable as error:
             result.fail(rule, f"could not read: {error}")
 
-    crate = {}
-
     def versions():
         crate.update(source.crate())
         stable = crate["crate"].get("max_stable_version")
         latest = source.latest_release()
-        tags = [t[1:] for t in source.tags() if t.startswith("v") and VERSION.fullmatch(t[1:])]
-        newest_tag = max((t for t in tags if not is_prerelease(t)), key=key, default=None)
+        # a tag whose version crates.io lists as yanked is not the newest stable tag, as that
+        # version is not crates.io's `max_stable_version`: counted, a yank of the highest
+        # stable version left this rule red until a higher one was tagged (#886's fold)
+        tags = [t[1:] for t in source.tags() if t.startswith("v")]
+        newest_tag = newest_stable(tags, yanked(crate))
         said = f"crates.io max_stable_version {stable}, GitHub Latest {latest}, newest stable tag v{newest_tag}"
         if latest == f"v{stable}" and newest_tag == stable:
             result.ok("versions", said)
@@ -816,7 +864,6 @@ def check(source, readme_from=README_FROM):
         return result
     stable = crate["crate"]["max_stable_version"]
     served = [v["num"] for v in crate.get("versions", [])]
-    releases, advisories = [], []
 
     def pages():
         releases.extend(r for r in source.releases() if not r.get("draft"))
