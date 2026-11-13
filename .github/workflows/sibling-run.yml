@@ -104,7 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C sibling rev-parse HEAD)" = "$PIN"
-          python3 -I -B judge/.github/scripts/sibling_harness.py raw --tree head --sibling sibling \
+          python3 -I -B judge/.github/scripts/sibling_harness.py raw --tree judge --sibling sibling \
             --corpus all --scratch "$RUNNER_TEMP/sibling-scratch" --out "$RUNNER_TEMP/sibling-out" \
             --head-sha "$HEAD_SHA" --pull-request "$PULL_REQUEST"
           python3 -I -B judge/.github/scripts/sibling_judge.py members > "$RUNNER_TEMP/sibling-members.txt"
