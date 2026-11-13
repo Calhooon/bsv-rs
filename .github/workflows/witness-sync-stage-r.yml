@@ -6,7 +6,9 @@ name: witness-sync-stage-r
 #   gh workflow run witness-sync-stage-r.yml --repo Calhooon/bsv-rs --ref <this branch>
 # after the branch's draft pull request into beta is open.
 on:
-  workflow_dispatch:
+  # a workflow that is not on the default branch cannot be dispatched by hand: it runs on a push to its own branch
+  push:
+    branches: ['witness-97/17-sync-step']
 
 permissions:
   contents: read
