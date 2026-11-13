@@ -5,8 +5,11 @@
 //! `packages/overlays/topics/src/shared/queryValidation.ts`). Until #756 such
 //! a question was sent, the overlay's refusal came back from the resolver as
 //! an empty answer and the host's reputation was charged for the caller's
-//! input. Hardening, not parity: the reference's SDK client sends the
-//! question as built (`IdentityClient.ts:614`).
+//! input. Hardening, not parity: `query` has no reference counterpart; the
+//! reference's SDK client hands its two lookups' arguments to its wallet,
+//! whose door refuses a bad key or map before any lookup
+//! (`IdentityClient.ts:569`, `:614`; `validationHelpers.ts:1535-1587`), the
+//! check the other doors make here since #818b (`identity_door_args_818b.rs`).
 //!
 //! Against `vectors/identity_query_bounds_756.json` (recorded by
 //! `support/identity_query_bounds_756.mjs`: the reference's

@@ -1,0 +1,2305 @@
+{
+ "source": "ts-stack@edf6e03 packages/sdk/src/wallet/validationHelpers.ts:1535-1587, IdentityClient.ts:559-655, WalletClient.ts:505-531; wallet-toolbox/src/utility/identityUtils.ts:247-255 (Wallet.ts:1012); Node v22.18.0",
+ "generator": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+ "no_point_x": "0000000000000000000000000000000000000000000000000000000000000005",
+ "cases": [
+  {
+   "name": "key_64_digits",
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be at least 66 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be at least 66 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_65_digits",
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be even length, not 65."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be even length, not 65."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_66_digits",
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "accepted": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "discoverByIdentityKey": {
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByIdentityKey": {
+      "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "key_66_digits_03",
+   "subject": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "accepted": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "discoverByIdentityKey": {
+      "subject": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByIdentityKey": {
+      "subject": "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "key_68_digits",
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179800",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be no more than 66 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be no more than 66 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey is empty, oversized, or contains control characters"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_not_hex",
+   "subject": "zz",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be hexadecimal string."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be hexadecimal string."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_not_hex_66",
+   "subject": "g279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be hexadecimal string."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be hexadecimal string."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_empty",
+   "subject": "",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be hexadecimal string."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be hexadecimal string."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey is empty, oversized, or contains control characters"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_tag_04",
+   "subject": "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_x_p_minus_1",
+   "subject": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_x_p",
+   "subject": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_x_p_plus_1",
+   "subject": "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_x_no_point",
+   "subject": "020000000000000000000000000000000000000000000000000000000000000005",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be a valid compressed secp256k1 public key"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_upper_case",
+   "subject": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+   "validator": {
+    "accepted": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "discoverByIdentityKey": {
+      "subject": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey must be a canonical compressed public key"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_padded_spaces",
+   "subject": "  0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798  ",
+   "validator": {
+    "accepted": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "discoverByIdentityKey": {
+      "subject": "  0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798  ",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey is empty, oversized, or contains control characters"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_feff",
+   "subject": "﻿0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "accepted": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByIdentityKey": 1
+    },
+    "received": {
+     "discoverByIdentityKey": {
+      "subject": "﻿0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "members": [
+       "identityKey"
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey is empty, oversized, or contains control characters"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "key_0085",
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be even length, not 67."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The identityKey parameter must be even length, not 67."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "Error",
+     "code": null,
+     "message": "Invalid contact: identityKey is empty, oversized, or contains control characters"
+    },
+    "calls": {},
+    "received": {}
+   }
+  },
+  {
+   "name": "attributes_0",
+   "attributes": [],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object containing 1-32 fields"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object containing 1-32 fields"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object containing 1-32 fields"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "attributes_1",
+   "attributes": [
+    [
+     "email",
+     "bob"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "bob"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "bob"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "attributes_32",
+   "attributes": [
+    [
+     "f0",
+     "v"
+    ],
+    [
+     "f1",
+     "v"
+    ],
+    [
+     "f2",
+     "v"
+    ],
+    [
+     "f3",
+     "v"
+    ],
+    [
+     "f4",
+     "v"
+    ],
+    [
+     "f5",
+     "v"
+    ],
+    [
+     "f6",
+     "v"
+    ],
+    [
+     "f7",
+     "v"
+    ],
+    [
+     "f8",
+     "v"
+    ],
+    [
+     "f9",
+     "v"
+    ],
+    [
+     "f10",
+     "v"
+    ],
+    [
+     "f11",
+     "v"
+    ],
+    [
+     "f12",
+     "v"
+    ],
+    [
+     "f13",
+     "v"
+    ],
+    [
+     "f14",
+     "v"
+    ],
+    [
+     "f15",
+     "v"
+    ],
+    [
+     "f16",
+     "v"
+    ],
+    [
+     "f17",
+     "v"
+    ],
+    [
+     "f18",
+     "v"
+    ],
+    [
+     "f19",
+     "v"
+    ],
+    [
+     "f20",
+     "v"
+    ],
+    [
+     "f21",
+     "v"
+    ],
+    [
+     "f22",
+     "v"
+    ],
+    [
+     "f23",
+     "v"
+    ],
+    [
+     "f24",
+     "v"
+    ],
+    [
+     "f25",
+     "v"
+    ],
+    [
+     "f26",
+     "v"
+    ],
+    [
+     "f27",
+     "v"
+    ],
+    [
+     "f28",
+     "v"
+    ],
+    [
+     "f29",
+     "v"
+    ],
+    [
+     "f30",
+     "v"
+    ],
+    [
+     "f31",
+     "v"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "f0",
+        "v"
+       ],
+       [
+        "f1",
+        "v"
+       ],
+       [
+        "f2",
+        "v"
+       ],
+       [
+        "f3",
+        "v"
+       ],
+       [
+        "f4",
+        "v"
+       ],
+       [
+        "f5",
+        "v"
+       ],
+       [
+        "f6",
+        "v"
+       ],
+       [
+        "f7",
+        "v"
+       ],
+       [
+        "f8",
+        "v"
+       ],
+       [
+        "f9",
+        "v"
+       ],
+       [
+        "f10",
+        "v"
+       ],
+       [
+        "f11",
+        "v"
+       ],
+       [
+        "f12",
+        "v"
+       ],
+       [
+        "f13",
+        "v"
+       ],
+       [
+        "f14",
+        "v"
+       ],
+       [
+        "f15",
+        "v"
+       ],
+       [
+        "f16",
+        "v"
+       ],
+       [
+        "f17",
+        "v"
+       ],
+       [
+        "f18",
+        "v"
+       ],
+       [
+        "f19",
+        "v"
+       ],
+       [
+        "f20",
+        "v"
+       ],
+       [
+        "f21",
+        "v"
+       ],
+       [
+        "f22",
+        "v"
+       ],
+       [
+        "f23",
+        "v"
+       ],
+       [
+        "f24",
+        "v"
+       ],
+       [
+        "f25",
+        "v"
+       ],
+       [
+        "f26",
+        "v"
+       ],
+       [
+        "f27",
+        "v"
+       ],
+       [
+        "f28",
+        "v"
+       ],
+       [
+        "f29",
+        "v"
+       ],
+       [
+        "f30",
+        "v"
+       ],
+       [
+        "f31",
+        "v"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "f0",
+        "v"
+       ],
+       [
+        "f1",
+        "v"
+       ],
+       [
+        "f2",
+        "v"
+       ],
+       [
+        "f3",
+        "v"
+       ],
+       [
+        "f4",
+        "v"
+       ],
+       [
+        "f5",
+        "v"
+       ],
+       [
+        "f6",
+        "v"
+       ],
+       [
+        "f7",
+        "v"
+       ],
+       [
+        "f8",
+        "v"
+       ],
+       [
+        "f9",
+        "v"
+       ],
+       [
+        "f10",
+        "v"
+       ],
+       [
+        "f11",
+        "v"
+       ],
+       [
+        "f12",
+        "v"
+       ],
+       [
+        "f13",
+        "v"
+       ],
+       [
+        "f14",
+        "v"
+       ],
+       [
+        "f15",
+        "v"
+       ],
+       [
+        "f16",
+        "v"
+       ],
+       [
+        "f17",
+        "v"
+       ],
+       [
+        "f18",
+        "v"
+       ],
+       [
+        "f19",
+        "v"
+       ],
+       [
+        "f20",
+        "v"
+       ],
+       [
+        "f21",
+        "v"
+       ],
+       [
+        "f22",
+        "v"
+       ],
+       [
+        "f23",
+        "v"
+       ],
+       [
+        "f24",
+        "v"
+       ],
+       [
+        "f25",
+        "v"
+       ],
+       [
+        "f26",
+        "v"
+       ],
+       [
+        "f27",
+        "v"
+       ],
+       [
+        "f28",
+        "v"
+       ],
+       [
+        "f29",
+        "v"
+       ],
+       [
+        "f30",
+        "v"
+       ],
+       [
+        "f31",
+        "v"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "attributes_33",
+   "attributes": [
+    [
+     "f0",
+     "v"
+    ],
+    [
+     "f1",
+     "v"
+    ],
+    [
+     "f2",
+     "v"
+    ],
+    [
+     "f3",
+     "v"
+    ],
+    [
+     "f4",
+     "v"
+    ],
+    [
+     "f5",
+     "v"
+    ],
+    [
+     "f6",
+     "v"
+    ],
+    [
+     "f7",
+     "v"
+    ],
+    [
+     "f8",
+     "v"
+    ],
+    [
+     "f9",
+     "v"
+    ],
+    [
+     "f10",
+     "v"
+    ],
+    [
+     "f11",
+     "v"
+    ],
+    [
+     "f12",
+     "v"
+    ],
+    [
+     "f13",
+     "v"
+    ],
+    [
+     "f14",
+     "v"
+    ],
+    [
+     "f15",
+     "v"
+    ],
+    [
+     "f16",
+     "v"
+    ],
+    [
+     "f17",
+     "v"
+    ],
+    [
+     "f18",
+     "v"
+    ],
+    [
+     "f19",
+     "v"
+    ],
+    [
+     "f20",
+     "v"
+    ],
+    [
+     "f21",
+     "v"
+    ],
+    [
+     "f22",
+     "v"
+    ],
+    [
+     "f23",
+     "v"
+    ],
+    [
+     "f24",
+     "v"
+    ],
+    [
+     "f25",
+     "v"
+    ],
+    [
+     "f26",
+     "v"
+    ],
+    [
+     "f27",
+     "v"
+    ],
+    [
+     "f28",
+     "v"
+    ],
+    [
+     "f29",
+     "v"
+    ],
+    [
+     "f30",
+     "v"
+    ],
+    [
+     "f31",
+     "v"
+    ],
+    [
+     "f32",
+     "v"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object containing 1-32 fields"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object containing 1-32 fields"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object containing 1-32 fields"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "attributes_100001",
+   "attributes": {
+    "count": 100001,
+    "pattern": "f<i>=v",
+    "extra": null
+   },
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with at most 100000 properties"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with at most 100000 properties"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with at most 100000 properties"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "name_0_bytes",
+   "attributes": [
+    [
+     "",
+     "v"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name  parameter must be at least 1 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name  parameter must be at least 1 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name  parameter must be at least 1 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "name_1_byte",
+   "attributes": [
+    [
+     "a",
+     "v"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "a",
+        "v"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "a",
+        "v"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "name_50_bytes",
+   "attributes": [
+    [
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "v"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "v"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "v"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "name_51_bytes",
+   "attributes": [
+    [
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "v"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa parameter must be no more than 50 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa parameter must be no more than 50 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa parameter must be no more than 50 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "name_50_bytes_two_byte",
+   "attributes": [
+    [
+     "ééééééééééééééééééééééééé",
+     "v"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "ééééééééééééééééééééééééé",
+        "v"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "ééééééééééééééééééééééééé",
+        "v"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "name_51_bytes_two_byte",
+   "attributes": [
+    [
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé",
+     "v"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé parameter must be no more than 50 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé parameter must be no more than 50 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé parameter must be no more than 50 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "name_52_bytes_two_byte",
+   "attributes": [
+    [
+     "éééééééééééééééééééééééééé",
+     "v"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name éééééééééééééééééééééééééé parameter must be no more than 50 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name éééééééééééééééééééééééééé parameter must be no more than 50 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name éééééééééééééééééééééééééé parameter must be no more than 50 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "value_0_bytes",
+   "attributes": [
+    [
+     "email",
+     ""
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be at least 1 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be at least 1 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be at least 1 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "value_1_byte",
+   "attributes": [
+    [
+     "email",
+     "b"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "b"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "b"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "value_500_bytes",
+   "attributes": [
+    [
+     "email",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "value_501_bytes",
+   "attributes": [
+    [
+     "email",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be no more than 500 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be no more than 500 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be no more than 500 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "value_500_bytes_two_byte",
+   "attributes": [
+    [
+     "email",
+     "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    ]
+   ],
+   "validator": {
+    "accepted": true
+   },
+   "resolve": {
+    "accepted": [],
+    "calls": {
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+       ]
+      ]
+     }
+    }
+   },
+   "resolve_with_contacts": {
+    "accepted": [],
+    "calls": {
+     "listOutputs": 1,
+     "discoverByAttributes": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     },
+     "discoverByAttributes": {
+      "attributes": [
+       [
+        "email",
+        "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+       ]
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "value_501_bytes_two_byte",
+   "attributes": [
+    [
+     "email",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbé"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be no more than 500 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be no more than 500 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.email parameter must be no more than 500 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "unsafe_proto",
+   "attributes": [
+    [
+     "email",
+     "b"
+    ],
+    [
+     "__proto__",
+     "x"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "unsafe_constructor",
+   "attributes": [
+    [
+     "constructor",
+     "x"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "unsafe_prototype",
+   "attributes": [
+    [
+     "prototype",
+     "x"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "unsafe_beside_33",
+   "attributes": [
+    [
+     "f0",
+     "v"
+    ],
+    [
+     "f1",
+     "v"
+    ],
+    [
+     "f2",
+     "v"
+    ],
+    [
+     "f3",
+     "v"
+    ],
+    [
+     "f4",
+     "v"
+    ],
+    [
+     "f5",
+     "v"
+    ],
+    [
+     "f6",
+     "v"
+    ],
+    [
+     "f7",
+     "v"
+    ],
+    [
+     "f8",
+     "v"
+    ],
+    [
+     "f9",
+     "v"
+    ],
+    [
+     "f10",
+     "v"
+    ],
+    [
+     "f11",
+     "v"
+    ],
+    [
+     "f12",
+     "v"
+    ],
+    [
+     "f13",
+     "v"
+    ],
+    [
+     "f14",
+     "v"
+    ],
+    [
+     "f15",
+     "v"
+    ],
+    [
+     "f16",
+     "v"
+    ],
+    [
+     "f17",
+     "v"
+    ],
+    [
+     "f18",
+     "v"
+    ],
+    [
+     "f19",
+     "v"
+    ],
+    [
+     "f20",
+     "v"
+    ],
+    [
+     "f21",
+     "v"
+    ],
+    [
+     "f22",
+     "v"
+    ],
+    [
+     "f23",
+     "v"
+    ],
+    [
+     "f24",
+     "v"
+    ],
+    [
+     "f25",
+     "v"
+    ],
+    [
+     "f26",
+     "v"
+    ],
+    [
+     "f27",
+     "v"
+    ],
+    [
+     "f28",
+     "v"
+    ],
+    [
+     "f29",
+     "v"
+    ],
+    [
+     "f30",
+     "v"
+    ],
+    [
+     "f31",
+     "v"
+    ],
+    [
+     "f32",
+     "v"
+    ],
+    [
+     "constructor",
+     "x"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes parameter must be an object with safe string keys"
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "two_faults_index_value_then_name",
+   "attributes": [
+    [
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "v"
+    ],
+    [
+     "7",
+     ""
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.7 parameter must be at least 1 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.7 parameter must be at least 1 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.7 parameter must be at least 1 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "two_faults_index_value_long_then_value",
+   "attributes": [
+    [
+     "x",
+     ""
+    ],
+    [
+     "3",
+     "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.3 parameter must be no more than 500 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.3 parameter must be no more than 500 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The attributes.3 parameter must be no more than 500 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "two_faults_in_insertion_order",
+   "attributes": [
+    [
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "v"
+    ],
+    [
+     "email",
+     ""
+    ]
+   ],
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa parameter must be no more than 50 length."
+    }
+   },
+   "resolve": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa parameter must be no more than 50 length."
+    },
+    "calls": {},
+    "received": {}
+   },
+   "resolve_with_contacts": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The field name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa parameter must be no more than 50 length."
+    },
+    "calls": {
+     "listOutputs": 1
+    },
+    "received": {
+     "listOutputs": {
+      "basket": "contacts"
+     }
+    }
+   }
+  },
+  {
+   "name": "limit_0",
+   "limit": 0,
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The limit parameter must be at least 1 length."
+    }
+   },
+   "validator_attributes": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The limit parameter must be at least 1 length."
+    }
+   }
+  },
+  {
+   "name": "limit_1",
+   "limit": 1,
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "accepted": 1
+   },
+   "validator_attributes": {
+    "accepted": 1
+   }
+  },
+  {
+   "name": "limit_10000",
+   "limit": 10000,
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "accepted": 10000
+   },
+   "validator_attributes": {
+    "accepted": 10000
+   }
+  },
+  {
+   "name": "limit_10001",
+   "limit": 10001,
+   "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validator": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The limit parameter must be no more than 10000 length."
+    }
+   },
+   "validator_attributes": {
+    "refused": {
+     "name": "WERR_INVALID_PARAMETER",
+     "code": 6,
+     "message": "The limit parameter must be no more than 10000 length."
+    }
+   }
+  }
+ ],
+ "subjects": [
+  {
+   "name": "subject_padded_spaces",
+   "subject": "  0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798  ",
+   "certificate_subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validated": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "kept": 1
+  },
+  {
+   "name": "subject_upper_case",
+   "subject": "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+   "certificate_subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "validated": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "kept": 1
+  }
+ ]
+}

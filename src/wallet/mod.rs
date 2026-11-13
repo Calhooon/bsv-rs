@@ -253,5 +253,10 @@ pub use validation::crypto::{
     validate_wallet_encrypt_args,
 };
 
+// The two discovery calls' argument validators, named for their reference sites (#818b).
+pub use validation::client::{
+    validate_discover_by_attributes_args, validate_discover_by_identity_key_args,
+};
+
 // Re-export the substrate-agnostic client core (wallet feature).
 pub use client::{SubstrateType, WalletClient};

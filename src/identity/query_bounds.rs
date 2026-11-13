@@ -5,8 +5,12 @@
 //! `:9` the prefix, `:58`, `:72`, `:126`, `:174-178`, `:188`, `:247-256`),
 //! where the overlay refuses the whole question and the resolver read its
 //! refusal as an empty answer and charged the host. Hardening, not parity:
-//! the reference's SDK client sends the question as built
-//! (`IdentityClient.ts:614`, `:736`).
+//! `query` has no reference counterpart. The reference's SDK client hands its
+//! two lookups' arguments to its wallet (`IdentityClient.ts:569`, `:614`),
+//! whose door refuses a bad key or map before any lookup in
+//! `WERR_INVALID_PARAMETER`'s words (`validationHelpers.ts:1535-1587`); those
+//! doors here make the wallet's check since #818b (`client_door_args.rs`), the
+//! by-type door's type this module's rule (`certificate_type`).
 
 use crate::identity::types::IdentityQuery;
 use crate::primitives::PublicKey;
@@ -46,17 +50,8 @@ pub(super) fn check(query: &IdentityQuery) -> Result<()> {
         bounded_item(certifier, 66, "certifiers[0]")?;
         public_key(certifier, "certifiers[0]")?;
     }
-    // `IdentityLookupService.ts:97-100`: `readStringArray`'s 44-byte item
-    // bound, then `requireBase64_32` (`queryValidation.ts:183-190`), whose
-    // `validateBase64String` (`validationHelpers.ts:488-498`) is
-    // `reveal::base64_parameter`; any refusal of it the overlay's one sentence.
     if let Some(cert_type) = query.certificate_type.as_deref() {
-        bounded_item(cert_type, 44, "certificateTypes[0]")?;
-        if super::reveal::base64_parameter(cert_type, "certificateTypes[0]", 32, 32).is_err() {
-            return Err(invalid(
-                "certificateTypes[0] must be a 32-byte base64 value",
-            ));
-        }
+        certificate_type(cert_type)?;
     }
     let Some(attributes) = query.attributes.as_ref() else {
         return Ok(());
@@ -80,6 +75,22 @@ pub(super) fn check(query: &IdentityQuery) -> Result<()> {
                 "attribute values must be strings of at most 500 UTF-8 bytes",
             ));
         }
+    }
+    Ok(())
+}
+
+/// The overlay's `certificateTypes[0]` (`IdentityLookupService.ts:97-100`):
+/// `readStringArray`'s 44-byte item bound, then `requireBase64_32`
+/// (`queryValidation.ts:183-190`), whose `validateBase64String`
+/// (`validationHelpers.ts:488-498`) is `reveal::base64_parameter`; any refusal
+/// of it the overlay's one sentence. Also `discover_certificates_by_type`'s
+/// type rule (#818b), as #756's fold ruled it for `query`.
+pub(super) fn certificate_type(cert_type: &str) -> Result<()> {
+    bounded_item(cert_type, 44, "certificateTypes[0]")?;
+    if super::reveal::base64_parameter(cert_type, "certificateTypes[0]", 32, 32).is_err() {
+        return Err(invalid(
+            "certificateTypes[0] must be a 32-byte base64 value",
+        ));
     }
     Ok(())
 }

@@ -29,6 +29,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// `validateIdentityKey` (`ContactsManager.ts:83-94`) on a text, the rule the
+/// reference's `getContacts(identityKey)` judges the asked key by before it
+/// reads a contact (`:316-317`; the identity client's by-key door, #818b).
+pub(super) fn contact_identity_key(identity_key: &str) -> crate::Result<String> {
+    record::identity_key(&serde_json::Value::String(identity_key.to_string()))
+}
+
 /// Cache entry for contacts.
 #[derive(Debug, Clone, Default)]
 struct ContactsCache {

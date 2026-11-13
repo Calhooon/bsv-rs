@@ -211,15 +211,21 @@ async fn a_by_type_discovery_keeps_only_the_asked_types_certificates_744() {
 }
 
 /// The comparison is the canonical text, exactly: the asked type written
-/// unpadded (a text no token carries, #553) matches nothing.
+/// unpadded (a text no token carries, #553) matched nothing until #818b, and
+/// since #818b is refused before the network by `query`'s type rule in the
+/// overlay's words (as #756's fold moved #746's twin), nothing asked.
 #[tokio::test]
 async fn the_asked_type_is_compared_as_its_canonical_text_744() {
     let key = record_553()["subject"].as_str().unwrap().to_string();
     let unpadded = ASKED.trim_end_matches('=');
-    assert!(
-        by_type(vec![output("11", reference_token())], &key, unpadded)
-            .await
-            .is_empty()
+    let got = client(vec![output("11", reference_token())])
+        .discover_certificates_by_type(&key, unpadded)
+        .await;
+    assert_eq!(
+        got.unwrap_err(),
+        bsv_rs::Error::IdentityError(
+            "Invalid lookup query: certificateTypes[0] must be a 32-byte base64 value".into()
+        )
     );
 }
 

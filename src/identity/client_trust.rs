@@ -11,9 +11,10 @@
 //! (no trust settings: #754's record); not ported, the settings' steps: a
 //! certificate of a certifier the settings do not name dropped (`:333-334`)
 //! and a subject whose summed trust is under the threshold dropped
-//! (`:369-374`). The subject groups (`:354-358`) are one after
-//! `is_asked_subject`, so their order is the members' order. The reference
-//! groups by the subject's exact text after a lower-cased filter (`:247-255`,
+//! (`:369-374`). The subject groups (`:354-358`) are one after the subject
+//! filter (the validated key since #818b), so their order is the members'
+//! order. The reference groups by the subject's exact text after a
+//! lower-cased filter (`:247-255`,
 //! `:354-358`), so an upper-case subject forms its own group with its own
 //! threshold and duplicate rule, and a certifier's case is matched against the
 //! settings' text; this crate holds keys and treats the cases as one (a stated
