@@ -13,7 +13,7 @@ use std::path::PathBuf;
 /// A dispatch outside the nightly whose workflow a trigger other than a hand act starts:
 /// `(file, job, dispatched, reason)`. The rule refuses one missing here and an entry the
 /// workflows no longer carry.
-pub const STATED: [(&str, &str, &str, &str); 2] = [
+pub const STATED: [(&str, &str, &str, &str); 3] = [
     (
         "sync-main-into-beta.yml",
         "sync",
@@ -28,6 +28,13 @@ pub const STATED: [(&str, &str, &str, &str); 2] = [
         "a push to main starts it; the sync PR's stage R of the node oracle's judge (#97: a \
          GITHUB_TOKEN push starts no run), one job of one harness build, not sequenced with the \
          nightly",
+    ),
+    (
+        "sync-main-into-beta.yml",
+        "sync",
+        "sibling-judge.yml",
+        "the sync's stage R run completed; its judge on main (#97, fix-97c: a run the \
+         GITHUB_TOKEN starts raises no workflow_run), two short jobs, no heavy work",
     ),
 ];
 

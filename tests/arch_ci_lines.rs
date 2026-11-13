@@ -360,6 +360,7 @@ fn sync(text: &str) -> Vec<String> {
     );
     errors.extend(sync_stage_r(text));
     errors.extend(sync_stage_r_reads(text));
+    errors.extend(sync_stage_r_judge(text));
     for (refused, why) in [
         ("git rebase", "the sync picks, it never rebases"),
         (
@@ -391,7 +392,10 @@ fn sync(text: &str) -> Vec<String> {
 /// The sync's dispatch of stage R of the node oracle's judge (#97), byte for byte from its
 /// comment to the job's end: the step that starts ci.yml's checks on the PR's branch, then this
 /// one, the last of the job. Its `--ref`, its `if:` and its place are held by the bytes, as the
-/// `sibling` job's step is held in `arch_ci_pr_runs_the_required_set.rs`.
+/// `sibling` job's step is held in `arch_ci_pr_runs_the_required_set.rs`. Since fix-97c the step
+/// also waits for the run its dispatch answered and dispatches the judge on main with its id: a
+/// run the `GITHUB_TOKEN` starts raises no `workflow_run` (witness 11, run 43476255821, judged by
+/// no event), so without it a sync pull request never earns `sibling-judge`.
 const SYNC_STAGE_R: &str = r#"      - name: Start the PR's CI
         if: steps.pick.outputs.push == 'true'
         env:
@@ -399,12 +403,37 @@ const SYNC_STAGE_R: &str = r#"      - name: Start the PR's CI
         run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
 
       # stage R of the node oracle's judge (#97) on the PR's branch, in a step of its own after
-      # ci.yml's: a GITHUB_TOKEN push starts no run, and a refused dispatch here never loses ci.yml's
-      - name: Start the PR's stage R
+      # ci.yml's: a GITHUB_TOKEN push starts no run, and a refused dispatch here never loses ci.yml's.
+      # A run this token starts starts no run that waits for its end (a dispatch is the one event the
+      # token may raise), so the trampoline never hears of it: the step takes the run's id from the dispatch's
+      # own answer (no other run can share it), waits for that run to complete and dispatches the
+      # judge on main with the id. It holds no key and judges nothing; a refused dispatch, or a run
+      # not completed in 40 minutes, fails the job where a person sees it.
+      - name: Start the PR's stage R and its judge
         if: steps.pick.outputs.push == 'true'
+        timeout-minutes: 45
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run sibling-run.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+        run: |
+          set -euo pipefail
+          run="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/sibling-run.yml/dispatches" \
+            -f ref="$SYNC_BRANCH" -F return_run_details=true --jq '.run_url | split("/") | last')"
+          if ! [[ "$run" =~ ^[1-9][0-9]{0,19}$ ]]; then
+            echo "::error::the dispatch of stage R on ${SYNC_BRANCH} answered no run id"
+            exit 1
+          fi
+          echo "stage R run ${run} on ${SYNC_BRANCH}"
+          status=""
+          for _ in $(seq 1 160); do
+            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"
+            if [ "$status" = completed ]; then break; fi
+            sleep 15
+          done
+          if [ "$status" != completed ]; then
+            echo "::error::stage R run ${run} is ${status} after 40 minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
+            exit 1
+          fi
+          gh workflow run sibling-judge.yml --repo "$GITHUB_REPOSITORY" --ref main -f run_id="$run"
 "#;
 
 /// The stage R dispatch of the sync (#97): named once, and the file's tail from ci.yml's dispatch
@@ -465,6 +494,30 @@ const SYNC_STAGE_R_READS: &[(&str, Definition)] = &[
     ("SYNC_BRANCH", Definition::Workflow("sync/main-into-beta")),
 ];
 
+/// A text's shell lines: each `run:` line, and every line of a `run: |` block (the lines below it
+/// indented deeper than the key).
+fn run_lines(text: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut block: Option<usize> = None;
+    for line in text.lines() {
+        let indent = line.len() - line.trim_start().len();
+        if let Some(key) = block {
+            if line.trim().is_empty() || indent > key {
+                out.push(line);
+                continue;
+            }
+            block = None;
+        }
+        if line.trim_start().starts_with("run:") {
+            out.push(line);
+            if line.trim_end().ends_with('|') {
+                block = Some(indent);
+            }
+        }
+    }
+    out
+}
+
 /// The variables a text's steps read: those its `run:` lines expand (`$NAME`, `${NAME}`) and
 /// those its steps' `env:` hands their commands (`gh` reads `GH_TOKEN` unexpanded); upper case,
 /// in order.
@@ -481,7 +534,7 @@ fn variables_read(text: &str) -> Vec<String> {
             }
         }
     }
-    for line in text.lines().filter(|l| l.trim_start().starts_with("run:")) {
+    for line in run_lines(text) {
         let bytes = line.as_bytes();
         for (at, _) in line.match_indices('$') {
             let start = at + 1 + usize::from(bytes.get(at + 1) == Some(&b'{'));
@@ -620,7 +673,7 @@ fn sync_stage_r_reads(text: &str) -> Vec<String> {
 /// normalized (#97's third fold, the form #819 pins its macro file by). Whoever changes the
 /// workflow deliberately reads the change, then sets this to the digest the failure prints, in
 /// the same diff.
-const SYNC_FILE_DIGEST: u64 = 0x828b_6214_aa7a_399a;
+const SYNC_FILE_DIGEST: u64 = 0xac0e_61cb_3cb9_3d05;
 
 /// The sync workflow's text moved from its digest.
 fn sync_digest_refusals(text: &str) -> Vec<String> {
@@ -839,29 +892,24 @@ fn a_sync_that_merges_rebuilds_or_drops_its_link_is_refused() {
 fn a_sync_stage_r_dispatch_retargeted_unconditioned_or_moved_is_refused_97() {
     let text = read(SYNC_FILE);
     assert!(sync_stage_r(&text).is_empty());
-    let dispatch =
-        "run: gh workflow run sibling-run.yml --repo \"$GITHUB_REPOSITORY\" --ref \"$SYNC_BRANCH\"";
-    let retargeted = text.replace(
-        dispatch,
-        "run: gh workflow run sibling-run.yml --repo \"$GITHUB_REPOSITORY\" --ref beta",
-    );
+    let dispatch = "-f ref=\"$SYNC_BRANCH\" -F return_run_details=true";
+    let retargeted = text.replace(dispatch, "-f ref=beta -F return_run_details=true");
     assert_ne!(retargeted, text);
     assert!(
         sync(&retargeted)
             .iter()
-            .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte") && e.contains("--ref beta")),
+            .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte") && e.contains("-f ref=beta")),
         "{:?}",
         sync(&retargeted)
     );
-    let step =
-        "      - name: Start the PR's stage R\n        if: steps.pick.outputs.push == 'true'\n";
-    let unconditioned = text.replace(step, "      - name: Start the PR's stage R\n");
+    let step = "      - name: Start the PR's stage R and its judge\n        if: steps.pick.outputs.push == 'true'\n";
+    let unconditioned = text.replace(step, "      - name: Start the PR's stage R and its judge\n");
     assert_ne!(unconditioned, text);
     assert!(
         sync(&unconditioned)
             .iter()
             .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte")
-                && e.contains("found `        env:`")),
+                && e.contains("found `        timeout-minutes: 45`")),
         "{:?}",
         sync(&unconditioned)
     );
@@ -885,6 +933,124 @@ fn a_sync_stage_r_dispatch_retargeted_unconditioned_or_moved_is_refused_97() {
         "{:?}",
         sync(&moved)
     );
+}
+
+/// The sync's stage R step earns its pull request a check (fix-97c): the run is the one the
+/// dispatch answered (`return_run_details`, never a listing a second run can share), the wait is
+/// bounded and its failure fails the job, and the judge is dispatched on main with that run's id;
+/// the job holds no key. Each rule refused by name on a plant, beside the pin's bytes.
+fn sync_stage_r_judge(text: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let Some(at) = text.find("      - name: Start the PR's stage R and its judge\n") else {
+        return vec!["sync: no step `Start the PR's stage R and its judge` (fix-97c)".to_owned()];
+    };
+    let step = &text[at..];
+    let rules: [(&str, bool, &str); 8] = [
+        ("set -euo pipefail", true, "the step stops at its first failing command"),
+        (
+            "-F return_run_details=true --jq '.run_url | split(\"/\") | last')\"",
+            true,
+            "the run is the one the dispatch answered, by its id",
+        ),
+        (
+            "[[ \"$run\" =~ ^[1-9][0-9]{0,19}$ ]]",
+            true,
+            "an answer that is no run id fails the job",
+        ),
+        (
+            "gh workflow run sibling-judge.yml --repo \"$GITHUB_REPOSITORY\" --ref main -f run_id=\"$run\"",
+            true,
+            "the judge is dispatched on main with the answered run's id",
+        ),
+        ("timeout-minutes: 45", true, "the step is bounded"),
+        ("gh run list", false, "no run is found by a listing a second run can share"),
+        ("|| true", false, "no failure is absorbed"),
+        ("continue-on-error", false, "no failure is absorbed"),
+    ];
+    for (needle, wanted, why) in rules {
+        if step.contains(needle) != wanted {
+            errors.push(format!(
+                "sync: the stage R step {} `{needle}`: {why} (fix-97c)",
+                if wanted { "lacks" } else { "carries" }
+            ));
+        }
+    }
+    if text.contains(concat!("SIBLING_JUDGE", "_KEY")) || text.contains("create-github-app-token") {
+        errors.push(
+            "sync: the workflow names the judge's key: the sync judges nothing (fix-97c)"
+                .to_owned(),
+        );
+    }
+    errors
+}
+
+#[test]
+fn the_sync_stage_r_step_waits_for_its_own_run_and_dispatches_its_judge_97c() {
+    let text = read(SYNC_FILE);
+    assert!(
+        sync_stage_r_judge(&text).is_empty(),
+        "{:?}",
+        sync_stage_r_judge(&text)
+    );
+    let latest = "          run=\"$(gh run list --repo \"$GITHUB_REPOSITORY\" --workflow sibling-run.yml --branch \"$SYNC_BRANCH\" --limit 1 --json databaseId --jq '.[0].databaseId')\"\n";
+    let answered = "          run=\"$(gh api --method POST";
+    let plants: Vec<(&str, String, &str)> = vec![
+        (
+            "the run found as the latest on the branch",
+            text.replacen(answered, &format!("{latest}          ignored=\"$(gh api --method POST"), 1),
+            "`gh run list`",
+        ),
+        (
+            "the run id not asked of the dispatch",
+            text.replace(" -F return_run_details=true", ""),
+            "the dispatch answered",
+        ),
+        (
+            "the judge not dispatched",
+            text.replace(
+                "          gh workflow run sibling-judge.yml --repo \"$GITHUB_REPOSITORY\" --ref main -f run_id=\"$run\"\n",
+                "",
+            ),
+            "the judge is dispatched",
+        ),
+        (
+            "the judge dispatched on beta",
+            text.replace("--ref main -f run_id=\"$run\"", "--ref beta -f run_id=\"$run\""),
+            "the judge is dispatched",
+        ),
+        (
+            "the wait's failure absorbed",
+            text.replace("sleep 15\n          done\n", "sleep 15\n          done || true\n"),
+            "`|| true`",
+        ),
+        (
+            "the bound dropped",
+            text.replace("        timeout-minutes: 45\n", ""),
+            "bounded",
+        ),
+        (
+            "the key named",
+            text.replace(
+                "          GH_TOKEN: ${{ github.token }}\n        run: |\n          set -euo pipefail\n          run=",
+                &format!("          GH_TOKEN: ${{{{ secrets.{} }}}}\n        run: |\n          set -euo pipefail\n          run=", concat!("SIBLING_JUDGE", "_KEY")),
+            ),
+            "the judge's key",
+        ),
+    ];
+    for (what, planted, needle) in plants {
+        assert_ne!(planted, text, "{what}: the plant changed nothing");
+        let errors = sync_stage_r_judge(&planted);
+        assert!(
+            errors.iter().any(|e| e.contains(needle)),
+            "{what}: {errors:?}"
+        );
+        assert!(
+            sync_stage_r(&planted)
+                .iter()
+                .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte")),
+            "{what}: the pin did not see it"
+        );
+    }
 }
 
 /// The re-read of PR #931's fold: a variable the pinned dispatch reads, redefined where the bytes
