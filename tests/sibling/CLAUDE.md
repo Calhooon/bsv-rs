@@ -329,8 +329,9 @@ dispatched, by itself (GitHub: "events triggered by the `GITHUB_TOKEN` will not 
 workflow run", `workflow_dispatch` and `repository_dispatch` excepted, so its end starts no
 `workflow_run`; witness 11's run 43476255821), which is judged only when a judgement of another
 stage R run of its head resolves to it, or when its dispatcher dispatches the judge itself, as
-the sync's step does since fix-97c (it takes the run's id from the dispatch's answer, waits for the
-run and dispatches `sibling-judge.yml` on main with the id); a `sibling-run.yml` that does
+the sync's step is to do (fix-97c's sync half, its own pull request: it takes the run's id from
+the dispatch's answer, waits for the run and dispatches `sibling-judge.yml` on main with the id); a
+`sibling-run.yml` that does
 not parse or changes its `name:` (the trampoline's `workflow_run` names `sibling-run`); a base
 changed to beta after the pull request opened; a token step that fails; an environment that
 refuses the `report` job; an event GitHub drops. The two re-drives:
