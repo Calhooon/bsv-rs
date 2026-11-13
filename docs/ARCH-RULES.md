@@ -265,7 +265,8 @@ their own, its setup longer than the gate for most of them, are steps of two
 jobs, one checkout, one toolchain setup and one `Swatinem/rust-cache` restore
 each: `lint` carries Rustfmt, Clippy (`--all-targets --all-features`, then
 each published slice alone), deny and ratchet; `checks` carries mutants-entries (#663),
-front-pages (`.github/scripts/test_front_pages.py`), vectors, fixtures, front page
+front-pages (`.github/scripts/test_front_pages.py`), judge-tests (#97: the node oracle's judge and
+its harness, `.github/scripts/test_sibling_*.py`), vectors, fixtures, front page
 (`tests/front_page.rs`), secrets, Documentation and wasm32 (combined). `main-in-beta`,
 `semver`, `beta-born` and the dependents jobs stay jobs of their own, on
 their own events. The guard refuses, naming the job and the gate:

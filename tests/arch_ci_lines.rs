@@ -515,6 +515,9 @@ const BUNDLES: &[(&str, &[(&str, &str)])] = &[
             // the Release page generator's and the reconciler's tests (front_pages.py), run
             // at every pull request so release.yml's page job never meets them broken
             ("front-pages", "front-pages"),
+            // the node oracle's judge and harness tests (#97): sibling_judge.py and
+            // sibling_harness.py on hermetic fixtures, on every pull request
+            ("judge-tests", "judge-tests"),
             ("vectors", "vectors"),
             ("fixtures", "fixtures"),
             ("front-page", "front page"),

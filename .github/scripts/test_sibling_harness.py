@@ -750,5 +750,108 @@ class Run(unittest.TestCase):
         self.assertEqual(self.run_with(0)[0], 2)
 
 
+class Raw(Run):
+    """`raw` (#97, stage R): run's steps less the judgment, and a stamp beside the run's files."""
+
+    def raw_with(self, exit_code, log=GREEN_LINE.strip(), head="a" * 40, pull_request="7"):
+        os.environ["STUB_EXIT"] = str(exit_code)
+        os.environ["STUB_ENTRIES"] = "1"
+        os.environ["STUB_LOG"] = log
+        self.n += 1
+        root = Path(self.dir.name)
+        args = ["raw", "--tree", str(self.tree), "--sibling", str(self.sibling), "--corpus", "seed",
+                "--scratch", str(root / f"scratch{self.n}"), "--out", str(root / f"out{self.n}"),
+                "--rev", self.commit, "--head-sha", head]
+        if pull_request is not None:
+            args += ["--pull-request", pull_request]
+        code, text = quiet(sh.main, args)
+        return code, text, root / f"out{self.n}"
+
+    def test_raw_writes_the_runs_files_and_a_stamp_and_reads_no_column(self):
+        self.column.unlink()
+        code, text, out = self.raw_with(0)
+        self.assertEqual(code, 0, text)
+        for name in ("sibling.json", "bsv-rs/manifest.json", "seed.log", "summary.txt", "bsvrs-words/seed.jsonl"):
+            self.assertTrue((out / name).is_file(), name)
+        stamp = json.loads((out / sh.STAMP).read_text())
+        kept = hashlib.sha256(b'{"id": "seed-1", "tx": "00"}\n').hexdigest()
+        self.assertEqual(stamp, {"schema": 1, "head_sha": "a" * 40, "pull_request": 7, "sibling": self.commit,
+                                 "rules_pin": "0.3.33", "corpora": {"seed": {"corpus_sha256": kept, "withheld": 1}}})
+        self.assertNotIn("VERDICTS", text)
+
+    def test_raw_is_0_whatever_the_verdict(self):
+        for log in (red_line(1, 0, 0).strip(), red_line(0, 3, 0).strip(), "no verdict line"):
+            with self.subTest(log):
+                code, text, _ = self.raw_with(1, log=log)
+                self.assertEqual(code, 0, text)
+
+    def test_raw_on_a_dispatch_stamps_no_pull_request(self):
+        code, text, out = self.raw_with(0, pull_request=None)
+        self.assertEqual(code, 0, text)
+        self.assertIsNone(json.loads((out / sh.STAMP).read_text())["pull_request"])
+
+    def test_raw_stops_as_run_stops(self):
+        self.assertEqual(self.raw_with(2)[0], 2)
+        for head in ("A" * 40, "a" * 39, ""):
+            with self.subTest(head):
+                self.assertEqual(self.raw_with(0, head=head)[0], 2)
+        self.assertEqual(self.raw_with(0, pull_request="seven")[0], 2)
+        (self.sibling / "harness" / "Cargo.toml").write_text(CARGO.replace(LINE, ""))
+        self.commit = self.commit_all()
+        self.assertEqual(self.raw_with(0)[0], 2)
+
+    def test_runs_lines_and_exits_do_not_move(self):
+        code, text, _ = self.run_with(0)
+        self.assertEqual(code, 0, text)
+        self.assertIn("sibling_harness: GREEN (1 corpora; verdicts and words equal to", text)
+        self.assertNotIn("RAW written", text)
+
+
+class JudgeRun(Compare):
+    """The judgment over the run's files as bytes by name, the column as an object and the corpus
+    facts as an argument (#97): what the judge calls, with no path of the run opened."""
+
+    def files(self):
+        out = {}
+        for path in self.out.rglob("*"):
+            if path.is_file():
+                out[str(path.relative_to(self.out))] = path.read_bytes()
+        return out
+
+    def test_a_zipped_moved_run_with_its_scratch_deleted_judges_as_compare_does(self):
+        import zipfile
+        code, text = self.compare()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            for name, data in self.files().items():
+                archive.writestr(name, data)
+        facts = {"sibling": SIBLING, "rules_pin": "0.3.33", "withheld": {},
+                 "corpora": {"seed": {"corpus_sha256": hashlib.sha256(self.corpus.read_bytes()).hexdigest()}}}
+        manifest = json.loads(self.manifest.read_text())
+        manifest["seed"]["corpus"] = "/nonexistent/on/this/machine"
+        column = json.loads(self.column.read_text())
+        self.corpus.unlink()
+        import shutil
+        shutil.rmtree(self.out)
+        with zipfile.ZipFile(io.BytesIO(buffer.getvalue())) as archive:
+            files = {name: archive.read(name) for name in archive.namelist()}
+        got, lines = sh.judge_run(files, "the artifact", ["seed"], manifest, column, facts, "column.json")
+        self.assertEqual((got, code), (0, 0), text)
+        self.assertIn("VERDICTS: 3 entries, 0 divergences", lines)
+        files["seed.log"] = red_line(1, 0, 0).encode()
+        self.assertEqual(sh.judge_run(files, "the artifact", ["seed"], manifest, column, facts, "column.json")[0], 1)
+        other = dict(facts, corpora={"seed": {"corpus_sha256": "00"}})
+        with self.assertRaisesRegex(sh.Stop, "corpus_sha256"):
+            sh.judge_run(files, "the artifact", ["seed"], manifest, column, other, "column.json")
+
+
+
+# Raw and JudgeRun borrow Run's and Compare's fixtures, not their tests (each runs once, there)
+for _cls, _base in ((Raw, Run), (JudgeRun, Compare)):
+    for _name in dir(_base):
+        if _name.startswith("test") and _name not in _cls.__dict__:
+            setattr(_cls, _name, None)
+del _cls, _base, _name
+
 if __name__ == "__main__":
     unittest.main()

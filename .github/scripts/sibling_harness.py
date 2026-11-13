@@ -34,6 +34,13 @@ instead, and judges the run in two parts (the captain's ruling on Q97.5,
            moves words only (every count, corpus file and withheld count held,
            and every entry's verdict under each of the three words, `undecided`
            included, equal to the column's, entry by entry).
+  raw      `run` less the judgment (#97's stage R): stage, rewrite, add
+           `bsvrs_words`, settle, drop the withheld entries, run the harness and
+           `bsvrs_words`, then write `stamp.json` beside the run's files; no
+           compare and no column read. Exit 0 when the harness ran to a verdict
+           (its exit 0 or 1) and the words ran, whatever the verdict; 2 on every
+           stop `run` has. `sibling_judge.py` judges what it wrote, from files
+           the pull request cannot edit (tests/sibling/CLAUDE.md, "The judge").
   summary  the run's summary.txt and each witness's id, rule and verdicts.
 
 Exit status: 0 both parts GREEN; 1 a verdict divergence, an explained row, a
@@ -97,7 +104,18 @@ CORPUS_NAME = re.compile(r"[a-z0-9][a-z0-9_-]*")
 
 
 class Stop(Exception):
-    """A usage or setup stop: exit 2, never a verdict."""
+    """A usage or setup stop: exit 2, never a verdict.
+
+    `lines` are what the judgment had printed before it stopped (the caller prints them)."""
+
+    def __init__(self, message, lines=()):
+        super().__init__(message)
+        self.lines = list(lines)
+
+
+STAMP = "stamp.json"
+STAMP_SCHEMA = 1
+SHA = re.compile(r"[0-9a-f]{40}")
 
 
 def sha256_file(path):
@@ -292,7 +310,17 @@ def run_words(harness, scratch, corpora, out, env, build):
             raise Stop(f"{WORDS_BIN} on {source} exited {done.returncode}")
 
 
-def command_run(args):
+class Staged:
+    """What `run` and `raw` share: the staged harness, its corpora, the run's record."""
+
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+
+
+def stage_and_run(args):
+    """Stage, rewrite, add `bsvrs_words`, settle, drop the withheld entries, write the run's
+    record and run the harness: the steps `run` and `raw` share. Returns a `Staged` whose
+    `code` is the harness's exit."""
     tree = Path(args.tree).resolve()
     if not (tree / "Cargo.toml").is_file():
         raise Stop(f"--tree {tree}: no Cargo.toml")
@@ -338,13 +366,70 @@ def command_run(args):
         command.append("--no-build")
     print(f"sibling_harness: {' '.join(command)}", flush=True)
     code = subprocess.run(command, cwd=harness, env=env, check=False).returncode
-    if code not in (0, 1):
-        # 2 a setup stop; a negative code a signal (a killed harness never ran to a verdict)
-        print(f"sibling_harness: SETUP (the harness exited {code}; no verdict)", flush=True)
+    return Staged(code=code, harness=harness, scratch=scratch, corpora=corpora, out=out, env=env, info=info)
+
+
+def ran_to_a_verdict(staged):
+    """The harness's exit 1 may be the sibling's 0.7.0 words alone (recorded_disagree): the
+    two parts decide. Its 2 is a setup stop, a negative code a signal (a killed harness never
+    ran to a verdict)."""
+    if staged.code not in (0, 1):
+        print(f"sibling_harness: SETUP (the harness exited {staged.code}; no verdict)", flush=True)
+        return False
+    return True
+
+
+def command_run(args):
+    staged = stage_and_run(args)
+    if not ran_to_a_verdict(staged):
         return 2
-    # exit 1 may be the sibling's 0.7.0 words alone (recorded_disagree): the two parts decide
-    run_words(harness, scratch, corpora, out, env, build=not args.no_build)
-    return compare(out / "bsv-rs" / "manifest.json", Path(args.column), None, record=False)
+    run_words(staged.harness, staged.scratch, staged.corpora, staged.out, staged.env, build=not args.no_build)
+    return compare(staged.out / "bsv-rs" / "manifest.json", Path(args.column), None, record=False)
+
+
+def head_sha_of(text):
+    if not SHA.fullmatch(text or ""):
+        raise Stop(f"--head-sha takes 40 lower-case hex digits, not {text!r}")
+    return text
+
+
+def pull_request_of(text):
+    if text in (None, ""):
+        return None
+    if not re.fullmatch(r"[1-9][0-9]{0,9}", text):
+        raise Stop(f"--pull-request takes a pull request's number, or nothing on a dispatch, not {text!r}")
+    return int(text)
+
+
+def command_raw(args):
+    """Stage R (#97): the run's raw output and its stamp; nothing judged, no column read."""
+    head = head_sha_of(args.head_sha)
+    pull_request = pull_request_of(args.pull_request)
+    staged = stage_and_run(args)
+    if not ran_to_a_verdict(staged):
+        return 2
+    run_words(staged.harness, staged.scratch, staged.corpora, staged.out, staged.env, build=not args.no_build)
+    stamp = {
+        "schema": STAMP_SCHEMA,
+        "head_sha": head,
+        "pull_request": pull_request,
+        "sibling": staged.info["sibling"],
+        "rules_pin": staged.info["rules_pin"],
+        "corpora": {
+            name: {
+                "corpus_sha256": sha256_file(corpus_file(staged.scratch, name)),
+                "withheld": staged.info["withheld"].get(name, 0),
+            }
+            for name in staged.corpora
+        },
+    }
+    (staged.out / STAMP).write_text(json.dumps(stamp, indent=2, sort_keys=True) + "\n")
+    print(
+        f"sibling_harness: RAW written to {staged.out} (the harness exited {staged.code}; "
+        "judged by sibling_judge.py, not here)",
+        flush=True,
+    )
+    return 0
 
 
 def rule_rows(rows):
@@ -354,15 +439,53 @@ def rule_rows(rows):
     )
 
 
-def column_of(name, entry):
-    """The column's object for one corpus of a manifest."""
+def corpus_of_entry(name, entry):
+    """The sha256 of the corpus file a manifest's entry names: the facts as `compare` reads
+    them on the machine that ran the harness (an absolute path of that machine, written by
+    the sibling's `run_diff.rs:578`). The judge never calls it: it stages the corpora itself."""
     corpus_file_ = entry.get("corpus")
     if not corpus_file_ or not Path(corpus_file_).is_file():
         raise Stop(f"{name}: the manifest's corpus file {corpus_file_!r} is not readable")
+    return sha256_file(corpus_file_)
+
+
+def column_entry(entry, corpus_sha256):
+    """The column's object for one corpus of a manifest, its corpus file's sha256 given."""
     out = {key: entry.get(key) for key in COMPARED}
-    out["corpus_sha256"] = sha256_file(corpus_file_)
+    out["corpus_sha256"] = corpus_sha256
     out["rules"] = [dict(zip(RULE_KEYS, row)) for row in rule_rows(entry.get("rules", []))]
     return out
+
+
+def column_of(name, entry):
+    """The column's object for one corpus of a manifest (its corpus file read by path)."""
+    return column_entry(entry, corpus_of_entry(name, entry))
+
+
+def text_of(files, name):
+    """One file of a run, by its name under the run's directory, or None."""
+    data = files.get(name)
+    return None if data is None else data.decode("utf-8", errors="replace")
+
+
+def json_of(files, name, what):
+    text = text_of(files, name)
+    try:
+        return json.loads(text)
+    except (TypeError, ValueError, RecursionError) as error:
+        raise Stop(f"{what} {name}: {type(error).__name__}: {error}") from error
+
+
+class RunDir(dict):
+    """A run's directory read as the judgment reads an artifact: a name's bytes, on demand."""
+
+    def __init__(self, out):
+        super().__init__()
+        self.out = Path(out)
+
+    def get(self, name, default=None):
+        path = self.out / name
+        return path.read_bytes() if path.is_file() else default
 
 
 def read_json(path, what):
@@ -372,7 +495,7 @@ def read_json(path, what):
         raise Stop(f"{what} {path}: {error}") from error
 
 
-def verdicts_of(out, names, manifest):
+def verdicts_of(files, where, names, manifest):
     """The VERDICTS part from the harness's own files: each corpus's log and summary.
 
     Returns (entries, divergences, lines, foreign): divergences are run_diff's
@@ -383,11 +506,11 @@ def verdicts_of(out, names, manifest):
     """
     entries, divergences, foreign, lines = 0, 0, 0, []
     for name in names:
-        log = Path(out) / f"{name}.log"
+        log = f"{where}/{name}.log"
         got = manifest.get(name)
         if got is not None:
             entries += got.get("entries") or 0
-        text = log.read_text(errors="replace").splitlines() if log.is_file() else []
+        text = (text_of(files, f"{name}.log") or "").splitlines()
         red = green = None
         named = []
         for line in text:
@@ -419,17 +542,29 @@ def verdicts_of(out, names, manifest):
 
 
 def read_words(path):
+    return read_words_text(Path(path).read_text(), path)
+
+
+def read_words_text(text, path):
     rows = {}
-    with Path(path).open() as source:
-        for number, line in enumerate(source, 1):
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-                rows[row["id"]] = {column: list(row[column]) for column in COLUMNS}
-            except (ValueError, KeyError, TypeError) as error:
-                raise Stop(f"{path}:{number}: not a words line ({error})") from error
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            rows[row["id"]] = {column: list(row[column]) for column in COLUMNS}
+        except (ValueError, KeyError, TypeError, RecursionError) as error:
+            raise Stop(f"{path}:{number}: not a words line ({error})") from error
     return rows
+
+
+def words_file(files, where, name):
+    """The words of one corpus, or a stop naming the file."""
+    text = text_of(files, f"{WORDS_DIR}/{name}.jsonl")
+    path = f"{where}/{WORDS_DIR}/{name}.jsonl"
+    if text is None:
+        raise Stop(f"{path}: no words for {name} (bsvrs_words did not run)")
+    return read_words_text(text, path)
 
 
 def compact(triple):
@@ -451,15 +586,12 @@ def said(pair):
     return verdict if reason is None else f"{verdict} {json.dumps(reason)}"
 
 
-def reasons_of(out, names, column, column_path):
+def reasons_of(files, where, names, column, column_path):
     """The REASONS part: each entry's three words against the column's."""
     equal, lines = 0, []
     recorded = column.get("words", {})
     for name in names:
-        path = Path(out) / WORDS_DIR / f"{name}.jsonl"
-        if not path.is_file():
-            raise Stop(f"{path}: no words for {name} (bsvrs_words did not run)")
-        run = read_words(path)
+        run = words_file(files, where, name)
         want = recorded.get(name)
         if want is None:
             raise Stop(f"{name}: a corpus of the run has no words in {column_path} (nothing to compare them with)")
@@ -551,12 +683,8 @@ def held_at_the_pin(old, info, run, words):
     return lines
 
 
-def compare(manifest_path, column_path, info_path, record):
-    manifest_path = Path(manifest_path)
-    out = manifest_path.parent.parent
-    manifest = read_json(manifest_path, "--manifest") if manifest_path.is_file() else {}
-    info = read_json(info_path or out / RUN_INFO, "the run's record")
-    names = list(info.get("corpora") or sorted(manifest))
+def corpus_names(manifest, names, manifest_path):
+    """The run's record and its manifest name the same corpora, or a stop."""
     if not names:
         raise Stop(f"{manifest_path}: no corpus")
     for name in names:
@@ -565,9 +693,26 @@ def compare(manifest_path, column_path, info_path, record):
     for name in sorted(manifest):
         if name not in names:
             raise Stop(f"{name}: a corpus of {manifest_path} is not in the run's record (its log and words would go unread)")
-    run = {name: column_of(name, entry) for name, entry in sorted(manifest.items())}
-    entries, divergences, verdict_lines, foreign = verdicts_of(out, names, manifest)
+
+
+def compare(manifest_path, column_path, info_path, record):
+    manifest_path = Path(manifest_path)
+    out = manifest_path.parent.parent
+    manifest = read_json(manifest_path, "--manifest") if manifest_path.is_file() else {}
+    info = read_json(info_path or out / RUN_INFO, "the run's record")
+    names = list(info.get("corpora") or sorted(manifest))
+    corpus_names(manifest, names, manifest_path)
+    # the facts as this machine reads them: the corpus files the manifest names, the record's pins
+    facts = {
+        "sibling": info.get("sibling"),
+        "rules_pin": info.get("rules_pin"),
+        "withheld": info.get("withheld") or {},
+        "corpora": {name: {"corpus_sha256": corpus_of_entry(name, manifest[name])} for name in sorted(manifest)},
+    }
+    files = RunDir(out)
     if record:
+        run = {name: column_entry(entry, facts["corpora"][name]["corpus_sha256"]) for name, entry in sorted(manifest.items())}
+        entries, divergences, verdict_lines, foreign = verdicts_of(files, str(out), names, manifest)
         if divergences:
             for line in verdict_lines:
                 print(line)
@@ -578,7 +723,7 @@ def compare(manifest_path, column_path, info_path, record):
                 print(line)
             raise Stop("the run carries an explained row or an abort witness; a column never records one")
         old = read_json(column_path, "--column") if Path(column_path).is_file() else {}
-        words = words_of(out, names)
+        words = words_of(files, str(out), names)
         held = held_at_the_pin(old, info, run, words)
         if held:
             for line in held:
@@ -586,18 +731,44 @@ def compare(manifest_path, column_path, info_path, record):
             raise Stop("at the column's own pin --record moves words only; a count, corpus, withheld count or entry's verdict moved")
         return write_column(column_path, info, run, names, words, old)
     column = read_json(column_path, "--column")
+    try:
+        code, lines = judge_run(files, str(out), names, manifest, column, facts, column_path, manifest_path)
+    except Stop as stop:
+        for line in stop.lines:
+            print(line)
+        raise
+    for line in lines:
+        print(line)
+    return code
+
+
+def judge_run(files, where, names, manifest, column, facts, column_path, manifest_path=None):
+    """The judgment of one run against one column: (exit, lines), or a Stop carrying the lines
+    printed before it.
+
+    `files` maps a name under the run's directory (`<corpus>.log`, `bsvrs-words/<corpus>.jsonl`)
+    to its bytes; `manifest` is the run's `bsv-rs/manifest.json`; `facts` are the sibling commit,
+    the rules pin, the withheld counts and each corpus's sha256, taken by the caller (`compare`
+    from the files the manifest names, the judge from its own staging of the sibling at the pin);
+    `names` the corpora judged. No path the run names is opened here.
+    """
+    manifest_path = manifest_path or f"{where}/bsv-rs/manifest.json"
+    corpus_names(manifest, names, manifest_path)
+    for name in names:
+        if name not in (facts.get("corpora") or {}):
+            raise Stop(f"{name}: a corpus of the run has no staged corpus facts")
+    run = {name: column_entry(entry, facts["corpora"][name]["corpus_sha256"]) for name, entry in sorted(manifest.items())}
+    entries, divergences, verdict_lines, foreign = verdicts_of(files, where, names, manifest)
     standing = explained_of(column.get("corpora") or {})
     if standing:
-        for line in standing:
-            print(line)
-        raise Stop(f"{column_path} carries an explained row or an abort witness; a column holds none")
+        raise Stop(f"{column_path} carries an explained row or an abort witness; a column holds none", standing)
     for key in ("sibling", "rules_pin"):
-        if column.get(key) != info.get(key):
-            raise Stop(f"{key}: column {column.get(key)}, run {info.get(key)} (another pin: re-record in a commit of its own)")
+        if column.get(key) != facts.get(key):
+            raise Stop(f"{key}: column {column.get(key)}, run {facts.get(key)} (another pin: re-record in a commit of its own)")
     moved, explained = [], []
     for name in names:
         want_gone = (column.get("withheld") or {}).get(name, 0)
-        got_gone = (info.get("withheld") or {}).get(name, 0)
+        got_gone = (facts.get("withheld") or {}).get(name, 0)
         if name in column.get("corpora", {}) and want_gone != got_gone:
             raise Stop(f"{name} withheld: column {want_gone}, run {got_gone} (another edition of the corpus)")
     for name, got in run.items():
@@ -613,36 +784,34 @@ def compare(manifest_path, column_path, info_path, record):
                 moved.append(f"{name} {key}: column {json.dumps(want.get(key), sort_keys=True)}, run {json.dumps(got[key], sort_keys=True)}")
         for row in got["rules"]:
             explained.append(f"{name} rules: an explained divergence, refused: {json.dumps(row)}")
-    equal, reason_lines = reasons_of(out, names, column, column_path)
+    equal, reason_lines = reasons_of(files, where, names, column, column_path)
     carried = sorted(set(column.get("corpora") or {}) | set(column.get("words") or {}))
     for name in carried:
         if name not in names:
             raise Stop(f"{name}: a corpus of {column_path} is not in the run (a run judges every corpus the column carries)")
     notes = column.get("notes", {})
+    lines = []
     # an explained row is a divergence in this job's words (zero from the node, no waiver)
     total = divergences + len(explained)
     split = f" ({divergences} unexplained or outside the table, {len(explained)} explained by a rules row, refused)" if explained else ""
-    print(f"VERDICTS: {entries} entries, {total} divergences{split}")
-    for line in verdict_lines:
-        print(f"  {line}")
-    for line in explained:
-        print(f"  {line}")
-    for line in moved:
-        print(f"  moved from the column: {line}")
+    lines.append(f"VERDICTS: {entries} entries, {total} divergences{split}")
+    lines += [f"  {line}" for line in verdict_lines]
+    lines += [f"  {line}" for line in explained]
+    lines += [f"  moved from the column: {line}" for line in moved]
     if foreign:
-        print(f"  (the sibling's recorded bsv-rs@0.7.0 texts disagreeing: {foreign}; reported, judged by REASONS)")
-    print(f"REASONS: {equal} equal, {len(reason_lines)} differ from {column_path}")
+        lines.append(f"  (the sibling's recorded bsv-rs@0.7.0 texts disagreeing: {foreign}; reported, judged by REASONS)")
+    lines.append(f"REASONS: {equal} equal, {len(reason_lines)} differ from {column_path}")
     for line in reason_lines:
         entry = line.split(" ", 2)[1].rstrip(":")
         note = f" (note: {notes[entry]})" if entry in notes else ""
-        print(f"  {line}{note}")
+        lines.append(f"  {line}{note}")
     if total or moved or reason_lines:
-        print(f"sibling_harness: RED (verdicts: {total} divergences, {len(moved)} counts moved; reasons: {len(reason_lines)} differ)")
-        return 1
+        lines.append(f"sibling_harness: RED (verdicts: {total} divergences, {len(moved)} counts moved; reasons: {len(reason_lines)} differ)")
+        return 1, lines
     if not any(name in column.get("words", {}) for name in names):
-        raise Stop(f"no corpus of the run is in {column_path}: nothing compared")
-    print(f"sibling_harness: GREEN ({len(names)} corpora; verdicts and words equal to {column_path})")
-    return 0
+        raise Stop(f"no corpus of the run is in {column_path}: nothing compared", lines)
+    lines.append(f"sibling_harness: GREEN ({len(names)} corpora; verdicts and words equal to {column_path})")
+    return 0, lines
 
 
 def column_text(column):
@@ -660,14 +829,11 @@ def column_text(column):
     return text[: text.rindex("}")].rstrip() + ",\n" + words + "\n}\n"
 
 
-def words_of(out, names):
+def words_of(files, where, names):
     """The run's words per corpus, in the column's form."""
     words = {}
     for name in names:
-        path = Path(out) / WORDS_DIR / f"{name}.jsonl"
-        if not path.is_file():
-            raise Stop(f"{path}: no words for {name}")
-        words[name] = {entry: compact(triple) for entry, triple in read_words(path).items()}
+        words[name] = {entry: compact(triple) for entry, triple in words_file(files, where, name).items()}
     return words
 
 
@@ -730,6 +896,16 @@ def parser():
     run.add_argument("--out", required=True, help="an empty directory for the harness's report")
     run.add_argument("--column", default="tests/sibling/column.json")
     run.add_argument("--no-build", action="store_true", help="reuse $CARGO_TARGET_DIR/release")
+    raw = sub.add_parser("raw", help="stage R: run's steps less the judgment, and a stamp.json")
+    raw.add_argument("--tree", required=True, help="the bsv-rs checkout run")
+    raw.add_argument("--sibling", required=True, help="the bsv-script-lean checkout")
+    raw.add_argument("--rev", help="git archive this commit of the sibling (else copy its paths)")
+    raw.add_argument("--corpus", required=True, action="append", help="a corpus name or all")
+    raw.add_argument("--scratch", required=True, help="an empty directory for the staged harness")
+    raw.add_argument("--out", required=True, help="an empty directory for the raw output and stamp")
+    raw.add_argument("--no-build", action="store_true", help="reuse $CARGO_TARGET_DIR/release")
+    raw.add_argument("--head-sha", required=True, help="the pull request's head commit (40 hex digits)")
+    raw.add_argument("--pull-request", help="the pull request's number (nothing on a dispatch)")
     comp = sub.add_parser("compare", help="a manifest against the column")
     comp.add_argument("--manifest", required=True)
     comp.add_argument("--column", required=True)
@@ -748,6 +924,8 @@ def main(argv=None):
     try:
         if args.command == "run":
             return command_run(args)
+        if args.command == "raw":
+            return command_raw(args)
         if args.command == "compare":
             return compare(args.manifest, args.column, args.run_info, args.record)
         return command_summary(args)
