@@ -1,0 +1,1420 @@
+{
+  "description": "The reference's toEF and toHexEF on block 170's transaction with a third output and a linked source, one amount at the edge of a JavaScript number (#843d7); recorded by tests/support/transaction_amount_doors_843d7.mjs",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "node": "v22.18.0",
+  "transaction": {
+    "hex": "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000",
+    "third_output": {
+      "satoshis": 1,
+      "locking_script": "51"
+    },
+    "source_output": {
+      "satoshis": 5000000000,
+      "locking_script": "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"
+    },
+    "second_input": {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "vout": 0,
+      "unlocking_script": "51",
+      "sequence": 4294967295,
+      "source_output": {
+        "satoshis": 7,
+        "locking_script": "51"
+      }
+    }
+  },
+  "control": {
+    "to_ef": {
+      "ok": true,
+      "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+    },
+    "to_hex_ef": {
+      "ok": true,
+      "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+    }
+  },
+  "two_input_control": {
+    "to_ef": {
+      "ok": true,
+      "hex": "010000000000000000ef02c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac1111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff070000000000000001510300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+    },
+    "to_hex_ef": {
+      "ok": true,
+      "hex": "010000000000000000ef02c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac1111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff070000000000000001510300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+    }
+  },
+  "cells": [
+    {
+      "edge": "two_to_the_53_minus_1",
+      "satoshis": "9007199254740991",
+      "position": "output_0",
+      "to_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac03ffffffffffff1f00434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      },
+      "to_hex_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac03ffffffffffff1f00434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      }
+    },
+    {
+      "edge": "two_to_the_53_minus_1",
+      "satoshis": "9007199254740991",
+      "position": "output_1",
+      "to_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cacffffffffffff1f0043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      },
+      "to_hex_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cacffffffffffff1f0043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      }
+    },
+    {
+      "edge": "two_to_the_53_minus_1",
+      "satoshis": "9007199254740991",
+      "position": "output_2",
+      "to_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3acffffffffffff1f00015100000000"
+      },
+      "to_hex_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3acffffffffffff1f00015100000000"
+      }
+    },
+    {
+      "edge": "two_to_the_53_minus_1",
+      "satoshis": "9007199254740991",
+      "position": "source_output",
+      "to_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffffffffffffffff1f0043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      },
+      "to_hex_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffffffffffffffff1f0043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      }
+    },
+    {
+      "edge": "two_to_the_53",
+      "satoshis": "9007199254740992",
+      "position": "output_0",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_53",
+      "satoshis": "9007199254740992",
+      "position": "output_1",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_53",
+      "satoshis": "9007199254740992",
+      "position": "output_2",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_53",
+      "satoshis": "9007199254740992",
+      "position": "source_output",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_63",
+      "satoshis": "9223372036854775808",
+      "position": "output_0",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_63",
+      "satoshis": "9223372036854775808",
+      "position": "output_1",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_63",
+      "satoshis": "9223372036854775808",
+      "position": "output_2",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_63",
+      "satoshis": "9223372036854775808",
+      "position": "source_output",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_64",
+      "satoshis": "18446744073709551616",
+      "position": "output_0",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_64",
+      "satoshis": "18446744073709551616",
+      "position": "output_1",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_64",
+      "satoshis": "18446744073709551616",
+      "position": "output_2",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "edge": "two_to_the_64",
+      "satoshis": "18446744073709551616",
+      "position": "source_output",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    }
+  ],
+  "two_fault_satoshis": "9007199254740992",
+  "two_fault_cells": [
+    {
+      "name": "source_amount_at_input_0_then_input_1_unlinked",
+      "second_input": {
+        "linked": false,
+        "unlocking": true
+      },
+      "position": "source_output",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "The number is larger than 2 ^ 53 (unsafe)"
+      }
+    },
+    {
+      "name": "output_amount_with_input_1_unlinked",
+      "second_input": {
+        "linked": false,
+        "unlocking": true
+      },
+      "position": "output_0",
+      "to_ef": {
+        "ok": false,
+        "error_name": "TypeError",
+        "error": "All inputs must have source transactions when serializing to EF format"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "TypeError",
+        "error": "All inputs must have source transactions when serializing to EF format"
+      }
+    },
+    {
+      "name": "output_amount_with_input_1_lacking_its_unlocking_script",
+      "second_input": {
+        "linked": true,
+        "unlocking": false
+      },
+      "position": "output_0",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "unlockingScript is undefined"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "unlockingScript is undefined"
+      }
+    }
+  ],
+  "no_txid": {
+    "source_other_output": {
+      "satoshis": 1,
+      "locking_script": "51"
+    },
+    "grandparent_output": {
+      "satoshis": 7,
+      "locking_script": "51"
+    },
+    "control": {
+      "to_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01a8fa573879cbcdcf0bc204057775f22b39c25c325130fc63a77079cc349fda06000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      },
+      "to_hex_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01a8fa573879cbcdcf0bc204057775f22b39c25c325130fc63a77079cc349fda06000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      }
+    },
+    "cells": [
+      {
+        "edge": "two_to_the_53_minus_1",
+        "satoshis": "9007199254740991",
+        "position": "source_spent_output",
+        "to_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef014dfff9f78df1b4fdeec0fb5239320c405a74b954fd2ed07ea1f37a7d566f304c000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffffffffffffffff1f0043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        },
+        "to_hex_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef014dfff9f78df1b4fdeec0fb5239320c405a74b954fd2ed07ea1f37a7d566f304c000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffffffffffffffff1f0043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        }
+      },
+      {
+        "edge": "two_to_the_53_minus_1",
+        "satoshis": "9007199254740991",
+        "position": "source_other_output",
+        "to_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef011556a1b20d58c6526b3fefec1823fbda37bda6a31cf16549c05d69f0805f01d7000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        },
+        "to_hex_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef011556a1b20d58c6526b3fefec1823fbda37bda6a31cf16549c05d69f0805f01d7000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        }
+      },
+      {
+        "edge": "two_to_the_53_minus_1",
+        "satoshis": "9007199254740991",
+        "position": "grandparent_output",
+        "to_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef01c38885cea06185f1ac118b236764d752d0395c2281e4154fc6a80922d04fa94e000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        },
+        "to_hex_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef01c38885cea06185f1ac118b236764d752d0395c2281e4154fc6a80922d04fa94e000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        }
+      },
+      {
+        "edge": "two_to_the_53",
+        "satoshis": "9007199254740992",
+        "position": "source_spent_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_53",
+        "satoshis": "9007199254740992",
+        "position": "source_other_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_53",
+        "satoshis": "9007199254740992",
+        "position": "grandparent_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_63",
+        "satoshis": "9223372036854775808",
+        "position": "source_spent_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_63",
+        "satoshis": "9223372036854775808",
+        "position": "source_other_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_63",
+        "satoshis": "9223372036854775808",
+        "position": "grandparent_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_64",
+        "satoshis": "18446744073709551616",
+        "position": "source_spent_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_64",
+        "satoshis": "18446744073709551616",
+        "position": "source_other_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "edge": "two_to_the_64",
+        "satoshis": "18446744073709551616",
+        "position": "grandparent_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      }
+    ],
+    "two_fault_cells": [
+      {
+        "name": "source_other_output_with_input_0_lacking_its_unlocking_script",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "name": "source_spent_output_with_input_0_lacking_its_unlocking_script",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "name": "source_other_output_with_input_0_spending_past_the_source",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "name": "source_other_output_then_input_1_unlinked",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "name": "input_0_lacking_its_unlocking_script_then_input_1_unnamed_with_source_other_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "unlockingScript is undefined"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "unlockingScript is undefined"
+        }
+      },
+      {
+        "name": "input_1_unnamed_with_source_other_output_then_output_0",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      }
+    ]
+  },
+  "strength_cells": [
+    {
+      "name": "s1_source_amount_with_input_0_lacking_its_unlocking_script",
+      "to_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "unlockingScript is undefined"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "Error",
+        "error": "unlockingScript is undefined"
+      }
+    },
+    {
+      "name": "s2_input_0_unlinked_then_input_1_source_amount",
+      "to_ef": {
+        "ok": false,
+        "error_name": "TypeError",
+        "error": "All inputs must have source transactions when serializing to EF format"
+      },
+      "to_hex_ef": {
+        "ok": false,
+        "error_name": "TypeError",
+        "error": "All inputs must have source transactions when serializing to EF format"
+      }
+    },
+    {
+      "name": "s3_named_input_whose_source_carries_an_unspent_output",
+      "to_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      },
+      "to_hex_ef": {
+        "ok": true,
+        "hex": "010000000000000000ef01c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+      }
+    }
+  ],
+  "walk": {
+    "named_txid": "3333333333333333333333333333333333333333333333333333333333333333",
+    "cells": [
+      {
+        "name": "m1_unnamed_source_whose_input_names_a_txid_over_a_grandparent_at_two_to_the_53",
+        "to_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef01148feae97616d98265b455e9223c01f344080ed027c87c657d6d021e608c438e000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        },
+        "to_hex_ef": {
+          "ok": true,
+          "hex": "010000000000000000ef01148feae97616d98265b455e9223c01f344080ed027c87c657d6d021e608c438e000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff00f2052a0100000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0300ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac0100000000000000015100000000"
+        }
+      },
+      {
+        "name": "m2_input_1_unnamed_with_source_other_output_alone",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      },
+      {
+        "name": "source_input_named_lacking_its_unlocking_script_with_source_other_output",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "unlockingScript is undefined"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "unlockingScript is undefined"
+        }
+      },
+      {
+        "name": "source_input_unnamed_lacking_its_unlocking_script_over_a_grandparent_at_two_to_the_53",
+        "to_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        },
+        "to_hex_ef": {
+          "ok": false,
+          "error_name": "Error",
+          "error": "The number is larger than 2 ^ 53 (unsafe)"
+        }
+      }
+    ],
+    "space": {
+      "inputs": 4,
+      "max_depth": 4,
+      "sample": [
+        {
+          "name": "u0_d1_links_none_at_l1o1",
+          "unnamed_input": 0,
+          "depth": 1,
+          "links": "",
+          "at": {
+            "level": 1,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u0_d1_links_none_at_none",
+          "unnamed_input": 0,
+          "depth": 1,
+          "links": "",
+          "at": null,
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u1_d1_links_none_at_l1o1",
+          "unnamed_input": 1,
+          "depth": 1,
+          "links": "",
+          "at": {
+            "level": 1,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u1_d1_links_none_at_none",
+          "unnamed_input": 1,
+          "depth": 1,
+          "links": "",
+          "at": null,
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u2_d1_links_none_at_l1o1",
+          "unnamed_input": 2,
+          "depth": 1,
+          "links": "",
+          "at": {
+            "level": 1,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u2_d1_links_none_at_none",
+          "unnamed_input": 2,
+          "depth": 1,
+          "links": "",
+          "at": null,
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u3_d1_links_none_at_l1o1",
+          "unnamed_input": 3,
+          "depth": 1,
+          "links": "",
+          "at": {
+            "level": 1,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u3_d1_links_none_at_none",
+          "unnamed_input": 3,
+          "depth": 1,
+          "links": "",
+          "at": null,
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151cb712ac51dd274d614aa15d4ca580bfad4b1d8f2d1c861fd85e9aa0abc028ac0000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u0_d2_links_u_at_l2o1",
+          "unnamed_input": 0,
+          "depth": 2,
+          "links": "u",
+          "at": {
+            "level": 2,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u0_d2_links_n_at_l2o0",
+          "unnamed_input": 0,
+          "depth": 2,
+          "links": "n",
+          "at": {
+            "level": 2,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u1_d2_links_u_at_l2o1",
+          "unnamed_input": 1,
+          "depth": 2,
+          "links": "u",
+          "at": {
+            "level": 2,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u1_d2_links_n_at_l2o0",
+          "unnamed_input": 1,
+          "depth": 2,
+          "links": "n",
+          "at": {
+            "level": 2,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u2_d2_links_u_at_l2o1",
+          "unnamed_input": 2,
+          "depth": 2,
+          "links": "u",
+          "at": {
+            "level": 2,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u2_d2_links_n_at_l2o0",
+          "unnamed_input": 2,
+          "depth": 2,
+          "links": "n",
+          "at": {
+            "level": 2,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u3_d2_links_u_at_l2o1",
+          "unnamed_input": 3,
+          "depth": 2,
+          "links": "u",
+          "at": {
+            "level": 2,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u3_d2_links_n_at_l2o0",
+          "unnamed_input": 3,
+          "depth": 2,
+          "links": "n",
+          "at": {
+            "level": 2,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u0_d3_links_uu_at_l3o1",
+          "unnamed_input": 0,
+          "depth": 3,
+          "links": "uu",
+          "at": {
+            "level": 3,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u0_d3_links_un_at_l3o0",
+          "unnamed_input": 0,
+          "depth": 3,
+          "links": "un",
+          "at": {
+            "level": 3,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef0429d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef0429d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u1_d3_links_uu_at_l3o1",
+          "unnamed_input": 1,
+          "depth": 3,
+          "links": "uu",
+          "at": {
+            "level": 3,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u1_d3_links_un_at_l3o0",
+          "unnamed_input": 1,
+          "depth": 3,
+          "links": "un",
+          "at": {
+            "level": 3,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u2_d3_links_uu_at_l3o1",
+          "unnamed_input": 2,
+          "depth": 3,
+          "links": "uu",
+          "at": {
+            "level": 3,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u2_d3_links_un_at_l3o0",
+          "unnamed_input": 2,
+          "depth": 3,
+          "links": "un",
+          "at": {
+            "level": 3,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u3_d3_links_uu_at_l3o1",
+          "unnamed_input": 3,
+          "depth": 3,
+          "links": "uu",
+          "at": {
+            "level": 3,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u3_d3_links_un_at_l3o0",
+          "unnamed_input": 3,
+          "depth": 3,
+          "links": "un",
+          "at": {
+            "level": 3,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u0_d4_links_uuu_at_l4o1",
+          "unnamed_input": 0,
+          "depth": 4,
+          "links": "uuu",
+          "at": {
+            "level": 4,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u0_d4_links_uun_at_l4o0",
+          "unnamed_input": 0,
+          "depth": 4,
+          "links": "uun",
+          "at": {
+            "level": 4,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u1_d4_links_uuu_at_l4o1",
+          "unnamed_input": 1,
+          "depth": 4,
+          "links": "uuu",
+          "at": {
+            "level": 4,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u1_d4_links_uun_at_l4o0",
+          "unnamed_input": 1,
+          "depth": 4,
+          "links": "uun",
+          "at": {
+            "level": 4,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u2_d4_links_uuu_at_l4o1",
+          "unnamed_input": 2,
+          "depth": 4,
+          "links": "uuu",
+          "at": {
+            "level": 4,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u2_d4_links_uun_at_l4o0",
+          "unnamed_input": 2,
+          "depth": 4,
+          "links": "uun",
+          "at": {
+            "level": 4,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u3_d4_links_uuu_at_l4o1",
+          "unnamed_input": 3,
+          "depth": 4,
+          "links": "uuu",
+          "at": {
+            "level": 4,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u3_d4_links_uun_at_l4o0",
+          "unnamed_input": 3,
+          "depth": 4,
+          "links": "uun",
+          "at": {
+            "level": 4,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151b58429de59980f7eb6111e11832723230977c726a2e22bdfa2459b1310e7c9ba000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u0_d4_links_nuu_at_l4o1",
+          "unnamed_input": 0,
+          "depth": 4,
+          "links": "nuu",
+          "at": {
+            "level": 4,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef04d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u1_d4_links_unu_at_l2o0",
+          "unnamed_input": 1,
+          "depth": 4,
+          "links": "unu",
+          "at": {
+            "level": 2,
+            "output": 0
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u2_d4_links_uun_at_l3o1",
+          "unnamed_input": 2,
+          "depth": 4,
+          "links": "uun",
+          "at": {
+            "level": 3,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u3_d3_links_nu_at_l1o1",
+          "unnamed_input": 3,
+          "depth": 3,
+          "links": "nu",
+          "at": {
+            "level": 1,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          },
+          "to_hex_ef": {
+            "ok": false,
+            "error_name": "Error",
+            "error": "The number is larger than 2 ^ 53 (unsafe)"
+          }
+        },
+        {
+          "name": "u3_d4_links_unn_at_l4o1",
+          "unnamed_input": 3,
+          "depth": 4,
+          "links": "unn",
+          "at": {
+            "level": 4,
+            "output": 1
+          },
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff0700000000000000015129d26adeb346b1ab38b7f4ce832e6d3ab73fac22dfb57a72052f936800534f66000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        },
+        {
+          "name": "u1_d2_links_n_at_none",
+          "unnamed_input": 1,
+          "depth": 2,
+          "links": "n",
+          "at": null,
+          "to_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          },
+          "to_hex_ef": {
+            "ok": true,
+            "hex": "010000000000000000ef043333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151d7e4902ae1c2c7adbd21c83b3f6c4dd3bcc8e3873f5a6348670e24596be53d73000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff070000000000000001513333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff07000000000000000151010100000000000000015100000000"
+          }
+        }
+      ]
+    }
+  }
+}

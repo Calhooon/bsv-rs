@@ -233,7 +233,9 @@ impl Broadcaster for WhatsOnChainBroadcaster {
 
 **Key difference from ARC**: Uses `tx.to_ef()` to serialize the transaction as EF binary instead of
 hex-encoded JSON. This is more efficient for large transactions. An `EF_SERIALIZATION_ERROR` is
-returned if the transaction cannot be serialized to EF format (e.g., missing source outputs).
+returned if the transaction cannot be serialized to EF format (e.g., missing source outputs; since
+#843d7 an output amount, or a linked source output's, of 2^53 satoshis or more, which `to_ef` refuses
+in the reference writer's words, `The number is larger than 2 ^ 53 (unsafe)`), before any request.
 
 ### WhatsOnChain API
 
@@ -258,7 +260,7 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 | `RATE_LIMITED` | A 429, or a 503 with `Retry-After`, whatever the body (`more` `{"status", "retry_after_ms"}`, the wait `null` when absent or unreadable): never a verdict on the transaction |
 | `PARSE_ERROR` | The body of an answer that is not a fault, read whole, is not the expected JSON (a decode error whose source is `serde_json`'s) |
 | `NO_HTTP` | HTTP feature not enabled |
-| `EF_SERIALIZATION_ERROR` | Failed to serialize to EF format (Teranode only) |
+| `EF_SERIALIZATION_ERROR` | Failed to serialize to EF format (Teranode only): `to_ef`'s refusal, an amount of 2^53 or more among them since #843d7; no request is made |
 | `{status}` | HTTP status code from service (e.g., "400", "500") |
 
 The three fault words come from the one classifier, `transport_fault.rs`

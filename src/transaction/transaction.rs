@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
-use super::amount::{read_amount, AmountRule};
+use super::amount::{read_amount, unnamed_source_amounts, written_amount, AmountRule};
 use super::beef::Beef;
 use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
@@ -1204,7 +1204,18 @@ impl Transaction {
     ///
     /// # Errors
     ///
-    /// Returns an error if any input is missing its source transaction.
+    /// Returns an error if any input is missing its source transaction, and,
+    /// since #843d7, if a linked source output's amount or an output's amount
+    /// is 2^53 satoshis or more: `TransactionError("The number is larger than
+    /// 2 ^ 53 (unsafe)")`, the reference writer's words, at the amount in
+    /// written order, as its `toEF` throws (`from_ef` refuses such bytes).
+    /// For an input that names no txid (`TransactionInput::source_txid`
+    /// `None`, as `with_source_transaction` and `add_input_from_tx` leave it)
+    /// the same refusal for such an amount in ANY output of its source, or of
+    /// a source reached through inputs naming no txid, ahead of that input's
+    /// other checks: the reference writes such an outpoint from the source's
+    /// `hash()`, its plain writer (`Transaction.ts:1137-1138`). This crate's
+    /// `to_binary`, `hash` and `id` refuse nothing (the node's serializer).
     pub fn to_ef(&self) -> Result<Vec<u8>> {
         let mut writer = Writer::new();
 
@@ -1218,6 +1229,13 @@ impl Transaction {
         for input in self.inputs() {
             // Get TXID bytes (reversed)
             let txid_bytes = input.get_source_txid_bytes()?;
+            // An input naming no txid: the reference writes its source's
+            // hash, which refuses an amount of 2^53 or more there (#843d7's fold).
+            if input.source_txid.is_none() {
+                if let Some(source) = input.source_transaction.as_deref() {
+                    unnamed_source_amounts(source)?;
+                }
+            }
             writer.write_bytes(&txid_bytes);
 
             writer.write_u32_le(input.source_output_index);
@@ -1250,7 +1268,7 @@ impl Transaction {
                     crate::Error::TransactionError("Source output index out of bounds".to_string())
                 })?;
 
-            writer.write_u64_le(source_output.satoshis.unwrap_or(0));
+            writer.write_u64_le(written_amount(source_output.satoshis.unwrap_or(0))?);
 
             let locking_script = source_output.locking_script.to_binary();
             writer.write_var_int(locking_script.len() as u64);
@@ -1260,7 +1278,7 @@ impl Transaction {
         // Write outputs
         writer.write_var_int(self.outputs().len() as u64);
         for output in self.outputs() {
-            writer.write_u64_le(output.satoshis.unwrap_or(0));
+            writer.write_u64_le(written_amount(output.satoshis.unwrap_or(0))?);
 
             let script = output.locking_script.to_binary();
             writer.write_var_int(script.len() as u64);
@@ -1273,6 +1291,11 @@ impl Transaction {
     }
 
     /// Serializes the transaction to a hex-encoded Extended Format string.
+    ///
+    /// # Errors
+    ///
+    /// What [`to_ef`](Self::to_ef) refuses, an amount of 2^53 or more among
+    /// them (#843d7).
     pub fn to_hex_ef(&self) -> Result<String> {
         Ok(to_hex(&self.to_ef()?))
     }
