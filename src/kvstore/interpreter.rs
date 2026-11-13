@@ -231,13 +231,13 @@ impl KVStoreInterpreter {
 
     /// Legacy verify_signature that takes PushDrop and PublicKey.
     ///
-    /// This is kept for backward compatibility but now delegates to the
-    /// KVStoreFields-based verification.
+    /// `true` only when `pushdrop` carries a KVStore token of five or six
+    /// fields whose controller field is `controller` and whose signature
+    /// field is `controller`'s signature over the other fields; `false` for
+    /// anything else.
     #[deprecated(note = "Use verify_signature with KVStoreFields instead")]
-    pub fn verify_signature_legacy(_pushdrop: &PushDrop, _controller: &PublicKey) -> bool {
-        // Legacy stub - returns true for backward compatibility
-        // New code should use verify_signature() with KVStoreFields
-        true
+    pub fn verify_signature_legacy(pushdrop: &PushDrop, controller: &PublicKey) -> bool {
+        super::legacy_signature::signed_by(pushdrop, controller, get_anyone_wallet())
     }
 
     /// Extract value from a PushDrop token without validation.

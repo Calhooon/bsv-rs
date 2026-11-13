@@ -25,6 +25,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; since #544 `interpret`/`interpret_script` read through `token_validation.rs` alone, the raw-protocol form no value there (`tests/kvstore_interpreter_envelope_544.rs`) | 656; since #537 its three readers (`extract_fields`, `extract_value`, `is_kvstore_token`) decode lock-before alone, as `kvStoreTokenValidation.ts:88` does, a lock-after token no value (`tests/kvstore_interpreter_lock_position_537.rs`) |
+| `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the derivation its protocol field names (the `[level, name]` namespace: the key as key ID and a locking key derived from the controller; a plain name: `kvstore-token`), a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds, the push encoding and a plain-name token's locking key not judged (`tests/kvstore_legacy_signature_verdict.rs`) | 95 |
 | `token_validation.rs` | #544: `decode_and_verify`, the reference's `decodeAndVerifyKVStoreToken` (`ts-stack@edf6e03` `kvStoreTokenValidation.ts:85-119`): the canonical five- or six-field envelope and bounds, the protocol canonical JSON `[level, name]`, key, value, a 33-byte controller, the tags, the controller-linked locking key, the controller's signature; crate-internal, read by `interpret_script`; its unit test replays the recorded words | 155 |
 | `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches (#489); the token decode lock-before alone, as the reference's (#499) | 308 |
 | `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489); the point and envelope words come from `script::templates::pushdrop_position` since #537, its point check `PublicKey::from_reference_der` (#498) | 58 |
@@ -390,6 +391,11 @@ impl KVStoreInterpreter {
     /// Uses ProtoWallet::anyone() with SecurityLevel::App protocol
     /// Returns true if signature is valid, false if invalid/missing
     pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool;
+
+    /// Deprecated: true only for a token whose controller field is `controller`
+    /// and whose last field is `controller`'s signature over the others
+    /// (`legacy_signature.rs`)
+    pub fn verify_signature_legacy(pushdrop: &PushDrop, controller: &PublicKey) -> bool;
 
     /// Extract just the value
     pub fn extract_value(script: &LockingScript) -> Option<String>;
