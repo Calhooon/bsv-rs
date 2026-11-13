@@ -135,8 +135,8 @@ pub use totp::{Algorithm as TotpAlgorithm, Totp, TotpOptions, TotpValidateOption
 // Convenience re-exports from auth
 #[cfg(feature = "socketio")]
 pub use auth::{
-    install_app_event_listener, run_dispatch, AppEvent, SocketIoFrameSource, SocketIoSink,
-    SocketIoTransport,
+    install_app_event_listener, run_dispatch, AppEvent, AppEventReceiver, SocketIoFrameSource,
+    SocketIoSink, SocketIoTransport,
 };
 #[cfg(feature = "auth")]
 pub use auth::{

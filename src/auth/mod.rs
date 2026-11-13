@@ -78,8 +78,8 @@ pub use peer::{Peer, PeerOptions};
 pub use session_manager::SessionManager;
 #[cfg(feature = "socketio")]
 pub use transports::{
-    install_app_event_listener, run_dispatch, AppEvent, SocketIoFrameSource, SocketIoSink,
-    SocketIoTransport,
+    install_app_event_listener, run_dispatch, AppEvent, AppEventReceiver, SocketIoFrameSource,
+    SocketIoSink, SocketIoTransport,
 };
 pub use transports::{MockTransport, SimplifiedFetchTransport, Transport};
 #[cfg(feature = "websocket")]

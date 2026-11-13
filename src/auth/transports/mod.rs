@@ -60,6 +60,6 @@ pub use websocket_transport::{WebSocketTransport, WebSocketTransportOptions};
 
 #[cfg(feature = "socketio")]
 pub use socketio::{
-    install_app_event_listener, run_dispatch, AppEvent, SocketIoFrameSource, SocketIoSink,
-    SocketIoTransport,
+    install_app_event_listener, run_dispatch, AppEvent, AppEventReceiver, SocketIoFrameSource,
+    SocketIoSink, SocketIoTransport,
 };
