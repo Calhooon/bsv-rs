@@ -131,6 +131,33 @@ together, as before.
   not spell (a name built by a shell expansion, `declare`, `read`), and a variable a step reads
   without naming it outside `gh`'s `GH_*` (the pinned commands run `gh` alone).
 
+## The third fold (2026-11-13, after the second re-read: FIX, three plants slipped)
+
+Rebased onto `origin/beta` at `b36bca93` without a conflict, the ten commits as cut (T names one
+file, `sibling-judge.yml`, unchanged; S its step and its pin); this fold's commits come after
+them. Logs: `/Volumes/Lanes/out/bsv-rs/fix-97b-fold3/`.
+
+- Item 1, the times compared as times. The script compares two timestamps, no more (every other
+  comparison is a count, a size, an id or an attempt number):
+
+  | Comparison | Before | Now |
+  |---|---|---|
+  | artifact `created_at` against the attempt's `run_started_at` (`_artifact_files`) | the two ISO texts as strings; an absent start skipped the filter | each parsed by `instant` to an aware UTC time and compared as times; a start or a creation time that does not parse `NOT JUDGED`, naming it |
+  | the trampoline's last commit time on `main` against beta's (`Judgment.lines`, which line is behind) | `int(out or 0)`, an empty answer read as 0 | `Git.last_change` reads the `%ct` text as a decimal integer of seconds or answers `None`, and a `None` on either line is `NOT JUDGED`, naming the line |
+
+  `Rerun`'s start moves to `10:07:37Z`, on no coarser mark (not on a minute, ten seconds or five
+  seconds; 37 is prime, so on no mark of any whole number of seconds from 2 to 36 inside its
+  minute). The one-second cell: an artifact made at `10:07:36Z` is the earlier attempt's, beside
+  this attempt's at `10:07:37Z` and at `10:07:38Z` in either order; any cut of the start coarser
+  than a second lands at or before `10:07:36Z` and admits it (two artifacts, `NOT JUDGED`), and any
+  cut of the creation time moves `10:07:37Z` or `10:07:38Z` below the start (none). An offset and
+  a fraction read as the instants they name (`11:07:36+02:00`, whose text sorts after the start's,
+  is an hour before it). RED on a scratch copy (`item1-red.log`): the re-read's plant (the start
+  cut to ten seconds) 6 failures, the first re-read's (to the minute) 6, both texts cut to ten
+  seconds 6, the parsed start floored to ten seconds, to two and to the minute 6 each, `>` for
+  `>=` 5, the plain string comparison 1 (the offset cell), an unparsed creation time dropped
+  silently 3 errors, `int(out or 0)` back 3. 92 tests (90 before).
+
 ## Rows left
 
 - R1 of the rule read (stays a row): the class-N guard of `tests/arch_ci_sibling_judge_97.rs`

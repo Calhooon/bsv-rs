@@ -273,6 +273,7 @@ class World:
               "base": {"ref": "beta", "repo": {"id": RID}}}
         if artifacts is None:
             artifacts = [{"id": 99, "name": "sibling-raw", "expired": False, "size_in_bytes": 1000, "digest": "sha256:ab",
+                          "created_at": "2026-11-12T10:02:11Z",
                           "workflow_run": {"id": RUN, "head_sha": head, "head_repository_id": RID}}]
         return {
             f"repos/{R}/actions/runs/{RUN}": run,
@@ -281,7 +282,7 @@ class World:
                 {"workflow_runs": [{"id": RUN, "path": sj.RUN_WORKFLOW, "status": "completed", "conclusion": conclusion}]},
             f"repos/Calhooon/bsv-script-lean/compare/{self.pin}...main": {"behind_by": 0, "ahead_by": 1},
             f"repos/Calhooon/bsv-script-lean/compare/{self.pins[2]}...main": {"behind_by": 0, "ahead_by": 0},
-            f"repos/{R}/actions/runs/{RUN}/attempts/{attempt}": {"conclusion": conclusion},
+            f"repos/{R}/actions/runs/{RUN}/attempts/{attempt}": {"conclusion": conclusion, "run_started_at": "2026-11-12T10:00:07Z"},
             f"repos/{R}/actions/runs/{RUN}/attempts/{attempt}/jobs?per_page=100":
                 {"jobs": [{"name": "raw", "steps": [{"name": "Set up job", "conclusion": "success"},
                                                     {"name": "Build the harness", "conclusion": "failure"}]}]},
@@ -780,6 +781,7 @@ class RunState(Base):
 
     def one(self, **overrides):
         item = {"id": 99, "name": "sibling-raw", "expired": False, "size_in_bytes": 1000, "digest": "d",
+                "created_at": "2026-11-12T10:02:11Z",
                 "workflow_run": {"id": RUN, "head_sha": self.world.head, "head_repository_id": RID}}
         item.update(overrides)
         return item
@@ -938,6 +940,26 @@ class Trampoline(Base):
                     with self.assertRaises(sj.Verdict) as caught:
                         j.lines(w.main)
                 self.assertEqual(caught.exception.reason, f"the trampoline on main differs from beta's; {behind} is behind")
+
+    def test_a_commit_time_that_does_not_read_is_not_judged(self):
+        """The commit times are parsed as integers of seconds (`Git.last_change`), never compared
+        as text or read as 0: git's answer that is empty or not a decimal is None, and a None on
+        either line is NOT JUDGED, naming the line."""
+        w = self.world
+        git = sj.Git(w.judge)
+        for out, parsed in ((b"1762942057\n", 1762942057), (b"", None), (b"12a\n", None), (b"-5\n", None)):
+            with self.subTest(out=out):
+                with mock.patch.object(sj.Git, "run", return_value=types.SimpleNamespace(stdout=out)):
+                    self.assertEqual(git.last_change(w.main, sj.JUDGE_WORKFLOW), parsed)
+        for which, times in (("main", {w.main: None, w.beta: 100}), ("beta", {w.main: 100, w.beta: None})):
+            with self.subTest(which):
+                j = sj.Judgment(None, sj.Git(w.judge), w.root, str(w.sibling))
+                with mock.patch.object(sj.Git, "entry", side_effect=lambda sha, path: ("100644", "b" if sha == w.beta else "m")), \
+                        mock.patch.object(sj.Git, "last_change", side_effect=lambda sha, path: times[sha]):
+                    with self.assertRaises(sj.Verdict) as caught:
+                        j.lines(w.main)
+                self.assertEqual((caught.exception.word, caught.exception.reason),
+                                 (sj.NOT_JUDGED, f"the trampoline on main differs from beta's; {which}'s commit time does not read"))
 
 
 class Text(unittest.TestCase):
@@ -1231,14 +1253,17 @@ class Standing(Base):
 
 class Rerun(Base):
     """A re-run of stage R is judged from the artifact its own attempt uploaded (`overwrite: true`
-    on the upload; the judge reads only an artifact created at or after the attempt started)."""
+    on the upload; the judge reads only an artifact created at or after the attempt started). The
+    two times are parsed and compared as times (`sibling_judge.instant`); the start sits at an odd
+    second on no coarser mark (`10:07:37Z`: not on a minute, not on ten seconds, not on five), so a
+    cut of either text to any unit coarser than a second moves `10:07:36Z` to the start's side."""
 
-    STARTED = "2026-11-12T10:00:30Z"
+    STARTED = "2026-11-12T10:07:37Z"
 
-    def rerun(self, artifacts):
+    def rerun(self, artifacts, started=STARTED):
         w = self.world
         answers = w.answers(attempt=2, artifacts=artifacts)
-        answers[f"repos/{R}/actions/runs/{RUN}/attempts/2"] = {"conclusion": "success", "run_started_at": self.STARTED}
+        answers[f"repos/{R}/actions/runs/{RUN}/attempts/2"] = {"conclusion": "success", "run_started_at": started}
         return self.judged(answers=answers, attempt=2)
 
     def made(self, artifact_id, created):
@@ -1246,39 +1271,57 @@ class Rerun(Base):
                 "created_at": created,
                 "workflow_run": {"id": RUN, "head_sha": self.world.head, "head_repository_id": RID}}
 
+    def assertJudged(self, listing, read, unread, started=STARTED):
+        check, gh, _ = self.rerun(listing, started)
+        self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
+        self.assertIn(f"repos/{R}/actions/artifacts/{read}/zip", gh.reads)
+        for other in unread:
+            self.assertNotIn(f"repos/{R}/actions/artifacts/{other}/zip", gh.reads)
+
     def test_a_rerun_is_judged_whether_the_old_artifact_was_replaced_or_is_still_listed(self):
-        old, new = self.made(98, "2026-11-12T09:30:00Z"), self.made(99, "2026-11-12T10:04:00Z")
+        old, new = self.made(98, "2026-11-12T09:30:00Z"), self.made(99, "2026-11-12T10:11:00Z")
         for name, listing in (("replaced", [new]), ("both listed", [old, new]), ("both listed, new first", [new, old])):
             with self.subTest(name):
-                check, gh, _ = self.rerun(listing)
-                self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
-                self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
-                self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
+                self.assertJudged(listing, 99, [98])
 
-    def test_an_artifact_created_at_the_instant_the_attempt_started_is_judged(self):
-        """The boundary of the attempt's start (the strength read: `>=` to `>` survived)."""
-        check, gh, _ = self.rerun([self.made(98, "2026-11-12T10:00:29Z"), self.made(99, self.STARTED)])
-        self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
-        self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
-        self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
+    def test_the_earlier_attempts_artifact_one_second_before_an_odd_start_is_the_earlier_attempts(self):
+        """The one-second cell (fold three): an artifact made at `10:07:36Z` against a start at
+        `10:07:37Z` is the earlier attempt's, beside this attempt's at the same second and one
+        second after, in either listing order; alone it leaves none."""
+        before = self.made(98, "2026-11-12T10:07:36Z")
+        for name, created in (("the same second", self.STARTED), ("one second after", "2026-11-12T10:07:38Z")):
+            for order in ("before first", "before last"):
+                with self.subTest(f"{name}, {order}"):
+                    this = self.made(99, created)
+                    self.assertJudged([before, this] if order == "before first" else [this, before], 99, [98])
+                with self.subTest(f"{name}, alone"):
+                    self.assertJudged([self.made(99, created)], 99, [])
+        check, gh, _ = self.rerun([before])
+        self.assertCheck(check, "NOT JUDGED", "0 unexpired sibling-raw artifacts of attempt 2, not one")
+        self.assertEqual(gh.writes, [])
 
-    def test_the_attempts_start_is_judged_to_the_second_inside_its_minute(self):
-        """The start is not cut to the minute (the re-read of the fold: `started[:16]` survived a
-        start that sat on the minute): an earlier attempt's artifact made earlier in the same
-        minute is left out, one made a second after the start is read, one a second before is not."""
-        before, after = self.made(98, "2026-11-12T10:00:10Z"), self.made(99, "2026-11-12T10:00:31Z")
-        for name, listing in (("same minute, earlier, beside one a second after", [before, after]),
-                              ("one a second after, alone", [after])):
+    def test_times_are_compared_as_times_not_as_text(self):
+        """A fraction of a second and an offset other than `Z` read as the instants they name: an
+        artifact at `10:07:36.999Z` is before `10:07:37Z`; one at `12:07:37+02:00` is the start
+        itself; one at `11:07:36+02:00` is an hour before it, though its text sorts after the
+        start's (the cell a comparison of the texts gets wrong); a start written `10:07:37.000Z` is
+        the same instant as `10:07:37Z`."""
+        self.assertJudged([self.made(98, "2026-11-12T10:07:36.999Z"), self.made(99, "2026-11-12T12:07:37+02:00")], 99, [98])
+        self.assertJudged([self.made(97, "2026-11-12T11:07:36+02:00"), self.made(99, self.STARTED)], 99, [97])
+        self.assertJudged([self.made(98, "2026-11-12T10:07:36Z"), self.made(99, self.STARTED)], 99, [98],
+                          started="2026-11-12T10:07:37.000Z")
+
+    def test_a_timestamp_that_does_not_parse_is_not_judged(self):
+        for name, started, created, reason in (
+                ("the start absent", None, self.STARTED, "the start of attempt 2 does not read as a time"),
+                ("the start cut to the minute", "2026-11-12T10:07Z", self.STARTED, "the start of attempt 2 does not read as a time"),
+                ("the start not a date", "2026-13-12T10:07:37Z", self.STARTED, "the start of attempt 2 does not read as a time"),
+                ("the creation time absent", self.STARTED, None, "an artifact's creation time does not read as a time"),
+                ("the creation time with no zone", self.STARTED, "2026-11-12T10:07:38", "an artifact's creation time does not read as a time"),
+                ("the creation time not text", self.STARTED, 1762942058, "an artifact's creation time does not read as a time")):
             with self.subTest(name):
-                check, gh, _ = self.rerun(listing)
-                self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
-                self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
-                self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
-        for name, created in (("same minute, earlier", "2026-11-12T10:00:10Z"),
-                              ("one second before", "2026-11-12T10:00:29Z")):
-            with self.subTest(name):
-                check, gh, _ = self.rerun([self.made(98, created)])
-                self.assertCheck(check, "NOT JUDGED", "0 unexpired sibling-raw artifacts of attempt 2, not one")
+                check, gh, _ = self.rerun([self.made(99, created)], started)
+                self.assertCheck(check, "NOT JUDGED", reason)
                 self.assertEqual(gh.writes, [])
 
     def test_an_earlier_attempts_artifact_alone_is_not_judged(self):

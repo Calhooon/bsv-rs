@@ -28,6 +28,7 @@ nothing was posted on purpose; 1 when `report` could not report, or a usage erro
 
 import argparse
 import base64
+from datetime import datetime, timezone
 import importlib.util
 import io
 import json
@@ -212,8 +213,10 @@ class Git:
         return found
 
     def last_change(self, sha, path):
+        """The commit time of `path`'s last change at `sha`, in seconds since the epoch, or None
+        when git answers no such time (no commit, or text that is not a decimal integer)."""
         out = self.run("log", "-1", "--format=%ct", sha, "--", path).stdout.decode().strip()
-        return int(out or 0)
+        return int(out) if re.fullmatch(r"[0-9]{1,12}", out) else None
 
 
 class Verdict(Exception):
@@ -453,7 +456,14 @@ class Judgment:
                           [f"the trampoline on main and beta's file must be one file; {which} lacks it"],
                           act=self.redrive())
         if main[1] != beta[1]:
-            behind = "main" if self.git.last_change(workflow_sha, JUDGE_WORKFLOW) <= self.git.last_change(self.beta, JUDGE_WORKFLOW) else "beta"
+            main_time = self.git.last_change(workflow_sha, JUDGE_WORKFLOW)
+            beta_time = self.git.last_change(self.beta, JUDGE_WORKFLOW)
+            if not isinstance(main_time, int) or not isinstance(beta_time, int):
+                which = "main" if not isinstance(main_time, int) else "beta"
+                raise Verdict(NOT_JUDGED, f"the trampoline on main differs from beta's; {which}'s commit time does not read",
+                              [f"{JUDGE_WORKFLOW}: main {main[1]}, beta {beta[1]}; the last change's commit time on {which} is not a time"],
+                              act=self.redrive())
+            behind = "main" if main_time <= beta_time else "beta"
             raise Verdict(NOT_JUDGED, f"the trampoline on main differs from beta's; {behind} is behind",
                           [f"{JUDGE_WORKFLOW}: main {main[1]}, beta {beta[1]}; {behind} is behind (pick or sync it)"],
                           act=self.redrive())
@@ -796,6 +806,23 @@ def local_artifact(path):
         raise Verdict(NOT_JUDGED, "the artifact is refused", [str(stop)]) from stop
 
 
+def instant(text):
+    """A GitHub timestamp (`2026-11-12T10:07:37Z`, fractional seconds or a numeric offset
+    allowed) as an aware datetime in UTC, or None for anything else. Two times are compared as
+    times, never as strings, so no cut of either text can move the verdict."""
+    if not isinstance(text, str) or not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})", text):
+        return None
+    body, zone = (text[:-1], "+00:00") if text.endswith("Z") else (text[:-6], text[-6:])
+    if "." in body:
+        body, fraction = body.split(".")
+        body = f"{body}.{fraction[:6].ljust(6, '0')}"
+    try:
+        return datetime.fromisoformat(body + zone).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
 def _artifact_files(self, args):
     """The one unexpired `sibling-raw` artifact a successful attempt uploaded, read in memory.
     Stage R uploads with `overwrite: true`, so a re-run replaces the artifact of the attempt before
@@ -824,9 +851,17 @@ def _artifact_files(self, args):
         and (a.get("workflow_run") or {}).get("head_sha") == self.head
         and (a.get("workflow_run") or {}).get("head_repository_id") == self.repository_id
     ]
-    started = state.get("run_started_at")
-    if isinstance(started, str):
-        found = [a for a in found if isinstance(a.get("created_at"), str) and a["created_at"] >= started]
+    started = instant(state.get("run_started_at"))
+    if started is None:
+        raise Verdict(NOT_JUDGED, f"the start of attempt {self.attempt} does not read as a time",
+                      [f"run {self.run_id} attempt {self.attempt}: run_started_at "
+                       f"{clean(str(state.get('run_started_at')), 60)} is not a UTC time"], act=self.rerun())
+    unread = [a for a in found if instant(a.get("created_at")) is None]
+    if unread:
+        raise Verdict(NOT_JUDGED, "an artifact's creation time does not read as a time",
+                      [f"artifact {clean(str(a.get('id')), 30)}: created_at {clean(str(a.get('created_at')), 60)} "
+                       "is not a UTC time" for a in unread], act=self.rerun())
+    found = [a for a in found if instant(a["created_at"]) >= started]
     live = [a for a in found if not a.get("expired")]
     if len(live) != 1:
         post = "unless-standing" if (self.event == "workflow_dispatch" and not live) else "yes"

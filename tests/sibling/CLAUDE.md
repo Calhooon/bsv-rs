@@ -241,7 +241,8 @@ pin reads `REFUSED` and never `NOT JUDGED`):
 7. **The run's state.** The artifact is read only from a run whose attempt ended `success`;
    any other conclusion is `NOT JUDGED` naming it and the failed step. Exactly one unexpired
    `sibling-raw` of the run, its head and this repository, created at or after the judged
-   attempt's `run_started_at` (stage R uploads with `overwrite: true`, so a re-run replaces the
+   attempt's `run_started_at`, the two parsed and compared as times (`instant`: a creation time or
+   a start that does not read as a UTC time is `NOT JUDGED` naming it; stage R uploads with `overwrite: true`, so a re-run replaces the
    earlier attempt's artifact, and one GitHub still lists from before the attempt is not counted:
    a re-run is judged, never `NOT JUDGED`, `test_sibling_judge.py`'s `Rerun`); none or two is
    `NOT JUDGED`, and a
