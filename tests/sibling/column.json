@@ -95,7 +95,7 @@
     "crypto-00079": "#657: CHECKMULTISIG returns the encoding helper's words (here the low-S refusal), as the node returns its error; the sibling's bsv-rs@0.7.0 record keeps the older 'OP_CHECKMULTISIG requires correct encoding for the public key and signature.' (ruled, Q97.5, 2026-11-10)"
   },
   "rules_pin": "0.3.33",
-  "sibling": "1c051eaef1077cc95e5d1618686d5efacc4aa097",
+  "sibling": "8eccaac0a0fb724a70fffa9adf00fb64e3a7cee5",
   "withheld": {
     "gen": 150
   },
@@ -3576,7 +3576,6 @@
       "gen-01011": {"mempool": ["invalid", "Script number overflow: 750000 bytes, the limit is 10000 bytes."], "rec": ["valid", null], "spec": ["valid", null]}
     },
     "seed": {
-      "seed-000001": ["valid", null],
       "seed-000002": ["invalid", "The top stack element must be truthy after script evaluation."],
       "seed-000003": ["invalid", "The top stack element must be truthy after script evaluation."],
       "seed-000004": ["valid", null],
