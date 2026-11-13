@@ -24,8 +24,12 @@ on:
 permissions:
   contents: read
 
-# one group per judged head (a re-judge by the run's id): every judgement of a head runs, in order,
-# none cancelled, so an older judge cannot finish last on a live head and none is dropped
+# one group per judged head (a re-judge by the run's id): the judgements of a head run one at a
+# time, so an older judge cannot finish last on a live head. GitHub keeps one pending run per group,
+# and a newer pending run replaces (cancels) an older one, so a judgement can be dropped; what
+# recovers it: every judgement judges the newest stage R run of its head (sibling_judge.py's
+# `resolve`), so the one that runs posts the verdict a dropped one would have, and the sweep names a
+# head left with none, with its re-judge
 concurrency:
   group: sibling-judge-${{ github.event.workflow_run.head_sha || inputs.run_id }}
   cancel-in-progress: false
