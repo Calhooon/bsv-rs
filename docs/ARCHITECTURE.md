@@ -120,7 +120,7 @@ A rule whose test is missing says so: that is a finding, never an invention.
 - **Every public behavior is pinned by a test.** CLAUDE.md rule 2 (a fix lands with a test that was RED before it); `fixtures_replay` (`fixtures_replay`: a wire byte, a body byte or a JSON value that moves fails with the file, case and path), `every_readme_snippet_is_an_example_file_and_every_example_is_in_the_readme` (`readme_examples`); [FIXTURES.md](FIXTURES.md).
 - **The whole suite runs in CI; a file CI does not run is refused.** The `test` job's "Run every integration test" step runs `cargo nextest run --features "full,http,websocket" --test '*' --no-fail-fast` (`cargo test` until speed round 1, `docs/lanes/ci-speed-1.md`; `--tests` until speed loop three, which ran the lib's unit tests a second time, `docs/lanes/ci-speed-3.md`), so cargo's own enumeration runs every `tests/*.rs` (an enumerated list had drifted to 34 of 73 files, #146); `memory_profiling` runs alone behind `dhat-profiling`, `wire_tracing_sink` in its own step behind `tracing` (outside `full`, #212). The guard is the step itself ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)); no test under `tests/` restates it.
 - **The census only falls.** `tools/ratchet/run --check` against [ratchets.json](ratchets.json) (seven counters, a limit per oversized file); `unwrap_and_expect_counts_never_rise` (`arch_no_unwrap`), `every_counter_and_each_file_has_an_independent_limit` (`tools/ratchet/src/model.rs`), `conformance_scripts_evaluation` (`conformance_scripts`: the corpus total pinned, every mismatch in an enumerated class with its count); [RATCHETS.md](RATCHETS.md), CLAUDE.md rule 3.
-- **The dependents build against every PR into `main`, every push to `main`, every dispatch and every tag.** The `dependents-plan`, `dependent-check`, `dependents` (required on `main` alone, so a PR into `beta` and a push to `beta` skip the three) and `semver` (every PR) jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) build every admitted consumer of [dependents.lock](dependents.lock) against the PR tree and refuse a breaking change against the last tag; `test_alias_resolves_to_the_pr_tree`, `test_unused_patch_cannot_report_success` ([`.github/scripts/test_dependents.py`](../.github/scripts/test_dependents.py), Python); [DEPENDENTS.md](DEPENDENTS.md).
+- **The dependents build against every PR into `main`, every push to `main`, every dispatch and every tag.** The `dependents-plan`, `dependent-check`, `dependents` (required on `main` alone, so a PR into `beta` and a push to `beta` skip the three) and `semver` (every PR) jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) build every admitted consumer of [dependents.lock](dependents.lock) against the PR tree and refuse a breaking change against the line's baseline (into `main` the last tag; into `beta` the commit the pull request is tested on, unless it carries `api-break`: the Semver paragraph below, #886); `test_alias_resolves_to_the_pr_tree`, `test_unused_patch_cannot_report_success` ([`.github/scripts/test_dependents.py`](../.github/scripts/test_dependents.py), Python); [DEPENDENTS.md](DEPENDENTS.md).
 
 The exit test's three gaps are closed: BRC-56's refusal by name is pinned by
 `tests/wallet_brc56_hmac_tests.rs` (#148), a BEEF whose source links form a
@@ -179,9 +179,14 @@ the wasm32 slice, five in the defaults; the census in
 | cpufeatures | 0.2.17, 0.3.1 | all, default | aes 0.8.4, polyval 0.6.2, sha1 0.10.7 (all) | in this crate | the same two moves |
 | sha1, digest, block-buffer | 0.10, 0.11/0.12 | all | tungstenite 0.24 (the `websocket` feature) | partly | tokio-tungstenite 0.30 clears the three and brings rand and thiserror pairs into all |
 
-**Semver.** `cargo-semver-checks` against the last `v*` tag reachable from
-the PR base, the release type read from the version (0.9.0 on `beta` is a
-minor), so a breaking change cannot ride a patch or a beta suffix.
+**Semver.** `cargo-semver-checks` on every pull request that changes code.
+Into `main`: against the last `v*` tag reachable from the PR base, the
+release type read from the version, so a breaking change cannot ride a
+patch. Into `beta`, whose versions are prereleases (the tool reads any
+prerelease step as a major one and would judge nothing): against the commit
+the pull request is tested on, as a minor change, so a removal fails unless
+the pull request carries the `api-break` label, read live before the check
+(#886, `tests/arch_ci_semver_holds_beta_886.rs`).
 [DEPENDENTS.md](DEPENDENTS.md).
 
 **The arch tests.** Five lexical guards over every file under `src/`:

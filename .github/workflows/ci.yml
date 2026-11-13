@@ -156,10 +156,17 @@ jobs:
           fi
           echo "All $CONSUMER_COUNT eligible consumer checks passed."
 
+  # tests/arch_ci_semver_holds_beta_886.rs pins this job's keys beside `steps:` (JOB_HEAD), its
+  # steps' opening lines in order (STEP_HEADS) and its checkout (CHECKOUT_STEP), comments aside.
   semver:
     name: semver
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # pull-requests: read for the label read below (#886); release.yml's call grants the same,
+    # a nested job asking more than its caller grants never starts (RELEASING.md step 22)
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -212,19 +219,54 @@ jobs:
           RUSTFLAGS: ""
         run: cargo install cargo-semver-checks --version 0.51.0 --locked --root "$RUNNER_TEMP/tools"
 
-      - name: Check against the last tag reachable from the PR base
+      # On `beta` every version is a prerelease, and the tool reads any prerelease step as a major
+      # one: with the release type inferred it ran 0 checks and passed whatever the pull request
+      # removed (#886). A pull request into `beta` is held to `--release-type minor` (an addition
+      # passes; a break the tool has a lint for fails, and one it has no lint for, a changed
+      # parameter or return type among them, passes it: a green check is no evidence for such a
+      # change) against the commit it is tested on, `HEAD^1` of the merge ref (the
+      # last tag would keep one labelled break red on every later pull request until the next
+      # tag), unless it carries the `api-break` label: then the same command runs, its lints are
+      # printed and the step ends green. The label is read live here, never from the event's
+      # copy and never by a `labeled` trigger; a failed read fails the job, never a waived check.
+      # Any other base keeps the comparison with the last tag, the release type inferred.
+      # tests/arch_ci_semver_holds_beta_886.rs pins the step whole, byte for byte (SEMVER_STEP):
+      # a change to any line below, this comment excepted, is a change to that constant.
+      - name: Check the public API against the base line's baseline
         if: steps.plan.outputs.docs_only != 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           BASE_REV: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
+          PR: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
         run: |
+          set -euo pipefail
+          if [ "$BASE_REF" = beta ]; then
+            # read live before the check; a failed read fails the job, never a waived check
+            labels=$(gh api "repos/$REPOSITORY/pulls/$PR" --jq '[.labels[].name] | join(",")')
+            echo "labels: ${labels:-none}"
+            baseline="$(git rev-parse HEAD^1)"
+            echo "Checking the PR against $baseline, the commit it is tested on (base $BASE_REV), as a minor change"
+            git clone --quiet --shared "$GITHUB_WORKSPACE" "$RUNNER_TEMP/semver-source"
+            cd "$RUNNER_TEMP/semver-source"
+            status=0
+            "$RUNNER_TEMP/tools/bin/cargo-semver-checks" check-release --baseline-rev "$baseline" --all-features --release-type minor || status=$?
+            # the tool's exit for a failed lint is 100; any other failure (a build, a bad
+            # baseline) stays red with or without the label
+            if [ "$status" = 100 ] && [[ ",$labels," == *",api-break,"* ]]; then
+              echo "::notice::The public API breaks above are allowed by the api-break label on this pull request (#886)."
+              exit 0
+            fi
+            exit "$status"
+          fi
           baseline="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$BASE_REV")"
           echo "Checking the PR against $baseline (base $BASE_REV)"
           git clone --quiet --shared "$GITHUB_WORKSPACE" "$RUNNER_TEMP/semver-source"
           cd "$RUNNER_TEMP/semver-source"
-          # A 0.x minor or a beta suffix must not waive breaking API changes.
-          # The release type is inferred from the version change between the baseline tag and
-          # Cargo.toml (a 0.x minor bump is semver's major): a breaking change passes only when the
-          # version says so, an additive one only when it says at least minor (#87's 0.9.0).
+          # Off `beta` the release type is inferred from the version change between the baseline
+          # tag and Cargo.toml (a 0.x minor bump is semver's major): a breaking change passes
+          # only when the version says so, an additive one only when it says at least minor.
           "$RUNNER_TEMP/tools/bin/cargo-semver-checks" check-release --baseline-rev "$baseline" --all-features
 
       - name: No API to check

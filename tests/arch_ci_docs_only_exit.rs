@@ -330,9 +330,9 @@ fn a_step_without_the_exit_is_refused_by_name() {
         ),
         // #689: the semver exit
         (
-            "        if: steps.plan.outputs.docs_only != 'true'\n        env:\n          BASE_REV:",
-            "        env:\n          BASE_REV:",
-            "semver: `Check against the last tag reachable from the PR base` runs under ``",
+            "        if: steps.plan.outputs.docs_only != 'true'\n        env:\n          GH_TOKEN: ${{ github.token }}\n          BASE_REV:",
+            "        env:\n          GH_TOKEN: ${{ github.token }}\n          BASE_REV:",
+            "semver: `Check the public API against the base line's baseline` runs under ``",
         ),
         (
             "        if: steps.plan.outputs.docs_only != 'true' && steps.semver-tool.outputs.cache-hit != 'true'\n",
