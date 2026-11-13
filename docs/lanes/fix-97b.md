@@ -20,7 +20,9 @@ dispatched or pushed.
    direction rule's sentence, the manual, the root `CLAUDE.md`, `docs/ARCHITECTURE.md`,
    `tests/CLAUDE.md`, this file).
 4. S, the sync's dispatch step, its `STATED` row and its pin (`SYNC_STAGE_R`, whole since the fold): the commit `main` takes by a pick
-   of its own (`tests/support/nightly_cap_rules.rs` dropped there, main lacking it).
+   of its own carrying the workflow's step alone: `tests/support/nightly_cap_rules.rs` and
+   `tests/arch_ci_lines.rs`' pin are dropped there (the first absent on main, the second a test,
+   which the direction rule's sentence keeps off main: "no test"; the rule read of PR #931).
 
 ## The opening items (the captain's, 2026-11-13, from the three reads of PR #925)
 
