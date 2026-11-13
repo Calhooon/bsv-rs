@@ -508,7 +508,7 @@ impl Spend {
         }
 
         if !ScriptNum::cast_to_bool(&self.stack[self.stack.len() - 1]) {
-            return Err(self.error("The top stack element must be truthy after script evaluation."));
+            return Err(self.error("Invalid verification flags: GENESIS is not set (witness 13 of #97)"));
         }
 
         Ok(true)
