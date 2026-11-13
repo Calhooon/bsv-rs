@@ -1148,6 +1148,29 @@ class Quoting(unittest.TestCase):
         self.assertIn("--ref " + shlex.quote(self.BRANCH) + "\n", act + "\n")
         self.assertEqual(shlex.split(act.splitlines()[-1])[-1], self.BRANCH)
 
+    def printed_act(self, branch):
+        j = sj.Judgment(None, None, tempfile.gettempdir(), "u", R, RID)
+        j.pr = {"head": {"ref": branch}}
+        text = sj.bounded(["REFUSED: a reason"], ["a quoted line"], j.repush())
+        return text.split("To re-judge:\n\n```sh\n", 1)[1].split("\n```", 1)[0]
+
+    def test_the_printed_act_has_its_command_on_a_line_of_its_own(self):
+        """The lane's finding: `clean()` turned the act's line break into `?`, so the act pasted
+        into a shell was one comment line and its command never ran."""
+        act = self.printed_act(self.BRANCH)
+        lines = act.split("\n")
+        self.assertEqual(len(lines), 2, act)
+        self.assertTrue(lines[0].startswith("# push a commit"), act)
+        self.assertFalse(lines[1].startswith("#"), act)
+        self.assertTrue(lines[1].startswith("gh workflow run sibling-run.yml --repo "), act)
+        self.assertEqual(shlex.split(lines[1])[-1], self.BRANCH)
+
+    def test_a_line_break_in_the_branch_opens_no_line_of_the_act(self):
+        act = self.printed_act("lane/x\nrm -rf ~\r\u2028y")
+        lines = act.split("\n")
+        self.assertEqual(len(lines), 2, act)
+        self.assertEqual(shlex.split(lines[1])[-1], "lane/x?rm -rf ~??y")
+
     def test_the_sweeps_act_quotes_the_branch(self):
         sha = "1" * 40
         answers = {
@@ -1214,6 +1237,13 @@ class Rerun(Base):
                 self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
                 self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
                 self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
+
+    def test_an_artifact_created_at_the_instant_the_attempt_started_is_judged(self):
+        """The boundary of the attempt's start (the strength read: `>=` to `>` survived)."""
+        check, gh, _ = self.rerun([self.made(98, "2026-11-12T09:59:59Z"), self.made(99, self.STARTED)])
+        self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
+        self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
+        self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
 
     def test_an_earlier_attempts_artifact_alone_is_not_judged(self):
         check, gh, _ = self.rerun([self.made(98, "2026-11-12T09:30:00Z")])
