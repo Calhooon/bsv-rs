@@ -409,8 +409,10 @@ fn merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_8
     // until #844's fold recorded fifteen control BEEFs of its writer cells;
     // 356 until 0.8.8's `beef_tx_order.json` brought its witnesses' five
     // distinct V1 BEEFs; 361 until #817's transaction fold, whose vector
-    // holds two V2 BEEFs.
-    assert_eq!(compared, 6 * 363, "six states of every BEEF read");
+    // holds two V2 BEEFs; 363 until #904's `contacts_listed_spend.json`
+    // brought nine distinct V1 BEEFs (three listings, six Atomic signable
+    // transactions over V1).
+    assert_eq!(compared, 6 * 372, "six states of every BEEF read");
 }
 
 /// The order of the checks is the order the reference meets them: an empty

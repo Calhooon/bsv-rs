@@ -118,7 +118,7 @@ async fn created_record(wallet: &Counting) -> Value {
     let token =
         PushDrop::decode(&LockingScript::from_binary(&output.locking_script).unwrap()).unwrap();
     let plaintext = WalletInterface::decrypt(
-        &Counting::of_scalar(9),
+        &Counting::answering_contacts(9),
         DecryptArgs {
             ciphertext: token.fields[0].clone(),
             protocol_id: Protocol::new(SecurityLevel::Counterparty, "contact"),
@@ -138,7 +138,7 @@ async fn created_record(wallet: &Counting) -> Value {
 fn listing(case: &Value) -> Counting {
     let script = from_hex(case["locking_script"].as_str().unwrap()).unwrap();
     let source = source_of(&script, 1);
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
         total_outputs: 1,
         beef: Some(source.to_beef(true).unwrap()),
@@ -161,7 +161,7 @@ async fn an_identity_saved_as_a_contact_keeps_its_badges_558() {
         let name = case["name"].as_str().unwrap();
         // The reference's saved record is its identity, field for field.
         assert_eq!(case["saved"], case["identity"], "{name}");
-        let wallet = Counting::of_scalar(9);
+        let wallet = Counting::answering_contacts(9);
         client(wallet.clone())
             .save_contact(identity_of(&case["identity"]), None)
             .await

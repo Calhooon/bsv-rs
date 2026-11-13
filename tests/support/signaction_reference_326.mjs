@@ -197,6 +197,26 @@ if (process.argv.includes('--kvstore-local-454')) {
   process.exit(0)
 }
 
+// #904 records the contacts manager's listed spend and its failures.
+if (process.argv.includes('--contacts-listed')) {
+  const { recordContactsListed } = await import('./contacts_listed_reference.mjs')
+  await emit(JSON.stringify(await recordContactsListed({
+    ContactsManager, ProtoWallet, PrivateKey, Transaction, Script, Utils, sourceOf,
+    resetCounter () { counter = 0 }
+  }), null, 2))
+  process.exit(0)
+}
+
+// #904's seventh fold: the differential replay of the contacts manager's cache.
+if (process.argv.includes('--contacts-replay')) {
+  const { recordContactsReplay, writeContactsReplay } = await import('./contacts_replay_reference.mjs')
+  await emit(writeContactsReplay(await recordContactsReplay({
+    ContactsManager, ProtoWallet, PrivateKey, Transaction, Script, Beef, Utils, sourceOf,
+    resetCounter () { counter = 0 }
+  })))
+  process.exit(0)
+}
+
 // #340 records the reference retry sequence, and the pinned local store's absence of retry.
 if (process.argv.includes('--double-spend-retry')) {
   const { recordDoubleSpendRetry } = await import('./double_spend_retry_340.mjs')

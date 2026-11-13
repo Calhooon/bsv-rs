@@ -25,7 +25,7 @@ use serde::Deserialize;
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
-use identity_reveal_wallet::Counting;
+use identity_reveal_wallet::{wallet_call, Counting};
 
 #[derive(Deserialize)]
 struct Vector {
@@ -133,10 +133,10 @@ async fn the_token_key_and_signature_are_asked_with_the_references_arguments() {
         assert_eq!(
             wallet.calls(),
             [
-                "prove_certificate",
-                "get_public_key",
-                "create_signature",
-                "create_action"
+                wallet_call!(prove_certificate),
+                wallet_call!(get_public_key),
+                wallet_call!(create_signature),
+                wallet_call!(create_action)
             ],
             "{}",
             w.name
@@ -266,7 +266,12 @@ async fn a_create_action_with_no_transaction_is_refused_in_the_reference_words()
             Err(Error::IdentityError(words)) => assert_eq!(words, w.refusal, "{}", w.name),
             other => panic!("{}: expected the refusal, got {other:?}", w.name),
         }
-        assert_eq!(wallet.calls().last(), Some(&"create_action"), "{}", w.name);
+        assert_eq!(
+            wallet.calls().last(),
+            Some(&wallet_call!(create_action)),
+            "{}",
+            w.name
+        );
     }
 }
 

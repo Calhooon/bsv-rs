@@ -270,13 +270,18 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
     // holding a BEEF moves these figures (#841's `transaction_trailing_data_
     // 840.json#0` moved 337 to 338; #817's transaction fold, whose
     // `transaction_fold_817.json` holds two V2 BEEFs, 361 to 363 and the
-    // split 2,443 and 3,694 to 2,467 and 3,704): re-derive them by running this test,
+    // split 2,443 and 3,694 to 2,467 and 3,704; #904's
+    // `contacts_listed_spend.json`, nine distinct V1 BEEFs, 363 to 372 and
+    // the split 2,467 and 3,704 to 2,566 and 3,758, the reader's 1,789 and
+    // the judge's 252 unmoved): re-derive them by running this test,
     // whose failing assertion prints the new figures as `left`, and carry
     // them to the records that cite them (`CHANGELOG.md`'s #621 entry,
     // `src/transaction/CLAUDE.md`'s `beef/prepass_621_tests.rs` row,
-    // `docs/lanes/fix-621.md`). A split that moves with no new vector is a
-    // finding. The totals are derived, never pinned.
-    assert_eq!(read, 363, "every BEEF the vectors hold that reads");
+    // `docs/lanes/fix-621.md`, and the two sweeps over the same seeds,
+    // `tests/beef_v1_txid_only_writer_817.rs`' `SWEPT` and
+    // `tests/beef_writer_refusals_817.rs`' `6 * read`). A split that moves
+    // with no new vector is a finding. The totals are derived, never pinned.
+    assert_eq!(read, 372, "every BEEF the vectors hold that reads");
     assert_eq!(
         counts.ok + counts.refused,
         changes.len() * read,
@@ -290,7 +295,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
             counts.by_reader,
             counts.root_not_carried
         ),
-        (2467, 3704, 1789, 252)
+        (2566, 3758, 1789, 252)
     );
 }
 

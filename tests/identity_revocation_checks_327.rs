@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex};
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
-use identity_reveal_wallet::Counting;
+use identity_reveal_wallet::{wallet_call, Counting};
 #[path = "support/signaction_reference_326.rs"]
 mod signaction_reference_326;
 
@@ -398,7 +398,10 @@ async fn a_token_for_another_certificate_is_refused_in_the_references_words() {
             "Failed to create signable transaction".to_string()
         ))
     );
-    assert_eq!(wallet.calls()[2..4], ["verify_signature", "create_action"]);
+    assert_eq!(
+        wallet.calls()[2..4],
+        [wallet_call!(verify_signature), wallet_call!(create_action)]
+    );
 }
 
 #[tokio::test]
@@ -530,12 +533,12 @@ async fn a_double_spend_on_every_attempt_ends_after_five() {
 /// The reference's method name as this crate's.
 fn snake(name: &str) -> &'static str {
     match name {
-        "getPublicKey" => "get_public_key",
-        "createSignature" => "create_signature",
-        "verifySignature" => "verify_signature",
-        "createAction" => "create_action",
-        "signAction" => "sign_action",
-        "abortAction" => "abort_action",
+        "getPublicKey" => wallet_call!(get_public_key),
+        "createSignature" => wallet_call!(create_signature),
+        "verifySignature" => wallet_call!(verify_signature),
+        "createAction" => wallet_call!(create_action),
+        "signAction" => wallet_call!(sign_action),
+        "abortAction" => wallet_call!(abort_action),
         other => panic!("no name for {other}"),
     }
 }

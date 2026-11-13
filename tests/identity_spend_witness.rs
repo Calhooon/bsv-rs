@@ -593,7 +593,14 @@ async fn a_contact_update_signature_verifies_under_the_node_word() {
     wallet.set_source(source_transaction(&lock));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
 
-    manager.add_contact(contact(ALICE)).await.unwrap();
+    // the mock's signAction returns no transaction: since #904 the update
+    // stops there in the reference's words, the unlocking script recorded
+    assert_eq!(
+        manager.add_contact(contact(ALICE)).await,
+        Err(Error::IdentityError(
+            "Failed to update contact output".to_string()
+        ))
+    );
     assert_every_spend_verifies(&wallet, &lock, 1);
 }
 
@@ -606,9 +613,15 @@ async fn a_contact_removal_signature_verifies_under_the_node_word() {
     let lock = contact_token(&wallet, &identity_key).await;
     wallet.set_source(source_transaction(&lock));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
-    // the contact enters the cache through an update of the listed token
-    manager.add_contact(contact(&identity_key)).await.unwrap();
-
-    manager.remove_contact(&identity_key).await.unwrap();
+    // an update of the listed token, then its removal, each stopping at the
+    // mock's signAction (no transaction) with its unlocking script recorded;
+    // since #904 the removal asks the wallet whatever the cache holds
+    assert!(manager.add_contact(contact(&identity_key)).await.is_err());
+    assert_eq!(
+        manager.remove_contact(&identity_key).await,
+        Err(Error::IdentityError(
+            "Unable to authenticate or remove a contact output".to_string()
+        ))
+    );
     assert_every_spend_verifies(&wallet, &lock, 2);
 }

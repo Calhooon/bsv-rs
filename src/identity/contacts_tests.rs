@@ -2,7 +2,87 @@
 #![cfg(test)]
 
 use super::*;
-use crate::wallet::ProtoWallet;
+use crate::transaction::{TransactionInput, TransactionOutput};
+use crate::wallet::*;
+
+/// A ProtoWallet that holds no contact and answers a create: listOutputs an
+/// empty listing, createAction without inputs its finished transaction.
+/// Since #904 the manager returns a wallet's failure, so these tests, which
+/// leaned on the ProtoWallet's refused listOutputs and createAction being
+/// swallowed, run over a wallet that answers them.
+#[derive(Clone)]
+struct Answering(ProtoWallet);
+
+macro_rules! forward {
+    ($(($method:ident, $args:ty, $result:ty)),* ; $(($status:ident, $sresult:ty)),*) => {
+        #[async_trait::async_trait]
+        impl WalletInterface for Answering {
+            $(async fn $method(&self, args: $args, o: Option<&str>) -> Result<$result> {
+                WalletInterface::$method(&self.0, args, o).await
+            })*
+            $(async fn $status(&self, o: Option<&str>) -> Result<$sresult> {
+                WalletInterface::$status(&self.0, o).await
+            })*
+            async fn list_outputs(
+                &self,
+                _args: ListOutputsArgs,
+                _o: Option<&str>,
+            ) -> Result<ListOutputsResult> {
+                Ok(ListOutputsResult { outputs: vec![], total_outputs: 0, beef: None })
+            }
+            async fn create_action(
+                &self,
+                args: CreateActionArgs,
+                _o: Option<&str>,
+            ) -> Result<CreateActionResult> {
+                let mut tx = Transaction::new();
+                let mut input = TransactionInput::new("11".repeat(32), 0);
+                input.unlocking_script =
+                    Some(crate::script::UnlockingScript::from_binary(&[0x51])?);
+                tx.add_input(input)?;
+                for output in args.outputs.iter().flatten() {
+                    let lock = crate::script::LockingScript::from_binary(&output.locking_script)?;
+                    tx.add_output(TransactionOutput::new(output.satoshis, lock))?;
+                }
+                Ok(CreateActionResult { tx: Some(tx.to_atomic_beef(true)?), ..Default::default() })
+            }
+        }
+    };
+}
+
+forward! {
+    (get_public_key, GetPublicKeyArgs, GetPublicKeyResult),
+    (encrypt, EncryptArgs, EncryptResult),
+    (decrypt, DecryptArgs, DecryptResult),
+    (create_hmac, CreateHmacArgs, CreateHmacResult),
+    (verify_hmac, VerifyHmacArgs, VerifyHmacResult),
+    (create_signature, CreateSignatureArgs, CreateSignatureResult),
+    (verify_signature, VerifySignatureArgs, VerifySignatureResult),
+    (reveal_counterparty_key_linkage, WalletRevealCounterpartyArgs, RevealCounterpartyKeyLinkageResult),
+    (reveal_specific_key_linkage, WalletRevealSpecificArgs, RevealSpecificKeyLinkageResult),
+    (sign_action, SignActionArgs, SignActionResult),
+    (abort_action, AbortActionArgs, AbortActionResult),
+    (list_actions, ListActionsArgs, ListActionsResult),
+    (internalize_action, InternalizeActionArgs, InternalizeActionResult),
+    (relinquish_output, RelinquishOutputArgs, RelinquishOutputResult),
+    (acquire_certificate, AcquireCertificateArgs, WalletCertificate),
+    (list_certificates, ListCertificatesArgs, ListCertificatesResult),
+    (prove_certificate, ProveCertificateArgs, ProveCertificateResult),
+    (relinquish_certificate, RelinquishCertificateArgs, RelinquishCertificateResult),
+    (discover_by_identity_key, DiscoverByIdentityKeyArgs, DiscoverCertificatesResult),
+    (discover_by_attributes, DiscoverByAttributesArgs, DiscoverCertificatesResult),
+    (get_header_for_height, GetHeaderArgs, GetHeaderResult);
+    (is_authenticated, AuthenticatedResult),
+    (wait_for_authentication, AuthenticatedResult),
+    (get_height, GetHeightResult),
+    (get_network, GetNetworkResult),
+    (get_version, GetVersionResult)
+}
+
+/// The answering wallet of a fresh ProtoWallet.
+fn answering() -> Answering {
+    Answering(ProtoWallet::new(None))
+}
 
 // Canonical compressed keys (1G, 2G, 3G): the reference's record admits no
 // other identity key (`validateIdentityKey`, `ContactsManager.ts:83-94`; #544).
@@ -18,7 +98,7 @@ fn create_test_contact(key: &str, name: &str) -> Contact {
 
 #[tokio::test]
 async fn test_add_and_get_contact() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let contact = create_test_contact(ALICE, "Alice");
@@ -31,7 +111,7 @@ async fn test_add_and_get_contact() {
 
 #[tokio::test]
 async fn test_get_nonexistent_contact() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let result = manager.get_contact("nonexistent").await.unwrap();
@@ -40,7 +120,7 @@ async fn test_get_nonexistent_contact() {
 
 #[tokio::test]
 async fn test_update_contact() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     // Add initial contact
@@ -59,7 +139,7 @@ async fn test_update_contact() {
 
 #[tokio::test]
 async fn test_update_nonexistent_contact() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let contact = create_test_contact(ALICE, "Alice");
@@ -69,7 +149,7 @@ async fn test_update_nonexistent_contact() {
 
 #[tokio::test]
 async fn test_remove_contact() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let contact = create_test_contact(ALICE, "Alice");
@@ -87,16 +167,19 @@ async fn test_remove_contact() {
 
 #[tokio::test]
 async fn test_remove_nonexistent_contact() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
+    // Not a canonical key: refused before any wallet call. A canonical key
+    // the cache lacks asks the wallet, `Ok` when nothing is listed (#904).
     let result = manager.remove_contact("nonexistent").await;
     assert!(result.is_err());
+    manager.remove_contact(ALICE).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_list_contacts() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     // Add multiple contacts
@@ -119,7 +202,7 @@ async fn test_list_contacts() {
 
 #[tokio::test]
 async fn test_search_contacts_by_name() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     manager
@@ -141,7 +224,7 @@ async fn test_search_contacts_by_name() {
 
 #[tokio::test]
 async fn test_search_contacts_by_tag() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let mut contact1 = create_test_contact(ALICE, "Alice");
@@ -163,7 +246,7 @@ async fn test_search_contacts_by_tag() {
 
 #[tokio::test]
 async fn test_get_contacts_by_tag() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let mut contact1 = create_test_contact(ALICE, "Alice");
@@ -186,7 +269,7 @@ async fn test_get_contacts_by_tag() {
 
 #[tokio::test]
 async fn test_search_contacts_by_notes() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let mut contact = create_test_contact(ALICE, "Alice");
@@ -201,7 +284,7 @@ async fn test_search_contacts_by_notes() {
 
 #[tokio::test]
 async fn test_cache_management() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     assert!(!manager.is_cache_initialized().await);
@@ -219,7 +302,7 @@ async fn test_cache_management() {
 
 #[tokio::test]
 async fn test_case_insensitive_search() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     manager
@@ -240,7 +323,7 @@ async fn test_case_insensitive_search() {
 
 #[tokio::test]
 async fn test_add_contact_replaces_existing() {
-    let wallet = ProtoWallet::new(None);
+    let wallet = answering();
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
     let contact1 = create_test_contact(ALICE, "Alice V1");

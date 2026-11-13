@@ -78,7 +78,10 @@ fn new_and_the_setters_set_their_fields_552() {
 
 #[tokio::test]
 async fn new_holds_its_values_and_add_contact_refuses_them_552() {
-    let manager = ContactsManager::new(Counting::of_scalar(9), ContactsManagerConfig::default());
+    let manager = ContactsManager::new(
+        Counting::answering_contacts(9),
+        ContactsManagerConfig::default(),
+    );
     let cases = [
         (
             Contact::new("", KEY),
@@ -110,7 +113,7 @@ async fn a_contact_built_by_new_writes_the_vectors_record_552() {
     .with_badge_label(r["badgeLabel"].as_str().unwrap())
     .with_badge_click_url(r["badgeClickURL"].as_str().unwrap());
 
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     manager.add_contact(contact).await.unwrap();
     let created = wallet.created.lock().unwrap().clone().unwrap();
@@ -120,7 +123,7 @@ async fn a_contact_built_by_new_writes_the_vectors_record_552() {
     let token =
         PushDrop::decode(&LockingScript::from_binary(&output.locking_script).unwrap()).unwrap();
     let plaintext = WalletInterface::decrypt(
-        &Counting::of_scalar(9),
+        &Counting::answering_contacts(9),
         DecryptArgs {
             ciphertext: token.fields[0].clone(),
             protocol_id: Protocol::new(SecurityLevel::Counterparty, "contact"),
