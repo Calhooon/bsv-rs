@@ -50,7 +50,7 @@ Transport layer implementations for wallet communication (requires `http` featur
 Wire protocol implementation for binary wallet communication:
 - `mod.rs` - Module definitions and re-exports
 - `encoding.rs` - Binary encoding/decoding for all wallet types (~2,493 lines)
-- `calls.rs` - Call frame definitions for all 28 wallet operations
+- `calls.rs` - Call frame definitions for all 28 wallet operations; an unknown code refused as `Invalid call code: N`, the reference's words (#914)
 - `transceiver.rs` - Protocol transceiver (`WalletWireTransceiver`); `linkage.rs` its two linkage calls (#406)
 - `processor.rs` - Request/response processing (`WalletWireProcessor`)
 - See `wire/CLAUDE.md` for details

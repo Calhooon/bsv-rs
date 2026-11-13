@@ -1,0 +1,512 @@
+{
+  "description": "An unknown wallet wire call code (#914): the pin processor's and the head's frames, HTTPWalletWire's refusal, and the head client's probe fallback over five answers.",
+  "references": {
+    "pin": "ts-stack@edf6e03 packages/sdk/src/wallet/substrates/WalletWireProcessor.ts:276-283, HTTPWalletWire.ts:33-40",
+    "head": "ts-stack@5226d0c7 packages/sdk/src/wallet/substrates/WalletWireProcessor.ts:287-294, WalletWireTransceiver.ts:126-154, HTTPWalletWire.ts:41-48"
+  },
+  "node": "v22.18.0",
+  "processor": [
+    {
+      "side": "pin",
+      "request_hex": "00",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "0000",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "00000001",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "00fb",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "0003612e6201",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1d",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1d00",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1d000001",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1dfb",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1d03612e6201",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1e",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1e00",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1e000001",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1efb",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "1e03612e6201",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "63",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "6300",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "63000001",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "63fb",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "6303612e6201",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "ff",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "ff00",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "ff000001",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "fffb",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "pin",
+      "request_hex": "ff03612e6201",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "00",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "0000",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "00000001",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "00fb",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "0003612e6201",
+      "response_hex": "0114496e76616c69642063616c6c20636f64653a203000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1d",
+      "response_hex": "012c52656164657255696e743841727261792072656164206578636565647320617661696c61626c65206461746100",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1d00",
+      "response_hex": "012c52656164657255696e743841727261792072656164206578636565647320617661696c61626c65206461746100",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1d000001",
+      "response_hex": "0001",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1dfb",
+      "response_hex": "0143496e76616c6964206f726967696e61746f72206c656e6774683a206578706563746564206174206d6f7374203235302062797465732c2072656365697665642032353100",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1d03612e6201",
+      "response_hex": "012c52656164657255696e743841727261792072656164206578636565647320617661696c61626c65206461746100",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1e",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1e00",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1e000001",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1efb",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "1e03612e6201",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20333000",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "63",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "6300",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "63000001",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "63fb",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "6303612e6201",
+      "response_hex": "0115496e76616c69642063616c6c20636f64653a20393900",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "ff",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "ff00",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "ff000001",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "fffb",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    },
+    {
+      "side": "head",
+      "request_hex": "ff03612e6201",
+      "response_hex": "0116496e76616c69642063616c6c20636f64653a2032353500",
+      "called": []
+    }
+  ],
+  "http": [
+    {
+      "side": "pin",
+      "request_hex": "1d000001",
+      "requests_sent": 0,
+      "urls": [],
+      "result": null,
+      "thrown": {
+        "name": "Error",
+        "code": null,
+        "message": "Invalid call code: 29"
+      }
+    },
+    {
+      "side": "pin",
+      "request_hex": "6300",
+      "requests_sent": 0,
+      "urls": [],
+      "result": null,
+      "thrown": {
+        "name": "Error",
+        "code": null,
+        "message": "Invalid call code: 99"
+      }
+    },
+    {
+      "side": "head",
+      "request_hex": "1d000001",
+      "requests_sent": 1,
+      "urls": [
+        "http://localhost:1/certificateCompatibility"
+      ],
+      "result": "0001",
+      "thrown": null
+    },
+    {
+      "side": "head",
+      "request_hex": "6300",
+      "requests_sent": 0,
+      "urls": [],
+      "result": null,
+      "thrown": {
+        "name": "Error",
+        "code": null,
+        "message": "Invalid call code: 99"
+      }
+    }
+  ],
+  "client": [
+    {
+      "call": "discoverByIdentityKey",
+      "wire": "pin_processor",
+      "requests": [
+        "1d000001",
+        "15000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ffffffffffffffffffffffffffffffffffffff"
+      ],
+      "probe_response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "fell_back": true,
+      "result": {
+        "totalCertificates": 0,
+        "certificates": []
+      },
+      "thrown": null
+    },
+    {
+      "call": "discoverByIdentityKey",
+      "wire": "head_processor",
+      "requests": [
+        "1d000001",
+        "1d000101150279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ffffffffffffffffffffffffffffffffffffff"
+      ],
+      "probe_response_hex": "0001",
+      "fell_back": false,
+      "result": {
+        "totalCertificates": 0,
+        "certificates": []
+      },
+      "thrown": null
+    },
+    {
+      "call": "discoverByIdentityKey",
+      "wire": "code6_sentence",
+      "requests": [
+        "1d000001"
+      ],
+      "probe_response_hex": "0615496e76616c69642063616c6c20636f64653a20323900",
+      "fell_back": false,
+      "result": null,
+      "thrown": {
+        "name": "WalletError",
+        "code": 6,
+        "message": "Invalid call code: 29"
+      }
+    },
+    {
+      "call": "discoverByIdentityKey",
+      "wire": "base_frame",
+      "requests": [
+        "1d000001"
+      ],
+      "probe_response_hex": "0128696e76616c69642063616c6c20636f64653a20657870656374656420312d32382c20676f7420323900",
+      "fell_back": false,
+      "result": null,
+      "thrown": {
+        "name": "WalletError",
+        "code": 1,
+        "message": "invalid call code: expected 1-28, got 29"
+      }
+    },
+    {
+      "call": "discoverByIdentityKey",
+      "wire": "tip_live",
+      "requests": [
+        "1d000001",
+        "15000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ffffffffffffffffffffffffffffffffffffff"
+      ],
+      "probe_response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "fell_back": true,
+      "result": null,
+      "thrown": {
+        "name": "WalletError",
+        "code": 1,
+        "message": "discoverByIdentityKey requires a full wallet implementation"
+      }
+    },
+    {
+      "call": "listCertificates",
+      "wire": "pin_processor",
+      "requests": [
+        "1d000001",
+        "12000000ffffffffffffffffffffffffffffffffffffffff"
+      ],
+      "probe_response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "fell_back": true,
+      "result": {
+        "totalCertificates": 0,
+        "certificates": []
+      },
+      "thrown": null
+    },
+    {
+      "call": "listCertificates",
+      "wire": "head_processor",
+      "requests": [
+        "1d000001",
+        "1d000101120000ffffffffffffffffffffffffffffffffffffffff"
+      ],
+      "probe_response_hex": "0001",
+      "fell_back": false,
+      "result": {
+        "totalCertificates": 0,
+        "certificates": []
+      },
+      "thrown": null
+    },
+    {
+      "call": "listCertificates",
+      "wire": "code6_sentence",
+      "requests": [
+        "1d000001"
+      ],
+      "probe_response_hex": "0615496e76616c69642063616c6c20636f64653a20323900",
+      "fell_back": false,
+      "result": null,
+      "thrown": {
+        "name": "WalletError",
+        "code": 6,
+        "message": "Invalid call code: 29"
+      }
+    },
+    {
+      "call": "listCertificates",
+      "wire": "base_frame",
+      "requests": [
+        "1d000001"
+      ],
+      "probe_response_hex": "0128696e76616c69642063616c6c20636f64653a20657870656374656420312d32382c20676f7420323900",
+      "fell_back": false,
+      "result": null,
+      "thrown": {
+        "name": "WalletError",
+        "code": 1,
+        "message": "invalid call code: expected 1-28, got 29"
+      }
+    },
+    {
+      "call": "listCertificates",
+      "wire": "tip_live",
+      "requests": [
+        "1d000001",
+        "12000000ffffffffffffffffffffffffffffffffffffffff"
+      ],
+      "probe_response_hex": "0115496e76616c69642063616c6c20636f64653a20323900",
+      "fell_back": true,
+      "result": null,
+      "thrown": {
+        "name": "WalletError",
+        "code": 1,
+        "message": "listCertificates requires a full wallet implementation"
+      }
+    }
+  ]
+}
