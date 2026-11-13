@@ -115,6 +115,7 @@ jobs:
               cp "$RUNNER_TEMP/sibling-out/$name" "$RUNNER_TEMP/sibling-raw/$name"
             fi
           done < "$RUNNER_TEMP/sibling-members.txt"
+          printf '{"schema": 1, "head_sha": ' > "$RUNNER_TEMP/sibling-raw/stamp.json"
 
       # a re-run replaces its earlier attempt's artifact (`overwrite`); 30 days, past which no run
       # can be re-run, so a longer life serves no re-drive
