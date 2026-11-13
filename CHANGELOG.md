@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-11-13
+
 ### Security: the deprecated `KVStoreInterpreter::verify_signature_legacy` answered `true` for every token and every key; it now answers `true` only for a token whose controller field is that key and whose last field is that key's signature over the other fields (GHSA-mj2m-jxgv-r446)
 
 - What was wrong. `verify_signature_legacy(&PushDrop, &PublicKey)` read neither argument and answered `true`: a token no controller signed, a signed token checked against a key other than its controller's, and a PushDrop with no fields all passed. Its documentation said it delegated to the `KVStoreFields`-based `verify_signature`; it did not. Every published version answers this way: `0.2.0`, the crate's first release, through `0.8.8`, and the `0.9.0-beta` line; this release carries the fix.
