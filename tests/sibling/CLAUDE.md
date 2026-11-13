@@ -51,7 +51,7 @@ two parts, the captain's ruling on Q97.5 under the owner's decision of 2026-11-1
    `--record` refuses it; and a change to a public item the harness's adapter
    builds against (`SpendParams` is built as a struct literal, `harness/src/engine.rs`)
    stops the harness build, exit 2. Each waits on the sibling's change and a pin
-   move (the procedure in the job's `SIBLING_PIN` comment; seen on the review of
+   move (a pull request of `tests/sibling/PIN` and the re-recorded column; seen on the review of
    PR #853: `flow.rs:168`'s OP_VERIFY text changed, 26 entries outside the table).
 
 Every column the harness runs is under a node word (`set_flags`); none runs
@@ -92,16 +92,24 @@ GitHub's `bash --noprofile --norc -eo pipefail {0}`: the block stops at its firs
 command, and the harness's status is taken from `PIPESTATUS[0]` between `set +e` and `set -e`
 and returned by `exit "$rc"`.
 
+The pin lives in `tests/sibling/PIN` since #97's judge lane: one line of 40 lower-case hex
+digits and a newline, read by the job's `pin` step (anything else refused) and handed to the
+sibling's checkout and the judging step; `tests/arch_ci_sibling_judge_97.rs` holds the file and
+its equality with `column.json`'s `sibling`. The pin moves by a pull request of that file and the
+re-recorded column alone, never by an edit of `ci.yml`.
+
 What the pin cannot hold: the arch test, the workflow and the judge all travel in the pull
 request's own tree, so a pull request that edits the job edits the pin beside it, where a
-reviewer sees it. Holding that against a pull request by a machine is the next stage of #97
-(the judge read from beta and reported by its own App).
+reviewer sees it. Holding that against a pull request by a machine is the judge below: it exists
+on beta (`.github/scripts/sibling_judge.py`, tested by the `judge-tests` gate of `checks`), and
+nothing runs it yet. Until the wiring lane lands its two workflows (stage R, `sibling-run.yml`;
+stage J, `sibling-judge.yml`), this paragraph's first sentence stays true of every pull request.
 
 ## column.json
 
 | Key | What |
 |---|---|
-| `sibling` | the sibling commit the column was read at (the job's `SIBLING_PIN`, `ci.yml`) |
+| `sibling` | the sibling commit the column was read at (`tests/sibling/PIN`, read by `ci.yml`'s `sibling`) |
 | `rules_pin` | `harness/rules/bsv-rs.json`'s `pin` at that commit |
 | `withheld` | entries the public edition withholds (`"tx": "WITHHELD: ..."`), dropped from the staged copy per corpus: `gen` 150 at `1c051eae` |
 | `corpora` | per corpus: the counts above, `unknown_messages`, the explained `rules` rows and the staged corpus file's sha256 |
@@ -140,8 +148,8 @@ nothing else. The agreement class is not held per entry: at the pin the node's
 verdicts are the corpus file's, whose sha256 is held, so it moves only with a
 verdict. It writes the column's bytes (`column_text`: sorted keys,
 one line per entry), never by hand. A ruled reason change adds its `notes` line
-(`crypto-00079`: #657). Moving the pin is a commit of its own (Q97.6): the job's
-`SIBLING_PIN` and the re-recorded column together.
+(`crypto-00079`: #657). Moving the pin is a commit of its own (Q97.6): `tests/sibling/PIN`
+and the re-recorded column together, nothing else (the judge's class P).
 
 ## Exit codes
 
@@ -155,3 +163,135 @@ or unreadable report, an error of the script itself, which prints a `SETUP STOP`
 line the step summary carries). Measured on this host
 (`docs/lanes/fix-97-s1.md`): about 18.5 s cold, 11 s with the crate rebuilt over
 cached dependencies, 3 s warm, all nine corpora (13,765 entries).
+
+## The judge (#97, built on beta, nothing fired)
+
+The two-stage judge (decided 2026-11-10; the three design reads of 2026-11-12; the lane record
+`docs/lanes/fix-97a.md`). Stage R, a workflow on the pull request's head with no secret, runs
+
+```sh
+python3 -B .github/scripts/sibling_harness.py raw --tree . --sibling sibling --rev "$PIN" \
+  --corpus all --scratch <empty dir> --out <empty dir> --head-sha <head> [--pull-request <n>]
+```
+
+and uploads the files `python3 -B .github/scripts/sibling_judge.py members` lists as the
+artifact `sibling-raw` (`sibling_judge.py pack --out <out> --zip <file>` zips them as the upload
+holds them). `raw` judges nothing and reads no column; it writes `stamp.json` beside the run's
+files and exits 0 whenever the harness ran to a verdict. Stage J, on the default branch, checks
+beta out and runs `sibling_judge.py judge` there, holding no key, then `sibling_judge.py report`,
+the one job holding the App's token (`bsv-rs-sibling-judge`, ID 5700082, from the environment
+`sibling-judge`), which creates the check run `sibling-judge` once, already completed. The
+script names no App id and no secret: the id is an option, the token the environment's.
+
+`judge`'s rules, in this order (the shape of the change before the state of the run, so a bad
+pin reads `REFUSED` and never `NOT JUDGED`):
+
+1. **The run and the pull request.** The head is the run's `head_sha` as GitHub answers
+   `actions/runs/<id>`; the run's `path` is `.github/workflows/sibling-run.yml` (never its
+   name), its `head_repository.id` this repository's, its event `pull_request` or
+   `workflow_dispatch`, and `commits/<head>/pulls`, asked at judge time, holds an open pull
+   request with that head, both repositories this one, base `beta`. Otherwise no check, a line
+   in the log (`post` `no`). A run a newer `sibling-run` run or a newer attempt supersedes earns
+   no check either. No branch name enters a URL.
+2. **The two lines.** Every beta fact is read at one sha, `git rev-parse HEAD` of the judge's
+   checkout; main is `github.workflow_sha`. The file the run executes
+   (`<workflow_sha>:.github/workflows/sibling-judge.yml`) must be beta's, else `NOT JUDGED`
+   naming the line that is behind.
+3. **The head.** Never checked out: its `tests/sibling/PIN` and `tests/sibling/column.json`
+   are blobs read by `git cat-file` after a fetch by sha, mode 100644 each. The head must hold
+   beta's sha (`git merge-base --is-ancestor`), else `REFUSED: behind beta by N commits`.
+4. **The class**, from `git diff --raw -z --no-renames --no-abbrev <beta> <head>` (the names and
+   modes, a rename its old name deleted; no API list, whose compare stops at 300 files and whose
+   pull request files at 3,000); a mode other than 100644 at a J, P or W path refused. The table,
+   the earliest match deciding:
+
+   | Class | Paths |
+   |---|---|
+   | P | `tests/sibling/PIN` |
+   | W | `tests/sibling/column.json` |
+   | N | `CHANGELOG.md`, `docs/**`, every `CLAUDE.md` |
+   | J | `.github/workflows/sibling-run.yml`, `.github/workflows/sibling-judge.yml`, every path under `.github/scripts/` whose file name or a directory name carries `sibling_`, every other path under `tests/sibling/`, `tests/arch_ci_sibling_judge_97.rs` |
+   | C | every other path, `.github/workflows/ci.yml`, `.github/workflows/sync-main-into-beta.yml` and `tests/arch_ci_pr_runs_the_required_set.rs` among them |
+
+   At most one of J, P, C; N rides with any; W rides with C, with P or alone, never beside J (so
+   in a J diff the column is beta's). No class makes a check green by itself: every class is
+   judged from its artifact. A J diff's title reads `JUDGE CHANGE: <paths>`, in place of `GREEN`
+   or after a failure's opening word. N cannot move a verdict:
+   `tests/arch_ci_sibling_judge_97.rs` refuses an `include_str!`, `include_bytes!` or
+   `include!` of such a file under `src/` or in `build.rs`.
+5. **The pin.** The head's PIN blob is `^[0-9a-f]{40}\n$`, beta's unless the class is P, and
+   `repos/Calhooon/bsv-script-lean/compare/<pin>...main` answers `behind_by` 0 (a commit only a
+   fork of the sibling carries, which GitHub serves by sha through the parent, is refused).
+6. **The column's rules** (2026-11-10): no explained row and no abort witness; recorded at the
+   head's pin (its `sibling`, `rules_pin`, `withheld` and every corpus sha256 the judge's own
+   staging of the sibling at the pin, fetched by sha, nothing of it executed); outside P it moves
+   words alone against beta's (`held_at_the_pin`, `verdicts_moved`); in P no corpus and no judged
+   entry is dropped, `withheld` does not grow, and an entry whose corpus line the pin move left
+   unchanged keeps beta's words.
+7. **The run's state.** The artifact is read only from a run whose attempt ended `success`;
+   any other conclusion is `NOT JUDGED` naming it and the failed step. Exactly one unexpired
+   `sibling-raw` of the run, its head and this repository; none or two is `NOT JUDGED`, and a
+   dispatch whose artifact is gone posts `unless-standing` (nothing over a standing check). The
+   zip is taken by `gh api .../artifacts/<id>/zip` (it follows the 302 to storage) and read in
+   memory by the allowlist: no extraction, no `download-artifact`, nothing written under the
+   workspace; an unlisted, repeated or oversized member (64 MiB the artifact, 16 MiB a member,
+   on the declared sizes), a `..` or a leading `/`, a symlink entry or an unknown `schema` is
+   refused. The stamp and the run's record are compared with what the judge read and never used.
+8. **The verdict**, `judge_run` over the artifact's files, the head's column and the judge's own
+   corpus facts. Then `post`, `conclusion` (`success` or `failure` alone: `neutral` and
+   `skipped` would satisfy a required check), `title` and `text` (base64) go to the outputs.
+
+A failed check's title opens with one of three words: `RED` (a divergence: the change's),
+`REFUSED` (its shape: the classes, the pin, the column's rules, a head behind beta) or
+`NOT JUDGED` (stage R, the artifact, the trampoline, GitHub: re-drive). Every string from the
+artifact or the head goes into the text inside one fenced block (backticks and control bytes
+replaced, 500 bytes a line, 60,000 characters in all, the lines cut counted), save a J diff's
+path names, which the title carries after `JUDGE CHANGE: ` (the same bytes replaced, the title
+cut at 240 bytes); the script prints
+none of it to its log. Every failed check ends with the command that re-judges it (the App has
+no webhook: its check's Re-run button does nothing). `judge` and `report` exit 0 whenever a
+verdict was reached and posted or nothing was posted on purpose, non-zero only when `report`
+could not report: a `workflow_run`'s own jobs sit on main's tip, and a RED in a pull request must
+never paint the stable line red.
+
+**A change that needs both sides at once.** A J diff is judged like any other, from its
+artifact, with beta's script in stage R (run on the head's tree) and beta's judge in stage J. So a change of an interface the two stages share lands in two pull
+requests, the reader made tolerant and then the writer: the `raw` command's options with the
+workflow that calls it; `stamp.json`'s fields with the judge's stamp check; the artifact's
+members with `members`; `sibling_words.rs` with a public item the harness's adapter builds
+against. One that cannot be split is the lift RELEASING describes (the owner's alone).
+
+**The dry run and the sweep.**
+
+```sh
+python3 -I -B .github/scripts/sibling_judge.py judge --dry-run --artifact <zip or raw tree> \
+  --head <sha> [--beta <sha>] --judge <checkout holding both> --sibling <bsv-script-lean repo> \
+  [--pull-request <n>] [--offline]
+python3 -I -B .github/scripts/sibling_judge.py sweep --app-id 5700082
+```
+
+The dry run calls no GitHub write (and with `--offline` no read: the pin's place on the
+sibling's `main` is then unmade) and prints the check it would post; it says which rules it could
+not make (the run's identity, the superseded test, the artifact's record, the trampoline's
+comparison). The sweep reads and never writes: for every open pull request into beta its head,
+its newest completed stage R run and whether the App's check stands, and the act for each gap
+as a command (no run, a run and no check, a conflict with beta, a fork's head).
+
+## What the judge does not hold
+
+The judge holds the judging files, the pin and the column against a pull request; it does not
+hold the raw output against the head's own code, since stage R runs the head's `build.rs`, its
+dependencies and the crate itself on the runner that writes that output. A head that lies in its
+raw output (a `build.rs` that rewrites the words, a crate that prints the column's answers) is
+held by the reads of the change, no machine.
+
+A RED on beta's own push run of `sibling` (a dependency's release: no `Cargo.lock` is tracked, so
+each run resolves afresh) turns every pull request RED with no change of its own at fault, and
+holds them all until the repairing pull request lands.
+
+The tests: `.github/scripts/test_sibling_judge.py` (hermetic: a fake of the one GitHub class
+counting every write, a sibling, an upstream and beta's clone built under a temporary directory;
+`fixtures/sibling_judge/` holds the two run records of 2026-11-12 as GitHub answered them, less the
+fields the judge never reads, the `path` alone replaced; no real fork is used, the identity
+table's foreign `head_repository.id` is that witness), run by `checks`' `judge-tests` with
+`test_sibling_harness.py`; and `tests/arch_ci_sibling_judge_97.rs`.

@@ -363,7 +363,8 @@ class Producers(unittest.TestCase):
         self.assertIn('["CI / sibling"]', self.source())
         self.assertIn('startswith("VERDICTS:")', self.source())
         if "sibling" in self.jobs(".github/workflows/ci.yml"):
-            self.assertIn('print(f"VERDICTS: {entries} entries, {total} divergences{split}")', self.text(".github/scripts/sibling_harness.py"))
+            # the headline's producer: judge_run builds it since #97's judge lane, compare prints it
+            self.assertIn('lines.append(f"VERDICTS: {entries} entries, {total} divergences{split}")', self.text(".github/scripts/sibling_harness.py"))
 
     def test_the_wasm32_slices_have_their_producers(self):
         self.assertIn(r'(?:CI|Features) / wasm32 \((.+)\)', self.source())

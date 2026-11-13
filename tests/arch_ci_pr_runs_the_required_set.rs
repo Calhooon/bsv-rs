@@ -1146,7 +1146,12 @@ fn the_evaluator_reads_the_files_idioms() {
 /// `bash --noprofile --norc -eo pipefail {0}` (the runner's documented template for `bash`): the
 /// block stops at the first failing command and a pipeline fails with its last failing member;
 /// `set -euo pipefail` repeats it in the block, and the harness's own status is taken from
-/// `PIPESTATUS[0]` between `set +e` and `set -e`. The constant is data: the YAML as it stands.
+/// `PIPESTATUS[0]` between `set +e` and `set -e`. The pin is not in these bytes since #97's
+/// judge lane: it lives in `tests/sibling/PIN`, read by the job's `pin` step (40 lower-case hex
+/// digits and a newline, refused otherwise) and handed to the sibling's checkout and the judging
+/// step as `steps.pin.outputs.sibling`, so a pin moves by a pull request of that file and the
+/// re-recorded column alone, never by an edit of this job (`tests/arch_ci_sibling_judge_97.rs`
+/// holds the file). The constant is data: the YAML as it stands.
 const SIBLING_JOB: &str = r##"  sibling:
     name: sibling
     if: >-
@@ -1154,18 +1159,29 @@ const SIBLING_JOB: &str = r##"  sibling:
       (github.event_name != 'push' || github.ref != 'refs/heads/main')
     runs-on: ubuntu-latest
     env:
-      # THE PIN, in this one place. The sibling's public edition (bsv-script-lean's home since
-      # 2026-10-27; the private Calgooon repository is archived): no token is read. To move it:
-      # set SIBLING_PIN to the new commit, run tests/sibling/CLAUDE.md's one command against a
-      # checkout at it with `--record`, and commit the pin and the re-recorded column together
-      # (a commit of its own, Q97.6). The script refuses a column read at another commit (exit 2).
+      # The sibling's public edition (bsv-script-lean's home since 2026-10-27; the private
+      # Calgooon repository is archived): no token is read. THE PIN lives in tests/sibling/PIN
+      # (#97), one line of 40 hex digits, read by the step below: it moves by a pull request of
+      # that file and the column re-recorded at it (tests/sibling/CLAUDE.md's one command with
+      # `--record`, a commit of its own, Q97.6), never by an edit of this job. The script refuses
+      # a column read at another commit (exit 2).
       SIBLING_REPOSITORY: Calhooon/bsv-script-lean
-      SIBLING_PIN: 1c051eaef1077cc95e5d1618686d5efacc4aa097
       CARGO_TARGET_DIR: ${{ github.workspace }}/sibling-target
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+
+      # the pin from its file: 40 lower-case hex digits and a newline, nothing else
+      - name: Read the pin
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          pin="$(cat tests/sibling/PIN)"
+          printf '%s\n' "$pin" | cmp -s - tests/sibling/PIN
+          [[ "$pin" =~ ^[0-9a-f]{40}$ ]]
+          echo "sibling=$pin" >> "$GITHUB_OUTPUT"
 
       - name: The command's unit tests
         run: python3 -B -m unittest discover -s .github/scripts -p 'test_sibling_harness.py'
@@ -1175,7 +1191,7 @@ const SIBLING_JOB: &str = r##"  sibling:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: ${{ env.SIBLING_REPOSITORY }}
-          ref: ${{ env.SIBLING_PIN }}
+          ref: ${{ steps.pin.outputs.sibling }}
           path: sibling
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -1209,7 +1225,7 @@ const SIBLING_JOB: &str = r##"  sibling:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C sibling rev-parse HEAD)" = "$SIBLING_PIN"
+          test "$(git -C sibling rev-parse HEAD)" = "${{ steps.pin.outputs.sibling }}"
           set +e
           python3 -B .github/scripts/sibling_harness.py run --tree . --sibling sibling \
             --corpus all --scratch "$RUNNER_TEMP/sibling-scratch" --out "$RUNNER_TEMP/sibling-out" \
@@ -1537,8 +1553,8 @@ fn the_sibling_job_judges_on_every_event_it_runs_on_with_no_reach_filter_97() {
     // the job behind a plan job's output
     let job = edited(
         &ci,
-        "      (github.event_name != 'push' || github.ref != 'refs/heads/main')\n    runs-on: ubuntu-latest\n    env:\n      # THE PIN",
-        "      (github.event_name != 'push' || github.ref != 'refs/heads/main') &&\n      needs.plan.outputs.reached == 'true'\n    needs: plan\n    runs-on: ubuntu-latest\n    env:\n      # THE PIN",
+        "      (github.event_name != 'push' || github.ref != 'refs/heads/main')\n    runs-on: ubuntu-latest\n    env:\n      # The sibling's public edition",
+        "      (github.event_name != 'push' || github.ref != 'refs/heads/main') &&\n      needs.plan.outputs.reached == 'true'\n    needs: plan\n    runs-on: ubuntu-latest\n    env:\n      # The sibling's public edition",
     );
     let errors = sibling_refusals(&job);
     assert_eq!(errors.len(), 3, "{errors:?}");
@@ -1635,7 +1651,7 @@ fn the_sibling_step_is_pinned_and_no_failure_of_it_is_absorbed_97() {
         );
     }
     // continue-on-error on the job: its line named, the job's bytes changed
-    let site = "      (github.event_name != 'push' || github.ref != 'refs/heads/main')\n    runs-on: ubuntu-latest\n    env:\n      # THE PIN";
+    let site = "      (github.event_name != 'push' || github.ref != 'refs/heads/main')\n    runs-on: ubuntu-latest\n    env:\n      # The sibling's public edition";
     let job = edited(
         &ci,
         site,
@@ -1692,9 +1708,11 @@ fn the_sibling_job_and_what_it_inherits_are_pinned_whole_97() {
     let ci = read(".github/workflows/ci.yml");
     let judging = "      - name: sibling\n        shell: bash\n";
     let before = |run: &str| format!("      - name: prepare\n        run: {run}\n\n{judging}");
-    let at_runs_on = "    runs-on: ubuntu-latest\n    env:\n      # THE PIN";
-    let job_key = |key: &str| format!("    runs-on: ubuntu-latest\n{key}    env:\n      # THE PIN");
-    let pin = "      SIBLING_PIN: 1c051eaef1077cc95e5d1618686d5efacc4aa097\n";
+    let at_runs_on = "    runs-on: ubuntu-latest\n    env:\n      # The sibling's public edition";
+    let job_key = |key: &str| {
+        format!("    runs-on: ubuntu-latest\n{key}    env:\n      # The sibling's public edition")
+    };
+    let pin = "      SIBLING_REPOSITORY: Calhooon/bsv-script-lean\n";
     let job_env = |key: &str| format!("{pin}      {key}\n");
     let checkout = "      - name: Check out the sibling at the pin\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n";
     let job_plants: Vec<(&str, &str, String)> = vec![
@@ -1707,13 +1725,16 @@ fn the_sibling_job_and_what_it_inherits_are_pinned_whole_97() {
         ("a job env: RUNNER_TEMP", pin, job_env("RUNNER_TEMP: ./shadow")),
         ("a job container:", at_runs_on, job_key("    container: python:3\n")),
         ("another action for the sibling's checkout", checkout, checkout.replace("actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0", "someone/checkout@v4")),
-        ("the sibling checkout's ref changed", "          ref: ${{ env.SIBLING_PIN }}\n", "          ref: main\n".into()),
+        ("the sibling checkout's ref changed", "          ref: ${{ steps.pin.outputs.sibling }}\n", "          ref: main\n".into()),
+        ("the pin back in the job's env", pin, format!("{pin}      SIBLING_PIN: 1c051eaef1077cc95e5d1618686d5efacc4aa097\n")),
+        ("the pin's file check loosened", "          [[ \"$pin\" =~ ^[0-9a-f]{40}$ ]]\n", "          [[ \"$pin\" =~ ^[0-9a-fA-F]+$ ]]\n".into()),
+        ("the pin step dropped from the judging step's comparison", "          test \"$(git -C sibling rev-parse HEAD)\" = \"${{ steps.pin.outputs.sibling }}\"\n", "".into()),
         ("a step after the judging one on failure()", "          exit \"$rc\"\n", "          exit \"$rc\"\n\n      - name: rescue\n        if: failure()\n        run: exit 0\n".into()),
         ("timeout-minutes: 0", at_runs_on, job_key("    timeout-minutes: 0\n")),
         ("runs-on changed", at_runs_on, at_runs_on.replace("ubuntu-latest", "self-hosted")),
         ("a strategy: added", at_runs_on, job_key("    strategy:\n      matrix:\n        os: [ubuntu-latest]\n")),
         ("a job key behind a comment at the job's indent", "          exit \"$rc\"\n", "          exit \"$rc\"\n  # an aside\n    continue-on-error: true\n".into()),
-        ("one byte changed in a comment of the job", "set SIBLING_PIN to the new commit", "set SIBLING_PIN to the new commits".into()),
+        ("one byte changed in a comment of the job", "THE PIN lives in tests/sibling/PIN", "THE PIN lives in tests/sibling/PINS".into()),
     ];
     for (what, old, new) in &job_plants {
         let errors = sibling_refusals(&edited(&ci, old, new));

@@ -1,0 +1,13 @@
+{
+  "conclusion": "cancelled",
+  "event": "workflow_dispatch",
+  "head_repository": {
+    "id": 1189676804
+  },
+  "head_sha": "5d7acc7f55115357693188f8a1e75199779d8c73",
+  "id": 41877431322,
+  "path": ".github/workflows/sibling-run.yml",
+  "pull_requests": [],
+  "run_attempt": 1,
+  "status": "completed"
+}
