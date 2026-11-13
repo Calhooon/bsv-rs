@@ -1,0 +1,26 @@
+name: witness-dispatch
+
+# Witness 15 of #97 (fix-97c): a pull request's job dispatches stage R on its own branch with the
+# GITHUB_TOKEN after the pull request's own stage R has completed and been judged; nothing else.
+on:
+  pull_request:
+    branches: [beta]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch stage R on the branch, four minutes after the pull request's own
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          sleep 240
+          gh workflow run sibling-run.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
