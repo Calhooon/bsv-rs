@@ -103,14 +103,15 @@ async fn receive(message: AuthMessage) -> Result<()> {
         message.initial_nonce.clone().unwrap(),
         42,
     );
-    let peer = Peer::new(PeerOptions {
-        wallet: ProtoWallet::new(Some(deterministic_test_key(69))),
-        transport: Capture::default(),
-        certificates_to_request: Some(policy),
-        session_manager: Some(sessions),
-        auto_persist_last_session: false,
-        originator: None,
-    });
+    let peer = Peer::new(
+        PeerOptions::new(
+            ProtoWallet::new(Some(deterministic_test_key(69))),
+            Capture::default(),
+        )
+        .with_certificates_to_request(Some(policy))
+        .with_session_manager(Some(sessions))
+        .with_auto_persist_last_session(false),
+    );
     peer.handle_incoming_message(message).await
 }
 
@@ -120,14 +121,11 @@ async fn response(names: &[&str]) -> AuthMessage {
     let sender_nonce = create_nonce(&sender_wallet, None, None).await.unwrap();
     let receiver_nonce = create_nonce(&receiver_wallet, None, None).await.unwrap();
     let capture = Capture::default();
-    let peer = Peer::new(PeerOptions {
-        wallet: sender_wallet,
-        transport: capture.clone(),
-        certificates_to_request: None,
-        session_manager: Some(session(sender_nonce, receiver_nonce, 69)),
-        auto_persist_last_session: false,
-        originator: None,
-    });
+    let peer = Peer::new(
+        PeerOptions::new(sender_wallet, capture.clone())
+            .with_session_manager(Some(session(sender_nonce, receiver_nonce, 69)))
+            .with_auto_persist_last_session(false),
+    );
     peer.send_certificate_response(
         &deterministic_test_key(69).public_key().to_hex(),
         vec![certificate(names)],

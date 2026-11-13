@@ -121,18 +121,20 @@ async fn end(
 ) -> End {
     let sent: Log = Arc::default();
     let callback: Arc<Mutex<Option<Box<TransportCallback>>>> = Arc::default();
-    let peer = Arc::new(Peer::new(PeerOptions {
-        wallet: ProtoWallet::new(Some(key.clone())),
-        transport: LoggedTransport {
-            sent: sent.clone(),
-            to,
-            callback: callback.clone(),
-        },
-        certificates_to_request: policy,
-        session_manager: sessions,
-        auto_persist_last_session: false,
-        originator: Some("test-294".into()),
-    }));
+    let peer = Arc::new(Peer::new(
+        PeerOptions::new(
+            ProtoWallet::new(Some(key.clone())),
+            LoggedTransport {
+                sent: sent.clone(),
+                to,
+                callback: callback.clone(),
+            },
+        )
+        .with_certificates_to_request(policy)
+        .with_session_manager(sessions)
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test-294".into())),
+    ));
     let requested: Arc<Mutex<Vec<RequestedCertificateSet>>> = Arc::default();
     let into = requested.clone();
     peer.listen_for_certificates_requested(move |_sender, set| {

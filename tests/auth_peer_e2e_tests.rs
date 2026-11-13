@@ -99,24 +99,20 @@ async fn create_connected_peers(
 
     // Create peers
     let alice_wallet = ProtoWallet::new(Some(alice_key.clone()));
-    let alice = Arc::new(Peer::new(PeerOptions {
-        wallet: alice_wallet,
-        transport: alice_transport,
-        certificates_to_request: alice_certs_to_request,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    }));
+    let alice = Arc::new(Peer::new(
+        PeerOptions::new(alice_wallet, alice_transport)
+            .with_certificates_to_request(alice_certs_to_request)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    ));
 
     let bob_wallet = ProtoWallet::new(Some(bob_key.clone()));
-    let bob = Arc::new(Peer::new(PeerOptions {
-        wallet: bob_wallet,
-        transport: bob_transport,
-        certificates_to_request: bob_certs_to_request,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    }));
+    let bob = Arc::new(Peer::new(
+        PeerOptions::new(bob_wallet, bob_transport)
+            .with_certificates_to_request(bob_certs_to_request)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    ));
 
     // Spawn routing task: messages from Alice's channel go to Alice's handle_incoming_message
     let alice_clone = alice.clone();
@@ -392,14 +388,11 @@ async fn test_invalid_auth_version_rejected() {
     let (bob_tx, _bob_rx) = mpsc::unbounded_channel::<AuthMessage>();
     let bob_transport = ChannelTransport::new(bob_tx);
     let bob_wallet = ProtoWallet::new(Some(bob_key.clone()));
-    let bob = Peer::new(PeerOptions {
-        wallet: bob_wallet,
-        transport: bob_transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    });
+    let bob = Peer::new(
+        PeerOptions::new(bob_wallet, bob_transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    );
 
     // Craft a message with an invalid version and deliver it directly
     let alice_pub = alice_key.public_key();
@@ -432,14 +425,11 @@ async fn test_handle_initial_request_creates_session() {
     let (bob_tx, mut bob_rx) = mpsc::unbounded_channel::<AuthMessage>();
     let bob_transport = ChannelTransport::new(bob_tx);
     let bob_wallet = ProtoWallet::new(Some(bob_key.clone()));
-    let bob = Peer::new(PeerOptions {
-        wallet: bob_wallet,
-        transport: bob_transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    });
+    let bob = Peer::new(
+        PeerOptions::new(bob_wallet, bob_transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    );
 
     // Create an InitialRequest from Alice
     let alice_pub = alice_key.public_key();
@@ -482,14 +472,11 @@ async fn test_listener_registration_and_deregistration() {
     let (tx, _rx) = mpsc::unbounded_channel::<AuthMessage>();
     let transport = ChannelTransport::new(tx);
     let wallet = ProtoWallet::new(Some(key.clone()));
-    let peer = Peer::new(PeerOptions {
-        wallet,
-        transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    });
+    let peer = Peer::new(
+        PeerOptions::new(wallet, transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    );
 
     // Register general message listener
     let id1 = peer
@@ -532,14 +519,11 @@ async fn test_identity_key_consistency() {
     let (tx, _rx) = mpsc::unbounded_channel::<AuthMessage>();
     let transport = ChannelTransport::new(tx);
     let wallet = ProtoWallet::new(Some(key.clone()));
-    let peer = Peer::new(PeerOptions {
-        wallet,
-        transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    });
+    let peer = Peer::new(
+        PeerOptions::new(wallet, transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    );
 
     let identity = peer.get_identity_key().await.unwrap();
     assert_eq!(identity.to_hex(), expected_pub.to_hex());
@@ -883,14 +867,11 @@ async fn test_general_message_without_session_fails() {
     let (bob_tx, _bob_rx) = mpsc::unbounded_channel::<AuthMessage>();
     let bob_transport = ChannelTransport::new(bob_tx);
     let bob_wallet = ProtoWallet::new(Some(bob_key.clone()));
-    let bob = Peer::new(PeerOptions {
-        wallet: bob_wallet,
-        transport: bob_transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    });
+    let bob = Peer::new(
+        PeerOptions::new(bob_wallet, bob_transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    );
 
     // Create a General message from Alice without prior handshake, its
     // yourNonce one Bob's wallet made (checked before the session since #353)
@@ -930,14 +911,11 @@ async fn test_certificate_request_without_session_fails() {
     let (bob_tx, _bob_rx) = mpsc::unbounded_channel::<AuthMessage>();
     let bob_transport = ChannelTransport::new(bob_tx);
     let bob_wallet = ProtoWallet::new(Some(bob_key.clone()));
-    let bob = Peer::new(PeerOptions {
-        wallet: bob_wallet,
-        transport: bob_transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("e2e-test".into()),
-    });
+    let bob = Peer::new(
+        PeerOptions::new(bob_wallet, bob_transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("e2e-test".into())),
+    );
 
     // Create a CertificateRequest from Alice without prior handshake
     let alice_pub = alice_key.public_key();
@@ -1041,14 +1019,11 @@ async fn test_ts_style_server_no_nonce_field() {
 
     let alice_transport = ChannelTransport::new(bob_tx);
     let alice_wallet = ProtoWallet::new(Some(alice_key.clone()));
-    let alice = Arc::new(Peer::new(PeerOptions {
-        wallet: alice_wallet,
-        transport: alice_transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("ts-compat-test".into()),
-    }));
+    let alice = Arc::new(Peer::new(
+        PeerOptions::new(alice_wallet, alice_transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("ts-compat-test".into())),
+    ));
 
     // Alice uses start() to set up the callback (not handle_incoming_message)
     alice.start();
@@ -1164,14 +1139,11 @@ async fn test_intake_refusal_leaves_the_handshake_waiter_to_timeout() {
 
     let alice_transport = ChannelTransport::new(bob_tx);
     let alice_wallet = ProtoWallet::new(Some(alice_key.clone()));
-    let alice = Arc::new(Peer::new(PeerOptions {
-        wallet: alice_wallet,
-        transport: alice_transport,
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("error-propagation-test".into()),
-    }));
+    let alice = Arc::new(Peer::new(
+        PeerOptions::new(alice_wallet, alice_transport)
+            .with_auto_persist_last_session(false)
+            .with_originator(Some("error-propagation-test".into())),
+    ));
 
     // Use start() to set up the callback (this is the code path we're testing)
     alice.start();

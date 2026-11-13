@@ -263,6 +263,25 @@ macro_rules! non_exhaustive_enum {
 /// # fn main() {}
 /// ```
 ///
+/// on a generic type with its own `Drop`, named at one instantiation, it
+/// fails to compile (#843d8a's fold)
+///
+/// ```compile_fail,E0283
+/// # mod util { pub mod non_exhaustive {
+/// #     include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/util/non_exhaustive.rs"));
+/// # } }
+/// pub mod sample {
+///     pub struct Pair<A> {
+///         pub one: A,
+///     }
+///     impl<A> Drop for Pair<A> {
+///         fn drop(&mut self) {}
+///     }
+///     crate::util::non_exhaustive::assert_no_drop!(Pair<u8>, crate::sample::Pair<u8>);
+/// }
+/// # fn main() {}
+/// ```
+///
 /// on a pin's path naming another type it fails to compile
 ///
 /// ```compile_fail,E0308
@@ -279,7 +298,9 @@ macro_rules! non_exhaustive_enum {
 /// # fn main() {}
 /// ```
 ///
-/// and on a type without one, named by its own path, it compiles:
+/// and on a type without one, named by its own path, it compiles, a generic
+/// struct named at one instantiation by its arguments after its name and in
+/// its path (#843d8a's fold, `PeerOptions`):
 ///
 /// ```
 /// # mod util { pub mod non_exhaustive {
@@ -291,12 +312,20 @@ macro_rules! non_exhaustive_enum {
 ///     }
 ///     pub struct Other;
 ///     crate::util::non_exhaustive::assert_no_drop!(Held, crate::sample::Held);
+///     pub struct Pair<A, B> {
+///         pub one: A,
+///         pub two: B,
+///     }
+///     crate::util::non_exhaustive::assert_no_drop!(
+///         Pair<String, Other>,
+///         crate::sample::Pair<String, Other>
+///     );
 /// }
 /// # fn main() {}
 /// ```
 #[allow(unused_macros)]
 macro_rules! assert_no_drop {
-    ($name:ident, $path:path) => {
+    ($name:ident $(< $($arg:ty),+ >)?, $path:path) => {
         const _: fn() = || {
             trait AmbiguousIfDrop<A> {
                 fn some_item() {}
@@ -306,9 +335,9 @@ macro_rules! assert_no_drop {
             struct ImplementsDrop;
             #[allow(drop_bounds)]
             impl<T: ?::core::marker::Sized + ::core::ops::Drop> AmbiguousIfDrop<ImplementsDrop> for T {}
-            let _ = <$name as AmbiguousIfDrop<_>>::some_item;
+            let _ = <$name $(< $($arg),+ >)? as AmbiguousIfDrop<_>>::some_item;
         };
-        const _: fn($name) -> $path = |value| value;
+        const _: fn($name $(< $($arg),+ >)?) -> $path = |value| value;
     };
 }
 

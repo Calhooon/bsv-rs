@@ -10,10 +10,9 @@
 //! ```rust,ignore
 //! use bsv_rs::auth::transports::websocket_transport::{WebSocketTransport, WebSocketTransportOptions};
 //!
-//! let transport = WebSocketTransport::new(WebSocketTransportOptions {
-//!     base_url: "ws://localhost:8080".to_string(),
-//!     read_deadline_secs: Some(30),
-//! })?;
+//! let transport = WebSocketTransport::new(
+//!     WebSocketTransportOptions::new("ws://localhost:8080").with_read_deadline_secs(Some(30)),
+//! )?;
 //! ```
 
 use crate::auth::types::AuthMessage;
@@ -27,13 +26,38 @@ use tokio_tungstenite::tungstenite::Message;
 use super::http::{Transport, TransportCallback};
 
 /// Configuration options for [`WebSocketTransport`].
-#[derive(Clone)] // Debug prints the URL through `debug_redact::Url` (below)
+///
+/// A record that grows (go-sdk's `WebSocketTransportOptions`,
+/// `auth/transports/websocket_transport.go:30-33` at `2ca481c`; no TypeScript
+/// twin), so it is `#[non_exhaustive]` (#843d8a): build it with
+/// [`Self::new`] and the `with_` setter; the fields stay readable, and a
+/// pattern over it ends in `..`.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::auth::WebSocketTransportOptions) -> bsv_rs::auth::WebSocketTransportOptions {
+///     bsv_rs::auth::WebSocketTransportOptions { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::auth::WebSocketTransportOptions) -> bsv_rs::auth::WebSocketTransportOptions {
+///     value
+/// }
+/// ```
+// Debug prints the URL through `debug_redact::Url` (below).
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct WebSocketTransportOptions {
     /// WebSocket URL to connect to (must start with `ws://` or `wss://`).
     pub base_url: String,
     /// Read deadline in seconds. Defaults to 30 if `None` or 0.
     pub read_deadline_secs: Option<u64>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    WebSocketTransportOptions,
+    bsv_rs::auth::WebSocketTransportOptions
+);
 
 /// The write half of a tokio-tungstenite WebSocket connection.
 type WsSink = futures_util::stream::SplitSink<
@@ -62,6 +86,24 @@ pub struct WebSocketTransport {
     on_data_callbacks: Arc<RwLock<Vec<Box<TransportCallback>>>>,
     /// Read deadline in seconds.
     read_deadline_secs: u64,
+}
+
+impl WebSocketTransportOptions {
+    /// The options for `base_url`, with no read deadline (30 seconds).
+    #[must_use]
+    pub fn new(base_url: impl Into<String>) -> Self {
+        Self {
+            base_url: base_url.into(),
+            read_deadline_secs: None,
+        }
+    }
+
+    /// Sets the read deadline in seconds (30 when `None` or 0).
+    #[must_use]
+    pub fn with_read_deadline_secs(mut self, value: Option<u64>) -> Self {
+        self.read_deadline_secs = value;
+        self
+    }
 }
 
 impl std::fmt::Debug for WebSocketTransportOptions {

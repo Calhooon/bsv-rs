@@ -204,17 +204,17 @@ struct End {
 async fn end(wallet: TestWallet, server: bool) -> End {
     let (out, sent) = mpsc::unbounded_channel();
     let callback: Callback = Arc::new(Mutex::new(None));
-    let peer = Arc::new(Peer::new(PeerOptions {
-        wallet,
-        transport: Wire {
-            out,
-            callback: callback.clone(),
-        },
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    }));
+    let peer = Arc::new(Peer::new(
+        PeerOptions::new(
+            wallet,
+            Wire {
+                out,
+                callback: callback.clone(),
+            },
+        )
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    ));
     if server {
         peer.start_server();
     } else {
@@ -566,17 +566,17 @@ impl Transport for Held {
 }
 
 fn held_peer(marker: &Arc<()>) -> Peer<ProtoWallet, Held> {
-    Peer::new(PeerOptions {
-        wallet: ProtoWallet::new(Some(client_key())),
-        transport: Held {
-            _marker: marker.clone(),
-            callback: Mutex::new(None),
-        },
-        certificates_to_request: None,
-        session_manager: None,
-        auto_persist_last_session: false,
-        originator: Some("test".into()),
-    })
+    Peer::new(
+        PeerOptions::new(
+            ProtoWallet::new(Some(client_key())),
+            Held {
+                _marker: marker.clone(),
+                callback: Mutex::new(None),
+            },
+        )
+        .with_auto_persist_last_session(false)
+        .with_originator(Some("test".into())),
+    )
 }
 
 #[test]

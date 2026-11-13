@@ -406,14 +406,11 @@ mod auth {
 
     async fn peer(originator: Option<&str>) -> Option<String> {
         let wallet = Recording::new();
-        let peer = Peer::new(PeerOptions {
-            wallet: wallet.clone(),
-            transport: MockTransport::new(),
-            certificates_to_request: None,
-            session_manager: None,
-            auto_persist_last_session: false,
-            originator: originator.map(str::to_string),
-        });
+        let peer = Peer::new(
+            PeerOptions::new(wallet.clone(), MockTransport::new())
+                .with_auto_persist_last_session(false)
+                .with_originator(originator.map(str::to_string)),
+        );
         peer.get_identity_key().await.unwrap();
         wallet.first().1
     }

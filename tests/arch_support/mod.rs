@@ -294,6 +294,12 @@ pub fn code_tokens(source: &str, wasm: bool) -> Vec<Token<'_>> {
     scan_tokens(source, wasm, false)
 }
 
+/// [`code_tokens`] with the attributes kept, on a text: what
+/// [`Source::tokens_with_attributes`] reads from a file (#843d8a's probes).
+pub fn scan_tokens_with_attributes(source: &str) -> Vec<Token<'_>> {
+    scan_tokens(source, false, true)
+}
+
 fn scan_tokens(source: &str, wasm: bool, keep_attributes: bool) -> Vec<Token<'_>> {
     let tokens = lex(source);
     let mut out = Vec::new();

@@ -167,12 +167,10 @@ async fn request_payloads_are_bounded_before_the_peer_copies_them_423() {
         )
         .with_max_response_bytes(1)
         .unwrap();
-        let options = AuthFetchOptions {
-            method: Some("POST".into()),
-            headers: headers.clone().into_iter().collect(),
-            body: Some(vec![0; size - overhead]),
-            ..Default::default()
-        };
+        let options = AuthFetchOptions::default()
+            .with_method(Some("POST".into()))
+            .with_headers(headers.clone().into_iter().collect())
+            .with_body(Some(vec![0; size - overhead]));
         let error = support::words(
             client
                 .fetch("https://payload-423.invalid/resource", options)

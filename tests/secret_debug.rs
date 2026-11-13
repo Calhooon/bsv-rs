@@ -731,10 +731,7 @@ fn the_http_shapes_holding_headers_print_no_header_value_but_the_public_ones() {
         headers: list.clone(),
         body: vec![],
     };
-    let options = AuthFetchOptions {
-        headers: list.clone().into_iter().collect(),
-        ..AuthFetchOptions::default()
-    };
+    let options = AuthFetchOptions::default().with_headers(list.clone().into_iter().collect());
     let answer = Response {
         status: 200,
         headers: list.clone().into_iter().collect(),
@@ -889,10 +886,7 @@ fn an_acquire_certificate_args_prints_no_credential_in_its_certifier_url() {
 fn the_websocket_options_print_no_credential_in_their_url() {
     use bsv_rs::auth::transports::WebSocketTransportOptions;
     let (url, secrets) = credential_url("websocket");
-    let options = WebSocketTransportOptions {
-        base_url: url,
-        read_deadline_secs: Some(5),
-    };
+    let options = WebSocketTransportOptions::new(url).with_read_deadline_secs(Some(5));
     assert_url_hidden("WebSocketTransportOptions", &options, &secrets);
 }
 

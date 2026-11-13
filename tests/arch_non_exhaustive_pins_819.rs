@@ -13,7 +13,12 @@
 //!   no struct expression is allowed outside the crate, without it this one
 //!   compiles whatever the fields are, provided each is `pub`, which this
 //!   test reads) and a compiling twin naming the same path
-//!   (`fn kept(value: T) -> T { value }`).
+//!   (`fn kept(value: T) -> T { value }`); a generic struct
+//!   (`pub struct Name<..> {`) is pinned at one instantiation, `T` its path
+//!   with the arguments and its `assert_no_drop!` naming them after its
+//!   name (#843d8a's fold, `PeerOptions` at `ProtoWallet` and
+//!   `MockTransport`: the attribute refuses the update whatever the
+//!   arguments are).
 //!
 //! A hand-written `compile_fail,E0004` match and an `E0639` block of another
 //! shape are refused anywhere under `src/`: both go stale at the next variant
@@ -118,7 +123,7 @@ const MACRO_FILE: &str = "src/util/non_exhaustive.rs";
 /// code tokens, since the macros' own doc tests are its comments). Whoever
 /// changes the file deliberately reads the change, then sets this to the
 /// digest the failure prints, in the same diff.
-const MACRO_FILE_DIGEST: u64 = 0xc40b_25ec_78d7_4e14;
+const MACRO_FILE_DIGEST: u64 = 0x9dce_d5a1_36dd_693d;
 
 /// FNV-1a, 64 bits (the same function as `tests/arch_field_writes_843.rs`).
 fn fnv(text: &str) -> u64 {
@@ -307,8 +312,21 @@ fn pinned(key: &str, path: &str) -> Found {
 
 /// The macro that asserts a pinned struct implements no `Drop` and that its
 /// pin's path names it, as the line after the struct's closing brace spells it.
+/// A generic struct is named at its pin's instantiation: its name, then the
+/// arguments its pin's path carries (#843d8a's fold).
 fn no_drop_line(name: &str, path: &str) -> String {
-    format!("crate::util::non_exhaustive::assert_no_drop!({name}, {path});")
+    let arguments = path.find('<').map_or("", |at| &path[at..]);
+    format!("crate::util::non_exhaustive::assert_no_drop!({name}{arguments}, {path});")
+}
+
+/// The name of a `pub struct` line's item, and whether it declares generic
+/// parameters: `PeerOptions<W: WalletInterface, T: Transport>` is
+/// `("PeerOptions", true)`.
+fn split_generics(declared: &str) -> (&str, bool) {
+    match declared.split_once('<') {
+        Some((name, rest)) if rest.ends_with('>') => (name, true),
+        _ => (declared, false),
+    }
 }
 
 fn is_attribute(line: &str) -> bool {
@@ -340,7 +358,7 @@ fn doc_of<'a>(head: &[&'a str]) -> Vec<&'a str> {
         .collect()
 }
 
-fn struct_pin(doc: &[&str], name: &str) -> Result<String, String> {
+fn struct_pin(doc: &[&str], name: &str, generic: bool) -> Result<String, String> {
     let at = doc
         .iter()
         .position(|line| *line == "```compile_fail,E0639")
@@ -351,11 +369,20 @@ fn struct_pin(doc: &[&str], name: &str) -> Result<String, String> {
         .and_then(|rest| rest.split_once(") -> "))
         .and_then(|(path, rest)| (rest == format!("{path} {{")).then_some(path))
         .ok_or("the block does not open `fn rebuilt(value: T) -> T {`")?;
-    if path != name && !path.ends_with(&format!("::{name}")) {
+    let base = path.split_once('<').map_or(path, |(base, _)| base);
+    if base != name && !base.ends_with(&format!("::{name}")) {
         return Err(format!("the block rebuilds `{path}`, not `{name}`"));
     }
+    if generic != (base.len() != path.len()) || generic && !path.ends_with('>') {
+        return Err(format!(
+            "the block's path `{path}` does not name `{name}` at one instantiation, or names arguments it does not declare"
+        ));
+    }
+    // A generic struct's update names its base path, the arguments inferred
+    // from `value`: `Path<A> { ..value }` does not parse as an expression, so
+    // its block would fail without the attribute too (the fold's RED).
     let rest = [
-        format!("    {path} {{ ..value }}"),
+        format!("    {base} {{ ..value }}"),
         "}".into(),
         "```".into(),
     ];
@@ -434,7 +461,7 @@ fn judge(path: &str, text: &str) -> (Vec<Found>, Vec<String>) {
             continue;
         }
         let declared = lines.get(item).copied().unwrap_or_default();
-        let (is_enum, name) = match declared
+        let (is_enum, name, generic) = match declared
             .strip_prefix("pub enum ")
             .map(|rest| (true, rest))
             .or_else(|| {
@@ -443,12 +470,21 @@ fn judge(path: &str, text: &str) -> (Vec<Found>, Vec<String>) {
                     .map(|rest| (false, rest))
             })
             .and_then(|(is_enum, rest)| Some((is_enum, rest.strip_suffix(" {")?)))
-        {
-            Some((is_enum, name)) if name.chars().all(char::is_alphanumeric) => (is_enum, name),
+            .map(|(is_enum, rest)| {
+                let (name, generic) = if is_enum {
+                    (rest, false)
+                } else {
+                    split_generics(rest)
+                };
+                (is_enum, name, generic)
+            }) {
+            Some((is_enum, name, generic)) if name.chars().all(char::is_alphanumeric) => {
+                (is_enum, name, generic)
+            }
             _ => {
                 refuse(
                     item,
-                    "not `pub enum Name {` or `pub struct Name {` after the attribute",
+                    "not `pub enum Name {`, `pub struct Name {` or `pub struct Name<..> {` after the attribute",
                 );
                 continue;
             }
@@ -485,7 +521,7 @@ fn judge(path: &str, text: &str) -> (Vec<Found>, Vec<String>) {
                 ),
             }
         } else {
-            match struct_pin(&doc_of(head), name) {
+            match struct_pin(&doc_of(head), name, generic) {
                 Ok(pin_path) => {
                     for (offset, field) in body.iter().enumerate() {
                         let field = field.trim();
@@ -713,8 +749,11 @@ fn macro_file_refusals(text: &str) -> Vec<String> {
 /// is the pins found under `src/` (the test below holds it so), and each
 /// entry must have exactly one `compile fail ... ok` line and at least one
 /// plain `... ok` line in the doc suite's log.
-const DOC_PINS: [&str; 21] = [
+const DOC_PINS: [&str; 24] = [
     "src/auth/certificates/certificate.rs - auth::certificates::certificate::Certificate",
+    "src/auth/clients/auth_fetch.rs - auth::clients::auth_fetch::AuthFetchOptions",
+    "src/auth/peer.rs - auth::peer::PeerOptions",
+    "src/auth/transports/websocket_transport.rs - auth::transports::websocket_transport::WebSocketTransportOptions",
     "src/block/activation.rs - block::activation::ActivationHeightsError",
     "src/block/difficulty.rs - block::difficulty::DifficultyError",
     "src/block/params.rs - block::params::ChainParams",
@@ -742,7 +781,7 @@ const DOC_PINS: [&str; 21] = [
 const MACRO_DOC_TESTS: [(&str, usize, usize); 4] = [
     (
         "src/util/non_exhaustive.rs - util::non_exhaustive::assert_no_drop",
-        2,
+        3,
         1,
     ),
     (
@@ -836,6 +875,7 @@ fn struct_fail_lines(files: &[(&str, &str)]) -> Vec<(String, usize)> {
             let name = lines[at..].iter().find_map(|l| {
                 l.strip_prefix("pub struct ")
                     .and_then(|rest| rest.strip_suffix(" {"))
+                    .map(|rest| split_generics(rest).0)
             });
             if let Some(name) = name {
                 out.push((doc_name(&format!("{path}:{name}")), at + 1));
@@ -968,12 +1008,13 @@ fn a_pinned_structs_compile_fail_line_is_its_functional_updates_819() {
 fn the_macro_file_is_pinned_whole_and_each_macro_has_one_arm_819() {
     let text = arch_support::read(MACRO_FILE);
     assert_eq!(macro_file_pin_refusals(&text), Vec::<String>::new());
-    let general = "macro_rules! assert_no_drop {\n    ($name:ident, $path:path) => {";
+    let general =
+        "macro_rules! assert_no_drop {\n    ($name:ident $(< $($arg:ty),+ >)?, $path:path) => {";
     assert!(text.contains(general));
     // the third re-read's fault B: an arm for one type ahead of the general one
     let specialised = text.replacen(
         general,
-        "macro_rules! assert_no_drop {\n    (LookupRequestOptions, $path:path) => {};\n    ($name:ident, $path:path) => {",
+        "macro_rules! assert_no_drop {\n    (LookupRequestOptions, $path:path) => {};\n    ($name:ident $(< $($arg:ty),+ >)?, $path:path) => {",
         1,
     );
     // the second fold's two vacuous macros: the body emptied, a unit body
@@ -1250,6 +1291,74 @@ pub struct Record {
 
 crate::util::non_exhaustive::assert_no_drop!(Record, bsv_rs::sample::Record);
 ";
+
+const GENERIC_PINNED: &str = "/// A sample.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::sample::Pair<u8>) -> bsv_rs::sample::Pair<u8> {
+///     bsv_rs::sample::Pair { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::sample::Pair<u8>) -> bsv_rs::sample::Pair<u8> {
+///     value
+/// }
+/// ```
+#[non_exhaustive]
+pub struct Pair<A: Copy> {
+    /// One.
+    pub one: A,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(Pair<u8>, bsv_rs::sample::Pair<u8>);
+";
+
+/// #843d8a's fold: a generic struct pinned at one instantiation is read as
+/// pinned; its path without the arguments, arguments on a struct that
+/// declares none, an update naming the arguments (no expression, so it
+/// fails to compile with the attribute or without it) and an
+/// `assert_no_drop!` without them are refused.
+#[test]
+fn a_generic_struct_is_pinned_at_one_instantiation_843d8a() {
+    let (found, refusals) = one(GENERIC_PINNED);
+    assert_eq!(refusals, Vec::<String>::new());
+    assert_eq!(
+        found,
+        [pinned("src/sample.rs:Pair", "bsv_rs::sample::Pair<u8>")]
+    );
+    let unpinned = |text: &str, needle: &str| {
+        let (found, refusals) = one(text);
+        assert!(
+            found.iter().all(|item| item.unpinned.is_some())
+                && refusals.iter().any(|r| r.contains(needle)),
+            "{needle}: {found:?} {refusals:?}"
+        );
+    };
+    unpinned(
+        &GENERIC_PINNED.replace("bsv_rs::sample::Pair<u8>", "bsv_rs::sample::Pair"),
+        "at one instantiation",
+    );
+    unpinned(
+        &GENERIC_PINNED.replace("pub struct Pair<A: Copy> {", "pub struct Pair {"),
+        "at one instantiation",
+    );
+    unpinned(
+        &GENERIC_PINNED.replace(
+            "bsv_rs::sample::Pair { ..value }",
+            "bsv_rs::sample::Pair<u8> { ..value }",
+        ),
+        "not the functional update alone",
+    );
+    let (_, refusals) =
+        one(&GENERIC_PINNED.replace("assert_no_drop!(Pair<u8>,", "assert_no_drop!(Pair,"));
+    assert!(
+        refusals
+            .iter()
+            .any(|r| r.contains("not followed by `assert_no_drop!`")),
+        "{refusals:?}"
+    );
+}
 
 fn one(text: &str) -> (Vec<Found>, Vec<String>) {
     refusals_of(&[("src/sample.rs", text)], &[])
