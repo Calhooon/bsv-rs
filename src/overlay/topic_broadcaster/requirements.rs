@@ -10,8 +10,9 @@ use super::{RequireAck, TopicBroadcaster};
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
 
-/// `MAX_SHIP_TOPICS` (`:95`): the topics a requirement may name.
-const MAX_SHIP_TOPICS: usize = 64;
+/// `MAX_SHIP_TOPICS` (`:95`): the topics a broadcast, a requirement or a
+/// STEAK may name.
+pub(super) const MAX_SHIP_TOPICS: usize = 64;
 
 /// The reference's `/^(?=.{1,50}$)tm_[a-z]+(?:_[a-z]+)*$/` (`:171`).
 fn canonical_topic(topic: &str) -> bool {
@@ -24,29 +25,40 @@ fn canonical_topic(topic: &str) -> bool {
             .all(|word| !word.is_empty() && word.bytes().all(|b| b.is_ascii_lowercase()))
 }
 
-/// `snapshotAcknowledgmentRequirement(value, topics, label)` (`:182-193`):
-/// `All` and `Any` (`'all'`, `'any'`) taken as given; a list read by
-/// `canonicalTopics(value, label, true)` (`:156-180`: at most 64 unique
-/// canonical names, the empty list allowed) and refused when it names a
-/// topic outside the broadcast's; `None` has no reference form (the
-/// reference's empty list, which this check passes) and is taken as given.
-pub(super) fn snapshot(requirement: &RequireAck, topics: &[String], label: &str) -> Result<()> {
-    let RequireAck::Some(required) = requirement else {
-        return Ok(());
-    };
-    if required.len() > MAX_SHIP_TOPICS {
+/// `canonicalTopics(value, label, allowEmpty)` (`:156-180`): at most 64
+/// names (and at least one unless `allow_empty`), else
+/// `<label> must be a bounded array of canonical topic names.`; each a
+/// canonical `tm_` name seen once, else
+/// `<label> must contain unique canonical tm_ topic names.`. Read for the
+/// broadcast topics (`:420`, label `Broadcast topics`, #815) and for each
+/// requirement's list (`allow_empty`, `:186`).
+pub(super) fn canonical_topics(topics: &[String], label: &str, allow_empty: bool) -> Result<()> {
+    if (!allow_empty && topics.is_empty()) || topics.len() > MAX_SHIP_TOPICS {
         return Err(Error::OverlayError(format!(
             "{label} must be a bounded array of canonical topic names."
         )));
     }
     let mut seen = HashSet::new();
-    for topic in required {
+    for topic in topics {
         if !canonical_topic(topic) || !seen.insert(topic.as_str()) {
             return Err(Error::OverlayError(format!(
                 "{label} must contain unique canonical tm_ topic names."
             )));
         }
     }
+    Ok(())
+}
+
+/// `snapshotAcknowledgmentRequirement(value, topics, label)` (`:182-193`):
+/// `All` and `Any` (`'all'`, `'any'`) taken as given; a list read by
+/// `canonicalTopics(value, label, true)` and refused when it names a
+/// topic outside the broadcast's; `None` has no reference form (the
+/// reference's empty list, which this check passes) and is taken as given.
+pub(super) fn snapshot(requirement: &RequireAck, topics: &[String], label: &str) -> Result<()> {
+    let RequireAck::Some(required) = requirement else {
+        return Ok(());
+    };
+    canonical_topics(required, label, true)?;
     if required.iter().any(|topic| !topics.contains(topic)) {
         return Err(Error::OverlayError(format!(
             "{label} may only reference topics included in this broadcast."

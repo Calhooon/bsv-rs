@@ -27,7 +27,10 @@ use bsv_rs::primitives::PrivateKey;
 use bsv_rs::script::LockingScript;
 use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+
+#[path = "support/pushdrop_lock_position_537.rs"]
+mod lock_position;
 
 // =================
 // Network Preset Tests
@@ -303,10 +306,16 @@ fn test_steak_creation() {
 #[test]
 fn test_topic_broadcaster_valid_topics() {
     let result = TopicBroadcaster::new(
-        vec!["tm_topic1".to_string(), "tm_topic2".to_string()],
+        vec!["tm_topic_one".to_string(), "tm_topic_two".to_string()],
         TopicBroadcasterConfig::default(),
     );
     assert!(result.is_ok());
+    // A digit is no canonical topic name since #815 (`SHIPBroadcaster.ts:171`)
+    let result = TopicBroadcaster::new(
+        vec!["tm_topic1".to_string()],
+        TopicBroadcasterConfig::default(),
+    );
+    assert!(result.is_err());
 }
 
 #[test]
@@ -316,7 +325,10 @@ fn test_topic_broadcaster_invalid_topic_prefix() {
         TopicBroadcasterConfig::default(),
     );
     match result {
-        Err(e) => assert!(e.to_string().contains("must start with \"tm_\"")),
+        Err(e) => assert_eq!(
+            e.to_string(),
+            "overlay error: Broadcast topics must contain unique canonical tm_ topic names."
+        ),
         Ok(_) => panic!("Expected error for invalid topic prefix"),
     }
 }
@@ -325,7 +337,10 @@ fn test_topic_broadcaster_invalid_topic_prefix() {
 fn test_topic_broadcaster_empty_topics() {
     let result = TopicBroadcaster::new(vec![], TopicBroadcasterConfig::default());
     match result {
-        Err(e) => assert!(e.to_string().contains("At least one topic")),
+        Err(e) => assert_eq!(
+            e.to_string(),
+            "overlay error: Broadcast topics must be a bounded array of canonical topic names."
+        ),
         Ok(_) => panic!("Expected error for empty topics"),
     }
 }
@@ -1116,28 +1131,77 @@ fn test_global_reputation_tracker() {
 // LookupResolver::find_competent_hosts Tests
 // =================
 
+/// A tracker answering its scripted answer and recording each question;
+/// a URL outside the script refused in words of its own. Nothing dialled.
+struct ScriptedTracker {
+    script: HashMap<String, LookupAnswer>,
+    asked: Mutex<Vec<(String, String, serde_json::Value)>>,
+}
+
+#[async_trait::async_trait(?Send)]
+impl bsv_rs::overlay::OverlayLookupFacilitator for ScriptedTracker {
+    async fn lookup(
+        &self,
+        url: &str,
+        question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> bsv_rs::Result<LookupAnswer> {
+        self.asked.lock().unwrap().push((
+            url.to_string(),
+            question.service.clone(),
+            question.query.clone(),
+        ));
+        self.script
+            .get(url)
+            .cloned()
+            .ok_or_else(|| bsv_rs::Error::OverlayError(format!("unscripted: {url}")))
+    }
+}
+
+/// `find_competent_hosts` is public and answers the hosts its trackers
+/// name: until #815 this test built `LookupResolver::default()`, reached
+/// the four Mainnet trackers under `http` and passed on `Ok` or `Err`
+/// (rule 4). Here one scripted tracker names one host, signed by this
+/// crate's writer, and the answer is asserted exactly, as
+/// `tests/lookup_discovery_779.rs` does. The signature matches the Go
+/// SDK's `FindCompetentHosts(ctx, service string) ([]string, error)`.
 #[tokio::test]
 async fn test_find_competent_hosts_public_api() {
-    // Verify that find_competent_hosts is publicly accessible on LookupResolver.
-    // This test confirms the method signature matches the Go SDK's FindCompetentHosts:
-    //   Go:   func (l *LookupResolver) FindCompetentHosts(ctx, service string) ([]string, error)
-    //   Rust: pub async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>>
-    let resolver = LookupResolver::default();
-    let result = resolver.find_competent_hosts("ls_test_service").await;
-
-    // Without network access, the SLAP tracker queries will fail.
-    // The key assertion is that the method is public and returns Result<Vec<String>>.
-    match result {
-        Ok(hosts) => {
-            // Hosts should be a Vec<String> of domain URLs
-            for host in &hosts {
-                assert!(!host.is_empty());
-            }
-        }
-        Err(_) => {
-            // Expected: SLAP trackers are not reachable in test environment
-        }
-    }
+    const TRACKER: &str = "https://tracker.public-api-815.invalid";
+    const HOST: &str = "https://host.public-api-815.invalid";
+    let advertisement = lock_position::output_of(create_signed_overlay_admin_token(
+        &PrivateKey::random(),
+        Protocol::Slap,
+        HOST,
+        "ls_test_service",
+    ));
+    let facilitator = Arc::new(ScriptedTracker {
+        script: HashMap::from([(
+            TRACKER.to_string(),
+            LookupAnswer::OutputList {
+                outputs: vec![advertisement],
+            },
+        )]),
+        asked: Mutex::new(vec![]),
+    });
+    let resolver = LookupResolver::new(LookupResolverConfig {
+        facilitator: Some(facilitator.clone()),
+        slap_trackers: Some(vec![TRACKER.to_string()]),
+        ..Default::default()
+    });
+    let hosts: Vec<String> = resolver
+        .find_competent_hosts("ls_test_service")
+        .await
+        .unwrap();
+    assert_eq!(hosts, [HOST]);
+    assert_eq!(
+        *facilitator.asked.lock().unwrap(),
+        [(
+            TRACKER.to_string(),
+            "ls_slap".to_string(),
+            serde_json::json!({ "service": "ls_test_service" })
+        )]
+    );
 }
 
 #[tokio::test]

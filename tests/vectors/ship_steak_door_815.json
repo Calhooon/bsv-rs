@@ -1,0 +1,1126 @@
+{
+  "description": "A host's answer to /submit at the door it comes through (#815's fold): the reference's TopicBroadcaster over its own HTTPSOverlayBroadcastFacilitator on a stub fetch, one interested host sent one topic. ts-stack@edf6e03 SHIPBroadcaster.ts:222-320,331-388,486-496 under Node v22.18.0. Recorder: tests/support/ship_steak_door_815.mjs.",
+  "topic": "tm_ship_steak",
+  "host": "https://steak.ship-steak-door-815.invalid",
+  "cases": [
+    {
+      "name": "control_admit",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_three_lists",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[1],\"coinsRemoved\":[2]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[1],\"coinsRemoved\":[2]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_removed_empty",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"coinsRemoved\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"coinsRemoved\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_idle",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+        "words": null
+      }
+    },
+    {
+      "name": "control_lists_reordered",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"coinsToRetain\":[],\"outputsToAdmit\":[0]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"coinsToRetain\":[],\"outputsToAdmit\":[0]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_whitespace",
+      "body": {
+        "kind": "text",
+        "text": " \n{ \"tm_ship_steak\" : {\"outputsToAdmit\":[0],\"coinsToRetain\":[]} }\n "
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_content_type_html",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "contentType": "text/html",
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_no_content_type",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "contentType": null,
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "control_status_201",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "status": 201,
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "body_empty",
+      "body": {
+        "kind": "text",
+        "text": ""
+      },
+      "reference": {
+        "send": {
+          "error": "SHIP response is not valid JSON."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not valid JSON."
+      }
+    },
+    {
+      "name": "body_open_brace",
+      "body": {
+        "kind": "text",
+        "text": "{"
+      },
+      "reference": {
+        "send": {
+          "error": "SHIP response is not valid JSON."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not valid JSON."
+      }
+    },
+    {
+      "name": "body_html",
+      "body": {
+        "kind": "text",
+        "text": "<html></html>"
+      },
+      "reference": {
+        "send": {
+          "error": "SHIP response is not valid JSON."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not valid JSON."
+      }
+    },
+    {
+      "name": "body_trailing_text",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}} x"
+      },
+      "reference": {
+        "send": {
+          "error": "SHIP response is not valid JSON."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not valid JSON."
+      }
+    },
+    {
+      "name": "body_bom",
+      "body": {
+        "kind": "hex",
+        "hex": "efbbbf7b22746d5f736869705f737465616b223a7b226f757470757473546f41646d6974223a5b305d2c22636f696e73546f52657461696e223a5b5d7d7d"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "body_not_utf8",
+      "body": {
+        "kind": "hex",
+        "hex": "7b22746d5f736869705f737465616b223a7b226f757470757473546f41646d6974223a5b305d2c22636f696e73546f52657461696e223a5b5d7d7dff"
+      },
+      "reference": {
+        "send": {
+          "error": "SHIP response is not valid UTF-8."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not valid UTF-8."
+      }
+    },
+    {
+      "name": "body_empty_object",
+      "body": {
+        "kind": "text",
+        "text": "{}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Steak has no topics."
+      }
+    },
+    {
+      "name": "body_null",
+      "body": {
+        "kind": "text",
+        "text": "null"
+      },
+      "reference": {
+        "send": {
+          "ok": "null"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Steak has no topics."
+      }
+    },
+    {
+      "name": "body_true",
+      "body": {
+        "kind": "text",
+        "text": "true"
+      },
+      "reference": {
+        "send": {
+          "ok": "true"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Steak has no topics."
+      }
+    },
+    {
+      "name": "body_number",
+      "body": {
+        "kind": "text",
+        "text": "5"
+      },
+      "reference": {
+        "send": {
+          "ok": "5"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Steak has no topics."
+      }
+    },
+    {
+      "name": "body_empty_string",
+      "body": {
+        "kind": "text",
+        "text": "\"\""
+      },
+      "reference": {
+        "send": {
+          "ok": "\"\""
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Steak has no topics."
+      }
+    },
+    {
+      "name": "body_string",
+      "body": {
+        "kind": "text",
+        "text": "\"abc\""
+      },
+      "reference": {
+        "send": {
+          "ok": "\"abc\""
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not a valid STEAK object."
+      }
+    },
+    {
+      "name": "body_empty_array",
+      "body": {
+        "kind": "text",
+        "text": "[]"
+      },
+      "reference": {
+        "send": {
+          "ok": "[]"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Steak has no topics."
+      }
+    },
+    {
+      "name": "body_array_of_number",
+      "body": {
+        "kind": "text",
+        "text": "[1]"
+      },
+      "reference": {
+        "send": {
+          "ok": "[1]"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not a valid STEAK object."
+      }
+    },
+    {
+      "name": "body_array_of_steak",
+      "body": {
+        "kind": "text",
+        "text": "[{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}]"
+      },
+      "reference": {
+        "send": {
+          "ok": "[{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}]"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response is not a valid STEAK object."
+      }
+    },
+    {
+      "name": "status_500_with_steak",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "status": 500,
+      "reference": {
+        "send": {
+          "error": "Failed to facilitate broadcast"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Failed to facilitate broadcast"
+      }
+    },
+    {
+      "name": "status_404",
+      "body": {
+        "kind": "text",
+        "text": "not found"
+      },
+      "status": 404,
+      "reference": {
+        "send": {
+          "error": "Failed to facilitate broadcast"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "Failed to facilitate broadcast"
+      }
+    },
+    {
+      "name": "size_one_mib",
+      "body": {
+        "kind": "padded",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}",
+        "total": 1048576
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "size_one_mib_and_one",
+      "body": {
+        "kind": "padded",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}",
+        "total": 1048577
+      },
+      "reference": {
+        "send": {
+          "error": "SHIP response exceeds the maximum permitted size."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response exceeds the maximum permitted size."
+      }
+    },
+    {
+      "name": "size_one_mib_and_one_undeclared",
+      "body": {
+        "kind": "padded",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}",
+        "total": 1048577
+      },
+      "undeclared": true,
+      "reference": {
+        "send": {
+          "error": "SHIP response exceeds the maximum permitted size."
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response exceeds the maximum permitted size."
+      }
+    },
+    {
+      "name": "topic_unsent_alone",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_other\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_other\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "topic_unsent_beside_sent",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]},\"tm_other\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]},\"tm_other\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "topic_proto",
+      "body": {
+        "kind": "text",
+        "text": "{\"__proto__\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"__proto__\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "topic_lone_surrogate",
+      "body": {
+        "kind": "text",
+        "text": "{\"\\ud800\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"\\ud800\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "topics_65",
+      "body": {
+        "kind": "topics",
+        "count": 65
+      },
+      "reference": {
+        "send": {
+          "ok_bytes": 5266
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response contains too many topics."
+      }
+    },
+    {
+      "name": "topic_twice_bad_then_good",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":null,\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "topic_twice_good_then_bad",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]},\"tm_ship_steak\":null}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":null}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "instructions_null",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":null}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":null}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "instructions_array",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":[]}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":[]}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "instructions_string",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":\"x\"}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":\"x\"}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "instructions_number",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":1}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":1}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response acknowledged an unexpected topic."
+      }
+    },
+    {
+      "name": "instructions_empty_object",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "field_extra",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"extra\":1}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"extra\":1}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response contains unexpected instruction fields."
+      }
+    },
+    {
+      "name": "field_extra_alone",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"extra\":1}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"extra\":1}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response contains unexpected instruction fields."
+      }
+    },
+    {
+      "name": "field_ancillary_txids",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"ancillaryTxids\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"ancillaryTxids\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response contains unexpected instruction fields."
+      }
+    },
+    {
+      "name": "field_proto",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"__proto__\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"__proto__\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response contains unexpected instruction fields."
+      }
+    },
+    {
+      "name": "field_case",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"CoinsRemoved\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"CoinsRemoved\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP response contains unexpected instruction fields."
+      }
+    },
+    {
+      "name": "field_twice_bad_then_good",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0,0],\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "outputs_missing",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "retain_missing",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsToRetain is invalid."
+      }
+    },
+    {
+      "name": "outputs_null",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":null,\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":null,\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "retain_null",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":null}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":null}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsToRetain is invalid."
+      }
+    },
+    {
+      "name": "removed_null",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"coinsRemoved\":null}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"coinsRemoved\":null}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsRemoved is invalid."
+      }
+    },
+    {
+      "name": "outputs_object",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":{\"0\":0},\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":{\"0\":0},\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "outputs_string",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":\"0\",\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":\"0\",\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "outputs_number",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":0,\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":0,\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_u32_max",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[4294967295],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[4294967295],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "index_past_u32",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[4294967296],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[4294967296],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_past_safe",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[9007199254740993],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[9007199254740992],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_negative",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[-1],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[-1],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_fraction",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0.5],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0.5],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_integral_fraction",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[1.0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[1],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "index_exponent",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[1e2],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[100],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "index_negative_zero",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[-0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "index_past_double",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[1e400],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[null],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_string",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[\"0\"],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[\"0\"],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_null",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[null],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[null],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_true",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[true],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[true],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_array",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[[0]],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[[0]],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_nested_200",
+      "body": {
+        "kind": "nested",
+        "depth": 200
+      },
+      "reference": {
+        "send": {
+          "ok_bytes": 458
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_repeated",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0,0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0,0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_repeated_as_fraction",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[1,1.0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[1,1],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "index_zero_and_negative_zero",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0,-0],\"coinsToRetain\":[]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0,0],\"coinsToRetain\":[]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "retain_repeated",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[3,3]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[3,3]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsToRetain is invalid."
+      }
+    },
+    {
+      "name": "removed_repeated",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"coinsRemoved\":[1,2,1]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[],\"coinsRemoved\":[1,2,1]}}"
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsRemoved is invalid."
+      }
+    },
+    {
+      "name": "same_index_in_two_lists",
+      "body": {
+        "kind": "text",
+        "text": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[0],\"coinsRemoved\":[0]}}"
+      },
+      "reference": {
+        "send": {
+          "ok": "{\"tm_ship_steak\":{\"outputsToAdmit\":[0],\"coinsToRetain\":[0],\"coinsRemoved\":[0]}}"
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "outputs_4096",
+      "body": {
+        "kind": "indexes",
+        "list": "outputsToAdmit",
+        "count": 4096
+      },
+      "reference": {
+        "send": {
+          "ok_bytes": 19427
+        },
+        "broadcast": null,
+        "words": null
+      }
+    },
+    {
+      "name": "outputs_4097",
+      "body": {
+        "kind": "indexes",
+        "list": "outputsToAdmit",
+        "count": 4097
+      },
+      "reference": {
+        "send": {
+          "ok_bytes": 19432
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP outputsToAdmit is invalid."
+      }
+    },
+    {
+      "name": "retain_4097",
+      "body": {
+        "kind": "indexes",
+        "list": "coinsToRetain",
+        "count": 4097
+      },
+      "reference": {
+        "send": {
+          "ok_bytes": 19432
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsToRetain is invalid."
+      }
+    },
+    {
+      "name": "removed_4097",
+      "body": {
+        "kind": "indexes",
+        "list": "coinsRemoved",
+        "count": 4097
+      },
+      "reference": {
+        "send": {
+          "ok_bytes": 19450
+        },
+        "broadcast": "ERR_ALL_HOSTS_REJECTED",
+        "words": "SHIP coinsRemoved is invalid."
+      }
+    }
+  ]
+}

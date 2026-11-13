@@ -737,22 +737,28 @@ async fn test_lookup_resolver_all_hosts_fail() {
 
 #[tokio::test]
 async fn test_topic_broadcaster_validation() {
-    // Topic names must start with "tm_"
+    // A topic is a canonical `tm_` name, in the reference's words
+    // (`SHIPBroadcaster.ts:156-179`, `:420`, #815)
     let result = TopicBroadcaster::new(
         vec!["invalid_topic".to_string()],
         TopicBroadcasterConfig::default(),
     );
-    assert!(result.is_err());
     match result {
-        Err(e) => assert!(e.to_string().contains("tm_")),
+        Err(e) => assert_eq!(
+            e.to_string(),
+            "overlay error: Broadcast topics must contain unique canonical tm_ topic names."
+        ),
         Ok(_) => panic!("Expected error for invalid topic"),
     }
 
-    // Empty topics rejected
+    // Empty topics rejected, in the reference's words (#815; until then
+    // `At least one topic is required for broadcast.`)
     let result = TopicBroadcaster::new(vec![], TopicBroadcasterConfig::default());
-    assert!(result.is_err());
     match result {
-        Err(e) => assert!(e.to_string().contains("At least one topic")),
+        Err(e) => assert_eq!(
+            e.to_string(),
+            "overlay error: Broadcast topics must be a bounded array of canonical topic names."
+        ),
         Ok(_) => panic!("Expected error for empty topics"),
     }
 }

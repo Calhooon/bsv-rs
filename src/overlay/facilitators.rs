@@ -14,7 +14,11 @@ use async_trait::async_trait;
 use serde_json::value::RawValue;
 
 #[cfg(feature = "http")]
+mod answer_body; // the body read as the reference reads it: type, length, BOM, count (#815)
+#[cfg(feature = "http")]
 mod binary_answer;
+#[cfg(feature = "http")]
+mod steak_body; // a `/submit` answer read as the reference reads it: size, UTF-8, JSON, `validateSTEAK` (#815's fold)
 
 /// Facilitator for overlay lookup operations.
 ///
@@ -230,13 +234,16 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
                 )));
             }
 
-            // Check content type for binary vs JSON response
-            let binary = response
-                .headers()
-                .get("content-type")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("")
-                .contains("octet-stream");
+            // The binary path for `application/octet-stream` alone, as the
+            // reference's `isOctetStream` reads the type
+            // (`LookupResolver.ts:512-516`, #815)
+            let binary = answer_body::is_octet_stream(
+                response
+                    .headers()
+                    .get("content-type")
+                    .map(|v| answer_body::header_text(v.as_bytes()))
+                    .as_deref(),
+            );
 
             let payload = read_bounded_body(&mut response, options).await?;
 
@@ -244,11 +251,9 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
                 // Binary response - parse as output list with outpoints and BEEF
                 parse_binary_lookup_response(&payload, options)
             } else {
-                // JSON response
-                let json: serde_json::Value = serde_json::from_slice(&payload)
-                    .map_err(|e| Error::OverlayError(format!("Failed to parse JSON: {}", e)))?;
-
-                parse_json_lookup_answer(json, options.max_outputs)
+                // JSON: strict UTF-8 less one leading BOM, the count judged
+                // before the tree (`:847-866`, #815)
+                answer_body::read_json_answer(&payload, options.max_outputs)
             }
         }
     }
@@ -268,13 +273,20 @@ async fn read_bounded_body(
     options: &LookupRequestOptions,
 ) -> Result<Vec<u8>> {
     let max = options.max_response_bytes;
-    let header_length = response
-        .headers()
-        .get(reqwest::header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().parse::<u64>().ok());
-    let declared = header_length.into_iter().chain(response.content_length());
-    if declared.into_iter().any(|length| length > max as u64) {
+    // The header's text by the reference's rule (`LookupResponseReader.ts:
+    // 23-36`, #815), the length hyper read beside it
+    answer_body::assert_declared_length(
+        response
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .map(|v| answer_body::header_text(v.as_bytes()))
+            .as_deref(),
+        max,
+    )?;
+    if response
+        .content_length()
+        .is_some_and(|length| length > max as u64)
+    {
         return Err(resource_limit("maxResponseBytes"));
     }
     let mut payload: Vec<u8> = Vec::new();
@@ -372,7 +384,7 @@ impl OverlayBroadcastFacilitator for HttpsOverlayBroadcastFacilitator {
                 request = request.header("x-includes-off-chain-values", "true");
             }
 
-            let response = request
+            let mut response = request
                 .body(body)
                 .send()
                 .await
@@ -385,12 +397,18 @@ impl OverlayBroadcastFacilitator for HttpsOverlayBroadcastFacilitator {
                 )));
             }
 
-            let steak: Steak = response
-                .json()
+            // The answer read as the reference reads it, never `.json()`
+            // (#815's fold; `tests/arch_steak_door_815.rs`)
+            let declared = response.headers().get(reqwest::header::CONTENT_LENGTH);
+            let mut answer = steak_body::Answer::declared(declared.map(|v| v.as_bytes()))?;
+            while let Some(chunk) = response
+                .chunk()
                 .await
-                .map_err(|e| Error::OverlayError(format!("Failed to parse STEAK: {}", e)))?;
-
-            Ok(steak)
+                .map_err(|e| Error::OverlayError(format!("Failed to read response: {}", e)))?
+            {
+                answer.push(&chunk)?;
+            }
+            answer.steak(&tagged_beef.topics)
         }
     }
 }

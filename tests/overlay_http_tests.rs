@@ -365,12 +365,11 @@ async fn test_broadcast_malformed_json_response() {
         "Expected error on malformed JSON, got: {:?}",
         result
     );
-    let err = result.unwrap_err();
-    let err_msg = err.to_string();
-    assert!(
-        err_msg.contains("STEAK"),
-        "Expected STEAK parse error, got: {}",
-        err_msg
+    // The reference's words (`SHIPBroadcaster.ts:317-320`) since #815's
+    // fold; `Failed to parse STEAK: <serde's words>` until then
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "overlay error: SHIP response is not valid JSON."
     );
 }
 

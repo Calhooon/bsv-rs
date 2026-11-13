@@ -12,14 +12,16 @@ use crate::overlay::{
 use crate::transaction::{
     BroadcastFailure, BroadcastResponse, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
 };
-use crate::{Error, Result};
+use crate::Result;
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
+mod cache; // the interested hosts cached five minutes, one discovery in flight (#815)
 mod discovery; // the discovery's admission and the endpoint's origin (#804)
 mod requirements; // the acknowledgment requirements as the reference has them
+mod steak; // a host's STEAK judged as the reference's `validateSTEAK` (#815)
 
 /// Acknowledgment requirement for broadcast success.
 #[derive(Debug, Clone, Default)]
@@ -101,6 +103,7 @@ pub struct TopicBroadcaster {
     require_ack_from_any_host: RequireAck,
     require_ack_from_specific_hosts: HashMap<String, RequireAck>,
     network_preset: NetworkPreset,
+    interested_hosts: cache::InterestedHostsCache,
 }
 
 impl TopicBroadcaster {
@@ -108,7 +111,10 @@ impl TopicBroadcaster {
     ///
     /// # Arguments
     ///
-    /// * `topics` - List of topics to broadcast to. Each must start with "tm_".
+    /// * `topics` - List of topics to broadcast to: one to 64 unique
+    ///   canonical names, each matching the reference's
+    ///   `^(?=.{1,50}$)tm_[a-z]+(?:_[a-z]+)*$` (`SHIPBroadcaster.ts:156-179`,
+    ///   `:420`, #815), else refused in the reference's words.
     /// * `config` - Configuration options
     ///
     /// # Returns
@@ -123,22 +129,11 @@ impl TopicBroadcaster {
     /// canonical `tm_` name, or one outside `topics`
     /// (`<label> may only reference topics included in this broadcast.`).
     pub fn new(topics: Vec<String>, config: TopicBroadcasterConfig) -> Result<Self> {
-        // Validate at least one topic
-        if topics.is_empty() {
-            return Err(Error::OverlayError(
-                "At least one topic is required for broadcast.".into(),
-            ));
-        }
-
-        // Validate topic names
-        for topic in &topics {
-            if !topic.starts_with("tm_") {
-                return Err(Error::OverlayError(format!(
-                    "Every topic must start with \"tm_\": {}",
-                    topic
-                )));
-            }
-        }
+        // The broadcast topics as the reference reads them
+        // (`canonicalTopics(topics, 'Broadcast topics')`,
+        // `SHIPBroadcaster.ts:420`, `:156-179`, #815): one to 64 unique
+        // canonical `tm_` names, ahead of the requirements.
+        requirements::canonical_topics(&topics, "Broadcast topics", false)?;
 
         // The all-host and any-host requirements' topic lists, as the
         // reference snapshots them (`SHIPBroadcaster.ts:430-439`,
@@ -192,6 +187,7 @@ impl TopicBroadcaster {
             require_ack_from_any_host: config.require_ack_from_any_host,
             require_ack_from_specific_hosts,
             network_preset: config.network_preset,
+            interested_hosts: cache::InterestedHostsCache::new(),
         })
     }
 
@@ -260,11 +256,12 @@ impl TopicBroadcaster {
                     off_chain_values: tagged.off_chain_values.clone(),
                 };
 
+                let sent = host_topics.clone();
                 async move {
                     let start = Instant::now();
                     let result = facilitator.send(&host, &tagged).await;
                     let elapsed = start.elapsed().as_millis() as u64;
-                    (host, result, elapsed)
+                    (host, sent, result, elapsed)
                 }
             })
             .collect();
@@ -275,28 +272,22 @@ impl TopicBroadcaster {
         let mut host_responses: Vec<HostResponse> = Vec::new();
         let mut host_acks: HashMap<String, HashSet<String>> = HashMap::new();
 
-        for (host, result, elapsed) in results {
+        for (host, sent, result, elapsed) in results {
             match result {
                 Ok(steak) => {
                     reputation_tracker.record_success(&host, elapsed);
 
-                    // Track which topics this host acknowledged
-                    let mut acknowledged_topics = HashSet::new();
-                    for (topic, instructions) in &steak {
-                        if instructions.has_activity() {
-                            acknowledged_topics.insert(topic.clone());
+                    // The STEAK judged as the reference judges it, over the
+                    // topics sent to this host (`SHIPBroadcaster.ts:486-496`,
+                    // `validateSTEAK`, `:240-269`, #815): the empty one or a
+                    // refused one fails the host. Its acknowledgments and
+                    // its success are read from the judged value alone
+                    match steak::judge(steak, &sent) {
+                        Ok(taken) => {
+                            host_acks.insert(host.clone(), taken.acknowledged());
+                            host_responses.push(HostResponse::success(host, taken.into_steak()));
                         }
-                    }
-
-                    // Only count as success if steak has topics
-                    if !steak.is_empty() {
-                        host_acks.insert(host.clone(), acknowledged_topics);
-                        host_responses.push(HostResponse::success(host, steak));
-                    } else {
-                        host_responses.push(HostResponse::failure(
-                            host.clone(),
-                            "Steak has no topics".into(),
-                        ));
+                        Err(words) => host_responses.push(HostResponse::failure(host, words)),
                     }
                 }
                 Err(e) => {
@@ -361,6 +352,12 @@ impl TopicBroadcaster {
     /// exactly 1 satoshi, its advertisement does not authenticate as SHIP for
     /// one of our topics, or the advertised domain is no `https:` origin; a
     /// host is keyed by that origin, and at most 32 are admitted.
+    ///
+    /// The answer is kept five minutes and one discovery runs at a time, as
+    /// the reference's `findInterestedHosts` keeps it (`:700-718`, #815): a
+    /// broadcaster reused within five minutes of a discovery does not see a
+    /// host advertised since. A failed discovery is not kept; a caller
+    /// waiting on it then asks for itself.
     pub async fn find_interested_hosts(&self) -> Result<HashMap<String, HashSet<String>>> {
         // Handle local preset
         if self.network_preset == NetworkPreset::Local {
@@ -372,6 +369,17 @@ impl TopicBroadcaster {
             return Ok(result);
         }
 
+        // The answer kept five minutes and one discovery in flight, as the
+        // reference's `findInterestedHosts` keeps it
+        // (`SHIPBroadcaster.ts:700-718`, #815)
+        self.interested_hosts
+            .get_or_fetch(|| self.fetch_interested_hosts())
+            .await
+    }
+
+    /// `#fetchInterestedHosts` (`SHIPBroadcaster.ts:725-789`): the `ls_ship`
+    /// lookup, read by `discovery::interested_hosts`.
+    async fn fetch_interested_hosts(&self) -> Result<HashMap<String, HashSet<String>>> {
         // Query for hosts interested in our topics via SHIP lookup
         let question = LookupQuestion::new("ls_ship", serde_json::json!({ "topics": self.topics }));
 
@@ -441,7 +449,10 @@ mod tests {
     fn test_empty_topics_rejected() {
         let result = TopicBroadcaster::new(vec![], TopicBroadcasterConfig::default());
         match result {
-            Err(e) => assert!(e.to_string().contains("At least one topic")),
+            Err(e) => assert_eq!(
+                e.to_string(),
+                "overlay error: Broadcast topics must be a bounded array of canonical topic names."
+            ),
             Ok(_) => panic!("Expected error for empty topics"),
         }
     }
@@ -518,6 +529,12 @@ mod tests {
         host_acks.insert("host2".to_string(), HashSet::new());
 
         assert!(broadcaster.check_any_host_requirement(&host_acks).is_err());
+    }
+
+    #[test]
+    fn the_broadcaster_stays_send_and_sync_815() {
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<TopicBroadcaster>();
     }
 
     #[test]

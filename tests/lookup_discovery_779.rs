@@ -309,3 +309,78 @@ async fn discovery_on_the_default_config_asks_the_four_mainnet_trackers_with_the
     assert_eq!(*waits.lock().unwrap(), [Some(5000); 4]);
     assert_eq!(MAX_TRACKER_WAIT_TIME_MS, 5000);
 }
+
+/// A SLAP advertisement of `host` for `service` carrying `satoshis`, its
+/// own transaction (`seed` its source index) proven by a block of its own.
+fn advertisement_at(
+    host: &str,
+    service: &str,
+    satoshis: u64,
+    seed: u32,
+) -> bsv_rs::overlay::OutputListItem {
+    use bsv_rs::transaction::{
+        Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+    };
+    let script =
+        create_signed_overlay_admin_token(&PrivateKey::random(), Protocol::Slap, host, service);
+    let mut tx = Transaction::new();
+    tx.add_input(TransactionInput::new("22".repeat(32), seed))
+        .unwrap();
+    tx.add_output(TransactionOutput::new(satoshis, script))
+        .unwrap();
+    let mut beef = Beef::new();
+    let index = beef.merge_bump(
+        MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap(),
+    );
+    beef.merge_raw_tx(tx.to_binary(), Some(index)).unwrap();
+    bsv_rs::overlay::OutputListItem {
+        beef: beef.to_binary().unwrap(),
+        output_index: 0,
+        context: None,
+        txid: None,
+    }
+}
+
+/// #815, the pin the cold re-read of PR #801 asked for: a tracker's share
+/// is counted over the hosts it admitted, as the reference's candidates
+/// are admitted before `LookupDiscovery` counts them (`ts-stack@edf6e03`
+/// `LookupDiscovery.ts:62-78`, the admission at `LookupResolver.ts:2194-2216`;
+/// here `src/overlay/lookup_resolver/discovery.rs`, the `filter_map` before
+/// `earliest_distinct`'s cut). A tracker whose share is 2 answers three
+/// advertisements of 2 satoshis (each refused, #786) and then one of 1:
+/// the admitted host is discovered. With the share taken ahead of the
+/// admission (the mutant `.take(share)` before the `filter_map`) the two
+/// refused outputs fill it and nothing is discovered.
+#[tokio::test]
+async fn a_trackers_share_is_counted_after_admission_815() {
+    const TRACKER: &str = "https://share.discovery-815.invalid";
+    const SERVICE: &str = "ls_share_admission";
+    let mut outputs: Vec<_> = (0..3)
+        .map(|seed| {
+            advertisement_at(
+                &format!("https://refused-{seed}.discovery-815.invalid"),
+                SERVICE,
+                2,
+                seed,
+            )
+        })
+        .collect();
+    outputs.push(advertisement_at(
+        "https://admitted.discovery-815.invalid",
+        SERVICE,
+        1,
+        9,
+    ));
+    let mut limits = bsv_rs::overlay::LookupLimits::default();
+    limits.max_hosts_per_tracker = 2;
+    let (resolver, asked) = resolver(
+        LookupResolverConfig {
+            limits,
+            ..trackers(&[TRACKER])
+        },
+        vec![(TRACKER, Ok(LookupAnswer::OutputList { outputs }))],
+    );
+    let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
+    assert_eq!(hosts, ["https://admitted.discovery-815.invalid"]);
+    assert_eq!(*asked.lock().unwrap(), [slap(TRACKER, SERVICE)]);
+}

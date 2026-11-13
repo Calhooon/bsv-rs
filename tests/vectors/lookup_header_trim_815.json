@@ -1,0 +1,1549 @@
+{
+ "reference": "ts-stack@edf6e03 packages/sdk HTTPSOverlayLookupFacilitator.lookup (isOctetStream, assertDeclaredLengthIsWithinLimit)",
+ "node": "v22.18.0",
+ "body": "{\"type\":\"output-list\",\"outputs\":[]}",
+ "content_type": [
+  {
+   "pad": "0009",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0009",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0009",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\t; x=1"
+   }
+  },
+  {
+   "pad": "000a",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "000a",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "000a",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "000b",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\u000b"
+   }
+  },
+  {
+   "pad": "000b",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "\u000bapplication/octet-stream"
+   }
+  },
+  {
+   "pad": "000b",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\u000b; x=1"
+   }
+  },
+  {
+   "pad": "000c",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\f"
+   }
+  },
+  {
+   "pad": "000c",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "\fapplication/octet-stream"
+   }
+  },
+  {
+   "pad": "000c",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\f; x=1"
+   }
+  },
+  {
+   "pad": "000d",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "000d",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "000d",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "0020",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0020",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0020",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream ; x=1"
+   }
+  },
+  {
+   "pad": "00a0",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream "
+   }
+  },
+  {
+   "pad": "00a0",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": " application/octet-stream"
+   }
+  },
+  {
+   "pad": "00a0",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream ; x=1"
+   }
+  },
+  {
+   "pad": "1680",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "1680",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "1680",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2000",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2000",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2000",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2001",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2001",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2001",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2002",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2002",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2002",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2003",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2003",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2003",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2004",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2004",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2004",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2005",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2005",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2005",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2006",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2006",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2006",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2007",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2007",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2007",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2008",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2008",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2008",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2009",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2009",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2009",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "200a",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "200a",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "200a",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2028",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2028",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2028",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2029",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2029",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2029",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "202f",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "202f",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "202f",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "205f",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "205f",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "205f",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "3000",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "3000",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "3000",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "feff",
+   "position": "after",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "feff",
+   "position": "before",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "feff",
+   "position": "before_parameter",
+   "path": "binary",
+   "result": {
+    "error": "Reader read exceeds available data"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "0085",
+   "position": "after",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0085",
+   "position": "before",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0085",
+   "position": "before_parameter",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream; x=1"
+   }
+  },
+  {
+   "pad": "001f",
+   "position": "after",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\u001f"
+   }
+  },
+  {
+   "pad": "001f",
+   "position": "before",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "\u001fapplication/octet-stream"
+   }
+  },
+  {
+   "pad": "001f",
+   "position": "before_parameter",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream\u001f; x=1"
+   }
+  },
+  {
+   "pad": "0080",
+   "position": "after",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0080",
+   "position": "before",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream"
+   }
+  },
+  {
+   "pad": "0080",
+   "position": "before_parameter",
+   "path": "json",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "application/octet-stream; x=1"
+   }
+  }
+ ],
+ "content_length": [
+  {
+   "pad": "0009",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "0009",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "000a",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "000a",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "000b",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100\u000b"
+   }
+  },
+  {
+   "pad": "000b",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "\u000b100"
+   }
+  },
+  {
+   "pad": "000c",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100\f"
+   }
+  },
+  {
+   "pad": "000c",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "\f100"
+   }
+  },
+  {
+   "pad": "000d",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "000d",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "0020",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "0020",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "00a0",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": "100 "
+   }
+  },
+  {
+   "pad": "00a0",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "held": " 100"
+   }
+  },
+  {
+   "pad": "1680",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "1680",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2000",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2000",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2001",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2001",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2002",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2002",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2003",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2003",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2004",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2004",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2005",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2005",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2006",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2006",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2007",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2007",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2008",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2008",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2009",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2009",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "200a",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "200a",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2028",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2028",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2029",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "2029",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "202f",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "202f",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "205f",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "205f",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "3000",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "3000",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "feff",
+   "position": "after",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "feff",
+   "position": "before",
+   "length": "read",
+   "result": {
+    "error": "Lookup resource limit reached: maxResponseBytes"
+   },
+   "fetch_headers": {
+    "refused": "TypeError"
+   }
+  },
+  {
+   "pad": "0085",
+   "position": "after",
+   "length": "none",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "0085",
+   "position": "before",
+   "length": "none",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "001f",
+   "position": "after",
+   "length": "none",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "100\u001f"
+   }
+  },
+  {
+   "pad": "001f",
+   "position": "before",
+   "length": "none",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "\u001f100"
+   }
+  },
+  {
+   "pad": "0080",
+   "position": "after",
+   "length": "none",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  },
+  {
+   "pad": "0080",
+   "position": "before",
+   "length": "none",
+   "result": {
+    "answer": "output-list"
+   },
+   "fetch_headers": {
+    "held": "100"
+   }
+  }
+ ]
+}

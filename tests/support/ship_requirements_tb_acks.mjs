@@ -2,9 +2,9 @@
 // (`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/SHIPBroadcaster.ts`):
 // the construction check of each requirement's topic list
 // (`snapshotAcknowledgmentRequirement`, `:182-193`, called at `:430-444`
-// and per specific host at `:214-218`), and the broadcast's verdict when an
+// and per specific host at `:212-216`), and the broadcast's verdict when an
 // interested host fails, answers no topic or acknowledges some topics, under
-// each requirement (the map seeded at `:510-511`, the checks at `:536-543`,
+// each requirement (the map seeded at `:511-512`, the checks at `:538-546`,
 // the codes at `:572`, `:596`, `:615`). Each case builds the unmodified
 // SDK's `TopicBroadcaster` afresh with `resolver: { query: async () =>
 // answer }` (two hosts, each advertising both topics: four SHIP
@@ -110,7 +110,7 @@ async function run (requirement, behaviours) {
   }
 }
 
-// The construction check (`:182-193`, `:430-444`, `:214-218`).
+// The construction check (`:182-193`, `:430-444`, `:212-216`).
 const many = Array.from({ length: 65 }, (_, i) => `tm_t${String.fromCharCode(97 + (i % 26))}${'x'.repeat(Math.floor(i / 26))}`)
 const construction = []
 for (const [name, requirement] of [
@@ -179,19 +179,60 @@ for (const [a, b] of SCENARIOS) {
   }
 }
 
+// #815: the broadcast topics themselves (`canonicalTopics(topics,
+// 'Broadcast topics')`, `:420`, `:156-179`: an array of 1 to 64 unique
+// names each matching `/^(?=.{1,50}$)tm_[a-z]+(?:_[a-z]+)*$/`), read ahead
+// of the requirements; each case built afresh with its own topics.
+async function construct (topics, requirement) {
+  try {
+    // eslint-disable-next-line no-new
+    new TopicBroadcaster(topics, {
+      resolver: { query: async () => answer },
+      facilitator: { send: async () => ({}) },
+      ...config(requirement)
+    })
+    return { constructed: true }
+  } catch (error) {
+    return { constructor_refusal: String(error?.message ?? error) }
+  }
+}
+const broadcastTopics = []
+for (const [name, topics, requirement] of [
+  ['valid', TOPICS, {}],
+  ['not_canonical_upper_case', ['tm_Foo'], {}],
+  ['not_canonical_prefix', ['invalid_topic'], {}],
+  ['not_canonical_digit', ['tm_a1'], {}],
+  ['not_canonical_trailing_underscore', ['tm_a_'], {}],
+  ['not_canonical_double_underscore', ['tm_a__b'], {}],
+  ['not_canonical_bare_prefix', ['tm_'], {}],
+  ['not_canonical_after_a_canonical_one', ['tm_alpha', 'tm_Beta'], {}],
+  ['empty', [], {}],
+  ['fifty_characters', [`tm_${'a'.repeat(47)}`], {}],
+  ['fifty_one_characters', [`tm_${'a'.repeat(48)}`], {}],
+  ['sixty_four', many.slice(0, 64), {}],
+  ['sixty_five', many, {}],
+  ['repeated', ['tm_alpha', 'tm_beta', 'tm_alpha'], {}],
+  ['not_canonical_named_by_a_requirement_too', ['tm_Foo'], { all: ['tm_Foo'] }],
+  ['sixty_four_required_by_all_hosts', many.slice(0, 64), { all: many.slice(0, 64) }],
+  ['sixty_five_required_of_sixty_four', many.slice(0, 64), { all: many }]
+]) {
+  broadcastTopics.push({ name, topics, requirement, ...(await construct(topics, requirement)) })
+}
+
 writeFileSync(
   out,
   JSON.stringify(
     {
       description:
-        "Lane fix-tb-acks: the reference's acknowledgment requirements, recorded by tests/support/ship_requirements_tb_acks.mjs under ts-stack@edf6e03 (SHIPBroadcaster.ts:182-193,214-218,430-444,510-511,536-543,555-684): the construction check of each requirement's topic list, and the broadcast's status, code, description and message with two interested hosts by their behaviour under each requirement. A requirement is in the reference's config form (absent: the default; 'all', 'any' or a topic list); a specific host's key is the host's URL.",
+        "Lane fix-tb-acks: the reference's acknowledgment requirements, recorded by tests/support/ship_requirements_tb_acks.mjs under ts-stack@edf6e03 (SHIPBroadcaster.ts:182-193,212-216,430-444,511-512,538-546,555-684): the construction check of each requirement's topic list, and the broadcast's status, code, description and message with two interested hosts by their behaviour under each requirement. A requirement is in the reference's config form (absent: the default; 'all', 'any' or a topic list); a specific host's key is the host's URL. #815: broadcast_topics, the construction check of the broadcast topics themselves (canonicalTopics(topics, 'Broadcast topics'), :156-179,420), each case with its own topics and requirement.",
       reference: 'ts-stack@edf6e03',
       node: process.version,
       topics: TOPICS,
       hosts: { a: A, b: B, c: C },
       advertisements: ads.map(a => ({ domain: a.domain, topic: a.topic, txid: a.txid, beef: Buffer.from(a.beef).toString('hex') })),
       construction,
-      broadcasts
+      broadcasts,
+      broadcast_topics: broadcastTopics
     },
     null,
     2
