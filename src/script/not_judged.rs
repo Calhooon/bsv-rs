@@ -4,6 +4,8 @@ use std::fmt;
 
 use crate::block::ActivationHeightsError;
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::script::NotJudgedCause;
 /// A refusal of the verifier's scope or resources, never a transaction judgment.
 ///
 /// The transaction and stream verifiers carry this cause beside the input index.
@@ -60,6 +62,7 @@ pub enum NotJudgedCause {
         /// The coin's verified BUMP height.
         height: u64,
     },
+}
 }
 
 impl NotJudgedCause {

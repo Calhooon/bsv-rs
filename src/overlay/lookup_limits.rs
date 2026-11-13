@@ -67,6 +67,21 @@ pub(crate) fn normalized_output_count(count: usize) -> Result<()> {
 /// limits.max_outputs = 512;
 /// assert_eq!(limits.max_response_bytes, 32 * 1024 * 1024);
 /// ```
+///
+/// No struct expression builds one outside the crate, a functional update
+/// that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::LookupLimits) -> bsv_rs::overlay::LookupLimits {
+///     bsv_rs::overlay::LookupLimits { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::LookupLimits) -> bsv_rs::overlay::LookupLimits {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct LookupLimits {
@@ -85,6 +100,8 @@ pub struct LookupLimits {
     /// The outputs of one answer (`maxOutputs`, 4096).
     pub max_outputs: usize,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(LookupLimits, bsv_rs::overlay::LookupLimits);
 
 impl Default for LookupLimits {
     fn default() -> Self {
@@ -192,6 +209,21 @@ impl LookupByteBudget {
 /// (`LookupResolver.ts:711-715`), handed to
 /// [`OverlayLookupFacilitator::lookup_bounded`](crate::overlay::OverlayLookupFacilitator::lookup_bounded).
 /// `default()` is the reference's defaults with no shared budget.
+///
+/// The struct is `#[non_exhaustive]`: no struct expression builds one outside
+/// the crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::LookupRequestOptions) -> bsv_rs::overlay::LookupRequestOptions {
+///     bsv_rs::overlay::LookupRequestOptions { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::LookupRequestOptions) -> bsv_rs::overlay::LookupRequestOptions {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LookupRequestOptions {
@@ -202,6 +234,11 @@ pub struct LookupRequestOptions {
     /// The budget the bytes read are charged to (`consumeBytes`), if any.
     pub budget: Option<Arc<LookupByteBudget>>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    LookupRequestOptions,
+    bsv_rs::overlay::LookupRequestOptions
+);
 
 impl Default for LookupRequestOptions {
     fn default() -> Self {

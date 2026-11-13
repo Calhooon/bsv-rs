@@ -55,6 +55,8 @@ impl HeaderAncestry for [HeaderLink] {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::block::DifficultyError;
 /// Why the rule has no answer for a header.
 /// ```
 /// use bsv_rs::block::DifficultyError;
@@ -95,6 +97,7 @@ pub enum DifficultyError {
         /// Height of the last suitable block.
         last: u32,
     },
+}
 }
 
 /// testnet's rule: a header more than twice the spacing after its parent

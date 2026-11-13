@@ -46,21 +46,19 @@ use indexmap::IndexMap;
 /// assert_eq!(cert.verify(), Ok(true));
 /// ```
 ///
-/// ```compile_fail,E0639
-/// use bsv_rs::auth::Certificate;
-/// use bsv_rs::primitives::PrivateKey;
+/// No struct expression builds one outside the crate, a functional update
+/// that names no field included:
 ///
-/// let key = PrivateKey::random().public_key();
-/// let cert = Certificate {
-///     cert_type: [1u8; 32],
-///     serial_number: [2u8; 32],
-///     subject: key.clone(),
-///     certifier: key,
-///     revocation_outpoint: None,
-///     fields: Default::default(),
-///     signature: None,
-///     received_unsigned: None,
-/// };
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::auth::Certificate) -> bsv_rs::auth::Certificate {
+///     bsv_rs::auth::Certificate { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::auth::Certificate) -> bsv_rs::auth::Certificate {
+///     value
+/// }
 /// ```
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -106,6 +104,8 @@ pub struct Certificate {
     /// value in the preimage clear it (#249).
     pub received_unsigned: Option<Vec<u8>>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(Certificate, bsv_rs::auth::Certificate);
 
 impl Certificate {
     /// Creates a new unsigned certificate.

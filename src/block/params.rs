@@ -33,6 +33,21 @@ const TEN_MINUTES: i64 = 10 * 60;
 /// assert_eq!(main.difficulty_adjustment_interval(), 2016);
 /// assert_eq!(main.pow_limit_bits(), 0x1d00ffff);
 /// ```
+///
+/// The struct is `#[non_exhaustive]`: no struct expression builds one outside
+/// the crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::block::ChainParams) -> bsv_rs::block::ChainParams {
+///     bsv_rs::block::ChainParams { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::block::ChainParams) -> bsv_rs::block::ChainParams {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ChainParams {
@@ -64,6 +79,8 @@ pub struct ChainParams {
     /// or more, which this `u32` accepts.
     pub chronicle_height: u32,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(ChainParams, bsv_rs::block::ChainParams);
 
 impl ChainParams {
     /// `CMainParams` (src/chainparams.cpp:1047-1053, `daaHeight` 504031 at 1068).

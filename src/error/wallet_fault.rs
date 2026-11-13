@@ -3,11 +3,15 @@
 use super::WalletRefusalClass;
 use thiserror::Error;
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::WalletFaultFamily;
 /// The port's extension beyond the reference: a wallet fault family for hosts.
 ///
 /// The reference's `WalletError` has a string and a code, with no fault family
 /// (`ts-stack@edf6e03`, `packages/sdk/src/wallet/WalletError.ts`). The string
 /// remains the reference's; this metadata changes no verdict or retry promise.
+///
+/// A host may hash a family and match it (#819).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum WalletFaultFamily {
@@ -21,6 +25,7 @@ pub enum WalletFaultFamily {
     /// Report an internal server failure and retain operator diagnostics.
     Internal,
 }
+}
 
 /// The port's extension beyond the reference: a typed wallet fault beside its string.
 ///
@@ -30,6 +35,24 @@ pub enum WalletFaultFamily {
 /// [`super::Error::WalletError`], so both errors display identically for the
 /// same message. This crate does not emit the new variant; a wallet host may
 /// supply it without classifying message text.
+///
+/// A host builds one through [`WalletFault::new`] and reads its fields: a
+/// later field is additive, so no struct expression builds one outside this
+/// crate, a functional update that names no field included (#819):
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::WalletFault) -> bsv_rs::WalletFault {
+///     bsv_rs::WalletFault { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::WalletFault) -> bsv_rs::WalletFault {
+///     value
+/// }
+/// let fault = bsv_rs::WalletFault::new(bsv_rs::WalletFaultFamily::Storage, String::new());
+/// assert_eq!(kept(fault).family, bsv_rs::WalletFaultFamily::Storage);
+/// ```
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[error("{message}")]
 #[non_exhaustive]
@@ -39,6 +62,8 @@ pub struct WalletFault {
     /// The original `WalletError` string, without its SDK display prefix.
     pub message: String,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(WalletFault, bsv_rs::WalletFault);
 
 impl WalletFault {
     /// Attach a fault family to the original wallet error string unchanged.
@@ -50,6 +75,8 @@ impl WalletFault {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::AbortKind;
 /// The port's extension beyond the reference: which fact refused an abort (#604).
 ///
 /// A host matches the case instead of the message text. The reference has no
@@ -61,6 +88,8 @@ impl WalletFault {
 /// as the [`super::Error::WalletRefusal`] of that class and message, whatever
 /// its kind: `OnChain` under `InvalidOperation` travels as code 1. The kind
 /// moves no wire byte and no display text.
+///
+/// A host may hash a kind and match it (#819).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum AbortKind {
@@ -77,6 +106,7 @@ pub enum AbortKind {
     /// the guard did not set.
     #[default]
     Other,
+}
 }
 
 /// The port's extension beyond the reference: an abort guard's refusal of an abort.
@@ -101,6 +131,30 @@ pub enum AbortKind {
 /// error compact. On the wire it follows the same class code and message
 /// rules as [`super::Error::WalletRefusal`]; the typed record stays in Rust.
 /// This crate emits no acceptance records; the toolbox can supply one.
+///
+/// A host builds one through [`AbortAcceptance::new`] and sets the optional
+/// fields: a later field is additive, so no struct expression builds one
+/// outside this crate, a functional update that names no field included
+/// (#819):
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::AbortAcceptance) -> bsv_rs::AbortAcceptance {
+///     bsv_rs::AbortAcceptance { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::AbortAcceptance) -> bsv_rs::AbortAcceptance {
+///     value
+/// }
+/// let mut record = bsv_rs::AbortAcceptance::new(
+///     String::new(),
+///     bsv_rs::WalletRefusalClass::InvalidOperation,
+///     String::new(),
+/// );
+/// record.kind = bsv_rs::AbortKind::Other;
+/// assert_eq!(kept(record).txid, None);
+/// ```
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[error("{message}")]
 #[non_exhaustive]
@@ -121,6 +175,8 @@ pub struct AbortAcceptance {
     /// The guard's complete display string, unchanged byte for byte.
     pub message: String,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(AbortAcceptance, bsv_rs::AbortAcceptance);
 
 impl AbortAcceptance {
     /// Record an abort guard's refusal, retaining the action, class and guard string.

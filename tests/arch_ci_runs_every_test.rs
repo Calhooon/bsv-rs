@@ -625,6 +625,186 @@ fn dependency_profile_refusals(ci: &str) -> Vec<String> {
     errors
 }
 
+/// The doc step and the step after it that reads its log for every
+/// `#[non_exhaustive]` pin (#819's third fold), byte for byte: the doc
+/// suite's own lines are that pin's evidence, so the log is written under
+/// bash with `pipefail` (a failing suite fails the step) and read on the
+/// same condition. Pinned through the opening line of the step that follows
+/// them (#819's fourth fold), so nothing can be appended to either step
+/// (a `continue-on-error: true` after the reader's `run:` let a failing
+/// reader pass the job: the third re-read's fault A).
+const DOC_LOG_STEPS: &str = r#"      - name: Run doc tests
+        if: steps.plan.outputs.doc == 'true'
+        shell: bash
+        run: cargo test --doc --all-features 2>&1 | tee "$RUNNER_TEMP/doc-suite.log"
+
+      # every pinned type's two blocks and the pin macros' own doc tests ran
+      # and passed, read from the doc suite's lines (#819's third fold)
+      - name: Read every pin's lines in the doc suite
+        if: steps.plan.outputs.doc == 'true'
+        shell: bash
+        env:
+          BSV_DOC_SUITE_LOG: ${{ runner.temp }}/doc-suite.log
+        run: cargo test --all-features --test arch_non_exhaustive_pins_819 -- --ignored --exact the_doc_suite_ran_every_pinned_block_819
+
+      # #668: the plan reached nothing; the required context reports green
+      - name: Nothing to build
+"#;
+
+/// The Test Suite job's keys, beside its id (#819's fifth fold).
+const TEST_JOB_KEYS: &[&str] = &["name", "runs-on", "permissions", "env", "strategy", "steps"];
+
+/// The keys of each of the two steps [`DOC_LOG_STEPS`] holds.
+const DOC_STEP_KEYS: &[&str] = &["name", "if", "shell", "env", "run"];
+
+/// The opening lines of the two steps [`DOC_LOG_STEPS`] holds.
+const DOC_STEP_HEADS: [&str; 2] = [
+    "      - name: Run doc tests",
+    "      - name: Read every pin's lines in the doc suite",
+];
+
+/// The spaces before a line's text (a tab is not a space, so a tab-led line
+/// reads as 0).
+fn spaces(line: &str) -> usize {
+    line.len() - line.trim_start_matches(' ').len()
+}
+
+/// The keys of one YAML mapping, by an exact allowlist (#819's fifth fold;
+/// the reading of `WORKFLOW_KEYS` in `tests/arch_ci_pr_runs_the_required_set.rs`:
+/// the literal text before the colon, trimmed). `lines` are the mapping's
+/// lines after its opening one (a job's id, a step's `- ` line, whose own key
+/// `opening` is); every line YAML reads at the mapping's level or above
+/// (indented fewer than `depth + 2` spaces, comments and blank lines aside)
+/// must sit at `depth` and name a key of `allowed`, each once. A key in any
+/// other spelling (a quoted key, an escape, a tag, a space before the colon)
+/// is not in the list and is refused by its line, as is a line at any other
+/// indentation (a tab among them).
+fn key_refusals(
+    what: &str,
+    opening: Option<(usize, &str)>,
+    lines: &[(usize, &str)],
+    depth: usize,
+    allowed: &[&str],
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mut seen: Vec<&str> = Vec::new();
+    let keyed = opening.into_iter().chain(
+        lines
+            .iter()
+            .copied()
+            .filter(|(_, l)| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+            .filter(|(_, l)| spaces(l) < depth + 2),
+    );
+    for (number, line) in keyed {
+        let text = line.trim();
+        let key = text.split(':').next().unwrap_or(text).trim_end();
+        let at_depth = opening.is_some_and(|(n, _)| n == number) || spaces(line) == depth;
+        if !at_depth || !text.contains(':') || !allowed.contains(&key) {
+            errors.push(format!(
+                "ci.yml:{number}: {what} carries `{text}`, whose key is not one of {allowed:?} at {depth} spaces"
+            ));
+        } else if seen.contains(&key) {
+            errors.push(format!("ci.yml:{number}: {what} carries `{key}:` twice"));
+        } else {
+            seen.push(key);
+        }
+    }
+    errors
+}
+
+/// The Test Suite job's keys are [`TEST_JOB_KEYS`] and each of the two steps
+/// [`DOC_LOG_STEPS`] holds carries [`DOC_STEP_KEYS`] alone (#819's fifth
+/// fold: `continue-on-error` written as `"continue\u002Don-error"` or after a
+/// `!!str` tag passed the line check of [`doc_log_refusals`], the fourth
+/// re-read's plant 3).
+fn job_key_refusals(ci: &str) -> Vec<String> {
+    let (from, to) = test_job(ci);
+    let lines: Vec<(usize, &str)> = ci
+        .lines()
+        .enumerate()
+        .map(|(at, l)| (at + 1, l))
+        .filter(|(n, _)| (from + 1..to).contains(n))
+        .collect();
+    let mut errors = key_refusals("the Test Suite job", None, &lines, 4, TEST_JOB_KEYS);
+    for head in DOC_STEP_HEADS {
+        let Some(open) = lines.iter().position(|(_, l)| *l == head) else {
+            errors.push(format!(
+                "ci.yml: no step `{}` in the Test Suite job",
+                head.trim()
+            ));
+            continue;
+        };
+        let body: Vec<(usize, &str)> = lines[open + 1..]
+            .iter()
+            .copied()
+            .take_while(|(_, l)| {
+                l.trim().is_empty() || l.trim_start().starts_with('#') || spaces(l) > 6
+            })
+            .collect();
+        let (number, line) = lines[open];
+        let opening = (number, line.trim_start().trim_start_matches("- "));
+        errors.extend(key_refusals(
+            &format!("the step `{}`", head.trim()),
+            Some(opening),
+            &body,
+            8,
+            DOC_STEP_KEYS,
+        ));
+    }
+    errors
+}
+
+/// The Test Suite job carries [`DOC_LOG_STEPS`] once, its one doc step is
+/// the one inside it, and no line of the job carries `continue-on-error`, on
+/// a step or at job level (#819's fourth fold; the form #853 holds for
+/// `sibling`): a failure absorbed is no evidence.
+fn doc_log_refusals(ci: &str, table: &[(String, Vec<String>)]) -> Vec<String> {
+    let mut errors = Vec::new();
+    let (from, to) = test_job(ci);
+    for (number, line) in ci.lines().enumerate().map(|(at, l)| (at + 1, l)) {
+        let text = line
+            .trim_start()
+            .trim_start_matches("- ")
+            .trim_start_matches(['"', '\'']);
+        if (from..to).contains(&number)
+            && !text.starts_with('#')
+            && text.starts_with("continue-on-error")
+        {
+            errors.push(format!(
+                "ci.yml:{number}: the Test Suite job carries `continue-on-error`, which would absorb the doc log reader's failure: `{}`",
+                line.trim()
+            ));
+        }
+    }
+    errors.extend(job_key_refusals(ci));
+    let count = ci.matches(DOC_LOG_STEPS).count();
+    if count != 1 {
+        errors.push(format!(
+            "ci.yml: the doc step and its log's reader (DOC_LOG_STEPS) appear {count} times, where once"
+        ));
+        return errors;
+    }
+    let start = ci[..ci.find(DOC_LOG_STEPS).unwrap_or_default()]
+        .lines()
+        .count()
+        + 1;
+    let end = start + DOC_LOG_STEPS.lines().count();
+    if !(from..to).contains(&start) {
+        errors.push(
+            "ci.yml: the doc step and its log's reader stand outside the Test Suite job".into(),
+        );
+    }
+    for step in steps(ci, table).iter().filter(|s| s.doc) {
+        if !(start..end).contains(&step.line) {
+            errors.push(format!(
+                "ci.yml:{}: a doc step whose log no step reads (#819: the pins' evidence is the doc suite's lines)",
+                step.line
+            ));
+        }
+    }
+    errors
+}
+
 /// The top-level `tests/*.rs`, each an integration binary; module
 /// directories (`support/`, `arch_support/`, ...) are not binaries.
 fn tree() -> (String, String, Vec<(String, String)>) {
@@ -657,6 +837,8 @@ fn ci_runs_every_integration_test_binary() {
     let errors = shared_build_refusals(&ci, &feature_table(&manifest));
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     let errors = dependency_profile_refusals(&ci);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let errors = doc_log_refusals(&ci, &feature_table(&manifest));
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     let asked: Vec<String> = HOUSE_FEATURES.split(',').map(str::to_owned).collect();
     let house = resolve(&feature_table(&manifest), &asked, false, true);
@@ -984,6 +1166,141 @@ fn the_dependencies_level_is_written_before_the_cache_and_every_build() {
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert!(
         errors[0].starts_with("ci.yml:5: runs before ci.yml:7 writes"),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn the_doc_suite_log_is_written_and_read_for_every_pin_819() {
+    let (ci, manifest, _) = tree();
+    let table = feature_table(&manifest);
+    assert_eq!(doc_log_refusals(&ci, &table), Vec::<String>::new());
+    let plants = [
+        // the log not written: the doc suite's lines go nowhere
+        ci.replace(
+            "cargo test --doc --all-features 2>&1 | tee \"$RUNNER_TEMP/doc-suite.log\"",
+            "cargo test --doc --all-features",
+        ),
+        // the reader dropped
+        ci.replace(
+            "-- --ignored --exact the_doc_suite_ran_every_pinned_block_819",
+            "",
+        ),
+        // the reader on another condition than the doc step's
+        ci.replacen(
+            "        if: steps.plan.outputs.doc == 'true'\n        shell: bash\n        env:",
+            "        if: steps.plan.outputs.whole == 'true'\n        shell: bash\n        env:",
+            1,
+        ),
+        // the shell's pipefail lost: a failing suite's step passes through `tee`
+        ci.replacen(
+            "        shell: bash\n        run: cargo test --doc",
+            "        run: cargo test --doc",
+            1,
+        ),
+    ];
+    for (at, plant) in plants.iter().enumerate() {
+        assert_ne!(plant, &ci, "plant {at} changed nothing");
+        let errors = doc_log_refusals(plant, &table);
+        assert!(
+            errors.iter().any(|e| e.contains("DOC_LOG_STEPS")),
+            "plant {at}: {errors:?}"
+        );
+    }
+    // the third re-read's fault A: `continue-on-error` after the reader's
+    // `run:`, on another step of the job, and at job level
+    let reader = "the_doc_suite_ran_every_pinned_block_819\n";
+    let absorbed = [
+        ci.replacen(
+            reader,
+            &format!("{reader}        continue-on-error: true\n"),
+            1,
+        ),
+        ci.replacen(
+            "      - name: Nothing to build\n",
+            "      - name: Nothing to build\n        continue-on-error: true\n",
+            1,
+        ),
+        ci.replacen("\n  test:\n", "\n  test:\n    continue-on-error: true\n", 1),
+    ];
+    for (at, plant) in absorbed.iter().enumerate() {
+        assert_ne!(plant, &ci, "absorbing plant {at} changed nothing");
+        let errors = doc_log_refusals(plant, &table);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("the Test Suite job carries `continue-on-error`")),
+            "absorbing plant {at}: {errors:?}"
+        );
+    }
+    assert!(doc_log_refusals(&absorbed[0], &table)
+        .iter()
+        .any(|e| e.contains("DOC_LOG_STEPS")));
+    // the fourth re-read's plant 3: the key at job level in two YAML
+    // spellings GitHub's reader takes as `continue-on-error`, and the plain one
+    let spelled = [
+        "    \"continue\\u002Don-error\": true\n",
+        "    !!str continue-on-error: true\n",
+        "    continue-on-error: true\n",
+    ];
+    for key in spelled {
+        let plant = ci.replacen("\n  test:\n", &format!("\n  test:\n{key}"), 1);
+        assert_ne!(plant, ci);
+        let errors = doc_log_refusals(&plant, &table);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("the Test Suite job carries `")
+                    && e.contains("whose key is not one of")),
+            "{key}: {errors:?}"
+        );
+    }
+    // the same three on the reader's step, and a key the steps' list lacks
+    for key in spelled
+        .iter()
+        .map(|k| format!("    {k}"))
+        .chain(["        timeout-minutes: 5\n".to_owned()])
+    {
+        let plant = ci.replacen(reader, &format!("{reader}{key}"), 1);
+        let errors = job_key_refusals(&plant);
+        assert!(
+            errors.iter().any(|e| e
+                .contains("the step `- name: Read every pin's lines in the doc suite` carries `")),
+            "{key}: {errors:?}"
+        );
+    }
+    // a key moved to another indentation is refused by its line
+    let tabbed = ci.replacen(
+        "\n  test:\n    name: Test Suite\n    runs-on:",
+        "\n  test:\n    name: Test Suite\n\truns-on:",
+        1,
+    );
+    assert_ne!(tabbed, ci);
+    assert!(job_key_refusals(&tabbed)
+        .iter()
+        .any(|e| e.contains("`runs-on:")));
+    // a step inserted between the reader and the step that follows it
+    let inserted = ci.replacen(
+        reader,
+        &format!("{reader}\n      - name: Between\n        run: true\n"),
+        1,
+    );
+    assert!(doc_log_refusals(&inserted, &table)
+        .iter()
+        .any(|e| e.contains("DOC_LOG_STEPS")));
+    // a second doc step whose log nobody reads
+    let second = ci.replacen(
+        DOC_LOG_STEPS,
+        &format!(
+            "{DOC_LOG_STEPS}\n      - name: Again\n        run: cargo test --doc --all-features\n"
+        ),
+        1,
+    );
+    let errors = doc_log_refusals(&second, &table);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("a doc step whose log no step reads")),
         "{errors:?}"
     );
 }

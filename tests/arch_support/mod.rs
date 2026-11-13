@@ -390,3 +390,64 @@ pub fn site_errors(
     }
     errors
 }
+
+/// The index after the group that opens at `tokens[open]` (`(`, `[` or `{`),
+/// literals opaque; `tokens.len()` when it does not close.
+pub fn group_end(tokens: &[Token<'_>], open: usize) -> usize {
+    let (o, c) = match tokens[open].text {
+        "(" => ("(", ")"),
+        "[" => ("[", "]"),
+        _ => ("{", "}"),
+    };
+    let mut depth = 0usize;
+    for (i, t) in tokens.iter().enumerate().skip(open) {
+        if t.literal {
+            continue;
+        }
+        if t.text == o {
+            depth += 1;
+        } else if t.text == c {
+            depth -= 1;
+            if depth == 0 {
+                return i + 1;
+            }
+        }
+    }
+    tokens.len()
+}
+
+/// The tokens' texts joined by one space.
+pub fn joined(tokens: &[Token<'_>]) -> String {
+    tokens.iter().map(|t| t.text).collect::<Vec<_>>().join(" ")
+}
+
+/// The attributes before the item whose opening token is `tokens[at]`, each
+/// its tokens inside `#[..]` joined (`path = "x.rs"`, `cfg ( test )`); a
+/// visibility before the item is passed over. Comments are not tokens, so a
+/// doc comment is no attribute here (a `#[doc = ..]` is). Shared by rule 14's
+/// module declarations (`tests/arch_field_writes_843.rs`) and #819's
+/// (`tests/arch_non_exhaustive_pins_819.rs`).
+pub fn attributes_before(tokens: &[Token<'_>], mut at: usize) -> Vec<String> {
+    let mut names = Vec::new();
+    // Skip a visibility.
+    if at >= 1 && tokens[at - 1].text == "pub" {
+        at -= 1;
+    } else if at >= 2 && tokens[at - 1].text == ")" {
+        if let Some(p) = (0..at).rev().find(|&k| tokens[k].text == "pub") {
+            at = p;
+        }
+    }
+    while at >= 1 && tokens[at - 1].text == "]" {
+        let Some(open) = (0..at - 1).rev().find(|&k| {
+            tokens[k].text == "["
+                && k >= 1
+                && tokens[k - 1].text == "#"
+                && group_end(tokens, k) == at
+        }) else {
+            break;
+        };
+        names.push(joined(&tokens[open + 1..at - 1]));
+        at = open - 1;
+    }
+    names
+}

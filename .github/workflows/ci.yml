@@ -511,10 +511,20 @@ jobs:
         if: steps.plan.outputs.tracing == 'true'
         run: cargo nextest run --all-features --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --no-fail-fast --cargo-verbose
 
-      # nextest runs no doc tests
+      # nextest runs no doc tests; the log is the next step's evidence (#819)
       - name: Run doc tests
         if: steps.plan.outputs.doc == 'true'
-        run: cargo test --doc --all-features
+        shell: bash
+        run: cargo test --doc --all-features 2>&1 | tee "$RUNNER_TEMP/doc-suite.log"
+
+      # every pinned type's two blocks and the pin macros' own doc tests ran
+      # and passed, read from the doc suite's lines (#819's third fold)
+      - name: Read every pin's lines in the doc suite
+        if: steps.plan.outputs.doc == 'true'
+        shell: bash
+        env:
+          BSV_DOC_SUITE_LOG: ${{ runner.temp }}/doc-suite.log
+        run: cargo test --all-features --test arch_non_exhaustive_pins_819 -- --ignored --exact the_doc_suite_ran_every_pinned_block_819
 
       # #668: the plan reached nothing; the required context reports green
       - name: Nothing to build

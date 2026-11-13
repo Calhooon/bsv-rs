@@ -564,6 +564,9 @@ pub enum Error {
     },
 }
 
+#[cfg(feature = "transaction")]
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::TransportFault;
 /// The class of a transport fault: what a caller may assume about the far
 /// side when no answer arrived in its word (Calhooon/bsv-rs#87).
 ///
@@ -590,6 +593,7 @@ pub enum TransportFault {
         /// was absent or unreadable. The server's word: a caller caps it.
         retry_after_ms: Option<u64>,
     },
+}
 }
 
 #[cfg(feature = "transaction")]
