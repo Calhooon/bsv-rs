@@ -38,6 +38,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
 | `kvstore_integration_tests.rs` | 93 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
+| `kvstore_legacy_signature_verdict.rs` | 12 | `kvstore` | The deprecated `KVStoreInterpreter::verify_signature_legacy` answers `true` only for a token whose controller field is the key checked and whose last field is that key's signature over the others (`src/kvstore/legacy_signature.rs`): tokens of this crate's writers' two derivations, signed by a seeded `ProtoWallet`, locked and read back by `PushDrop`; a stranger's junk-signed token in four shapes, a PushDrop of no fields, a signed token against another key, one-change copies, a token of four or seven fields its controller signed, a namespace token signed with a non-canonical JSON protocol field, a signed token whose controller field names another key `false`; signed tokens with any tags, an empty or zero-byte value, an empty key or tags field, a plain-name token under a stranger's locking key `true`; the invariant over 100 generated tokens, 25 per shape at least. On a scratch copy of the base (`2edb403f`, `v0.8.8`) with the file alone, 10 of 12 RED, the tags and the any-lock controls green; green on the fix; the five cells added after the fix's reviews each RED on a copy of the fix with the one check it pins weakened. A differential of 20,000 signed tokens (a scratch program outside the tree) gives the same scripts and answers by one SHA-256 on the base, on the fix and on the published `0.8.8` |
 | `live_policy_http_tests.rs` | 20 | `transaction`+`http` | LivePolicy dynamic fee model with wiremock |
 | `memory_profiling.rs` | 7 | `dhat-profiling` | Heap allocation profiling for crypto operations; the streaming BEEF reader's peak heap at 1,000, 10,000 and 100,000 links, and on 100 proven transactions of 1,000 inputs with and without a subject (the edges, 0.8.1) |
 | `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
@@ -248,7 +249,7 @@ Tests are organized by feature area:
 | **storage** | `storage_tests` |
 | **storage HTTP** | `storage_http_tests` |
 | **identity** | `identity_tests` |
-| **kvstore** | `kvstore_integration_tests`, `kvstore_global_tests` |
+| **kvstore** | `kvstore_integration_tests`, `kvstore_global_tests`, `kvstore_legacy_signature_verdict` |
 | **registry** | `registry_integration_tests` |
 | **profiling** | `memory_profiling` |
 | **documentation** | `readme_examples` |

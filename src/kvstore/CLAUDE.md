@@ -19,6 +19,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `local.rs` | LocalKVStore implementation with MockWallet tests | ~1743 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~826 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
+| `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the derivation its protocol field names (the `[level, name]` namespace: the key as key ID and a locking key derived from the controller; a plain name: `kvstore-token`), a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds, the push encoding and a plain-name token's locking key not judged; on this line it answers `true` for untagged and namespace tokens their controller signed, which `verify_signature` answers `false` (`tests/kvstore_legacy_signature_verdict.rs`) | 94 |
 
 ## Key Exports
 
@@ -342,6 +343,11 @@ impl KVStoreInterpreter {
     /// Uses ProtoWallet::anyone() with SecurityLevel::App protocol
     /// Returns true if signature is valid, false if invalid/missing
     pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool;
+
+    /// Deprecated: true only for a token whose controller field is `controller`
+    /// and whose last field is `controller`'s signature over the others
+    /// (`legacy_signature.rs`)
+    pub fn verify_signature_legacy(pushdrop: &PushDrop, controller: &PublicKey) -> bool;
 
     /// Extract just the value
     pub fn extract_value(script: &LockingScript) -> Option<String>;
