@@ -31,7 +31,21 @@
 //! `front_pages.py notes` with this run's id, flags from `front_pages.py flags`), holds
 //! `contents: write` in that job alone, and runs the reconciler after it;
 //! `front-pages.yml` runs the reconciler on a dispatch and nothing else (no schedule).
+//!
+//! The sync's dispatch of stage R (#97): `SYNC_STAGE_R` holds its steps byte for byte, and
+//! `SYNC_FILE_DIGEST` holds `sync-main-into-beta.yml` whole, so a second definition of a variable
+//! the dispatch reads, in any spelling (a flow mapping, a multiline write to `$GITHUB_ENV`, a YAML
+//! escape in a key), moves the file and fails; the scan of definitions
+//! (`every_variable_the_stage_r_dispatch_reads_has_its_one_definition_97`) stays beside it as a
+//! readable second check and does not claim every spelling. The bound: what holds the sync's
+//! dispatch is the pinned step's text and the digest of the whole workflow; what neither sees is a
+//! change that edits the workflow and its digest in the same pull request (a reviewer's matter,
+//! visible in the diff), and a value GitHub keeps outside the file (an organization or repository
+//! variable, which reaches a job only through a `${{ vars.NAME }}` the file would carry, and of
+//! which the repository and its organization held none on 2026-11-13).
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
+
+mod arch_support;
 
 use std::fs;
 use std::path::PathBuf;
@@ -602,6 +616,81 @@ fn sync_stage_r_reads(text: &str) -> Vec<String> {
     errors
 }
 
+/// FNV-1a (`arch_support::fnv`) of `sync-main-into-beta.yml`'s whole text, line endings
+/// normalized (#97's third fold, the form #819 pins its macro file by). Whoever changes the
+/// workflow deliberately reads the change, then sets this to the digest the failure prints, in
+/// the same diff.
+const SYNC_FILE_DIGEST: u64 = 0x828b_6214_aa7a_399a;
+
+/// The sync workflow's text moved from its digest.
+fn sync_digest_refusals(text: &str) -> Vec<String> {
+    let digest = arch_support::fnv(text);
+    if digest == SYNC_FILE_DIGEST {
+        return Vec::new();
+    }
+    vec![format!(
+        "{SYNC_FILE}: its text moved (digest {digest:#018x}, pinned {SYNC_FILE_DIGEST:#018x}): the stage R dispatch (#97) reads variables the workflow defines; read the change, then move SYNC_FILE_DIGEST in the same diff"
+    )]
+}
+
+/// The sync workflow pinned whole (#97's third fold): the second re-read's two plants, which
+/// passed the scan of definitions (a flow mapping with no space after its brace, a multiline
+/// `$GITHUB_ENV` write), its escape row (a YAML escape in a quoted key) and an `env:` on the job
+/// with a value the dispatch does not read, each refused by the digest's message.
+#[test]
+fn the_sync_workflow_is_pinned_whole_by_its_digest_97() {
+    let text = read(SYNC_FILE);
+    assert!(
+        sync_digest_refusals(&text).is_empty(),
+        "{:?}",
+        sync_digest_refusals(&text)
+    );
+    let job = "    runs-on: ubuntu-latest\n";
+    let pick = "      - name: Cherry-pick main's commits onto beta\n        id: pick\n        run: |\n          set -euo pipefail\n";
+    assert_eq!(text.matches(job).count(), 1);
+    assert_eq!(text.matches(pick).count(), 1);
+    let plants: Vec<(&str, String)> = vec![
+        (
+            "a job-level flow mapping with no space",
+            text.replace(job, &format!("{job}    env: {{SYNC_BRANCH: beta}}\n")),
+        ),
+        (
+            "a multiline $GITHUB_ENV write",
+            text.replace(
+                pick,
+                &format!(
+                    "{pick}          {{ echo 'SYNC_BRANCH<<EOF'; echo beta; echo EOF; }} >> \"$GITHUB_ENV\"\n"
+                ),
+            ),
+        ),
+        (
+            "a YAML escape in a quoted job-level key",
+            text.replace(
+                job,
+                &format!("{job}    env:\n      \"SYNC_BRAN\\x43H\": beta\n"),
+            ),
+        ),
+        (
+            "a job-level proxy",
+            text.replace(
+                job,
+                &format!("{job}    env:\n      HTTPS_PROXY: http://example.invalid:8080\n"),
+            ),
+        ),
+        ("a comment added", format!("{text}# a comment\n")),
+    ];
+    for (what, planted) in plants {
+        assert_ne!(planted, text, "{what}: the plant changed nothing");
+        let errors = sync_digest_refusals(&planted);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("its text moved") && e.contains("SYNC_FILE_DIGEST")),
+            "{what}: {errors:?}"
+        );
+    }
+}
+
 #[test]
 fn both_workflows_have_a_workflows_shape() {
     let mut errors = shape("ci.yml", &read(".github/workflows/ci.yml"));
@@ -799,7 +888,8 @@ fn a_sync_stage_r_dispatch_retargeted_unconditioned_or_moved_is_refused_97() {
 }
 
 /// The re-read of PR #931's fold: a variable the pinned dispatch reads, redefined where the bytes
-/// do not reach, is refused by its name, whatever the spelling of the definition.
+/// do not reach, is refused by its name in the spellings the scan reads; every other spelling is
+/// held by `SYNC_FILE_DIGEST` (`the_sync_workflow_is_pinned_whole_by_its_digest_97`).
 #[test]
 fn every_variable_the_stage_r_dispatch_reads_has_its_one_definition_97() {
     let mut reads = variables_read(SYNC_STAGE_R);

@@ -34,6 +34,15 @@ pub fn normalize(text: &str) -> String {
     text.replace("\r\n", "\n")
 }
 
+/// FNV-1a, 64 bits: the digest every text pin of the architecture rules takes
+/// (`sealed` in `arch_field_writes_843.rs`, the macro file in
+/// `arch_non_exhaustive_pins_819.rs`, the sync workflow in `arch_ci_lines.rs`).
+pub fn fnv(text: &str) -> u64 {
+    text.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
 pub fn sources() -> Vec<Source> {
     fn visit(root: &Path, dir: &Path, out: &mut Vec<Source>) {
         for entry in fs::read_dir(dir).expect("read source directory") {
