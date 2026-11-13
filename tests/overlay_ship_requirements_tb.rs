@@ -370,3 +370,152 @@ async fn the_failed_requirement_carries_the_references_code_and_description_tb_a
         ])
     );
 }
+
+// =============================================================================
+// #815: the broadcast topics themselves, as the reference's constructor
+// reads them (`SHIPBroadcaster.ts:420`, `this.topics =
+// canonicalTopics(topics, 'Broadcast topics')`; `:156-179`: not an array,
+// empty or over 64 `<label> must be a bounded array of canonical topic
+// names.`, a name failing `/^(?=.{1,50}$)tm_[a-z]+(?:_[a-z]+)*$/` (`:171`)
+// or seen before `<label> must contain unique canonical tm_ topic names.`),
+// ahead of the requirements. Recorded as `broadcast_topics`.
+// =============================================================================
+
+fn broadcast_topic_case(name: &str) -> &'static Value {
+    recorded()["broadcast_topics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == name)
+        .unwrap_or_else(|| panic!("no recorded case {name}"))
+}
+
+/// `new` over the case's own topics and requirement, against the recording.
+fn assert_broadcast_topics_case(name: &str) {
+    let case = broadcast_topic_case(name);
+    let topics: Vec<String> = case["topics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t.as_str().unwrap().to_string())
+        .collect();
+    let facilitator = behaving(case);
+    let ours = TopicBroadcaster::new(topics, config(&case["requirement"], facilitator))
+        .map(|_| ())
+        .map_err(|e| e.to_string());
+    let theirs = match case["constructor_refusal"].as_str() {
+        Some(words) => Err(Error::OverlayError(words.into()).to_string()),
+        None => Ok(()),
+    };
+    assert_eq!(ours, theirs, "{name}");
+}
+
+#[test]
+fn a_non_canonical_broadcast_topic_is_refused_at_new_815() {
+    for name in [
+        "not_canonical_upper_case",
+        "not_canonical_prefix",
+        "not_canonical_digit",
+        "not_canonical_trailing_underscore",
+        "not_canonical_double_underscore",
+        "not_canonical_bare_prefix",
+        "not_canonical_after_a_canonical_one",
+        // The issue's line: a requirement naming `tm_Foo` is refused at the
+        // broadcast topics, ahead of the requirement, as there.
+        "not_canonical_named_by_a_requirement_too",
+        // The empty list in the reference's words (until #815 `At least one
+        // topic is required for broadcast.`).
+        "empty",
+    ] {
+        assert_broadcast_topics_case(name);
+    }
+    assert_eq!(
+        broadcast_topic_case("not_canonical_upper_case")["constructor_refusal"],
+        "Broadcast topics must contain unique canonical tm_ topic names."
+    );
+}
+
+#[test]
+fn sixty_five_broadcast_topics_are_refused_815() {
+    assert_broadcast_topics_case("sixty_four");
+    assert_broadcast_topics_case("sixty_five");
+    assert_eq!(
+        broadcast_topic_case("sixty_five")["constructor_refusal"],
+        "Broadcast topics must be a bounded array of canonical topic names."
+    );
+}
+
+#[test]
+fn a_repeated_broadcast_topic_is_refused_815() {
+    assert_broadcast_topics_case("repeated");
+    assert_eq!(
+        broadcast_topic_case("repeated")["constructor_refusal"],
+        "Broadcast topics must contain unique canonical tm_ topic names."
+    );
+}
+
+#[test]
+fn fifty_characters_pass_and_fifty_one_are_refused_815() {
+    assert_broadcast_topics_case("fifty_characters");
+    assert_broadcast_topics_case("fifty_one_characters");
+    assert_eq!(
+        broadcast_topic_case("fifty_characters")["constructed"],
+        true
+    );
+}
+
+/// Every recorded broadcast-topics case, counted.
+#[test]
+fn every_recorded_broadcast_topics_case_is_the_references_815() {
+    let cases = recorded()["broadcast_topics"].as_array().unwrap();
+    assert_eq!(cases.len(), 17);
+    for case in cases {
+        assert_broadcast_topics_case(case["name"].as_str().unwrap());
+    }
+}
+
+/// The pin the tb-acks reads asked for: a requirement list of exactly 64
+/// topics is taken (`canonicalTopics`' `value.length > MAX_SHIP_TOPICS`,
+/// `:159`; the `>` of `requirements.rs`), 65 refused in the requirement's
+/// words.
+#[test]
+fn a_requirement_list_of_exactly_64_topics_is_taken_815() {
+    assert_broadcast_topics_case("sixty_four_required_by_all_hosts");
+    assert_eq!(
+        broadcast_topic_case("sixty_four_required_by_all_hosts")["constructed"],
+        true
+    );
+    assert_broadcast_topics_case("sixty_five_required_of_sixty_four");
+}
+
+/// The pin the tb-acks reads asked for: an interested specific host whose
+/// requirement is `RequireAck::None` (no reference form; its `continue`
+/// for a requirement that is neither `'all'`, `'any'` nor a list,
+/// `:674-677`) is passed over once it is in the map: host `b`, interested
+/// and acknowledging nothing (`idle`), passes under `None` and fails under
+/// `All` (`ack_idle__specific_b_all` is recorded a failure).
+#[tokio::test]
+async fn a_specific_host_with_no_requirement_is_passed_over_815() {
+    let b_host = recorded()["hosts"]["b"].as_str().unwrap().to_string();
+    let subject = Transaction::from_beef(
+        &hex::decode(recorded()["advertisements"][0]["beef"].as_str().unwrap()).unwrap(),
+        None,
+    )
+    .unwrap();
+    for (requirement, passes) in [(RequireAck::None, true), (RequireAck::All, false)] {
+        let facilitator =
+            behaving(&serde_json::json!({ "behaviours": { "a": "ack", "b": "idle" } }));
+        let mut cfg = config(&serde_json::json!({ "any": [] }), facilitator);
+        cfg.require_ack_from_specific_hosts =
+            HashMap::from([(b_host.clone(), requirement.clone())]);
+        let b = TopicBroadcaster::new(topics(), cfg).unwrap();
+        let verdict = b.broadcast_tx(&subject).await;
+        assert_eq!(verdict.is_ok(), passes, "{requirement:?}: {verdict:?}");
+        if !passes {
+            assert_eq!(
+                verdict.unwrap_err().code,
+                "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED"
+            );
+        }
+    }
+}

@@ -162,3 +162,67 @@ async fn malformed_reference_tags_are_refused_by_both_reader_paths() {
         );
     }
 }
+
+/// #815's pin at the kvstore door: one host answering freeform beside one
+/// answering the token's output list. `GlobalKVStore`'s freeform arm
+/// (`src/kvstore/global.rs`) is unreachable since #821: `LookupResolver::query`
+/// answers the merged output list in every case, a freeform host
+/// contributing nothing (`ts-stack@edf6e03` `LookupResolver.ts:1085-1087`,
+/// `:1445-1450`), so the store reads the token. Before #821 the earliest
+/// freeform answer was returned over the aggregate and the store read no
+/// value. The other consumer doors (identity, registry, storage, revoke)
+/// run through the same `query`.
+#[tokio::test]
+async fn a_freeform_host_beside_a_list_answers_the_list_at_the_kvstore_door_815() {
+    struct ByHost(Vec<u8>);
+
+    #[async_trait::async_trait(?Send)]
+    impl OverlayLookupFacilitator for ByHost {
+        async fn lookup(
+            &self,
+            url: &str,
+            _question: &LookupQuestion,
+            _timeout_ms: Option<u64>,
+        ) -> bsv_rs::Result<LookupAnswer> {
+            match url {
+                "https://freeform.kvstore-815.invalid" => Ok(LookupAnswer::Freeform {
+                    result: serde_json::json!({ "note": "no outputs here" }),
+                }),
+                "https://list.kvstore-815.invalid" => Ok(LookupAnswer::OutputList {
+                    outputs: vec![OutputListItem {
+                        beef: self.0.clone(),
+                        output_index: 0,
+                        context: None,
+                        txid: None,
+                    }],
+                }),
+                other => panic!("unscripted host {other}"),
+            }
+        }
+    }
+
+    let case = cases().remove(0);
+    let config = KVStoreConfig::default();
+    let source = signaction_reference_326::source_of(&script(&case).to_binary(), 1);
+    let resolver = LookupResolver::new(LookupResolverConfig {
+        network_preset: NetworkPreset::Local,
+        host_overrides: Some(std::collections::HashMap::from([(
+            config.service_name.clone(),
+            vec![
+                "https://freeform.kvstore-815.invalid".to_owned(),
+                "https://list.kvstore-815.invalid".to_owned(),
+            ],
+        )])),
+        slap_trackers: Some(Vec::new()),
+        facilitator: Some(Arc::new(ByHost(source.to_beef(true).unwrap()))),
+        ..Default::default()
+    });
+    let store = GlobalKVStore::with_resolver(
+        Counting::of_scalar(9),
+        config,
+        NetworkPreset::Local,
+        resolver,
+    );
+    let entry = store.get("alpha", None).await.unwrap();
+    assert_eq!(entry.map(|e| e.value), Some("one".to_string()));
+}

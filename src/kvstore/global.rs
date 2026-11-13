@@ -485,7 +485,12 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                 }
             }
             LookupAnswer::Freeform { result: _ } => {
-                // Freeform responses not supported for kvstore
+                // Unreachable since #821: `LookupResolver::query` answers the
+                // merged output list in every case, a freeform host
+                // contributing nothing (`ts-stack@edf6e03`
+                // `LookupResolver.ts:1085-1087`, `:1445-1450`); the arm stays
+                // so the `match` is exhaustive. Pinned at this door by
+                // `a_freeform_host_beside_a_list_answers_the_list_at_the_kvstore_door_815`.
             }
             LookupAnswer::Formula { formulas: _ } => {
                 // Formula responses not supported for kvstore
