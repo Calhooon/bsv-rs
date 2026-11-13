@@ -1,0 +1,24 @@
+name: witness-dispatch
+
+# Witness 11 of #97: a pull request's job dispatches stage R on its own branch with the
+# GITHUB_TOKEN; the dispatched run reaches a check (the sync's path).
+on:
+  pull_request:
+    branches: [beta]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch stage R on the branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.head_ref }}
+        run: gh workflow run sibling-run.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
