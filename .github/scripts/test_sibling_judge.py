@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -788,7 +789,7 @@ class RunState(Base):
                               ("another run's", [self.one(workflow_run={"id": 1, "head_sha": self.world.head, "head_repository_id": RID})])):
             with self.subTest(name):
                 check = self.artifacts(listing)
-                self.assertCheck(check, "NOT JUDGED", "unexpired sibling-raw artifacts, not one")
+                self.assertCheck(check, "NOT JUDGED", "unexpired sibling-raw artifacts of attempt 1, not one")
 
     def test_a_dispatch_whose_artifact_is_gone_posts_unless_standing(self):
         check = self.artifacts([self.one(expired=True)], event="workflow_dispatch")
@@ -1047,6 +1048,190 @@ class Members(unittest.TestCase):
         self.assertEqual(len(required), 3 + 2 * len(sh.ALL))
         self.assertIn("bsvrs-words/tx.jsonl", required)
         self.assertIn("bsv-rs/tx.jsonl", optional)
+
+
+class StampAndRecord(Base):
+    """Each comparison of the stamp and the run's record with what the judge read, alone (the
+    strength read of lane 1's FIX lines): one field moved at a time, each refused."""
+
+    def moved(self, stamp_change=None, info_change=None, **raw):
+        files = self.world.raw_files(**raw)
+        stamp, info = json.loads(files[sh.STAMP]), json.loads(files[sh.RUN_INFO])
+        (stamp_change or (lambda s: None))(stamp)
+        (info_change or (lambda i: None))(info)
+        files[sh.STAMP], files[sh.RUN_INFO] = json.dumps(stamp).encode(), json.dumps(info).encode()
+        return files
+
+    def test_each_comparison_of_the_stamp_and_the_record_refuses_on_its_own(self):
+        def drop(key):
+            return lambda s: s["corpora"].pop(key)
+
+        cases = (
+            ("the record's pin", None, lambda i: i.update(sibling="1" * 40), "pin: stamp"),
+            ("the stamp's rules pin", lambda s: s.update(rules_pin="0.0.0"), None, "rules pin: stamp '0.0.0'"),
+            ("the record's rules pin", None, lambda i: i.update(rules_pin="0.0.0"), "record '0.0.0'"),
+            ("the stamp's corpus sha256", lambda s: s["corpora"]["seed"].update(corpus_sha256="0" * 64), None,
+             "corpora: the stamp's"),
+            ("the stamp's withheld count", lambda s: s["corpora"]["gen"].update(withheld=9), None, "corpora: the stamp's"),
+            ("the stamp one corpus short", drop("tx"), None, "corpora: the stamp's"),
+            ("the record's withheld count", None, lambda i: i.update(withheld={"gen": 9}), "withheld: the record's"),
+            ("the record one corpus short", None, lambda i: i.update(corpora=list(sh.ALL)[:-1]), "the record does not name"),
+            ("the record's corpora reordered", None, lambda i: i.update(corpora=list(reversed(sh.ALL))),
+             "the record does not name"),
+        )
+        for name, stamp_change, info_change, needle in cases:
+            with self.subTest(name):
+                check, gh, _ = self.judged(files=self.moved(stamp_change, info_change))
+                self.assertCheck(check, "NOT JUDGED", needle)
+                self.assertIn("differs from what the judge read", check.title)
+                self.assertEqual(gh.writes, [])
+
+    def test_a_dispatch_stamp_naming_no_pull_request_is_judged_and_any_other_mismatch_is_not(self):
+        w = self.world
+        check, _, _ = self.judged(files=w.raw_files(pull_request=None), answers=w.answers(event="workflow_dispatch"))
+        self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
+        for name, event, stamped in (("a dispatch stamping another pull request", "workflow_dispatch", 8),
+                                     ("a pull request's run stamping none", "pull_request", None)):
+            with self.subTest(name):
+                check, _, _ = self.judged(files=w.raw_files(pull_request=stamped), answers=w.answers(event=event))
+                self.assertCheck(check, "NOT JUDGED", "pull request: stamp")
+
+
+class LineFeeds(unittest.TestCase):
+    """A line is split on a line feed alone: JSON holds U+0085, U+2028 and U+2029 raw inside a
+    string, and `str.splitlines` splits on each (the strength read of lane 1)."""
+
+    SEPARATORS = ("\u0085", " ", " ")
+
+    def test_a_words_line_holding_a_separator_reads_as_one_entry(self):
+        for sep in self.SEPARATORS:
+            with self.subTest(hex(ord(sep))):
+                row = {"id": "a", "rec": ["invalid", f"x{sep}y"], "spec": ["valid", None], "mempool": ["valid", None]}
+                text = json.dumps(row, ensure_ascii=False) + "\n" + json.dumps({**row, "id": "b"}) + "\n"
+                rows = sh.read_words_text(text, "w/seed.jsonl")
+                self.assertEqual(sorted(rows), ["a", "b"])
+                self.assertEqual(rows["a"]["rec"], ["invalid", f"x{sep}y"])
+
+    def test_a_log_whose_verdict_follows_a_separator_has_no_verdict_line(self):
+        for sep in self.SEPARATORS:
+            with self.subTest(hex(ord(sep))):
+                files = {"seed.log": f"spec_recorded: planted{sep}{GREEN_LINE}".encode()}
+                _, divergences, lines, _ = sh.verdicts_of(files, "w", ["seed"], {"seed": {"entries": 1}})
+                self.assertEqual(divergences, 1, lines)
+                self.assertIn("no run_diff verdict line", lines[0])
+
+    def test_the_judges_facts_and_the_withheld_drop_read_a_separator_inside_a_line(self):
+        with tempfile.TemporaryDirectory() as d:
+            world = World(d)
+            seed = world.sibling / "corpus" / "seed" / "seed.jsonl"
+            gen = world.sibling / "corpus" / "gen" / "gen.jsonl"
+            seed.write_text(seed.read_text() + '{"id": "seed-x", "tx": "00", "note": "a b"}\n')
+            gen.write_text(gen.read_text() + '{"id": "gen-x", "tx": "WITHHELD: a b"}\n')
+            git(world.sibling, "add", ".")
+            git(world.sibling, "commit", "-q", "-m", "separators")
+            pin = git(world.sibling, "rev-parse", "HEAD")
+            facts = quiet(sj.Facts, world.sibling, pin, d)[0]
+        self.assertEqual(facts.lines["seed"].get("seed-x"), '{"id": "seed-x", "tx": "00", "note": "a b"}')
+        self.assertEqual(facts.withheld, {"gen": 2})
+        self.assertNotIn("gen-x", facts.lines["gen"])
+
+
+class Quoting(unittest.TestCase):
+    """A branch name is a pull request's text: every command the judge builds quotes it."""
+
+    BRANCH = "lane/x;touch $(id) 'y'"
+
+    def test_the_repush_act_quotes_the_branch(self):
+        j = sj.Judgment(None, None, tempfile.gettempdir(), "u", R, RID)
+        j.pr = {"head": {"ref": self.BRANCH}}
+        act = j.repush()
+        self.assertIn("--ref " + shlex.quote(self.BRANCH) + "\n", act + "\n")
+        self.assertEqual(shlex.split(act.splitlines()[-1])[-1], self.BRANCH)
+
+    def test_the_sweeps_act_quotes_the_branch(self):
+        sha = "1" * 40
+        answers = {
+            f"repos/{R}/pulls?state=open&base=beta&per_page=100":
+                [{"number": 1, "head": {"sha": sha, "ref": self.BRANCH, "repo": {"full_name": R}}}],
+            f"repos/{R}/pulls/1": {"mergeable_state": "clean"},
+            f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={sha}&per_page=100": {"workflow_runs": []},
+            f"repos/{R}/commits/{sha}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100": {"check_runs": []},
+        }
+        code, log = quiet(sj.main, ["sweep", "--app-id", str(APP)], GitHubFake(answers))
+        self.assertEqual(code, 0)
+        act = log.split("act: ", 1)[1].splitlines()[0]
+        self.assertEqual(shlex.split(act)[-1], self.BRANCH)
+
+
+class Standing(Base):
+    """A check counts as the App's only when its app id is the configured one (the rule read's
+    R3): a check with no app, a null app or another App's never stands."""
+
+    def test_a_check_without_the_apps_id_does_not_stand(self):
+        w = self.world
+        path = f"repos/{R}/commits/{w.head}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"
+        for name, forged in (("no app", {"status": "completed"}), ("a null app", {"status": "completed", "app": None}),
+                             ("an app with no id", {"status": "completed", "app": {}}),
+                             ("another App", {"status": "completed", "app": {"id": APP + 1}})):
+            with self.subTest(name):
+                answers = w.answers()
+                answers[path] = {"check_runs": [forged]}
+                self.assertFalse(sj.standing(GitHubFake(answers), R, w.head, APP))
+                env = {**outputs(self.judged()[0]), "POST": "unless-standing", "CONCLUSION": "failure",
+                       "TITLE": "NOT JUDGED: gone"}
+                gh = GitHubFake(answers)
+                args = ["report", "--run-id", str(RUN), "--repository", R, "--repository-id", str(RID), "--app-id",
+                        str(APP), "--judge-result", "success"]
+                code, _ = quiet(sj.main, args, gh, env)
+                self.assertEqual((code, len(gh.writes)), (0, 1))
+        answers = w.answers()
+        answers[path] = {"check_runs": [{"status": "completed", "app": {"id": APP}}]}
+        self.assertTrue(sj.standing(GitHubFake(answers), R, w.head, APP))
+
+
+class Rerun(Base):
+    """A re-run of stage R is judged from the artifact its own attempt uploaded (`overwrite: true`
+    on the upload; the judge reads only an artifact created at or after the attempt started)."""
+
+    STARTED = "2026-11-12T10:00:00Z"
+
+    def rerun(self, artifacts):
+        w = self.world
+        answers = w.answers(attempt=2, artifacts=artifacts)
+        answers[f"repos/{R}/actions/runs/{RUN}/attempts/2"] = {"conclusion": "success", "run_started_at": self.STARTED}
+        return self.judged(answers=answers, attempt=2)
+
+    def made(self, artifact_id, created):
+        return {"id": artifact_id, "name": "sibling-raw", "expired": False, "size_in_bytes": 1000, "digest": "d",
+                "created_at": created,
+                "workflow_run": {"id": RUN, "head_sha": self.world.head, "head_repository_id": RID}}
+
+    def test_a_rerun_is_judged_whether_the_old_artifact_was_replaced_or_is_still_listed(self):
+        old, new = self.made(98, "2026-11-12T09:30:00Z"), self.made(99, "2026-11-12T10:04:00Z")
+        for name, listing in (("replaced", [new]), ("both listed", [old, new]), ("both listed, new first", [new, old])):
+            with self.subTest(name):
+                check, gh, _ = self.rerun(listing)
+                self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
+                self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
+                self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
+
+    def test_an_earlier_attempts_artifact_alone_is_not_judged(self):
+        check, gh, _ = self.rerun([self.made(98, "2026-11-12T09:30:00Z")])
+        self.assertCheck(check, "NOT JUDGED", "0 unexpired sibling-raw artifacts of attempt 2, not one")
+        self.assertEqual(gh.writes, [])
+
+
+class StageRScript(unittest.TestCase):
+    """Whose `sibling_harness.py` stage R runs is said one way (the rule read's R2): beta's, from
+    the `judge/` checkout, on the head's tree, so a J diff cannot change the script that writes
+    its own artifact."""
+
+    def test_the_script_and_the_manual_say_beta_s_harness(self):
+        doc = sj.__doc__
+        self.assertIn("runs beta's `sibling_harness.py raw` on the head's tree", " ".join(doc.split()))
+        manual = (HERE.parent.parent / "tests" / "sibling" / "CLAUDE.md").read_text()
+        self.assertIn("python3 -I -B judge/.github/scripts/sibling_harness.py raw --tree head", manual)
+        self.assertNotIn("sibling_harness.py raw --tree .", manual)
 
 
 if __name__ == "__main__":

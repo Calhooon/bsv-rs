@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """The node oracle's judge (#97): a pull request's raw sibling output judged from beta's files.
 
-Stage R (a workflow on the pull request's head, no secret) runs `sibling_harness.py raw` and
-uploads what it wrote as the artifact `sibling-raw`. Stage J (a workflow on the default branch,
+Stage R (a workflow on the pull request's head, no secret) runs beta's `sibling_harness.py raw`
+on the head's tree, from its `judge/` checkout of beta, and uploads what it wrote as the artifact
+`sibling-raw`; the head's own copy of this folder is never executed. Stage J (a workflow on the default branch,
 started by the end of stage R) checks out beta, runs `judge` there with no key, and hands four
 one-line outputs to `report`, the one job that holds the App's token and posts the check run
 `sibling-judge`. Nothing the pull request carries decides the verdict: the judging files, the
@@ -33,6 +34,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -305,7 +307,7 @@ class Facts:
             path = sh.corpus_file(scratch, name)
             self.corpora[name] = {"corpus_sha256": sh.sha256_file(path), "withheld": self.withheld.get(name, 0)}
             entries = {}
-            for line in path.read_text().splitlines():
+            for line in sh.lines_of(path.read_text()):
                 try:
                     row = json.loads(line)
                 except ValueError:
@@ -650,7 +652,8 @@ class Judgment:
         return f"gh run rerun {self.run_id} --repo {self.repository}"
 
     def repush(self):
-        branch = ((self.pr or {}).get("head") or {}).get("ref") or "<the pull request's branch>"
+        branch = ((self.pr or {}).get("head") or {}).get("ref")
+        branch = shlex.quote(branch) if branch else "<the pull request's branch>"
         return (f"# push a commit that fixes it to the pull request's branch (the push is judged), or:\n"
                 f"gh workflow run sibling-run.yml --repo {self.repository or 'Calhooon/bsv-rs'} --ref {branch}")
 
@@ -700,9 +703,10 @@ def superseded(gh, repository, run, attempt):
 
 
 def standing(gh, repository, head, app_id):
-    """Whether a completed check of this App stands on the head."""
+    """Whether a completed check of this App stands on the head: a check counts only when its
+    app id is the configured one (a check with no app, a null app or another App's never does)."""
     answer = gh.get(f"repos/{repository}/commits/{head}/check-runs?check_name={CHECK_NAME}&app_id={app_id}&per_page=100")
-    return any(c.get("status") == "completed" and ((c.get("app") or {}).get("id") in (None, app_id))
+    return any(c.get("status") == "completed" and isinstance(c.get("app"), dict) and c["app"].get("id") == app_id
                for c in answer.get("check_runs") or [])
 
 
@@ -791,7 +795,10 @@ def local_artifact(path):
 
 
 def _artifact_files(self, args):
-    """The one unexpired `sibling-raw` artifact of a successful run, read in memory."""
+    """The one unexpired `sibling-raw` artifact a successful attempt uploaded, read in memory.
+    Stage R uploads with `overwrite: true`, so a re-run replaces the artifact of the attempt before
+    it; where GitHub still lists that one, an artifact created before this attempt started is not
+    this attempt's and is not counted."""
     state = self.gh.get(f"repos/{self.repository}/actions/runs/{self.run_id}/attempts/{self.attempt}")
     conclusion = state.get("conclusion")
     if conclusion != "success":
@@ -815,11 +822,15 @@ def _artifact_files(self, args):
         and (a.get("workflow_run") or {}).get("head_sha") == self.head
         and (a.get("workflow_run") or {}).get("head_repository_id") == self.repository_id
     ]
+    started = state.get("run_started_at")
+    if isinstance(started, str):
+        found = [a for a in found if isinstance(a.get("created_at"), str) and a["created_at"] >= started]
     live = [a for a in found if not a.get("expired")]
     if len(live) != 1:
         post = "unless-standing" if (self.event == "workflow_dispatch" and not live) else "yes"
-        raise Verdict(NOT_JUDGED, f"{len(live)} unexpired {ARTIFACT_NAME} artifacts, not one",
-                      [f"run {self.run_id} has {len(found)} {ARTIFACT_NAME} artifacts of its head, {len(live)} unexpired"],
+        raise Verdict(NOT_JUDGED, f"{len(live)} unexpired {ARTIFACT_NAME} artifacts of attempt {self.attempt}, not one",
+                      [f"run {self.run_id} attempt {self.attempt} has {len(found)} {ARTIFACT_NAME} artifacts of its head, "
+                       f"{len(live)} unexpired"],
                       act=self.rerun(), post=post)
     self.artifact = live[0]
     if (self.artifact.get("size_in_bytes") or 0) > ARTIFACT_LIMIT:
@@ -965,7 +976,7 @@ def command_sweep(args, gh=None):
             if detail.get("mergeable_state") == "dirty":
                 print(f"{line}; act: rebase on {BASE_REF} (a conflict)")
             elif newest is None:
-                print(f"{line}; act: gh workflow run sibling-run.yml --repo {repository} --ref {branch}")
+                print(f"{line}; act: gh workflow run sibling-run.yml --repo {repository} --ref {shlex.quote(branch)}")
             elif not stands:
                 print(f"{line}; act: gh workflow run sibling-judge.yml --repo {repository} --ref main -f run_id={newest.get('id')}")
             else:

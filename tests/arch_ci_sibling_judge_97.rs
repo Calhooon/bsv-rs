@@ -130,6 +130,7 @@ const STANDARD: &[&str] = &[
     "os",
     "pathlib",
     "re",
+    "shlex",
     "shutil",
     "subprocess",
     "sys",

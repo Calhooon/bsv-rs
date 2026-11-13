@@ -139,13 +139,26 @@ def corpora_of(names):
     return out
 
 
+def lines_of(text, keepends=False):
+    """A text's lines split on a line feed alone (#97, the strength read of lane 1). JSON holds
+    U+0085, U+2028 and U+2029 raw inside a string, and `str.splitlines` splits on each of them
+    (and on CR, VT, FF and U+001C to U+001E), so a line it cuts is a line no reader of the corpus,
+    the words or a log sees; every split of this script and of `sibling_judge.py` is this one."""
+    if keepends:
+        return [line for line in re.split(r"(?<=\n)", text) if line]
+    parts = text.split("\n")
+    if parts and parts[-1] == "":
+        parts.pop()
+    return parts
+
+
 def rewrite_dependency(cargo_toml, tree):
     """Rewrite the one `bsv-rs = ...` line of the harness's manifest to `path`.
 
     The features of the line are kept; an absent or doubled line is a stop.
     """
     path = Path(cargo_toml)
-    lines = path.read_text().splitlines(keepends=True)
+    lines = lines_of(path.read_text(), keepends=True)
     hits = [i for i, line in enumerate(lines) if DEP_LINE.match(line)]
     if len(hits) != 1:
         raise Stop(f"{path}: expected one `bsv-rs = ...` dependency line, found {len(hits)}")
@@ -210,7 +223,7 @@ def drop_withheld(scratch, corpora):
     for name in corpora:
         source = corpus_file(scratch, name)
         kept, gone = [], 0
-        for line in source.read_text().splitlines(keepends=True):
+        for line in lines_of(source.read_text(), keepends=True):
             if line.strip():
                 try:
                     tx = json.loads(line).get("tx")
@@ -510,7 +523,7 @@ def verdicts_of(files, where, names, manifest):
         got = manifest.get(name)
         if got is not None:
             entries += got.get("entries") or 0
-        text = (text_of(files, f"{name}.log") or "").splitlines()
+        text = lines_of(text_of(files, f"{name}.log") or "")
         red = green = None
         named = []
         for line in text:
@@ -547,7 +560,7 @@ def read_words(path):
 
 def read_words_text(text, path):
     rows = {}
-    for number, line in enumerate(text.splitlines(), 1):
+    for number, line in enumerate(lines_of(text), 1):
         if not line.strip():
             continue
         try:
@@ -871,7 +884,7 @@ def command_summary(args):
         raise Stop(f"{summary}: not found")
     print(summary.read_text(), end="")
     for path in sorted((out / "bsv-rs").glob("*.jsonl")):
-        lines = [line for line in path.read_text().splitlines() if line.strip()]
+        lines = [line for line in lines_of(path.read_text()) if line.strip()]
         print(f"{path.stem}: {len(lines)} witnesses")
         for line in lines:
             witness = json.loads(line)
