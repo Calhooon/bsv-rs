@@ -1,0 +1,27 @@
+name: sibling-run
+
+# Witness 10 of #97: a second workflow named sibling-run. Its run earns no check: the judge reads
+# a run's path, never its name, so the real stage R's verdict stands alone.
+on:
+  pull_request:
+    branches: [beta]
+
+permissions:
+  contents: read
+
+jobs:
+  raw:
+    name: raw
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: A green artifact of nothing
+        run: |
+          mkdir -p "$RUNNER_TEMP/sibling-raw"
+          echo '{}' > "$RUNNER_TEMP/sibling-raw/stamp.json"
+
+      - name: Upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sibling-raw
+          path: ${{ runner.temp }}/sibling-raw
