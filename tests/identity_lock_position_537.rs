@@ -33,7 +33,9 @@ fn subject_of(script: &LockingScript, case: &str) -> String {
 
 /// The key a key-only token (#618) is asked under: it carries no
 /// certificate, so no subject is there to filter, and none is looked for.
-const KEY_ONLY_ASKED: &str = "02aa";
+/// The generator's key, a valid one: since #818b `discover_certificates`
+/// refuses a text that is no key (`02aa` until then) before any lookup.
+const KEY_ONLY_ASKED: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 
 /// How many identities and certificates the two parsers return for
 /// `script`, `discover_certificates` asked for `asked`.

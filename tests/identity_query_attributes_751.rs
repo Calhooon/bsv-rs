@@ -262,11 +262,16 @@ async fn a_host_answering_an_attribute_question_with_another_certificate_is_not_
         .await
         .unwrap()
         .is_empty());
-    assert!(client(three())
-        .resolve_by_attributes(IndexMap::new(), false)
-        .await
-        .unwrap()
-        .is_empty());
+    // The empty map: nothing kept until #818b; since #818b refused before
+    // the network in the wallet door's words (`validationHelpers.ts:1559-1562`)
+    assert_eq!(
+        client(three())
+            .resolve_by_attributes(IndexMap::new(), false)
+            .await
+            .unwrap_err()
+            .to_string(),
+        "The attributes parameter must be an object containing 1-32 fields"
+    );
 }
 
 /// The type beside attributes (#756's pin): the overlay searches by the

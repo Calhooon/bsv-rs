@@ -178,23 +178,9 @@ fn any_matches(fields: &IndexMap<String, String>, expected: &str) -> bool {
 }
 
 /// The order `Object.entries` walks a JavaScript object built in `fields`'
-/// order: array-index names ahead, ascending, then the rest as inserted.
-pub(super) fn js_order(fields: &IndexMap<String, String>) -> Vec<(&str, &str)> {
-    let index = |name: &str| {
-        name.parse::<u32>()
-            .ok()
-            .filter(|n| *n != u32::MAX && n.to_string() == name)
-    };
-    let mut entries: Vec<_> = fields
-        .iter()
-        .map(|(name, value)| (index(name), name.as_str(), value.as_str()))
-        .collect();
-    entries.sort_by_key(|(index, _, _)| index.map_or((1, 0), |n| (0, n)));
-    entries
-        .into_iter()
-        .map(|(_, name, value)| (name, value))
-        .collect()
-}
+/// order: array-index names ahead, ascending, then the rest as inserted; one
+/// definition with the wallet's attribute check since #818b.
+pub(super) use crate::wallet::validation::client::js_order;
 
 /// A compiled pattern of this module, `None` never in practice (the patterns
 /// are constants; a failure keeps nothing rather than panics).

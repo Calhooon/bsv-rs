@@ -600,16 +600,21 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// ```
     ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when any lookup output's evidence exceeds the reference's limits (#730), before or after an admitted one (#737); an output whose evidence the check refuses as invalid is skipped.
+    /// Refuses, before any host is asked, a key the wallet's `validateDiscoverByIdentityKeyArgs` refuses (`validationHelpers.ts:1535-1546` at `ts-stack@edf6e03`; `Error::WalletRefusal`, class `InvalidParameter`, in its words); with `override_with_contacts`, ahead of that a key the contacts manager's `validateIdentityKey` refuses (`ContactsManager.ts:83-94`, `Error::IdentityError` in its words), as `getContacts` judges it ahead of the wallet (`IdentityClient.ts:575`). The question carries the text as given; the subject is compared with the key it names, so a space-padded key keeps its subject's certificates (`Wallet.ts:1004`, `:1012`; #818b).
     pub async fn resolve_by_identity_key(
         &self,
         identity_key: &str,
         override_with_contacts: bool,
     ) -> Result<Vec<DisplayableIdentity>> {
         if override_with_contacts {
+            // The contact read's own rule ahead of it (`IdentityClient.ts:575`, #818b)
+            door_args::contact_key(identity_key)?;
             if let Ok(Some(contact)) = self.contacts_manager.get_contact(identity_key).await {
                 return Ok(vec![contact.to_displayable_identity()]);
             }
         }
+        // The wallet door's check before any host is asked (#818b)
+        let asked = door_args::identity_key(identity_key)?;
         let question = LookupQuestion::new(
             "ls_identity",
             serde_json::json!({
@@ -626,7 +631,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         let mut certificates = Vec::new();
         for output in &outputs {
             if let Some(cert) = self.parse_output_to_certificate(output).await? {
-                if is_asked_subject(cert.certificate.subject(), identity_key) {
+                if cert.certificate.subject() == &asked {
                     certificates.push(cert);
                 }
             }
@@ -662,11 +667,14 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// all-fields search; an empty map keeps nothing.
     ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
+    /// Refuses, before the contacts load and any host is asked, a map the wallet's `validateDiscoverByAttributesArgs` refuses (`validationHelpers.ts:1555-1587` at `ts-stack@edf6e03`: at most 100000 names, none unsafe, 1 to 32, each name 1 to 50 bytes and value 1 to 500 in `Object.keys` order; `Error::WalletRefusal`, class `InvalidParameter`, in its words; #818b).
     pub async fn resolve_by_attributes(
         &self,
         attributes: IndexMap<String, String>,
         override_with_contacts: bool,
     ) -> Result<Vec<DisplayableIdentity>> {
+        // The wallet door's check on the map as given, before anything (#818b)
+        door_args::attributes(&attributes)?;
         // Load contacts in parallel if override is enabled
         let contacts_map: HashMap<String, Contact> = if override_with_contacts {
             self.contacts_manager
@@ -730,11 +738,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     ///
     /// Returns the certificates the identity has revealed: every output of
     /// the lookup answer parsed in order, a skipped one passed over, and only
-    /// certificates whose subject is `identity_key` kept (compared
-    /// lower-cased, the rule [`Self::resolve_by_identity_key`] carries from
+    /// certificates whose subject is the key `identity_key` names kept (the
+    /// validated key since #818b, the rule [`Self::resolve_by_identity_key`] carries from
     /// the reference's `filterCertificatesByIdentityKey`; this door is the
-    /// BRC-100 wallet's `discoverByIdentityKey`, whose trust step, page and
-    /// argument check are not ported, #739).
+    /// BRC-100 wallet's `discoverByIdentityKey`, whose trust step and page
+    /// are not ported, #739; its argument check is, #818b).
     ///
     /// The question is `{ identityKey }`, the key the reference overlay's
     /// `ls_identity` allowlist admits (`IdentityLookupService.ts:74-82` at
@@ -751,13 +759,15 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// * `identity_key` - The hex-encoded public key to look up
     ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
+    /// Refuses, before any host is asked, a key the wallet's `validateDiscoverByIdentityKeyArgs` refuses (`validationHelpers.ts:1535-1546` at `ts-stack@edf6e03`; `Error::WalletRefusal`, class `InvalidParameter`, in its words); the question carries the text as given, the subject compared with the key it names (`Wallet.ts:1004`, `:1012`; #818b).
     pub async fn discover_certificates(
         &self,
         identity_key: &str,
     ) -> Result<Vec<VerifiableCertificate>> {
-        // The key alone, as the reference overlay admits it (#754)
+        let asked = door_args::identity_key(identity_key)?;
+        // The key alone, as the reference overlay admits it (#754), as given
         let query = serde_json::json!({ "identityKey": identity_key });
-        self.discover_of_subject(identity_key, query).await
+        self.discover_of_subject(&asked, query).await
     }
 
     /// Discover certificates of a specific type.
@@ -780,16 +790,20 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// * `cert_type` - The certificate type ID (base64 of 32 bytes, canonical)
     ///
     /// Fails with `Error::IdentityError("Transaction evidence: limit")` when a lookup output's evidence exceeds the reference's limits (#730); an output whose evidence the check refuses as invalid is skipped.
+    /// Refuses, before any host is asked, a key the wallet's `validateDiscoverByIdentityKeyArgs` refuses (`validationHelpers.ts:1535-1546`; `Error::WalletRefusal`, class `InvalidParameter`, its words) and then a type `query` refuses (`certificateTypes[0]`, the overlay's words, this crate's own rule) (#818b).
     pub async fn discover_certificates_by_type(
         &self,
         identity_key: &str,
         cert_type: &str,
     ) -> Result<Vec<VerifiableCertificate>> {
+        // The key, then the type by the overlay's rule (#818b)
+        let asked = door_args::identity_key(identity_key)?;
+        door_args::certificate_type(cert_type)?;
         // The type as the reference overlay reads it: `certificateTypes`, an
         // array, beside `identityKey` (#752)
         let query =
             serde_json::json!({ "identityKey": identity_key, "certificateTypes": [cert_type] });
-        let mut certificates = self.discover_of_subject(identity_key, query).await?;
+        let mut certificates = self.discover_of_subject(&asked, query).await?;
         // Every output parsed and the subject filtered, then only the asked
         // type's (#744): the token's type text is canonical base64 of 32
         // bytes (#553), so its re-encoding is the token's own text
@@ -802,7 +816,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// subject's certificates (#739).
     async fn discover_of_subject(
         &self,
-        identity_key: &str,
+        asked: &crate::primitives::PublicKey,
         query: serde_json::Value,
     ) -> Result<Vec<VerifiableCertificate>> {
         let question = LookupQuestion::new("ls_identity", query);
@@ -816,7 +830,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                 certificates.push(cert);
             }
         }
-        certificates.retain(|cert| is_asked_subject(cert.subject(), identity_key));
+        certificates.retain(|cert| cert.subject() == asked);
         Ok(certificates)
     }
 
@@ -826,7 +840,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// one passed over, a limit anywhere the call's refusal), then only the
     /// certificates the question asked for are kept (#746), as the two
     /// `discover_*` doors keep theirs (#739, #744): with `identity_key` set,
-    /// the subject's (lower-cased on both sides, `is_asked_subject`); with
+    /// the subject's (lower-cased on both sides, `is_asked_subject`, where the
+    /// by-key doors compare with the validated key since #818b); with
     /// `certificate_type` set, the type's (the canonical base64 text,
     /// `type_base64()`, compared exactly with the asked text); with
     /// `certifier` set, the certifier's (the certificate's certifier key,
@@ -1732,3 +1747,6 @@ mod record;
 
 #[path = "client_trust.rs"]
 mod trust;
+
+#[path = "client_door_args.rs"]
+mod door_args;
