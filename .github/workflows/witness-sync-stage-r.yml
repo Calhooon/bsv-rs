@@ -1,0 +1,52 @@
+name: witness-sync-stage-r
+
+# Witness 17 of #97 (fix-97c): the sync's stage R step, its bytes copied from
+# sync-main-into-beta.yml, run by a hand dispatch on this branch (SYNC_BRANCH the branch itself),
+# as the sync runs it on sync/main-into-beta with the GITHUB_TOKEN. Dispatch it with
+#   gh workflow run witness-sync-stage-r.yml --repo Calhooon/bsv-rs --ref <this branch>
+# after the branch's draft pull request into beta is open.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SYNC_BRANCH: ${{ github.ref_name }}
+
+jobs:
+  sync:
+    name: the sync's stage R step
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: The pull request is open (the sync's earlier step opens it)
+        id: pick
+        run: echo "push=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start the PR's stage R and its judge
+        if: steps.pick.outputs.push == 'true'
+        timeout-minutes: 45
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/sibling-run.yml/dispatches" \
+            -f ref="$SYNC_BRANCH" -F return_run_details=true --jq '.run_url | split("/") | last')"
+          if ! [[ "$run" =~ ^[1-9][0-9]{0,19}$ ]]; then
+            echo "::error::the dispatch of stage R on ${SYNC_BRANCH} answered no run id"
+            exit 1
+          fi
+          echo "stage R run ${run} on ${SYNC_BRANCH}"
+          status=""
+          for _ in $(seq 1 160); do
+            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"
+            if [ "$status" = completed ]; then break; fi
+            sleep 15
+          done
+          if [ "$status" != completed ]; then
+            echo "::error::stage R run ${run} is ${status} after 40 minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
+            exit 1
+          fi
+          gh workflow run sibling-judge.yml --repo "$GITHUB_REPOSITORY" --ref main -f run_id="$run"
