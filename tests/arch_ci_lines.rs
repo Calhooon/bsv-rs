@@ -345,6 +345,7 @@ fn sync(text: &str) -> Vec<String> {
         &mut errors,
     );
     errors.extend(sync_stage_r(text));
+    errors.extend(sync_stage_r_reads(text));
     for (refused, why) in [
         ("git rebase", "the sync picks, it never rebases"),
         (
@@ -423,6 +424,179 @@ fn sync_stage_r(text: &str) -> Vec<String> {
                     tail.lines().nth(found).unwrap_or("<end>"),
                 ));
             }
+        }
+    }
+    errors
+}
+
+/// Where a variable `SYNC_STAGE_R` reads is defined: the pinned bytes hold the steps, not what
+/// their variables hold, so each is held here too (the re-read of PR #931's fold: a job-level
+/// `SYNC_BRANCH: beta` sent the dispatch to beta with every pinned byte standing).
+#[derive(Clone, Copy)]
+enum Definition {
+    /// Defined once, in the workflow's top-level `env:`, as this value.
+    Workflow(&'static str),
+    /// Defined only in a step's own `env:`, always as this value.
+    Steps(&'static str),
+    /// Never defined in the file: the runner's own.
+    Runner,
+}
+
+/// Every variable the pinned dispatch steps read, with where it is defined; the test
+/// `every_variable_the_stage_r_dispatch_reads_has_its_one_definition_97` holds this list equal
+/// to what `SYNC_STAGE_R`'s `run:` lines read, so a variable added to the pin needs its row.
+const SYNC_STAGE_R_READS: &[(&str, Definition)] = &[
+    ("GH_TOKEN", Definition::Steps("${{ github.token }}")),
+    ("GITHUB_REPOSITORY", Definition::Runner),
+    ("SYNC_BRANCH", Definition::Workflow("sync/main-into-beta")),
+];
+
+/// The variables a text's steps read: those its `run:` lines expand (`$NAME`, `${NAME}`) and
+/// those its steps' `env:` hands their commands (`gh` reads `GH_TOKEN` unexpanded); upper case,
+/// in order.
+fn variables_read(text: &str) -> Vec<String> {
+    let mut found: Vec<String> = Vec::new();
+    for line in text.lines() {
+        if let Some((key, _)) = line.trim().split_once(": ") {
+            let upper = !key.is_empty()
+                && key
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
+            if upper && !found.iter().any(|f| f == key) {
+                found.push(key.to_owned());
+            }
+        }
+    }
+    for line in text.lines().filter(|l| l.trim_start().starts_with("run:")) {
+        let bytes = line.as_bytes();
+        for (at, _) in line.match_indices('$') {
+            let start = at + 1 + usize::from(bytes.get(at + 1) == Some(&b'{'));
+            let name: String = line[start..]
+                .chars()
+                .take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_')
+                .collect();
+            if !name.is_empty() && !found.contains(&name) {
+                found.push(name);
+            }
+        }
+    }
+    found
+}
+
+/// Every line of `text` that defines `name`: the name as a word (not after `$`, `{` or a word
+/// character), a quote at most after it, then `:` (a YAML key, a flow mapping's included) or a
+/// lone `=` (a shell assignment, an `export`, a `$GITHUB_ENV` write); one-based line numbers.
+fn definitions<'a>(text: &'a str, name: &str) -> Vec<(usize, &'a str)> {
+    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| {
+            line.match_indices(name).any(|(at, _)| {
+                let before = line[..at].chars().next_back();
+                if before.is_some_and(|c| word(c) || c == '$' || c == '{') {
+                    return false;
+                }
+                let rest = &line[at + name.len()..];
+                if rest.chars().next().is_some_and(word) {
+                    return false;
+                }
+                let rest = rest.trim_start_matches(['"', '\'']).trim_start();
+                rest.starts_with(':') || (rest.starts_with('=') && !rest.starts_with("=="))
+            })
+        })
+        .map(|(n, line)| (n + 1, line))
+        .collect()
+}
+
+/// The nearest line above line `n` (one-based) indented less than `indent`, comments and blank
+/// lines aside.
+fn parent_of(text: &str, n: usize, indent: usize) -> Option<&str> {
+    text.lines()
+        .take(n - 1)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .find(|l| {
+            !l.trim().is_empty()
+                && !l.trim_start().starts_with('#')
+                && l.len() - l.trim_start().len() < indent
+        })
+}
+
+/// Each variable the stage R dispatch reads is defined where `SYNC_STAGE_R_READS` says, and
+/// nowhere else.
+fn sync_stage_r_reads(text: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    for &(name, defined) in SYNC_STAGE_R_READS {
+        let found = definitions(text, name);
+        let lines = || {
+            found
+                .iter()
+                .map(|(n, l)| format!("{n} `{}`", l.trim()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        match defined {
+            Definition::Workflow(value) => {
+                let want = format!("  {name}: {value}");
+                let placed = found.len() == 1
+                    && found[0].1 == want
+                    && parent_of(text, found[0].0, 2) == Some("env:");
+                if !placed {
+                    errors.push(format!(
+                        "sync: `{name}`, which the stage R dispatch (#97) reads, is defined {} times ({}); it is defined once, in the workflow's top-level `env:`, as `{}`",
+                        found.len(),
+                        lines(),
+                        want.trim()
+                    ));
+                }
+            }
+            Definition::Steps(value) => {
+                let want = format!("          {name}: {value}");
+                let stray: Vec<_> = found
+                    .iter()
+                    .filter(|(n, l)| *l != want || parent_of(text, *n, 10) != Some("        env:"))
+                    .map(|(n, l)| format!("{n} `{}`", l.trim()))
+                    .collect();
+                if !stray.is_empty() {
+                    errors.push(format!(
+                        "sync: `{name}`, which the stage R dispatch (#97) reads, is defined outside a step's `env:` or as another value ({}); it is defined in a step's own `env:` alone, as `{}`",
+                        stray.join(", "),
+                        want.trim()
+                    ));
+                }
+            }
+            Definition::Runner => {
+                if !found.is_empty() {
+                    errors.push(format!(
+                        "sync: `{name}`, which the stage R dispatch (#97) reads, is defined ({}); it is the runner's own, defined nowhere in the file",
+                        lines()
+                    ));
+                }
+            }
+        }
+    }
+    let mut configured: Vec<&str> = Vec::new();
+    for (at, _) in text.match_indices("GH_") {
+        let name_len = text[at..]
+            .find(|c: char| !(c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'))
+            .unwrap_or(text.len() - at);
+        let name = &text[at..at + name_len];
+        if name != "GH_TOKEN" && !configured.contains(&name) {
+            configured.push(name);
+        }
+    }
+    for name in configured {
+        let found = definitions(text, name);
+        if !found.is_empty() {
+            errors.push(format!(
+                "sync: `{name}` is defined ({}); `gh`, which the stage R dispatch (#97) runs, reads its `GH_*` settings unnamed, so none but `GH_TOKEN` is defined in the file",
+                found
+                    .iter()
+                    .map(|(n, l)| format!("{n} `{}`", l.trim()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
         }
     }
     errors
@@ -622,6 +796,135 @@ fn a_sync_stage_r_dispatch_retargeted_unconditioned_or_moved_is_refused_97() {
         "{:?}",
         sync(&moved)
     );
+}
+
+/// The re-read of PR #931's fold: a variable the pinned dispatch reads, redefined where the bytes
+/// do not reach, is refused by its name, whatever the spelling of the definition.
+#[test]
+fn every_variable_the_stage_r_dispatch_reads_has_its_one_definition_97() {
+    let mut reads = variables_read(SYNC_STAGE_R);
+    reads.sort();
+    let mut listed: Vec<String> = SYNC_STAGE_R_READS
+        .iter()
+        .map(|(n, _)| (*n).to_owned())
+        .collect();
+    listed.sort();
+    assert_eq!(
+        reads, listed,
+        "SYNC_STAGE_R_READS is not what SYNC_STAGE_R's run: lines read"
+    );
+    let text = read(SYNC_FILE);
+    assert!(
+        sync_stage_r_reads(&text).is_empty(),
+        "{:?}",
+        sync_stage_r_reads(&text)
+    );
+    assert!(sync(&text).is_empty(), "{:?}", sync(&text));
+    let job = "    runs-on: ubuntu-latest\n";
+    let pick = "      - name: Cherry-pick main's commits onto beta\n        id: pick\n        run: |\n          set -euo pipefail\n";
+    assert_eq!(text.matches(job).count(), 1);
+    assert_eq!(text.matches(pick).count(), 1);
+    let plants: Vec<(&str, String, &str)> = vec![
+        (
+            "a job-level SYNC_BRANCH (the re-read's plant)",
+            text.replace(job, &format!("{job}    env:\n      SYNC_BRANCH: beta\n")),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "a job-level flow mapping",
+            text.replace(job, &format!("{job}    env: {{ SYNC_BRANCH: beta }}\n")),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "a quoted job-level key",
+            text.replace(
+                job,
+                &format!("{job}    env:\n      \"SYNC_BRANCH\": beta\n"),
+            ),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "the workflow's value changed",
+            text.replace(
+                "  SYNC_BRANCH: sync/main-into-beta\n",
+                "  SYNC_BRANCH: beta\n",
+            ),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "the workflow's definition moved to the job",
+            text.replace("env:\n  SYNC_BRANCH: sync/main-into-beta\n", "")
+                .replace(
+                    job,
+                    &format!("{job}    env:\n      SYNC_BRANCH: sync/main-into-beta\n"),
+                ),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "a $GITHUB_ENV write",
+            text.replace(
+                pick,
+                &format!("{pick}          echo \"SYNC_BRANCH=beta\" >> \"$GITHUB_ENV\"\n"),
+            ),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "an export",
+            text.replace(pick, &format!("{pick}          export SYNC_BRANCH=beta\n")),
+            "`SYNC_BRANCH`",
+        ),
+        (
+            "a job-level GH_TOKEN",
+            text.replace(
+                job,
+                &format!("{job}    env:\n      GH_TOKEN: ${{{{ secrets.OTHER }}}}\n"),
+            ),
+            "`GH_TOKEN`",
+        ),
+        (
+            "a step's GH_TOKEN of another value",
+            text.replacen(
+                "          GH_TOKEN: ${{ github.token }}\n",
+                "          GH_TOKEN: ${{ secrets.OTHER }}\n",
+                1,
+            ),
+            "`GH_TOKEN`",
+        ),
+        (
+            "a job-level GH_HOST",
+            text.replace(
+                job,
+                &format!("{job}    env:\n      GH_HOST: example.invalid\n"),
+            ),
+            "`GH_HOST`",
+        ),
+        (
+            "a GH_REPO written to $GITHUB_ENV",
+            text.replace(
+                pick,
+                &format!("{pick}          echo \"GH_REPO=someone/else\" >> \"$GITHUB_ENV\"\n"),
+            ),
+            "`GH_REPO`",
+        ),
+        (
+            "GITHUB_REPOSITORY defined",
+            text.replace(
+                "env:\n  SYNC_BRANCH: sync/main-into-beta\n",
+                "env:\n  SYNC_BRANCH: sync/main-into-beta\n  GITHUB_REPOSITORY: someone/else\n",
+            ),
+            "`GITHUB_REPOSITORY`",
+        ),
+    ];
+    for (what, planted, named) in plants {
+        assert_ne!(planted, text, "{what}: the plant changed nothing");
+        let errors = sync(&planted);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains(named) && e.contains("stage R dispatch (#97)")),
+            "{what}: {errors:?}"
+        );
+    }
 }
 
 #[test]
