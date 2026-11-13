@@ -41,7 +41,8 @@
 //! [`build_envelope_payload`] and [`parse_app_event_payload`] encode and
 //! decode it byte-exactly against the TS canonical (`encodeEventPayload`);
 //! [`AppEvent`] is the decoded form. See [`install_app_event_listener`] to
-//! subscribe a [`Peer`](crate::auth::Peer) to a stream of decoded events.
+//! subscribe a [`Peer`](crate::auth::Peer) to a queue of decoded events, an
+//! [`AppEventReceiver`] (this crate's type, #843d23).
 //!
 //! # Example
 //!
@@ -75,8 +76,11 @@
 //! // tokio::spawn(run_dispatch(my_frame_source, sink, callback));
 //! ```
 
+mod app_event;
 pub mod codec;
 mod packet_rules;
+
+pub use app_event::AppEventReceiver;
 
 use std::sync::{Arc, Mutex as StdMutex};
 
@@ -369,19 +373,19 @@ pub struct AppEvent {
 
 /// Install an inbound listener that decodes every post-BRC-103 General
 /// message payload as the canonical `{eventName, data}` envelope and
-/// forwards it on an unbounded `mpsc` channel.
+/// queues it on an [`AppEventReceiver`].
 ///
-/// The returned `Receiver` is the caller's queue of inbound application
-/// events; the `u32` is the `Peer::listen_for_general_messages` callback
-/// id (pass it to `Peer::stop_listening_for_general_messages` on teardown
-/// if needed).
+/// The returned receiver is the caller's queue of inbound application
+/// events (read with [`AppEventReceiver::recv`]); the `u32` is the
+/// `Peer::listen_for_general_messages` callback id (pass it to
+/// `Peer::stop_listening_for_general_messages` on teardown if needed).
 ///
 /// Requires `Peer::start()` to have been called on the same
 /// [`Peer`](crate::auth::Peer) so the start-callback routes inbound
 /// Generals to the `general_message_callbacks` map this helper subscribes to.
 pub async fn install_app_event_listener<W, T>(
     peer: &crate::auth::Peer<W, T>,
-) -> (futures::channel::mpsc::UnboundedReceiver<AppEvent>, u32)
+) -> (AppEventReceiver, u32)
 where
     W: crate::wallet::WalletInterface + 'static,
     T: Transport + 'static,
@@ -401,7 +405,7 @@ where
             })
         })
         .await;
-    (rx, id)
+    (AppEventReceiver::new(rx), id)
 }
 
 /// Parse a `{eventName, data}` JSON envelope from a General message's

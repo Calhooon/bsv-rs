@@ -29,7 +29,7 @@ impl Spend {
         let buf = self.pop_stack()?;
         let lens = [buf.len()];
         self.arithmetic_room(opcode, &[&buf])?;
-        let n = BigInt::from(self.read_number(&buf)?);
+        let n = self.read_number(&buf)?.into_bigint();
         drop(buf);
 
         // Owned arithmetic: the result takes the operand's digits, whose
@@ -58,9 +58,13 @@ impl Spend {
         // The top operand read first, as the reference reads `bn2` first
         // (`Spend.ts:1560-1561`); each operand's bytes leave as its number
         // arrives (bsv-rs#374), the number held in their place.
-        let bn2 = BigInt::from(self.read_number_holding(&buf2, lens[0] as u64)?);
+        let bn2 = self
+            .read_number_holding(&buf2, lens[0] as u64)?
+            .into_bigint();
         drop(buf2);
-        let bn1 = BigInt::from(self.read_number_holding(&buf1, lens[1] as u64)?);
+        let bn1 = self
+            .read_number_holding(&buf1, lens[1] as u64)?
+            .into_bigint();
         drop(buf1);
 
         // Owned where num-bigint reuses an operand's digits for the result.

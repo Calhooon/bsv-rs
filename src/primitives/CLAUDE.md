@@ -74,7 +74,9 @@ pub struct BigNumber { ... }  // from_hex(), from_dec_str(), from_bytes_be(), fr
                                // pow(), mod_inverse(), mod_pow(), gcd(), compare(),
                                // is_zero(), is_negative(), is_positive(), is_odd(), is_even(),
                                // bit_length(), byte_length(), secp256k1_order(), secp256k1_prime(),
-                               // as_bigint(), from_bigint()
+                               // (as_bigint(), into_bigint(), from_bigint() crate-private
+                               //  under `script`, no From<BigInt> either way, #843d23:
+                               //  cross through to_hex()/from_hex() or the decimal text)
 
 // HMAC-DRBG
 pub struct HmacDrbg { ... }  // new(), new_with_hash(), generate(), reseed()

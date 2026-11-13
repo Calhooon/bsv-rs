@@ -40,8 +40,29 @@ use std::fmt;
 
 /// BigNumber wrapper for BSV SDK compatibility.
 ///
-/// Internally uses `num_bigint::BigInt` but provides BSV-specific serialization
-/// and operations needed for cryptographic key operations.
+/// Its representation is its own (#843d23): no public door takes or returns
+/// another crate's number type. To and from a `num_bigint::BigInt`, by text:
+///
+/// ```rust
+/// # use bsv_rs::primitives::BigNumber;
+/// # use num_bigint::BigInt;
+/// let n = BigNumber::from_hex("-deadbeef").unwrap();
+/// let b = BigInt::parse_bytes(n.to_hex().as_bytes(), 16).unwrap();
+/// assert_eq!(BigNumber::from_hex(&b.to_str_radix(16)).unwrap(), n);
+/// ```
+///
+/// The internal value is not reachable from outside the crate, nor is a
+/// `BigNumber` built from a `BigInt`:
+///
+/// ```compile_fail
+/// # use bsv_rs::primitives::BigNumber;
+/// let n = BigNumber::from_i64(1);
+/// let _ = n.as_bigint();
+/// ```
+/// ```compile_fail,E0277
+/// # use bsv_rs::primitives::BigNumber;
+/// let _ = BigNumber::from(num_bigint::BigInt::from(1));
+/// ```
 #[derive(Clone, PartialEq, Eq)]
 pub struct BigNumber {
     inner: BigInt,
@@ -675,21 +696,12 @@ impl BigNumber {
     pub fn to_u64(&self) -> Option<u64> {
         self.inner.to_u64()
     }
-
-    // ========================================================================
-    // Internal access (for EC operations)
-    // ========================================================================
-
-    /// Returns a reference to the internal BigInt.
-    pub fn as_bigint(&self) -> &BigInt {
-        &self.inner
-    }
-
-    /// Creates a BigNumber from a BigInt.
-    pub fn from_bigint(inner: BigInt) -> Self {
-        Self { inner }
-    }
 }
+
+/// The internal value's crate-private doors, for `script` alone (#843d23).
+#[cfg(feature = "script")]
+#[path = "bignum_inner.rs"]
+mod inner;
 
 // ============================================================================
 // Trait Implementations
@@ -716,18 +728,6 @@ impl From<i32> for BigNumber {
 impl From<u32> for BigNumber {
     fn from(val: u32) -> Self {
         Self::from_u64(val as u64)
-    }
-}
-
-impl From<BigInt> for BigNumber {
-    fn from(inner: BigInt) -> Self {
-        Self { inner }
-    }
-}
-
-impl From<BigNumber> for BigInt {
-    fn from(bn: BigNumber) -> Self {
-        bn.inner
     }
 }
 
