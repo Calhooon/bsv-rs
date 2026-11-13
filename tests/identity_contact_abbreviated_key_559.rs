@@ -32,7 +32,7 @@ use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
 use bsv_rs::wallet::{
     Counterparty, DecryptArgs, ListOutputsResult, Outpoint, Protocol, SecurityLevel,
-    SignActionResult, WalletInterface, WalletOutput,
+    WalletInterface, WalletOutput,
 };
 use identity_reveal_wallet::Counting;
 use serde_json::{json, Map, Value};
@@ -53,7 +53,7 @@ fn listing_reference_token(case: &Value) -> Counting {
     let save = &case["reference"]["save"];
     let script = from_hex(save["locking_script"].as_str().unwrap()).unwrap();
     let source = source_of(&script, 1);
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
         total_outputs: 1,
         beef: Some(source.to_beef(true).unwrap()),
@@ -68,15 +68,6 @@ fn listing_reference_token(case: &Value) -> Counting {
         }],
     });
     *wallet.spending.lock().unwrap() = Some(source);
-    wallet
-        .sign_answers
-        .lock()
-        .unwrap()
-        .push_back(Ok(SignActionResult {
-            txid: Some([0xab; 32]),
-            tx: None,
-            send_with_results: None,
-        }));
     wallet
 }
 
@@ -96,7 +87,7 @@ fn created_token(wallet: &Counting) -> (String, Vec<u8>) {
 async fn record_in(key_id: &str, script: &[u8]) -> Value {
     let token = PushDrop::decode(&LockingScript::from_binary(script).unwrap()).unwrap();
     let plaintext = WalletInterface::decrypt(
-        &Counting::of_scalar(9),
+        &Counting::answering_contacts(9),
         DecryptArgs {
             ciphertext: token.fields[0].clone(),
             protocol_id: Protocol::new(SecurityLevel::Counterparty, "contact"),

@@ -7,7 +7,7 @@ use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
 use crate::primitives::to_base64;
-use crate::transaction::{Beef, Transaction};
+use crate::transaction::Transaction;
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
     EncryptArgs, ListOutputsArgs, OutputInclude, Protocol, SignActionArgs, SignActionSpend,
@@ -24,6 +24,8 @@ mod auth;
 mod cache;
 #[path = "contacts_record.rs"]
 mod record;
+#[path = "contacts_spend.rs"]
+mod spend;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,13 +38,76 @@ pub(super) fn contact_identity_key(identity_key: &str) -> crate::Result<String> 
     record::identity_key(&serde_json::Value::String(identity_key.to_string()))
 }
 
-/// Cache entry for contacts.
+/// The contacts cache, held in the reference's order (#904's eighth fold):
+/// the reference's cache is an array (`ContactsManager.ts:376`, `:381-391`),
+/// in the listing's order on a load, a new contact appended and an update
+/// written in place (`saveContact`, `:532-534`), a removal filtering it
+/// (`#commitCachedRemoval`, `:934`). A plain read answers that array, and a
+/// read by key its first entry for the key (`:390`). The index names each
+/// key's first position, so a lookup costs one hash; a load and a removal
+/// rebuild it, as the reference rewrites its array there.
 #[derive(Debug, Clone, Default)]
 struct ContactsCache {
-    /// Cached contacts indexed by identity key.
-    contacts: HashMap<String, Contact>,
+    /// Cached contacts in the reference's order.
+    contacts: Vec<Contact>,
+    /// Each identity key's first position in `contacts`.
+    index: HashMap<String, usize>,
     /// Whether the cache has been populated.
     initialized: bool,
+}
+
+impl ContactsCache {
+    /// The first cached contact of the key.
+    fn get(&self, identity_key: &str) -> Option<&Contact> {
+        self.index.get(identity_key).map(|&at| &self.contacts[at])
+    }
+
+    /// The contacts in order.
+    fn ordered(&self) -> Vec<Contact> {
+        self.contacts.clone()
+    }
+
+    /// `saveContact`'s write (`:532-534`): the first entry of the key
+    /// replaced in place, else the contact appended.
+    fn save(&mut self, contact: Contact) {
+        match self.index.get(&contact.identity_key) {
+            Some(&at) => self.contacts[at] = contact,
+            None => {
+                self.index
+                    .insert(contact.identity_key.clone(), self.contacts.len());
+                self.contacts.push(contact);
+            }
+        }
+    }
+
+    /// The cache replaced by a load, in the listing's order.
+    fn load(&mut self, contacts: Vec<Contact>) {
+        self.contacts = contacts;
+        self.reindex();
+    }
+
+    /// `#commitCachedRemoval`'s filter (`:934`): every entry of the key
+    /// removed, the others kept in order.
+    fn remove(&mut self, identity_key: &str) {
+        if self.index.contains_key(identity_key) {
+            self.contacts.retain(|c| c.identity_key != identity_key);
+            self.reindex();
+        }
+    }
+
+    /// The cache emptied and marked unloaded.
+    fn clear(&mut self) {
+        self.contacts.clear();
+        self.index.clear();
+        self.initialized = false;
+    }
+
+    fn reindex(&mut self) {
+        self.index.clear();
+        for (at, contact) in self.contacts.iter().enumerate() {
+            self.index.entry(contact.identity_key.clone()).or_insert(at);
+        }
+    }
 }
 
 /// Manager for encrypted contact storage.
@@ -121,46 +186,35 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// ```
     pub async fn add_contact(&self, contact: Contact) -> Result<()> {
         // The reference's record, validated before any wallet call
-        // (`saveContact`, `ContactsManager.ts:527-528`; #544).
+        // (`saveContact`, `ContactsManager.ts:527-528`; #544). Every wallet
+        // failure is the caller's, as `saveContact` lets it through, and the
+        // cache is written after the chain alone (`:536-566`; #904).
         let record = record::record_of(&contact)?;
-        let tag = self.create_identity_tag(&contact.identity_key).await.ok();
-        let existing = if let Some(tag) = &tag {
-            self.contact_outputs(
+        let tag = self.create_identity_tag(&record.identity_key).await?;
+        let existing = self
+            .contact_outputs(
                 Some(vec![tag.clone()]),
                 OutputInclude::EntireTransactions,
                 100,
             )
-            .await
-            .ok()
-        } else {
-            None
-        };
-        let found = match &existing {
-            Some(existing) => self.find_existing(existing, &record.identity_key).await?,
-            None => None,
-        };
+            .await?;
+        let found = self.find_existing(&existing, &record.identity_key).await?;
         let key_id = found
             .as_ref()
             .map_or_else(|| self.generate_key_id(), |(_, key_id)| key_id.clone());
         let lock = self.contact_lock(&record, &key_id).await?;
-        let instructions = serde_json::json!({ "keyID": key_id }).to_string();
-        match (existing.as_ref(), tag.as_ref(), found) {
-            (Some(existing), Some(tag), Some(found)) => {
-                self.update_contact_on_chain(existing, found, &contact, &lock, tag)
-                    .await?;
+        match found {
+            Some(found) => {
+                self.update_contact_on_chain(&existing, found, &contact, &lock, &tag)
+                    .await?
             }
-            (_, Some(tag), _) => {
-                let _ = self
-                    .create_contact(&contact, &lock, tag, &instructions)
-                    .await;
+            None => {
+                let instructions = serde_json::json!({ "keyID": key_id }).to_string();
+                self.create_contact(&contact, &lock, &tag, &instructions)
+                    .await?
             }
-            _ => {}
         }
-        self.cache
-            .write()
-            .await
-            .contacts
-            .insert(contact.identity_key.clone(), contact);
+        self.cache.write().await.save(contact);
         Ok(())
     }
 
@@ -179,7 +233,7 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// The contact if found, or None if not found.
     pub async fn get_contact(&self, identity_key: &str) -> Result<Option<Contact>> {
         let cache = self.cache.read().await;
-        Ok(cache.contacts.get(identity_key).cloned())
+        Ok(cache.get(identity_key).cloned())
     }
 
     /// Update an existing contact.
@@ -198,7 +252,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         // Verify contact exists in cache
         {
             let cache = self.cache.read().await;
-            if !cache.contacts.contains_key(identity_key) {
+            if cache.get(identity_key).is_none() {
                 return Err(Error::ContactNotFound(identity_key.to_string()));
             }
         }
@@ -216,7 +270,6 @@ impl<W: WalletInterface> ContactsManager<W> {
     ///
     /// Uses HMAC to hash the identity key so contacts can be looked up
     /// without revealing the actual identity key in the tag.
-    #[allow(dead_code)]
     async fn create_identity_tag(&self, identity_key: &str) -> Result<String> {
         let protocol = self.protocol()?;
 
@@ -233,7 +286,8 @@ impl<W: WalletInterface> ContactsManager<W> {
                 self.originator(),
             )
             .await?;
-
+        // `bytes(hmac, 'contact identity HMAC', 32, 32)` (`:411`, `:583`):
+        // the result's type holds 32 bytes.
         Ok(format!(
             "identityKey {}",
             crate::primitives::to_hex(&result.hmac)

@@ -44,7 +44,7 @@ fn vector() -> Value {
 /// The contacts manager over the ProtoWallet of 9, listing `script` with
 /// `instructions`, its contacts loaded.
 async fn loaded(script: &str, instructions: &str) -> Vec<Contact> {
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
         total_outputs: 1,
         beef: None,
@@ -78,7 +78,7 @@ fn contact(v: &Value) -> Contact {
 
 /// The token this crate writes for the vector's contact, nothing listed.
 async fn written(v: &Value) -> (String, Vec<u8>) {
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     manager.add_contact(contact(v)).await.unwrap();
     let created = wallet.created.lock().unwrap().clone().unwrap();
@@ -181,7 +181,7 @@ async fn this_crates_contact_token_is_read_by_the_reference_544() {
     let token = PushDrop::decode(&LockingScript::from_binary(&script).unwrap()).unwrap();
     assert_eq!(token.fields.len(), 2, "{}", to_hex(&script));
     let protocol = Protocol::new(SecurityLevel::Counterparty, "contact");
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     let verified = WalletInterface::verify_signature(
         &wallet,
         VerifySignatureArgs {
@@ -249,7 +249,7 @@ async fn the_writer_refuses_a_record_the_reference_refuses_544() {
         record.identity_key = given["identityKey"].as_str().unwrap().into();
         record.avatar_url = Some(given["avatarURL"].as_str().unwrap().into());
         record.metadata = (!case["metadata"].is_null()).then(|| case["metadata"].clone());
-        let wallet = Counting::of_scalar(9);
+        let wallet = Counting::answering_contacts(9);
         let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
         let refused = manager.add_contact(record).await.unwrap_err();
         assert_eq!(

@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
-use identity_reveal_wallet::Counting;
+use identity_reveal_wallet::{wallet_call, Counting};
 
 #[derive(Deserialize)]
 struct Vector {
@@ -63,7 +63,12 @@ async fn created(certificate: &WalletCertificate, w: &Witness) -> (Value, String
     let _ = client
         .publicly_reveal_attributes(certificate.clone(), w.fields_to_reveal.clone())
         .await;
-    assert_eq!(wallet.calls().last(), Some(&"create_action"), "{}", w.name);
+    assert_eq!(
+        wallet.calls().last(),
+        Some(&wallet_call!(create_action)),
+        "{}",
+        w.name
+    );
     let args = wallet.created.lock().unwrap().clone().unwrap();
     let originator = wallet.created_originator.lock().unwrap().clone().unwrap();
     (serde_json::to_value(args).unwrap(), originator)

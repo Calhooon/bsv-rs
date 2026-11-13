@@ -8,7 +8,7 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// A list of all stored contacts.
     pub async fn list_contacts(&self) -> Result<Vec<Contact>> {
         let cache = self.cache.read().await;
-        Ok(cache.contacts.values().cloned().collect())
+        Ok(cache.ordered())
     }
 
     /// List contacts with optional cache refresh.
@@ -20,22 +20,30 @@ impl<W: WalletInterface> ContactsManager<W> {
         if !force_refresh {
             let cache = self.cache.read().await;
             if cache.initialized {
-                return Ok(cache.contacts.values().cloned().collect());
+                return Ok(cache.ordered());
             }
         }
 
-        // Load contacts from blockchain
-        let contacts = self.load_contacts_from_chain().await?;
+        // Load contacts from blockchain. A forced refresh drops the cache
+        // before it loads in the reference (`getContacts`'s `#invalidate`,
+        // `ContactsManager.ts:321`, `:343-347`), so one whose load fails
+        // leaves it cold; it is dropped here when the load fails, the
+        // decode reading each contact's saved-at time from it until then
+        // (#904's fourth fold).
+        let contacts = match self.load_contacts_from_chain().await {
+            Ok(contacts) => contacts,
+            Err(error) => {
+                if force_refresh {
+                    self.cache.write().await.clear();
+                }
+                return Err(error);
+            }
+        };
 
-        // Update cache
+        // The cache in the listing's order (`ContactsManager.ts:376`).
         {
             let mut cache = self.cache.write().await;
-            cache.contacts.clear();
-            for contact in &contacts {
-                cache
-                    .contacts
-                    .insert(contact.identity_key.clone(), contact.clone());
-            }
+            cache.load(contacts.clone());
             cache.initialized = true;
         }
 
@@ -44,12 +52,16 @@ impl<W: WalletInterface> ContactsManager<W> {
 
     /// Load all contacts from the blockchain.
     async fn load_contacts_from_chain(&self) -> Result<Vec<Contact>> {
+        // `#loadContactsFromWallet` (`ContactsManager.ts:353-368`): the
+        // listing's failure the caller's, as the reference throws it (#904).
         let result = self
             .contact_outputs(None, OutputInclude::LockingScripts, 1000)
-            .await;
-        let Ok(result) = result else {
-            return Ok(Vec::new());
-        };
+            .await?;
+        if result.outputs.len() > 1000 {
+            return Err(Error::IdentityError(
+                "Invalid contacts result: outputs must be an array of at most 1000 entries".into(),
+            ));
+        }
         let mut contacts = Vec::new();
         for output in result.outputs {
             if let Some(contact) = self.decode_cached_contact(output).await? {
@@ -88,7 +100,6 @@ impl<W: WalletInterface> ContactsManager<W> {
             .cache
             .read()
             .await
-            .contacts
             .get(&record.identity_key)
             .map_or(0, |cached| cached.added_at);
         Ok(Some(super::record::contact_of(record, added_at)))
@@ -113,7 +124,7 @@ impl<W: WalletInterface> ContactsManager<W> {
 
         let matches: Vec<Contact> = cache
             .contacts
-            .values()
+            .iter()
             .filter(|c| {
                 c.name.to_lowercase().contains(&query_lower)
                     || c.tags
@@ -143,7 +154,7 @@ impl<W: WalletInterface> ContactsManager<W> {
 
         let matches: Vec<Contact> = cache
             .contacts
-            .values()
+            .iter()
             .filter(|c| c.tags.iter().any(|t| t.to_lowercase() == tag_lower))
             .cloned()
             .collect();
@@ -159,9 +170,7 @@ impl<W: WalletInterface> ContactsManager<W> {
     ///
     /// This does not remove contacts from storage, only clears the in-memory cache.
     pub async fn clear_cache(&self) {
-        let mut cache = self.cache.write().await;
-        cache.contacts.clear();
-        cache.initialized = false;
+        self.cache.write().await.clear();
     }
 
     /// Check if the cache is initialized.

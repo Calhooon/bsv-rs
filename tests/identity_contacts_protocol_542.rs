@@ -85,7 +85,7 @@ fn contact(v: &Value) -> Contact {
 
 /// The token this crate writes for the vector's contact, nothing listed.
 async fn written_token(v: &Value) -> (CreateActionArgs, Counting) {
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     manager.add_contact(contact(v)).await.unwrap();
     let created = wallet.created.lock().unwrap().clone().unwrap();
@@ -121,7 +121,7 @@ fn listing(v: &Value) -> (ListOutputsResult, bsv_rs::transaction::Transaction) {
 #[tokio::test]
 async fn the_reference_contact_record_is_read_here_542() {
     let v = vector();
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     *wallet.listed.lock().unwrap() = Some(listing(&v).0);
     let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
     let contacts = manager.list_contacts_with_refresh(true).await.unwrap();
@@ -234,20 +234,9 @@ async fn the_reference_verdicts_on_this_crates_tokens_542() {
 async fn the_spend_of_a_reference_token_is_signed_by_its_locking_key_542() {
     let v = vector();
     let (listed, source) = listing(&v);
-    let wallet = Counting::of_scalar(9);
+    let wallet = Counting::answering_contacts(9);
     *wallet.listed.lock().unwrap() = Some(listed);
     *wallet.spending.lock().unwrap() = Some(source);
-    // A signAction answer naming a txid: since #544 a failed update is the
-    // caller's error, as the reference's saveContact throws it.
-    wallet
-        .sign_answers
-        .lock()
-        .unwrap()
-        .push_back(Ok(bsv_rs::wallet::SignActionResult {
-            txid: Some([0xab; 32]),
-            tx: None,
-            send_with_results: None,
-        }));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     manager.add_contact(contact(&v)).await.unwrap();
     let signed = wallet.signed.lock().unwrap().clone().unwrap();

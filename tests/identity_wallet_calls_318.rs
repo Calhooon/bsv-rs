@@ -32,7 +32,7 @@ use std::sync::Arc;
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
-use identity_reveal_wallet::Counting;
+use identity_reveal_wallet::{wallet_call, Counting};
 #[path = "support/signaction_reference_326.rs"]
 mod signaction_reference_326;
 
@@ -376,13 +376,13 @@ async fn no_originator_is_sent_unless_one_is_configured() {
 /// The reference's method name as this crate's.
 fn snake(name: &str) -> &'static str {
     match name {
-        "proveCertificate" => "prove_certificate",
-        "getPublicKey" => "get_public_key",
-        "createSignature" => "create_signature",
-        "verifySignature" => "verify_signature",
-        "createAction" => "create_action",
-        "signAction" => "sign_action",
-        "abortAction" => "abort_action",
+        "proveCertificate" => wallet_call!(prove_certificate),
+        "getPublicKey" => wallet_call!(get_public_key),
+        "createSignature" => wallet_call!(create_signature),
+        "verifySignature" => wallet_call!(verify_signature),
+        "createAction" => wallet_call!(create_action),
+        "signAction" => wallet_call!(sign_action),
+        "abortAction" => wallet_call!(abort_action),
         other => panic!("no name for {other}"),
     }
 }

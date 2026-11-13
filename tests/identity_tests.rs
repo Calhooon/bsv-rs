@@ -15,6 +15,8 @@ use bsv_rs::identity::{
     IdentityQuery, KnownCertificateType, StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
 use bsv_rs::overlay::NetworkPreset;
+#[path = "support/identity_reveal_wallet.rs"]
+mod identity_reveal_wallet;
 use indexmap::IndexMap;
 
 // =================
@@ -704,7 +706,7 @@ mod contacts_manager_tests {
     const BOB: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
     const CHARLIE: &str = "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
     use bsv_rs::identity::ContactsManager;
-    use bsv_rs::wallet::ProtoWallet;
+    use identity_reveal_wallet::Counting;
 
     fn create_test_contact(key: &str, name: &str) -> Contact {
         Contact::new(name, key)
@@ -714,7 +716,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_add_and_get_contact() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let contact = create_test_contact(ALICE, "Alice");
@@ -727,7 +731,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_get_nonexistent_contact() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let result = manager.get_contact("nonexistent").await.unwrap();
@@ -736,7 +742,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_update_contact() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         // Add initial contact
@@ -755,7 +763,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_update_nonexistent_contact_fails() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let contact = create_test_contact(ALICE, "Alice");
@@ -765,7 +775,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_remove_contact() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let contact = create_test_contact(ALICE, "Alice");
@@ -783,7 +795,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_remove_nonexistent_contact_fails() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let result = manager.remove_contact("nonexistent").await;
@@ -792,7 +806,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_list_contacts() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         // Add multiple contacts
@@ -815,7 +831,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_search_contacts_by_name() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         manager
@@ -837,7 +855,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_search_contacts_case_insensitive() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         manager
@@ -853,7 +873,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_search_contacts_by_tag() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let mut contact1 = create_test_contact(ALICE, "Alice");
@@ -872,7 +894,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_search_contacts_by_notes() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let mut contact = create_test_contact(ALICE, "Alice");
@@ -887,7 +911,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_get_contacts_by_tag() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let mut contact1 = create_test_contact(ALICE, "Alice");
@@ -911,7 +937,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_cache_management() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         assert!(!manager.is_cache_initialized().await);
@@ -930,7 +958,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_add_contact_replaces_existing() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         let contact1 = create_test_contact(ALICE, "Alice V1");
@@ -948,7 +978,9 @@ mod contacts_manager_tests {
 
     #[tokio::test]
     async fn test_empty_search_returns_empty() {
-        let wallet = ProtoWallet::new(None);
+        // #904: a wallet answering the manager's listing and create, the
+        // manager returning the failures a ProtoWallet answers them with
+        let wallet = Counting::answering_contacts(1);
         let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());
 
         manager

@@ -13,7 +13,11 @@
 //! reach signAction (#326); signAction answered by another wallet when one
 //! is set, the JSON substrate under wiremock (#339); getPublicKey's answer
 //! for a derived key rewritten into another form when one is set (#545);
-//! createSignature answering a set error (#782's fold).
+//! createSignature answering a set error (#782's fold); a call named in
+//! `fail` answering `<name> failed`, and createAction without inputs
+//! answering a finished transaction when `create_finished` is set, as the
+//! #326 recorder's wallet does (`signaction_reference_326.mjs:110-114`;
+//! #904).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -23,6 +27,12 @@ use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::*;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+
+// The call-name macro (#904's fold), in its own file so the crate's doc
+// tests can include it and hold its refusals.
+include!("wallet_call.rs");
+#[allow(unused_imports)]
+pub(crate) use wallet_call;
 
 /// The reference text the #326 wallet answers createAction with: the
 /// recorder's, the base64 of eight bytes of 0x52.
@@ -60,6 +70,21 @@ fn spending_many(
         tx: partial.to_atomic_beef(true).unwrap(),
         reference: from_base64(SIGNABLE_REFERENCE).unwrap(),
     }
+}
+
+/// #904: the finished transaction createAction answers without inputs:
+/// one made-up input, the outputs asked, as the #326 recorder's `sourceOf`.
+fn finished_transaction(outputs: &[CreateActionOutput]) -> Transaction {
+    let mut tx = Transaction::new();
+    let mut input = TransactionInput::new("11".repeat(32), 0);
+    input.unlocking_script = Some(bsv_rs::script::UnlockingScript::from_binary(&[0x51]).unwrap());
+    tx.add_input(input).unwrap();
+    for output in outputs {
+        let lock = LockingScript::from_binary(&output.locking_script).unwrap();
+        tx.add_output(TransactionOutput::new(output.satoshis, lock))
+            .unwrap();
+    }
+    tx
 }
 
 /// #545: a rewrite of getPublicKey's compressed answer into another form.
@@ -116,6 +141,12 @@ pub struct Counting {
     /// #782's fold: the error createSignature answers when set, after the
     /// call is recorded.
     pub signature_error: Arc<Mutex<Option<bsv_rs::Error>>>,
+    /// #904: the calls, by name, that answer `<name> failed` after being
+    /// recorded.
+    pub fail: Arc<Mutex<Vec<&'static str>>>,
+    /// #904: createAction without inputs and without a source answers the
+    /// finished transaction paying the outputs asked from one made-up input.
+    pub create_finished: Arc<Mutex<bool>>,
     pending: Arc<Mutex<Option<SignableTransaction>>>,
 }
 
@@ -137,6 +168,22 @@ impl Counting {
         let mut scalar = [0u8; 32];
         scalar[31] = n;
         Self::of_key(PrivateKey::from_bytes(&scalar).unwrap())
+    }
+
+    /// #904: the wallet of the scalar `n` answering the contacts manager as
+    /// a full wallet does: an empty listing until one is set, a finished
+    /// transaction for a create, the signed transaction for a spend. Since
+    /// #904 the manager returns the wallet's failure where it swallowed it.
+    pub fn answering_contacts(n: u8) -> Self {
+        let wallet = Self::of_scalar(n);
+        *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
+            outputs: vec![],
+            total_outputs: 0,
+            beef: None,
+        });
+        *wallet.create_finished.lock().unwrap() = true;
+        *wallet.sign_mode.lock().unwrap() = "signed";
+        wallet
     }
 
     fn of_key(key: PrivateKey) -> Self {
@@ -168,6 +215,8 @@ impl Counting {
             sign_mode: Arc::new(Mutex::new("")),
             key_form: Arc::default(),
             signature_error: Arc::default(),
+            fail: Arc::default(),
+            create_finished: Arc::default(),
             pending: Arc::default(),
         }
     }
@@ -189,6 +238,19 @@ impl Counting {
             .unwrap()
             .push(originator.map(str::to_string));
     }
+
+    /// #904: the signable transaction createAction last answered.
+    pub fn pending(&self) -> Option<SignableTransaction> {
+        self.pending.lock().unwrap().clone()
+    }
+
+    /// #904: the refusal of a call named in `fail`.
+    fn failing(&self, name: &'static str) -> bsv_rs::Result<()> {
+        if self.fail.lock().unwrap().contains(&name) {
+            return Err(bsv_rs::Error::WalletError(format!("{name} failed")));
+        }
+        Ok(())
+    }
 }
 
 // async_trait rewrites the impl it is applied to, so the macro writes the
@@ -198,7 +260,8 @@ macro_rules! counting {
         #[async_trait::async_trait]
         impl WalletInterface for Counting {
             $(async fn $method(&self, args: $args, o: Option<&str>) -> bsv_rs::Result<$result> {
-                self.note(stringify!($method), o);
+                self.note(wallet_call!($method), o);
+                self.failing(wallet_call!($method))?;
                 WalletInterface::$method(&*self.inner, args, o).await
             })*
 
@@ -207,7 +270,7 @@ macro_rules! counting {
                 args: ProveCertificateArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<ProveCertificateResult> {
-                self.note("prove_certificate", o);
+                self.note(wallet_call!(prove_certificate), o);
                 let asked = args.fields_to_reveal.iter().map(|f| (f.clone(), "AAAA".to_string()));
                 Ok(ProveCertificateResult {
                     keyring_for_verifier: self.keyring.clone().unwrap_or_else(|| asked.collect()),
@@ -220,7 +283,8 @@ macro_rules! counting {
                 args: CreateActionArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<CreateActionResult> {
-                self.note("create_action", o);
+                self.note(wallet_call!(create_action), o);
+                self.failing(wallet_call!(create_action))?;
                 self.creates.lock().unwrap().push(args.clone());
                 let spent = self.spending.lock().unwrap().clone();
                 let mut signable = match spent {
@@ -233,7 +297,7 @@ macro_rules! counting {
                 if !sources.is_empty() {
                     signable = Some(spending_many(&sources, args.outputs.as_deref().unwrap_or(&[])));
                 }
-                if self.create_from_request {
+                if self.create_from_request && args.inputs.is_some() {
                     let beef = args.input_beef.as_deref().unwrap();
                     let sources: Vec<_> = args.inputs.iter().flatten().map(|input| {
                         let txid = bsv_rs::primitives::to_hex(&input.outpoint.txid);
@@ -248,9 +312,17 @@ macro_rules! counting {
                     mutate_bound_answer(answer, &self.create_mode.lock().unwrap());
                 }
                 *self.pending.lock().unwrap() = signable.clone();
+                let finished = (signable.is_none()
+                    && args.inputs.is_none()
+                    && *self.create_finished.lock().unwrap())
+                .then(|| finished_transaction(args.outputs.as_deref().unwrap_or(&[])));
                 *self.created.lock().unwrap() = Some(args);
                 *self.created_originator.lock().unwrap() = o.map(str::to_string);
                 Ok(CreateActionResult {
+                    txid: finished.as_ref().map(|tx| {
+                        Outpoint::from_string(&format!("{}.0", tx.id())).unwrap().txid
+                    }),
+                    tx: finished.map(|tx| tx.to_atomic_beef(true).unwrap()),
                     signable_transaction: signable,
                     ..Default::default()
                 })
@@ -260,7 +332,8 @@ macro_rules! counting {
                 args: SignActionArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<SignActionResult> {
-                self.note("sign_action", o);
+                self.note(wallet_call!(sign_action), o);
+                self.failing(wallet_call!(sign_action))?;
                 self.signs.lock().unwrap().push(args.clone());
                 *self.signed.lock().unwrap() = Some(args.clone());
                 if let Some(answer) = self.sign_answers.lock().unwrap().pop_front() {
@@ -284,7 +357,8 @@ macro_rules! counting {
                 args: AbortActionArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<AbortActionResult> {
-                self.note("abort_action", o);
+                self.note(wallet_call!(abort_action), o);
+                self.failing(wallet_call!(abort_action))?;
                 self.aborts.lock().unwrap().push(args);
                 Ok(AbortActionResult { aborted: true })
             }
@@ -293,7 +367,8 @@ macro_rules! counting {
                 args: ListOutputsArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<ListOutputsResult> {
-                self.note("list_outputs", o);
+                self.note(wallet_call!(list_outputs), o);
+                self.failing(wallet_call!(list_outputs))?;
                 self.list_args.lock().unwrap().push(args.clone());
                 if let Some(listed) = self.list_answers.lock().unwrap().pop_front() {
                     return Ok(listed);
@@ -311,7 +386,8 @@ macro_rules! counting {
                 args: GetPublicKeyArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<GetPublicKeyResult> {
-                self.note("get_public_key", o);
+                self.note(wallet_call!(get_public_key), o);
+                self.failing(wallet_call!(get_public_key))?;
                 self.public_key_args.lock().unwrap().push(args.clone());
                 let identity = args.identity_key;
                 let mut answer = WalletInterface::get_public_key(&*self.inner, args, o).await?;
@@ -325,7 +401,8 @@ macro_rules! counting {
                 args: CreateSignatureArgs,
                 o: Option<&str>,
             ) -> bsv_rs::Result<CreateSignatureResult> {
-                self.note("create_signature", o);
+                self.note(wallet_call!(create_signature), o);
+                self.failing(wallet_call!(create_signature))?;
                 self.signature_args.lock().unwrap().push(args.clone());
                 if let Some(error) = self.signature_error.lock().unwrap().clone() {
                     return Err(error);
@@ -333,26 +410,26 @@ macro_rules! counting {
                 WalletInterface::create_signature(&*self.inner, args, o).await
             }
             async fn is_authenticated(&self, o: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
-                self.note("is_authenticated", o);
+                self.note(wallet_call!(is_authenticated), o);
                 WalletInterface::is_authenticated(&*self.inner, o).await
             }
             async fn wait_for_authentication(
                 &self,
                 o: Option<&str>,
             ) -> bsv_rs::Result<AuthenticatedResult> {
-                self.note("wait_for_authentication", o);
+                self.note(wallet_call!(wait_for_authentication), o);
                 WalletInterface::wait_for_authentication(&*self.inner, o).await
             }
             async fn get_height(&self, o: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
-                self.note("get_height", o);
+                self.note(wallet_call!(get_height), o);
                 WalletInterface::get_height(&*self.inner, o).await
             }
             async fn get_network(&self, o: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
-                self.note("get_network", o);
+                self.note(wallet_call!(get_network), o);
                 WalletInterface::get_network(&*self.inner, o).await
             }
             async fn get_version(&self, o: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
-                self.note("get_version", o);
+                self.note(wallet_call!(get_version), o);
                 WalletInterface::get_version(&*self.inner, o).await
             }
         }
@@ -388,26 +465,33 @@ fn mutate_bound_answer(answer: &mut SignableTransaction, mode: &str) {
         return;
     }
     let mut tx = Transaction::from_atomic_beef(&answer.tx).unwrap();
-    match mode {
-        "version" | "version_before_input" => tx.set_version(2),
-        "lock_time" => tx.set_lock_time(1),
-        "sequence" => tx.inputs_mut()[0].sequence = 0,
-        "duplicate_input" => {
-            let first = tx.inputs()[0].clone();
-            tx.inputs_mut().push(first)
+    // A mode may name two faults joined by `+` (#904's fourth fold).
+    let parts: Vec<&str> = mode.split('+').collect();
+    for part in &parts {
+        match *part {
+            "version" | "version_before_input" => tx.set_version(2),
+            "lock_time" => tx.set_lock_time(1),
+            "sequence" => tx.inputs_mut()[0].sequence = 0,
+            "duplicate_input" => {
+                let first = tx.inputs()[0].clone();
+                tx.inputs_mut().push(first)
+            }
+            "output" => tx.outputs_mut()[0].satoshis = Some(0),
+            "inflation" | "unrequested_output" => {
+                let value = if *part == "inflation" { 2 } else { 1 };
+                tx.add_output(TransactionOutput::new(
+                    value,
+                    LockingScript::from_binary(&[0x51]).unwrap(),
+                ))
+                .unwrap();
+            }
+            _ => {}
         }
-        "output" => tx.outputs_mut()[0].satoshis = Some(0),
-        "inflation" | "unrequested_output" => {
-            let value = if mode == "inflation" { 2 } else { 1 };
-            tx.add_output(TransactionOutput::new(
-                value,
-                LockingScript::from_binary(&[0x51]).unwrap(),
-            ))
-            .unwrap();
-        }
-        _ => {}
     }
-    if mode == "missing_input" || mode == "version_before_input" {
+    if parts
+        .iter()
+        .any(|p| *p == "missing_input" || *p == "version_before_input")
+    {
         tx.inputs_mut()[0].source_output_index = 1;
     }
     answer.tx = tx.to_atomic_beef(true).unwrap();
@@ -423,14 +507,17 @@ fn bound_sign_answer(
         tx.inputs_mut()[*index as usize].unlocking_script =
             Some(bsv_rs::script::UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
     }
-    match mode {
-        "signed_version" => tx.set_version(2),
-        "signed_output" => tx.outputs_mut()[0].satoshis = Some(0),
-        "signed_script" => {
-            tx.inputs_mut()[0].unlocking_script =
-                Some(bsv_rs::script::UnlockingScript::from_binary(&[0]).unwrap())
+    // A mode may name two faults joined by `+` (#904's fourth fold).
+    for part in mode.split('+') {
+        match part {
+            "signed_version" => tx.set_version(2),
+            "signed_output" => tx.outputs_mut()[0].satoshis = Some(0),
+            "signed_script" => {
+                tx.inputs_mut()[0].unlocking_script =
+                    Some(bsv_rs::script::UnlockingScript::from_binary(&[0]).unwrap())
+            }
+            _ => {}
         }
-        _ => {}
     }
     let id = if mode == "txid_mismatch" {
         let mut other = tx.clone();

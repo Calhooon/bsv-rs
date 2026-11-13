@@ -796,6 +796,13 @@ const MACRO_DOC_TESTS: [(&str, usize, usize); 4] = [
     ),
 ];
 
+/// Another macro's doc tests the suite must run (#904's fourth fold, the row
+/// its third fold's re-read left): `wallet_call!`'s hold on a wrong name
+/// rests on the two `compile_fail` blocks of `WalletCallMacroDocTests`
+/// (`src/lib.rs`, `cfg(all(doctest, feature = "wallet"))`), which an `ignore`
+/// on either would silence; its one plain block the macro's compiling twin.
+const OTHER_DOC_TESTS: [(&str, usize, usize); 1] = [("src/lib.rs - WalletCallMacroDocTests", 2, 1)];
+
 /// The doc suite's test name of a pin found at `file:Name`.
 fn doc_name(key: &str) -> String {
     let (file, name) = key.rsplit_once(':').unwrap_or((key, ""));
@@ -910,6 +917,7 @@ fn doc_wanted() -> Vec<(String, usize, usize)> {
         .chain(
             MACRO_DOC_TESTS
                 .iter()
+                .chain(OTHER_DOC_TESTS.iter())
                 .map(|(name, fail, plain)| ((*name).to_string(), *fail, *plain)),
         )
         .collect()

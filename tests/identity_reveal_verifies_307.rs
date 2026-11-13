@@ -29,7 +29,7 @@ use std::collections::HashMap;
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
-use identity_reveal_wallet::Counting;
+use identity_reveal_wallet::{wallet_call, Counting};
 
 #[derive(Deserialize)]
 struct Vector {
@@ -117,7 +117,11 @@ fn assert_reached_create_action(
         }
         other => panic!("{name}: expected createAction's empty answer refused, got {other:?}"),
     }
-    assert_eq!(wallet.calls().last(), Some(&"create_action"), "{name}");
+    assert_eq!(
+        wallet.calls().last(),
+        Some(&wallet_call!(create_action)),
+        "{name}"
+    );
 }
 
 fn assert_refused_before_the_wallet(
@@ -206,10 +210,10 @@ async fn a_signed_master_certificate_is_published_as_before() {
     assert_eq!(
         calls,
         [
-            "prove_certificate",
-            "get_public_key",
-            "create_signature",
-            "create_action"
+            wallet_call!(prove_certificate),
+            wallet_call!(get_public_key),
+            wallet_call!(create_signature),
+            wallet_call!(create_action)
         ]
     );
     let created = wallet.created.lock().unwrap().clone().unwrap();
@@ -239,7 +243,7 @@ async fn an_unsafe_keyring_name_is_refused_in_the_reference_words() {
             "Invalid display identity: proof result keyringForVerifier contains an unsafe field";
         assert_eq!(w.refusal.as_deref(), Some(words), "{name}");
         assert_refusal(&result, &w, words);
-        assert_eq!(wallet.calls(), ["prove_certificate"], "{name}");
+        assert_eq!(wallet.calls(), [wallet_call!(prove_certificate)], "{name}");
     }
 }
 
@@ -256,7 +260,7 @@ async fn a_keyring_value_not_base64_or_over_2048_bytes_is_refused_as_the_referen
         let words = format!("The keyringForVerifier.email parameter must be {must_be}");
         assert_eq!(w.refusal.as_deref(), Some(words.as_str()), "{name}");
         assert_refusal(&result, &w, &words);
-        assert_eq!(wallet.calls(), ["prove_certificate"], "{name}");
+        assert_eq!(wallet.calls(), [wallet_call!(prove_certificate)], "{name}");
     }
 }
 
@@ -291,7 +295,7 @@ async fn a_keyring_for_another_field_is_refused_before_create_action() {
         ),
         other => panic!("expected the keyring refusal, got {other:?}"),
     }
-    assert_eq!(wallet.calls(), ["prove_certificate"]);
+    assert_eq!(wallet.calls(), [wallet_call!(prove_certificate)]);
 }
 
 #[test]

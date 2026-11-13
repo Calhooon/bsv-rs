@@ -186,3 +186,36 @@ pub use identity::{
     Contact, ContactsManager, ContactsManagerConfig, DisplayableIdentity, IdentityClient,
     IdentityClientConfig, IdentityQuery, KnownCertificateType,
 };
+
+/// The doc tests of the test double's call-name macro (#904's third fold),
+/// compiled by `cargo test --doc` alone (`cfg(doctest)`: no item of the
+/// crate's API). The macro is `tests/support/wallet_call.rs`, included as
+/// the counting wallet includes it. A wallet method's name compiles:
+///
+/// ```
+/// include!("../tests/support/wallet_call.rs");
+/// fn main() {
+///     assert_eq!(wallet_call!(sign_action), "sign_action");
+///     assert_eq!(wallet_call!(create_signature), "create_signature");
+/// }
+/// ```
+///
+/// A name another trait in scope could resolve (`From::from`) does not:
+///
+/// ```compile_fail,E0576
+/// include!("../tests/support/wallet_call.rs");
+/// fn main() {
+///     let _ = wallet_call!(from);
+/// }
+/// ```
+///
+/// Nor does the reference's camelCase name of a wallet method:
+///
+/// ```compile_fail,E0576
+/// include!("../tests/support/wallet_call.rs");
+/// fn main() {
+///     let _ = wallet_call!(signAction);
+/// }
+/// ```
+#[cfg(all(doctest, feature = "wallet"))]
+pub struct WalletCallMacroDocTests;

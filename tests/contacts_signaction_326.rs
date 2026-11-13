@@ -26,6 +26,39 @@ use signaction_reference_326::{
     assert_reference_sign_metadata as assert_reference_sign, source_of, vector,
 };
 
+/// #904: the recorded createAction options, aborts and stopping words of
+/// the case, read beside the signAction (until #904 no test read them).
+fn assert_reference_stop(
+    name: &str,
+    case: &serde_json::Value,
+    wallet: &Counting,
+    err: &bsv_rs::Error,
+) {
+    let created = wallet.created.lock().unwrap().clone().unwrap();
+    assert_eq!(
+        serde_json::to_value(created.options.as_ref().unwrap()).unwrap(),
+        case["create_action_options"],
+        "{name}: the reference's createAction options"
+    );
+    let aborts: Vec<_> = wallet
+        .aborts
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|a| serde_json::json!({ "reference": a.reference }))
+        .collect();
+    assert_eq!(
+        serde_json::Value::Array(aborts),
+        case["abort_action"],
+        "{name}: the abort"
+    );
+    assert_eq!(
+        err,
+        &bsv_rs::Error::IdentityError(case["stopped"].as_str().unwrap().into()),
+        "{name}: the reference's words"
+    );
+}
+
 fn contact(name: &str) -> Contact {
     Contact::new(
         name,
@@ -41,6 +74,14 @@ fn contact(name: &str) -> Contact {
 /// token then listed and spent by createAction.
 async fn manager_with_listed_contact() -> (ContactsManager<Counting>, Counting) {
     let wallet = Counting::of_scalar(9);
+    // #904: the create path needs a listing and a finished transaction,
+    // the manager returning the wallet's failure where it swallowed it.
+    *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
+        outputs: vec![],
+        total_outputs: 0,
+        beef: None,
+    });
+    *wallet.create_finished.lock().unwrap() = true;
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     manager.add_contact(contact("Bob Example")).await.unwrap();
     let created = wallet.created.lock().unwrap().take().unwrap();
@@ -66,18 +107,19 @@ async fn manager_with_listed_contact() -> (ContactsManager<Counting>, Counting) 
 #[tokio::test]
 async fn the_contact_update_signs_with_the_reference_text_and_no_options() {
     let (manager, wallet) = manager_with_listed_contact().await;
-    // A signAction answer naming a txid: since #544 a failed update is the
-    // caller's error, as the reference's saveContact throws it.
-    wallet
-        .sign_answers
-        .lock()
-        .unwrap()
-        .push_back(Ok(bsv_rs::wallet::SignActionResult {
-            txid: Some([0xab; 32]),
-            tx: None,
-            send_with_results: None,
-        }));
-    manager.add_contact(contact("Bob Updated")).await.unwrap();
+    // signAction answers no transaction: the update stops in the
+    // reference's words, as the recorded reference stopped (#904; until
+    // then a txid alone was taken as a finished update).
+    let err = manager
+        .add_contact(contact("Bob Updated"))
+        .await
+        .unwrap_err();
+    assert_reference_stop(
+        "contacts update",
+        &vector()["contacts"]["update"],
+        &wallet,
+        &err,
+    );
     let signed = wallet.signed.lock().unwrap().clone().unwrap();
     let requests = wallet.signature_args.lock().unwrap();
     assert!(
@@ -98,10 +140,16 @@ async fn the_contact_update_signs_with_the_reference_text_and_no_options() {
 #[tokio::test]
 async fn the_contact_removal_signs_with_the_reference_text_and_no_options() {
     let (manager, wallet) = manager_with_listed_contact().await;
-    manager
+    let err = manager
         .remove_contact(&contact("").identity_key)
         .await
         .unwrap_err();
+    assert_reference_stop(
+        "contacts remove",
+        &vector()["contacts"]["remove"],
+        &wallet,
+        &err,
+    );
     let signed = wallet.signed.lock().unwrap().clone().unwrap();
     let requests = wallet.signature_args.lock().unwrap();
     assert!(
