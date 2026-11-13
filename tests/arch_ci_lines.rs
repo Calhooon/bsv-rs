@@ -344,6 +344,7 @@ fn sync(text: &str) -> Vec<String> {
         ],
         &mut errors,
     );
+    errors.extend(sync_stage_r(text));
     for (refused, why) in [
         ("git rebase", "the sync picks, it never rebases"),
         (
@@ -367,6 +368,61 @@ fn sync(text: &str) -> Vec<String> {
     ] {
         if text.contains(refused) {
             errors.push(format!("sync: `{refused}`; {why}"));
+        }
+    }
+    errors
+}
+
+/// The sync's dispatch of stage R of the node oracle's judge (#97), byte for byte from its
+/// comment to the job's end: the step that starts ci.yml's checks on the PR's branch, then this
+/// one, the last of the job. Its `--ref`, its `if:` and its place are held by the bytes, as the
+/// `sibling` job's step is held in `arch_ci_pr_runs_the_required_set.rs`.
+const SYNC_STAGE_R: &str = r#"      - name: Start the PR's CI
+        if: steps.pick.outputs.push == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+
+      # stage R of the node oracle's judge (#97) on the PR's branch, in a step of its own after
+      # ci.yml's: a GITHUB_TOKEN push starts no run, and a refused dispatch here never loses ci.yml's
+      - name: Start the PR's stage R
+        if: steps.pick.outputs.push == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sibling-run.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"
+"#;
+
+/// The stage R dispatch of the sync (#97): named once, and the file's tail from ci.yml's dispatch
+/// to its end is `SYNC_STAGE_R`, so the step is held whole, after ci.yml's, the job's last.
+fn sync_stage_r(text: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let named = text.matches("sibling-run.yml").count();
+    if named != 1 {
+        errors.push(format!(
+            "sync: `sibling-run.yml` named {named} times; the stage R dispatch (#97) names it once"
+        ));
+    }
+    let head = "      - name: Start the PR's CI\n";
+    match text.find(head) {
+        None => errors.push(
+            "sync: no step `Start the PR's CI`, which the stage R dispatch (#97) follows"
+                .to_owned(),
+        ),
+        Some(at) => {
+            let tail = text[at..].trim_end();
+            if tail != SYNC_STAGE_R.trim_end() {
+                let found = tail
+                    .lines()
+                    .zip(SYNC_STAGE_R.lines())
+                    .position(|(a, b)| a != b)
+                    .unwrap_or_else(|| tail.lines().count().min(SYNC_STAGE_R.lines().count()));
+                errors.push(format!(
+                    "sync: the stage R dispatch (#97) is not `SYNC_STAGE_R` byte for byte after ci.yml's step to the job's end; line {} of the pin is `{}`, found `{}`",
+                    found + 1,
+                    SYNC_STAGE_R.lines().nth(found).unwrap_or("<end>"),
+                    tail.lines().nth(found).unwrap_or("<end>"),
+                ));
+            }
         }
     }
     errors
@@ -513,6 +569,59 @@ fn a_sync_that_merges_rebuilds_or_drops_its_link_is_refused() {
     assert!(sync(&off_main)
         .iter()
         .any(|e| e == "sync: it fires on no push to main"));
+}
+
+/// The strength read of PR #931's three plants on the stage R dispatch, each refused by name.
+#[test]
+fn a_sync_stage_r_dispatch_retargeted_unconditioned_or_moved_is_refused_97() {
+    let text = read(SYNC_FILE);
+    assert!(sync_stage_r(&text).is_empty());
+    let dispatch =
+        "run: gh workflow run sibling-run.yml --repo \"$GITHUB_REPOSITORY\" --ref \"$SYNC_BRANCH\"";
+    let retargeted = text.replace(
+        dispatch,
+        "run: gh workflow run sibling-run.yml --repo \"$GITHUB_REPOSITORY\" --ref beta",
+    );
+    assert_ne!(retargeted, text);
+    assert!(
+        sync(&retargeted)
+            .iter()
+            .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte") && e.contains("--ref beta")),
+        "{:?}",
+        sync(&retargeted)
+    );
+    let step =
+        "      - name: Start the PR's stage R\n        if: steps.pick.outputs.push == 'true'\n";
+    let unconditioned = text.replace(step, "      - name: Start the PR's stage R\n");
+    assert_ne!(unconditioned, text);
+    assert!(
+        sync(&unconditioned)
+            .iter()
+            .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte")
+                && e.contains("found `        env:`")),
+        "{:?}",
+        sync(&unconditioned)
+    );
+    let at = text.find("      - name: Start the PR's CI\n").unwrap();
+    let stage_r_at = text
+        .find("      # stage R of the node oracle's judge (#97) on the PR's branch")
+        .unwrap();
+    let ci_step = &text[at..stage_r_at];
+    let stage_r_step = &text[stage_r_at..];
+    let moved = format!(
+        "{}{}\n{}",
+        &text[..at],
+        stage_r_step.trim_end(),
+        ci_step.trim_end()
+    ) + "\n";
+    assert_ne!(moved, text);
+    assert!(
+        sync(&moved)
+            .iter()
+            .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte") && e.contains("found `<end>`")),
+        "{:?}",
+        sync(&moved)
+    );
 }
 
 #[test]
