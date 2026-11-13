@@ -18,7 +18,9 @@ use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
 
 mod fields;
-pub(in crate::transaction) use fields::outpoint_txid_name;
+pub(in crate::transaction) use fields::{
+    outpoint_txid, outpoint_txid_bytes, outpoint_txid_name, OutpointTxid,
+};
 pub use fields::{TransactionParts, TransactionPartsMut};
 
 /// Number of placeholder outputs to fabricate for an EF source transaction whose
@@ -1307,6 +1309,10 @@ impl Transaction {
     /// Returns an error if:
     /// - Any output is missing a satoshi amount (except change outputs)
     /// - Change outputs haven't been computed (call `fee()` first)
+    /// - An input's `source_txid` (64 hex digits) is not the id of its linked
+    ///   source, and that source has an input or a merkle path (#848, the
+    ///   reference's refusal and words, `Transaction.ts:964-984`); no template
+    ///   runs and no field moves
     /// - Template signing fails
     pub async fn sign(&mut self) -> Result<()> {
         // Validate all outputs have amounts
@@ -1327,6 +1333,9 @@ impl Transaction {
                 }
             }
         }
+
+        // No complete source linked under another txid is signed (#848).
+        super::source_link::refuse_at_sign(self.inputs())?;
 
         // Sign each input with a template
         let raw_tx = self.to_binary();
@@ -1705,18 +1714,34 @@ impl Transaction {
     ///
     /// 1. a transaction carrying a merkle path is checked against the chain
     ///    tracker and is not descended;
-    /// 2. an unproven one has its fee checked when a fee model is given, every
-    ///    input's script executed with the source looked up BY TXID in the map,
-    ///    and the reference's value rule applied (its outputs may not spend
-    ///    more than its inputs);
+    /// 2. an unproven one has every output's amount read, its fee checked when
+    ///    a fee model is given, every input's script executed with the source
+    ///    looked up BY TXID in the map, and the reference's value rule applied
+    ///    (its outputs may not spend more than its inputs);
     /// 3. the sources of an unproven transaction are queued by txid.
     ///
-    /// Nothing is cloned and nothing depends on which copy of a parent an
-    /// input holds, so a BEEF that links each distinct parent once (the linear
-    /// structure `Beef::add_input_proof` builds, where later inputs sourcing
-    /// the same txid get a bare stub) verifies exactly like one that links
-    /// every input in full. The earlier object-graph walk forced that second
-    /// structure, which is exponential on a diamond chain (0.3.21).
+    /// Each input must link a source, and its `source_txid`, when 64 hex
+    /// digits, must be that source's id (#848); the copy looked up is then
+    /// one of the same id and bytes, so nothing depends on which copy of a
+    /// parent an input holds: a BEEF that links each distinct parent once (the
+    /// linear structure `Beef::add_input_proof` builds, where later inputs
+    /// sourcing the same txid get a stub of the same id) verifies exactly like
+    /// one that links every input in full. The earlier object-graph walk
+    /// forced that second structure, which is exponential on a diamond chain
+    /// (0.3.21).
+    ///
+    /// Refused in the reference's words (`ts-stack@edf6e03`
+    /// `Transaction.ts:1336-1432`, `:1464-1474`), for every unproven
+    /// transaction the walk reaches: an output amount absent or past 21e14,
+    /// the output total past 21e14 (both before any input); an input that
+    /// links no source (`... is missing an associated source transaction.
+    /// ...`), whatever another input links; a source output that does not
+    /// exist (in this crate's words, `Input N source output index out of
+    /// bounds`); a source amount absent or past 21e14, the input total past
+    /// 21e14; a linked source that is not the transaction the input names
+    /// (`Verification failed because input N of transaction <txid> does not
+    /// reference its supplied source transaction.`, a descriptor without
+    /// inputs included, so a `from_ef` transaction is refused here).
     ///
     /// Matches the Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`,
     /// whose inputs share one source object per txid by reference.

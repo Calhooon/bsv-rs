@@ -1,0 +1,941 @@
+{
+  "recorded_by": "tests/support/source_txid_mismatch_848.mjs",
+  "reference": "ts-stack@edf6e03 packages/sdk, Node v22.18.0",
+  "other_txid": "abababababababababababababababababababababababababababababababab",
+  "cells": [
+    {
+      "cell": "matching",
+      "built": {
+        "hex": "0100000001c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff84030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "sign": {
+        "ok": true,
+        "template_calls": 1
+      },
+      "verify_tracker": {
+        "ok": true
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "ok": "0100000037c14dc57b1fe3ab907d3d3a2ab22c9a8b4ef4ec5aa46954c7175e3bab43482a3bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000001518403000000000000ffffffff1209b778aed7b57b3b10d5fed8a75a30297611efb8a5d8993cd0d58da7bd49160000000041000000"
+      }
+    },
+    {
+      "cell": "mismatch_complete",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffff84030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 0 sourceTXID does not reference its supplied source transaction.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction 6fd818e6cf42c56e0ccb7b1d897ce94de5319c8c128091906c4b479a7a9e7e27 does not reference its supplied source transaction."
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "mismatch_proven",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffffe8030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 0 sourceTXID does not reference its supplied source transaction.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction 6fd818e6cf42c56e0ccb7b1d897ce94de5319c8c128091906c4b479a7a9e7e27 does not reference its supplied source transaction."
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "mismatch_anchored_no_inputs",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffff84030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "d53fe049d7291f56c70a096f3c49e33743d1d38d9763a0ad7dd2beb887a78143",
+              "inputs": 0,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 0 sourceTXID does not reference its supplied source transaction.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction 6fd818e6cf42c56e0ccb7b1d897ce94de5319c8c128091906c4b479a7a9e7e27 does not reference its supplied source transaction."
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "mismatch_descriptor",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffff84030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "d53fe049d7291f56c70a096f3c49e33743d1d38d9763a0ad7dd2beb887a78143",
+              "inputs": 0,
+              "path": false
+            }
+          }
+        ]
+      },
+      "sign": {
+        "ok": true,
+        "template_calls": 1
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction 6fd818e6cf42c56e0ccb7b1d897ce94de5319c8c128091906c4b479a7a9e7e27 does not reference its supplied source transaction."
+      },
+      "verify_scripts_only": {
+        "error": "Verification failed because transaction d53fe049d7291f56c70a096f3c49e33743d1d38d9763a0ad7dd2beb887a78143 has no inputs."
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "from_ef",
+      "built": {
+        "hex": "0100000001c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff84030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "d53fe049d7291f56c70a096f3c49e33743d1d38d9763a0ad7dd2beb887a78143",
+              "inputs": 0,
+              "path": false
+            }
+          }
+        ]
+      },
+      "sign": {
+        "ok": true,
+        "template_calls": 1
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction 0b23bde1fdb1e56d3cdb81da498e1b027f5026fe08ffbe5d96d1463ab0b08d73 does not reference its supplied source transaction."
+      },
+      "verify_scripts_only": {
+        "error": "Verification failed because transaction d53fe049d7291f56c70a096f3c49e33743d1d38d9763a0ad7dd2beb887a78143 has no inputs."
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "upper_matching",
+      "built": {
+        "hex": "0100000001c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff84030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "sign": {
+        "ok": true,
+        "template_calls": 1
+      },
+      "verify_tracker": {
+        "ok": true
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "ok": "0100000037c14dc57b1fe3ab907d3d3a2ab22c9a8b4ef4ec5aa46954c7175e3bab43482a3bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000001518403000000000000ffffffff1209b778aed7b57b3b10d5fed8a75a30297611efb8a5d8993cd0d58da7bd49160000000041000000"
+      }
+    },
+    {
+      "cell": "upper_matching_proven",
+      "built": {
+        "hex": "0100000001d8721dea30fd7b487c2d360d286b86ae353f1399cc47015307e3f5409c6a29990000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01d8721dea30fd7b487c2d360d286b86ae353f1399cc47015307e3f5409c6a29990000000000ffffffffe8030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "ok": true,
+        "template_calls": 1
+      },
+      "verify_tracker": {
+        "ok": true
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "ok": "01000000f38ad03ceadb9bfcc901ce7780de540eeab7a75ef8f34de35ae6fac36df31b733bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044d8721dea30fd7b487c2d360d286b86ae353f1399cc47015307e3f5409c6a2999000000000151e803000000000000ffffffff1209b778aed7b57b3b10d5fed8a75a30297611efb8a5d8993cd0d58da7bd49160000000041000000"
+      }
+    },
+    {
+      "cell": "named_other_inputs_source",
+      "built": {
+        "hex": "01000000029ba6f9fbe35944b9260a03c829255da31d1754e61b7cb9f2dd2ea82de506c8d00000000000ffffffff9ba6f9fbe35944b9260a03c829255da31d1754e61b7cb9f2dd2ea82de506c8d00100000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef029ba6f9fbe35944b9260a03c829255da31d1754e61b7cb9f2dd2ea82de506c8d00000000000ffffffffe80300000000000001519ba6f9fbe35944b9260a03c829255da31d1754e61b7cb9f2dd2ea82de506c8d00100000000ffffffffe8030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "d0c806e52da82eddf2b97c1be654171da35d2529c8030a26b94459e3fbf9a69b",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "inputs": 1,
+              "path": true
+            }
+          },
+          {
+            "sourceTXID": "d0c806e52da82eddf2b97c1be654171da35d2529c8030a26b94459e3fbf9a69b",
+            "sourceOutputIndex": 1,
+            "source": {
+              "id": "d0c806e52da82eddf2b97c1be654171da35d2529c8030a26b94459e3fbf9a69b",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 0 sourceTXID does not reference its supplied source transaction.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction a40152cc3793dbe506cc51a889749760e3d09d30116b3a4398379387a6738305 does not reference its supplied source transaction."
+      },
+      "verify_scripts_only": {
+        "ok": true
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "mismatch_and_output_missing",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0500000000ffffffff010500000000000000015100000000",
+        "ef": null,
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 5,
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 0 references a source output that does not exist.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "Verification failed because input 0 of transaction f114f4269ff2ee7a9b57cc09f0b27f7369ea4aee36c6a271fff7fbade2473c1d references a source output that does not exist."
+      },
+      "verify_scripts_only": {
+        "error": "Verification failed because input 0 of transaction f114f4269ff2ee7a9b57cc09f0b27f7369ea4aee36c6a271fff7fbade2473c1d references a source output that does not exist."
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "mismatch_and_no_unlocking_script",
+      "built": {
+        "hex": null,
+        "ef": null,
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 0 sourceTXID does not reference its supplied source transaction.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "unlockingScript is undefined"
+      },
+      "verify_scripts_only": {
+        "error": "unlockingScript is undefined"
+      },
+      "preimage": {
+        "error": "sourceTXID does not match sourceTransaction"
+      }
+    },
+    {
+      "cell": "failing_script_before_mismatch",
+      "built": {
+        "hex": "0100000002d8721dea30fd7b487c2d360d286b86ae353f1399cc47015307e3f5409c6a2999000000000100ffffffffabababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef02d8721dea30fd7b487c2d360d286b86ae353f1399cc47015307e3f5409c6a2999000000000100ffffffffe8030000000000000151abababababababababababababababababababababababababababababababab0000000000ffffffffe8030000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8",
+              "inputs": 1,
+              "path": true
+            }
+          },
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "b599fe19336a8ce43aad18c08dc3f3272bb3fd1d35a8f97d866ad1f31147db44",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "sign": {
+        "error": "Input 1 sourceTXID does not reference its supplied source transaction.",
+        "template_calls": 0
+      },
+      "verify_tracker": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 2.\nTXID: 99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8, OutputIdx: 0\nContext: LockingScript, PC: 1\nStack: [, 01] (len: 2, mem: 1)\nAltStack: [] (len: 0, mem: 0)\nIfStack: []"
+      },
+      "verify_scripts_only": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 2.\nTXID: 99296a9c40f5e307530147cc99133f35ae866b280d362d7c487bfd30ea1d72d8, OutputIdx: 0\nContext: LockingScript, PC: 1\nStack: [, 01] (len: 2, mem: 1)\nAltStack: [] (len: 0, mem: 0)\nIfStack: []"
+      },
+      "preimage": {
+        "ok": "0100000041a20af5099b01cbad6f4038ead5aa51ca59435c741906e7bf386d4623748188752adad0a7b9ceca853768aebb6965eca126a62965f698a0c1bc43d83db632add8721dea30fd7b487c2d360d286b86ae353f1399cc47015307e3f5409c6a2999000000000151e803000000000000ffffffff1209b778aed7b57b3b10d5fed8a75a30297611efb8a5d8993cd0d58da7bd49160000000041000000"
+      }
+    }
+  ],
+  "survey": {
+    "cell": "mismatch_complete",
+    "getFee": {
+      "ok": 895
+    },
+    "fee": {
+      "ok": 895
+    },
+    "toEF": {
+      "ok": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffff84030000000000000151010500000000000000015100000000"
+    }
+  },
+  "templates": {
+    "key_hex": "0000000000000000000000000000000000000000000000000000000000000007",
+    "protocol": [
+      2,
+      "source txid test"
+    ],
+    "satoshis": 900,
+    "cells": [
+      {
+        "template": "P2PKH",
+        "cell": "descriptor",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "0e05934e95e2a237c73cbbb03ab81c4d90649868f14afecedd54678da91e64ad",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "P2PKH",
+        "cell": "complete",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "3c5fe007132dddf6a6386cbe7f922e2bca97418b7a3c320024e27bf40c374490",
+                "inputs": 1,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "Input 0 sourceTXID does not reference its supplied source transaction."
+        }
+      },
+      {
+        "template": "P2PKH",
+        "cell": "from_ef",
+        "built": {
+          "hex": "01000000016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "4ddae750132e5cf863a751834d355ba026b0c4fa6859e85b2535cf991fa28364",
+              "sourceOutputIndex": 0,
+              "source": {
+                "id": "9b5d4fe7900f6b1e8a0118503913d7c1d2e17bd8a5802c130498952c28e144dd",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "P2PKH",
+        "cell": "named_alone",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": null,
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": null
+            }
+          ]
+        },
+        "sign": {
+          "ok": "483045022100d6987b66dee84728cf07a23a1e591b088e3a7bfe659fc2795a21d639bb8bfcc002204c60cf26f30137fd31e95516a93d47b9d873bf16b30daa4879a414a2f8a9a56f4121025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        }
+      },
+      {
+        "template": "PushDrop",
+        "cell": "descriptor",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "0e05934e95e2a237c73cbbb03ab81c4d90649868f14afecedd54678da91e64ad",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "PushDrop",
+        "cell": "complete",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "3c5fe007132dddf6a6386cbe7f922e2bca97418b7a3c320024e27bf40c374490",
+                "inputs": 1,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "Input 0 sourceTXID does not reference its supplied source transaction."
+        }
+      },
+      {
+        "template": "PushDrop",
+        "cell": "from_ef",
+        "built": {
+          "hex": "01000000016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "4ddae750132e5cf863a751834d355ba026b0c4fa6859e85b2535cf991fa28364",
+              "sourceOutputIndex": 0,
+              "source": {
+                "id": "9b5d4fe7900f6b1e8a0118503913d7c1d2e17bd8a5802c130498952c28e144dd",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "PushDrop",
+        "cell": "named_alone",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": null,
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": null
+            }
+          ]
+        },
+        "sign": {
+          "ok": "4830450221008d3c320fd19a08ddc1365642f3104efb4d31d3fb57fddaf80e1941a6316c411a0220074868b89f095a71af20d5a5f76a10874ec31622233b8fe3205953750978881441"
+        }
+      },
+      {
+        "template": "RPuzzle",
+        "cell": "descriptor",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "0e05934e95e2a237c73cbbb03ab81c4d90649868f14afecedd54678da91e64ad",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "RPuzzle",
+        "cell": "complete",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "3c5fe007132dddf6a6386cbe7f922e2bca97418b7a3c320024e27bf40c374490",
+                "inputs": 1,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "Input 0 sourceTXID does not reference its supplied source transaction."
+        }
+      },
+      {
+        "template": "RPuzzle",
+        "cell": "from_ef",
+        "built": {
+          "hex": "01000000016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "4ddae750132e5cf863a751834d355ba026b0c4fa6859e85b2535cf991fa28364",
+              "sourceOutputIndex": 0,
+              "source": {
+                "id": "9b5d4fe7900f6b1e8a0118503913d7c1d2e17bd8a5802c130498952c28e144dd",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "OverlayAdminTokenTemplate",
+        "cell": "descriptor",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "0e05934e95e2a237c73cbbb03ab81c4d90649868f14afecedd54678da91e64ad",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      },
+      {
+        "template": "OverlayAdminTokenTemplate",
+        "cell": "complete",
+        "built": {
+          "hex": "0100000001abababababababababababababababababababababababababababababababab0100000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0100000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "abababababababababababababababababababababababababababababababab",
+              "sourceOutputIndex": 1,
+              "source": {
+                "id": "3c5fe007132dddf6a6386cbe7f922e2bca97418b7a3c320024e27bf40c374490",
+                "inputs": 1,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "Input 0 sourceTXID does not reference its supplied source transaction."
+        }
+      },
+      {
+        "template": "OverlayAdminTokenTemplate",
+        "cell": "from_ef",
+        "built": {
+          "hex": "01000000016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff010500000000000000015100000000",
+          "ef": "010000000000000000ef016483a21f99cf35255be85968fac4b026a05b354d8351a763f85c2e1350e7da4d0000000000ffffffff84030000000000001976a9145dedfbf9ea599dd4e3ca6a80b333c472fd0b3f6988ac010500000000000000015100000000",
+          "inputs": [
+            {
+              "sourceTXID": "4ddae750132e5cf863a751834d355ba026b0c4fa6859e85b2535cf991fa28364",
+              "sourceOutputIndex": 0,
+              "source": {
+                "id": "9b5d4fe7900f6b1e8a0118503913d7c1d2e17bd8a5802c130498952c28e144dd",
+                "inputs": 0,
+                "path": false
+              }
+            }
+          ]
+        },
+        "sign": {
+          "error": "The input sourceTXID does not match the input sourceTransaction."
+        }
+      }
+    ]
+  },
+  "verify_fold": [
+    {
+      "cell": "unlinked_named_reachable",
+      "built": {
+        "hex": "01000000029ba6f9fbe35944b9260a03c829255da31d1754e61b7cb9f2dd2ea82de506c8d00000000000ffffffff9ba6f9fbe35944b9260a03c829255da31d1754e61b7cb9f2dd2ea82de506c8d00100000000ffffffff010500000000000000015100000000",
+        "ef": null,
+        "inputs": [
+          {
+            "sourceTXID": "d0c806e52da82eddf2b97c1be654171da35d2529c8030a26b94459e3fbf9a69b",
+            "sourceOutputIndex": 0,
+            "source": null
+          },
+          {
+            "sourceTXID": "d0c806e52da82eddf2b97c1be654171da35d2529c8030a26b94459e3fbf9a69b",
+            "sourceOutputIndex": 1,
+            "source": {
+              "id": "d0c806e52da82eddf2b97c1be654171da35d2529c8030a26b94459e3fbf9a69b",
+              "inputs": 1,
+              "path": true
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Verification failed because the input at index 0 of transaction a40152cc3793dbe506cc51a889749760e3d09d30116b3a4398379387a6738305 is missing an associated source transaction. This source transaction is required for transaction verification because there is no merkle proof for the transaction spending a UTXO it contains."
+      }
+    },
+    {
+      "cell": "unlinked_unreachable",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": null,
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": null
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Verification failed because the input at index 0 of transaction 6fd818e6cf42c56e0ccb7b1d897ce94de5319c8c128091906c4b479a7a9e7e27 is missing an associated source transaction. This source transaction is required for transaction verification because there is no merkle proof for the transaction spending a UTXO it contains."
+      }
+    },
+    {
+      "cell": "absent_source_amount",
+      "built": {
+        "hex": "0100000001246ba09498bacee96d8149c8980b56c0b9051c1f5c73fae17f61ddbe4735b3630000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01246ba09498bacee96d8149c8980b56c0b9051c1f5c73fae17f61ddbe4735b3630000000000ffffffff00000000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "63b33547bedd617fe1fa735c1f1c05b9c0560b98c849816de9ceba9894a06b24",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "63b33547bedd617fe1fa735c1f1c05b9c0560b98c849816de9ceba9894a06b24",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "cell": "source_amount_past_max",
+      "built": {
+        "hex": "010000000120b556cf045632c819194c11f22f307ae22c323546deeff72f80af76445bf8b90000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef0120b556cf045632c819194c11f22f307ae22c323546deeff72f80af76445bf8b90000000000ffffffff0140075af07507000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "b9f85b4476af802ff7efde4635322ce27a302ff2114c1919c8325604cf56b520",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "b9f85b4476af802ff7efde4635322ce27a302ff2114c1919c8325604cf56b520",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "cell": "input_total_past_max",
+      "built": {
+        "hex": "010000000253b7eeb301a5c3d33bb70bba201b0210e3b01de929b3100227c8102cb4a7f4e20000000000ffffffff23205a4bb5b17f8e89f4cd9de57d3b9d417bd035a6e83581811ecab6aac3ea530000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef0253b7eeb301a5c3d33bb70bba201b0210e3b01de929b3100227c8102cb4a7f4e20000000000ffffffff0040075af0750700015123205a4bb5b17f8e89f4cd9de57d3b9d417bd035a6e83581811ecab6aac3ea530000000000ffffffff01000000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "e2f4a7b42c10c8270210b329e91db0e310021b20ba0bb73bd3c3a501b3eeb753",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "e2f4a7b42c10c8270210b329e91db0e310021b20ba0bb73bd3c3a501b3eeb753",
+              "inputs": 1,
+              "path": false
+            }
+          },
+          {
+            "sourceTXID": "53eac3aab6ca1e818135e8a635d07b419d3b7de59dcdf4898e7fb1b54b5a2023",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "53eac3aab6ca1e818135e8a635d07b419d3b7de59dcdf4898e7fb1b54b5a2023",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Transaction input total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "cell": "absent_output_amount",
+      "built": {
+        "hex": "0100000001c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff010000000000000000015100000000",
+        "ef": "010000000000000000ef01c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff84030000000000000151010000000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "cell": "output_amount_past_max",
+      "built": {
+        "hex": "0100000001c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff010140075af0750700015100000000",
+        "ef": "010000000000000000ef01c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff84030000000000000151010140075af0750700015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "cell": "output_total_past_max",
+      "built": {
+        "hex": "0100000001c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff020040075af075070001510100000000000000015100000000",
+        "ef": "010000000000000000ef01c7a71e4ec7de77a846ea59d3586c0760195f7db87a371e04cd8e6df8a0acec730000000000ffffffff84030000000000000151020040075af075070001510100000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Transaction output total exceeds the maximum valid monetary range."
+      }
+    },
+    {
+      "cell": "absent_output_amount_and_mismatch",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010000000000000000015100000000",
+        "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffff84030000000000000151010000000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "73ecaca0f86d8ecd041e377ab87d5f1960076c58d359ea46a877dec74e1ea7c7",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Output 0 amount must be a non-negative safe integer no greater than 21e14."
+      }
+    },
+    {
+      "cell": "absent_source_amount_and_mismatch",
+      "built": {
+        "hex": "0100000001abababababababababababababababababababababababababababababababab0000000000ffffffff010500000000000000015100000000",
+        "ef": "010000000000000000ef01abababababababababababababababababababababababababababababababab0000000000ffffffff00000000000000000151010500000000000000015100000000",
+        "inputs": [
+          {
+            "sourceTXID": "abababababababababababababababababababababababababababababababab",
+            "sourceOutputIndex": 0,
+            "source": {
+              "id": "63b33547bedd617fe1fa735c1f1c05b9c0560b98c849816de9ceba9894a06b24",
+              "inputs": 1,
+              "path": false
+            }
+          }
+        ]
+      },
+      "verify_tracker": {
+        "error": "Input 0 source amount must be a non-negative safe integer no greater than 21e14."
+      }
+    }
+  ]
+}

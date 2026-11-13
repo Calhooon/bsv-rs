@@ -104,6 +104,7 @@ mod merkle_path_legal;
 mod merkle_path_verify;
 mod merkle_path_walk;
 pub mod output;
+mod source_link;
 mod spending;
 #[allow(clippy::module_inception)]
 pub mod transaction;
