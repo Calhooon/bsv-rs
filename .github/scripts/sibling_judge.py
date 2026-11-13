@@ -261,7 +261,9 @@ def bounded(own, quoted, act):
     head = "\n".join(clean(line) for line in own)
     tail = ""
     if act:
-        tail = "\n\nTo re-judge:\n\n```sh\n" + clean(act) + "\n```\n"
+        # each of the act's own lines cleaned apart, so its line breaks stay line breaks and the
+        # command is not folded into the comment above it
+        tail = "\n\nTo re-judge:\n\n```sh\n" + "\n".join(clean(line) for line in str(act).split("\n")) + "\n```\n"
     budget = TEXT_LIMIT - len(head) - len(tail) - 200
     body, cut = [], 0
     used = 0
@@ -653,7 +655,7 @@ class Judgment:
 
     def repush(self):
         branch = ((self.pr or {}).get("head") or {}).get("ref")
-        branch = shlex.quote(branch) if branch else "<the pull request's branch>"
+        branch = shlex.quote(clean(branch)) if branch else "<the pull request's branch>"
         return (f"# push a commit that fixes it to the pull request's branch (the push is judged), or:\n"
                 f"gh workflow run sibling-run.yml --repo {self.repository or 'Calhooon/bsv-rs'} --ref {branch}")
 
