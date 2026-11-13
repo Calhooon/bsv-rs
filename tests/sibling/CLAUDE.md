@@ -309,7 +309,7 @@ gh workflow run sibling-judge.yml --repo Calhooon/bsv-rs --ref main -f run_id=<r
 ```
 
 and the sweep (`sibling_judge.py sweep --app-id 5700082`) names every open pull request's gap
-with its act. Both workflows carry the head's sha in their `run-name:`. A re-run of stage R is
+with its act. Both workflows carry the head's sha in their `run-name:`, a re-judge dispatch of `sibling-judge.yml` the stage R run's id. A re-run of stage R is
 judged from its own attempt's artifact (`overwrite: true` on the upload, the judge's attempt
 filter), never `NOT JUDGED`.
 
