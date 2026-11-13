@@ -4,50 +4,48 @@
 //! encapsulating the functionality to construct, parse, and serialize
 //! scripts used in both locking (output) and unlocking (input) scripts.
 
-use std::cell::RefCell;
-
 use super::chunk::ScriptChunk;
 use super::op::*;
-use crate::primitives::{from_hex, to_hex};
+use crate::primitives::from_hex;
 use crate::Result;
 
 #[path = "script_asm.rs"]
 mod asm;
+#[path = "script_cache.rs"]
+mod cache;
 
 /// The Script class represents a script in a Bitcoin SV transaction.
 ///
 /// Scripts can be constructed from ASM strings, hex strings, or binary data,
 /// and can be serialized back to any of these formats.
+///
+/// Its chunks and the two serializations derived from them live in a cache
+/// whose fields only its own module can name (`script_cache.rs`, #843d1): a
+/// serialization is filled through `&self` and emptied by the one write door
+/// every editing method goes through, so `Script` is `Send` and `Sync` and its
+/// bytes are always those of its chunks, or the bytes given before any edit.
 #[derive(Debug, Clone)]
 pub struct Script {
-    /// The chunks that make up this script
-    chunks: RefCell<Vec<ScriptChunk>>,
-    /// Whether the chunks have been parsed from raw bytes
-    parsed: RefCell<bool>,
-    /// Cached raw bytes (for lazy parsing)
-    raw_bytes_cache: RefCell<Option<Vec<u8>>>,
-    /// Cached hex string
-    hex_cache: RefCell<Option<String>>,
+    /// The chunks, the bytes and the hex.
+    cache: cache::Cache,
 }
+
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<Script>();
+    shareable::<ScriptChunk>();
+};
 
 impl Script {
     /// Creates a new empty script.
     pub fn new() -> Self {
-        Self {
-            chunks: RefCell::new(Vec::new()),
-            parsed: RefCell::new(true),
-            raw_bytes_cache: RefCell::new(None),
-            hex_cache: RefCell::new(None),
-        }
+        Self::from_chunks(Vec::new())
     }
 
     /// Creates a script from a vector of chunks.
     pub fn from_chunks(chunks: Vec<ScriptChunk>) -> Self {
         Self {
-            chunks: RefCell::new(chunks),
-            parsed: RefCell::new(true),
-            raw_bytes_cache: RefCell::new(None),
-            hex_cache: RefCell::new(None),
+            cache: cache::Cache::from_chunks(chunks),
         }
     }
 
@@ -66,14 +64,10 @@ impl Script {
         }
 
         let bin = from_hex(hex)?;
-        let raw_bytes = bin.clone();
         let hex_lower = hex.to_lowercase();
 
         Ok(Self {
-            chunks: RefCell::new(Vec::new()),
-            parsed: RefCell::new(false),
-            raw_bytes_cache: RefCell::new(Some(raw_bytes)),
-            hex_cache: RefCell::new(Some(hex_lower)),
+            cache: cache::Cache::from_bytes(bin, Some(hex_lower)),
         })
     }
 
@@ -88,23 +82,8 @@ impl Script {
     /// ```
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
         Ok(Self {
-            chunks: RefCell::new(Vec::new()),
-            parsed: RefCell::new(false),
-            raw_bytes_cache: RefCell::new(Some(bin.to_vec())),
-            hex_cache: RefCell::new(None),
+            cache: cache::Cache::from_bytes(bin.to_vec(), None),
         })
-    }
-
-    /// Ensures that the chunks have been parsed from raw bytes.
-    fn ensure_parsed(&self) {
-        if *self.parsed.borrow() {
-            return;
-        }
-
-        if let Some(ref bytes) = *self.raw_bytes_cache.borrow() {
-            *self.chunks.borrow_mut() = Self::parse_chunks(bytes, true);
-        }
-        *self.parsed.borrow_mut() = true;
     }
 
     /// The chunk index of the first push that declares more bytes than the
@@ -119,7 +98,7 @@ impl Script {
     /// this index. Bytes after a top-level `OP_RETURN` are data on both sides
     /// and are not examined.
     pub fn truncated_push(&self) -> Option<usize> {
-        truncated_push_index(&self.to_binary())
+        truncated_push_index(self.cache.bytes())
     }
 
     /// The reference's `#parseChunks` (`ts-stack@edf6e03` `Script.ts:599-631`):
@@ -222,26 +201,12 @@ impl Script {
 
     /// Serializes the script to a hexadecimal string.
     pub fn to_hex(&self) -> String {
-        if let Some(ref hex) = *self.hex_cache.borrow() {
-            return hex.clone();
-        }
-
-        let bytes = self.to_binary();
-        let hex = to_hex(&bytes);
-        *self.hex_cache.borrow_mut() = Some(hex.clone());
-        hex
+        self.cache.hex().to_owned()
     }
 
     /// Serializes the script to binary (byte array).
     pub fn to_binary(&self) -> Vec<u8> {
-        if let Some(ref bytes) = *self.raw_bytes_cache.borrow() {
-            return bytes.clone();
-        }
-
-        self.ensure_parsed();
-        let bytes = self.serialize_chunks_to_bytes();
-        *self.raw_bytes_cache.borrow_mut() = Some(bytes.clone());
-        bytes
+        self.cache.bytes().to_vec()
     }
 
     /// Computes the serialized length of the chunks.
@@ -269,74 +234,22 @@ impl Script {
         total
     }
 
-    /// Serializes chunks to raw bytes.
-    fn serialize_chunks_to_bytes(&self) -> Vec<u8> {
-        let chunks = self.chunks.borrow();
-        let total_length = Self::compute_serialized_length(&chunks);
-        let mut bytes = Vec::with_capacity(total_length);
-
-        for chunk in chunks.iter() {
-            bytes.push(chunk.op);
-
-            if let Some(ref data) = chunk.data {
-                if chunk.op == OP_RETURN {
-                    bytes.extend_from_slice(data);
-                    break;
-                }
-
-                if chunk.op < OP_PUSHDATA1 {
-                    bytes.extend_from_slice(data);
-                } else if chunk.op == OP_PUSHDATA1 {
-                    bytes.push(data.len() as u8);
-                    bytes.extend_from_slice(data);
-                } else if chunk.op == OP_PUSHDATA2 {
-                    let len = data.len() as u16;
-                    bytes.push((len & 0xff) as u8);
-                    bytes.push(((len >> 8) & 0xff) as u8);
-                    bytes.extend_from_slice(data);
-                } else if chunk.op == OP_PUSHDATA4 {
-                    let len = data.len() as u32;
-                    bytes.push((len & 0xff) as u8);
-                    bytes.push(((len >> 8) & 0xff) as u8);
-                    bytes.push(((len >> 16) & 0xff) as u8);
-                    bytes.push(((len >> 24) & 0xff) as u8);
-                    bytes.extend_from_slice(data);
-                }
-            }
-        }
-
-        bytes
-    }
-
-    /// Invalidates the serialization caches.
-    fn invalidate_caches(&self) {
-        *self.raw_bytes_cache.borrow_mut() = None;
-        *self.hex_cache.borrow_mut() = None;
-    }
-
     /// Appends another script to this script.
     pub fn write_script(&mut self, script: &Script) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-        script.ensure_parsed();
-        {
-            let mut chunks = self.chunks.borrow_mut();
-            chunks.extend(script.chunks.borrow().iter().cloned());
-        }
+        // the write door parses BEFORE it drops the byte cache: on a `from_binary` script the
+        // raw bytes are the only source of chunks, and the old order (invalidate, then parse)
+        // parsed from nothing and returned an EMPTY script (btg-token #11; the regression test
+        // names it).
+        let appended = script.chunks();
+        self.cache
+            .write(|chunks| chunks.extend(appended.iter().cloned()));
         self
     }
 
     /// Appends an opcode to the script.
     pub fn write_opcode(&mut self, op: u8) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-        self.chunks.borrow_mut().push(ScriptChunk::new_opcode(op));
+        self.cache
+            .write(|chunks| chunks.push(ScriptChunk::new_opcode(op)));
         self
     }
 
@@ -347,36 +260,22 @@ impl Script {
     /// Panics if `bin` is 4 GiB or longer: no push opcode carries it.
     #[allow(clippy::panic)] // #134: the documented `# Panics` contract; a Result here is a breaking change
     pub fn write_bin(&mut self, bin: &[u8]) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-
         let len = bin.len();
-        let op: u8;
-        let data: Option<Vec<u8>>;
-
-        if len == 0 {
-            op = OP_0;
-            data = None;
+        let chunk = if len == 0 {
+            ScriptChunk::new(OP_0, None)
         } else if len < OP_PUSHDATA1 as usize {
-            op = len as u8;
-            data = Some(bin.to_vec());
+            ScriptChunk::new(len as u8, Some(bin.to_vec()))
         } else if len < 256 {
-            op = OP_PUSHDATA1;
-            data = Some(bin.to_vec());
+            ScriptChunk::new(OP_PUSHDATA1, Some(bin.to_vec()))
         } else if len < 65536 {
-            op = OP_PUSHDATA2;
-            data = Some(bin.to_vec());
+            ScriptChunk::new(OP_PUSHDATA2, Some(bin.to_vec()))
         } else if (len as u64) < 0x100000000 {
-            op = OP_PUSHDATA4;
-            data = Some(bin.to_vec());
+            ScriptChunk::new(OP_PUSHDATA4, Some(bin.to_vec()))
         } else {
             panic!("Data too large to push");
-        }
+        };
 
-        self.chunks.borrow_mut().push(ScriptChunk::new(op, data));
+        self.cache.write(|chunks| chunks.push(chunk));
         self
     }
 
@@ -385,21 +284,12 @@ impl Script {
     /// Numbers 0, -1, and 1-16 use special opcodes.
     /// Larger numbers are encoded in little-endian sign-magnitude format.
     pub fn write_number(&mut self, num: i64) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-
-        if num == 0 {
-            self.chunks.borrow_mut().push(ScriptChunk::new_opcode(OP_0));
+        let chunk = if num == 0 {
+            ScriptChunk::new_opcode(OP_0)
         } else if num == -1 {
-            self.chunks
-                .borrow_mut()
-                .push(ScriptChunk::new_opcode(OP_1NEGATE));
+            ScriptChunk::new_opcode(OP_1NEGATE)
         } else if (1..=16).contains(&num) {
-            let op = (OP_1 as i64 + num - 1) as u8;
-            self.chunks.borrow_mut().push(ScriptChunk::new_opcode(op));
+            ScriptChunk::new_opcode((OP_1 as i64 + num - 1) as u8)
         } else {
             // Encode as little-endian sign-magnitude
             let data = Self::encode_script_number(num);
@@ -411,11 +301,10 @@ impl Script {
             } else {
                 OP_PUSHDATA2
             };
-            self.chunks
-                .borrow_mut()
-                .push(ScriptChunk::new(op, Some(data)));
-        }
+            ScriptChunk::new(op, Some(data))
+        };
 
+        self.cache.write(|chunks| chunks.push(chunk));
         self
     }
 
@@ -450,59 +339,36 @@ impl Script {
 
     /// Removes all OP_CODESEPARATOR opcodes from the script.
     pub fn remove_codeseparators(&mut self) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-
-        {
-            let mut chunks = self.chunks.borrow_mut();
-            chunks.retain(|chunk| chunk.op != OP_CODESEPARATOR);
-        }
-
+        self.cache
+            .write(|chunks| chunks.retain(|chunk| chunk.op != OP_CODESEPARATOR));
         self
     }
 
     /// Deletes the given script wherever it appears in the current script.
     pub fn find_and_delete(&mut self, script: &Script) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-        script.ensure_parsed();
-
-        let target_hex = script.to_hex();
-        {
-            let mut chunks = self.chunks.borrow_mut();
-
-            chunks.retain(|chunk| {
-                let chunk_script = Script::from_chunks(vec![chunk.clone()]);
-                chunk_script.to_hex() != target_hex
-            });
-        }
-
+        let target = script.cache.bytes();
+        self.cache.write(|chunks| {
+            chunks.retain(|chunk| serialize_chunks(std::slice::from_ref(chunk)) != target)
+        });
         self
     }
 
     /// Checks if the script contains only push data operations.
     pub fn is_push_only(&self) -> bool {
-        self.ensure_parsed();
-        let chunks = self.chunks.borrow();
-        chunks.iter().all(|chunk| chunk.op <= OP_16)
+        self.chunks().iter().all(|chunk| chunk.op <= OP_16)
     }
 
-    /// Returns the chunks that make up this script.
-    pub fn chunks(&self) -> Vec<ScriptChunk> {
-        self.ensure_parsed();
-        self.chunks.borrow().clone()
+    /// Returns the chunks that make up this script, lent from the script as the reference's
+    /// `chunks` getter lends its array (`Script.ts:195-198`); parsed from the bytes once. An
+    /// edit goes through the write methods or [`Script::from_chunks`]; `.to_vec()` gives an
+    /// owned list.
+    pub fn chunks(&self) -> &[ScriptChunk] {
+        self.cache.chunks()
     }
 
     /// Returns the number of chunks in this script.
     pub fn len(&self) -> usize {
-        self.ensure_parsed();
-        self.chunks.borrow().len()
+        self.chunks().len()
     }
 
     /// Returns true if this script is empty.
@@ -513,19 +379,13 @@ impl Script {
     /// Sets a specific chunk's opcode at the given index; at the chunk count it appends one, as
     /// the reference's `setChunkOpCode` does (`Script.ts:297-301`); beyond it, nothing changes.
     pub fn set_chunk_opcode(&mut self, index: usize, op: u8) -> &mut Self {
-        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
-        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
-        // returned an EMPTY script (btg-token #11; the regression test names it).
-        self.ensure_parsed();
-        self.invalidate_caches();
-        {
-            let mut chunks = self.chunks.borrow_mut();
+        self.cache.write(|chunks| {
             if index < chunks.len() {
                 chunks[index] = ScriptChunk::new_opcode(op);
             } else if index == chunks.len() {
                 chunks.push(ScriptChunk::new_opcode(op));
             }
-        }
+        });
         self
     }
 
@@ -695,6 +555,45 @@ impl Default for Script {
     }
 }
 
+/// Serializes chunks to raw bytes, as the reference's `#writeChunkData` writes them
+/// (`Script.ts:539-562`).
+fn serialize_chunks(chunks: &[ScriptChunk]) -> Vec<u8> {
+    let total_length = Script::compute_serialized_length(chunks);
+    let mut bytes = Vec::with_capacity(total_length);
+
+    for chunk in chunks.iter() {
+        bytes.push(chunk.op);
+
+        if let Some(ref data) = chunk.data {
+            if chunk.op == OP_RETURN {
+                bytes.extend_from_slice(data);
+                break;
+            }
+
+            if chunk.op < OP_PUSHDATA1 {
+                bytes.extend_from_slice(data);
+            } else if chunk.op == OP_PUSHDATA1 {
+                bytes.push(data.len() as u8);
+                bytes.extend_from_slice(data);
+            } else if chunk.op == OP_PUSHDATA2 {
+                let len = data.len() as u16;
+                bytes.push((len & 0xff) as u8);
+                bytes.push(((len >> 8) & 0xff) as u8);
+                bytes.extend_from_slice(data);
+            } else if chunk.op == OP_PUSHDATA4 {
+                let len = data.len() as u32;
+                bytes.push((len & 0xff) as u8);
+                bytes.push(((len >> 8) & 0xff) as u8);
+                bytes.push(((len >> 16) & 0xff) as u8);
+                bytes.push(((len >> 24) & 0xff) as u8);
+                bytes.extend_from_slice(data);
+            }
+        }
+    }
+
+    bytes
+}
+
 /// The index of the first truncated push in `bytes`, walking exactly as
 /// `Script::parse_chunks` walks (the same top-level `OP_RETURN` rule, the same
 /// conditional tracking), so the index names the same chunk.
@@ -756,7 +655,7 @@ fn truncated_push_index(bytes: &[u8]) -> Option<usize> {
 
 impl PartialEq for Script {
     fn eq(&self, other: &Self) -> bool {
-        self.to_binary() == other.to_binary()
+        self.cache.bytes() == other.cache.bytes()
     }
 }
 

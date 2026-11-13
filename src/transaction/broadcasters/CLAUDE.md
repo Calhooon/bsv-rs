@@ -386,7 +386,7 @@ for (i, result) in results.iter().enumerate() {
 
 ## Implementation Notes
 
-- **Async Trait**: Uses `#[async_trait(?Send)]` because `Transaction` contains `RefCell` which is not `Send`
+- **Async Trait**: Uses `#[async_trait(?Send)]`, written when `Transaction` held `RefCell`s (in `Script`) and was not `Sync`; since #843d1 it is `Send` and `Sync`, the trait's bound unchanged
 - **Sequential Batching**: `broadcast_many()` is a default trait method that broadcasts sequentially; none of the three implementations override it
 - **Timeout Handling**: Default 30-second timeout on all broadcasters; increase for slow networks or large transactions
 - **TXID Computation**: All broadcasters compute the TXID locally via `tx.id()` before sending

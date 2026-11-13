@@ -429,8 +429,8 @@ impl Spend {
             unlocking_truncated: None,
             locking_truncated: None,
         };
-        spend.unlocking_chunks = spend.unlocking_script.chunks().into();
-        spend.locking_chunks = spend.locking_script.chunks().into();
+        spend.unlocking_chunks = Arc::from(spend.unlocking_script.chunks());
+        spend.locking_chunks = Arc::from(spend.locking_script.chunks());
         spend.unlocking_truncated = spend.unlocking_script.as_script().truncated_push();
         spend.locking_truncated = spend.locking_script.as_script().truncated_push();
         spend.reset();

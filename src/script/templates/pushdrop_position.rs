@@ -30,7 +30,7 @@ impl PushDrop {
                 "script.chunks[0].data must have value".into(),
             ));
         }
-        Self::decode_lock_before(&chunks)
+        Self::decode_lock_before(chunks)
     }
 }
 

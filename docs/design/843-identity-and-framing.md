@@ -247,7 +247,7 @@ The method this class taught, for the next captain:
 | Item | Issue |
 |---|---|
 | #843's three PRs: the transaction owns its fields (**built on lane `break-tx-fields`**); the BEEF owns `txs` and `bumps`; the one id type, the wallet included | #843, #845 |
-| `Script`'s caches as `OnceLock`s and `Script::chunks()` lending a slice, so that `Transaction` becomes `Sync` (left out of the transaction's PR by its brief) | #843 |
+| `Script`'s caches as `OnceLock`s and `Script::chunks()` lending a slice, so that `Transaction` becomes `Sync` (left out of the transaction's PR by its brief): **built on lane `fix-843d1`** (`src/script/script_cache.rs`, one write door; `Transaction`, `Script` and `Beef` `Send` and `Sync`, a future awaiting `verify` `Send`; `tests/script_sync_843d1.rs`, `tests/script_cache_agreement_843d1.rs`) | #843 |
 | The writer's 2^53 refusal (the readers' half landed with #844's lane) | #844, #843 |
 | The wallet's `TxId` alias (`wallet/types.rs:161`), a bare `[u8; 32]` in display order beside the wire-order `Txid` decided above (named by the T1 reads) | **decided, not built**: W1, 3 of 3, after this record was written (section 9); built in #843's third PR |
 | The reference refuses at sign and at verify an input whose txid differs from its linked source's id (`Transaction.ts:973-983`, `:1424-1432`, `:2164-2169`); this crate has no such check | [#848](https://github.com/Calhooon/bsv-rs/issues/848) (filed in the open, 2026-11-10 13:59Z) |

@@ -162,3 +162,18 @@ pub use work_budget::WorkBudget;
 pub use crate::primitives::bsv::sighash::{
     SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
 };
+
+/// `Transaction`, `MerklePath` and `Beef` are shared across threads: a
+/// `RefCell` added under one fails every build, wasm32 included (#843d1;
+/// their files stand at the ratchet's line limits, so the proof sits here).
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<Transaction>();
+    shareable::<MerklePath>();
+    shareable::<Beef>();
+    // gained `Sync` with #843d1 and held since its fold, so a later
+    // `RefCell` cannot take it away silently
+    shareable::<TransactionParts>();
+    shareable::<TransactionPartsMut<'static>>();
+    shareable::<Utxo>();
+};

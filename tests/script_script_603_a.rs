@@ -524,7 +524,7 @@ fn set_chunk_opcode_at_the_chunk_count_appends_as_the_reference_does_ts_297_301(
 #[test]
 fn scripts_are_equal_by_their_bytes_flow_01005_flow_01007() {
     let a = lock_script(&FLOW_01005);
-    let b = Script::from_chunks(lock_script(&FLOW_01005).chunks());
+    let b = Script::from_chunks(lock_script(&FLOW_01005).chunks().to_vec());
     assert!(a == b, "flow-01005: the same bytes");
     let c = lock_script(&FLOW_01007);
     assert!(a != c, "5151 and 5100 differ in their second instruction");

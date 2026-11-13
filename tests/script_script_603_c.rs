@@ -297,7 +297,8 @@ fn a_corpus_script_written_back_from_its_chunks_is_its_bytes_bytes_00079_seed_00
             continue;
         };
         let corpus = from_hex(hex).unwrap();
-        let rewritten = Script::from_chunks(Script::from_binary(&corpus).unwrap().chunks());
+        let rewritten =
+            Script::from_chunks(Script::from_binary(&corpus).unwrap().chunks().to_vec());
         let bytes = rewritten.to_binary();
         assert_eq!(to_hex(&bytes), hex, "{id}: the chunks written back");
         assert_eq!(entry["where"], "prevout 0", "{id}");
