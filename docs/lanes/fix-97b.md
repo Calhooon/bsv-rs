@@ -10,7 +10,7 @@ dispatched or pushed.
 
 ## The commits
 
-Ten, in this order, each green by itself; `main` takes two of them by `git cherry-pick -x` (the
+Twelve, in this order, each green by itself; `main` takes two of them by `git cherry-pick -x` (the
 direction rule's sentence of 2026-11-12) and nothing else:
 
 1. O, `fix(ci): the judge's opening items from lane 1's three reads (#97)`: `.github/scripts/`,
@@ -43,6 +43,19 @@ direction rule's sentence of 2026-11-12) and nothing else:
     and, on beta, by this test over the file both lines carry (the sync workflow fires from
     `main`; `main-in-beta` keeps beta's copy equal). If the owner ever lets S's pin reach `main`,
     this commit travels with it, picked right after S.
+11. `fix(ci): the judge compares its two times as times, a time that does not parse not judged (#97)`
+    (the third fold's item 1: `sibling_judge.py`, its tests, `datetime` on the import allowlist
+    of `tests/arch_ci_sibling_judge_97.rs`, the records of item 1). Beta alone.
+12. `test(ci): the sync workflow pinned whole by its digest (#97)` (the third fold's item 2:
+    `tests/arch_ci_lines.rs`, `fnv` moved into `tests/arch_support/mod.rs` and shared by
+    `arch_field_writes_843.rs` and `arch_non_exhaustive_pins_819.rs`, their digests unchanged;
+    the records of item 2 and this list). Beta alone, for the reason of 10: tests alone.
+    `main` needs nothing of either. Main's `tests/arch_ci_lines.rs` (484 lines at `origin/main`)
+    checks the sync workflow by needles (fires on main, `-x`, no merge, rebase or squash, the
+    branch and its label) and holds neither `SYNC_STAGE_R`, the definition scan nor the digest,
+    and main has no `tests/arch_support/`; main's copy of the workflow is S's step picked onto
+    main's file, held on beta by the digest through `main-in-beta` (the sync fires from main,
+    and beta carries main's commits).
 
 ## The opening items (the captain's, 2026-11-13, from the three reads of PR #925)
 
@@ -127,9 +140,10 @@ together, as before.
   a job-level `GH_TOKEN`, a step's `GH_TOKEN` of another value, a defined `GITHUB_REPOSITORY`, a job-level `GH_HOST`, a `GH_REPO` written to `$GITHUB_ENV`.
   RED in the real workflow (`item2-red.log`): the job-level `SYNC_BRANCH`, the `$GITHUB_ENV`
   write, the job-level `GH_TOKEN` and the job-level `GH_HOST` each pass S's test (14 of 14) and are each refused by the
-  new rule naming the variable and its lines. Not seen, stated: a definition the scan's words do
-  not spell (a name built by a shell expansion, `declare`, `read`), and a variable a step reads
-  without naming it outside `gh`'s `GH_*` (the pinned commands run `gh` alone).
+  new rule naming the variable and its lines. The scan reads the spellings it names and no
+  others (the second re-read passed a flow mapping with no space after its brace, a multiline
+  `$GITHUB_ENV` write and a YAML escape in a key through it); since the third fold every
+  spelling is held by the digest of the whole workflow, the scan a readable second check.
 
 ## The third fold (2026-11-13, after the second re-read: FIX, three plants slipped)
 
@@ -157,6 +171,27 @@ them. Logs: `/Volumes/Lanes/out/bsv-rs/fix-97b-fold3/`.
   seconds 6, the parsed start floored to ten seconds, to two and to the minute 6 each, `>` for
   `>=` 5, the plain string comparison 1 (the offset cell), an unparsed creation time dropped
   silently 3 errors, `int(out or 0)` back 3. 92 tests (90 before).
+- Item 2, the sync workflow pinned whole. `SYNC_FILE_DIGEST` (`0x828b_6214_aa7a_399a`, FNV-1a
+  of the whole text, line endings normalized, the form #819 pins its macro file by, through the
+  one `arch_support::fnv`) beside `the_sync_workflow_is_pinned_whole_by_its_digest_97`, the
+  constant's comment telling whoever changes the workflow deliberately to read the change and
+  move the constant in the same diff. RED in the real workflow (`item2-red.log`, each plant
+  written into `sync-main-into-beta.yml` and the file restored): the second re-read's flow
+  mapping with no space (`env: {SYNC_BRANCH: beta}` at job level), its multiline `$GITHUB_ENV`
+  write (`SYNC_BRANCH<<EOF`) and its escape row (`"SYNC_BRAN\x43H": beta`) each pass the scan
+  (`every_variable_..._97` green) and fail the digest test alone by its message (`its text
+  moved (digest ..., pinned 0x828b6214aa7a399a)`). The test plants those three, a job-level
+  `HTTPS_PROXY` (the re-read's other row) and a comment. The scan stays as a readable second
+  check, and the records say it reads the spellings it names; the digest holds every spelling.
+- The bound, one sentence (the test file's header and the CHANGELOG entry say the same): what
+  holds the sync's dispatch is the pinned step's text and the digest of the whole workflow; what
+  neither sees is a change that edits the workflow and its digest in the same pull request (a
+  reviewer's matter, visible in the diff), and a value GitHub keeps outside the file (an
+  organization or repository variable, which reaches a job only through a `${{ vars.NAME }}` the
+  file would carry, and of which the repository and its organization held none on 2026-11-13:
+  `gh api repos/Calhooon/bsv-rs/actions/variables` and `.../actions/organization-variables`
+  answered a count of 0; the environment `sibling-judge` holds one, `SIBLING_JUDGE_APP_ID`,
+  which no job of the sync names).
 
 ## Rows left
 

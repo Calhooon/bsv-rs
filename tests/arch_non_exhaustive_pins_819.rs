@@ -125,12 +125,7 @@ const MACRO_FILE: &str = "src/util/non_exhaustive.rs";
 /// digest the failure prints, in the same diff.
 const MACRO_FILE_DIGEST: u64 = 0x9dce_d5a1_36dd_693d;
 
-/// FNV-1a, 64 bits (the same function as `tests/arch_field_writes_843.rs`).
-fn fnv(text: &str) -> u64 {
-    text.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-    })
-}
+use arch_support::fnv;
 
 /// The macro file's text moved from its digest, or a `macro_rules!` of it
 /// with other than one arm (an arm specialised to one type ahead of the

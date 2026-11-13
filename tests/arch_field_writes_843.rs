@@ -110,12 +110,7 @@ fn source(path: &str) -> Source {
     }
 }
 
-/// FNV-1a, 64 bits.
-fn fnv(text: &str) -> u64 {
-    text.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-    })
-}
+use arch_support::fnv;
 
 /// The `sealed` module's body, `mod sealed {` .. `}` exclusive, as raw
 /// tokens, with the line of its `mod` token; `None` when fields.rs holds no
