@@ -10,7 +10,7 @@ This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte 
 | File | Purpose |
 |------|---------|
 | `fuzz_base58.rs` | Fuzzes Base58, Base58Check, hex, and Base64 decoding plus encode/decode roundtrips |
-| `fuzz_script_parser.rs` | Fuzzes `Script::from_binary` and `Script::from_hex`, exercises type detection and serialization |
+| `fuzz_script_parser.rs` | Fuzzes `Script::from_binary` and `Script::from_hex`, exercises type detection and serialization; a script `PushDrop::decode` reads goes through the deprecated `KVStoreInterpreter::verify_signature_legacy` under its lock key and its controller field's key, whose `true` must come only for five or six fields whose controller field is the key checked (with the base's always-`true` body planted, the committed seed `corpus/fuzz_script_parser/script-valid-584`, a P2PK script and so a PushDrop of no fields, copied byte for byte from the `0.9.0-beta` line's `corpus-gen` output, fails it) |
 | `fuzz_transaction_parser.rs` | Fuzzes `Transaction::from_binary`, `from_hex`, `from_ef`, `from_hex_ef`, `from_reader`, sighash `parse_transaction`, and `MerklePath::from_binary`; a transaction `from_binary` returns serializes to exactly its buffer (#840) |
 | `fuzz_beef_parser.rs` | Fuzzes `Beef::from_binary` against the hinted parse and the streaming reader (`verify_stream_structure`: a verdict on any bytes, no root accepted without a header), links every subject (`find_atomic_transaction`), serializes, clones and drops it, then `verify_valid`, the round trip, `Transaction::from_beef` and `from_atomic_beef` |
 | `fuzz_wire_protocol.rs` | Fuzzes `WireReader` deserialization of varint, string, counterparty, protocol ID, and raw bytes |

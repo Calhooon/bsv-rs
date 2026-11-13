@@ -103,6 +103,7 @@
 
 pub mod global;
 pub mod interpreter;
+mod legacy_signature;
 pub mod local;
 pub mod types;
 
