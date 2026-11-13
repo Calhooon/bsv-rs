@@ -186,3 +186,5 @@ pub use identity::{
     Contact, ContactsManager, ContactsManagerConfig, DisplayableIdentity, IdentityClient,
     IdentityClientConfig, IdentityQuery, KnownCertificateType,
 };
+
+compile_error!("witness 09 of #97: a crate that does not build");
