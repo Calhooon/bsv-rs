@@ -1,0 +1,129 @@
+name: sibling-run
+run-name: sibling-run ${{ github.event.pull_request.head.sha || github.sha }}
+
+# The node oracle's judge, stage R (#97; tests/sibling/CLAUDE.md, "The judge"; RELEASING.md step
+# 25): the one job a pull request into beta runs outside ci.yml. It builds the head's crate against
+# the sibling at the head's own pin and runs beta's `sibling_harness.py raw` on it, with no secret,
+# no environment and no write: it judges nothing and uploads the raw output as `sibling-raw`, which
+# sibling-judge.yml, on main, reads with beta's files and reports as the App's check
+# `sibling-judge`. It runs on every pull request into beta and on a dispatch (the sync's on its
+# branch, a re-drive by hand), with no path filter and no condition but the upload's: a skipped
+# stage R would be a run without an artifact. A run that reached a verdict ends success whatever
+# the verdict; a crate that does not build ends failure with no artifact. ci.yml's `sibling` stays.
+on:
+  pull_request:
+    branches: [beta]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# keyed as ci.yml is: a newer push to the same pull request or ref cancels the run it supersedes
+concurrency:
+  group: sibling-run-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  raw:
+    name: raw
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/sibling-target
+    steps:
+      # the head itself, never the merge ref: the judge reads the head's PIN and column by its sha
+      - name: Check out the head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: head
+          persist-credentials: false
+
+      # beta's scripts run on the head's tree: the head's own .github/scripts is never executed
+      - name: Check out beta
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: refs/heads/beta
+          path: judge
+          persist-credentials: false
+
+      # the head's pin, never beta's: a pull request that moves the pin is run at its own
+      - name: Read the head's pin
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          pin="$(cat head/tests/sibling/PIN)"
+          printf '%s\n' "$pin" | cmp -s - head/tests/sibling/PIN
+          [[ "$pin" =~ ^[0-9a-f]{40}$ ]]
+          echo "sibling=$pin" >> "$GITHUB_OUTPUT"
+
+      # the harness, the pins it reads and the nine corpora (ci.yml's `sibling` list), nothing else
+      - name: Check out the sibling at the pin
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: Calhooon/bsv-script-lean
+          ref: ${{ steps.pin.outputs.sibling }}
+          path: sibling
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /harness/
+            /docs/PROVENANCE.md
+            /corpus/seed/
+            /corpus/flow/
+            /corpus/arith/
+            /corpus/stack/
+            /corpus/crypto/
+            /corpus/bytes/
+            /corpus/eras/
+            /corpus/gen/
+            /corpus/tx/
+
+      # the harness's own toolchain file (`harness/rust-toolchain.toml`) names 1.95.0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: 1.95.0
+
+      # beta's push run of ci.yml's `sibling` saves this cache; a pull request's head never does
+      - name: Restore the harness's build
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: sibling
+          workspaces: sibling/harness -> ../../sibling-target
+          save-if: false
+
+      # the raw output and its stamp, then the allowlist's members alone into the upload's folder
+      - name: raw
+        shell: bash
+        env:
+          PIN: ${{ steps.pin.outputs.sibling }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          test "$(git -C sibling rev-parse HEAD)" = "$PIN"
+          python3 -I -B judge/.github/scripts/sibling_harness.py raw --tree head --sibling sibling \
+            --corpus all --scratch "$RUNNER_TEMP/sibling-scratch" --out "$RUNNER_TEMP/sibling-out" \
+            --head-sha "$HEAD_SHA" --pull-request "$PULL_REQUEST"
+          python3 -I -B judge/.github/scripts/sibling_judge.py members > "$RUNNER_TEMP/sibling-members.txt"
+          mkdir "$RUNNER_TEMP/sibling-raw"
+          while IFS= read -r name; do
+            if [ -f "$RUNNER_TEMP/sibling-out/$name" ] && [ ! -L "$RUNNER_TEMP/sibling-out/$name" ]; then
+              mkdir -p "$(dirname "$RUNNER_TEMP/sibling-raw/$name")"
+              cp "$RUNNER_TEMP/sibling-out/$name" "$RUNNER_TEMP/sibling-raw/$name"
+            fi
+          done < "$RUNNER_TEMP/sibling-members.txt"
+
+      # a re-run replaces its earlier attempt's artifact (`overwrite`); 30 days, past which no run
+      # can be re-run, so a longer life serves no re-drive
+      - name: Upload the raw output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sibling-raw
+          path: ${{ runner.temp }}/sibling-raw
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true

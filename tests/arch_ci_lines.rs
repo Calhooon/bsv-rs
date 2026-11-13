@@ -379,6 +379,37 @@ fn both_workflows_have_a_workflows_shape() {
     assert!(errors.is_empty(), "{}", errors.join("\n"));
 }
 
+/// The node oracle's two workflows (#97) keep a workflow's shape on beta: stage R, which beta
+/// alone carries, and the trampoline, which main takes by pick (main carries no copy of this test;
+/// its file is held there by the judge's comparison of the file it runs with beta's, by the
+/// rehearsal of each pick and by `docs.yml` before each tag).
+#[test]
+fn the_judges_two_workflows_have_a_workflows_shape_97() {
+    let mut errors = shape(
+        "sibling-run.yml",
+        &read(".github/workflows/sibling-run.yml"),
+    );
+    errors.extend(shape(
+        "sibling-judge.yml",
+        &read(".github/workflows/sibling-judge.yml"),
+    ));
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let judge = read(".github/workflows/sibling-judge.yml");
+    let unpinned = judge.replacen(
+        "actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0",
+        "actions/create-github-app-token@v3",
+        1,
+    );
+    assert_ne!(
+        unpinned, judge,
+        "the token step's pin is where the plant goes"
+    );
+    assert_eq!(
+        shape("sibling-judge.yml", &unpinned),
+        ["sibling-judge.yml: `uses: actions/create-github-app-token@v3` is not pinned by sha"]
+    );
+}
+
 #[test]
 fn main_in_beta_fails_a_beta_tree_without_a_link_to_each_main_commit() {
     let errors = main_in_beta(&read(".github/workflows/ci.yml"));

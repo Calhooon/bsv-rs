@@ -98,12 +98,19 @@ sibling's checkout and the judging step; `tests/arch_ci_sibling_judge_97.rs` hol
 its equality with `column.json`'s `sibling`. The pin moves by a pull request of that file and the
 re-recorded column alone, never by an edit of `ci.yml`.
 
-What the pin cannot hold: the arch test, the workflow and the judge all travel in the pull
-request's own tree, so a pull request that edits the job edits the pin beside it, where a
-reviewer sees it. Holding that against a pull request by a machine is the judge below: it exists
-on beta (`.github/scripts/sibling_judge.py`, tested by the `judge-tests` gate of `checks`), and
-nothing runs it yet. Until the wiring lane lands its two workflows (stage R, `sibling-run.yml`;
-stage J, `sibling-judge.yml`), this paragraph's first sentence stays true of every pull request.
+What the pin cannot hold, and what holds it now: the arch test, the workflow and the judge all
+travel in the pull request's own tree, so a pull request that edits the job edits the pin beside
+it. The two stages of the judge below hold that against a pull request by a machine (#97's wiring
+lane): stage R (`.github/workflows/sibling-run.yml`, job `raw`) runs on every pull request into
+beta with no secret and uploads the raw output; stage J (`.github/workflows/sibling-judge.yml`,
+the trampoline, on main) judges it with beta's scripts, beta's pin rules and beta's column rules,
+never the head's, and posts the App's check `sibling-judge`. A pull request that edits the
+judging files is class J and judged by beta's copy of them; one that moves the pin is class P;
+neither can change the rules its own verdict is read by. What remains is the manual's stated
+limit (below, "What the judge does not hold"): the raw output is written by the head's own code
+on the runner. `sibling-judge` is required by no protection until the owner's PATCH, after the
+witnesses and the soak (`RELEASING.md` step 25), so until then the sentence above stays true of
+what a merge needs.
 
 ## column.json
 
@@ -164,7 +171,7 @@ line the step summary carries). Measured on this host
 (`docs/lanes/fix-97-s1.md`): about 18.5 s cold, 11 s with the crate rebuilt over
 cached dependencies, 3 s warm, all nine corpora (13,765 entries).
 
-## The judge (#97, built on beta, nothing fired)
+## The judge (#97: built on beta by the judge lane, wired by `sibling-run.yml` and `sibling-judge.yml`)
 
 The two-stage judge (decided 2026-11-10; the three design reads of 2026-11-12; the lane record
 `docs/lanes/fix-97a.md`). Stage R, a workflow on the pull request's head with no secret, checks
@@ -286,6 +293,26 @@ app id is the configured one: a check with no app id never stands, the rule read
 act for each gap as a command, the branch name quoted by `shlex.quote` there and in every re-push
 act a check carries (no run, a run and no check, a conflict with beta, a fork's head).
 
+## Where no check is posted, and the re-drives
+
+Silence is named, not excluded (`RELEASING.md` step 25 carries the same list). No `sibling-judge`
+check is ever posted for: a pull request in conflict with beta (GitHub starts no `pull_request`
+run); a skip instruction in the head's commit message; a head pushed with the `GITHUB_TOKEN` (the
+sync's branch until the sync's own dispatch of `sibling-run.yml`); a `sibling-run.yml` that does
+not parse or changes its `name:` (the trampoline's `workflow_run` names `sibling-run`); a base
+changed to beta after the pull request opened; a token step that fails; an environment that
+refuses the `report` job; an event GitHub drops. The two re-drives:
+
+```sh
+gh workflow run sibling-run.yml --repo Calhooon/bsv-rs --ref <branch>        # a new stage R on the head
+gh workflow run sibling-judge.yml --repo Calhooon/bsv-rs --ref main -f run_id=<run>   # the run judged again
+```
+
+and the sweep (`sibling_judge.py sweep --app-id 5700082`) names every open pull request's gap
+with its act. Both workflows carry the head's sha in their `run-name:`. A re-run of stage R is
+judged from its own attempt's artifact (`overwrite: true` on the upload, the judge's attempt
+filter), never `NOT JUDGED`.
+
 ## What the judge does not hold
 
 The judge holds the judging files, the pin and the column against a pull request; it does not
@@ -303,4 +330,6 @@ counting every write, a sibling, an upstream and beta's clone built under a temp
 `fixtures/sibling_judge/` holds the two run records of 2026-11-12 as GitHub answered them, less the
 fields the judge never reads, the `path` alone replaced; no real fork is used, the identity
 table's foreign `head_repository.id` is that witness), run by `checks`' `judge-tests` with
-`test_sibling_harness.py`; and `tests/arch_ci_sibling_judge_97.rs`.
+`test_sibling_harness.py`; and `tests/arch_ci_sibling_judge_97.rs`, which also pins both workflows
+whole, byte for byte, beside the named rules of each (`stage_r_holds_its_named_rules_97`,
+`stage_j_holds_its_named_rules_97`, `the_key_the_environment_and_workflow_run_belong_to_the_trampoline_alone_97`).

@@ -145,6 +145,11 @@ admitted to the stack's line. [RELEASING.md](../RELEASING.md), [NORTH-STAR.md](N
 Documentation runs in `ci.yml` on every pull request and push of both lines,
 a step of the required `checks` job since the small gates were bundled
 (`docs/lanes/ci-speed-2.md`); tag calls run it through CI too.
+The node oracle's judge (#97) runs beside `ci.yml` on a pull request into
+`beta`: `sibling-run.yml` (stage R, no secret) uploads the raw output and
+`sibling-judge.yml`, the trampoline on `main`, judges it with `beta`'s files
+and posts the App's check `sibling-judge`, required by no protection yet
+(`RELEASING.md` step 25; `tests/arch_ci_sibling_judge_97.rs`).
 Benchmark regression comparisons skip tag refs and remain on branch dispatches;
 the tag still builds the benchmarks and collects the scoreboard.
 
