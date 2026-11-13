@@ -131,6 +131,7 @@ fn workflow_refusals(file: &str, text: &str) -> Vec<String> {
 const STANDARD: &[&str] = &[
     "argparse",
     "base64",
+    "datetime",
     "importlib.util",
     "io",
     "json",
