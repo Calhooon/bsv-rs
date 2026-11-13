@@ -922,6 +922,23 @@ class Trampoline(Base):
                 j.lines(w.main)
         self.assertIn("absent on beta", caught.exception.reason)
 
+    def test_the_line_named_behind_is_the_one_whose_trampoline_changed_earlier_or_at_the_same_second(self):
+        """`sibling_judge.py`'s one other time comparison: the commit times of the trampoline's last
+        change on each line, a tie naming main (the line that takes it by pick)."""
+        w = self.world
+        for name, main_time, beta_time, behind in (("main a second earlier", 99, 100, "main"),
+                                                    ("the same second", 100, 100, "main"),
+                                                    ("main a second later", 101, 100, "beta"),
+                                                    ("main a minute earlier", 40, 100, "main")):
+            with self.subTest(name):
+                j = sj.Judgment(None, sj.Git(w.judge), w.root, str(w.sibling))
+                times = {w.main: main_time, w.beta: beta_time}
+                with mock.patch.object(sj.Git, "entry", side_effect=lambda sha, path: ("100644", "b" if sha == w.beta else "m")), \
+                        mock.patch.object(sj.Git, "last_change", side_effect=lambda sha, path: times[sha]):
+                    with self.assertRaises(sj.Verdict) as caught:
+                        j.lines(w.main)
+                self.assertEqual(caught.exception.reason, f"the trampoline on main differs from beta's; {behind} is behind")
+
 
 class Text(unittest.TestCase):
     def test_backticks_a_fence_a_command_and_control_bytes_are_replaced(self):
@@ -1216,7 +1233,7 @@ class Rerun(Base):
     """A re-run of stage R is judged from the artifact its own attempt uploaded (`overwrite: true`
     on the upload; the judge reads only an artifact created at or after the attempt started)."""
 
-    STARTED = "2026-11-12T10:00:00Z"
+    STARTED = "2026-11-12T10:00:30Z"
 
     def rerun(self, artifacts):
         w = self.world
@@ -1240,10 +1257,29 @@ class Rerun(Base):
 
     def test_an_artifact_created_at_the_instant_the_attempt_started_is_judged(self):
         """The boundary of the attempt's start (the strength read: `>=` to `>` survived)."""
-        check, gh, _ = self.rerun([self.made(98, "2026-11-12T09:59:59Z"), self.made(99, self.STARTED)])
+        check, gh, _ = self.rerun([self.made(98, "2026-11-12T10:00:29Z"), self.made(99, self.STARTED)])
         self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
         self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
         self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
+
+    def test_the_attempts_start_is_judged_to_the_second_inside_its_minute(self):
+        """The start is not cut to the minute (the re-read of the fold: `started[:16]` survived a
+        start that sat on the minute): an earlier attempt's artifact made earlier in the same
+        minute is left out, one made a second after the start is read, one a second before is not."""
+        before, after = self.made(98, "2026-11-12T10:00:10Z"), self.made(99, "2026-11-12T10:00:31Z")
+        for name, listing in (("same minute, earlier, beside one a second after", [before, after]),
+                              ("one a second after, alone", [after])):
+            with self.subTest(name):
+                check, gh, _ = self.rerun(listing)
+                self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), check.text)
+                self.assertIn(f"repos/{R}/actions/artifacts/99/zip", gh.reads)
+                self.assertNotIn(f"repos/{R}/actions/artifacts/98/zip", gh.reads)
+        for name, created in (("same minute, earlier", "2026-11-12T10:00:10Z"),
+                              ("one second before", "2026-11-12T10:00:29Z")):
+            with self.subTest(name):
+                check, gh, _ = self.rerun([self.made(98, created)])
+                self.assertCheck(check, "NOT JUDGED", "0 unexpired sibling-raw artifacts of attempt 2, not one")
+                self.assertEqual(gh.writes, [])
 
     def test_an_earlier_attempts_artifact_alone_is_not_judged(self):
         check, gh, _ = self.rerun([self.made(98, "2026-11-12T09:30:00Z")])
