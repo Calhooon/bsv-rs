@@ -1,0 +1,33 @@
+name: witness-forgery
+
+# Witness 14 of #97, for the scratch protected branch witness-97 alone: a job named sibling-judge
+# that succeeds and a job that posts a commit status named sibling-judge. Neither satisfies the
+# entry {context: sibling-judge, app_id: 5700082}.
+on:
+  pull_request:
+    branches: [witness-97]
+
+permissions:
+  contents: read
+
+jobs:
+  forged-check:
+    name: sibling-judge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Succeed
+        run: echo "a check run named sibling-judge, from GitHub Actions"
+
+  forged-status:
+    name: forged-status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+    steps:
+      - name: Post a commit status named sibling-judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA" -f state=success -f context=sibling-judge -f description=forged
