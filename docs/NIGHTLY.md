@@ -61,7 +61,10 @@ up to 22 for a minute and a half at its start, the residual the next complete ru
 measures (`docs/lanes/ci-speed-7.md`, "The fleet's runner cap"). The other measurements
 are workflows of their own, dispatched on the line and called by `release.yml`
 before every tag: `bench.yml` (build and scoreboard; comparisons only on branch
-dispatches), `msrv.yml`, `features.yml`, `machete.yml`, `docs.yml` (actionlint).
+dispatches), `msrv.yml`, `features.yml`, `machete.yml`, `docs.yml` (actionlint;
+on a dispatch alone, never in a tag's call, also the doc suite on the fuzz job's
+dated nightly, where rustdoc reads the error number of each `compile_fail`
+block, #908, `tests/arch_ci_doc_error_numbers_908.rs`).
 Documentation is a step of `ci.yml`'s required `checks` job on both lines
 since the small gates were bundled (`docs/lanes/ci-speed-2.md`): it runs on
 pull requests and pushes, with `cargo doc --no-deps --all-features` under

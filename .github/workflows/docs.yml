@@ -3,6 +3,9 @@ name: Docs
 # Workflow lint on demand (`gh workflow run docs.yml --ref <line>`) and called by release.yml
 # on every version tag before it publishes. Rustdoc with warnings denied is now a required
 # job in ci.yml on pull requests and pushes too (#515, the keeper's word of 2026-10-30).
+# A dispatch also runs the doc suite on a dated nightly, where rustdoc reads the error number
+# of every `compile_fail` block (#908, line 1); a tag's call does not, so no publish waits on
+# a nightly compiler: RELEASING.md step 4 dispatches this workflow before any tag.
 on:
   workflow_dispatch:
   workflow_call:
@@ -51,3 +54,30 @@ jobs:
 
       - name: Lint the workflows
         run: '"$RUNNER_TEMP/bin/actionlint" -no-color'
+
+  # The error number of every `compile_fail` doc test (#908, line 1). Stable rustdoc reads no
+  # number: a block that fails for another reason (a misspelt path, a missing import) reads
+  # `compile fail ... ok` on the required cell. A nightly rustdoc requires the number a block
+  # names among its errors, so this job is the doc suite on the dated nightly the fuzz job builds with
+  # (nightly.yml's FUZZ_TOOLCHAIN, one date in the tree; tests/arch_ci_doc_error_numbers_908.rs
+  # pins this job whole and the two dates equal). On a dispatch alone: a tag's call skips it.
+  doc-error-numbers:
+    name: doc error numbers
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOC_TOOLCHAIN: nightly-2026-10-19
+      RUSTFLAGS: ''
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: ${{ env.DOC_TOOLCHAIN }}
+
+      - name: Run the doc suite where rustdoc reads each block's error number
+        run: cargo test --doc --all-features
