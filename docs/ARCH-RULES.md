@@ -291,6 +291,16 @@ refuses a `checks` job without it, a nightly pin job that does not run it
 before its plan, a workflow that passes `--fix`, and two versions of
 cargo-mutants between `ci.yml` and `nightly.yml`.
 
+The deny gate (#104) also runs `.github/scripts/duplicate_versions.py` after
+its three `cargo-deny` checks: a crate held in two versions in a graph the
+crate ships must have its row in `docs/duplicate-versions.txt` (the graphs
+that hold it, its semver lines, the reason), and a row must still describe
+its graphs. `tests/arch_duplicate_versions_104.rs` pins the list's totals
+(`ROWS`, `TOTALS`, `LINES`), the two lines of the step (the script's tests and the
+script, each under `|| result=1`, the step ending `exit "$result"`), and
+`deny.toml`'s `multiple-versions = "warn"` with no `skip`: cargo-deny keeps
+naming every duplicate, the list is the one record of the ones allowed.
+
 The required contexts become `lint` and `checks` in place of the nine;
 `tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` (five) and
 `REQUIRED_ON_MAIN` (six) carry them.

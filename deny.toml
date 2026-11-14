@@ -12,7 +12,9 @@ ignore = []
 
 # https://embarkstudios.github.io/cargo-deny/checks/bans/cfg.html
 [bans]
-# Report duplicates while ecosystem major versions coexist; do not skip them.
+# Report duplicates while ecosystem major versions coexist; do not skip them. A duplicate
+# is refused beside this file, not in it: .github/scripts/duplicate_versions.py (the deny
+# step of ci.yml) fails on one that docs/duplicate-versions.txt does not hold (#104).
 multiple-versions = "warn"
 multiple-versions-include-dev = true
 wildcards = "deny"
