@@ -836,6 +836,12 @@ jobs:
         run: |
           trap 'if [ $? -eq 0 ]; then echo "PASS fixtures"; else echo "FAIL fixtures"; fi' EXIT
           cargo test --features "full,http" --test fixtures_replay --locked
+          # the fuzz corpus regenerated and compared (#802): fuzz/corpus-gen's own source run
+          # into a temporary directory, every seed it writes checked in byte for byte, every
+          # other checked-in seed of a listed family, the counts per target with the empty
+          # seeds in; named here because a change to fuzz/corpus/, to the generator or to a
+          # vector reaches no module a pull request's Test Suite selects by
+          cargo test --features "full,http" --test fuzz_corpus_regenerates_802 --locked
 
       # the README's first screen worked out again from its producers in this tree, the install
       # line, the version-free text before the examples and the front files (the front-page lane,

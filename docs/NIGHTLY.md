@@ -973,7 +973,7 @@ cargo +nightly fuzz cmin <target> fuzz/corpus/<target> <scratch>   # keeps the e
 du -sh fuzz/corpus                                                  # the checked-in corpora stay under 2 MB in all
 ```
 
-**Locally.** `cargo +nightly fuzz run <target> fuzz/corpus/<target> -- -max_total_time=600`. On a macOS host whose default SDK's `.tbd` files the linker cannot read (`ld: tapi error: malformed file`), set `SDKROOT` to an older SDK (`/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`). The seeds are written by `fuzz/corpus-gen` (`cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- --rest <dir>`); rerunning it rewrites its own seeds by name and leaves the merged entries.
+**Locally.** `cargo +nightly fuzz run <target> fuzz/corpus/<target> -- -max_total_time=600`. On a macOS host whose default SDK's `.tbd` files the linker cannot read (`ld: tapi error: malformed file`), set `SDKROOT` to an older SDK (`/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`). The seeds are written by `fuzz/corpus-gen` (`cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- --rest <dir>`); rerunning it rewrites its own seeds by name and leaves the merged entries. A merged entry is counted in `tests/fuzz_corpus_regenerates_802.rs` (`KEPT`'s row for its target and `COUNTS`), which holds the checked-in corpus to the generator's output and refuses a seed of no listed family (#802): raise both figures in the merge's commit.
 
 A crash's input is preserved in the run artifact; its minimized form joins the
 regression corpus through review, with the deterministic regression test of
