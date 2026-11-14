@@ -37,6 +37,14 @@
 //! that gains a job, or a file that gains a caller, moves no assertion here. One list is a pin
 //! on purpose and says so where it stands: the jobs of `ci.yml` that hold the run's token.
 //!
+//! Each caller is judged by its own grant (the second fold of #980). The tree had one caller a
+//! called file, so a rule that read one caller a file and passed the rest unread passed every
+//! plant. `each_caller_of_one_called_file_is_judged_by_its_own_grant_909` builds the second
+//! caller: a job appended to `release.yml` that calls `docs.yml` under a grant other than the
+//! `docs` job's, in three trees (the later caller alone short, the earlier alone short, both
+//! short by different grants), and asks a refusal for each caller the called jobs exceed, by
+//! its name and its grant's words, and none for the caller that grants enough.
+//!
 //! What it cannot see, stated: a workflow called from another repository or by a ref, a
 //! permission GitHub adds or renames, the repository's default token setting, and whether
 //! GitHub's own check is this one (the rule is step 22's as written, and the one run that
@@ -597,6 +605,120 @@ fn a_called_job_asking_more_than_the_grant_is_refused_909() {
             .iter()
             .any(|r| r.contains("granting `{}`") && r.contains("asks `contents: read`")),
         "{refusals:#?}"
+    );
+}
+
+/// The tree with a second calling job of `docs.yml`, `docs-again`, appended to `release.yml`'s
+/// jobs under `grant` (a job's permissions lines, column 4).
+fn with_a_second_caller_of_docs(tree: &Tree, grant: &str) -> Tree {
+    let mut out = tree.clone();
+    let text = out.get_mut("release.yml").expect("release.yml");
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    text.push_str("\n  docs-again:\n    uses: ./.github/workflows/docs.yml\n");
+    text.push_str(grant);
+    out
+}
+
+/// What the grant rule owes one named calling job of `release.yml` that calls `docs.yml`: its
+/// grant read from that job's own lines, and one refusal, in the caller's name and its grant's
+/// words, for each scope a job of `docs.yml` asks (its own permissions, else the file's) above
+/// that grant. Written beside `judge`, never through it, and for one caller at a time.
+fn owed_by_docs_under(tree: &Tree, caller: &str) -> Vec<Wanted> {
+    let release = parse("release.yml", &tree["release.yml"]).expect("release.yml parses");
+    let docs = parse("docs.yml", &tree["docs.yml"]).expect("docs.yml parses");
+    let job = release
+        .jobs
+        .iter()
+        .find(|j| j.id == caller)
+        .unwrap_or_else(|| panic!("release.yml has no job `{caller}`"));
+    assert_eq!(
+        job.uses.as_deref(),
+        Some("./.github/workflows/docs.yml"),
+        "release.yml `{caller}` does not call docs.yml"
+    );
+    let grant = job
+        .permissions
+        .as_ref()
+        .unwrap_or_else(|| panic!("release.yml `{caller}` states no grant of its own"));
+    let mut out = Vec::new();
+    for asking in &docs.jobs {
+        let Some(asked) = asking.permissions.as_ref().or(docs.permissions.as_ref()) else {
+            continue;
+        };
+        for (scope, level) in asked {
+            if *level > grant.get(scope).copied().unwrap_or(0) {
+                out.push(vec![format!(
+                    "release.yml `{caller}` (line {}) calls docs.yml granting `{}`, and docs.yml's job `{}` (line {}) asks `{scope}: {}`:",
+                    job.line,
+                    said(grant),
+                    asking.id,
+                    asking.line,
+                    ["none", "read", "write"][*level as usize]
+                )]);
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn each_caller_of_one_called_file_is_judged_by_its_own_grant_909() {
+    let tree = tree();
+    // today's tree: the `docs` job is a caller of docs.yml that grants enough
+    assert!(owed_by_docs_under(&tree, "docs").is_empty());
+    let widened = planted(
+        &tree,
+        "docs.yml",
+        "\npermissions:\n  contents: read\n",
+        "\npermissions:\n  contents: read\n  issues: write\n",
+    );
+    let enough = "    permissions:\n      contents: read\n      issues: write\n";
+    let nothing = "    permissions: {}\n";
+    // both callers are found, in every tree below
+    let found = |tree: &Tree| {
+        let (calls, _) = judge(tree);
+        for call in [
+            "release.yml:docs:docs.yml",
+            "release.yml:docs-again:docs.yml",
+        ] {
+            assert!(
+                calls.iter().any(|c| c == call),
+                "{call} not among {calls:?}"
+            );
+        }
+    };
+    // the later caller grants what the widened docs.yml asks, the earlier does not: a refusal
+    // for each job the earlier caller's grant is below, in its name, none in the later's
+    let later_enough = with_a_second_caller_of_docs(&widened, enough);
+    found(&later_enough);
+    let wanted = owed_by_docs_under(&later_enough, "docs");
+    assert!(!wanted.is_empty());
+    assert!(owed_by_docs_under(&later_enough, "docs-again").is_empty());
+    refused(&later_enough, &wanted);
+    // the earlier caller grants enough (today's docs.yml), the later grants nothing: the
+    // refusals are the later caller's, in its name and under `{}`
+    let later_short = with_a_second_caller_of_docs(&tree, nothing);
+    found(&later_short);
+    let wanted = owed_by_docs_under(&later_short, "docs-again");
+    assert!(!wanted.is_empty());
+    assert!(wanted.iter().all(|want| want[0].contains("granting `{}`")));
+    assert!(owed_by_docs_under(&later_short, "docs").is_empty());
+    refused(&later_short, &wanted);
+    // both short, by different grants: each caller's refusals under its own grant's words, the
+    // later caller owing the scope the earlier grants as well
+    let both_short = with_a_second_caller_of_docs(&widened, nothing);
+    found(&both_short);
+    let earlier = owed_by_docs_under(&both_short, "docs");
+    let later = owed_by_docs_under(&both_short, "docs-again");
+    assert!(!earlier.is_empty() && later.len() > earlier.len());
+    let wanted: Vec<Wanted> = earlier.into_iter().chain(later).collect();
+    refused(&both_short, &wanted);
+    // the helper beside the rule agrees on the count: one scope, every caller
+    assert_eq!(
+        owed(&later_enough, "docs.yml", "issues").len(),
+        owed_by_docs_under(&later_enough, "docs").len()
     );
 }
 

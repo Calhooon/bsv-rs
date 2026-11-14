@@ -12,7 +12,7 @@ Counts: 10 built, 5 already true, 5 need a decision, 2 not a defect.
 
 | # | The line | Fate | The evidence |
 |---|---|---|---|
-| 1 | No machine holds `RELEASING.md` step 22 | BUILT | `tests/arch_ci_called_jobs_stay_within_the_grant_909.rs`, four tests. RED on the tree with `origin/main`'s `release.yml` in place of `beta`'s: `release.yml `ci` (line 52) calls ci.yml granting `contents: read`, and ci.yml's job `semver` (line 161) asks `pull-requests: read``, and the same for `test` (`red-rust-main-release-yml.txt`). Eleven planted refusals on the tree's own text. Step 22 names the test and its bound (it reads one tree) |
+| 1 | No machine holds `RELEASING.md` step 22 | BUILT | `tests/arch_ci_called_jobs_stay_within_the_grant_909.rs`, four tests (five since the second fold of #980, below). RED on the tree with `origin/main`'s `release.yml` in place of `beta`'s: `release.yml `ci` (line 52) calls ci.yml granting `contents: read`, and ci.yml's job `semver` (line 161) asks `pull-requests: read``, and the same for `test` (`red-rust-main-release-yml.txt`). Eleven planted refusals on the tree's own text. Step 22 names the test and its bound (it reads one tree) |
 | 2 | The pick of the front pages for `main`: F7's producer asks six lines `main`'s `ci.yml` lacks | NEEDS A DECISION | Still so: `origin/main` (`f569499a`) holds no `tests/front_page.rs`, no `front_pages.py`, and its `semver` step is `release_type=(--release-type patch)` (`ci.yml:191-206` there). Question 1 below |
 | 3 | `flags` and `notes` read their sources once | BUILT | `front_pages.py`: `again`, used by `flags` (crates.io) and `notes` (the advisories, the run, its jobs, each job's log); `main` answers `Unavailable` with one line and exit 1. `Again`, four tests, RED on the base script (`red-python-base.txt`) and on the mutants `m6` (the retry taken out of `flags`), `m7` (out of the log read) and `m8` (the pause dropped) |
 | 4 | On `beta` the `semver` check reads the `internal-test-doors` items | BUILT (a document) | `RELEASING.md` step 2 says the check runs `--all-features` (`ci.yml:254`), reads the test doors (`Cargo.toml`'s `internal-test-doors`) and that the label covers a test door's change. The other remedy, the feature left out of the step, would change `SEMVER_STEP`, two F7 producer lines and the six-line list of the pick: not taken |
@@ -71,6 +71,30 @@ The runs (2026-11-14, logs under `/Volumes/Lanes/out/bsv-rs/fix-ci-buckets-fold/
 | `origin/main`'s `release.yml` in place of `beta`'s, either `docs.yml` | the fold's | 1 passed, 3 failed; the tree test names `semver` (line 161) and `test` (line 309) asking `pull-requests: read` under `granting contents: read`; the two plant tests fail at the plant's site, `main`'s file lacking `CI_GRANT`'s text |
 
 Five hand mutants of `judge`, each on the scratch copy with #981's `docs.yml` and the fold's tests: a job with no permissions of its own asking nothing (1 failed); only the earliest asking job of a called file refused (2 failed); the token rule letting a `write` through (2 failed); the level compared so that an equal `write` is refused (2 failed); a caller with no grant passed (1 failed). The in-file plants are the same eleven texts as before the fold.
+
+## The second fold of #980: the grant test builds a second caller (lane fix-ci-buckets-fold2)
+
+Rebased onto `beta` `6232488b` (pull request #981 merged, its job `doc-error-numbers` in `docs.yml`). Two conflicts, both sides kept: `CHANGELOG.md` (this lane's entry above #908's and #867's) and `RELEASING.md`. In `RELEASING.md` step 2 is this lane's one step (beta's own merged copy plus the label's bound); steps 4 and 5 stood twice on `beta` (a rebase's leftover there: one pair with #908's sentence in step 4 and without #867's clause in step 5, the other the reverse) and are one step each with both, step 5 with this lane's #909 words. The steps number 1 to 25, each once; `tests/CLAUDE.md` holds one row a file.
+
+What the re-read of the fold found: the tree has one caller a called file, and no plant built a second, so a rule judging one caller a called file passed all four tests. The rule in the test file (`judge`) did not have the fault: it walks every calling job of every workflow. What was missing was the plant.
+
+The plant, `each_caller_of_one_called_file_is_judged_by_its_own_grant_909`: a job `docs-again` appended to `release.yml`'s text, calling `docs.yml` under a grant of its own. Three trees: `docs.yml` widened by `issues: write` with `docs-again` granting `contents: read` and `issues: write` (the earlier caller, `docs`, alone short); today's `docs.yml` with `docs-again` granting `{}` (the later caller alone short); the widened `docs.yml` with `docs-again` granting `{}` (both short, the later owing `contents: read` too). What is owed is read for one named caller at a time by `owed_by_docs_under` (the caller's own grant from its lines, each job of `docs.yml`, each scope above the grant), every wanted refusal holding the caller's name, line and its grant's words in one piece; `refused` then requires each once and none beside them. The plant appends text and locates nothing by a needle in `release.yml`; `docs.yml`'s widening uses the needle the earlier fold's plant uses.
+
+The hand mutants of `judge`, run again on this lane's tip (five tests, `docs.yml` with two jobs as `beta` carries it), one at a time, the file put back and compared byte for byte after each (logs `mutant-*.txt` under `/Volumes/Lanes/out/bsv-rs/fix-ci-buckets-fold2/`):
+
+| Mutant | Spelling | Failed of 5 |
+|---|---|---|
+| a job with no permissions of its own asks nothing | `.or(called.permissions.as_ref())` removed from the asking job's read | 2 |
+| only the earliest asking job of a called file refused | `for asked_by in called.jobs.iter().filter(\|j\| j.permissions.is_some() \|\| called.permissions.is_some()).take(1)` | 3 |
+| the token rule lets a `write` through | `**level > 2` for `**level > 1` | 2 |
+| the level compared with `>=` | `if *level >= granted` | 4 |
+| a caller with no grant passed | `continue;` ahead of the no-grant refusal | 1 |
+| one caller a called file, the earliest | a set of called files seen, a later caller of a seen file skipped | 1 (the new test, at `docs-again` under `{}`: found 0) |
+| one caller a called file, the latest | the last caller of each file computed ahead, every other skipped | 1 (the new test, at `docs` under `contents: read`: found 0) |
+
+The earlier fold's record says 2 for the level mutant; the `>=` spelling failed 3 of 4 on that tip by the re-read's run and fails 4 of 5 here. A second spelling of it, an equal `write` alone refused (`*level > granted || (*level == 2 && granted == 2)`), passed all four tests before this fold, no plant holding a `write` grant; it fails 1 of 5 now (the new test: `docs-again` grants `issues: write` and `docs.yml` asks it).
+
+Not built, stated: the last test asserts that `ci.yml` has a job `lint` that names the token nowhere, an accident of today's tree; and the texts that locate the plants in `docs.yml`, `msrv.yml` and `ci.yml` (`\npermissions:\n  contents: read\n`, each file's own workflow permissions) and in `release.yml` (`permissions:\n  contents: read\n\nconcurrency:`, `uses: ./.github/workflows/msrv.yml`) are literal workflow text beside `CI_GRANT` and `SEMVER_ASKS`: a reworded line there fails the plant's site check by name.
 
 ## Found beside the lines
 
