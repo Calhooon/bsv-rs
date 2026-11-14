@@ -45,6 +45,33 @@ Counts: 10 built, 5 already true, 5 need a decision, 2 not a defect.
 | 2 | `bench-compare --record` cannot be cut into pieces | NEEDS A DECISION | `tools/bench-compare/src/main.rs:248-250` refuses `--record` with `--skip`; `:700-711` replaces the machine's whole entry, which carries one `source_commit`, one `rustc` and one time for all its rows. Both recorded entries hold 207 rows (`benches/baseline.json`: the M1 Max at `67559f9d`, the EPYC at `4b1c4688`), so each answers `benchmark inventory changed` (`main.rs:592`) against today's inventory. Question 4 below |
 | 3 | The #880 differential costs about a minute in a debug build | NEEDS A DECISION (the figures read; the figure to hold it to is the captain's) | On the Linux stable cell, three push runs of `beta`: `the_batched_interpolation_answers_as_the_pairwise_one_on_10000_sets_880` 39.1 s, 39.9 s, 40.3 s (runs 43620796290, 43518352346, 43498175719); the ratio test 4.9 s, 5.1 s, 5.3 s, passing each time. It is the slowest test of the integration step (next: 31.8 s, 28.5 s, 26.3 s), inside a step nextest ends in 151.6 s over 4,068 tests, so it does not bound the step. Question 5 below |
 
+## The fold of #980: the grant test asks the rule, not a count (lane fix-ci-buckets-fold)
+
+What was found, by the captain, from public code: with the `docs.yml` of pull request #981 (a second job, `doc-error-numbers`, beside `actionlint`) laid over this tree, `a_called_job_asking_more_than_the_grant_is_refused_909` failed (3 passed, 1 failed). The plant adds `issues: write` to `docs.yml`'s own permissions; the rule refuses each job of the file that states none of its own, two refusals, and the helper `refused` asked for exactly one. The rule was right and the test had pinned the number of jobs `docs.yml` had that day.
+
+What the test asks now:
+
+- `refused(tree, wanted)` takes the whole set of refusals owed: each wanted refusal is held by exactly one refusal found, each refusal found holds a wanted one, and the counts are equal (none missing, none beside them, none twice). An empty set is refused.
+- `owed(tree, target, scope)` reads what the grant rule owes from the planted tree's parsed jobs, never from `judge`: for every job of any workflow that calls `target` under a stated grant, one refusal for each job of `target` that asks `scope` (its own permissions, else the file's) above that grant, named by caller, job, line and level.
+- A plant on a called workflow's own permissions (`docs.yml` widened by `issues: write`, `msrv.yml` raised to `contents: write`) asks `owed`'s set; for `docs.yml` the test also reads the jobs that state no permissions and requires a refusal owed for each under `release.yml`'s `docs`.
+- A plant on the calling job's grant (`pull-requests: read` removed, or the grant inherited from the workflow) asks one refusal for each job of `ci.yml` that asks the scope, whichever they are; until the fold it asked for two and zipped them against `semver` and `test`.
+- A plant on one job (`semver` at `contents: write`) asks that job's refusal under each caller, and the token rule's for the same job while it holds the token; until the fold a count of two.
+- A caller with no grant on job or workflow: one refusal for each calling job of `release.yml` that then states none (today `ci` alone), read from the planted tree.
+- One unread line, and one call of a file the folder lacks, each ask their one refusal: that is the rule (a file that does not parse is judged no further; one call, one refusal).
+- Left as a pin, and said so in the file: `holders`, the jobs of `ci.yml` that hand a step the run's token (`dependent-check`, `semver`, `test`). It is the record of who holds the token; the comment says what a reader does when it moves (read the job's steps, confirm read permissions alone, change the list in the same commit, say so here). The six calls of `release.yml` in the first test are asked by `any`, so a seventh moves nothing.
+- Not changed, stated: `CI_GRANT` and `SEMVER_ASKS` locate the plants by the files' own text, comments included, so a reworded comment there fails the plant's site check (`is not there exactly once`) by name; that is the edit site's pin, as the sibling guards have it.
+
+The runs (2026-11-14, logs under `/Volumes/Lanes/out/bsv-rs/fix-ci-buckets-fold/`):
+
+| Tree | Test file | Result |
+|---|---|---|
+| the fold's tip (rebased on `beta` `b701c06f`) | the fold's | 4 passed |
+| the tip with #981's `docs.yml` (scratch copy) | the fold's | 4 passed |
+| the tip with #981's `docs.yml` | before the fold | 3 passed, 1 failed (`wanted one refusal holding ...`, two found) |
+| `origin/main`'s `release.yml` in place of `beta`'s, either `docs.yml` | the fold's | 1 passed, 3 failed; the tree test names `semver` (line 161) and `test` (line 309) asking `pull-requests: read` under `granting contents: read`; the two plant tests fail at the plant's site, `main`'s file lacking `CI_GRANT`'s text |
+
+Five hand mutants of `judge`, each on the scratch copy with #981's `docs.yml` and the fold's tests: a job with no permissions of its own asking nothing (1 failed); only the earliest asking job of a called file refused (2 failed); the token rule letting a `write` through (2 failed); the level compared so that an equal `write` is refused (2 failed); a caller with no grant passed (1 failed). The in-file plants are the same eleven texts as before the fold.
+
 ## Found beside the lines
 
 - `RELEASING.md` step 2 stood twice, a rebase's leftover: the copy at line 14 carried the `api-break` sentence and lacked `judge-tests` in `checks`' list, the copy at line 16 the reverse (`ad43c269` and `4dc92be3` each edited the step). Merged into one step with both; the script that merged them asserts the two copies differ in nothing else.
