@@ -9,6 +9,10 @@ This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte 
 
 Each target's assertion is "returns, never panics"; the column says where a target also checks a round trip or a bound. Its seeds are `fuzz/corpus/<target>/`, written by `fuzz/corpus-gen` from the tree's vectors (byte for byte on a rerun: the signed and encrypted messages' seeds and the Shamir shares' take a fixed key id, IV and coefficients through `sign_with`, `encrypt_with` and `split_private_key_with`, bsv-rs#180, the Shamir coordinate draws too since #854); the nightly runs each for an hour (`docs/NIGHTLY.md`).
 
+**The corpus is held to the generator (#802).** `tests/fuzz_corpus_regenerates_802.rs` compiles `fuzz/corpus-gen/src/main.rs` as a module, reruns it into a temporary directory and compares the result with `fuzz/corpus/`: every seed the generator writes is checked in under its name with the same bytes, and every checked-in seed it does not write is of a family the test's `KEPT` lists with its count (the hand seeds of #110, #285, #423, #844 and #843d7; the 25 entries merged from a night into `fuzz_script_spend`; the sibling's 75 `lean-seed-*` rows, which come from a file outside this tree and are compared only when `BSV_SCRIPT_SEED` names the sibling's `corpus/seed/seed.jsonl` at `tests/sibling/PIN`; `fuzz_script_spend_default`'s 678 copies of `fuzz_script_spend`, each held equal to its source, and its six `issue-*` seeds). A seed added by hand or merged from a night is added to `KEPT` and to `COUNTS` in the same commit; a seed the generator writes is committed by rerunning it. The test runs in the Test Suite's whole run and by name in the `fixtures` gate of `checks`.
+
+**The counts take the empty seeds in.** `COUNTS` in that test is the number of seed files per target as the generator counts them (its `<target>: N seeds` line counts a seed of no bytes), 3,034 files over the 21 targets. Seven seeds are empty, named by the test's `EMPTY`: `fuzz_beef_parser/door-Truncated-bad_index-0-0`, `fuzz_ecies/plain-0`, `fuzz_messages_encrypted/plain-0`, `fuzz_script_parser/script-valid-472` and `fuzz_signature_der/842-reader-empty`, which the generator writes, and `fuzz_auth_messages/known423-1` and `response423-truncated_0`, kept from #423. libFuzzer leaves a file of no bytes out of the corpus it loads (its directory reader keeps a file of non-zero size), so the `seed corpus: files:` figure of a run of those six targets is lower than the count here by the target's empty seeds (two for `fuzz_auth_messages`, one for the others); its seed pass runs the callback on the empty input once on its own (both read in libFuzzer's source, `FuzzerIO.cpp` and `FuzzerLoop.cpp`, not measured by a run in the lane). The seeds are kept: dropping them so both counts agree is a separate choice (#802).
+
 | Target | What it reads | Also checks | Seeds |
 |---|---|---|---|
 | `fuzz_base58` | Base58, Base58Check, hex, Base64 decoding | encode then decode is the input | a WIF, an address, hex, Base64 |
@@ -102,6 +106,12 @@ cargo +nightly fuzz run fuzz_auth_messages -- -fork=1 -ignore_crashes=1 -max_tot
 
 # Rewrite the seeds from the vectors (and the sibling's rows, with the rest out of git)
 cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- --rest /Volumes/Lanes/out/bsv-rs/oracle-fuzz/corpus
+
+# Write them somewhere else and leave fuzz/corpus/ alone (what the gate does, #802)
+cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- --out "$TMPDIR/corpus"
+
+# The gate, with the sibling's rows compared too
+BSV_SCRIPT_SEED=<bsv-script-lean at tests/sibling/PIN>/corpus/seed/seed.jsonl cargo test --features "full,http" --test fuzz_corpus_regenerates_802
 ```
 
 On a macOS host whose default SDK the linker cannot read (`ld: tapi error: malformed file`), build with `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`.

@@ -3,7 +3,11 @@
 //! the wallet-wire message files), each seed in its target's input shape and
 //! built by this crate's own writers, so a seed cannot drift from the wire.
 //!
-//! `cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- [--rest <dir>]`
+//! `cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- [--rest <dir>] [--out <dir>]`
+//!
+//! `--out <dir>` writes under `<dir>` and leaves `fuzz/corpus/` alone: a rerun
+//! there is compared with the checked-in corpus by
+//! `tests/fuzz_corpus_regenerates_802.rs` on every pull request (#802).
 //!
 //! The script target's seeds are the sibling harness's seed rows
 //! (`$BSV_SCRIPT_SEED`, default `~/bsv/bsv-script-lean/corpus/seed/seed.jsonl`):
@@ -45,12 +49,19 @@ use bsv_rs::transaction::{
     Transaction, TransactionInput, TransactionOutput, Verdict,
 };
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
-const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+/// The tree the seeds are written from: this crate's `../..` under `main`, the
+/// crate's own manifest directory under `tests/fuzz_corpus_regenerates_802.rs`,
+/// which compiles this file as a module (#802).
+static ROOT: OnceLock<PathBuf> = OnceLock::new();
+
+fn root() -> &'static Path {
+    ROOT.get().expect("generate() names the tree")
+}
 
 /// The response decoders' call order (`fuzz_targets/support/mod.rs`,
 /// `call_shared!`), by the wallet-wire vectors' call names; the two reveals
@@ -108,7 +119,7 @@ impl Corpus {
     /// Writes one seed named `<name>`; a seed with the bytes of an earlier
     /// one is not written again.
     fn add(&mut self, name: &str, data: &[u8]) {
-        let digest: [u8; 32] = Sha256::digest(data).into();
+        let digest: [u8; 32] = sha256(data);
         if !self.seen.insert(digest) {
             return;
         }
@@ -132,12 +143,12 @@ impl Corpus {
 }
 
 fn read(path: &str) -> String {
-    fs::read_to_string(Path::new(ROOT).join(path)).unwrap()
+    fs::read_to_string(root().join(path)).unwrap()
 }
 
 fn vector_files() -> Vec<(String, Value)> {
     let mut out = Vec::new();
-    let dir = Path::new(ROOT).join("tests/vectors/wallet_wire");
+    let dir = root().join("tests/vectors/wallet_wire");
     let mut names: Vec<_> = fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -147,7 +158,12 @@ fn vector_files() -> Vec<(String, Value)> {
     for name in names {
         let value: Value =
             serde_json::from_str(&fs::read_to_string(dir.join(&name)).unwrap()).unwrap();
-        out.push((name.trim_end_matches(".json").to_string(), value));
+        // A message file carries its frame as `wire`; the directory's recorded
+        // tables (`bounds_473.json` and the like) carry none and seed nothing
+        // (#802: the whole run stopped at `bounds_473.json`).
+        if value["wire"].is_string() {
+            out.push((name.trim_end_matches(".json").to_string(), value));
+        }
     }
     out
 }
@@ -197,7 +213,7 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
             let Some(tx) = entry.tx() else {
                 continue;
             };
-            let [spent, ..] = &tx.inputs()[..] else {
+            let [spent, ..] = tx.inputs() else {
                 continue;
             };
             let mut twice = tx.clone();
@@ -244,7 +260,7 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
 }
 
 fn lean_rows() -> Vec<(String, Vec<u8>)> {
-    let dir = Path::new(ROOT).join("tests/vectors/beef_of_any_size");
+    let dir = root().join("tests/vectors/beef_of_any_size");
     let mut rows: Vec<_> = fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().path())
@@ -674,7 +690,7 @@ fn auth_corpus(base: &Path) {
     auth.report("fuzz_auth_messages");
 }
 
-fn script_corpus(base: &Path, rest: Option<&Path>) {
+fn script_corpus(base: &Path, sibling: Option<&Path>, rest: Option<&Path>) {
     let mut spend = Corpus::new(base, "fuzz_script_spend");
     let mut rest_corpus = rest.map(|dir| Corpus::new(dir, "fuzz_script_spend"));
     let shape = |mode: u8, unlocking: &[u8], locking: &[u8]| -> Vec<u8> {
@@ -707,14 +723,13 @@ fn script_corpus(base: &Path, rest: Option<&Path>) {
         }
     }
 
-    let default = format!(
-        "{}/bsv/bsv-script-lean/corpus/seed/seed.jsonl",
-        std::env::var("HOME").unwrap_or_default()
-    );
-    let path = std::env::var("BSV_SCRIPT_SEED").unwrap_or(default);
-    match fs::read_to_string(&path) {
-        Err(e) => println!("fuzz_script_spend: SKIPPED the sibling's seed rows ({path}: {e})"),
-        Ok(text) => {
+    match sibling.map(|path| (path, fs::read_to_string(path))) {
+        None => println!("fuzz_script_spend: SKIPPED the sibling's seed rows (no file named)"),
+        Some((path, Err(e))) => println!(
+            "fuzz_script_spend: SKIPPED the sibling's seed rows ({}: {e})",
+            path.display()
+        ),
+        Some((_, Ok(text))) => {
             let mut families = BTreeSet::new();
             let mut converted = 0usize;
             for line in text.lines() {
@@ -796,30 +811,50 @@ fn args_census() {
 
 fn main() {
     if std::env::args().any(|a| a == "--args-census") {
+        ROOT.get_or_init(|| Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../..")).to_path_buf());
         args_census();
         return;
     }
     let args: Vec<String> = std::env::args().collect();
-    let base = Path::new(ROOT).join("fuzz/corpus");
+    let named = |flag: &str| {
+        args.iter()
+            .position(|a| a == flag)
+            .and_then(|i| args.get(i + 1))
+            .map(PathBuf::from)
+    };
+    let tree = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
+    let base = named("--out").unwrap_or_else(|| tree.join("fuzz/corpus"));
     if args.iter().any(|a| a == "--door-only") {
         // `fuzz_verify_input`'s seeds alone (#855).
+        ROOT.get_or_init(|| tree.to_path_buf());
         door_corpus(&base);
         return;
     }
-    let rest = args
-        .iter()
-        .position(|a| a == "--rest")
-        .and_then(|i| args.get(i + 1))
-        .map(PathBuf::from);
-    beef_corpora(&base);
-    wallet_corpora(&base);
-    key_corpora(&base);
-    auth_corpus(&base);
-    script_corpus(&base, rest.as_deref());
-    parser_corpora(&base);
-    reader_corpora(&base);
-    signature_corpus(&base);
-    door_corpus(&base);
+    let default = format!(
+        "{}/bsv/bsv-script-lean/corpus/seed/seed.jsonl",
+        std::env::var("HOME").unwrap_or_default()
+    );
+    let sibling = PathBuf::from(std::env::var("BSV_SCRIPT_SEED").unwrap_or(default));
+    generate(tree, &base, Some(&sibling), named("--rest").as_deref());
+}
+
+/// Writes every seed this program derives from the tree at `tree` under
+/// `base/<target>/`: a pure function of the tree's vectors and, when `sibling`
+/// names a readable file, of the sibling's seed rows (the `lean-seed-*` seeds
+/// of `fuzz_script_spend`, one per family, the others under `rest`). The gate
+/// `tests/fuzz_corpus_regenerates_802.rs` calls it with no sibling and holds
+/// the checked-in corpus to what it writes.
+pub fn generate(tree: &Path, base: &Path, sibling: Option<&Path>, rest: Option<&Path>) {
+    assert_eq!(ROOT.get_or_init(|| tree.to_path_buf()), tree);
+    beef_corpora(base);
+    wallet_corpora(base);
+    key_corpora(base);
+    auth_corpus(base);
+    script_corpus(base, sibling, rest);
+    parser_corpora(base);
+    reader_corpora(base);
+    signature_corpus(base);
+    door_corpus(base);
 }
 
 /// The DER reader's seeds (#842): every DER of `signature_der_842.json` (the
