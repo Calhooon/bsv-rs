@@ -224,8 +224,9 @@ pin reads `REFUSED` and never `NOT JUDGED`):
    `JUDGED_RUN` and `JUDGED_ATTEMPT`, posts that verdict only when its own resolution names the
    same run and attempt: a newer run or attempt that completed between the two jobs gets `NOT
    JUDGED` with its re-judge, never the older run's verdict; names that do not read, or a success
-   that names no run, the same (#958; the trampoline hands the two names on after its own sitting,
-   and until then `report` reads the outputs as it did). The table of
+   that names no run, the same (#958; the trampoline hands the two names on since
+   fix-97-trampoline2's sitting, two `outputs:` of `judge` and two `env:` lines of `Report`; a
+   trampoline that hands on neither, main's copy until its pick, is read as before). The table of
    interleavings, with the test of each row, is `docs/lanes/fix-97c.md`, rows 10 to 16 in
    `docs/lanes/fix-958-judge.md`. Until fix-97c a run that
    a newer `sibling-run` run or a newer attempt superseded earned no check, and trusted that run's
@@ -351,8 +352,19 @@ answer; the line is a read-back for whoever runs the sweep and moves no exit sta
 no key, whether a check is owed for a run: one line, `owed=yes` or `owed=no`, to the output file.
 It makes `report`'s own two reads (`resolve` with no wait, `identity`): `no` exactly where `report`
 would post nothing, `yes` otherwise and whenever a read fails, so no failure of it can silence a
-check. The trampoline does not call it yet (#958's line on the mint's order: a step before the
-mint, the mint under its answer, one sitting with main's pick).
+check. The trampoline calls it since fix-97-trampoline2's sitting (#958's line on the mint's
+order): `report`'s step `Is a check owed` (id `owed`) runs it under the job's own token, before
+the step that mints, and the mint and the post carry one condition,
+`steps.owed.outcome != 'success' || steps.owed.outputs.owed != 'no'`: both are skipped only when
+the asking succeeded and answered a plain `no`, so a fork's stage R run mints no token. The step
+is `continue-on-error: true` with `timeout-minutes: 3`: an asking that fails, hangs or writes no
+answer is read as owed, and `report` decides as it did. One window is new and fails closed: a
+newest run still running when `owed` reads and completed when `report` would have read is now
+silence where `report` posted `NOT JUDGED: the judge posted nothing where a check is owed`; that
+run's own judgement posts, and the sweep names the head (`check absent`, with its re-judge) where
+a token started the run. The mint's input is still `app-id` (the action marks it deprecated);
+`client-id` waits for the environment variable `SIBLING_JUDGE_CLIENT_ID`, the owner's
+(`docs/lanes/fix-97-trampoline2.md`).
 
 ## Where no check is posted, and the re-drives
 
@@ -401,7 +413,10 @@ policy (`main` alone) and its `can_admins_bypass` (true when read on 2026-11-13 
 line, which reads both back on every run), each an admin's
 to change; and the trampoline's concurrency group keeps one pending judgement per head, a newer
 pending one replacing the older (GitHub's documented rule), recovered by every judgement judging
-the newest stage R run of its head and by the sweep.
+the newest stage R run of its head and by the sweep. The group is the head's for an event's
+judgement and the run id's for a dispatch, so a dispatch may run beside an event's judgement of
+the same head: both judge the head's newest stage R run, and beta's strict protection bounds a
+slower one posting last (the file's comment says so since fix-97-trampoline2).
 
 A RED on beta's own push run of `sibling` (a dependency's release: no `Cargo.lock` is tracked, so
 each run resolves afresh) turns every pull request RED with no change of its own at fault, and
@@ -414,4 +429,7 @@ fields the judge never reads, the `path` alone replaced; no real fork is used, t
 table's foreign `head_repository.id` is that witness), run by `checks`' `judge-tests` with
 `test_sibling_harness.py`; and `tests/arch_ci_sibling_judge_97.rs`, which also pins both workflows
 whole, byte for byte, beside the named rules of each (`stage_r_holds_its_named_rules_97`,
-`stage_j_holds_its_named_rules_97`, `the_key_the_environment_and_workflow_run_belong_to_the_trampoline_alone_97`).
+`stage_j_holds_its_named_rules_97`, `the_key_the_environment_and_workflow_run_belong_to_the_trampoline_alone_97`,
+and since #958's sitting `the_trampoline_asks_before_it_mints_and_hands_report_the_run_judged_958`:
+the asking before the mint with no key, the one condition on the mint and the post, the six
+outputs and the two names handed on, `owed_and_bound_refusals`).
