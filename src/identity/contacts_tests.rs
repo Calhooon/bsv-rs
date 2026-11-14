@@ -36,7 +36,7 @@ macro_rules! forward {
                 _o: Option<&str>,
             ) -> Result<CreateActionResult> {
                 let mut tx = Transaction::new();
-                let mut input = TransactionInput::new("11".repeat(32), 0);
+                let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
                 input.unlocking_script =
                     Some(crate::script::UnlockingScript::from_binary(&[0x51])?);
                 tx.add_input(input)?;

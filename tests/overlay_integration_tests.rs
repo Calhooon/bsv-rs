@@ -695,7 +695,7 @@ fn create_test_transaction(id_modifier: u8, source: Option<Transaction>) -> Tran
 
     // Add input with source transaction if provided
     if let Some(source_tx) = source {
-        let mut input = TransactionInput::new(source_tx.id(), 0);
+        let mut input = TransactionInput::new(source_tx.txid(), 0);
         input.source_transaction = Some(Box::new(source_tx));
         tx.inputs_mut().push(input);
     }

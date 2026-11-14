@@ -3,6 +3,7 @@
 //! Represents an input to a Bitcoin transaction, referencing a previous
 //! transaction output (UTXO) that is being spent.
 
+use super::Txid;
 use crate::script::{LockingScript, ScriptTemplateUnlock, UnlockingScript};
 
 /// Represents an unspent transaction output (UTXO).
@@ -51,10 +52,7 @@ pub struct Utxo {
 /// use bsv_rs::transaction::TransactionInput;
 ///
 /// // Create an input referencing a specific UTXO
-/// let input = TransactionInput::new(
-///     "abc123...".to_string(),
-///     0,
-/// );
+/// let input = TransactionInput::new(Txid::from_hex("abc123...")?, 0);
 /// ```
 ///
 /// `Debug` prints a linked `source_transaction` as its txid
@@ -70,9 +68,12 @@ pub struct TransactionInput {
 
     /// The transaction ID (TXID) of the source transaction.
     ///
-    /// This is the hex string representation of the reversed hash.
-    /// Either `source_txid` or `source_transaction` must be provided.
-    pub source_txid: Option<String>,
+    /// A [`Txid`] since #845 (a `String` nothing checked until then, which
+    /// the serializer wrote as 32 zero bytes when it was not 64 hex digits):
+    /// text enters through [`Txid::from_hex`], so what is held here is what
+    /// is written. Either `source_txid` or `source_transaction` must be
+    /// provided; with `None` the serializer writes the linked source's hash.
+    pub source_txid: Option<Txid>,
 
     /// The index of the output being spent in the source transaction.
     pub source_output_index: u32,
@@ -100,18 +101,21 @@ impl TransactionInput {
     ///
     /// # Arguments
     ///
-    /// * `source_txid` - The hex string TXID of the source transaction
+    /// * `source_txid` - The TXID of the source transaction
     /// * `source_output_index` - The index of the output being spent
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let input = TransactionInput::new(
-    ///     "abc123def456...".to_string(),
-    ///     0,
-    /// );
     /// ```
-    pub fn new(source_txid: String, source_output_index: u32) -> Self {
+    /// use bsv_rs::transaction::{TransactionInput, Txid};
+    ///
+    /// let txid = Txid::from_hex(&"ab".repeat(32)).unwrap();
+    /// let input = TransactionInput::new(txid, 0);
+    /// assert_eq!(input.source_txid, Some(txid));
+    /// // A text that is no txid never becomes an input's (#845).
+    /// assert!(Txid::from_hex("abcd").is_err());
+    /// ```
+    pub fn new(source_txid: Txid, source_output_index: u32) -> Self {
         Self {
             source_transaction: None,
             source_txid: Some(source_txid),
@@ -158,8 +162,8 @@ impl TransactionInput {
     ///
     /// Returns an error if neither `source_txid` nor `source_transaction` is set.
     pub fn get_source_txid(&self) -> crate::Result<String> {
-        if let Some(ref txid) = self.source_txid {
-            return Ok(txid.clone());
+        if let Some(txid) = self.source_txid {
+            return Ok(txid.to_string());
         }
 
         if let Some(ref tx) = self.source_transaction {
@@ -176,22 +180,17 @@ impl TransactionInput {
     /// Used for transaction serialization where the TXID is stored in
     /// internal byte order (reversed from display order).
     pub fn get_source_txid_bytes(&self) -> crate::Result<[u8; 32]> {
-        let txid = self.get_source_txid()?;
-        let bytes = crate::primitives::from_hex(&txid)?;
-
-        if bytes.len() != 32 {
-            return Err(crate::Error::TransactionError(format!(
-                "Invalid TXID length: expected 32, got {}",
-                bytes.len()
-            )));
+        if let Some(txid) = self.source_txid {
+            return Ok(*txid.as_wire_bytes());
         }
 
-        let mut result = [0u8; 32];
-        // Reverse to get internal byte order
-        for (i, byte) in bytes.iter().enumerate() {
-            result[31 - i] = *byte;
+        if let Some(ref tx) = self.source_transaction {
+            return Ok(tx.hash());
         }
-        Ok(result)
+
+        Err(crate::Error::TransactionError(
+            "Input has neither sourceTXID nor sourceTransaction".to_string(),
+        ))
     }
 
     /// Returns the satoshi value of the source output.
@@ -237,7 +236,7 @@ impl TransactionInput {
     pub(crate) fn clone_without_source(&self) -> Self {
         Self {
             source_transaction: None,
-            source_txid: self.source_txid.clone(),
+            source_txid: self.source_txid,
             source_output_index: self.source_output_index,
             unlocking_script: self.unlocking_script.clone(),
             // Templates are not cloned - they contain closures
@@ -293,10 +292,12 @@ impl Default for TransactionInput {
 mod tests {
     use super::*;
 
+    const TXID: &str = "abc123def456789012345678901234567890123456789012345678901234abcd";
+
     #[test]
     fn test_new_input() {
-        let txid = "abc123def456789012345678901234567890123456789012345678901234abcd".to_string();
-        let input = TransactionInput::new(txid.clone(), 0);
+        let txid = Txid::from_hex(TXID).unwrap();
+        let input = TransactionInput::new(txid, 0);
 
         assert_eq!(input.source_txid, Some(txid));
         assert_eq!(input.source_output_index, 0);
@@ -306,21 +307,24 @@ mod tests {
 
     #[test]
     fn test_get_source_txid() {
-        let txid = "abc123def456789012345678901234567890123456789012345678901234abcd".to_string();
-        let input = TransactionInput::new(txid.clone(), 0);
+        let input = TransactionInput::new(Txid::from_hex(TXID).unwrap(), 0);
 
-        assert_eq!(input.get_source_txid().unwrap(), txid);
+        assert_eq!(input.get_source_txid().unwrap(), TXID);
+        let mut wire: [u8; 32] = hex::decode(TXID).unwrap().try_into().unwrap();
+        wire.reverse();
+        assert_eq!(input.get_source_txid_bytes().unwrap(), wire);
     }
 
     #[test]
     fn test_get_source_txid_missing() {
         let input = TransactionInput::default();
         assert!(input.get_source_txid().is_err());
+        assert!(input.get_source_txid_bytes().is_err());
     }
 
     #[test]
     fn test_source_satoshis_none() {
-        let input = TransactionInput::new("abc123".repeat(11), 0);
+        let input = TransactionInput::new(Txid::from_hex(TXID).unwrap(), 0);
         assert!(input.source_satoshis().is_none());
     }
 }

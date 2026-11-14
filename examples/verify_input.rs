@@ -9,7 +9,7 @@ use bsv_rs::script::templates::P2PKH;
 use bsv_rs::script::{ProtocolEra, ScriptFlags, SignOutputs, UnlockingScript};
 use bsv_rs::transaction::{
     verify_input, InputRefusal, InputRules, SpendingTransaction, Transaction, TransactionInput,
-    TransactionOutput,
+    TransactionOutput, Txid,
 };
 
 fn main() {
@@ -18,7 +18,8 @@ fn main() {
     let key = PrivateKey::random();
     let lock = P2PKH::lock_from_address(&key.public_key().to_address()).unwrap();
     let mut coin = Transaction::new();
-    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    let earlier = Txid::from_hex(&"11".repeat(32)).expect("64 hex digits");
+    let mut mined = TransactionInput::new(earlier, 0);
     mined.unlocking_script = Some(UnlockingScript::new());
     coin.add_input(mined).unwrap();
     for _ in 0..2 {

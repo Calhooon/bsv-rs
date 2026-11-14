@@ -324,8 +324,11 @@ fn advertisement_at(
     let script =
         create_signed_overlay_admin_token(&PrivateKey::random(), Protocol::Slap, host, service);
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("22".repeat(32), seed))
-        .unwrap();
+    tx.add_input(TransactionInput::new(
+        "22".repeat(32).parse().unwrap(),
+        seed,
+    ))
+    .unwrap();
     tx.add_output(TransactionOutput::new(satoshis, script))
         .unwrap();
     let mut beef = Beef::new();

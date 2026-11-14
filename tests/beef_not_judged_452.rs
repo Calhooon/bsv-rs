@@ -131,7 +131,7 @@ fn assert_whole(case: Case, error: Error, tx: &Transaction) {
 
 fn source(height: u32) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new("aa".repeat(32), 0);
+    let mut input = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::new());
     tx.add_input(input).unwrap();
     tx.add_output(TransactionOutput::new(

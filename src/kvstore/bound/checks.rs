@@ -9,9 +9,9 @@ pub(super) fn refusal(message: impl Into<String>) -> Error {
 }
 
 pub(super) fn input_outpoint(input: &TransactionInput) -> Result<Outpoint> {
-    let embedded = input.source_transaction.as_ref().map(|tx| tx.id());
+    let embedded = input.source_transaction.as_ref().map(|tx| tx.txid());
     if let (Some(txid), Some(source)) = (&input.source_txid, &embedded) {
-        if !txid.eq_ignore_ascii_case(source) {
+        if txid != source {
             return Err(refusal("Wallet transaction input source mismatch"));
         }
     }

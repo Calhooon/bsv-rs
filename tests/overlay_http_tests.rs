@@ -1081,7 +1081,7 @@ fn two_transaction_beef() -> (Vec<u8>, String, String) {
     let mut beef = Beef::new();
     let mut txids = Vec::new();
     for (byte, height) in [("11", 900), ("22", 901)] {
-        let mut input = TransactionInput::new(byte.repeat(32), 0);
+        let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
         input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
         let mut tx = Transaction::new();
         tx.add_input(input).unwrap();

@@ -20,7 +20,7 @@ use bsv_rs::script::templates::P2PKH;
 use bsv_rs::script::{LockingScript, Script, ScriptTemplate, UnlockingScript};
 use bsv_rs::transaction::{
     Beef, ChangeDistribution, Transaction, TransactionInput, TransactionOutput, TransactionParts,
-    Utxo,
+    Txid, Utxo,
 };
 
 /// The seed of the property run; a failure prints it with the sequence.
@@ -80,11 +80,7 @@ fn var_int(out: &mut Vec<u8>, n: u64) {
 /// written here (#869's second fold): the `source_txid` when it is hex of
 /// exactly 32 bytes, else the linked source's own fields' hash, else zeros.
 fn wire_txid(input: &TransactionInput) -> Vec<u8> {
-    let named = input
-        .source_txid
-        .as_deref()
-        .and_then(|t| from_hex(t).ok())
-        .filter(|b| b.len() == 32);
+    let named = input.source_txid.map(|t| t.to_display_bytes().to_vec());
     match (named, input.source_transaction.as_deref()) {
         (Some(mut b), _) => {
             b.reverse();
@@ -305,26 +301,40 @@ fn parent(rng: &mut Rng) -> Transaction {
         let mut g = Transaction::new();
         if rng.below(3) != 0 {
             let mut gg = Transaction::new();
-            gg.add_input(TransactionInput::new(rng.txid(), 0)).unwrap();
+            gg.add_input(TransactionInput::new(rng.txid().parse().unwrap(), 0))
+                .unwrap();
             gg.add_output(TransactionOutput::new(6_000, rng.script()))
                 .unwrap();
             g.add_input(TransactionInput::with_source_transaction(gg, 0))
                 .unwrap();
         } else {
-            g.add_input(TransactionInput::new(rng.txid(), rng.u32() % 4))
-                .unwrap();
+            g.add_input(TransactionInput::new(
+                rng.txid().parse().unwrap(),
+                rng.u32() % 4,
+            ))
+            .unwrap();
         }
         g.add_output(TransactionOutput::new(5_000, rng.script()))
             .unwrap();
         p.add_input(TransactionInput::with_source_transaction(g, 0))
             .unwrap();
     } else {
-        p.add_input(TransactionInput::new(rng.txid(), 0)).unwrap();
+        p.add_input(TransactionInput::new(rng.txid().parse().unwrap(), 0))
+            .unwrap();
     }
     p.add_output(TransactionOutput::new(4_000, rng.script()))
         .unwrap();
     p.set_lock_time(rng.u32() % 3);
     p
+}
+
+/// The txid an input holds for `text` (#845): `Txid::from_hex`'s answer, a
+/// text that does not parse refused there, so the input names none.
+/// `parses` is what the caller expects of the text, asserted.
+fn held(text: &str, parses: bool) -> Option<Txid> {
+    let txid = Txid::from_hex(text).ok();
+    assert_eq!(txid.is_some(), parses, "{text:?}");
+    txid
 }
 
 /// One step through a public door; its name for the failure's log.
@@ -345,7 +355,7 @@ fn step(
             "set_lock_time"
         }
         3 if room => {
-            let mut input = TransactionInput::new(rng.txid(), rng.u32() % 8);
+            let mut input = TransactionInput::new(rng.txid().parse().unwrap(), rng.u32() % 8);
             input.sequence = rng.u32();
             tx.inputs_mut().push(input);
             "inputs_mut().push"
@@ -401,7 +411,9 @@ fn step(
             *parts.lock_time = parts.inputs.len() as u32 ^ flip;
             *parts.version = parts.outputs.len() as u32;
             if parts.inputs.len() < 10 {
-                parts.inputs.push(TransactionInput::new(txid, 1));
+                parts
+                    .inputs
+                    .push(TransactionInput::new(txid.parse().unwrap(), 1));
             }
             "parts_mut"
         }
@@ -430,7 +442,7 @@ fn step(
             "into_parts/from_parts"
         }
         10 if room => {
-            let input = TransactionInput::new(rng.txid(), rng.u32() % 4);
+            let input = TransactionInput::new(rng.txid().parse().unwrap(), rng.u32() % 4);
             tx.add_input(input).unwrap();
             "add_input"
         }
@@ -690,7 +702,8 @@ fn odd_txid(top: &mut Transaction, rng: &mut Rng, counts: &mut Counts) -> &'stat
         top
     };
     if tx.inputs().is_empty() {
-        tx.inputs_mut().push(TransactionInput::new(rng.txid(), 0));
+        tx.inputs_mut()
+            .push(TransactionInput::new(rng.txid().parse().unwrap(), 0));
     }
     let i = rng.below(tx.inputs().len() as u64) as usize;
     let kind = rng.below(7);
@@ -721,7 +734,10 @@ fn odd_txid(top: &mut Transaction, rng: &mut Rng, counts: &mut Counts) -> &'stat
         None
     };
     let input = &mut tx.inputs_mut()[i];
-    input.source_txid = Some(text);
+    // #845: a text that is no txid is refused where it enters, so the odd
+    // arms that do not parse leave the input naming no txid (the serializer
+    // reads the linked source, or writes zeros); the last arm holds its id.
+    input.source_txid = held(&text, kind == 6);
     input.source_transaction = source;
     name
 }
@@ -754,8 +770,13 @@ fn shared_txid(top: &mut Transaction, rng: &mut Rng, counts: &mut Counts) -> &'s
         2 => ("abc".to_string(), "shared txid: does not parse"),
         _ => (rng.txid(), "shared txid: parses"),
     };
+    let shared = held(&text, name == "shared txid: parses");
     for _ in 0..2 + rng.below(2) {
-        let mut input = TransactionInput::new(text.clone(), rng.u32() % 2);
+        let mut input = TransactionInput {
+            source_txid: shared,
+            source_output_index: rng.u32() % 2,
+            ..TransactionInput::default()
+        };
         input.source_transaction = Some(Box::new(parent(rng)));
         tx.inputs_mut().push(input);
     }
@@ -791,15 +812,15 @@ fn link_kind(tx: &mut Transaction, rng: &mut Rng) -> &'static str {
     }
     let source = parent(rng);
     let (txid, name) = match rng.below(4) {
-        0 => (Some(source.id()), "link: txid the source's id"),
-        1 => (Some(rng.txid()), "link: txid another"),
+        0 => (Some(source.txid()), "link: txid the source's id"),
+        1 => (held(&rng.txid(), true), "link: txid another"),
         2 => (None, "link: no txid"),
-        _ => (Some("zz".to_string()), "link: txid not hex"),
+        _ => (held("zz", false), "link: txid not hex"),
     };
     tx.inputs_mut().push(TransactionInput {
         source_txid: txid,
         source_transaction: Some(Box::new(source)),
-        ..TransactionInput::new(String::new(), 0)
+        ..TransactionInput::default()
     });
     name
 }
@@ -1112,7 +1133,7 @@ fn an_edited_linked_parent_changes_the_child_id_843() {
     let mut rng = Rng(SEED ^ 0xa);
     let mut parent = Transaction::new();
     parent
-        .add_input(TransactionInput::new(rng.txid(), 0))
+        .add_input(TransactionInput::new(rng.txid().parse().unwrap(), 0))
         .unwrap();
     parent
         .add_output(TransactionOutput::new(1_000, rng.script()))
@@ -1208,7 +1229,7 @@ fn the_id_is_the_hash_of_the_fields_843() {
 #[test]
 fn the_lock_time_table_843() {
     let mut t = Transaction::new();
-    t.add_input(TransactionInput::new("11".repeat(32), 0))
+    t.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     t.add_output(TransactionOutput::new(
         1_000,
@@ -1387,7 +1408,7 @@ fn the_parts_default_is_transaction_new_869() {
     assert_eq!(parts.merkle_path.is_none(), default.merkle_path.is_none());
 
     let literal = TransactionParts {
-        inputs: vec![TransactionInput::new("11".repeat(32), 0)],
+        inputs: vec![TransactionInput::new("11".repeat(32).parse().unwrap(), 0)],
         outputs: vec![TransactionOutput::new(1, p2pkh_lock())],
         ..Default::default()
     };
@@ -1407,21 +1428,23 @@ fn a_beef_copy_of_a_parent_whose_txid_text_does_not_parse_keeps_the_law_869() {
     let mut grandparent = Transaction::new();
     grandparent
         .inputs_mut()
-        .push(TransactionInput::new("11".repeat(32), 0));
+        .push(TransactionInput::new("11".repeat(32).parse().unwrap(), 0));
     grandparent
         .outputs_mut()
         .push(TransactionOutput::new(1_000, script()));
     let mut parent = Transaction::new();
-    let mut input = TransactionInput::new("zz".to_string(), 0);
+    // `"zz"` until #845: no txid now, the outpoint read through the source.
+    let mut input = TransactionInput {
+        source_txid: held("zz", false),
+        ..TransactionInput::default()
+    };
     input.source_transaction = Some(Box::new(grandparent));
     parent.inputs_mut().push(input);
     parent
         .outputs_mut()
         .push(TransactionOutput::new(900, script()));
     let mut child = Transaction::new();
-    let mut input = TransactionInput::new(String::new(), 0);
-    input.source_txid = None;
-    input.source_transaction = Some(Box::new(parent));
+    let input = TransactionInput::with_source_transaction(parent, 0);
     child.inputs_mut().push(input);
     child
         .outputs_mut()

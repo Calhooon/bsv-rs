@@ -27,7 +27,7 @@ fn bench(c: &mut Criterion) {
         .lock(&key.public_key().hash160())
         .expect("P2PKH");
     let mut source = Transaction::new();
-    let mut input = TransactionInput::new("aa".repeat(32), 0);
+    let mut input = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::new());
     source.inputs_mut().push(input);
     *source.outputs_mut() = (0..100)

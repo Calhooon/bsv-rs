@@ -300,7 +300,8 @@ fn enqueue_unconfirmed_parents<'a>(
     spent: &mut HashSet<(String, u32)>,
 ) -> Result<(), Refusal> {
     for input in current.inputs() {
-        let named = input.source_txid.as_deref();
+        let named = input.source_txid.map(|t| t.to_string());
+        let named = named.as_deref();
         let Some(source) = named.and_then(|t| beef.find_txid(t)).and_then(BeefTx::tx) else {
             return Err(invalid("TransactionEvidence.ts:143"));
         };

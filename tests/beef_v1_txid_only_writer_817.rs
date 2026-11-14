@@ -59,7 +59,7 @@ const FRESH: &str = "81700000000000000000000000000000000000000000000000000000000
 /// One transaction spending `(source, vout)` into one output of `sats`.
 fn spend(source: &str, vout: u32, sats: u64) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new(source.to_string(), vout);
+    let mut input = TransactionInput::new(source.parse().unwrap(), vout);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     tx.inputs_mut().push(input);
     tx.outputs_mut().push(TransactionOutput::new(

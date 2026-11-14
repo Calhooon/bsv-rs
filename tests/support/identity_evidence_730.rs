@@ -28,7 +28,7 @@ pub fn token() -> LockingScript {
 
 /// One input spending `txid:vout` with `unlocking`.
 fn input(txid: String, vout: u32, unlocking: &str) -> TransactionInput {
-    let mut input = TransactionInput::new(txid, vout);
+    let mut input = TransactionInput::new(txid.parse().unwrap(), vout);
     input.set_unlocking_script(UnlockingScript::from_hex(unlocking).unwrap());
     input
 }

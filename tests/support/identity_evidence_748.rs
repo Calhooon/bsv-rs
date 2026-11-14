@@ -45,7 +45,7 @@ fn token() -> LockingScript {
 fn spending(sources: &[(String, u32)], outputs: usize, satoshis: u64) -> Transaction {
     let mut tx = Transaction::new();
     for (txid, vout) in sources {
-        let mut input = TransactionInput::new(txid.clone(), *vout);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), *vout);
         input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
         tx.add_input(input).unwrap();
     }

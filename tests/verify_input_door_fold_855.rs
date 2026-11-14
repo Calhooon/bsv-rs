@@ -30,7 +30,7 @@ use bsv_rs::Error;
 use serde_json::Value;
 
 fn one_input_transaction(unlocking: &[u8], version: u32) -> Vec<u8> {
-    let mut input = TransactionInput::new("00".repeat(32), 0);
+    let mut input = TransactionInput::new("00".repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_binary(unlocking).unwrap());
     Transaction::with_params(version, vec![input], vec![], 0).to_binary()
 }
@@ -127,7 +127,7 @@ fn signed_p2pkh() -> (Vec<u8>, Vec<u8>) {
     let key = PrivateKey::from_bytes(&[7u8; 32]).unwrap();
     let lock = P2PKH::lock_from_address(&key.public_key().to_address()).unwrap();
     let mut coin = Transaction::new();
-    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    let mut mined = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     mined.unlocking_script = Some(UnlockingScript::new());
     coin.add_input(mined).unwrap();
     for _ in 0..2 {

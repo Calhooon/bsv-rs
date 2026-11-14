@@ -44,7 +44,7 @@ fn op_true() -> LockingScript {
 
 /// One input spending `txid:vout` with an empty unlocking script.
 fn input(txid: &str, vout: u32) -> TransactionInput {
-    let mut input = TransactionInput::new(txid.to_string(), vout);
+    let mut input = TransactionInput::new(txid.parse().unwrap(), vout);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     input
 }

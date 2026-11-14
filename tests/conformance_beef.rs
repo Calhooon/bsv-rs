@@ -549,13 +549,13 @@ fn conformance_serialization() {
                 suite.unsupported(
                     id,
                     "TS runtime-validation fixture (addInput/addOutput with missing/negative \
-                     fields) — unrepresentable in bsv-rs's typed API (Option<String> txid is \
-                     checked at spend/serialize time; satoshis is u64)",
+                     fields), unrepresentable in bsv-rs's typed API (an input's txid is an \
+                     Option<Txid>, a missing one add_input's refusal; satoshis is u64)",
                 );
             }
             "tx-008" => {
                 let input_default = TransactionInput::new(
-                    s(input, "source_txid").to_string(),
+                    s(input, "source_txid").parse().unwrap(),
                     n(input, "source_output_index") as u32,
                 );
                 suite.check(
@@ -592,7 +592,7 @@ fn conformance_serialization() {
             "tx-014" => {
                 let mut tx = Transaction::new();
                 tx.inputs_mut().push(TransactionInput::new(
-                    s(input, "source_txid").to_string(),
+                    s(input, "source_txid").parse().unwrap(),
                     n(input, "source_output_index") as u32,
                 ));
                 suite.check(
@@ -656,7 +656,9 @@ fn tx_of_estimated_size(target: usize) -> Transaction {
     );
     let script_len = target - 60 - 3; // 3-byte varint for 253 <= L < 65536
     let mut input = TransactionInput::new(
-        "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        "0000000000000000000000000000000000000000000000000000000000000000"
+            .parse()
+            .unwrap(),
         0,
     );
     input.unlocking_script = Some(UnlockingScript::from_script(
@@ -829,7 +831,9 @@ fn conformance_transactions_regressions() {
                 // Serialized layout with 1 input, 0 outputs: the 4 sequence
                 // bytes precede the output count + locktime (last 5 bytes).
                 let mut txin = TransactionInput::new(
-                    "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                    "0000000000000000000000000000000000000000000000000000000000000000"
+                        .parse()
+                        .unwrap(),
                     0,
                 );
                 txin.unlocking_script = Some(UnlockingScript::new());

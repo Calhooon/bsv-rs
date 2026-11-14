@@ -29,7 +29,7 @@ const ELEMENT: usize = 1_000_000;
 /// spending its output 0 with a push of `ELEMENT` bytes of 0x01.
 fn child_of(lock: &[u8]) -> Transaction {
     let mut parent = Transaction::new();
-    let mut funding = TransactionInput::new("aa".repeat(32), 0);
+    let mut funding = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     funding.unlocking_script = Some(UnlockingScript::new());
     parent.inputs_mut().push(funding);
     parent.outputs_mut().push(TransactionOutput::new(
@@ -40,7 +40,7 @@ fn child_of(lock: &[u8]) -> Transaction {
 
     let mut unlock = Script::new();
     unlock.write_bin(&vec![0x01; ELEMENT]);
-    let mut input = TransactionInput::new(parent.id(), 0);
+    let mut input = TransactionInput::new(parent.txid(), 0);
     input.unlocking_script = Some(UnlockingScript::from_script(unlock));
     input.source_transaction = Some(Box::new(parent));
     let mut child = Transaction::new();

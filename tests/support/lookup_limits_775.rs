@@ -101,7 +101,7 @@ pub fn binary_beef_spending(source: &str) -> BinaryBeef {
     use bsv_rs::transaction::{
         Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
     };
-    let mut input = TransactionInput::new(source.to_string(), 0);
+    let mut input = TransactionInput::new(source.parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

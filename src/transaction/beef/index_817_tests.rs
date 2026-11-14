@@ -14,7 +14,7 @@ use crate::transaction::{Transaction, TransactionInput, TransactionOutput};
 /// `"<byte>" x 32`.
 fn tx(byte: &str, sats: u64) -> Transaction {
     let mut t = Transaction::new();
-    let mut input = TransactionInput::new(byte.repeat(32), 0);
+    let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
     t.inputs_mut().push(input);
     t.outputs_mut().push(TransactionOutput::new(

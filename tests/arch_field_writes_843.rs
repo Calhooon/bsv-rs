@@ -57,7 +57,6 @@ const SEALED_ITEMS: &[&str] = &[
     "use std :: sync :: OnceLock ;",
     "use crate :: transaction :: { Transaction , TransactionInput , TransactionOutput } ;",
     "pub ( in crate :: transaction :: transaction ) struct Fields { version : u32 , inputs : Vec < TransactionInput > , outputs : Vec < TransactionOutput > , lock_time : u32 , cached_hash : OnceLock < [ u8 ; 32 ] > , raw_bytes_cache : OnceLock < Vec < u8 > > , hex_cache : OnceLock < String > , }",
-    "pub ( super ) fn names_32_bytes ( text : & str ) - > bool",
     "fn named ( input : & TransactionInput ) - > bool",
     "impl Fields",
     "impl Fields > pub ( super ) fn new ( version : u32 , inputs : Vec < TransactionInput > , outputs : Vec < TransactionOutput > , lock_time : u32 , ) - > Self",
@@ -73,7 +72,7 @@ const SEALED_ITEMS: &[&str] = &[
 
 /// FNV-1a (64 bits) of the `sealed` module's tokens joined by one space:
 /// a body changed moves it (comments and layout do not).
-const SEALED_DIGEST: u64 = 0x5ace_95d2_377c_c14b;
+const SEALED_DIGEST: u64 = 0xa0d0_a5a0_53ac_1924;
 
 /// The functions of fields.rs, outside `sealed`, that may name `caches`.
 const CACHE_READERS: &[&str] = &[

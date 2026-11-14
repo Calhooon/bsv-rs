@@ -38,8 +38,11 @@ fn advertise(beef: &mut Beef, host: &str, satoshis: u64, height: u32) -> String 
     let script =
         create_signed_overlay_admin_token(&PrivateKey::random(), Protocol::Slap, host, SERVICE);
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("33".repeat(32), height))
-        .unwrap();
+    tx.add_input(TransactionInput::new(
+        "33".repeat(32).parse().unwrap(),
+        height,
+    ))
+    .unwrap();
     tx.add_output(TransactionOutput::new(satoshis, script))
         .unwrap();
     let index = beef.merge_bump(

@@ -64,7 +64,7 @@ const BOB: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c7
 /// made-up outpoint, the source's output 0 is the token.
 fn source_transaction(lock: &LockingScript) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     tx.add_input(input).unwrap();
     tx.add_output(TransactionOutput::new(1, lock.clone()))

@@ -197,7 +197,7 @@ mod streaming {
     fn parent(lock: LockingScript, proven: Option<u32>, genesis: u32) -> Transaction {
         let mut tx = Transaction::new();
         let mut input = match proven {
-            Some(_) => TransactionInput::new("aa".repeat(32), 0),
+            Some(_) => TransactionInput::new("aa".repeat(32).parse().unwrap(), 0),
             None => TransactionInput::with_source_transaction(
                 parent(
                     LockingScript::from_hex("51").unwrap(),

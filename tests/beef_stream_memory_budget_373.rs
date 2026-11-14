@@ -46,7 +46,7 @@ fn fixture(answer: u8) -> Fixture {
         .write_opcode(OP_2DROP)
         .write_opcode(answer);
     let mut parent = Transaction::new();
-    let mut phantom = TransactionInput::new("aa".repeat(32), 0);
+    let mut phantom = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     phantom.set_unlocking_script(UnlockingScript::new());
     parent.add_input(phantom).unwrap();
     parent

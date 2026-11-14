@@ -123,7 +123,7 @@ fn a_kvstore_token_whose_controller_field_is_tag_05_reads_no_value_550() {
     let read = KVStoreInterpreter::extract_fields(&script).unwrap();
     assert!(!KVStoreInterpreter::verify_signature(&read, "kvstore"));
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, script)).unwrap();
     let ctx = KVStoreContext::new("alpha", "kvstore");
@@ -136,7 +136,7 @@ fn the_reference_kvstore_token_with_a_tag_05_key_reads_no_value_550() {
         assert_eq!(case(name)["words"], "Unknown point format", "{name}");
         let script = LockingScript::from_binary(&input(name)).unwrap();
         let mut tx = Transaction::new();
-        tx.add_input(TransactionInput::new("11".repeat(32), 0))
+        tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
             .unwrap();
         tx.add_output(TransactionOutput::new(1, script)).unwrap();
         let ctx = KVStoreContext::new("alpha", "kvstore");

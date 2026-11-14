@@ -32,10 +32,7 @@ pub(super) async fn token_spends<W: WalletInterface + ?Sized>(
         .inputs()
         .iter()
         .position(|input| {
-            let source = input
-                .source_txid
-                .clone()
-                .or_else(|| input.source_transaction.as_ref().map(|tx| tx.id()));
+            let source = input.get_source_txid().ok();
             input.source_output_index == record.output_index()
                 && source.is_some_and(|source| source.eq_ignore_ascii_case(&txid))
         })

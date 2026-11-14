@@ -56,7 +56,7 @@ fn token() -> LockingScript {
 
 /// One input spending `txid:0` with `unlocking`, one 1-satoshi output.
 fn spending(txid: String, unlocking: &str, lock: LockingScript) -> Transaction {
-    let mut input = TransactionInput::new(txid, 0);
+    let mut input = TransactionInput::new(txid.parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex(unlocking).unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

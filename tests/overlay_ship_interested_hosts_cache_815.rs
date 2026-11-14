@@ -93,8 +93,11 @@ fn advertisement(domain: &str, seed: u32) -> (OutputListItem, Transaction) {
     let script =
         create_signed_overlay_admin_token(&PrivateKey::random(), Protocol::Ship, domain, TOPIC);
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), seed))
-        .unwrap();
+    tx.add_input(TransactionInput::new(
+        "11".repeat(32).parse().unwrap(),
+        seed,
+    ))
+    .unwrap();
     tx.add_output(TransactionOutput::new(1, script)).unwrap();
     let txid = tx.id();
     let mut beef = Beef::new();
