@@ -293,6 +293,10 @@ NO_PACKAGE = [
     "syn v2.0.119 ",
     "syn\tv2.0.119",
     "  ",
+    # a name the form refuses, a mark with no space before it, a dot in a name (the fourth re-read)
+    "warning: v1.0.0",
+    "syn v2.0.119(*)",
+    "syn.x v1.0.0",
 ]
 
 # What `cargo tree --prefix none --format {p}` prints for a package, each form read off a
