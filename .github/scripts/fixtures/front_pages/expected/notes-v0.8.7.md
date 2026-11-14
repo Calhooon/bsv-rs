@@ -12,7 +12,7 @@ A security patch on the 0.8 line. To upgrade: `cargo update -p bsv-rs` (a `"0.8"
 - Changed: The gate runs the page script's tests on every pull request (#902).
 - Changed: The reconciler names each gap (#903).
 
-The section carries 1 cross-SDK parity note(s); the changelog at the tag has them.
+The section carries 1 `### Notes` heading(s) on cross-SDK parity (one that says nothing moves is counted too); the changelog at the tag has them.
 
 ## Migration
 
