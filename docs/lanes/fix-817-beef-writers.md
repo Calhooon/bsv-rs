@@ -161,6 +161,12 @@ Each grepped by its own path; counts by call text, "tests" the files under a `te
 
 `to_binary_atomic` keeps its signature (toolbox 6, cli 5, overlay 26, message-box 1).
 
+Added for #906 on 2026-11-14: the CLI's row is its `src` at `f4285bf` alone. That ref holds 3
+`merge_raw_tx` lines under `tests/` (`tests/compact_tracker_off.rs`), and its beta line at
+`6dc14ef5`, by a compile, 31 `merge_raw_tx` statements in 16 files (8 in the library and the
+binary), 1 `merge_beef` statement, `Beef::to_binary` at 23 sites and `Beef::to_hex` at 2. The
+counts by dependent, and how the compile ran, are in the CHANGELOG entry's Migration block.
+
 The overlay engine's three accumulators, traced:
 
 - `crates/overlay-engine/src/engine.rs:4014-4042` (`hydrate_utxo_history`): the stored BEEF

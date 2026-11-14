@@ -156,6 +156,12 @@ the overlay are on a `Beef`, which this lane does not change.
 | `~/bsv/rust-message-box/src` | 0 | 0 | 0 |
 | total | 15 | 116 | 131 |
 
+Added for #906 on 2026-11-14: the CLI's row is the checkout read on 2026-11-09. Its beta line
+at `6dc14ef5`, by a compile (0.9.0-beta.6 with these writers marked deprecated, each call
+site named by its warning), calls `MerklePath::to_binary` at 24 sites (1 in the library and
+the binary, 23 in test and bench code) and `MerklePath::to_hex` at 13 (3 and 10), `to_writer`
+at none; with them the total is 168.
+
 The production sites and what each does with the bytes:
 
 | Site | Method | Use |
