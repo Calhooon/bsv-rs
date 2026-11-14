@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (CI): the node oracle's trampoline asks whether a check is owed before it mints the App's token, and hands `report` the run judged (#958, fix-97-trampoline2)
+
+The three decisions fix-958-judge left for the trampoline's own sitting, in one class J commit that touches `.github/workflows/sibling-judge.yml` and its pin alone; the three lenses on every changed line (the key's reach, GitHub's semantics, failing closed: 36 rows, 33 by a line, 3 by a setting, none that does not hold), main's pick as rehearsed, the sitting's order and the witnesses are `docs/lanes/fix-97-trampoline2.md`.
+
+- What was wrong: `report` minted and revoked the App's token for every stage R run, a fork's included, before it read whether any check was owed; `report` posted the judge job's verdict on the run it resolved itself without being told which run `judge` had judged, so a newer run or attempt completed between the two jobs took the older one's verdict; and the concurrency comment said the judgements of a head run one at a time, where a dispatch is grouped by its run id and runs beside them.
+- The asking: `report`'s step `Is a check owed` runs beta's `sibling_judge.py owed` under the job's own token, before the mint and with no key. The mint and the post carry one condition, `steps.owed.outcome != 'success' || steps.owed.outputs.owed != 'no'`: skipped only when the asking succeeded and answered a plain `no`. The asking is `continue-on-error: true` with `timeout-minutes: 3`, so an asking that fails, hangs or writes no answer is read as owed and `report` decides as it did. One window is new and ends with no check, never a green: a newest run still running when `owed` reads and completed when `report` would have read is silence where `report` posted `NOT JUDGED`; that run's own judgement posts, and the sweep names the head.
+- The run judged: `judge`'s outputs gain `run` and `attempt`, the Report step's `env:` hands them on as `JUDGED_RUN` and `JUDGED_ATTEMPT`, and the script (fix-958-judge's `judged_of`) posts a verdict only when its own resolution names the same run and attempt; a mismatch, a name that does not read or a success naming no run is `NOT JUDGED` with the re-judge.
+- Pinned by `tests/arch_ci_sibling_judge_97.rs`: `SIBLING_JUDGE` moved with the file; `owed_and_bound_refusals` and `the_trampoline_asks_before_it_mints_and_hands_report_the_run_judged_958` (the asking before the mint, no step before the mint naming the key or the token, the one condition on the mint and the post and on no other step, the asking alone absorbing its failure, the six outputs, the two names; sixteen planted changes each refused by name, the condition's truth table, the names read against the script). 3 of 10 RED on a scratch copy of `80532565` with the file overlaid.
+- Left: the mint's input is still `app-id`, which the pinned action marks deprecated; `client-id` waits for the environment variable `SIBLING_JUDGE_CLIENT_ID`, the owner's (the two-line change is in the lane's record). `RELEASING.md` step 25's sentence on the mint is class C by the judge's rule and rides a pull request of its own. The change is one sitting: beta's pull request, main's pick within minutes (every head reads `NOT JUDGED: the trampoline on main differs from beta's` while the two differ), the sweep, a re-judge for each open pull request.
+
+### Notes: cross-SDK parity (#958, fix-97-trampoline2)
+
+No SDK has a twin of the judge. No verdict, word or byte of the crate moves, no file under `src/` is touched, and no row of the root `CLAUDE.md` divergence list is touched.
+
 ### Changed (CI and documents): `docs/dependents.lock` at the dependents' lines of 2026-11-14
 
 - What was behind. The lock was the 2026-10-23 snapshot: the read of 2026-11-14 (#957) found nine of its fourteen rows, seven repositories, naming a revision behind the tip of the dependent's `main`, two of them with an older requirement. The `dependents` job checks out the lock's revisions, so wherever it ran it built October's trees.
