@@ -4,7 +4,7 @@ Snapshot: 2026-10-23 for the features, targets, production cells and app trees; 
 `[D]` means reported, including historical production records. A manifest
 version is not evidence of the version running in production. The source of
 the build matrix is [dependents.lock](dependents.lock); all its revisions were
-default-branch heads when read. Consumer captains refresh the lock in each
+default-branch heads when read (on 2026-11-14 since the lock's move of that day, the section before the last). Consumer captains refresh the lock in each
 pin-move PR. The map and scope come from [#83](https://github.com/Calhooon/bsv-rs/issues/83)
 and [#101](https://github.com/Calhooon/bsv-rs/issues/101).
 
@@ -101,7 +101,7 @@ snapshot's unless a cell says otherwise.
 | [bsv-tracker](https://github.com/Calhooon/bsv-tracker/blob/fdc88960e4ea99f64a8885315c13c6abfb28ef02/Cargo.toml) | `main` `fdc88960` (2026-11-13), read 2026-11-14 `[X]` | `0.8.0` `[X]` | 0.8.9 (`Cargo.lock`) `[X]` | `transaction`, no defaults; wasm adds `wasm` | Native and wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | bsv-tracker, beta line | `beta` `3cfba165` (2026-11-04), read 2026-11-14 `[X]` | `=0.9.0-beta.7` `[X]` | 0.9.0-beta.7 (`Cargo.lock`) `[X]` | `transaction`, no defaults (read 2026-11-14 `[X]`) | not read | [D] Unknown | Stack keeper until named |
 | [bsv-wallet-infra-cloudflare](https://github.com/Calhooon/bsv-wallet-infra-cloudflare/blob/2025fcde98664dd69a6305c60e87fa12c3930cde/Cargo.toml), alias `bsv-sdk` | `main` `2025fcde` (2026-10-27), read 2026-11-14 `[X]` | `0.8.1` `[X]` | 0.8.1 (`Cargo.lock`) `[X]` | default + `auth,wallet,transaction,wasm` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
-| [bsv-messagebox-cloudflare](https://github.com/Calhooon/bsv-messagebox-cloudflare/blob/32afeeed9ad4cebf484b04c481442174b6bcfb26/Cargo.toml) | `main` `32afeeed` (2026-11-03), read 2026-11-14 `[X]` | `0.8.2` in the root, `0.8.1` in `tests/load_gen/` `[X]` | no lock committed at the root; 0.8.1 in `tests/load_gen/Cargo.lock` `[X]` | default + `auth,wallet,transaction,wasm` | wasm32; native library tests; the integration suite's version guard pins bsv-rs 0.8.1 in the lock and is excluded until the row re-pins; `tests/load_gen` is a separate live client, excluded | [D] Unknown | Stack keeper until named |
+| [bsv-messagebox-cloudflare](https://github.com/Calhooon/bsv-messagebox-cloudflare/blob/32afeeed9ad4cebf484b04c481442174b6bcfb26/Cargo.toml) | `main` `32afeeed` (2026-11-03), read 2026-11-14 `[X]` | `0.8.2` in the root, `0.8.1` in `tests/load_gen/` `[X]` | no lock committed at the root; 0.8.1 in `tests/load_gen/Cargo.lock` `[X]` | default + `auth,wallet,transaction,wasm` | wasm32; native library tests; the integration suite's version guard asserts the resolved bsv-rs is 0.8.3 (0.8.1 at the revision locked until 2026-11-14) and is excluded, as any later patch fails it; `tests/load_gen` is a separate live client, excluded | [D] Unknown | Stack keeper until named |
 | [bsv-middleware-cloudflare](https://github.com/Calhooon/bsv-middleware-cloudflare/blob/d7ccb6c1a56708687c6d044989f9ff06ea024823/Cargo.toml), alias `bsv-sdk`; crates `bsv-middleware-cloudflare` and `bsv-middleware-core` (the `core/` member) | `main` `d7ccb6c1` (2026-10-22; the linked commit, still the tip), read 2026-11-14 `[X]` | `0.8` in the root and in `core/` `[X]` | no lock committed `[X]` | default + `auth,wallet,transaction,wasm`; workspace `core` takes the same slice without `wasm` | wasm32 with consumer features `refund,d1-claims`; native workspace library and integration tests | [D] Unknown; see Zanaadu's historical embedded worker below | Stack keeper until named |
 | [bsv-agent-template](https://github.com/Calhooon/bsv-agent-template/blob/b1dcbdbfa9d8beab6783dc515789f5690968f462/Cargo.toml), alias `bsv-sdk`; not on crates.io's reverse-dependency list on 2026-11-14 | `main` `b1dcbdbf` (2026-10-13; the linked commit, still the tip), read 2026-11-14 `[X]` | `0.6.0` `[X]` | 0.6.0 (`Cargo.lock`) `[X]` | default + `auth,wallet,transaction,wasm` | wasm32 | [D] Unknown | Stack keeper until named |
 | [bsv-storage-cloudflare](https://github.com/Calhooon/bsv-storage-cloudflare/blob/2563293557849a29007fa1c1b5d2001a3fc8a17d/Cargo.toml) | `main` `25632935` (2026-10-21; the linked commit, still the tip), read 2026-11-14 `[X]` | `=0.4.5` in the root and in `tests/parity/` `[X]` | 0.4.5 (`Cargo.lock`) `[X]` | default + `auth,wallet,transaction,script,wasm`; parity member adds `auth,http,overlay` | wasm32 worker; native parity client is live and excluded | `[D]` 0.4.5 with worker 0.2.1 on 2026-10-13; current unknown | Stack keeper until named |
@@ -195,37 +195,76 @@ lock; new feature/target shapes also update the architecture lane's matrix.
 
 ## The lock against the table (2026-11-14)
 
-[dependents.lock](dependents.lock) is the 2026-10-23 snapshot: no commit has
-touched it since that day (`git log -- docs/dependents.lock`). The two answer
-different questions and each is right about its own. The lock names the
-revisions the `dependents` job checks out and builds, and at each the
-requirement it declares is that revision's manifest's (the job verifies it; the
-two rows whose requirement differs from the tip's were read again at their
-locked revisions on 2026-11-14). The table names what the branches read today,
-and it is the one that says where a dependent stands.
+[dependents.lock](dependents.lock) was the 2026-10-23 snapshot until
+2026-11-14, when the read above found nine of its fourteen rows (seven
+repositories) behind their branches' tips, two of them with an older
+requirement, and the lock was moved to the tips the same day (each tip read
+again with `gh api` at 18:48Z: the eleven repositories public, none archived,
+the eleven shas the table's). The lock names the revisions the `dependents` job
+checks out and builds, and at each the requirement, features and manifests it
+declares are that revision's manifest's (the job verifies it; every moved row
+was read at its new revision by the job's own reader, `declared_dependency`).
 
-| Lock rows | Locked revision and requirement | Tip on 2026-11-14 and requirement | The lock is |
+| Lock rows | Revision until 2026-11-14 | Revision since (the tip of `main`) | What moved |
 |---|---|---|---|
-| `bsv-wallet-cli` | `5e0dbb06`, `=0.8.1` | `2cc76c9d`, `=0.8.3` | behind: revision and requirement |
-| `bsv-wallet-toolbox-rs` | `e9857b8b`, `0.8.0` | `3ddf48db`, `0.8.0` | behind: revision |
-| `bsv-tracker` | `c127bccd`, `0.8.0` | `fdc88960`, `0.8.0` | behind: revision |
-| `bsv-wallet-infra-cloudflare` | `d0dba8d2`, `0.8.1` | `2025fcde`, `0.8.1` | behind: revision |
-| `chaintracks-cloudflare` | `dcfa491a`, `0.8.1` | `eff96cbc`, `0.8.1` | behind: revision |
-| `bsv-messagebox-cloudflare` | `190a8a78`, `0.8.1` | `32afeeed`, `0.8.2` | behind: revision and requirement |
-| `bsv-overlay-cloudflare`, `bsv-overlay-worker`, `bsv-overlay-app-layer` | `a10ada00`, `=0.7.2` | `2abcd748`, `=0.7.2` | behind: revision |
-| `bsv-middleware-rs` | `5a1fd275`, `0.8.0` | the same | at the tip |
-| `bsv-middleware-cloudflare` | `d7ccb6c1`, `0.8` | the same | at the tip |
-| `bsv-agent-template` | `b1dcbdbf`, `0.6.0` | the same | at the tip |
-| `bsv-storage-cloudflare`, `bsv-storage-parity` | `25632935`, `=0.4.5` | the same | at the tip |
+| `bsv-wallet-cli` | `5e0dbb06`, `=0.8.1` | `2cc76c9d`, `=0.8.3` | revision and requirement |
+| `bsv-wallet-toolbox-rs` | `e9857b8b`, `0.8.0` | `3ddf48db`, `0.8.0` | revision |
+| `bsv-tracker` | `c127bccd`, `0.8.0` | `fdc88960`, `0.8.0` | revision |
+| `bsv-wallet-infra-cloudflare` | `d0dba8d2`, `0.8.1` | `2025fcde`, `0.8.1` | revision |
+| `chaintracks-cloudflare` | `dcfa491a`, `0.8.1` | `eff96cbc`, `0.8.1` | revision |
+| `bsv-messagebox-cloudflare` | `190a8a78`, `0.8.1` | `32afeeed`, `0.8.2` | revision, requirement and the test selection's comment |
+| `bsv-overlay-cloudflare`, `bsv-overlay-worker`, `bsv-overlay-app-layer` | `a10ada00`, `=0.7.2` | `2abcd748`, `=0.7.2` | revision |
+| `bsv-middleware-rs` | `5a1fd275`, `0.8.0` | the same | nothing: at the tip |
+| `bsv-middleware-cloudflare` | `d7ccb6c1`, `0.8` | the same | nothing: at the tip |
+| `bsv-agent-template` | `b1dcbdbf`, `0.6.0` | the same | nothing: at the tip |
+| `bsv-storage-cloudflare`, `bsv-storage-parity` | `25632935`, `=0.4.5` | the same | nothing: at the tip |
 
-Nine of the lock's fourteen rows (seven repositories) name a revision behind
-its branch's tip, two of them with an older requirement; five rows are at the
-tip. The three beta lines are not rows of the lock. So on a 0.8 tree the job
-builds the seven caret repositories at their October revisions and skips the
-CLI at `=0.8.1` (its tip's `=0.8.3` admits no patch after 0.8.3 either); at this tree's version, 0.9.0-beta.7, `dependents.py plan`
-admits no row (run on 2026-11-14: fourteen `SKIP` lines and `{"include":[]}`).
-The lock is the job's input and this page does not change it; a refresh is a
-pin-move PR's (above).
+No row's features, targets, manifests or test selection moved. The message
+box's selection stays its library tests: at `32afeeed` its integration suite's
+version guard (`tests/middleware_version_guard.rs`) asserts that the resolved
+bsv-rs is 0.8.3, which any later patch fails, where at `190a8a78` it pinned
+0.8.1; the row's comment says so. The three beta lines are not rows of the lock.
+
+What the plan admits (`dependents.py plan`, run on 2026-11-14 with the moved
+lock). On the stable line's tree (0.8.9): seven rows, the seven caret
+repositories (`bsv-wallet-toolbox-rs`, `bsv-tracker`,
+`bsv-wallet-infra-cloudflare`, `chaintracks-cloudflare`,
+`bsv-messagebox-cloudflare`, `bsv-middleware-rs`, `bsv-middleware-cloudflare`),
+and seven `SKIP` lines (the CLI's `=0.8.3`, the overlay's three rows at
+`=0.7.2`, the template's `0.6.0`, the storage worker's two at `=0.4.5`); the
+same seven as with the lock before the move, five of them at a newer revision.
+On this tree (0.9.0-beta.7): no row, fourteen `SKIP` lines and
+`{"include":[]}`, before the move and after it. That is by design: `admits`
+does not guess a prerelease's ordering and admits one only to an exact
+requirement equal to it (`.github/scripts/dependents.py`, the branch under
+"Pre-release ordering is deliberately not guessed";
+`test_caret_pins_admit_only_their_compatible_line` and
+`test_beta_requires_an_explicit_exact_pin` pin it), no row of the lock carries
+such a requirement, and with a count of 0 the `dependents` status passes on no
+check; [#100](https://github.com/Calhooon/bsv-rs/issues/100) owns the beta
+lines' rows.
+
+The five moved rows the stable tree admits were run on 2026-11-14 at their new
+revisions against `origin/main` (`f569499a`, 0.8.9) with the moved lock, by
+`dependents.py run` (macOS arm64, rustc 1.98.1, `RUSTFLAGS=-Dwarnings` as the
+workflow sets it), each resolving to the path override (`VERIFIED ... -> bsv-rs
+0.8.9 at PR tree`):
+
+| Row | Checks | Tests: passed / failed / ignored |
+|---|---|---|
+| `bsv-wallet-toolbox-rs` at `3ddf48db` | native, passed | 1,305 / 0 / 14 (27 binaries) |
+| `bsv-tracker` at `fdc88960` | native and wasm32, passed | 61 / 0 / 0 (10 binaries) |
+| `bsv-wallet-infra-cloudflare` at `2025fcde` | wasm32, passed | 876 / 0 / 1 (8 binaries) |
+| `chaintracks-cloudflare` at `eff96cbc` | wasm32, passed | 340 / 0 / 2 |
+| `bsv-messagebox-cloudflare` at `32afeeed` | wasm32: not run to an answer on that host (below) | 608 / 0 / 1, the row's test command run by hand |
+
+The message box's wasm32 check builds `ring`'s C sources, and that host's
+`clang` has no wasm32 backend (`No available targets are compatible with triple
+"wasm32-unknown-unknown"`); the same command stops at the same line at the old
+revision `190a8a78`, where `ring` is the same direct dependency, so the stop is
+the host's and says nothing of either revision. That check is CI's to witness,
+on the `dependents` job's Linux runner. The four moved rows the stable tree
+does not admit (the CLI's and the overlay's three) were read, not built.
 
 ## How the checks work
 
