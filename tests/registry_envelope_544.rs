@@ -60,3 +60,28 @@ async fn the_registry_reader_already_runs_the_reference_validator_544() {
         assert_eq!(resolved, expected, "{}", case["name"]);
     }
 }
+
+/// #815's pin at the registry door: one host answering freeform beside one
+/// answering the reference's basket definition. `LookupResolver::query`
+/// answers the merged output list in every case, a freeform host
+/// contributing nothing (`ts-stack@edf6e03` `LookupResolver.ts:1085-1087`,
+/// `:1445-1450`), so the definition is resolved; with the earliest freeform
+/// answer returned over the aggregate (before #821) none was.
+#[tokio::test]
+async fn a_freeform_host_beside_a_list_resolves_the_definition_at_the_registry_door_815() {
+    let v = vector();
+    let case = v["registry"]["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["outcome"] == "resolved")
+        .unwrap();
+    let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+    let resolver = lock_position::answering_beside_freeform("ls_basketmap", script, "registry");
+    let client = RegistryClient::new(
+        ProtoWallet::new(None),
+        RegistryClientConfig::new().with_resolver(resolver),
+    );
+    let resolved = client.resolve_basket(BasketQuery::default()).await.unwrap();
+    assert_eq!(resolved.len(), 1);
+}

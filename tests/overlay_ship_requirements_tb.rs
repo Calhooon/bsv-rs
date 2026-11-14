@@ -30,8 +30,8 @@
 
 use bsv_rs::overlay::{
     AdmittanceInstructions, LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig,
-    OutputListItem, OverlayBroadcastFacilitator, OverlayLookupFacilitator, RequireAck, Steak,
-    TaggedBEEF, TopicBroadcaster, TopicBroadcasterConfig,
+    NetworkPreset, OutputListItem, OverlayBroadcastFacilitator, OverlayLookupFacilitator,
+    RequireAck, Steak, TaggedBEEF, TopicBroadcaster, TopicBroadcasterConfig,
 };
 use bsv_rs::transaction::Transaction;
 use bsv_rs::Error;
@@ -56,8 +56,9 @@ fn topics() -> Vec<String> {
         .collect()
 }
 
-/// A lookup facilitator answering every question with its one answer.
-struct Scripted(LookupAnswer);
+/// A lookup facilitator answering every question with its one answer and
+/// counting the questions.
+struct Scripted(LookupAnswer, AtomicUsize);
 
 #[async_trait::async_trait(?Send)]
 impl OverlayLookupFacilitator for Scripted {
@@ -67,6 +68,7 @@ impl OverlayLookupFacilitator for Scripted {
         _question: &LookupQuestion,
         _timeout_ms: Option<u64>,
     ) -> bsv_rs::Result<LookupAnswer> {
+        self.1.fetch_add(1, Ordering::SeqCst);
         Ok(self.0.clone())
     }
 }
@@ -117,8 +119,6 @@ impl OverlayBroadcastFacilitator for Behaving {
 /// A resolver whose `ls_ship` host (one of its own: the reputation tracker
 /// is one global keyed by URL) answers the recorded advertisements.
 fn resolver() -> Arc<LookupResolver> {
-    static N: AtomicUsize = AtomicUsize::new(0);
-    let n = N.fetch_add(1, Ordering::Relaxed);
     let outputs = recorded()["advertisements"]
         .as_array()
         .unwrap()
@@ -130,8 +130,24 @@ fn resolver() -> Arc<LookupResolver> {
             txid: None,
         })
         .collect();
-    Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Scripted(LookupAnswer::OutputList { outputs }))),
+    resolver_answering(outputs)
+}
+
+/// A resolver whose `ls_ship` host, one of its own, answers `outputs`.
+fn resolver_answering(outputs: Vec<OutputListItem>) -> Arc<LookupResolver> {
+    resolver_counting(outputs).0
+}
+
+/// The same resolver, with the facilitator that counts what it is asked.
+fn resolver_counting(outputs: Vec<OutputListItem>) -> (Arc<LookupResolver>, Arc<Scripted>) {
+    static N: AtomicUsize = AtomicUsize::new(0);
+    let n = N.fetch_add(1, Ordering::Relaxed);
+    let lookup = Arc::new(Scripted(
+        LookupAnswer::OutputList { outputs },
+        AtomicUsize::new(0),
+    ));
+    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
+        facilitator: Some(lookup.clone()),
         slap_trackers: Some(vec![]),
         host_overrides: Some(HashMap::from([(
             "ls_ship".to_string(),
@@ -140,7 +156,8 @@ fn resolver() -> Arc<LookupResolver> {
             )],
         )])),
         ..Default::default()
-    }))
+    }));
+    (resolver, lookup)
 }
 
 /// A requirement in the reference's form: `'all'`, `'any'` or a list.
@@ -368,6 +385,142 @@ async fn the_failed_requirement_carries_the_references_code_and_description_tb_a
             ("ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED".to_string(), 23),
             ("ERR_ALL_HOSTS_REJECTED".to_string(), 15),
         ])
+    );
+}
+
+/// #815, stated: a failed broadcast carries the transaction's id
+/// (`BroadcastFailure::txid`, `Some`), where the reference's failure object
+/// has no `txid` member (`ts-stack@edf6e03` `SHIPBroadcaster.ts:473-477`,
+/// `:503-507`, `:570-574`, `:594-598`, `:613-617`: `status`, `code` and
+/// `description` alone, read at the pin, the recorder keeping those and the
+/// message; its `BroadcastFailure.txid` optional, `Broadcaster.ts:133`). Kept: the id is the caller's own transaction's,
+/// and removing it is a change to an answer a caller reads. One failure of
+/// each requirement, one with every host rejecting, one with no host
+/// interested (the `ls_ship` host answering an empty output list: the
+/// reference's `ERR_NO_HOSTS_INTERESTED` in its words, `:473-477`, under
+/// the mainnet and the testnet preset, `ls_ship` asked once and nothing
+/// sent) and one whose transaction no BEEF writer writes (an output of 2^53
+/// satoshis: this crate's `ERR_BEEF_SERIALIZATION`, its description opening
+/// with the sentence the reference throws at `:467-469`, before it asks for
+/// the hosts at `:471`: `ls_ship` is asked nothing, counted, its resolver
+/// one that would answer no host, so a writer run after the lookup answers
+/// another code too; nothing sent). The failed discovery's is
+/// `a_failed_discovery_fails_the_broadcast_with_its_txid_stated_815`
+/// (`overlay_ship_interested_hosts_cache_815.rs`).
+#[tokio::test]
+async fn a_failed_broadcast_carries_the_txid_the_reference_leaves_out_stated_815() {
+    for (name, code) in [
+        (
+            "idle_idle__all_hosts_all",
+            "ERR_REQUIRE_ACK_FROM_ALL_HOSTS_FAILED",
+        ),
+        (
+            "idle_idle__any_host_any",
+            "ERR_REQUIRE_ACK_FROM_ANY_HOST_FAILED",
+        ),
+        (
+            "ack_ack__specific_c_empty",
+            "ERR_REQUIRE_ACK_FROM_SPECIFIC_HOSTS_FAILED",
+        ),
+    ] {
+        let case = broadcasts().iter().find(|c| c["name"] == name).unwrap();
+        let b =
+            TopicBroadcaster::new(topics(), config(&case["requirement"], behaving(case))).unwrap();
+        let subject = Transaction::from_beef(
+            &hex::decode(recorded()["advertisements"][0]["beef"].as_str().unwrap()).unwrap(),
+            None,
+        )
+        .unwrap();
+        let failure = b.broadcast_tx(&subject).await.unwrap_err();
+        assert_eq!(failure.code, code, "{name}");
+        assert_eq!(failure.txid, Some(subject.id()), "{name}");
+    }
+    let rejected = broadcasts()
+        .iter()
+        .find(|c| c["code"] == "ERR_ALL_HOSTS_REJECTED")
+        .unwrap();
+    let b = TopicBroadcaster::new(
+        topics(),
+        config(&rejected["requirement"], behaving(rejected)),
+    )
+    .unwrap();
+    let subject = Transaction::from_beef(
+        &hex::decode(recorded()["advertisements"][0]["beef"].as_str().unwrap()).unwrap(),
+        None,
+    )
+    .unwrap();
+    let failure = b.broadcast_tx(&subject).await.unwrap_err();
+    assert_eq!(failure.code, "ERR_ALL_HOSTS_REJECTED");
+    assert_eq!(failure.txid, Some(subject.id()));
+
+    // No host interested: the `ls_ship` host answers an empty list, asked
+    // once. The words name the broadcaster's network preset (the local
+    // preset asks no `ls_ship` and always holds its one host, so it never
+    // answers this code).
+    let case = serde_json::json!({ "behaviours": { "a": "ack", "b": "ack" } });
+    for (preset, word) in [
+        (NetworkPreset::Mainnet, "mainnet"),
+        (NetworkPreset::Testnet, "testnet"),
+    ] {
+        let facilitator = behaving(&case);
+        let (resolver, lookup) = resolver_counting(vec![]);
+        let b = TopicBroadcaster::new(
+            topics(),
+            TopicBroadcasterConfig {
+                network_preset: preset,
+                resolver: Some(resolver),
+                facilitator: Some(facilitator.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let failure = b.broadcast_tx(&subject).await.unwrap_err();
+        assert_eq!(failure.code, "ERR_NO_HOSTS_INTERESTED", "{word}");
+        assert_eq!(
+            failure.description,
+            format!("No {word} hosts are interested in receiving this transaction.")
+        );
+        assert_eq!(failure.txid, Some(subject.id()), "{word}");
+        assert_eq!(lookup.1.load(Ordering::SeqCst), 1, "{word}");
+        assert_eq!(
+            facilitator.sent.lock().unwrap().clone(),
+            Vec::<String>::new(),
+            "{word}"
+        );
+    }
+
+    // No BEEF: an output of 2^53 satoshis, which the BEEF writers refuse.
+    // The writer runs before the hosts are asked (`SHIPBroadcaster.ts:464-470`
+    // before `:471`): `ls_ship` is asked nothing, and its resolver answers no
+    // host, so a writer run after the lookup and the empty-hosts check
+    // answers `ERR_NO_HOSTS_INTERESTED` here.
+    let mut unwritable = subject.clone();
+    unwritable.outputs_mut()[0].satoshis = Some(1 << 53);
+    let facilitator = behaving(&case);
+    let (resolver, lookup) = resolver_counting(vec![]);
+    let b = TopicBroadcaster::new(
+        topics(),
+        TopicBroadcasterConfig {
+            resolver: Some(resolver),
+            facilitator: Some(facilitator.clone()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let failure = b.broadcast_tx(&unwritable).await.unwrap_err();
+    assert_eq!(failure.code, "ERR_BEEF_SERIALIZATION");
+    assert_eq!(lookup.1.load(Ordering::SeqCst), 0);
+    assert!(
+        failure.description.starts_with(
+            "Transactions sent via SHIP to Overlay Services must be serializable to BEEF format"
+        ),
+        "{}",
+        failure.description
+    );
+    assert_eq!(failure.txid, Some(unwritable.id()));
+    assert_eq!(
+        facilitator.sent.lock().unwrap().clone(),
+        Vec::<String>::new()
     );
 }
 

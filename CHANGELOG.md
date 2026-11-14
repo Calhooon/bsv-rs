@@ -47,6 +47,63 @@ No SDK has a twin of either test or of the workflow job. No row of the root `CLA
 
 No SDK has a twin of this workflow. No verdict, word or byte of the crate moves, and no row of the root `CLAUDE.md` divergence list is touched.
 
+### Tests: the overlay bucket's last open pins: a freeform host beside a list at the identity, revocation, registry and storage doors, and a failed broadcast's txid stated (#815)
+
+The overlay bucket of the reads of 2026-11-09 (#815), every line re-read on
+`beta` at `2b419d90` (lane fix-815-overlay, `docs/lanes/fix-815-overlay.md`,
+the table of all 24 lines). Seventeen were true already (PR #820, PR #821 and
+the fold `b36bca93`), four wait on a decision and are built by nothing here,
+one is a downstream's. No public item, wire byte, verdict or error text moves:
+two lines are tests and records.
+
+**A freeform host beside a list, at the four consumer doors no test held.**
+Since #821 `LookupResolver::query` answers the merged output list in every
+case, a freeform host contributing nothing (`ts-stack@edf6e03`
+`LookupResolver.ts:1085-1087`, `:1445-1450`); the kvstore door alone had a
+witness of it. Four more, each one `.invalid` host answering freeform ranked
+ahead of one answering the door's recorded token, read as without the freeform
+host: `a_freeform_host_beside_a_list_reads_the_token_at_the_identity_door_815`
+(`tests/identity_envelope_544.rs`, both `ls_identity` parsers),
+`a_freeform_host_beside_a_list_revokes_the_token_at_the_revocation_door_815`
+(`tests/identity_revocation_checks_327.rs`, the run `second_output_matches`
+with its wallet calls),
+`a_freeform_host_beside_a_list_resolves_the_definition_at_the_registry_door_815`
+(`tests/registry_envelope_544.rs`) and
+`a_freeform_host_beside_a_list_names_the_host_at_the_storage_door_815`
+(`tests/storage_advertisement_envelope_544.rs`). Green on the tip, as pins of
+landed behaviour are; 4 of 4 RED on a scratch copy with the earliest freeform
+answer returned over the aggregate in `lookup_resolver/query.rs` (`(0, 0)`,
+`Err(IdentityError("Failed to get lookup result"))`, `0`, `[]`).
+`GlobalKVStore`'s freeform arm stays: the `match` over `LookupAnswer` needs it.
+
+**A failed broadcast's txid, stated.** Every `BroadcastFailure` that
+`TopicBroadcaster::broadcast_tx` answers carries `txid: Some(..)`, the id of
+the transaction sent, older than #804 and stated nowhere until now;
+`a_failed_broadcast_carries_the_txid_the_reference_leaves_out_stated_815`
+(`tests/overlay_ship_requirements_tb.rs`) pins it on one failure of each
+acknowledgment requirement, on every host rejecting, on no host interested
+(an injected resolver whose `ls_ship` host answers an empty output list:
+`ERR_NO_HOSTS_INTERESTED` in the reference's words, nothing sent) and on a
+transaction no BEEF writer writes (`ERR_BEEF_SERIALIZATION`), and
+`a_failed_discovery_fails_the_broadcast_with_its_txid_stated_815`
+(`tests/overlay_ship_interested_hosts_cache_815.rs`) on a refused discovery
+(`ERR_HOST_DISCOVERY`): the seven failures the door answers, the last three
+by the fold after the strength read of PR #982, each RED on a scratch copy
+with that site's `txid: None` planted. The BEEF case also holds that the
+writer runs before the hosts are asked (`SHIPBroadcaster.ts:464-470` before
+`:471`: its `ls_ship` facilitator counts 0 questions and would answer no
+host), and the no-host case states the words under the mainnet and the
+testnet preset (the second fold, the re-read of PR #982). Nothing changes.
+
+### Notes: cross-SDK parity (#815, the bucket's lane)
+
+The reference's SHIP broadcaster's failure object holds `status`, `code` and
+`description` alone (`ts-stack@edf6e03` `SHIPBroadcaster.ts:473-477`,
+`:503-507`, `:570-574`, `:594-598`, `:613-617`; `BroadcastFailure.txid` is
+optional, `Broadcaster.ts:133`), where this crate's carries the transaction's
+id. Ours: the id kept, a caller's own transaction's; the row is in the #804
+entry of the divergence list. Theirs: none.
+
 ### Changed (CI): the node oracle's trampoline asks whether a check is owed before it mints the App's token, and hands `report` the run judged (#958, fix-97-trampoline2)
 
 The three decisions fix-958-judge left for the trampoline's own sitting, in one class J commit that touches `.github/workflows/sibling-judge.yml` and its pin alone; the three lenses on every changed line (the key's reach, GitHub's semantics, failing closed: 36 rows, 33 by a line, 3 by a setting, none that does not hold), main's pick as rehearsed, the sitting's order and the witnesses are `docs/lanes/fix-97-trampoline2.md`.

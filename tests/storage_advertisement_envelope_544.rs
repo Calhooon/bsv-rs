@@ -41,3 +41,26 @@ async fn a_host_is_named_only_for_an_authenticated_advertisement_of_the_file_544
         assert_eq!(hosts, expected, "{}: {}", case["name"], case["words"]);
     }
 }
+
+/// #815's pin at the storage door: one host answering freeform beside one
+/// answering the reference's advertisement. `LookupResolver::query` answers
+/// the merged output list in every case, a freeform host contributing
+/// nothing (`ts-stack@edf6e03` `LookupResolver.ts:1085-1087`, `:1445-1450`),
+/// so the downloader names the advertised host; with the earliest freeform
+/// answer returned over the aggregate (before #821) it named none.
+#[tokio::test]
+async fn a_freeform_host_beside_a_list_names_the_host_at_the_storage_door_815() {
+    let v = vector();
+    let url = v["storage"]["uhrp_url"].as_str().unwrap();
+    let case = &v["storage"]["cases"][0];
+    let expected: Vec<String> = serde_json::from_value(case["hosts"].clone()).unwrap();
+    assert_eq!(expected.len(), 1, "the control names one host");
+    let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+    let downloader = StorageDownloader::new(StorageDownloaderConfig {
+        resolver: Some(lock_position::answering_beside_freeform(
+            "ls_uhrp", script, "storage",
+        )),
+        ..Default::default()
+    });
+    assert_eq!(downloader.resolve(url).await.unwrap(), expected);
+}

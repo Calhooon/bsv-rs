@@ -433,6 +433,33 @@ async fn of_two_outputs_the_matching_second_is_spent_at_its_index() {
     );
 }
 
+/// #815's pin at the revocation door: one host answering freeform ranked
+/// ahead of one answering the two outputs. `LookupResolver::query` answers
+/// the merged output list in every case, a freeform host contributing
+/// nothing (`ts-stack@edf6e03` `LookupResolver.ts:1085-1087`, `:1445-1450`),
+/// so the token is found and spent as in the run without the freeform host;
+/// with the earliest freeform answer returned over the aggregate (before
+/// #821) the revocation found no output.
+#[tokio::test]
+async fn a_freeform_host_beside_a_list_revokes_the_token_at_the_revocation_door_815() {
+    let v = vector();
+    let r = run(&v, "second_output_matches");
+    assert_eq!(r.verdict, None);
+    let freeform = LookupAnswer::Freeform {
+        result: serde_json::json!({ "note": "no outputs here" }),
+    };
+    let (wallet, verdict, sent) = revoke_across(
+        &v.serial_number,
+        vec![freeform, outputs(&v.lookups.both, &[0, 1])],
+        r.signable_tx.as_deref(),
+        vec![signed(r)],
+    )
+    .await;
+    assert_eq!(verdict, Ok(()));
+    same_calls(r, &wallet, &sent);
+    assert_eq!(wallet.creates.lock().unwrap().len(), 1);
+}
+
 #[tokio::test]
 async fn a_sign_action_failure_aborts_the_action_and_keeps_the_failure() {
     let v = vector();
