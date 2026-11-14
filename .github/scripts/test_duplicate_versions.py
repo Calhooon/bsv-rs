@@ -4,6 +4,9 @@ import contextlib
 import io
 import os
 from pathlib import Path
+import re
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,6 +16,24 @@ import unittest.mock
 sys.path.insert(0, os.path.dirname(__file__))
 
 import duplicate_versions as dv  # noqa: E402
+
+REPOSITORY = Path(__file__).resolve().parents[2]
+ARCH = "tests/arch_duplicate_versions_104.rs"
+CI = ".github/workflows/ci.yml"
+SCRIPT = ".github/scripts/duplicate_versions.py"
+
+
+def arch_table(name):
+    """A `const NAME: [&str; N] = [..];` of the arch test, as its texts: the one table of
+    line spellings both readers are held to."""
+    source = (REPOSITORY / ARCH).read_text(encoding="utf-8")
+    found = re.findall(rf"\nconst {name}: \[&str; (\d+)\] = \[(.*?)\n\];", source, re.DOTALL)
+    if len(found) != 1:
+        raise AssertionError(f"{ARCH}: {len(found)} tables named {name}")
+    texts = re.findall(r'"([^"\\]*)"', found[0][1])
+    if not texts or len(texts) != int(found[0][0]):
+        raise AssertionError(f"{ARCH}: {name} read as {len(texts)} texts of {found[0][0]}")
+    return texts
 
 
 TREE = """\
@@ -107,6 +128,24 @@ class Rows(unittest.TestCase):
     def test_lines_that_are_one_unordered_repeated_or_a_full_version_are_refused(self):
         for lines in ["2", "3, 2", "2, 2", "2.0.119, 3", "0.10, 0.9", "2, "]:
             self.refused(f"all | syn | {lines} | r", "not two or more distinct lines in order")
+
+    def test_a_crate_name_holding_a_space_is_refused(self):
+        self.refused("all | sy n | 2, 3 | r", "`sy n` is no crate name")
+
+    def test_every_spelling_the_arch_test_refuses_is_refused_here(self):
+        """The arch test's `REFUSED_LINES`, read from its source: the two readers of a
+        row's lines are held to one table, so neither refuses a spelling alone."""
+        for lines in arch_table("REFUSED_LINES"):
+            _, errors = dv.parse_rows(f"all | syn | {lines} | r\n")
+            self.assertEqual(len(errors), 1, (lines, errors))
+            self.assertIn(f"syn: `{lines.strip()}` is not two or more distinct lines in order",
+                          errors[0])
+
+    def test_every_spelling_the_arch_test_reads_is_read_here(self):
+        for lines in arch_table("READ_LINES"):
+            rows, errors = dv.parse_rows(f"all | syn | {lines} | r\n")
+            self.assertEqual(errors, [], lines)
+            self.assertEqual(rows[0][2], [v.strip() for v in lines.split(",")])
 
     def test_a_crate_named_twice_or_out_of_order_is_refused(self):
         _, errors = dv.parse_rows("all | syn | 2, 3 | r\nall | syn | 2, 3 | r\n")
@@ -278,6 +317,97 @@ class Main(unittest.TestCase):
         self.assertEqual(lines, [])
         self.assertIn("`cargo tree --locked` failed:", err)
         self.assertIn("the lock file needs to be updated", err)
+
+
+
+STUB = """\
+#!/bin/sh
+# A stand-in for cargo: `cargo tree` alone, one graph's package lines from a file.
+here=$(dirname "$0")
+printf '%s\\n' "$*" >> "$here/asked"
+[ "$1" = tree ] || { echo "the stub is asked for \\`$1\\`, not \\`tree\\`" >&2; exit 2; }
+if [ -e "$here/fail" ]; then
+  echo "error: the lock file needs to be updated but --locked was passed" >&2
+  exit 101
+fi
+case " $* " in
+  *" --all-features "*) graph=all ;;
+  *" full,http,websocket "*) graph=native ;;
+  *" wasm32-unknown-unknown "*) graph=wasm32 ;;
+  *) graph=default ;;
+esac
+cat "$here/$graph"
+"""
+
+
+@unittest.skipUnless(os.name == "posix", "the stub cargo is a shell script")
+class Process(unittest.TestCase):
+    """The script run as the `deny` step runs it: the PROCESS's exit code is what
+    `|| result=1` reads, so `sys.exit(main())` is held here and by no test of `main()`.
+    A copy of the script under a temporary root, the step's own command line, and a stub
+    `cargo` the only one on `PATH` (no real cargo, no network)."""
+
+    def command(self):
+        """The step's command line for the script, read from ci.yml, `python3` this one."""
+        step = (REPOSITORY / CI).read_text(encoding="utf-8")
+        lines = [line for line in step.splitlines() if "duplicate_versions.py" in line
+                 and "unittest" not in line and not line.lstrip().startswith("#")]
+        self.assertEqual(len(lines), 1, lines)
+        command, gate = lines[0].split("||")
+        self.assertEqual(gate.strip(), "result=1")
+        words = shlex.split(command)
+        self.assertEqual(words, ["python3", "-B", SCRIPT])
+        return [sys.executable, *words[1:]]
+
+    def run_script(self, graphs, text=LIST, fail=False):
+        """The exit code, stdout's lines, stderr and what the stub was asked."""
+        with tempfile.TemporaryDirectory() as scratch:
+            root, stub = Path(scratch) / "root", Path(scratch) / "bin"
+            (root / SCRIPT).parent.mkdir(parents=True)
+            shutil.copyfile(REPOSITORY / SCRIPT, root / SCRIPT)
+            (root / dv.LIST).parent.mkdir(parents=True)
+            (root / dv.LIST).write_text(text, encoding="utf-8")
+            stub.mkdir()
+            (stub / "cargo").write_text(STUB, encoding="utf-8")
+            (stub / "cargo").chmod(0o755)
+            for graph in dv.GRAPHS:
+                (stub / graph).write_text(tree_of(graphs[graph]), encoding="utf-8")
+            if fail:
+                (stub / "fail").write_text("", encoding="utf-8")
+            done = subprocess.run(self.command(), cwd=root, capture_output=True, text=True,
+                                  env={"PATH": f"{stub}{os.pathsep}{os.defpath}"}, check=False)
+            asked = (stub / "asked").read_text(encoding="utf-8").splitlines()
+            manifest = str((root / "Cargo.toml").resolve())
+        for line in asked:
+            self.assertTrue(line.startswith(f"tree --locked --color never --manifest-path {manifest} "),
+                            line)
+        return done.returncode, done.stdout.splitlines(), done.stderr, asked
+
+    def test_the_graphs_the_list_describes_exit_0_as_a_process(self):
+        code, lines, err, asked = self.run_script(HELD)
+        self.assertEqual(lines, [Main.COUNTS])
+        self.assertEqual(err, "")
+        self.assertEqual(code, 0)
+        self.assertEqual(len(asked), len(dv.GRAPHS), asked)
+
+    def test_a_new_duplicate_exits_1_as_a_process(self):
+        more = dict(SYN, itoa=["0.4.8", "1.0.15"])
+        code, lines, err, asked = self.run_script(found(all=PAIR, native=PAIR, wasm32=more, default=SYN))
+        self.assertEqual(len(lines), 2, lines)
+        self.assertEqual(lines[0], Main.COUNTS.replace("wasm32 1", "wasm32 2"))
+        self.assertTrue(lines[1].startswith("NEW duplicate in `wasm32`: itoa 0.4.8, 1.0.15 has no row"),
+                        lines[1])
+        self.assertEqual(err, "")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(asked), len(dv.GRAPHS), asked)
+
+    def test_a_cargo_tree_that_fails_exits_1_as_a_process(self):
+        code, lines, err, asked = self.run_script(HELD, fail=True)
+        self.assertEqual(lines, [])
+        self.assertIn("duplicate versions: `cargo tree --locked", err)
+        self.assertIn("the lock file needs to be updated", err)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(asked), 1, asked)
 
 
 if __name__ == "__main__":

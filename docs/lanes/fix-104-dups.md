@@ -25,7 +25,7 @@ with `lint` green.
 |---|---|
 | `docs/duplicate-versions.txt` | One row a crate: `graphs \| crate \| lines \| reason`. The graphs that hold the pair, the semver-compatible lines held, the older side's parents and what would end it |
 | `.github/scripts/duplicate_versions.py` | Reads four graphs with `cargo tree --locked -e normal,build,dev --prefix none --format {p}` (nothing built) and refuses `NEW` (a duplicate with no row), `MOVED` (other lines than the row's, a third line included) and `STALE` (a row naming a graph that holds no such pair), and a malformed list |
-| `ci.yml`, the `deny` step of `lint` | Runs the script's unit tests (21; 28 since the fold) and the script after the three `cargo-deny` checks, each under `\|\| result=1`; no new gate, no new step, no tool installed |
+| `ci.yml`, the `deny` step of `lint` | Runs the script's unit tests (21; 28 since the fold; 34 since the second) and the script after the three `cargo-deny` checks, each under `\|\| result=1`; no new gate, no new step, no tool installed |
 | `tests/arch_duplicate_versions_104.rs` | Pins the list's form and totals (`ROWS` 11; `TOTALS` 11, 11, 3, 5; `LINES` 22 since the fold), the step's two lines, `deny.toml`'s warn level with no `skip`, the script's graphs |
 
 The graphs: `all` (`--all-features --target all`), `wasm32` (`--no-default-features --features
@@ -128,3 +128,26 @@ edges as cargo-deny's `--target` filter does.
 
 Logs: `/Volumes/Lanes/out/bsv-rs/fix-104-dups-fold/` (`red-main-A.log`, `red-main-B.log`,
 `red-lines-before.log`, `red-lines-tip.log`). The scratch tree and its target dir are removed.
+
+## The second fold (lane fix-104-dups-fold2, 2026-11-14)
+
+The re-read of the fold planted two faults that passed. Both are mended, each with its RED.
+
+| What | Before | Now | RED |
+|---|---|---|---|
+| The exit code CI reads | every test called `dv.main()`; the script's last line changed from `sys.exit(main())` to `main()` passed all 28, and the process then exits 0 on a new duplicate and on a failing `cargo tree` | `Process` in `test_duplicate_versions.py`, three tests: a copy of the script under a temporary root, run by the step's own command line (read from `ci.yml`, `python3 -B .github/scripts/duplicate_versions.py`, no argument), a stub `cargo` (a shell script answering `cargo tree` from one file a graph) the only one on `PATH`; 0 for the graphs the list describes, 1 for a new duplicate, 1 for a `cargo tree` that fails | the plant: 2 of 34 fail (`0 != 1`, twice); the fold's 28 tests on the plant: 28 of 28 |
+| A line as the two readers read it | `base64 \| 0.22, 0.23-rc` and `0.22, 0.23+x` passed the arch test 6 of 6 where the script's `parse_rows` refuses them: `is_line` did not refuse `-` or `+` as `line_of(v) != v` does | `is_line` refuses both; the arch test's header writes the script's rule out with every spelling it refuses; `REFUSED_LINES` (21 texts) plants each and `READ_LINES` (7) the spellings read; the script's tests read both tables from the arch test's file and hold `parse_rows` to them; a crate name holding a space is refused by both | `is_line` without the refusal: 5 of 6, the form test failing with no refusal for `0.10, 0.11-rc`; the two rows in a copy of the list: 3 of 6 fail on the tip |
+
+The agreement, as far as it is held: on the two tables by a run on each side; beyond them by
+reading, on a list of ASCII text whose line parts are numbers as cargo writes them. Outside that
+the two can part and nothing holds them (the arch test's header lists the cells: two spellings of
+one number such as `01, 1`, a number past `u64`, a digit outside ASCII, white space and line ends
+Python takes and Rust does not).
+
+Said, not built: `base64 | 0.22, 0.24` in the list alone passes the arch test 6 of 6 (the line
+total does not move) and the script's `parse_rows`; the script's `judge` refuses it against the
+graphs as `MOVED`, in CI. The arch test's header says so: whether the graphs hold what the list
+says is the script's run, never that file's.
+
+Logs: `/Volumes/Lanes/out/bsv-rs/fix-104-dups-fold2/` (`red1-exit-plant.log`, `red2a-is-line.log`,
+`red2c-name.log`, `plant-row-*.log`). The scratch tree and its target dir are removed.

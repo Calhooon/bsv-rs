@@ -10,14 +10,41 @@
 //! This guard reads four files and nothing else (no cargo, no network, no environment), at
 //! the string level, and names what it misses:
 //!
-//! - the list: every row four cells with a reason, one row a crate in name order, the graphs
-//!   known and in order, the lines two or more, distinct and in order (the script's rule),
-//!   and the totals pinned here (`ROWS`, `TOTALS`, `LINES`), so a row added, dropped,
-//!   widened to another graph or widened by a line is a change of this file in the same diff;
+//! - the list: every row four cells with a reason, one row a crate in name order (no space in
+//!   a name), the graphs known and in order, the lines two or more, distinct and in order
+//!   (the script's rule, written out below), and the totals pinned here (`ROWS`, `TOTALS`,
+//!   `LINES`), so a row added, dropped, widened to another graph or widened by a line is a
+//!   change of this file in the same diff;
 //! - ci.yml: the `deny` step runs the script's tests and the script, each failing the step;
 //! - `deny.toml`: duplicates still warn there and nothing is skipped, so the list is the one
 //!   record of them;
 //! - the script: it reads the list at this path and the wasm32 slice the `deny` step checks.
+//!
+//! The script's rule for a row's `lines` cell (`parse_rows`, `line_of`, `line_key`), which
+//! `list_errors` mirrors: the cell is split on `,` and each text trimmed; a text is a line
+//! when `line_of(text) == text`, and `line_of` cuts a version at its leftmost `-`, then at its
+//! leftmost `+`, and keeps the parts up to the leftmost one that is not `0`. So the script
+//! refuses, and `is_line` and `list_errors` refuse with it:
+//!
+//! - fewer than two lines (`0.10`, an empty cell);
+//! - an empty line (`0.10, `, `0.10, , 0.11`);
+//! - a line carrying `-`, a pre-release (`0.11-rc`, `0.11-`);
+//! - a line carrying `+`, build metadata (`0.11+x`, `0.11+`);
+//! - a line with a part after its leftmost part that is not `0`, a full version among them
+//!   (`0.10.4`, `1.2`, `0..11`, `.11`);
+//! - a line repeated (`0.10, 0.10`);
+//! - lines out of `line_key`'s order, numeric by part (`0.11, 0.10`; `0.10, 0.9`).
+//!
+//! `REFUSED_LINES` plants each spelling and `READ_LINES` the spellings read; the script's
+//! tests read both tables from this file and hold `parse_rows` to them
+//! (`test_every_spelling_the_arch_test_refuses_is_refused_here`, `..._reads_is_read_here`),
+//! so the two readers agree on the tables by a run on each side. Beyond the tables the
+//! agreement is by reading, on a list of ASCII text whose line parts are numbers as cargo
+//! writes them (no leading zero, within `u64`). Outside that the two can part and no test
+//! holds them: two spellings of one number (`01, 1`: refused here, the script's answer its
+//! set's order), a number past `u64` (text here, a number there), a digit outside ASCII, and
+//! white space or line ends that Python's `strip` and `splitlines` take and Rust's `trim`
+//! and `lines` do not.
 //!
 //! The bound: the pinned totals say the list did not grow unseen; whether the graphs hold
 //! what the list says is the script's run in CI, on the lockfile that run resolves (the crate
@@ -58,12 +85,60 @@ fn line_key(line: &str) -> Vec<(bool, u64, &str)> {
         .collect()
 }
 
-/// Whether a text is a semver-compatible line, the script's `line_of(v) == v`: zero parts,
-/// then the leftmost nonzero part and nothing after it (`3`, `0.22`, `0.0.4`), or all zeros.
+/// Whether a text is a semver-compatible line, the script's `v and line_of(v) == v`: no `-`
+/// and no `+` (`line_of` cuts a version at either, so a text holding one is never its own
+/// line), then zero parts, the leftmost part that is not `0` and nothing after it (`3`,
+/// `0.22`, `0.0.4`), or all zeros.
 fn is_line(text: &str) -> bool {
     let parts: Vec<&str> = text.split('.').collect();
-    !text.is_empty() && parts[..parts.len() - 1].iter().all(|part| *part == "0")
+    !text.is_empty()
+        && !text.contains(['-', '+'])
+        && parts[..parts.len() - 1].iter().all(|part| *part == "0")
 }
+
+/// Every spelling of a row's `lines` cell the script refuses (the header's list), each one
+/// fault: where a line carries `-` or `+` the lines are otherwise two, distinct and in order.
+/// The script's tests read this table from this file and refuse each text too.
+const REFUSED_LINES: [&str; 21] = [
+    // fewer than two lines
+    "0.10",
+    "",
+    // an empty line
+    "0.10, ",
+    ", 0.10",
+    "0.10, , 0.11",
+    // a pre-release
+    "0.10, 0.11-rc",
+    "0.10-rc, 0.11",
+    "0.10, 0.11-",
+    "0.10, 0.11-rc.1",
+    // build metadata
+    "0.10, 0.11+x",
+    "0.10+x, 0.11",
+    "0.10, 0.11+",
+    "0.10, 0.11-rc+x",
+    // a part after the leftmost part that is not `0`
+    "0.10.4, 0.11",
+    "0.10, 0.11.0",
+    "1.2, 2",
+    "0.10, 0..11",
+    "0.10, .11",
+    // repeated, and out of order
+    "0.10, 0.10",
+    "0.11, 0.10",
+    "0.10, 0.9",
+];
+
+/// Spellings the script reads as two or more distinct lines in order, read here too.
+const READ_LINES: [&str; 7] = [
+    "0.10, 0.11",
+    "0.9, 0.10",
+    "2, 3",
+    "2, 10",
+    "0.0.4, 0.0.5",
+    "0.0.0, 0.0.4, 0.4, 4",
+    "0.10,0.11",
+];
 
 /// What is wrong with the list's text: its form, then its totals against the pins.
 fn list_errors(text: &str) -> Vec<String> {
@@ -116,6 +191,9 @@ fn list_errors(text: &str) -> Vec<String> {
         }
         if reason.is_empty() {
             errors.push(format!("{LIST}:{number}: {name}: no reason"));
+        }
+        if name.contains(' ') {
+            errors.push(format!("{LIST}:{number}: `{name}` is no crate name"));
         }
         if name.is_empty() || name <= last.as_str() {
             errors.push(format!(
@@ -326,19 +404,21 @@ fn a_duplicate_row_without_a_reason_or_out_of_form_is_refused_104() {
         with("all, linux | sha1 | 0.10, 0.11 | r"),
         "each once in that order",
     );
-    for lines in [
-        "0.10",
-        "0.11, 0.10",
-        "0.10, 0.10",
-        "0.10, 0.9",
-        "0.10.4, 0.11",
-        "0.10, ",
-    ] {
-        one(
-            with(&format!("all, native | sha1 | {lines} | r")),
-            "is not two or more distinct lines in order",
+    let form = "is not two or more distinct lines in order";
+    for lines in REFUSED_LINES {
+        one(with(&format!("all, native | sha1 | {lines} | r")), form);
+    }
+    for lines in READ_LINES {
+        let errors = list_errors(&with(&format!("all, native | sha1 | {lines} | r")));
+        assert!(
+            !errors.iter().any(|e| e.contains(form)),
+            "`{lines}` is refused: {errors:?}"
         );
     }
+    one(
+        with("all, native | sha 1 | 0.10, 0.11 | r"),
+        "`sha 1` is no crate name",
+    );
     one(
         with("all, native | rand_core | 0.10, 0.11 | r"),
         "`rand_core` is not after `rand_core`",
