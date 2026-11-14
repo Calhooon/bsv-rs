@@ -198,6 +198,8 @@ impl Beef {
     /// its `#ensureSerializableState` and its sort. The words name no entry,
     /// so the order the entries are met in moves nothing.
     pub(super) fn refuse_unsafe_amount(&self) -> Result<()> {
+        #[cfg(test)]
+        super::atomic::cost::amounts(self.txs.len());
         self.txs.iter().try_for_each(BeefTx::amount_refusal)
     }
 

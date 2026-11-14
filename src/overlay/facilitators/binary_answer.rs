@@ -72,6 +72,15 @@ fn atomic_outputs_within(
 ) -> Result<Vec<OutputListItem>> {
     let mut beef = Beef::from_binary(beef)
         .map_err(|e| Error::OverlayError(format!("Failed to parse BEEF: {e}")))?;
+    if outpoints.is_empty() {
+        return Ok(Vec::new());
+    }
+    // One refresh, one amount check and one position map for every
+    // outpoint's closure (#817: `Beef::to_binary_atomic` ran the three a
+    // distinct txid), prepared where the leading outpoint's closure began,
+    // so its refusal stands where that call's did.
+    let extract = |e: Error| Error::OverlayError(format!("Failed to extract BEEF: {e}"));
+    let batch = beef.atomic_batch().map_err(extract)?;
     let mut by_txid: HashMap<String, Vec<u8>> = HashMap::new();
     let mut generated = 0usize;
     let mut extracted = 0usize;
@@ -80,9 +89,7 @@ fn atomic_outputs_within(
         let atomic = match by_txid.get(&txid) {
             Some(atomic) => atomic.clone(),
             None => {
-                let atomic = beef
-                    .to_binary_atomic(&txid)
-                    .map_err(|e| Error::OverlayError(format!("Failed to extract BEEF: {e}")))?;
+                let atomic = batch.to_binary_atomic(&txid).map_err(extract)?;
                 generated = generated.saturating_add(atomic.len());
                 if generated > max_generated {
                     return Err(Error::OverlayError(
