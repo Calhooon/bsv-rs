@@ -1,0 +1,465 @@
+{
+  "description": "#845: the reference's answers for an input's sourceTXID at addInput and at the plain writer (ts-stack@edf6e03, Node v22.18.0); tests/support/source_txid_doors_845.mjs",
+  "source_id": "92f06005f51981ae89f855306f6498bc8b764c4d7f6cbdb4881dc56d4d77314f",
+  "cases": [
+    {
+      "name": "lower_64",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "ok": {
+          "held": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      }
+    },
+    {
+      "name": "lower_64_linked",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "ok": {
+          "held": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      }
+    },
+    {
+      "name": "upper_64",
+      "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "linked": false,
+      "add_input": {
+        "ok": {
+          "held": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      }
+    },
+    {
+      "name": "upper_64_linked",
+      "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "linked": true,
+      "add_input": {
+        "ok": {
+          "held": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      }
+    },
+    {
+      "name": "mixed_64",
+      "text": "aAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaA",
+      "linked": false,
+      "add_input": {
+        "ok": {
+          "held": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      }
+    },
+    {
+      "name": "mixed_64_linked",
+      "text": "aAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaA",
+      "linked": true,
+      "add_input": {
+        "ok": {
+          "held": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "id": "e6910da2e7595f2a27d5155430dfc8d3326cb6f14a0834fa00517a405543a43b"
+        }
+      }
+    },
+    {
+      "name": "null_64",
+      "text": "0000000000000000000000000000000000000000000000000000000000000000",
+      "linked": false,
+      "add_input": {
+        "ok": {
+          "held": "0000000000000000000000000000000000000000000000000000000000000000",
+          "outpoint": "0000000000000000000000000000000000000000000000000000000000000000",
+          "id": "161b0bf0e498c493a5de698ee6e6ad5c009b4ccefcd9885737a27f9284112c35"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "0000000000000000000000000000000000000000000000000000000000000000",
+          "id": "161b0bf0e498c493a5de698ee6e6ad5c009b4ccefcd9885737a27f9284112c35"
+        }
+      }
+    },
+    {
+      "name": "null_64_linked",
+      "text": "0000000000000000000000000000000000000000000000000000000000000000",
+      "linked": true,
+      "add_input": {
+        "ok": {
+          "held": "0000000000000000000000000000000000000000000000000000000000000000",
+          "outpoint": "0000000000000000000000000000000000000000000000000000000000000000",
+          "id": "161b0bf0e498c493a5de698ee6e6ad5c009b4ccefcd9885737a27f9284112c35"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "0000000000000000000000000000000000000000000000000000000000000000",
+          "id": "161b0bf0e498c493a5de698ee6e6ad5c009b4ccefcd9885737a27f9284112c35"
+        }
+      }
+    },
+    {
+      "name": "short_4",
+      "text": "abcd",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "short_4_linked",
+      "text": "abcd",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "odd_63",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "odd_63_linked",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "odd_65",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "odd_65_linked",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "long_66",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "long_66_linked",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "not_hex_64",
+      "text": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "not_hex_64_linked",
+      "text": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "not_hex_2",
+      "text": "zz",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "not_hex_2_linked",
+      "text": "zz",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "one_bad_digit_64",
+      "text": "gaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "one_bad_digit_64_linked",
+      "text": "gaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "empty",
+      "text": "",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "empty_linked",
+      "text": "",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "space_padded_64",
+      "text": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "space_padded_64_linked",
+      "text": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "space_padded_66",
+      "text": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "space_padded_66_linked",
+      "text": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "prefixed_0x_64",
+      "text": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "prefixed_0x_64_linked",
+      "text": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "plus_sign_64",
+      "text": "+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "plus_sign_64_linked",
+      "text": "+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "two_byte_character",
+      "text": "éaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": false,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "two_byte_character_linked",
+      "text": "éaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "linked": true,
+      "add_input": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      },
+      "hand_built": {
+        "error": "sourceTXID must be a 32-byte hexadecimal transaction ID."
+      }
+    },
+    {
+      "name": "absent",
+      "text": null,
+      "linked": false,
+      "add_input": {
+        "error": "A reference to an an input transaction is required. If the input transaction itself cannot be referenced, its TXID must still be provided."
+      },
+      "hand_built": {
+        "error": "sourceTransaction is undefined"
+      }
+    },
+    {
+      "name": "absent_linked",
+      "text": null,
+      "linked": true,
+      "add_input": {
+        "ok": {
+          "held": null,
+          "outpoint": "4f31774d6dc51d88b4bd6c7f4d4c768bbc98646f3055f889ae8119f50560f092",
+          "id": "7c69a336c4aa0b3fa496abd0f6ea2459b1f25abbec62b89bcb402f0e109511e2"
+        }
+      },
+      "hand_built": {
+        "ok": {
+          "outpoint": "4f31774d6dc51d88b4bd6c7f4d4c768bbc98646f3055f889ae8119f50560f092",
+          "id": "7c69a336c4aa0b3fa496abd0f6ea2459b1f25abbec62b89bcb402f0e109511e2"
+        }
+      }
+    }
+  ]
+}

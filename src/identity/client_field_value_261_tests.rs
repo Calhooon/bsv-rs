@@ -52,7 +52,7 @@ fn publish(json: &serde_json::Value) -> OutputListItem {
 fn publish_by(json: &serde_json::Value, subject: &PrivateKey) -> OutputListItem {
     let locking = revelation(subject, &serde_json::to_vec(json).unwrap());
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, locking)).unwrap();
     OutputListItem {
@@ -223,7 +223,7 @@ fn published_with_txid_alone() -> (Certificate, OutputListItem) {
     let subject_key = PrivateKey::from_bytes(&[37u8; 32]).unwrap();
     let locking = revelation(&subject_key, &serde_json::to_vec(&json).unwrap());
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, locking)).unwrap();
     let output = OutputListItem {

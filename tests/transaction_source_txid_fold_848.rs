@@ -68,7 +68,7 @@ fn bump(txid: &str) -> MerklePath {
 /// proven by a path of its own.
 fn root(fill: &str, sats: u64, outs: usize) -> Transaction {
     let mut t = Transaction::new();
-    let mut i = TransactionInput::new(fill.repeat(32), 0);
+    let mut i = TransactionInput::new(fill.repeat(32).parse().unwrap(), 0);
     i.unlocking_script = empty();
     t.add_input(i).unwrap();
     for _ in 0..outs {
@@ -82,7 +82,7 @@ fn root(fill: &str, sats: u64, outs: usize) -> Transaction {
 fn link(src: Transaction, named: Option<String>, vout: u32) -> TransactionInput {
     let named = named.unwrap_or_else(|| src.id());
     let mut i = TransactionInput::with_source_transaction(src, vout);
-    i.source_txid = Some(named);
+    i.source_txid = Some(named.parse().unwrap());
     i.unlocking_script = empty();
     i
 }
@@ -202,7 +202,7 @@ fn build_template_cell(cell: &Value) -> Transaction {
             Transaction::from_ef(&from_hex(cell["built"]["ef"].as_str().unwrap()).unwrap()).unwrap()
         }
         "named_alone" => {
-            let mut i = TransactionInput::new(other(), 1);
+            let mut i = TransactionInput::new(other().parse().unwrap(), 1);
             i.unlocking_script = empty();
             child(vec![i])
         }
@@ -351,12 +351,12 @@ fn build_verify_cell(cell: &str) -> Transaction {
     match cell {
         "unlinked_named_reachable" => {
             let b = root("22", 1000, 2);
-            let mut unlinked = TransactionInput::new(b.id(), 0);
+            let mut unlinked = TransactionInput::new(b.txid(), 0);
             unlinked.unlocking_script = empty();
             child(vec![unlinked, link(b, None, 1)])
         }
         "unlinked_unreachable" => {
-            let mut unlinked = TransactionInput::new(other(), 0);
+            let mut unlinked = TransactionInput::new(other().parse().unwrap(), 0);
             unlinked.unlocking_script = empty();
             child(vec![unlinked])
         }

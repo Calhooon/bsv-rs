@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use super::{sha256d, to_hex, Transaction, Writer, TRAILING_DATA};
-use crate::transaction::{MerklePath, TransactionInput, TransactionOutput};
+use crate::transaction::{MerklePath, TransactionInput, TransactionOutput, Txid};
 use crate::Result;
 
 pub(super) use sealed::Fields;
@@ -45,16 +45,11 @@ mod sealed {
         hex_cache: OnceLock<String>,
     }
 
-    /// Whether `text` is 64 ASCII hex digits, the texts the serializer writes
-    /// an outpoint from (its bytes, never a linked source's): the outpoint
-    /// rule's one test, which `super::outpoint_txid` reads too.
-    pub(super) fn names_32_bytes(text: &str) -> bool {
-        text.len() == 64 && text.bytes().all(|b| b.is_ascii_hexdigit())
-    }
-
-    /// Whether the serializer writes `input`'s outpoint from its text.
+    /// Whether the serializer writes `input`'s outpoint from its own txid
+    /// (its bytes, never a linked source's): the outpoint rule's one test,
+    /// a `Txid` held since #845 (a text of 64 hex digits until then).
     fn named(input: &TransactionInput) -> bool {
-        input.source_txid.as_deref().is_some_and(names_32_bytes)
+        input.source_txid.is_some()
     }
 
     impl Fields {
@@ -116,9 +111,9 @@ mod sealed {
 
         /// Links `source` to input `index` and returns the source it held:
         /// the linking door, which lends nothing. The caches are kept exactly
-        /// when the input's `source_txid` is 64 hex digits, the outpoint
-        /// rule's `Named` arm, under which the serializer writes the text and
-        /// never reads the source, and the text is not touched here, so no
+        /// when the input holds a `source_txid`, the outpoint
+        /// rule's `Named` arm, under which the serializer writes the txid and
+        /// never reads the source, and the txid is not touched here, so no
         /// byte moves; else they are emptied through `write`. Panics when
         /// `index` is not an input's.
         pub(super) fn replace_source(
@@ -174,7 +169,7 @@ mod sealed {
                     if let (false, Some(source)) =
                         (named(input), input.source_transaction.as_deref())
                     {
-                        copy.source_txid = Some(source.id());
+                        copy.source_txid = Some(source.txid());
                     }
                     copy
                 })
@@ -304,7 +299,7 @@ impl Transaction {
     /// ```compile_fail,E0615
     /// use bsv_rs::transaction::{Transaction, TransactionInput};
     /// let mut tx = Transaction::new();
-    /// tx.inputs.push(TransactionInput::new("00".repeat(32), 0));
+    /// tx.inputs.push(TransactionInput::new("00".repeat(32).parse().unwrap(), 0));
     /// ```
     pub fn inputs(&self) -> &[TransactionInput] {
         self.fields.read().1
@@ -408,7 +403,7 @@ impl Transaction {
     /// ```
     /// use bsv_rs::transaction::{Transaction, TransactionInput};
     /// let mut tx = Transaction::new();
-    /// tx.inputs_mut().push(TransactionInput::new("11".repeat(32), 0));
+    /// tx.inputs_mut().push(TransactionInput::new("11".repeat(32).parse().unwrap(), 0));
     /// let parts = tx.parts_mut();
     /// *parts.lock_time = parts.inputs.len() as u32;
     /// assert_eq!(tx.lock_time(), 1);
@@ -657,31 +652,25 @@ impl Transaction {
 
 /// What the serializer writes as an input's outpoint txid, by the one rule
 /// every path that copies a cache shares (#869's second fold): the input's
-/// `source_txid` when it is hex of exactly 32 bytes (`Named`, the bytes
-/// reversed into internal order), else the linked source's hash
-/// (`Source`), else 32 zero bytes (`Zero`). The rule is the serializer's
-/// as it stood (`get_source_txid_bytes`, then the source's `hash()`, then
-/// zeros); no byte it writes moved.
+/// `source_txid` when it holds one (`Named`, its wire bytes), else the
+/// linked source's hash (`Source`), else 32 zero bytes (`Zero`). Since #845
+/// `source_txid` is a [`Txid`], so `Named` is every input that names a
+/// txid: a text the serializer could not read, which it wrote from the
+/// source or as zeros until then, cannot be held.
 pub(in crate::transaction) enum OutpointTxid<'a> {
-    /// `source_txid` is 64 hex digits: its bytes, whatever the source.
-    Named(&'a str),
-    /// `source_txid` is absent or not 64 hex digits, and a source is
-    /// linked: its hash.
+    /// `source_txid` is held: its bytes, whatever the source.
+    Named(Txid),
+    /// `source_txid` is absent and a source is linked: its hash.
     Source(&'a Transaction),
-    /// Neither: 32 zero bytes.
+    /// Neither: 32 zero bytes (an input `add_input` refuses; reached by a
+    /// struct literal or `inputs_mut()`, stated).
     Zero,
 }
 
 /// The arm of [`OutpointTxid`] an input is in.
 pub(in crate::transaction) fn outpoint_txid(input: &TransactionInput) -> OutpointTxid<'_> {
-    match (
-        input
-            .source_txid
-            .as_deref()
-            .filter(|t| sealed::names_32_bytes(t)),
-        input.source_transaction.as_deref(),
-    ) {
-        (Some(text), _) => OutpointTxid::Named(text),
+    match (input.source_txid, input.source_transaction.as_deref()) {
+        (Some(txid), _) => OutpointTxid::Named(txid),
         (None, Some(source)) => OutpointTxid::Source(source),
         (None, None) => OutpointTxid::Zero,
     }
@@ -690,35 +679,20 @@ pub(in crate::transaction) fn outpoint_txid(input: &TransactionInput) -> Outpoin
 /// The outpoint txid bytes the serializer writes for `input`.
 pub(in crate::transaction) fn outpoint_txid_bytes(input: &TransactionInput) -> [u8; 32] {
     match outpoint_txid(input) {
-        OutpointTxid::Named(text) => {
-            let mut out = [0u8; 32];
-            // 64 hex digits always decode to 32 bytes.
-            if hex::decode_to_slice(text, &mut out).is_err() {
-                return [0; 32];
-            }
-            out.reverse();
-            out
-        }
+        OutpointTxid::Named(txid) => *txid.as_wire_bytes(),
         OutpointTxid::Source(source) => source.hash(),
         OutpointTxid::Zero => [0; 32],
     }
 }
 
 /// The txid an input's outpoint names, as the BEEF graph keys it (#869's
-/// third fold): the text when it is 64 hex digits, as given; else the linked
-/// source's id; else the text as given, if any (what `get_source_txid` read
-/// before the fold, so only a text that does not parse over a linked source
-/// moves: it named the text, which no entry and no written byte carries).
+/// third fold): the input's own when it holds one, else the linked source's
+/// id, else none.
 pub(in crate::transaction) fn outpoint_txid_name(input: &TransactionInput) -> Option<String> {
-    if input.source_transaction.is_none() {
-        // `Named` or `Zero`: the text either way, so no scan (the read path's
-        // entries link nothing).
-        return input.source_txid.clone();
-    }
     match outpoint_txid(input) {
-        OutpointTxid::Named(text) => Some(text.to_string()),
+        OutpointTxid::Named(txid) => Some(txid.to_string()),
         OutpointTxid::Source(source) => Some(source.id()),
-        OutpointTxid::Zero => input.source_txid.clone(),
+        OutpointTxid::Zero => None,
     }
 }
 

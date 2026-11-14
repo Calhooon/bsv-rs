@@ -347,7 +347,7 @@ fn chronicle_child(version: u32) -> Result<bool, String> {
     let mut source = Transaction::new();
     source
         .add_input({
-            let mut input = TransactionInput::new("11".repeat(32), 0);
+            let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
             input.set_unlocking_script(UnlockingScript::from_hex("51").unwrap());
             input
         })

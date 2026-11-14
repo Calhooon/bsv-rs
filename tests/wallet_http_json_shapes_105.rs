@@ -84,7 +84,7 @@ fn record(test: &str, patches: Vec<Value>) {
 fn witness_bytes() -> Vec<(&'static str, Vec<u8>)> {
     let op_1 = || LockingScript::from_binary(&[0x51]).unwrap();
     let mut parent = Transaction::new();
-    let mut funding = TransactionInput::new("44".repeat(32), 0);
+    let mut funding = TransactionInput::new("44".repeat(32).parse().unwrap(), 0);
     funding.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     parent.add_input(funding).unwrap();
     parent

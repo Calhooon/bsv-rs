@@ -259,7 +259,7 @@ fn parent_and_child(version: u32, unlock: &str) -> (Transaction, Transaction, Mo
     let lock = cases("default")[0].lock.clone();
     let mut parent = Transaction::new();
     parent
-        .add_input(TransactionInput::new("11".repeat(32), 0))
+        .add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     parent.inputs_mut()[0].set_unlocking_script(UnlockingScript::from_hex("51").unwrap());
     parent

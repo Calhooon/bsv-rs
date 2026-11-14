@@ -298,7 +298,7 @@ fn token_of(name: &str) -> LockingScript {
 /// #737's `proven_spend`: a proven transaction spending `<byte>`x32:0 into
 /// `lock`, its BUMP a lone leaf at offset 0 at 900, by this crate's writer.
 fn proven_spend(byte: &str, lock: LockingScript) -> Vec<u8> {
-    let mut input = TransactionInput::new(byte.repeat(32), 0);
+    let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

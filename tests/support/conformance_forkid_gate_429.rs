@@ -16,7 +16,7 @@ fn run(input: &Value) -> Result<bool, String> {
         let prevout = prevouts
             .iter()
             .find(|p| {
-                Some(s(p, "txid")) == txin.source_txid.as_deref()
+                txin.source_txid.is_some_and(|t| t == s(p, "txid"))
                     && p["vout"].as_u64() == Some(u64::from(txin.source_output_index))
             })
             .unwrap();

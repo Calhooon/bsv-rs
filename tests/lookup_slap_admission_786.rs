@@ -81,7 +81,7 @@ fn advertisement(host: &str, satoshis: u64) -> (String, OutputListItem) {
     let script: LockingScript =
         create_signed_overlay_admin_token(&PrivateKey::random(), Protocol::Slap, host, SERVICE);
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(satoshis, script))
         .unwrap();

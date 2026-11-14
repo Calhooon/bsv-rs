@@ -43,7 +43,7 @@ pub fn relocked_before(case: &Value) -> LockingScript {
 /// A transaction of one made-up input whose output 0 is `script`.
 pub fn source_of(script: LockingScript) -> Transaction {
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, script)).unwrap();
     tx

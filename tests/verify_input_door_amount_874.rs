@@ -72,7 +72,9 @@ const TX_00026: &str = "0200000001636324f2afc64bfbe8bc2327a0cdd05ec515df96c5ca1c
 /// locked by `OP_1`, lock time 0.
 fn tx_00026() -> Vec<u8> {
     let mut input = TransactionInput::new(
-        "067d582185c18f53921ccac596df15c55ed0cda02723bce8fb4bc6aff2246363".to_string(),
+        "067d582185c18f53921ccac596df15c55ed0cda02723bce8fb4bc6aff2246363"
+            .parse()
+            .unwrap(),
         0,
     );
     input.set_unlocking_script(UnlockingScript::from_binary(&[]).unwrap());
@@ -241,8 +243,10 @@ fn built(rng: &mut Seeded, amount: u64, place: Place) -> (Vec<u8>, usize) {
     };
     let inputs = (0..inputs)
         .map(|n| {
-            let mut input =
-                TransactionInput::new(format!("{:064x}", rng.next() ^ n as u64), n as u32);
+            let mut input = TransactionInput::new(
+                (format!("{:064x}", rng.next() ^ n as u64)).parse().unwrap(),
+                n as u32,
+            );
             input.set_unlocking_script(UnlockingScript::from_binary(&[]).unwrap());
             input
         })

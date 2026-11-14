@@ -61,7 +61,7 @@ fn p2pk() -> LockingScript {
 fn parent(lock: LockingScript, proven: Option<u32>) -> Transaction {
     let mut source = Transaction::new();
     let mut input = if proven.is_some() {
-        TransactionInput::new("aa".repeat(32), 0)
+        TransactionInput::new("aa".repeat(32).parse().unwrap(), 0)
     } else {
         TransactionInput::with_source_transaction(
             parent(LockingScript::from_hex("51").unwrap(), Some(GENESIS)),

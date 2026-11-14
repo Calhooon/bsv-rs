@@ -204,7 +204,7 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
             twice.inputs_mut().push(spent.clone());
             let mut null = tx.clone();
             let mut input = spent.clone();
-            input.source_txid = Some("00".repeat(32));
+            input.source_txid = Some("00".repeat(32).parse().unwrap());
             input.source_output_index = 0xffff_ffff;
             null.inputs_mut().push(input);
             // The doors clear the caches, so each serializes its fields (#843).
@@ -272,14 +272,14 @@ fn lean_rows() -> Vec<(String, Vec<u8>)> {
 fn shared_text_edit_seed() -> Vec<u8> {
     let one = || LockingScript::from_binary(&[0x51]).unwrap();
     let mut parent = Transaction::new();
-    let mut input = TransactionInput::new("aa".repeat(32), 0);
+    let mut input = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
     parent.inputs_mut().push(input);
     parent
         .outputs_mut()
         .push(TransactionOutput::new(1000, one()));
     let mut child = Transaction::new();
-    let mut input = TransactionInput::new(parent.id(), 0);
+    let mut input = TransactionInput::new(parent.txid(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
     child.inputs_mut().push(input);
     child.outputs_mut().push(TransactionOutput::new(900, one()));
@@ -344,8 +344,10 @@ fn beef_corpora(base: &Path) {
             let mut r = Transaction::new();
             r.set_version(1);
             r.set_lock_time(salt as u32);
-            let mut input =
-                TransactionInput::new(format!("{salt:02x}{}", "5e".repeat(31)), (salt % 4) as u32);
+            let mut input = TransactionInput::new(
+                (format!("{salt:02x}{}", "5e".repeat(31))).parse().unwrap(),
+                (salt % 4) as u32,
+            );
             input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
             r.inputs_mut().push(input);
             r.outputs_mut().push(TransactionOutput::new(
@@ -366,7 +368,7 @@ fn beef_corpora(base: &Path) {
         };
         let link = |src: &Transaction| {
             let mut i = TransactionInput::with_source_transaction(src.clone(), 0);
-            i.source_txid = Some(src.id());
+            i.source_txid = Some(src.txid());
             i.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
             i.sequence = 0xffffffff;
             i
@@ -1109,7 +1111,7 @@ fn door_corpus(base: &Path) {
         serde_json::from_str(&read("tests/vectors/spend_valid.json")).unwrap();
     let block = ScriptFlags::block(ProtocolEra::PostChronicle).bits();
     let spend = |unlock: &[u8], version: u32| {
-        let mut input = TransactionInput::new("00".repeat(32), 0);
+        let mut input = TransactionInput::new("00".repeat(32).parse().unwrap(), 0);
         input.set_unlocking_script(UnlockingScript::from_binary(unlock).unwrap());
         Transaction::with_params(version, vec![input], vec![], 0).to_binary()
     };

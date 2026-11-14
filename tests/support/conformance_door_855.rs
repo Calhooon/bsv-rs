@@ -39,7 +39,7 @@ fn node_script_door(input: &Value) -> Option<Result<(), String>> {
     let amount = n(input, "amount_satoshis") as u64;
     let mut source = crediting_txid(&locking, amount);
     source.reverse();
-    let mut txin = TransactionInput::new(bsv_rs::primitives::to_hex(&source), 0);
+    let mut txin = TransactionInput::new((bsv_rs::primitives::to_hex(&source)).parse().unwrap(), 0);
     txin.set_unlocking_script(unlocking);
     let output = TransactionOutput::new(amount, LockingScript::new());
     let version = n(input, "tx_version") as i32 as u32;
@@ -80,7 +80,7 @@ fn node_transaction_door(id: &str, input: &Value, census: &mut DoorCensus) {
     let prevouts = input["prevouts"].as_array().unwrap_or(&empty);
     for (vin, txin) in tx.inputs().iter().enumerate() {
         let Some(prevout) = prevouts.iter().find(|p| {
-            Some(s(p, "txid")) == txin.source_txid.as_deref()
+            txin.source_txid.is_some_and(|t| t == s(p, "txid"))
                 && (n(p, "vout") as u32) == txin.source_output_index
         }) else {
             continue;

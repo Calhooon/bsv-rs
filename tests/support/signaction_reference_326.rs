@@ -35,7 +35,7 @@ pub fn vector() -> Value {
 /// A token's source: one made-up input, output 0 the token.
 pub fn source_of(lock: &[u8], satoshis: u64) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     tx.add_input(input).unwrap();
     let lock = LockingScript::from_binary(lock).unwrap();

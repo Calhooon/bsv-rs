@@ -88,7 +88,7 @@ fn op_true() -> LockingScript {
 fn spend(spends: &[(String, u32)], outputs: usize) -> Transaction {
     let mut tx = Transaction::new();
     for (txid, vout) in spends {
-        let mut input = TransactionInput::new(txid.clone(), *vout);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
         tx.inputs_mut().push(input);
     }
@@ -330,12 +330,15 @@ fn a_deep_chain_built_in_memory_hashes_and_serializes_on_a_small_stack() {
     assert_eq!(beef, original, "the same bytes as the parsed chain");
 }
 
-/// The chain with every input's `source_txid` a text that does not parse
-/// (`"zz"`), so each outpoint is its linked parent's hash, read through the
-/// parent's own serialization (#869's third fold; the cold re-read of the
-/// second fold measured `id`, `to_binary` and `verify` overflowing a stack on
-/// 0.8.5 and on beta at 20,000 links). `verify` finds a source by its txid
-/// text, so it refuses the subject's input in its words, after its walk.
+/// The chain with every input naming no txid, so each outpoint is its linked
+/// parent's hash, read through the parent's own serialization (#869's third
+/// fold; the cold re-read of the second fold measured `id`, `to_binary` and
+/// `verify` overflowing a stack on 0.8.5 and on beta at 20,000 links). Until
+/// #845 the state was a `source_txid` text that does not parse (`"zz"`),
+/// which `verify` refused by the text (`Input 0 has no source transaction`);
+/// no such text is a `Txid`, an input naming none is found by its linked
+/// source's id, and the chain verifies, as the reference reads
+/// `sourceTXID ?? sourceTransaction.id` (`Transaction.ts:1349-1351`).
 #[test]
 fn a_deep_chain_whose_txid_texts_do_not_parse_hashes_serializes_and_verifies_on_a_small_stack_869()
 {
@@ -348,7 +351,7 @@ fn a_deep_chain_whose_txid_texts_do_not_parse_hashes_serializes_and_verifies_on_
             if input.source_transaction.is_none() {
                 break;
             }
-            input.source_txid = Some("zz".to_string());
+            input.source_txid = None;
             current = input.source_transaction.as_deref_mut().expect("source");
         }
         (linked, bytes)
@@ -369,10 +372,7 @@ fn a_deep_chain_whose_txid_texts_do_not_parse_hashes_serializes_and_verifies_on_
     let subject = subject.txs.last().expect("a tx");
     assert_eq!(id, subject.txid(), "the same id as the parsed chain");
     assert_eq!(Some(bin.as_slice()), subject.raw_tx(), "the same bytes");
-    assert_eq!(
-        verified,
-        Err("transaction error: Input 0 has no source transaction".to_string())
-    );
+    assert_eq!(verified, Ok(true));
 }
 
 /// The overlay's historians walk a transaction's linked ancestry, the one

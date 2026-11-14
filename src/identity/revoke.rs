@@ -464,23 +464,17 @@ fn input_outpoint(tx: &Transaction, index: usize) -> Result<String> {
         .inputs()
         .get(index)
         .ok_or_else(|| refused("Revelation transaction input is malformed"))?;
-    let embedded = input.source_transaction.as_ref().map(|t| t.id());
+    let embedded = input.source_transaction.as_ref().map(|t| t.txid());
     if let (Some(named), Some(embedded)) = (&input.source_txid, &embedded) {
-        if !named.eq_ignore_ascii_case(embedded) {
+        if named != embedded {
             return Err(refused("Revelation transaction input source mismatch"));
         }
     }
     let txid = input
         .source_txid
-        .clone()
         .or(embedded)
-        .filter(|t| t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit()))
         .ok_or_else(|| refused("Revelation transaction input has no canonical source ID"))?;
-    Ok(format!(
-        "{}.{}",
-        txid.to_lowercase(),
-        input.source_output_index
-    ))
+    Ok(format!("{txid}.{}", input.source_output_index))
 }
 
 /// The reference's checks of the signed transaction (`:917-932`,

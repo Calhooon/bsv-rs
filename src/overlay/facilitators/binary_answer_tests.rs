@@ -13,7 +13,7 @@ use crate::transaction::{
 
 /// A transaction spending `<byte>`x32:0, proven by a block of its own.
 fn proven(beef: &mut Beef, byte: &str, height: u32) -> String {
-    let mut input = TransactionInput::new(byte.repeat(32), 0);
+    let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

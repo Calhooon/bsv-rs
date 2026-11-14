@@ -228,7 +228,7 @@ pub fn setup(name: &str) -> Harness {
     let lock = create_signed_overlay_admin_token(&key, Protocol::Ship, &host, "tm_kvstore");
     let mut advertisement = Transaction::new();
     advertisement
-        .add_input(TransactionInput::new("11".repeat(32), 0))
+        .add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     advertisement
         .add_output(TransactionOutput::new(1, lock))

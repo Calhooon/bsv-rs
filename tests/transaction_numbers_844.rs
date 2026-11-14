@@ -742,7 +742,7 @@ fn a_json_input_txid_in_upper_case_is_held_in_lower_case_845() {
         .collect();
     for text in [GOOD.to_uppercase(), mixed] {
         let tx = Transaction::from_json(&json_with_txids(&[&text])).unwrap();
-        assert_eq!(tx.inputs()[0].source_txid.as_deref(), Some(GOOD));
+        assert_eq!(tx.inputs()[0].source_txid.unwrap(), GOOD);
         assert_eq!(tx.id(), lower.id());
         assert_eq!(tx.to_binary(), lower.to_binary());
         let json: Value = serde_json::from_str(&tx.to_json().unwrap()).unwrap();

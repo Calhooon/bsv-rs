@@ -13,6 +13,7 @@ use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
+use super::Txid;
 use crate::primitives::{bounded_capacity, from_hex, sha256d, to_hex, var_int_len, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
@@ -63,7 +64,7 @@ fn ef_source_placeholder_len(source_output_index: u32) -> Option<usize> {
 /// use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 ///
 /// let mut tx = Transaction::new();
-/// tx.add_input(TransactionInput::new("abc123...".to_string(), 0))?;
+/// tx.add_input(TransactionInput::new("abc123...".parse().unwrap(), 0))?;
 /// tx.add_output(TransactionOutput::new(100_000, locking_script))?;
 /// tx.fee(None, ChangeDistribution::Equal).await?;
 /// tx.sign().await?;
@@ -267,12 +268,9 @@ impl Transaction {
 
         for _ in 0..input_count {
             // Read TXID (reversed in EF format)
-            let txid_bytes = reader.read_bytes(32)?;
-            let mut txid_reversed = [0u8; 32];
-            for (i, byte) in txid_bytes.iter().enumerate() {
-                txid_reversed[31 - i] = *byte;
-            }
-            let source_txid = to_hex(&txid_reversed);
+            let mut txid_wire = [0u8; 32];
+            txid_wire.copy_from_slice(reader.read_bytes(32)?);
+            let source_txid = Txid::from_wire_bytes(txid_wire);
 
             let source_output_index = reader.read_u32_le()?;
 
@@ -404,12 +402,9 @@ impl Transaction {
 
         for _ in 0..input_count {
             // Read TXID (stored reversed)
-            let txid_bytes = reader.read_bytes(32)?;
-            let mut txid_reversed = [0u8; 32];
-            for (i, byte) in txid_bytes.iter().enumerate() {
-                txid_reversed[31 - i] = *byte;
-            }
-            let source_txid = to_hex(&txid_reversed);
+            let mut txid_wire = [0u8; 32];
+            txid_wire.copy_from_slice(reader.read_bytes(32)?);
+            let source_txid = Txid::from_wire_bytes(txid_wire);
 
             let source_output_index = reader.read_u32_le()?;
 
@@ -820,7 +815,9 @@ impl Transaction {
                 entering = Some(source_tx);
             } else if !allow_partial {
                 // Missing source transaction and not allowing partial
-                let source_txid = input.source_txid.as_deref().unwrap_or("unknown");
+                let source_txid = input
+                    .source_txid
+                    .map_or_else(|| "unknown".to_string(), |txid| txid.to_string());
                 return Err(crate::Error::TransactionError(format!(
                     "Missing source transaction for input {} (txid: {}). \
                      Set allow_partial=true to skip missing source transactions.",
@@ -1096,6 +1093,9 @@ impl Transaction {
                 txid_bytes.len()
             )));
         }
+        // 64 hex digits by the checks above; held as a `Txid`, so an
+        // upper-case text names the same input (#845).
+        let prev_txid = Txid::named(prev_txid, "sourceTXID")?;
 
         // Build a minimal source transaction with the correct output at the given index
         let mut outputs = vec![TransactionOutput::new(0, LockingScript::new()); vout as usize];
@@ -1105,7 +1105,7 @@ impl Transaction {
         ));
         let source_tx = Transaction::with_params(1, Vec::new(), outputs, 0);
 
-        let mut input = TransactionInput::new(prev_txid.to_string(), vout);
+        let mut input = TransactionInput::new(prev_txid, vout);
         input.source_transaction = Some(Box::new(source_tx));
         input.set_unlocking_script_template(template);
         self.add_input(input)
@@ -1171,7 +1171,8 @@ impl Transaction {
             ));
             let source_tx = Transaction::with_params(1, Vec::new(), outputs, 0);
 
-            let mut input = TransactionInput::new(utxo.txid.clone(), utxo.vout);
+            let mut input =
+                TransactionInput::new(Txid::named(&utxo.txid, "sourceTXID")?, utxo.vout);
             input.source_transaction = Some(Box::new(source_tx));
             self.add_input(input)?;
         }
@@ -1305,6 +1306,13 @@ impl Transaction {
     /// This is the internal byte order hash, not the display TXID.
     pub fn hash(&self) -> [u8; 32] {
         self.serialized_hash()
+    }
+
+    /// Returns the transaction ID as a [`Txid`]: the double SHA-256 of the
+    /// serialized fields, the value an input that spends this transaction
+    /// holds as its `source_txid` (#845).
+    pub fn txid(&self) -> Txid {
+        Txid::from_wire_bytes(self.hash())
     }
 
     /// Returns the transaction ID (TXID).
@@ -1629,11 +1637,7 @@ impl Transaction {
             return false;
         }
         // Check if source TXID is all zeros
-        if let Some(ref txid) = input.source_txid {
-            txid.chars().all(|c| c == '0')
-        } else {
-            false
-        }
+        input.source_txid.is_some_and(|txid| txid.is_null())
     }
 
     /// Returns true if this transaction has any data-only outputs (OP_RETURN).
@@ -2008,7 +2012,7 @@ mod tests {
         assert!(tx.add_input(bad_input).is_err());
 
         // Should succeed with TXID
-        let good_input = TransactionInput::new("abc123".repeat(11), 0);
+        let good_input = TransactionInput::new("ab".repeat(32).parse().unwrap(), 0);
         assert!(tx.add_input(good_input).is_ok());
         assert_eq!(tx.inputs().len(), 1);
     }
@@ -2144,7 +2148,9 @@ mod tests {
         coinbase_tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
-                "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
             ),
             source_output_index: 0xFFFFFFFF,
             unlocking_script: Some(UnlockingScript::from_hex("03a75e0b").unwrap()),
@@ -2166,7 +2172,9 @@ mod tests {
         two_input_tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
-                "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
             ),
             source_output_index: 0xFFFFFFFF,
             unlocking_script: None,
@@ -2175,7 +2183,7 @@ mod tests {
         });
         two_input_tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
-            source_txid: Some("abc123".repeat(11)),
+            source_txid: Some("ab".repeat(32).parse().unwrap()),
             source_output_index: 0,
             unlocking_script: None,
             unlocking_script_template: None,
@@ -2372,7 +2380,9 @@ mod tests {
     fn test_total_input_satoshis_missing_source() {
         let mut tx = Transaction::new();
         tx.add_input(TransactionInput::new(
-            "0000000000000000000000000000000000000000000000000000000000000001".to_string(),
+            "0000000000000000000000000000000000000000000000000000000000000001"
+                .parse()
+                .unwrap(),
             0,
         ))
         .unwrap();

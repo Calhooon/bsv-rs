@@ -696,7 +696,7 @@ mod tests {
         let parent = "e5".repeat(32);
         let mut tx = Transaction::new();
         for vout in 0..2 {
-            let mut input = TransactionInput::new(parent.clone(), vout);
+            let mut input = TransactionInput::new(parent.parse().unwrap(), vout);
             input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
             tx.inputs_mut().push(input);
         }
@@ -730,7 +730,7 @@ mod tests {
             let tx = entry
                 .tx_mut()
                 .expect("a parsed entry yields its transaction");
-            tx.inputs_mut()[0].source_txid = Some(parent.clone());
+            tx.inputs_mut()[0].source_txid = Some(parent.parse().unwrap());
             tx.clone()
         };
         assert_ne!(mutated.id(), TEST_TX_ID);

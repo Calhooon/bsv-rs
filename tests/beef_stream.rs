@@ -2082,7 +2082,7 @@ fn linked(inputs: &[(&Transaction, u32)], outputs: &[u64]) -> Transaction {
 fn mined(n_inputs: usize, outputs: &[u64]) -> (Transaction, MockChainTracker) {
     let mut tx = linked(&[], outputs);
     for i in 0..n_inputs {
-        let mut input = TransactionInput::new("11".repeat(32), i as u32);
+        let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), i as u32);
         input.unlocking_script = Some(UnlockingScript::new());
         tx.add_input(input).unwrap();
     }

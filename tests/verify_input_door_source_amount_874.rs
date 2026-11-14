@@ -41,7 +41,7 @@ fn cell(amount: u64, version: u32) -> (Vec<u8>, Vec<u8>) {
     let address = key.public_key().to_address();
     let lock = P2PKH::lock_from_address(&address).unwrap();
     let mut funding = Transaction::new();
-    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    let mut mined = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     mined.set_unlocking_script(UnlockingScript::new());
     funding.add_input(mined).unwrap();
     funding

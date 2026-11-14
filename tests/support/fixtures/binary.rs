@@ -24,7 +24,7 @@ fn readme_chain() -> (Transaction, Transaction) {
     let key = PrivateKey::from_bytes(&sha256(README_SEED.as_bytes())).unwrap();
     let address = key.public_key().to_address();
     let mut funding = Transaction::new();
-    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    let mut mined = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     mined.unlocking_script = Some(UnlockingScript::new());
     funding.add_input(mined).unwrap();
     funding
@@ -180,11 +180,11 @@ pub fn record(suite: &mut Suite) {
     for (source, expected) in [
         (
             "examples/transaction.rs",
-            "ae91ad931e18242f7aef6725384c25061f3c5f45f0238ec7039fe8cb61fddc42",
+            "3e238a3edece1abcbdf84f00ba6e9f7edc10de18a901090b75cda5568f5731e3",
         ),
         (
             "examples/beef_spv.rs",
-            "8389c03039cb59920a7be1354a1fba15adc8d269a017e80dbeb5ecce25a67a99",
+            "acb43937ddac4e2a12c611b43398dfde16d5a87b3d010d04e7e18fb937526aae",
         ),
         (
             "examples/overlay.rs",

@@ -76,7 +76,7 @@ fn spending_many(
 /// one made-up input, the outputs asked, as the #326 recorder's `sourceOf`.
 fn finished_transaction(outputs: &[CreateActionOutput]) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(bsv_rs::script::UnlockingScript::from_binary(&[0x51]).unwrap());
     tx.add_input(input).unwrap();
     for output in outputs {

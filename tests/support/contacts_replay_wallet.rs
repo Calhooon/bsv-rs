@@ -171,7 +171,7 @@ impl Basket {
 /// input, the outputs asked (`sourceOf`).
 fn finished(outputs: &[CreateActionOutput]) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     tx.add_input(input).unwrap();
     for output in outputs {

@@ -56,7 +56,7 @@ fn one(sats: u64) -> TransactionOutput {
 /// The recorder's `root`: one input naming `fill` repeated, one output.
 fn root(fill: &str, sats: u64) -> Transaction {
     let mut t = Transaction::new();
-    let mut i = TransactionInput::new(fill.repeat(32), 0);
+    let mut i = TransactionInput::new(fill.repeat(32).parse().unwrap(), 0);
     i.unlocking_script = empty_unlock();
     t.inputs_mut().push(i);
     t.outputs_mut().push(one(sats));
@@ -90,7 +90,7 @@ fn describe(t: Option<&Transaction>, depth: u32) -> Value {
             } else {
                 json!(i.source_transaction.is_some())
             };
-            json!({ "sourceTXID": i.source_txid, "source": source })
+            json!({ "sourceTXID": i.source_txid.map(|t| t.to_string()), "source": source })
         })
         .collect();
     json!({ "id": t.id(), "path": t.merkle_path.is_some(), "inputs": inputs })

@@ -44,7 +44,7 @@ fn build(cell: &Value) -> Transaction {
     for input in cell["inputs"].as_array().unwrap() {
         let index = input["index"].as_u64().unwrap() as u32;
         let mut built = match input["source"].as_array() {
-            None => TransactionInput::new("aa".repeat(32), index),
+            None => TransactionInput::new("aa".repeat(32).parse().unwrap(), index),
             Some(amounts) => {
                 let mut src = Transaction::new();
                 for a in amounts {

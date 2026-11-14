@@ -64,7 +64,7 @@ fn token_of(name: &str) -> LockingScript {
 /// script, one 1-satoshi output locked by `lock`, its BUMP a lone leaf at
 /// offset 0 at 900: the recorder's `proven(spending(..))`.
 fn proven_spend(byte: &str, lock: LockingScript) -> Vec<u8> {
-    let mut input = TransactionInput::new(byte.repeat(32), 0);
+    let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();
@@ -85,7 +85,7 @@ fn issued(name: &str) -> LockingScript {
 /// The recorder's `overBound`: 256 txid-only entries and a proven subject
 /// spending `<byte>`x32:0 into #553's token, under an Atomic BEEF prefix.
 fn over_bound(byte: &str, n: usize) -> Vec<u8> {
-    let mut input = TransactionInput::new(byte.repeat(32), 0);
+    let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut subject = Transaction::new();
     subject.add_input(input).unwrap();

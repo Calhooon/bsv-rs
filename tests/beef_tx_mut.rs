@@ -27,7 +27,7 @@ use bsv_rs::transaction::{
 /// output 0 of `spends`, with an empty unlocking script.
 fn tx(spends: &str) -> Transaction {
     let mut t = Transaction::new();
-    let mut input = TransactionInput::new(spends.to_string(), 0);
+    let mut input = TransactionInput::new(spends.parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
     t.inputs_mut().push(input);
     t.outputs_mut().push(TransactionOutput::new(
@@ -79,10 +79,10 @@ fn repointed() -> (Beef, Transaction, Transaction, Transaction, Transaction) {
     ];
     let mut beef = Beef::from_binary(&write(&bumps, &entries, &[(0, 0), (2, 1)])).unwrap();
     assert!(beef.clone().verify_structure().is_ok());
-    beef.edit_tx(&c.id(), |t| t.inputs_mut()[0].source_txid = Some(q.id()))
+    beef.edit_tx(&c.id(), |t| t.inputs_mut()[0].source_txid = Some(q.txid()))
         .unwrap();
     let mut mutated = c.clone();
-    mutated.inputs_mut()[0].source_txid = Some(q.id());
+    mutated.inputs_mut()[0].source_txid = Some(q.txid());
     // `Transaction` caches its hash; a direct field edit asks for this.
     (beef, p, q, c, mutated)
 }
@@ -160,7 +160,7 @@ fn an_input_repointed_outside_the_beef_through_edit_tx_is_missing() {
     // A second edit of the same entry, found by its new name.
     let outside = "f0".repeat(32);
     beef.edit_tx(&mutated.id(), |t| {
-        t.inputs_mut()[0].source_txid = Some(outside.clone())
+        t.inputs_mut()[0].source_txid = Some(outside.parse().unwrap())
     })
     .unwrap();
     let sr = beef.clone().sort_txs();

@@ -52,7 +52,7 @@ fn rebuilt(name: &str) -> (build::Built, sdk::transaction::Beef, serde_json::Val
     let pushes: usize = [&built.p1, &built.p2]
         .iter()
         .flat_map(|p| beef.find_txid(p).and_then(BeefTx::tx).unwrap().inputs())
-        .filter(|i| i.source_txid.as_deref() == Some(built.g.as_str()))
+        .filter(|i| i.source_txid.is_some_and(|t| t == built.g))
         .count();
     assert_eq!(pushes as u64, case["g_pushes"].as_u64().unwrap(), "{name}");
     (built, beef, case)

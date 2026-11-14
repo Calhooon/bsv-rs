@@ -45,7 +45,7 @@ struct Node {
 fn tx(inputs: &[(&str, u32)], amounts: &[u64]) -> Transaction {
     let mut t = Transaction::new();
     for (txid, vout) in inputs {
-        let mut input = TransactionInput::new(txid.to_string(), *vout);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), *vout);
         input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
         t.inputs_mut().push(input);
     }

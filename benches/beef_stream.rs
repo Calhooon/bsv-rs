@@ -28,7 +28,7 @@ const SIZES: [usize; 2] = [1_000_000, 10_000_000];
 
 fn transaction(previous: String, payload: usize) -> Transaction {
     let mut tx = Transaction::new();
-    let mut input = TransactionInput::new(previous, 0);
+    let mut input = TransactionInput::new(previous.parse().unwrap(), 0);
     // A push-only unlock; the lock consumes the padding, then leaves true.
     let mut unlock = vec![0x4d]; // OP_PUSHDATA2
     unlock.extend_from_slice(&(payload as u16).to_le_bytes());
