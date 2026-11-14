@@ -62,3 +62,28 @@ async fn an_identity_token_is_read_only_when_the_reference_authenticates_it_544(
     assert_eq!(cases[0]["name"], "reference");
     assert_eq!(cases[0]["outcome"], "authenticated");
 }
+
+/// #815's pin at the identity door: one host answering freeform beside one
+/// answering the reference's revelation token. `LookupResolver::query`
+/// answers the merged output list in every case, a freeform host
+/// contributing nothing (`ts-stack@edf6e03` `LookupResolver.ts:1085-1087`,
+/// `:1445-1450`), so both parsers read the token; with the earliest freeform
+/// answer returned over the aggregate (before #821) neither read anything.
+#[tokio::test]
+async fn a_freeform_host_beside_a_list_reads_the_token_at_the_identity_door_815() {
+    let v = vector();
+    let subject = v["identity"]["certificate"]["subject"].as_str().unwrap();
+    let case = &v["identity"]["cases"][0];
+    assert_eq!(case["outcome"], "authenticated");
+    let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+    let resolver = lock_position::answering_beside_freeform("ls_identity", script, "identity");
+    let client =
+        IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
+    let attributes = IndexMap::from([("email".to_string(), "alice@example.com".to_string())]);
+    let identities = client
+        .resolve_by_attributes(attributes, false)
+        .await
+        .unwrap();
+    let certificates = client.discover_certificates(subject).await.unwrap();
+    assert_eq!((identities.len(), certificates.len()), (1, 1));
+}

@@ -98,3 +98,53 @@ pub fn answering(service: &str, script: LockingScript) -> Arc<LookupResolver> {
         ..Default::default()
     }))
 }
+
+/// A facilitator whose `freeform` host answers a freeform result and whose
+/// every other host answers the outputs given.
+struct BesideFreeform {
+    freeform: String,
+    outputs: Vec<OutputListItem>,
+}
+
+#[async_trait::async_trait(?Send)]
+impl OverlayLookupFacilitator for BesideFreeform {
+    async fn lookup(
+        &self,
+        url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> bsv_rs::Result<LookupAnswer> {
+        if url == self.freeform {
+            return Ok(LookupAnswer::Freeform {
+                result: serde_json::json!({ "note": "no outputs here" }),
+            });
+        }
+        Ok(LookupAnswer::OutputList {
+            outputs: self.outputs.clone(),
+        })
+    }
+}
+
+/// A resolver with two hosts for `service` (`.invalid` names carrying `door`,
+/// never dialled, a test's own so the process-wide host reputation is not
+/// shared): the one ranked ahead answers freeform, the other `script`'s
+/// output (#815: the consumer doors beside a freeform host).
+pub fn answering_beside_freeform(
+    service: &str,
+    script: LockingScript,
+    door: &str,
+) -> Arc<LookupResolver> {
+    let freeform = format!("https://freeform.{door}-815.invalid");
+    Arc::new(LookupResolver::new(LookupResolverConfig {
+        facilitator: Some(Arc::new(BesideFreeform {
+            freeform: freeform.clone(),
+            outputs: vec![output_of(script)],
+        })),
+        slap_trackers: Some(vec![]),
+        host_overrides: Some(HashMap::from([(
+            service.to_string(),
+            vec![freeform, format!("https://list.{door}-815.invalid")],
+        )])),
+        ..Default::default()
+    }))
+}

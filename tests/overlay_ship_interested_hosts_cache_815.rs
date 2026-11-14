@@ -221,6 +221,29 @@ async fn a_failed_discovery_is_not_cached_815() {
     assert_eq!(lookup.calls.load(Ordering::SeqCst), 2);
 }
 
+/// #815, stated: a failed discovery fails the broadcast as
+/// `ERR_HOST_DISCOVERY`, this crate's form of the reference's rejected
+/// promise (`:471`, `:743`: the `Error` thrown out of `broadcast`, no
+/// failure object), its description the discovery's error and its `txid`
+/// the transaction's; nothing is sent.
+#[tokio::test]
+async fn a_failed_discovery_fails_the_broadcast_with_its_txid_stated_815() {
+    let too_many: Vec<OutputListItem> = (0..257)
+        .map(|seed| advertisement(&host("many-broadcast"), seed).0)
+        .collect();
+    let (_, subject) = advertisement(&host("subject"), 400);
+    let (b, lookup, sent) = broadcaster(vec![list(too_many)]);
+    let failure = b.broadcast_tx(&subject).await.unwrap_err();
+    assert_eq!(failure.code, "ERR_HOST_DISCOVERY");
+    assert_eq!(
+        failure.description,
+        Error::OverlayError("SHIP answer is not a bounded output list.".into()).to_string()
+    );
+    assert_eq!(failure.txid, Some(subject.id()));
+    assert_eq!(lookup.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(*sent.0.lock().unwrap(), 0);
+}
+
 /// An empty discovery is kept, as the reference keeps `{}`: the broadcast
 /// is `ERR_NO_HOSTS_INTERESTED` both times and `ls_ship` asked once.
 #[tokio::test]
