@@ -21,6 +21,10 @@ jobs:
   version:
     name: Tag matches Cargo.toml
     runs-on: ubuntu-latest
+    # actions: read is the last step's, for the list of this workflow's runs of the tag (#867)
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -83,6 +87,61 @@ jobs:
             echo "::error::${GITHUB_SHA} is not on ${line}; a tag of this shape is cut from ${line} after a PR merged there"
             exit 1
           fi
+
+      # A version is published once, from one commit (#867; RELEASING.md steps 8 and 9). The
+      # repository's ruleset forbids moving or deleting a `v*` tag; this step is the workflow's
+      # own refusal, should the ruleset ever change. It refuses, before any job that publishes
+      # starts (every one of them needs this job), a tag whose version crates.io's index
+      # lists (yanked included), a tag that has a Release page, and a tag an earlier run of
+      # this workflow ran at another commit (v0.9.0-beta.4 ran at three on 2026-10-30). It
+      # fails closed: an answer it cannot read (crates.io or GitHub unreachable, an index
+      # without 0.8.9, a status other than 200 or 404, a run list without this run's own
+      # commit) refuses too. Nothing here is consumed, so "Re-run failed jobs" tries again.
+      - name: The version is not published and the tag ran at no other commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          curl -fsS --retry 3 --max-time 60 -o "$RUNNER_TEMP/index.jsonl" https://index.crates.io/bs/v-/bsv-rs
+          listed="$(jq -r 'select(.name == "bsv-rs") | .vers' "$RUNNER_TEMP/index.jsonl")"
+          if ! grep -qxF '0.8.9' <<< "$listed"; then
+            echo "::error::crates.io's index for bsv-rs could not be read (its answer does not list 0.8.9); nothing is published on an answer that cannot be read: re-run this job when https://index.crates.io/bs/v-/bsv-rs answers"
+            exit 1
+          fi
+          if grep -qxF -- "$version" <<< "$listed"; then
+            echo "::error::bsv-rs ${version} is already on crates.io; a version is published once (RELEASING.md step 9). Leave the tag where it is and ship the fix as the next version, by a release pull request and a new tag (step 8)"
+            exit 1
+          fi
+          page="$(curl -sS --retry 3 --max-time 60 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}")"
+          case "$page" in
+            404) ;;
+            200)
+              echo "::error::${GITHUB_REF_NAME} already has a Release page (gh release view ${GITHUB_REF_NAME}); a version is released once. If the page was made by mistake for a version crates.io does not list, delete the page and re-run this job; otherwise ship the next version (RELEASING.md step 8)"
+              exit 1
+              ;;
+            *)
+              echo "::error::GitHub answered ${page} for the Release page of ${GITHUB_REF_NAME}; nothing is published on an answer that cannot be read: re-run this job"
+              exit 1
+              ;;
+          esac
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --branch "$GITHUB_REF_NAME" --event push --limit 100 --json headSha,headBranch > "$RUNNER_TEMP/runs.json"
+          count="$(jq -r 'if type == "array" then length else error("not a list") end' "$RUNNER_TEMP/runs.json")"
+          if [ "$count" -ge 100 ]; then
+            echo "::error::100 runs of release.yml or more name ${GITHUB_REF_NAME}; the list cannot be read whole, so the tag is refused: ship the next version (RELEASING.md step 8)"
+            exit 1
+          fi
+          commits="$(jq -r --arg tag "$GITHUB_REF_NAME" '[.[] | select(.headBranch == $tag) | .headSha] | unique | .[]' "$RUNNER_TEMP/runs.json")"
+          if ! grep -qxF -- "$GITHUB_SHA" <<< "$commits"; then
+            echo "::error::the runs of release.yml for ${GITHUB_REF_NAME} do not list this run's own commit ${GITHUB_SHA}; nothing is published on an answer that cannot be read: re-run this job"
+            exit 1
+          fi
+          others="$(grep -vxF -- "$GITHUB_SHA" <<< "$commits" || true)"
+          if [ -n "$others" ]; then
+            echo "::error::${GITHUB_REF_NAME} was moved: release.yml ran for it at $(tr '\n' ' ' <<< "$others")and now at ${GITHUB_SHA}. A v* tag is never moved (RELEASING.md step 8): leave it, say in its CHANGELOG.md section that it was tagged and never published, and ship the next version"
+            exit 1
+          fi
+          echo "bsv-rs ${version}: not on crates.io, no Release page, release.yml ran for ${GITHUB_REF_NAME} at ${GITHUB_SHA} alone"
 
   ci:
     name: CI
