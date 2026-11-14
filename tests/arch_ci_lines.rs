@@ -1183,6 +1183,78 @@ fn every_variable_the_stage_r_dispatch_reads_has_its_one_definition_97() {
     }
 }
 
+/// `run_lines` on sample texts (#958): the reader behind the stage R step's variable rule had no
+/// test of its own, and with its block arm gone every test stayed green, the one-line `run:` of
+/// ci.yml's dispatch reading the same names as the block. Each sample names what a block is: the
+/// lines below a `run: |` indented deeper than the key, a blank line among them, up to the next
+/// line at the key's indent or shallower.
+#[test]
+fn run_lines_reads_a_one_line_run_and_every_line_of_a_block_958() {
+    let one = "      - name: a\n        env:\n          A: b\n        run: echo \"$ONE\"\n";
+    assert_eq!(run_lines(one), ["        run: echo \"$ONE\""]);
+    let blank = "        run: |\n          echo \"$TWO\"\n\n          echo \"$THREE\"\n";
+    assert_eq!(
+        run_lines(blank),
+        [
+            "        run: |",
+            "          echo \"$TWO\"",
+            "",
+            "          echo \"$THREE\""
+        ]
+    );
+    let closed = "        run: |\n          echo \"$FOUR\"\n        env:\n          B: \"$NOT_A_RUN_LINE\"\n      - name: next\n";
+    assert_eq!(
+        run_lines(closed),
+        ["        run: |", "          echo \"$FOUR\""]
+    );
+    let two = "        run: |\n          one\n      - name: b\n        run: |\n          two\n          three\n      - name: c\n        run: four\n";
+    assert_eq!(
+        run_lines(two),
+        [
+            "        run: |",
+            "          one",
+            "        run: |",
+            "          two",
+            "          three",
+            "        run: four"
+        ]
+    );
+    assert!(run_lines("      - name: a\n        with:\n          x: y\n").is_empty());
+    assert_eq!(
+        variables_read(closed),
+        ["B", "FOUR"],
+        "a block's lines are read for `$NAME`, an `env:` value is not"
+    );
+}
+
+/// A variable the stage R step reads inside its `run: |` block alone is seen by the variable rule
+/// (#958): planted on the block's own echo line of `SYNC_STAGE_R`, it is a name the list lacks, so
+/// `every_variable_the_stage_r_dispatch_reads_has_its_one_definition_97` would refuse the pin until
+/// the name has its row.
+#[test]
+fn a_variable_read_only_inside_the_stage_r_block_is_read_958() {
+    let line = "          echo \"stage R run ${run} on ${SYNC_BRANCH}\"\n";
+    assert_eq!(SYNC_STAGE_R.matches(line).count(), 1);
+    for spelled in ["$NEW_NAME", "${NEW_NAME}"] {
+        let planted = SYNC_STAGE_R.replace(
+            line,
+            &format!("          echo \"stage R run ${{run}} on ${{SYNC_BRANCH}} {spelled}\"\n"),
+        );
+        assert_ne!(planted, SYNC_STAGE_R);
+        let reads = variables_read(&planted);
+        assert!(
+            reads.iter().any(|name| name == "NEW_NAME"),
+            "{spelled}: {reads:?}"
+        );
+        assert!(
+            !SYNC_STAGE_R_READS
+                .iter()
+                .any(|(name, _)| *name == "NEW_NAME"),
+            "the list names the plant"
+        );
+    }
+}
+
 #[test]
 fn the_shape_check_names_a_job_with_no_runner_and_an_unpinned_action() {
     let text = "name: x\non:\n  push:\npermissions:\n  contents: read\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n  b:\n    steps: []\n";
