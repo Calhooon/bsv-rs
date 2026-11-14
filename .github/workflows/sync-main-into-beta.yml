@@ -9,7 +9,11 @@ name: Sync main into beta
 # sha. A pick that conflicts is aborted: the branch keeps beta's tip and the picks before it, the
 # PR names the commit and its files and is labelled needs-hand. A branch that already holds beta's
 # tip (a hand resolution not yet landed) is picked onto, never rebuilt. This file lives on main
-# and on beta; it fires from main.
+# and on beta; it fires from main. One run at a time (the group below, never cancelled in
+# progress), and a run that pushed picks holds the group while it waits for stage R, up to 45
+# minutes: GitHub keeps one pending run per group, so of several pushes to main in that window
+# only the newest waits and each one it replaced shows as cancelled. A cancelled sync run under
+# a newer one is the group's, not a failure: the newest run finds every commit beta lacks.
 on:
   push:
     branches: [main]
@@ -227,7 +231,10 @@ jobs:
       # token may raise), so the trampoline never hears of it: the step takes the run's id from the dispatch's
       # own answer (no other run can share it), waits for that run to complete and dispatches the
       # judge on main with the id. It holds no key and judges nothing; a refused dispatch, or a run
-      # not completed in 40 minutes, fails the job where a person sees it.
+      # not completed in 40 minutes, fails the job where a person sees it. The wait is bounded by
+      # the clock (budget, each poll's own timeout and one interval end inside the step's 45
+      # minutes) and a poll that fails or hangs is read as not completed yet, so every way out of
+      # the wait that is not `completed` prints the hand command with the run's id.
       - name: Start the PR's stage R and its judge
         if: steps.pick.outputs.push == 'true'
         timeout-minutes: 45
@@ -243,13 +250,17 @@ jobs:
           fi
           echo "stage R run ${run} on ${SYNC_BRANCH}"
           status=""
-          for _ in $(seq 1 160); do
-            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"
+          budget=2400
+          while [ "$SECONDS" -lt "$budget" ]; do
+            if ! status="$(timeout 60 gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"; then
+              status="unread (its last poll failed)"
+            fi
             if [ "$status" = completed ]; then break; fi
             sleep 15
           done
           if [ "$status" != completed ]; then
-            echo "::error::stage R run ${run} is ${status} after 40 minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
+            echo "::error::stage R run ${run} is ${status:-unread} after $((SECONDS / 60)) minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
             exit 1
           fi
+          echo "stage R run ${run} completed; its judge, by hand if the next line fails: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
           gh workflow run sibling-judge.yml --repo "$GITHUB_REPOSITORY" --ref main -f run_id="$run"
