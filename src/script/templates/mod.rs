@@ -98,6 +98,10 @@ mod pushdrop_reference_read;
 // `WalletInterface`, so it stands on `wallet`.
 #[cfg(feature = "wallet")]
 mod pushdrop_wallet;
+// The reference's wallet-aware `PushDrop.unlock` (#803), on `wallet` as the
+// lock's door is.
+#[cfg(feature = "wallet")]
+mod pushdrop_wallet_unlock;
 // Its six callers (#537) all stand on `overlay`; a slice without it would
 // carry dead code (`ci.yml`'s clippy on each slice alone).
 #[cfg(feature = "overlay")]
@@ -109,4 +113,6 @@ pub use multisig::Multisig;
 pub use p2pk::P2PK;
 pub use p2pkh::P2PKH;
 pub use pushdrop::{LockPosition, PushDrop};
+#[cfg(feature = "wallet")]
+pub use pushdrop_wallet_unlock::PushDropWalletUnlock;
 pub use rpuzzle::{RPuzzle, RPuzzleType};

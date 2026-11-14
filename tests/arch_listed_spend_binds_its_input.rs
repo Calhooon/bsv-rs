@@ -6,7 +6,7 @@
 //! source by txid (`ts-stack@edf6e03` `ContactsManager.ts:640,689-697,819-838`).
 //!
 //! The machine: every caller of the one wallet PushDrop signer
-//! (`crate::wallet::pushdrop::sign`) is listed in `CALLERS`, a fifth refused
+//! (`crate::wallet::pushdrop::sign`) is listed in `CALLERS`, another refused
 //! until it is listed, a listed one that no longer calls it refused as
 //! stale; in every listed file, read with whitespace and line comments
 //! removed, no `input_index:` given a literal, no spend keyed by a literal
@@ -28,6 +28,10 @@ use std::path::{Path, PathBuf};
 
 /// The callers of `wallet::pushdrop::sign`, each with how it binds.
 const CALLERS: &[(&str, &str)] = &[
+    (
+        "src/script/templates/pushdrop_wallet_unlock.rs",
+        "the public door (#803): no listing read; the input and its source are the caller's SigningContext",
+    ),
     (
         "src/identity/contacts_actions.rs",
         "the listed output read by txid (#readListedSource); the input bound by outpoint (#findBoundInput)",

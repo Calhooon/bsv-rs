@@ -1,0 +1,1105 @@
+{
+  "issue": 803,
+  "source": "ts-stack@edf6e03 packages/sdk/src/script/templates/PushDrop.ts:205-262, SignatureUtils.ts:44-68,74-184",
+  "recorder": "tests/support/pushdrop_wallet_unlock_803.mjs",
+  "node": "v22.18.0",
+  "wallet_scalar": 9,
+  "other_scalar": 7,
+  "cases": [
+    {
+      "name": "input_0_all",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100ed9167590209fe5c559b33f08b0b7961e5cbe4d65f81f56f07c360482314e6bc02207407780663d98b30e9aefa2e1411f5f60ae44b3eb258d825c2de2c765dcd106541",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_0_all_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100b32aa4ab5c7c50e88b1ae3633c39dd87ceb00dbbbf85cb73b7d31ec3c0b0f00d022049f910c0410e812e4b1899459504e178fe3af376cdd687eb6e5f7006999cc34ac1",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "50e80175350a8cdd1d170aade6165d34dab9f7a600f26b13d8c9435e1c418c0f"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_0_none",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "none",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100eece5718dfb4d2adb70b2ddcb5b16cc1d7c4cdadfca4b8cf528ee9eea4fef90f0220432d7a1f57f70293c75c418e5dc8061c0158e77fbebbbcfdf4d9c33ce2c03ec842",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "4eb6adb06e28fd6176ab652f9e23a1256d9a71bef78c8246cf8527294bab43e1"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_0_none_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "none",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100956e2fa7a40af348bde6b991766ff5de31bf8950a3e0150888b6884a2dc26925022043c94732067c7833a6590cb5b0cc1b4e0ac27f92383c2dd34b01984b137434d6c2",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "ad21d5540faa27291982a114411157b1ba0034d6337e5be0f0819de18b5278ea"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_0_single",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100e77d020082d2e3513c2ff4c890b4ebfc26521f4c342db5dc353ddb8f01e09bba02205a1b5726bb74f8c067c5e10d736d2a40c188f34a49b73167f0f48d815cf384f843",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "b3e584494bc84d29a68134478f291836c8cbc1baabb6adc472168397a41fcb75"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_0_single_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402202c39a7276d510569102b803c53f4c2d22e073edda559ec7a33c1d4bf13e4e7e202201c34ca7e9da679c15d45764202f30dca3295361b1a128c994152efa4d8f1288cc3",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "337a3b22a907989bd37dc2b033f5e381c6c6176cb2654856eee0d9ec12af550f"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_1_all",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100a00e29e8fd765811853680ef6580957a0944dc9df0113555a6b50e95216ff838022061b7dff9da2a9bb225cbb9a5b85a10f91081fe495f10a5e20991f9f5d15c657e41",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "c7fb3960dd0b12d97888b3c25c6ec4388ebd2b7ac223355bec9c9cdf71b9ba91"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_1_all_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402207d3c440cbd7c5700b2f4c9403552a09c618a1ae631fb795bdcbcd1741d27f610022068fe401693a8707e4f98ab5b3f37aef1f677f158a401e600e2f22258a1708537c1",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "0155646e2e1030ac4805ad26cf464ed29386f7f54bb1b318a8dc8162b883a69f"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_1_none",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "none",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402200b3c03d267472cef9626758f62840bf5b8fcf55e2d44831f1cad18c30207d2af0220183c1df2edc33b3018d855d1660c49a1248e56cd9c85fcbdbd64e905f85d49d942",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "a62ed3f2e5718e5f488e28a3c8110acd773fce21391f627c1e9a833dca88b68a"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_1_none_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "none",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100fb3e02f227368422ff981bece4e4bc5210465c82f4fe29ccd7096c1dacb4946502201bb051938866a90305c44c9473b0251ce0bb5cf40e10c8bbf416e734b569d9dfc2",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "52f8e8ad135f8904eeee848f289b93a192e2b71341545fe8c6e341f9c2978d0d"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_1_single",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "4830450221009e4c35235c2cc7221ecec47be88e4d57bdcf8ecaeee2fe58fa63c4b05b29b791022035f605ddc3150737425a5908903fccd61c548bbc8432aff54c9fd2d1aad3a7c943",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "f04a7f7cff179ec9ad0f873e89c4689d0d4bfa56ec64b32897e31b4e49b7b805"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_1_single_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402207c42d5cbb50e5a30b2d30fa717c098999cea1dcd234c534e718a1ea64eb234dc02205de87e84a9f09df536d84bf38c8b011af0f894e8476a97093f2796772fd31b0ec3",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "73f2b253532e70c734ec9e950656b9079d18e99dbcc61c644efb8ac492ae3445"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_2_all",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 2,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402205673269709b895c228b2020c49559c2f03a2fefda5d7c4744d7c796556e05a60022014a2a4accea93be567d638cc6dfea0caa0806e18cc9511dbd9d732871fbd2e5141",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "6dce3aeacd16ae2f309633cdce444f2ef286386ec6cd1a4f3b12d82fde8a94d2"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_2_all_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 2,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "473044022003ce39df0e4de8bf472b395224cc7de6cd9e62a95b324ebb4313e57046752384022056bff88e0d2415e6ea78cb7fef103069baf8b1cf75c8f7dd8eb2aeb2410ce220c1",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "520c00bbc34eecd5653163a780dc7f38cde1571c729990b4089fa154bb671a71"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_2_none",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "none",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 2,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100c966df9b7530081a2048c360b1924f85a2bc5c6ed840f386325c8c9a18de26cc022078a2169adabee8a21da12f06b4ca5ad5c5834c2fa685d0be8c551801af179fac42",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "b6346235b09f30b8a5e970c0e190ecd73e705c7bc3700e3be5334cf3756c0bd3"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_2_none_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "none",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 2,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402200c099f4b7f9d627d0f4c5c976c18b326fb4b3e3b859f2ffd7a003b1b22077f2102200687faad7bcd25f8a9952d62143f6d1e6ce0c0ba6a6e9424ea20bf288f863864c2",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "3cb9552b02a015dcd81361cf8018a6f9ecc29b43c8450a788fbe146fc3ea4853"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_2_single",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 2,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "4830450221009cce8f04257a3da23e707ae08b518a857a269d171bb9147f71c1ace88fca511502200b62102767ccf1d1b3484254a49d7453d7ff22600fd0414b321d656bceae1ada43",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "4d703bbb3ba54414b69eb1be7f7705e854aaa9fa4ae24694caf77a1ea254a8d5"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "input_2_single_anyone_can_pay",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": true,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 2,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "4730440220100dc266e5d12d01575ada4ec776cca904dc0e657285d90d5f18e9f2dc17834b022007135d83e8c4524723bb8364099fcfc11b14a0ca86995bbf15c8db6006c0d502c3",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "687902fb4b2dd23e7784141d53c87f7b858de05b6fe03ba7df520c86a77ac7ce"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "counterparty_anyone",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "anyone",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "2103330cf4829aae57ffb0cd2c717c86927117cb951f90f5bda92d8fb62367c4be5cac0301020346304402207fcea1655e780b584a980187f4a53e30ba2851afcb96d393c3851f96de15cf870220597c44ea60102292ab9b662c7e1c6fa38c1feb69800c7ae6e01322874bacc0296d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402204b6d0426a29170b48211ac58143ab90127064575a61aa8e08710e687459873f1022008e2e7e13f14bfd02f0072b71f6676624089be954eecea1a7bd149419e846f6d41",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "anyone",
+            "data": "253a1c2fcec35d85fc71d461cbdaa2c264558192aea45235ae3045af9cedca79"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "counterparty_other",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21024849a64f45b8163d85f078d449599e1ab4a8716d16ede59afeb4b22fb390e321ac0301020347304502210081b13b5a7cd32ab7110630972acbf8c9023abac7b597ef9779efed0005510a150220310c1991380bf46f112fbb2883a97522e340826756fb593d86668263b1957d766d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402201103657d0e0a10665d8adc4e736bd57b092ef33912b0be82e37791b606c22e8f0220098236d30a9c77a264eefb5bdee43f6daea79ae29394a6812f11a0131cc501b941",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "data": "69ba3d65a5be4b0a6dbef47407c18a9a91992513ea06abad77e64a74e225e5da"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "with_an_originator",
+      "originator": "pushdrop.example.com",
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100ed9167590209fe5c559b33f08b0b7961e5cbe4d65f81f56f07c360482314e6bc02207407780663d98b30e9aefa2e1411f5f60ae44b3eb258d825c2de2c765dcd106541",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": "pushdrop.example.com"
+        }
+      ]
+    },
+    {
+      "name": "version_2",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "single",
+      "anyone_can_pay": true,
+      "transaction": "02000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 1,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100b828f21cc6f9258f9252d019db61184870deec6df0ba05e662edc3e71699b2bf0220228036fdc3039768b16da11b9200dc19410601bda647c1de5311aa41361d90b1c3",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "29cee6b764697b9104a8cc77dbd784c60be6cc64b235ea7c3920f9dd9b021fe7"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "amount_at_21e14",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 2100000000000000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "47304402201469eb9e039854d928195d9a5b9327b996dc2eaa68da3b13019f446fb3e4fa770220110ce788fc682df09eeac62e85ada4f6cbbfe3ab992bcc72fc6fedeb4573f4a441",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "5536f9e46de485b855c837a1ea367d0fac2325fac2d3961814fa36f8d371da9f"
+          },
+          "originator": null
+        }
+      ]
+    }
+  ],
+  "refusals": [
+    {
+      "name": "input_index_past_the_inputs",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 3,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "inputIndex 3 is outside the transaction input range",
+      "class": "Error",
+      "calls": []
+    },
+    {
+      "name": "amount_past_21e14",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 2100000000000001,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "sourceSatoshis must be a valid number of satoshis",
+      "class": "Error",
+      "calls": []
+    },
+    {
+      "name": "wallet_throws",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "wallet refused",
+      "class": "Error",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    }
+  ],
+  "answers": [
+    {
+      "name": "answer_not_der",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "Signature DER must start with 0x30",
+      "class": "Error",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "answer_empty",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "Signature DER must start with 0x30",
+      "class": "Error",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "answer_with_a_byte_after",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "Signature DER invalid",
+      "class": "Error",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    },
+    {
+      "name": "answer_high_s",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "493046022100ed9167590209fe5c559b33f08b0b7961e5cbe4d65f81f56f07c360482314e6bc0221008bf887f99c2674cf165105d1ebee0a08afca91a7fcefc815fcf43216726930dc41",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    }
+  ],
+  "fold": [
+    {
+      "name": "input_index_past_the_inputs_and_amount_past_21e14",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 3,
+      "source_satoshis": 2100000000000001,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": false,
+      "refusal": "inputIndex 3 is outside the transaction input range",
+      "class": "Error",
+      "calls": []
+    },
+    {
+      "name": "answer_r_past_32_bytes",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022101ed9167590209fe5c559b33f08b0b7961e5cbe4d65f81f56f07c360482314e6bc02207407780663d98b30e9aefa2e1411f5f60ae44b3eb258d825c2de2c765dcd106541",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    }
+  ],
+  "fold2": [
+    {
+      "name": "answer_high_s_of_equal_der_length",
+      "originator": null,
+      "protocol_id": [
+        2,
+        "pushdrop wallet unlock"
+      ],
+      "key_id": "1",
+      "counterparty": "self",
+      "sign_outputs": "all",
+      "anyone_can_pay": false,
+      "transaction": "01000000039a4585773ce2ccd7a585c331d60a60d1e3b7d28cbb2ede3bc55445342f12f54b0000000000ffffffff86d9576498ea764b49243efeb05df625010438c6a55d5b578de4ff00c9b4c1db0100000000feffffffc529ffad9a5ab61162b11d616b639e00586ba846746a197d4daf78b908ed4f080200000000050000000258020000000000001976a914111111111111111111111111111111111111111188ac2c0100000000000008006a0568656c6c6f07000000",
+      "input_index": 0,
+      "source_satoshis": 1000,
+      "locking_script": "21025fcfd7bb619d7258aff7d8394af443149f1bead30c70367ba47c3a1357194045ac030102034730450221009635ec1c0dc6abd51140a6cfc4f150a01456d45d3eddbaaf2f294d0d03129d730220157bd71673c8403db7eed3c6e4e3777091bd86cd3e99a99b0563af8935b8f7096d",
+      "estimate_length": 73,
+      "accepted": true,
+      "unlocking_script": "483045022100ed9167590209fe5c559b33f08b0b7961e5cbe4d65f81f56f07c360482314e6bc02207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff41",
+      "calls": [
+        {
+          "method": "createSignature",
+          "args": {
+            "protocolID": [
+              2,
+              "pushdrop wallet unlock"
+            ],
+            "keyID": "1",
+            "counterparty": "self",
+            "data": "9df5193151d9554297ce3e16e0b3572384a0755857127cb45764a2168ce204c4"
+          },
+          "originator": null
+        }
+      ]
+    }
+  ]
+}

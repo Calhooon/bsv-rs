@@ -90,6 +90,9 @@ fn finished_transaction(outputs: &[CreateActionOutput]) -> Transaction {
 /// #545: a rewrite of getPublicKey's compressed answer into another form.
 pub type KeyForm = fn(&str) -> String;
 
+/// #803: a rewrite of createSignature's answer (the DER bytes).
+pub type SignatureForm = fn(Vec<u8>) -> Vec<u8>;
+
 /// A ProtoWallet that records each call by name; proveCertificate answers
 /// a keyring of the names asked (or of `keyring` when set), createAction
 /// no transaction; getPublicKey's and createSignature's arguments kept.
@@ -141,6 +144,9 @@ pub struct Counting {
     /// #782's fold: the error createSignature answers when set, after the
     /// call is recorded.
     pub signature_error: Arc<Mutex<Option<bsv_rs::Error>>>,
+    /// #803: the form createSignature answers its signature in (the DER
+    /// bytes rewritten), after the call is recorded.
+    pub signature_form: Arc<Mutex<Option<SignatureForm>>>,
     /// #904: the calls, by name, that answer `<name> failed` after being
     /// recorded.
     pub fail: Arc<Mutex<Vec<&'static str>>>,
@@ -215,6 +221,7 @@ impl Counting {
             sign_mode: Arc::new(Mutex::new("")),
             key_form: Arc::default(),
             signature_error: Arc::default(),
+            signature_form: Arc::default(),
             fail: Arc::default(),
             create_finished: Arc::default(),
             pending: Arc::default(),
@@ -407,7 +414,11 @@ macro_rules! counting {
                 if let Some(error) = self.signature_error.lock().unwrap().clone() {
                     return Err(error);
                 }
-                WalletInterface::create_signature(&*self.inner, args, o).await
+                let mut answer = WalletInterface::create_signature(&*self.inner, args, o).await?;
+                if let Some(form) = *self.signature_form.lock().unwrap() {
+                    answer.signature = form(answer.signature);
+                }
+                Ok(answer)
             }
             async fn is_authenticated(&self, o: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 self.note(wallet_call!(is_authenticated), o);
