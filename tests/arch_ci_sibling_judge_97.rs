@@ -18,7 +18,10 @@
 //! [`judge_refusals`]) say why a change matters; and across the tree the App's key expression is
 //! written once (the token step), the environment `sibling-judge` and `workflow_run` in no other
 //! workflow ([`tree_refusals`]; this file, which holds the trampoline's pin, is passed over and
-//! builds its needle with `concat!`). Each refusal is shown
+//! builds its needle with `concat!`). Since #958's sitting [`owed_and_bound_refusals`]: `report`
+//! asks beta's `owed` with no key before the mint, the mint and the post skipped only on a plain
+//! `no` of an asking that succeeded, and `judge` hands `report` the run and attempt it judged.
+//! Each refusal is shown
 //! on a mutated text. Not read: a job whose id or name is written as an expression, an import
 //! made by `__import__` or `importlib.import_module` (refused by name), an include whose path is
 //! built by a macro other than `concat!`.
@@ -573,10 +576,12 @@ run-name: sibling-judge ${{ github.event.workflow_run.head_sha || format('of run
 # 25). This file is the trampoline: it lives on main and on beta, byte for byte, and holds no rule.
 # It runs from main alone (each job tests the ref, and the environment `sibling-judge` admits main
 # alone), checks beta out to `judge/` and runs beta's `sibling_judge.py`: `judge`, holding no key,
-# reads stage R's run and its artifact and writes four outputs; `report`, the one job holding the
-# App's token (`bsv-rs-sibling-judge`), posts the check `sibling-judge` on the run's head and never
-# opens the artifact. A change to this file is one sitting with the queue held: beta's pull
-# request, main's pick, then the sweep and one re-judge dispatch for each open pull request.
+# reads stage R's run and its artifact and writes six outputs, the run and attempt it judged among
+# them; `report`, the one job holding the App's token (`bsv-rs-sibling-judge`), asks with no key
+# whether a check is owed, mints the token only when the answer is not a plain `no`, hands the
+# script the run judged, posts the check `sibling-judge` on the run's head and never opens the
+# artifact. A change to this file is one sitting with the queue held: beta's pull request, main's
+# pick, then the sweep and one re-judge dispatch for each open pull request.
 on:
   workflow_run:
     workflows: [sibling-run]
@@ -592,12 +597,14 @@ on:
 permissions:
   contents: read
 
-# one group per judged head (a re-judge by the run's id): the judgements of a head run one at a
-# time, so an older judge cannot finish last on a live head. GitHub keeps one pending run per group,
-# and a newer pending run replaces (cancels) an older one, so a judgement can be dropped; what
-# recovers it: every judgement judges the newest stage R run of its head (sibling_judge.py's
-# `resolve`), so the one that runs posts the verdict a dropped one would have, and the sweep names a
-# head left with none, with its re-judge
+# one group per judged head for an event's judgement, and one per run id for a dispatch (a hand
+# re-judge, the sequencer's, the sync's): an event's judgements of a head run one at a time; a
+# dispatch may run beside them, which is safe because every judgement judges the newest stage R run
+# of its head (one verdict per head), and beta's strict protection bounds a slower one posting
+# last. GitHub keeps one pending run per group, and a newer pending run replaces (cancels) an older
+# one, so a judgement can be dropped; what recovers it: every judgement judges the newest stage R
+# run of its head (sibling_judge.py's `resolve`), so the one that runs posts the verdict a dropped
+# one would have, and the sweep names a head left with none, with its re-judge
 concurrency:
   group: sibling-judge-${{ github.event.workflow_run.head_sha || inputs.run_id }}
   cancel-in-progress: false
@@ -617,6 +624,8 @@ jobs:
       conclusion: ${{ steps.judge.outputs.conclusion }}
       title: ${{ steps.judge.outputs.title }}
       text: ${{ steps.judge.outputs.text }}
+      run: ${{ steps.judge.outputs.run }}
+      attempt: ${{ steps.judge.outputs.attempt }}
     steps:
       - name: Check out beta
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -663,8 +672,27 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # asked with no key, before the mint: `owed=no` only where `report` would post nothing (a
+      # fork's run, a decoy, no open pull request into beta, a newer run still running). Every
+      # failure of the asking is read as owed: the step may fail without ending the job, and the two
+      # steps below are skipped only when it succeeded and answered a plain `no`
+      - name: Is a check owed
+        id: owed
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          python3 -I -B judge/.github/scripts/sibling_judge.py owed --run-id "$RUN_ID" \
+            --repository "$GITHUB_REPOSITORY" --repository-id "$REPOSITORY_ID"
+
       - name: Mint the App's token
         id: token
+        if: steps.owed.outcome != 'success' || steps.owed.outputs.owed != 'no'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.SIBLING_JUDGE_APP_ID }}
@@ -672,6 +700,7 @@ jobs:
           permission-checks: write
 
       - name: Report
+        if: steps.owed.outcome != 'success' || steps.owed.outputs.owed != 'no'
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
@@ -683,6 +712,8 @@ jobs:
           CONCLUSION: ${{ needs.judge.outputs.conclusion }}
           TITLE: ${{ needs.judge.outputs.title }}
           TEXT: ${{ needs.judge.outputs.text }}
+          JUDGED_RUN: ${{ needs.judge.outputs.run }}
+          JUDGED_ATTEMPT: ${{ needs.judge.outputs.attempt }}
           DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -824,7 +855,126 @@ fn job_permissions(job: &[&str]) -> Vec<String> {
     out
 }
 
-/// Every `${{` inside a `run:` block, by its line.
+/// A job's block under `key:` at the job's level (4 spaces): its lines, trimmed, in order.
+fn job_block(job: &[&str], key: &str) -> Vec<String> {
+    let open = format!("{key}:");
+    let mut lines = job
+        .iter()
+        .skip_while(|l| !(indent(l) == 4 && l.trim() == open));
+    if lines.next().is_none() {
+        return Vec::new();
+    }
+    lines
+        .take_while(|l| indent(l) > 4)
+        .map(|l| l.trim().to_string())
+        .collect()
+}
+
+/// A step's `env:` entry, as written.
+fn env_entry<'a>(step: &[&'a str], name: &str) -> Option<&'a str> {
+    let open = format!("{name}:");
+    step.iter()
+        .find_map(|l| {
+            (indent(l) == 10)
+                .then(|| l.trim().strip_prefix(&open))
+                .flatten()
+        })
+        .map(str::trim)
+}
+
+/// The one condition of the trampoline's steps (#958): the mint and the post are skipped only
+/// when the asking succeeded and answered a plain `no`.
+const OWED_IF: &str = "steps.owed.outcome != 'success' || steps.owed.outputs.owed != 'no'";
+
+/// The judge job's six outputs, in order (#958: the run and attempt judged handed to `report`).
+const JUDGE_OUTPUTS: [&str; 6] = [
+    "post: ${{ steps.judge.outputs.post }}",
+    "conclusion: ${{ steps.judge.outputs.conclusion }}",
+    "title: ${{ steps.judge.outputs.title }}",
+    "text: ${{ steps.judge.outputs.text }}",
+    "run: ${{ steps.judge.outputs.run }}",
+    "attempt: ${{ steps.judge.outputs.attempt }}",
+];
+
+/// The rules of #958's sitting on the trampoline's jobs: `report` asks beta's `owed`, with no
+/// key, before the step that mints; the asking may fail without ending the job and is read as
+/// owed unless it succeeded and answered `no`; the mint and the post carry that one condition and
+/// no other step carries any; `judge` hands on the run and attempt it judged and `report` passes
+/// them to the script under the names it reads.
+fn owed_and_bound_refusals(file: &str, all: &[(String, Vec<&str>)]) -> Vec<String> {
+    let mut errors = Vec::new();
+    for (id, job) in all {
+        let steps = steps(job);
+        let named = |name: &str| steps.iter().position(|s| step_key(s, "name") == Some(name));
+        if id == "judge" {
+            if job_block(job, "outputs") != JUDGE_OUTPUTS {
+                errors.push(format!("{file}: `judge`'s outputs are not the six, the run and attempt it judged among them"));
+            }
+            if steps.iter().any(|s| step_key(s, "if").is_some()) {
+                errors.push(format!("{file}: a step of `judge` has an `if:`"));
+            }
+            continue;
+        }
+        if id != "report" {
+            continue;
+        }
+        let mint = steps.iter().position(|s| {
+            step_key(s, "uses").is_some_and(|u| u.starts_with("actions/create-github-app-token@"))
+        });
+        let (Some(owed), Some(mint), Some(post)) =
+            (named("Is a check owed"), mint, named("Report"))
+        else {
+            errors.push(format!("{file}: `report` lacks one of its three steps after the checkout: the asking (`Is a check owed`), the mint, `Report`"));
+            continue;
+        };
+        if !(owed < mint && mint < post) {
+            errors.push(format!("{file}: `report` does not ask whether a check is owed before it mints, and mint before it posts"));
+        }
+        for (n, step) in steps.iter().enumerate() {
+            let holds_key = step
+                .iter()
+                .any(|l| l.contains("secrets.") || l.contains("steps.token."));
+            if n < mint && holds_key {
+                errors.push(format!(
+                    "{file}: a step of `report` before the mint names the key or the token"
+                ));
+            }
+            let cond = step_key(step, "if");
+            let want = (n == mint || n == post).then_some(OWED_IF);
+            if cond != want {
+                errors.push(format!("{file}: step {} of `report` has `if: {cond:?}`; the mint and the post alone carry `{OWED_IF}` (skipped only on a plain `no` of an asking that succeeded)", n + 1));
+            }
+            let absorbed = step_key(step, "continue-on-error");
+            if absorbed != (n == owed).then_some("true") {
+                errors.push(format!("{file}: step {} of `report` has `continue-on-error: {absorbed:?}`; the asking alone may fail without ending the job (a failed asking is read as owed)", n + 1));
+            }
+        }
+        let asking = &steps[owed];
+        if step_key(asking, "id") != Some("owed")
+            || env_entry(asking, "GH_TOKEN") != Some("${{ github.token }}")
+            || !asking.iter().any(|l| {
+                l.trim_start()
+                    .starts_with("python3 -I -B judge/.github/scripts/sibling_judge.py owed ")
+            })
+        {
+            errors.push(format!("{file}: the asking is not beta's `sibling_judge.py owed` under the job's own token with the id `owed`"));
+        }
+        if step_key(asking, "timeout-minutes").is_none() {
+            errors.push(format!("{file}: the asking has no `timeout-minutes` (a hung asking is read as owed, never the job's end)"));
+        }
+        for (name, want) in [
+            ("JUDGED_RUN", "${{ needs.judge.outputs.run }}"),
+            ("JUDGED_ATTEMPT", "${{ needs.judge.outputs.attempt }}"),
+        ] {
+            if env_entry(&steps[post], name) != Some(want) {
+                errors.push(format!("{file}: `Report` does not hand the script `{name}` as `{want}` (the run `judge` judged)"));
+            }
+        }
+    }
+    errors
+}
+
+/// Every `${{` inside a step's `run:` block, by its line.
 fn expressions_in_run(file: &str, text: &str) -> Vec<String> {
     let mut errors = Vec::new();
     let mut block: Option<usize> = None;
@@ -840,7 +990,9 @@ fn expressions_in_run(file: &str, text: &str) -> Vec<String> {
             block = None;
         }
         let key = line.trim_start().trim_start_matches("- ");
-        if let Some(rest) = key.strip_prefix("run:") {
+        // a step's key sits at column 8; a job output named `run` (column 6) is no command
+        let column = line.len() - key.len();
+        if let Some(rest) = key.strip_prefix("run:").filter(|_| column >= 8) {
             let rest = rest.trim();
             if rest.starts_with('|') || rest.starts_with('>') {
                 block = Some(indent(line));
@@ -1133,9 +1285,17 @@ fn judge_refusals(text: &str) -> Vec<String> {
                 .starts_with("python3 -I -B judge/.github/scripts/sibling_judge.py report ")
         })
         .count();
-    if (judge, report, runs.len()) != (1, 1, 2) {
-        errors.push(format!("{file}: the two commands are not beta's `sibling_judge.py judge` and `report` under `python3 -I -B` from `judge/`: {runs:?}"));
+    let owed = runs
+        .iter()
+        .filter(|l| {
+            l.trim_start()
+                .starts_with("python3 -I -B judge/.github/scripts/sibling_judge.py owed ")
+        })
+        .count();
+    if (judge, report, owed, runs.len()) != (1, 1, 1, 3) {
+        errors.push(format!("{file}: the three commands are not beta's `sibling_judge.py judge`, `owed` and `report` under `python3 -I -B` from `judge/`: {runs:?}"));
     }
+    errors.extend(owed_and_bound_refusals(file, &all));
     errors.extend(expressions_in_run(file, text));
     errors
 }
@@ -1221,7 +1381,7 @@ fn the_two_workflows_of_the_judge_are_pinned_whole_97() {
     let planted = judge.replacen("timeout-minutes: 10", "timeout-minutes: 11", 1);
     assert_eq!(
         first_difference(".github/workflows/sibling-judge.yml", SIBLING_JUDGE, &planted).as_deref(),
-        Some(".github/workflows/sibling-judge.yml is not its pin byte for byte (a change to it is a change to this test in the same diff): line 42\n  expected: \"    timeout-minutes: 10\"\n  found:    \"    timeout-minutes: 11\"")
+        Some(".github/workflows/sibling-judge.yml is not its pin byte for byte (a change to it is a change to this test in the same diff): line 46\n  expected: \"    timeout-minutes: 10\"\n  found:    \"    timeout-minutes: 11\"")
     );
     let shorter = run.trim_end_matches('\n');
     assert!(
@@ -1297,8 +1457,8 @@ fn stage_j_holds_its_named_rules_97() {
         ("a secret in judge", "          GH_TOKEN: ${{ github.token }}\n", "          GH_TOKEN: ${{ secrets.SIBLING_JUDGE_KEY }}\n".into(), "`judge` names a secret"),
         ("one group for every head", "  group: sibling-judge-${{ github.event.workflow_run.head_sha || inputs.run_id }}\n", "  group: sibling-judge\n".into(), "one group per judged head"),
         ("judgements cancelled", "  cancel-in-progress: false\n", "  cancel-in-progress: true\n".into(), "one group per judged head"),
-        ("not isolated", "python3 -I -B judge/.github/scripts/sibling_judge.py judge", "python3 judge/.github/scripts/sibling_judge.py judge".into(), "the two commands are not"),
-        ("the head's script", "python3 -I -B judge/.github/scripts/sibling_judge.py report", "python3 -I -B .github/scripts/sibling_judge.py report".into(), "the two commands are not"),
+        ("not isolated", "python3 -I -B judge/.github/scripts/sibling_judge.py judge", "python3 judge/.github/scripts/sibling_judge.py judge".into(), "the three commands are not"),
+        ("the head's script", "python3 -I -B judge/.github/scripts/sibling_judge.py report", "python3 -I -B .github/scripts/sibling_judge.py report".into(), "the three commands are not"),
         ("a cache step", "      - name: Judge\n", "      - name: Cache\n        uses: actions/cache@0000000000000000000000000000000000000000 # v4\n\n      - name: Judge\n".into(), "restores a cache"),
         ("an expression in run", "            --workflow-sha \"$WORKFLOW_SHA\"\n", "            --workflow-sha \"${{ github.workflow_sha }}\"\n".into(), "an expression inside a `run:` block"),
         ("an output in run", "            --judge-result \"$JUDGE_RESULT\" --details-url \"$DETAILS_URL\"\n", "            --judge-result \"${{ needs.judge.result }}\" --details-url \"$DETAILS_URL\"\n".into(), "an expression inside a `run:` block"),
@@ -1311,6 +1471,21 @@ fn stage_j_holds_its_named_rules_97() {
         ("no timeout", "    timeout-minutes: 10\n", "".into(), "has no `timeout-minutes`"),
         ("a write permission", "      pull-requests: read\n", "      pull-requests: write\n".into(), "is not the three reads"),
         ("no needs", "    needs: judge\n", "".into(), "`report` does not need `judge`"),
+        ("the mint unasked", &format!("        id: token\n        if: {OWED_IF}\n"), "        id: token\n".into(), "the mint and the post alone carry"),
+        ("the post unasked", &format!("      - name: Report\n        if: {OWED_IF}\n"), "      - name: Report\n".into(), "the mint and the post alone carry"),
+        ("skipped unless a yes", &format!("        id: token\n        if: {OWED_IF}\n"), "        id: token\n        if: steps.owed.outputs.owed == 'yes'\n".into(), "the mint and the post alone carry"),
+        ("a failed asking's no trusted", &format!("        id: token\n        if: {OWED_IF}\n"), "        id: token\n        if: steps.owed.outputs.owed != 'no'\n".into(), "the mint and the post alone carry"),
+        ("a failed asking ends the job", "        continue-on-error: true\n", "".into(), "the asking alone may fail without ending the job"),
+        ("a failed post absorbed", "      - name: Report\n", "      - name: Report\n        continue-on-error: true\n".into(), "the asking alone may fail without ending the job"),
+        ("the asking with the App's token", "        id: owed\n        continue-on-error: true\n        timeout-minutes: 3\n        env:\n          GH_TOKEN: ${{ github.token }}\n", "        id: owed\n        continue-on-error: true\n        timeout-minutes: 3\n        env:\n          GH_TOKEN: ${{ steps.token.outputs.token }}\n".into(), "before the mint names the key or the token"),
+        ("the asking unbounded", "        continue-on-error: true\n        timeout-minutes: 3\n", "        continue-on-error: true\n".into(), "the asking has no `timeout-minutes`"),
+        ("the asking by another script", "python3 -I -B judge/.github/scripts/sibling_judge.py owed", "python3 -I -B judge/.github/scripts/sibling_judge.py sweep".into(), "the asking is not beta's `sibling_judge.py owed`"),
+        ("the asking renamed", "      - name: Is a check owed\n", "      - name: Ask\n".into(), "lacks one of its three steps"),
+        ("a condition in judge", "      - name: Judge\n", "      - name: Judge\n        if: github.event_name == 'workflow_run'\n".into(), "a step of `judge` has an `if:`"),
+        ("the run judged not written out", "      run: ${{ steps.judge.outputs.run }}\n", "".into(), "`judge`'s outputs are not the six"),
+        ("the attempt judged not written out", "      attempt: ${{ steps.judge.outputs.attempt }}\n", "".into(), "`judge`'s outputs are not the six"),
+        ("the run judged not handed on", "          JUDGED_RUN: ${{ needs.judge.outputs.run }}\n", "".into(), "does not hand the script `JUDGED_RUN`"),
+        ("the event's attempt for the judged one", "          JUDGED_ATTEMPT: ${{ needs.judge.outputs.attempt }}\n", "          JUDGED_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}\n".into(), "does not hand the script `JUDGED_ATTEMPT`"),
     ];
     for (what, from, to, refusal) in plants {
         assert!(text.contains(from), "{what}: the plant's anchor is gone");
@@ -1321,6 +1496,75 @@ fn stage_j_holds_its_named_rules_97() {
             judge_refusals(&planted)
         );
     }
+}
+
+/// #958's sitting, the two rules a plant of one line cannot show: the order of the asking and the
+/// mint, and that the names the trampoline hands on are the names beta's script writes and reads.
+#[test]
+fn the_trampoline_asks_before_it_mints_and_hands_report_the_run_judged_958() {
+    let text = read(".github/workflows/sibling-judge.yml");
+    let all = jobs(&text);
+    let errors = owed_and_bound_refusals("sibling-judge.yml", &all);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    // the asking moved below the mint: the key is minted before anything is asked
+    let from = text
+        .find("      # asked with no key, before the mint")
+        .expect("the asking's comment");
+    let mint = text
+        .find("      - name: Mint the App's token\n")
+        .expect("the mint");
+    let post = text.find("      - name: Report\n").expect("the post");
+    assert!(from < mint && mint < post);
+    let moved = format!(
+        "{}{}{}{}",
+        &text[..from],
+        &text[mint..post],
+        &text[from..mint],
+        &text[post..]
+    );
+    let found = owed_and_bound_refusals("sibling-judge.yml", &jobs(&moved));
+    assert!(
+        found
+            .iter()
+            .any(|e| e.contains("does not ask whether a check is owed before it mints")),
+        "{found:?}"
+    );
+    // the condition's two halves, as GitHub reads them: a step skipped only when the asking's
+    // outcome is `success` and its answer is `no`; an absent answer is the empty string
+    let skipped = |outcome: &str, answer: &str| !(outcome != "success" || answer != "no");
+    assert_eq!(
+        OWED_IF,
+        "steps.owed.outcome != 'success' || steps.owed.outputs.owed != 'no'"
+    );
+    for (outcome, answer, skip) in [
+        ("success", "no", true),
+        ("success", "yes", false),
+        ("success", "", false),
+        ("success", "maybe", false),
+        ("failure", "no", false),
+        ("failure", "", false),
+        ("cancelled", "no", false),
+        ("skipped", "", false),
+    ] {
+        assert_eq!(skipped(outcome, answer), skip, "{outcome} {answer:?}");
+    }
+    // the names: every output the trampoline maps is a line beta's `write_outputs` writes, the
+    // two names it hands `report` are the two `judged_of` reads, and `owed` writes the one output
+    // the condition reads
+    let script = read(".github/scripts/sibling_judge.py");
+    for output in JUDGE_OUTPUTS {
+        let name = output.split(':').next().unwrap_or(output);
+        assert!(
+            script.contains(&format!("f\"{name}={{")),
+            "sibling_judge.py writes no output `{name}`"
+        );
+        assert!(
+            output.ends_with(&format!("steps.judge.outputs.{name} }}}}")),
+            "{output}"
+        );
+    }
+    assert!(script.contains("env.get(\"JUDGED_RUN\"), env.get(\"JUDGED_ATTEMPT\")"));
+    assert!(script.contains("output.write(f\"owed={owed}\\n\")"));
 }
 
 #[test]
