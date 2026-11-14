@@ -278,6 +278,8 @@ The BRC-42 key derivation enables hierarchical deterministic key generation betw
 
 The HMAC uses compressed shared secret as the key and invoice number bytes as the data. This matches the Go SDK's `Sha256HMAC(invoiceNumberBin, sharedSecret.Compressed())` where parameters are (data, key).
 
+`derive_child` takes no shared-secret cache callbacks (#912's third line, stated by the captain's ruling: a row in the root `CLAUDE.md`'s divergence list, no new public door): both doors (`private_key.rs:339`, `public_key.rs:247`) derive the ECDH point on every call, where `ts-stack@edf6e03` `deriveChild` takes two further optional parameters, `cacheSharedSecret` and `retrieveCachedSharedSecret` (`PrivateKey.ts:439-444`, `PublicKey.ts:205-210`), which at the pin `KeyDeriver` alone passes: its constructor's two, which the reference's own `CachedKeyDeriver` alone supplies (`wallet/CachedKeyDeriver.ts:50-58`), and in `derivePrivateKeys` closures of its own that reuse one point within a counterparty's group (`wallet/KeyDeriver.ts:226-241`). This crate's `CachedKeyDeriver` keeps its own caches, of the derived keys (`src/wallet/cached_key_deriver.rs:142-147`). A port of reference code that passes its own cache drops the two arguments, and no derived key differs wherever the retrieve callback answers the ECDH point of the two keys. go-sdk@2ca481c's `DeriveChild` takes no such parameter (`primitives/ec/privatekey.go:208`, `publickey.go:305`).
+
 ## DER Signature Format
 
 ```
