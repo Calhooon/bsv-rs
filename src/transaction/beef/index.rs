@@ -112,6 +112,8 @@ impl Beef {
     pub(super) fn refresh_mutated(&mut self) {
         let mut refreshed = false;
         for tx in &mut self.txs {
+            #[cfg(test)]
+            super::atomic::cost::refreshed();
             refreshed |= tx.refresh();
         }
         if refreshed {

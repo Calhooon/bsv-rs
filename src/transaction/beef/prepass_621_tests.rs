@@ -13,7 +13,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 #[path = "../../../tests/support/beef_seeds_817.rs"]
-mod seeds;
+pub(super) mod seeds; // read by `atomic_batch_817_tests.rs` too: one load of the file
 #[path = "../../../tests/support/beef_merge_states_817.rs"]
 mod states;
 

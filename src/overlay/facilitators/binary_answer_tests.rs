@@ -114,3 +114,57 @@ fn extracted_bytes_count_each_outpoints_atomic_beef_and_context_775() {
         Error::OverlayResourceLimit("maxResponseBytes".into())
     );
 }
+
+/// #817: the answer's closures share one preparation of its BEEF (a
+/// refresh, an amount check and a position map over every entry), and each
+/// closure's loops visit the entries it keeps alone. The counts are of
+/// entries VISITED, taken at each loop's own turn: 32 proven transactions,
+/// each named by two outpoints, are 32 entries refreshed, 32 checked for
+/// their amounts and 32 mapped (beside the one entry each of the 32
+/// closures' own sort refreshes and own check reads, and none mapped) and
+/// 32 turns of each closure loop, where
+/// `Beef::to_binary_atomic` a distinct txid ran each pass 32 times (1,024
+/// entries) and each loop over all 32 entries a closure (1,024 turns).
+/// Counts, never a time.
+#[test]
+fn the_answers_closures_share_one_preparation_of_its_beef_817() {
+    let mut beef = Beef::new();
+    let txids: Vec<String> = (0..32u32)
+        .map(|k| proven(&mut beef, &format!("{:02x}", k + 1), 900 + k))
+        .collect();
+    let bytes = beef.to_binary().expect("the BEEF is writable");
+    let expected: Vec<Vec<u8>> = txids
+        .iter()
+        .map(|t| beef.to_binary_atomic(t).unwrap())
+        .collect();
+    let outpoints: Vec<Outpoint> = txids
+        .iter()
+        .chain(txids.iter())
+        .map(|t| (t.clone(), 0, None))
+        .collect();
+
+    Beef::atomic_cost_taken();
+    let read = atomic_outputs(outpoints, &bytes, usize::MAX).unwrap();
+    let cost = Beef::atomic_cost_taken();
+    assert_eq!(cost.passes(), (32 + 32, 32 + 32, 32));
+    assert_eq!(cost.loops(), (32, 32));
+    // The bytes are each txid's own Atomic BEEF, as before.
+    assert_eq!(read.len(), 64);
+    for (k, output) in read.iter().enumerate() {
+        assert_eq!(output.beef, expected[k % 32], "outpoint {k}");
+    }
+}
+
+/// #817: an answer of no outpoint prepares nothing, as it called no
+/// closure before.
+#[test]
+fn an_answer_of_no_outpoint_prepares_nothing_817() {
+    let (bytes, ..) = two();
+    Beef::atomic_cost_taken();
+    assert!(atomic_outputs(Vec::new(), &bytes, usize::MAX)
+        .unwrap()
+        .is_empty());
+    let cost = Beef::atomic_cost_taken();
+    assert_eq!(cost.passes(), (0, 0, 0));
+    assert_eq!(cost.loops(), (0, 0));
+}
