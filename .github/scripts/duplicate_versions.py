@@ -24,6 +24,7 @@ list's totals and the lines of `ci.yml` that run this check.
 
 import argparse
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -62,16 +63,29 @@ def line_key(line):
     return [(0, int(p), "") if p.isdigit() else (1, 0, p) for p in line.split(".")]
 
 
+# A package line of `cargo tree --prefix none --format {p}`, whole: the crate's name, one
+# space, `v` and a version of three numeric parts with an optional pre-release and build
+# part (`0.9.0-beta.7`, `0.11.1+wasi-snapshot-preview1`), then nothing or marks in
+# parentheses to the line's end: `(proc-macro)`, the source of a package not from
+# crates.io (a path, a registry, a git URL) and `(*)` for a subtree printed before. Those
+# are the forms cargo 1.98.1 prints for the four graphs of this crate (2,372 lines read,
+# 2026-11-14); any other line, a diagnostic whose second word starts with `v` among them,
+# is no package line and is refused.
+PACKAGE = re.compile(r"([A-Za-z0-9_-]+) v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)"
+                     r"(?: \(.*\))?")
+
+
 def tree_versions(output):
-    """`cargo tree --prefix none --format {p}`: each crate's versions."""
+    """`cargo tree --prefix none --format {p}`: each crate's versions. A line that is
+    empty is passed; one that is not `PACKAGE`, whole, raises."""
     versions = {}
     for raw in output.splitlines():
-        words = raw.split()
-        if not words:
+        if not raw:
             continue
-        if len(words) < 2 or not words[1].startswith("v"):
+        line = PACKAGE.fullmatch(raw)
+        if line is None:
             raise ValueError(f"not a `cargo tree` package line: {raw}")
-        versions.setdefault(words[0], set()).add(words[1][1:])
+        versions.setdefault(line[1], set()).add(line[2])
     return versions
 
 

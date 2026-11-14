@@ -8,7 +8,9 @@ process's exit code and nothing else of it):
                                                         a cargo that prints no package)
     `cargo tree` exits nonzero                      1   held
     no `cargo` on PATH (OSError at the spawn)       1   held
-    a line of cargo's that is no package line       1   held (in the graph read last and before it)
+    a line of cargo's that is no package line       1   held (`NO_PACKAGE`'s lines, in each of the
+                                                        four graphs; a package line is `PACKAGE`'s
+                                                        form in the script and no other)
     the list missing (OSError at the read)          1   held
     the list not UTF-8                              1   held
     an argument argparse refuses                    2   held
@@ -115,8 +117,17 @@ class Tree(unittest.TestCase):
         self.assertEqual(dv.duplicates(versions),
                          {"base64": ["0.22.1", "0.23.1"], "syn": ["2.0.119", "3.0.10"]})
 
+    def test_every_form_of_a_package_line_is_read(self):
+        for raw, (name, version) in PACKAGE_LINES.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(dv.tree_versions(raw + "\n"), {name: {version}})
+        self.assertEqual(dv.tree_versions("\n".join(PACKAGE_LINES) + "\n\n"),
+                         {"syn": {"2.0.119"}, "serde_derive": {"1.0.229"},
+                          "wasi": {"0.11.1+wasi-snapshot-preview1"},
+                          "bsv-rs": {"0.9.0-beta.7"}, "one": {"1.0.0-rc.1+build.5", "1.0.0"}})
+
     def test_a_line_that_is_no_package_is_refused_not_skipped(self):
-        for raw in ["error: something", "syn", "syn 2.0.119"]:
+        for raw in ["error: something", *NO_PACKAGE]:
             with self.assertRaises(ValueError, msg=raw):
                 dv.tree_versions(raw)
 
@@ -255,6 +266,53 @@ class Repository(unittest.TestCase):
         self.assertIn("wasm32-unknown-unknown", calls[2][0])
         self.assertIn("--all-features", calls[0][0])
         self.assertIn("full,http,websocket", calls[1][0])
+
+
+# Lines of cargo's stdout that are no package line: each is refused by `tree_versions` and
+# ends the process with exit 1 in whichever graph prints it. From `warning: very old
+# lockfile` on, the second word starts with `v`, which was all the script asked of a line
+# until the fourth fold (the third re-read's four lines, then the forms beside them).
+NO_PACKAGE = [
+    "syn 2.0.119",
+    "warning: something",
+    "syn",
+    "warning: very old lockfile",
+    "error: version mismatch",
+    "note: v2 resolver",
+    "(*) vX",
+    "(*) v1.0.0",
+    "syn v2",
+    "syn v2.0",
+    "syn v2.0.x",
+    "syn v2.0.119.1",
+    "syn v2.0.119x",
+    "syn v2.0.119 again",
+    "syn v2.0.119 (*) again",
+    " syn v2.0.119",
+    "syn  v2.0.119",
+    "syn v2.0.119 ",
+    "syn\tv2.0.119",
+    "  ",
+]
+
+# What `cargo tree --prefix none --format {p}` prints for a package, each form read off a
+# real run on this tree (cargo 1.98.1, the four graphs, 2,372 lines): the bare line, the
+# repeat mark, a proc-macro with and without it, build metadata, the root crate with a
+# pre-release and its path. The registry and git sources are cargo's `{p}` for a package
+# not from crates.io, which this tree does not hold.
+PACKAGE_LINES = {
+    "syn v2.0.119": ("syn", "2.0.119"),
+    "syn v2.0.119 (*)": ("syn", "2.0.119"),
+    "serde_derive v1.0.229 (proc-macro)": ("serde_derive", "1.0.229"),
+    "serde_derive v1.0.229 (proc-macro) (*)": ("serde_derive", "1.0.229"),
+    "wasi v0.11.1+wasi-snapshot-preview1": ("wasi", "0.11.1+wasi-snapshot-preview1"),
+    "wasi v0.11.1+wasi-snapshot-preview1 (*)": ("wasi", "0.11.1+wasi-snapshot-preview1"),
+    "bsv-rs v0.9.0-beta.7 (/home/runner/work/bsv-rs/bsv-rs)": ("bsv-rs", "0.9.0-beta.7"),
+    "bsv-rs v0.9.0-beta.7 (/a path (with) marks/bsv-rs) (*)": ("bsv-rs", "0.9.0-beta.7"),
+    "one v1.0.0-rc.1+build.5": ("one", "1.0.0-rc.1+build.5"),
+    "one v1.0.0 (registry+https://example.invalid/index)": ("one", "1.0.0"),
+    "one v1.0.0 (https://example.invalid/one.git?branch=main#0123abcd)": ("one", "1.0.0"),
+}
 
 
 def tree_of(held):
@@ -465,15 +523,17 @@ class Process(unittest.TestCase):
 
     def test_a_cargo_line_that_is_no_package_exits_1_as_a_process(self):
         # The raise is `tree_versions`' and nothing catches it: the refusal's line is the
-        # traceback's last, and no counts line is printed. In the graph read last too, so
-        # the three graphs read before it do not carry the exit.
-        for graph, calls in [("all", 1), ("default", len(dv.GRAPHS))]:
-            for raw in ["syn 2.0.119", "warning: something", "syn"]:
+        # traceback's last, and no counts line is printed. In each of the four graphs, so
+        # no graph's reading is skipped and the graphs read before it do not carry the exit:
+        # cargo is asked for the graphs up to the one that prints the line and no further.
+        self.assertEqual(list(dv.GRAPHS), ["all", "native", "wasm32", "default"])
+        for calls, graph in enumerate(dv.GRAPHS, 1):
+            for raw in NO_PACKAGE:
                 with self.subTest(graph=graph, raw=raw):
                     graphs = dict(HELD, **{graph: tree_of(HELD[graph]) + raw + "\n"})
                     code, lines, err, asked = self.run_script(graphs)
                     self.assertEqual(lines, [])
-                    self.raised(err, f"ValueError: not a `cargo tree` package line: {raw}")
+                    self.raised(err, f"ValueError: not a `cargo tree` package line: {raw}".rstrip())
                     self.assertEqual(code, 1)
                     self.assertEqual(len(asked), calls, asked)
 

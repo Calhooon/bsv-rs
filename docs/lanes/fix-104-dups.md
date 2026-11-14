@@ -25,7 +25,7 @@ with `lint` green.
 |---|---|
 | `docs/duplicate-versions.txt` | One row a crate: `graphs \| crate \| lines \| reason`. The graphs that hold the pair, the semver-compatible lines held, the older side's parents and what would end it |
 | `.github/scripts/duplicate_versions.py` | Reads four graphs with `cargo tree --locked -e normal,build,dev --prefix none --format {p}` (nothing built) and refuses `NEW` (a duplicate with no row), `MOVED` (other lines than the row's, a third line included) and `STALE` (a row naming a graph that holds no such pair), and a malformed list |
-| `ci.yml`, the `deny` step of `lint` | Runs the script's unit tests (21; 28 since the fold; 34 since the second; 41 since the third) and the script after the three `cargo-deny` checks, each under `\|\| result=1`; no new gate, no new step, no tool installed |
+| `ci.yml`, the `deny` step of `lint` | Runs the script's unit tests (21; 28 since the fold; 34 since the second; 41 since the third; 42 since the fourth) and the script after the three `cargo-deny` checks, each under `\|\| result=1`; no new gate, no new step, no tool installed |
 | `tests/arch_duplicate_versions_104.rs` | Pins the list's form and totals (`ROWS` 11; `TOTALS` 11, 11, 3, 5; `LINES` 22 since the fold), the step's two lines, `deny.toml`'s warn level with no `skip`, the script's graphs |
 
 The graphs: `all` (`--all-features --target all`), `wasm32` (`--no-default-features --features
@@ -167,7 +167,7 @@ and holds or states each. The script is unchanged.
 | returns 1: the list out of form (a malformed list file that is text) | 1 | `test_a_list_out_of_form_exits_1_as_a_process` |
 | returns 1: cargo exits 0 and prints no package | 1 | `test_a_cargo_that_prints_no_package_exits_1_as_a_process` |
 | returns 1: `cargo tree` exits nonzero (`CalledProcessError`, caught) | 1 | `test_a_cargo_tree_that_fails_exits_1_as_a_process` |
-| raises `ValueError`: a line of cargo's that is no package line | 1 | `test_a_cargo_line_that_is_no_package_exits_1_as_a_process` (three lines, in `all`, read ahead of the others, and in `default`, read last) |
+| raises `ValueError`: a line of cargo's that is no package line | 1 | `test_a_cargo_line_that_is_no_package_exits_1_as_a_process` (three lines, in `all`, read ahead of the others, and in `default`, read last; since the fourth fold a package line is the script's `PACKAGE`, whole, and the test runs `NO_PACKAGE`'s 20 lines in each of the four graphs) |
 | raises `FileNotFoundError`: the list missing | 1 | `test_a_missing_list_exits_1_as_a_process` |
 | raises `UnicodeDecodeError`: the list not UTF-8 | 1 | `test_a_list_that_is_not_utf8_exits_1_as_a_process` |
 | raises `FileNotFoundError`: no `cargo` on `PATH` | 1 | `test_no_cargo_on_the_path_exits_1_as_a_process` |
@@ -197,3 +197,63 @@ temporary root's manifest. The script reads no other variable and opens no socke
 
 Logs: `/Volumes/Lanes/out/bsv-rs/fix-104-dups-fold3/` (`plantA-before.log`, `plants-after.log`,
 `unittest-tip.log`). The scratch copy and the target dir are removed.
+
+## The fourth fold (lane fix-104-dups-fold4, 2026-11-14)
+
+The third re-read found the row above untrue of the script, and this fold changes the SCRIPT.
+`tree_versions` took a line for a package line when its second word started with `v`, so run as
+a process with the stub's graph ending in `warning: very old lockfile`, `error: version
+mismatch`, `note: v2 resolver` or `(*) vX` the script exited 0, the line counted as a crate.
+
+The reading now. A line is a package line when the whole of it is `PACKAGE`
+(`duplicate_versions.py`): a crate's name (`[A-Za-z0-9_-]+`), one space, `v` and a version of
+three numeric parts with an optional pre-release and an optional build part, then nothing or
+one space and marks in parentheses to the line's end. An empty line is passed; every other
+line raises, a line of spaces and a line with a space before or after it included.
+
+What cargo prints for a package, read off a real run (the lockfile resolved as the job
+resolves it, `cargo generate-lockfile`, SHA-256 `a2e3cf13...`, cargo 1.98.1; the script's own
+`cargo_tree` for each graph, 699, 689, 478 and 506 lines, 2,372, none empty):
+
+| Form | Lines | Example |
+|---|---|---|
+| name and version | 1,489 | `syn v2.0.119` |
+| with the repeat mark | 784 | `syn v2.0.119 (*)` |
+| a proc-macro | 54 | `serde_derive v1.0.229 (proc-macro)` |
+| a proc-macro repeated | 35 | `serde_derive v1.0.229 (proc-macro) (*)` |
+| a build part | 6 | `wasi v0.11.1+wasi-snapshot-preview1` |
+| the root: a pre-release and its path | 4 | `bsv-rs v0.9.0-beta.7 (/.../bsv-rs)` |
+
+Every one of the 2,372 lines is `PACKAGE`, and the old and the new reading give the same crates
+and versions for each graph (279, 276, 209 and 222 crates). Two forms this tree does not hold
+are read by the same last group and held on small texts alone, not seen in a run: a registry
+source and a git source in parentheses. No feature line is printed (the step passes no
+`-e features`, and `--format {p}` alone). A path holding parentheses or spaces is read (the
+group is `\(.*\)` to the line's end), which is also the form's bound: text between a `(` after
+the version and a `)` at the line's end is not judged.
+
+The tests (`test_duplicate_versions.py`, 42). `NO_PACKAGE`, 20 lines: the three of the third
+fold, the re-read's four, and `(*) v1.0.0`, a version of one, two or four parts, `v2.0.x`,
+`v2.0.119x`, a word after the version or after `(*)`, a space before the name, two spaces, a
+space after the version, a tab, and a line of spaces. `Tree` refuses each; `Process` runs each
+in each of the four graphs (the re-read's second item: `all` and `default` alone until now), 80
+processes, each exit 1 by the uncaught `ValueError`, its line the traceback's last, cargo asked
+for the graphs up to that one and no further. `PACKAGE_LINES`, 11 texts, are the forms above
+and the two sources, each read to its name and version.
+
+RED. The new tests on the script as it was (`red-before.log`, before the line of spaces was
+added): 65 failures, the 16 lines beyond the third fold's three in each of the four graphs and
+the `Tree` test. On a scratch copy of the script, its tests and the three files they read
+(`plant-*.log`): the old reading, 69 (17 lines by four graphs and `Tree`); the re-read's form
+on the second word alone (`v\d+\.\d+\.\d+\S*`), 37 (nine lines: a suffix on the version, a
+fourth part, a word after, the spacing, `(*)` as a name); `PACKAGE.match` for `fullmatch`, 21
+(five lines).
+
+The rows of the third fold's table, each run as a process again by the tests (42 of 42, three
+times), and the script once on this tree as the step runs it: exit 0, `all 11, native 11,
+wasm32 3, default 5; 11 rows`. Line 11 of the test file's header now names `NO_PACKAGE` and the
+four graphs.
+
+Logs: `/Volumes/Lanes/out/bsv-rs/fix-104-dups-fold4/` (`tree-*.txt`, `red-before.log`,
+`plant-*.log`, `unittest-after-*.log`, `script-tree.log`). The scratch copy and the target dir
+are removed.
