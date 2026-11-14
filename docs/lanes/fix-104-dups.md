@@ -25,7 +25,7 @@ with `lint` green.
 |---|---|
 | `docs/duplicate-versions.txt` | One row a crate: `graphs \| crate \| lines \| reason`. The graphs that hold the pair, the semver-compatible lines held, the older side's parents and what would end it |
 | `.github/scripts/duplicate_versions.py` | Reads four graphs with `cargo tree --locked -e normal,build,dev --prefix none --format {p}` (nothing built) and refuses `NEW` (a duplicate with no row), `MOVED` (other lines than the row's, a third line included) and `STALE` (a row naming a graph that holds no such pair), and a malformed list |
-| `ci.yml`, the `deny` step of `lint` | Runs the script's unit tests (21; 28 since the fold; 34 since the second) and the script after the three `cargo-deny` checks, each under `\|\| result=1`; no new gate, no new step, no tool installed |
+| `ci.yml`, the `deny` step of `lint` | Runs the script's unit tests (21; 28 since the fold; 34 since the second; 41 since the third) and the script after the three `cargo-deny` checks, each under `\|\| result=1`; no new gate, no new step, no tool installed |
 | `tests/arch_duplicate_versions_104.rs` | Pins the list's form and totals (`ROWS` 11; `TOTALS` 11, 11, 3, 5; `LINES` 22 since the fold), the step's two lines, `deny.toml`'s warn level with no `skip`, the script's graphs |
 
 The graphs: `all` (`--all-features --target all`), `wasm32` (`--no-default-features --features
@@ -151,3 +151,49 @@ says is the script's run, never that file's.
 
 Logs: `/Volumes/Lanes/out/bsv-rs/fix-104-dups-fold2/` (`red1-exit-plant.log`, `red2a-is-line.log`,
 `red2c-name.log`, `plant-row-*.log`). The scratch tree and its target dir are removed.
+
+## The third fold (lane fix-104-dups-fold3, 2026-11-14)
+
+The second re-read planted one more exit that passed: the script's last line wrapped as
+`try: code = main()`, `except Exception: code = 0`, `sys.exit(code)` passed 34 of 34, and run as a
+process with a stub `cargo` printing `syn 2.0.119` the tip exits 1 and the plant 0. Two reads had
+each found one more way for the process to exit 0, so this fold lists every way the process ends
+and holds or states each. The script is unchanged.
+
+| How `main()` ends, run as a process | Exit | Held by (`Process`, `test_duplicate_versions.py`) or stated |
+|---|---|---|
+| returns 0: the graphs are the list's | 0 | `test_the_graphs_the_list_describes_exit_0_as_a_process` |
+| returns 1: a duplicate the list does not hold | 1 | `test_a_new_duplicate_exits_1_as_a_process` |
+| returns 1: the list out of form (a malformed list file that is text) | 1 | `test_a_list_out_of_form_exits_1_as_a_process` |
+| returns 1: cargo exits 0 and prints no package | 1 | `test_a_cargo_that_prints_no_package_exits_1_as_a_process` |
+| returns 1: `cargo tree` exits nonzero (`CalledProcessError`, caught) | 1 | `test_a_cargo_tree_that_fails_exits_1_as_a_process` |
+| raises `ValueError`: a line of cargo's that is no package line | 1 | `test_a_cargo_line_that_is_no_package_exits_1_as_a_process` (three lines, in `all`, read ahead of the others, and in `default`, read last) |
+| raises `FileNotFoundError`: the list missing | 1 | `test_a_missing_list_exits_1_as_a_process` |
+| raises `UnicodeDecodeError`: the list not UTF-8 | 1 | `test_a_list_that_is_not_utf8_exits_1_as_a_process` |
+| raises `FileNotFoundError`: no `cargo` on `PATH` | 1 | `test_no_cargo_on_the_path_exits_1_as_a_process` |
+| `SystemExit` of argparse: an argument it refuses | 2 | `test_an_argument_argparse_refuses_exits_2_as_a_process` |
+| an unreadable lockfile | 1 | stated: the script reads no lockfile, cargo does, so it is the `cargo tree` row (the stub's words are cargo's refusal of a lockfile) |
+| the list a directory or unreadable by permission | 1 | stated: an `OSError` at the same read as the missing list's, caught by nothing |
+| bytes of cargo's that are no text in the runner's locale | 1 where they raise | stated: the decoding is the locale's, so the bytes that raise differ by host; where they decode the line is judged as any other |
+| a stdout that refuses a write | nonzero | stated: the step's stdout is the runner's log; the raise is `print`'s, uncaught as the others |
+| `cargo tree` ended by a signal | 1 | stated: `check=True` raises the same `CalledProcessError` as for an exit code |
+| an exit that depends on an environment variable | | stated bound: the process runs with the tests' environment, `PATH` alone replaced, so a variable the tests' run does not carry is read by no test |
+| `KeyboardInterrupt`, a signal to the interpreter | | not this file's |
+
+RED, on a scratch copy of the script and its tests (`plants-after.log`): the re-read's plant, 9
+failures of 41 (the no-package-line test's six cases, the missing list, the list not UTF-8, no
+cargo); `except ValueError`, 7; `except OSError`, 2; `except SystemExit`, 1 (the argparse test);
+the last line `main()` alone, 4. The re-read's other plant (`main()` without `sys.exit` when
+`GITHUB_ACTIONS` is set): 41 of 41 with the variable unset and 4 failures with it set, which is
+how CI runs the tests, in the step that runs the script. That is the stated bound and no more: a
+variable neither run carries is read by nothing.
+
+The environment and hermeticity. `Process` passed `PATH` alone until this fold; it now passes
+the tests' environment with `PATH` replaced by the stub's directory then `os.defpath`. Each run
+asserts that `cargo` on that path is the stub (`shutil.which`), and for the run without a stub
+that the path, an empty directory alone, holds no `cargo`; the child's `subprocess.run` finds
+`cargo` by that `PATH`, and every call the stub records is checked to be `tree --locked` on the
+temporary root's manifest. The script reads no other variable and opens no socket.
+
+Logs: `/Volumes/Lanes/out/bsv-rs/fix-104-dups-fold3/` (`plantA-before.log`, `plants-after.log`,
+`unittest-tip.log`). The scratch copy and the target dir are removed.

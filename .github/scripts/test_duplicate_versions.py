@@ -1,4 +1,33 @@
-"""The duplicate dependency versions' check against its list (#104)."""
+"""The duplicate dependency versions' check against its list (#104).
+
+How the script's PROCESS can end, and what holds each (`Process`, below; the step reads the
+process's exit code and nothing else of it):
+
+    main() returns 0                                0   held
+    main() returns 1: a duplicate, a row, the list  1   held (a new duplicate, a list out of form,
+                                                        a cargo that prints no package)
+    `cargo tree` exits nonzero                      1   held
+    no `cargo` on PATH (OSError at the spawn)       1   held
+    a line of cargo's that is no package line       1   held (in the graph read last and before it)
+    the list missing (OSError at the read)          1   held
+    the list not UTF-8                              1   held
+    an argument argparse refuses                    2   held
+
+What no test here holds, one sentence each. An unreadable lockfile: the script reads no
+lockfile, cargo does, so it is `cargo tree` exiting nonzero (the stub's words there are cargo's
+refusal of a lockfile). The list a directory or unreadable by permission: an OSError at the same read as
+the missing list's, raised by the same call and caught by nothing. Bytes of cargo's that are
+no text in the runner's locale: the decoding is the locale's (`text=True`), so the bytes that
+raise differ by host, and where they decode the line is judged as any other. A stdout that
+refuses a write: the step's stdout is the runner's log, and the raise is `print`'s, uncaught
+as the others. `cargo tree` ended by a signal: `check=True` raises the same
+`CalledProcessError` as for its exit code. An exit that depends on an environment variable:
+the process is run with this process's environment, `PATH` alone replaced, so a variable the
+runner sets and this run does not (or the reverse) is read by no test; in CI the tests run in
+the step the script runs in, with its variables. `KeyboardInterrupt` and a signal to the
+interpreter are not this file's. A change of the script made to defeat these tests (an exit
+keyed on the temporary root's path, on the stub) is visible in its diff and a reviewer's.
+"""
 
 import contextlib
 import io
@@ -343,9 +372,13 @@ cat "$here/$graph"
 @unittest.skipUnless(os.name == "posix", "the stub cargo is a shell script")
 class Process(unittest.TestCase):
     """The script run as the `deny` step runs it: the PROCESS's exit code is what
-    `|| result=1` reads, so `sys.exit(main())` is held here and by no test of `main()`.
-    A copy of the script under a temporary root, the step's own command line, and a stub
-    `cargo` the only one on `PATH` (no real cargo, no network)."""
+    `|| result=1` reads, so `sys.exit(main())` is held here and by no test of `main()`,
+    and so is every way `main()` ends by a raise (the file's header lists them).
+    A copy of the script under a temporary root, the step's own command line, this
+    process's environment with `PATH` replaced: the stub's directory then `os.defpath`,
+    and `cargo` on that path is the stub (asserted; with no stub, the empty directory
+    alone, and no `cargo` on it). Every call the stub gets is `tree --locked` on the
+    temporary root's manifest: no real cargo, no network."""
 
     def command(self):
         """The step's command line for the script, read from ci.yml, `python3` this one."""
@@ -359,29 +392,50 @@ class Process(unittest.TestCase):
         self.assertEqual(words, ["python3", "-B", SCRIPT])
         return [sys.executable, *words[1:]]
 
-    def run_script(self, graphs, text=LIST, fail=False):
-        """The exit code, stdout's lines, stderr and what the stub was asked."""
+    def run_script(self, graphs, text=LIST, fail=False, cargo=True, arguments=()):
+        """The exit code, stdout's lines, stderr and what the stub was asked. A graph's
+        value is its duplicates, or the text the stub prints for it; `text` is the list
+        (`None`: no list; bytes: written as they are); `cargo=False`: no stub, and a
+        `PATH` that holds no program at all."""
         with tempfile.TemporaryDirectory() as scratch:
             root, stub = Path(scratch) / "root", Path(scratch) / "bin"
             (root / SCRIPT).parent.mkdir(parents=True)
             shutil.copyfile(REPOSITORY / SCRIPT, root / SCRIPT)
             (root / dv.LIST).parent.mkdir(parents=True)
-            (root / dv.LIST).write_text(text, encoding="utf-8")
+            if isinstance(text, bytes):
+                (root / dv.LIST).write_bytes(text)
+            elif text is not None:
+                (root / dv.LIST).write_text(text, encoding="utf-8")
             stub.mkdir()
-            (stub / "cargo").write_text(STUB, encoding="utf-8")
-            (stub / "cargo").chmod(0o755)
+            if cargo:
+                (stub / "cargo").write_text(STUB, encoding="utf-8")
+                (stub / "cargo").chmod(0o755)
+                path = f"{stub}{os.pathsep}{os.defpath}"
+                self.assertEqual(shutil.which("cargo", path=path), str(stub / "cargo"))
+            else:
+                path = str(stub)
+                self.assertIsNone(shutil.which("cargo", path=path))
             for graph in dv.GRAPHS:
-                (stub / graph).write_text(tree_of(graphs[graph]), encoding="utf-8")
+                held = graphs[graph]
+                (stub / graph).write_text(held if isinstance(held, str) else tree_of(held),
+                                          encoding="utf-8")
             if fail:
                 (stub / "fail").write_text("", encoding="utf-8")
-            done = subprocess.run(self.command(), cwd=root, capture_output=True, text=True,
-                                  env={"PATH": f"{stub}{os.pathsep}{os.defpath}"}, check=False)
-            asked = (stub / "asked").read_text(encoding="utf-8").splitlines()
+            done = subprocess.run([*self.command(), *arguments], cwd=root, capture_output=True,
+                                  text=True, env=dict(os.environ, PATH=path), check=False)
+            asked = []
+            if (stub / "asked").exists():
+                asked = (stub / "asked").read_text(encoding="utf-8").splitlines()
             manifest = str((root / "Cargo.toml").resolve())
         for line in asked:
             self.assertTrue(line.startswith(f"tree --locked --color never --manifest-path {manifest} "),
                             line)
         return done.returncode, done.stdout.splitlines(), done.stderr, asked
+
+    def raised(self, err, last):
+        """The process ended by an uncaught raise: Python's traceback, `last` its last line."""
+        self.assertIn("Traceback (most recent call last):", err)
+        self.assertIn(last, err.strip().splitlines()[-1])
 
     def test_the_graphs_the_list_describes_exit_0_as_a_process(self):
         code, lines, err, asked = self.run_script(HELD)
@@ -408,6 +462,70 @@ class Process(unittest.TestCase):
         self.assertIn("the lock file needs to be updated", err)
         self.assertEqual(code, 1)
         self.assertEqual(len(asked), 1, asked)
+
+    def test_a_cargo_line_that_is_no_package_exits_1_as_a_process(self):
+        # The raise is `tree_versions`' and nothing catches it: the refusal's line is the
+        # traceback's last, and no counts line is printed. In the graph read last too, so
+        # the three graphs read before it do not carry the exit.
+        for graph, calls in [("all", 1), ("default", len(dv.GRAPHS))]:
+            for raw in ["syn 2.0.119", "warning: something", "syn"]:
+                with self.subTest(graph=graph, raw=raw):
+                    graphs = dict(HELD, **{graph: tree_of(HELD[graph]) + raw + "\n"})
+                    code, lines, err, asked = self.run_script(graphs)
+                    self.assertEqual(lines, [])
+                    self.raised(err, f"ValueError: not a `cargo tree` package line: {raw}")
+                    self.assertEqual(code, 1)
+                    self.assertEqual(len(asked), calls, asked)
+
+    def test_a_cargo_that_prints_no_package_exits_1_as_a_process(self):
+        # Exit 0 from cargo and nothing on stdout is no agreement with the list.
+        code, lines, err, asked = self.run_script({graph: "" for graph in dv.GRAPHS})
+        self.assertEqual(lines[0], f"duplicate versions: all 0, native 0, wasm32 0, default 0; "
+                                   f"2 rows in {dv.LIST}")
+        self.assertEqual(len(lines), 7, lines)
+        for line in lines[1:]:
+            self.assertTrue(line.startswith("STALE row in `"), line)
+        self.assertEqual(err, "")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(asked), len(dv.GRAPHS), asked)
+
+    def test_a_list_out_of_form_exits_1_as_a_process(self):
+        code, lines, err, asked = self.run_script(HELD, LIST.replace("| zerocopy-derive", "|"))
+        self.assertEqual(lines, [Main.COUNTS, f"{dv.LIST}:4: syn: no reason"])
+        self.assertEqual(err, "")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(asked), len(dv.GRAPHS), asked)
+
+    def test_a_missing_list_exits_1_as_a_process(self):
+        code, lines, err, asked = self.run_script(HELD, None)
+        self.assertEqual(lines, [])
+        self.raised(err, "FileNotFoundError")
+        self.assertIn("duplicate-versions.txt", err.strip().splitlines()[-1])
+        self.assertEqual(code, 1)
+        self.assertEqual(asked, [])
+
+    def test_a_list_that_is_not_utf8_exits_1_as_a_process(self):
+        code, lines, err, asked = self.run_script(HELD, LIST.encode("utf-8") + b"all | \xff | 2, 3 | r\n")
+        self.assertEqual(lines, [])
+        self.raised(err, "UnicodeDecodeError")
+        self.assertEqual(code, 1)
+        self.assertEqual(asked, [])
+
+    def test_no_cargo_on_the_path_exits_1_as_a_process(self):
+        code, lines, err, asked = self.run_script(HELD, cargo=False)
+        self.assertEqual(lines, [])
+        self.raised(err, "FileNotFoundError")
+        self.assertIn("cargo", err.strip().splitlines()[-1])
+        self.assertEqual(code, 1)
+        self.assertEqual(asked, [])
+
+    def test_an_argument_argparse_refuses_exits_2_as_a_process(self):
+        # The step passes none (`command` holds its words); the exit is argparse's own.
+        code, lines, err, asked = self.run_script(HELD, arguments=["--no-such-argument"])
+        self.assertEqual(lines, [])
+        self.assertIn("unrecognized arguments: --no-such-argument", err)
+        self.assertEqual(code, 2)
+        self.assertEqual(asked, [])
 
 
 if __name__ == "__main__":
