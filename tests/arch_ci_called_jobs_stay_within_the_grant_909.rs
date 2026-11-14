@@ -45,6 +45,19 @@
 //! short by different grants), and asks a refusal for each caller the called jobs exceed, by
 //! its name and its grant's words, and none for the caller that grants enough.
 //!
+//! Every caller is judged, whatever it shares with another (the third fold of #980). In those
+//! three trees the two callers' grants differ, so a rule that judged one caller for each called
+//! file and grant text passed them. Two more trees over a `docs.yml` that asks `issues: write`,
+//! both callers granting `contents: read` and a refusal asked for each by name: in one the
+//! callers share the workflow and differ by job id (`docs`, `docs-again` in `release.yml`), in
+//! the other they share the job id and differ by workflow (`docs` in `release.yml` and in a
+//! planted `tag-again.yml`). Two callers differ in workflow or in job id, so a rule keeping one
+//! caller for each value of a key built from the called file, the grant, the calling workflow
+//! and the job id drops a caller of one of the two trees unless the key holds both of the last
+//! two, which is every caller. The bound, stated: a rule that drops a caller by something else
+//! (its line, its position among three or more callers, its `needs:`, a third workflow) is not
+//! planted; no tree here has three callers of one file.
+//!
 //! What it cannot see, stated: a workflow called from another repository or by a ref, a
 //! permission GitHub adds or renames, the repository's default token setting, and whether
 //! GitHub's own check is this one (the rule is step 22's as written, and the one run that
@@ -626,22 +639,27 @@ fn with_a_second_caller_of_docs(tree: &Tree, grant: &str) -> Tree {
 /// words, for each scope a job of `docs.yml` asks (its own permissions, else the file's) above
 /// that grant. Written beside `judge`, never through it, and for one caller at a time.
 fn owed_by_docs_under(tree: &Tree, caller: &str) -> Vec<Wanted> {
-    let release = parse("release.yml", &tree["release.yml"]).expect("release.yml parses");
+    owed_by_docs_under_in(tree, "release.yml", caller)
+}
+
+/// The same for a calling job of any workflow file of the tree, named by file and job id.
+fn owed_by_docs_under_in(tree: &Tree, file: &str, caller: &str) -> Vec<Wanted> {
+    let release = parse(file, &tree[file]).unwrap_or_else(|e| panic!("{file}: {e}"));
     let docs = parse("docs.yml", &tree["docs.yml"]).expect("docs.yml parses");
     let job = release
         .jobs
         .iter()
         .find(|j| j.id == caller)
-        .unwrap_or_else(|| panic!("release.yml has no job `{caller}`"));
+        .unwrap_or_else(|| panic!("{file} has no job `{caller}`"));
     assert_eq!(
         job.uses.as_deref(),
         Some("./.github/workflows/docs.yml"),
-        "release.yml `{caller}` does not call docs.yml"
+        "{file} `{caller}` does not call docs.yml"
     );
     let grant = job
         .permissions
         .as_ref()
-        .unwrap_or_else(|| panic!("release.yml `{caller}` states no grant of its own"));
+        .unwrap_or_else(|| panic!("{file} `{caller}` states no grant of its own"));
     let mut out = Vec::new();
     for asking in &docs.jobs {
         let Some(asked) = asking.permissions.as_ref().or(docs.permissions.as_ref()) else {
@@ -650,7 +668,7 @@ fn owed_by_docs_under(tree: &Tree, caller: &str) -> Vec<Wanted> {
         for (scope, level) in asked {
             if *level > grant.get(scope).copied().unwrap_or(0) {
                 out.push(vec![format!(
-                    "release.yml `{caller}` (line {}) calls docs.yml granting `{}`, and docs.yml's job `{}` (line {}) asks `{scope}: {}`:",
+                    "{file} `{caller}` (line {}) calls docs.yml granting `{}`, and docs.yml's job `{}` (line {}) asks `{scope}: {}`:",
                     job.line,
                     said(grant),
                     asking.id,
@@ -719,6 +737,106 @@ fn each_caller_of_one_called_file_is_judged_by_its_own_grant_909() {
     assert_eq!(
         owed(&later_enough, "docs.yml", "issues").len(),
         owed_by_docs_under(&later_enough, "docs").len()
+    );
+}
+
+/// `docs.yml` with `issues: write` added to the file's own permissions: every job of it that
+/// states none of its own then asks a scope a grant of `contents: read` lacks.
+fn widened_docs(tree: &Tree) -> Tree {
+    planted(
+        tree,
+        "docs.yml",
+        "\npermissions:\n  contents: read\n",
+        "\npermissions:\n  contents: read\n  issues: write\n",
+    )
+}
+
+/// Two callers that are both short owe each its own refusals, in its own name: the wanted
+/// lists of both, neither empty, of one length (one grant, one called file), under `grant`'s
+/// words, and the tree's refusals exactly those.
+#[track_caller]
+fn both_refused_under_one_grant(tree: &Tree, one: (&str, &str), other: (&str, &str), grant: &str) {
+    let (calls, _) = judge(tree);
+    for (file, id) in [one, other] {
+        let call = format!("{file}:{id}:docs.yml");
+        assert!(calls.contains(&call), "{call} not among {calls:?}");
+    }
+    let of_one = owed_by_docs_under_in(tree, one.0, one.1);
+    let of_other = owed_by_docs_under_in(tree, other.0, other.1);
+    assert!(!of_one.is_empty(), "{one:?} owes nothing");
+    assert_eq!(
+        of_one.len(),
+        of_other.len(),
+        "{of_one:#?} against {of_other:#?}"
+    );
+    let words = format!("calls docs.yml granting `{grant}`, and ");
+    let wanted: Vec<Wanted> = of_one.into_iter().chain(of_other).collect();
+    assert!(
+        wanted.iter().all(|want| want[0].contains(&words)),
+        "{wanted:#?}"
+    );
+    for (file, id) in [one, other] {
+        let name = format!("{file} `{id}` (line ");
+        assert!(
+            wanted.iter().any(|want| want[0].starts_with(&name)),
+            "{name}: {wanted:#?}"
+        );
+    }
+    refused(tree, &wanted);
+}
+
+#[test]
+fn two_callers_of_one_workflow_with_one_grant_are_each_judged_909() {
+    // the fourth tree (the third fold of #980): `docs-again` grants `contents: read`, the very
+    // grant of `docs`, over the widened docs.yml. Same called file, same grant text, same
+    // calling workflow; the job ids alone differ. A refusal for EACH caller by name: a rule
+    // that judges one caller for each called file and grant text finds one caller's alone
+    let tree = tree();
+    let docs = parse("release.yml", &tree["release.yml"]).expect("release.yml parses");
+    let grant = docs
+        .jobs
+        .iter()
+        .find(|j| j.id == "docs")
+        .and_then(|j| j.permissions.clone())
+        .expect("release.yml `docs` states its own grant");
+    assert_eq!(
+        said(&grant),
+        "contents: read",
+        "the plant below copies this grant"
+    );
+    let same = with_a_second_caller_of_docs(
+        &widened_docs(&tree),
+        "    permissions:\n      contents: read\n",
+    );
+    both_refused_under_one_grant(
+        &same,
+        ("release.yml", "docs"),
+        ("release.yml", "docs-again"),
+        "contents: read",
+    );
+}
+
+#[test]
+fn two_callers_with_one_job_id_in_two_workflows_are_each_judged_909() {
+    // the fifth tree: a workflow file the folder lacks, whose one job has the id `docs`, calls
+    // docs.yml and grants `contents: read`. Same called file, same grant text, same job id; the
+    // calling workflows alone differ. With the fourth tree this closes the family: two callers
+    // differ in their workflow or in their job id, so a rule that keeps one caller for each
+    // value of any key built from the called file, the grant, the calling workflow and the job
+    // id (short of both of the last two, which is every caller) drops a caller of one of the
+    // two trees, as does a rule that judges the callers of one workflow alone
+    let mut other = widened_docs(&tree());
+    assert!(!other.contains_key("tag-again.yml"));
+    other.insert(
+        "tag-again.yml".to_string(),
+        "name: again\n\non:\n  workflow_dispatch:\n\njobs:\n  docs:\n    uses: ./.github/workflows/docs.yml\n    permissions:\n      contents: read\n"
+            .to_string(),
+    );
+    both_refused_under_one_grant(
+        &other,
+        ("release.yml", "docs"),
+        ("tag-again.yml", "docs"),
+        "contents: read",
     );
 }
 

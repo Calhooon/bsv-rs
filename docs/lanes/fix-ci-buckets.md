@@ -12,7 +12,7 @@ Counts: 10 built, 5 already true, 5 need a decision, 2 not a defect.
 
 | # | The line | Fate | The evidence |
 |---|---|---|---|
-| 1 | No machine holds `RELEASING.md` step 22 | BUILT | `tests/arch_ci_called_jobs_stay_within_the_grant_909.rs`, four tests (five since the second fold of #980, below). RED on the tree with `origin/main`'s `release.yml` in place of `beta`'s: `release.yml `ci` (line 52) calls ci.yml granting `contents: read`, and ci.yml's job `semver` (line 161) asks `pull-requests: read``, and the same for `test` (`red-rust-main-release-yml.txt`). Eleven planted refusals on the tree's own text. Step 22 names the test and its bound (it reads one tree) |
+| 1 | No machine holds `RELEASING.md` step 22 | BUILT | `tests/arch_ci_called_jobs_stay_within_the_grant_909.rs`, four tests (five since the second fold of #980, seven since the third, below). RED on the tree with `origin/main`'s `release.yml` in place of `beta`'s: `release.yml `ci` (line 52) calls ci.yml granting `contents: read`, and ci.yml's job `semver` (line 161) asks `pull-requests: read``, and the same for `test` (`red-rust-main-release-yml.txt`). Eleven planted refusals on the tree's own text. Step 22 names the test and its bound (it reads one tree) |
 | 2 | The pick of the front pages for `main`: F7's producer asks six lines `main`'s `ci.yml` lacks | NEEDS A DECISION | Still so: `origin/main` (`f569499a`) holds no `tests/front_page.rs`, no `front_pages.py`, and its `semver` step is `release_type=(--release-type patch)` (`ci.yml:191-206` there). Question 1 below |
 | 3 | `flags` and `notes` read their sources once | BUILT | `front_pages.py`: `again`, used by `flags` (crates.io) and `notes` (the advisories, the run, its jobs, each job's log); `main` answers `Unavailable` with one line and exit 1. `Again`, four tests, RED on the base script (`red-python-base.txt`) and on the mutants `m6` (the retry taken out of `flags`), `m7` (out of the log read) and `m8` (the pause dropped) |
 | 4 | On `beta` the `semver` check reads the `internal-test-doors` items | BUILT (a document) | `RELEASING.md` step 2 says the check runs `--all-features` (`ci.yml:254`), reads the test doors (`Cargo.toml`'s `internal-test-doors`) and that the label covers a test door's change. The other remedy, the feature left out of the step, would change `SEMVER_STEP`, two F7 producer lines and the six-line list of the pick: not taken |
@@ -95,6 +95,32 @@ The hand mutants of `judge`, run again on this lane's tip (five tests, `docs.yml
 The earlier fold's record says 2 for the level mutant; the `>=` spelling failed 3 of 4 on that tip by the re-read's run and fails 4 of 5 here. A second spelling of it, an equal `write` alone refused (`*level > granted || (*level == 2 && granted == 2)`), passed all four tests before this fold, no plant holding a `write` grant; it fails 1 of 5 now (the new test: `docs-again` grants `issues: write` and `docs.yml` asks it).
 
 Not built, stated: the last test asserts that `ci.yml` has a job `lint` that names the token nowhere, an accident of today's tree; and the texts that locate the plants in `docs.yml`, `msrv.yml` and `ci.yml` (`\npermissions:\n  contents: read\n`, each file's own workflow permissions) and in `release.yml` (`permissions:\n  contents: read\n\nconcurrency:`, `uses: ./.github/workflows/msrv.yml`) are literal workflow text beside `CI_GRANT` and `SEMVER_ASKS`: a reworded line there fails the plant's site check by name.
+
+## The third fold of #980: two callers with one grant, and the family of fewer-callers rules (lane fix-ci-buckets-fold3)
+
+Rebased onto `beta` `cb950611` (#912). One conflict, `CHANGELOG.md`'s Unreleased head, both sides kept (this lane's entry above #912's). `RELEASING.md` numbers 1 to 25, each once; `tests/CLAUDE.md` holds one row a file.
+
+What the second re-read found: in the second fold's three trees the two callers of `docs.yml` never grant the same thing, so a rule judging one caller for each called file and grant text passed 5 of 5. Two rounds of reads had each found one more rule that judges fewer callers than there are, so this fold closes the family instead of its next member.
+
+The argument. Two calling jobs differ in their workflow file or in their job id. A rule that keeps one caller for each value of a key drops a caller only where two callers share the key. So two trees, each of two callers that share the called file and the grant text and are both short, cover every key built from the called file, the grant, the calling workflow and the job id: one whose callers share the workflow and differ by job id, one whose callers share the job id and differ by workflow. A key holding both the workflow and the job id is every caller, no weaker rule.
+
+- `two_callers_of_one_workflow_with_one_grant_are_each_judged_909` (the re-read's fourth tree): `docs-again` appended to `release.yml` granting `contents: read`, the grant `docs` states (asserted, so the plant cannot drift from it), over `docs.yml` widened by `issues: write`.
+- `two_callers_with_one_job_id_in_two_workflows_are_each_judged_909` (a fifth tree): a file `tag-again.yml` added to the tree in memory, its one job `docs` calling `docs.yml` under `contents: read`, over the same widened `docs.yml`.
+
+Both go through `both_refused_under_one_grant`: both calls found, what each caller owes read for that caller alone (`owed_by_docs_under_in`, the second fold's helper taking the calling file), neither list empty, both of one length, every wanted refusal in the grant's words and each caller named, then `refused` (each once, none beside them).
+
+The family, each rule written out as a copy of the test file with `judge` changed, in a scratch package of the test file and the tree's `.github/workflows/` (the file names no crate module), run against the seven tests of this fold and against the five of the second fold (`9f8c7174`'s file); the copies are `scratch/tests/new_<x>.rs` and `old_<x>.rs` and the run is `mutants.log` under `/Volumes/Lanes/out/bsv-rs/fix-ci-buckets-fold3/`. The unmutated file in the same package: 7 passed.
+
+| | The rule judges one caller for each | Spelling (after the grant is read, ahead of the called jobs) | Failed of 5 before | Failed of 7 | Caught by |
+|---|---|---|---|---|---|
+| a | called file (the earliest) | `if !seen.insert(target.to_string()) { continue; }` | 1 | 3 | the second fold's trees, the fourth, the fifth |
+| b | called file and grant text | `seen.insert((target.to_string(), said(grant)))` | 0 | 2 | the fourth tree, the fifth |
+| c | called file and calling workflow | `seen.insert((target.to_string(), file.to_string()))` | 1 | 2 | the second fold's trees, the fourth |
+| d | called file and job id | `seen.insert((target.to_string(), job.id.clone()))` | 0 | 1 | the fifth tree |
+| e | called file, the latest in file order (the earliest is row a) | the last caller of each called file computed ahead, every other skipped | 1 | 3 | the second fold's trees, the fourth, the fifth |
+| f | workflow: the callers of one workflow alone | the earliest workflow holding a call computed ahead, callers of any other skipped | 0 | 1 | the fifth tree |
+
+No row passes, so no bound is stated for the six. The bound that is stated, in the file's header: a rule that drops a caller by something outside those four values (its line, its place among three or more callers, its `needs:`, a third workflow) is not planted, and no tree has three callers of one file; such a rule would have to be written to count callers, which no reading of step 22 suggests, and a tree for each count has no end.
 
 ## Found beside the lines
 
