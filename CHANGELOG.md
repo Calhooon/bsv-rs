@@ -6900,7 +6900,7 @@ The witnesses are `tests/pubkey_encoding_660.rs`:
 NULLFAIL's words), `the_default_mode_reads_the_point_as_the_node_reads_it_660`
 (its verdict one function, `default_valid`, a fold's to switch),
 `the_vector_carries_this_crates_cells_and_the_lean_agrees_with_the_node_660`,
-`the_reference_default_refuses_an_off_curve_point_a_stated_divergence_660`,
+`an_off_curve_key_passes_the_encoding_check_in_the_default_mode_660`,
 `a_wrong_length_or_prefix_is_still_refused_at_the_encoding_check_660` and
 `a_key_on_the_curve_verifies_its_signature_and_refuses_a_wrong_one_660`,
 against `tests/vectors/pubkey_encoding_660.json`: 280 cells (the control and

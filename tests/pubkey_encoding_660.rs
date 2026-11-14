@@ -306,7 +306,7 @@ fn the_vector_carries_this_crates_cells_and_the_lean_agrees_with_the_node_660() 
 /// the node's reading accepts both spends. The divergence, pinned so it
 /// cannot move unseen: the off-curve cells alone.
 #[test]
-fn the_reference_default_refuses_an_off_curve_point_a_stated_divergence_660() {
+fn an_off_curve_key_passes_the_encoding_check_in_the_default_mode_660() {
     let mut differ = Vec::new();
     let v = vector();
     for c in v.cells.iter().filter(|c| c.mode == "default") {
