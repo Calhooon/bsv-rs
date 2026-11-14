@@ -111,6 +111,143 @@ One row is added to the root `CLAUDE.md` divergence list. It states a difference
 ### Notes: cross-SDK parity (#97, the required-set words)
 
 No SDK has a twin of this guard. No verdict, word or byte of the crate moves, and no row of the root `CLAUDE.md` divergence list is touched.
+### Added: PushDrop's wallet-aware unlock, `PushDrop::unlock_with_wallet`, the sdk's `PushDrop.unlock` (#803)
+
+`PushDrop::unlock_with_wallet(wallet, originator, protocol_id, key_id,
+counterparty, sign_outputs, anyone_can_pay) -> PushDropWalletUnlock<'_, W>`
+(`src/script/templates/pushdrop_wallet_unlock.rs`, under the `wallet` feature;
+the type re-exported from `script::templates`) is the reference's
+`new PushDrop(wallet, originator).unlock(protocolID, keyID, counterparty,
+signOutputs, anyoneCanPay, sourceSatoshis, lockingScript)` (`ts-stack@edf6e03`
+`packages/sdk/src/script/templates/PushDrop.ts:205-262`). The template has the
+reference's two members: `sign(SigningContext).await -> Result<UnlockingScript>`
+(the context by value, the future `Send`: the fold's paragraph below)
+computes the scope as `computeSignatureScope` does (`SignatureUtils.ts:44-68`:
+`SIGHASH_FORKID` with ALL, NONE or SINGLE, `SIGHASH_ANYONECANPAY` or-ed in),
+asks the wallet's `createSignature` once with `data` SHA-256 of the input's
+BIP143 preimage for the protocol, key ID and counterparty, carrying the
+originator (`PushDrop.ts:245-254`), reads the answer as DER and pushes it with
+the scope byte, one push (`:255-258`); `estimate_length()` answers the
+reference's 73 (`:260`). Before the wallet is asked, an input index past the
+inputs and a source amount past 21e14 are refused in the reference's words
+(`inputIndex N is outside the transaction input range`, `sourceSatoshis must
+be a valid number of satoshis`, both `Error::TransactionError`); a wallet
+error is returned as it came; an answer that is no DER signature is refused
+by `Signature::from_der`, in `Signature.fromDER`'s words. The template's
+`Debug` prints its scope and estimate alone.
+
+Why: the crate's wallet PushDrop signer (`wallet::pushdrop::sign`) was
+crate-private, called by the key-value stores, the registry, the contacts
+manager and the identity revocation alone, so a downstream that minted a
+token through `PushDrop::lock_with_wallet` (#782) had no public door to spend
+it through its wallet: the raw `PushDrop::unlock` takes a `PrivateKey`, which
+a wallet does not hand out. Additive: no existing public item changes shape;
+`PushDrop::unlock`, `sign_with_sighash` and `ScriptTemplateUnlock` are
+unchanged, and the signer is now compiled under `wallet` (under `kvstore`,
+`identity` and `registry` alone until now).
+
+Pinned by `tests/script_pushdrop_wallet_unlock_803.rs` (15 tests) against
+`tests/vectors/pushdrop_wallet_unlock_803.json` (23 cases, 3 refusals and 4
+wallet answers, the fold's 2 and the second fold's 1; `tests/support/pushdrop_wallet_unlock_803.mjs`, the
+reference's own template over a ProtoWallet of the scalar 9 under Node
+v22.18.0, two runs byte-identical): every recorded unlocking script byte for
+byte at the three scopes with and without anyone-can-pay at each of three
+inputs, the wallet's one call and its arguments, each script spending the
+recorded lock through `verify_input`, and a token minted through
+`lock_with_wallet` spent through the new door. Compile-RED on `cb950611`
+(E0599); seven planted faults each RED in a scratch copy of the tip (the
+table in `docs/lanes/fix-803-unlock.md`). `tests/arch_listed_spend_binds_its_input.rs`
+lists the door as the fifth caller of the signer (RED with beta's list).
+
+The fold, before the shape froze (three design reads and three reads of
+2026-11-14). `sign` is `pub fn sign(&self, context: SigningContext<'_>) ->
+impl Future<Output = Result<UnlockingScript>> + Send + '_`, where it was
+`async fn sign(&self, context: &SigningContext<'_>)`: a `SigningContext`
+borrows a `Script`, which is not `Sync` (its caches are `RefCell`s), and the
+`async fn` kept the context across its await, so the future was not `Send`
+and the door did not compile under `#[async_trait]`'s default or in a
+multi-threaded server's handler, where its dependents would call it. The
+context is now read before the future starts (the bytes parsed, the two
+refusals judged, the scriptCode copied), and the future awaits owned data
+alone; the same signature on wasm32, as `WalletInterface`'s own futures are
+`Send` on every target. A caller writes
+`template.sign(SigningContext::new(..)).await`; `SigningContext` is `Clone`
+for a context used again. Pinned by
+`the_future_sign_returns_is_send_in_each_caller_form_803` (three caller
+forms and an `#[async_trait]` method over an `Arc<dyn WalletInterface>`,
+each run to the recorded script): against the shape as built, with the
+calls given `&`, 16 errors, each `E0277` or `future cannot be sent between
+threads safely`, naming `Script`'s `RefCell`s. The high-S pin now gives the
+door a high-S answer (its helper built the twin through `Signature::to_der`,
+which writes low-S, so the wallet answered its plain signature and the
+reference's own behaviour passed the test): the DER is written by hand, and
+under a plant that pushes the wallet's answer as given the test is RED with
+the reference's recorded `answer_high_s` script, byte for byte, as its
+output. Two recorded cases, a group `fold` of the vector (the recorder at
+the pin, two runs byte-identical, the three earlier groups byte for byte):
+an index past the inputs with an amount past 21e14 is refused for the index
+on both sides (RED with the two checks swapped), and a wallet answer whose R
+is 33 bytes is pushed by the reference and refused here, stated (#842's
+row). The constructor's example is a compiled doc test.
+
+The second fold (the re-read of 2026-11-14). The high-S pin held one sample,
+whose DER is a byte longer than its low-S twin's, so a signer that pushed the
+wallet's answer as given only when the two are of one length passed it. A
+second sample, the vector's group `fold2` (the same recorder at the pin, two
+runs byte-identical, the four earlier groups byte for byte): the wallet's R
+over an S of 2^255 - 1, its DER written by hand. A high S of 32 DER bytes
+lies between n / 2 and 2^255, a range 2^127 wide that no signer reaches by
+chance, so the S is chosen and the signature verifies under no key, which
+the template does not ask; its low-S twin, n - S, is 32 bytes too. The
+reference pushes the answer as given (the script 73 bytes), this crate
+writes n - S in its place, the same length (row (d) below, unchanged).
+Pinned by `a_high_s_answer_as_long_as_its_low_s_form_is_written_low_803`,
+RED under that plant with the reference's recorded script, byte for byte, as
+its output. And `sign`'s rustdoc now says what a caller must own across the
+await where the caller's own future must be `Send` (under `#[async_trait]`,
+in a spawned handler): each locking script owned (parsed or cloned inside
+the loop, or moved out of an owned list), the context built in the call. A
+`&LockingScript` or `&Script` held across the await (a loop over a borrowed
+`&[(usize, LockingScript)]`), or a `SigningContext` kept alive past it,
+makes the caller's future not `Send`, because a `Script` is `Send` and not
+`Sync` (its caches are `RefCell`s); the door's own future is `Send` either
+way. The form that compiles is a `no_run` doc test on `sign`, its future
+checked `Send`; the borrowed form has no `compile_fail` block (a sentence
+instead: such a block on stable names no error, so it would pass for any
+reason).
+
+### Notes: cross-SDK parity (#803)
+
+Four shapes of the door are this crate's, stated (the row in `CLAUDE.md`):
+(a) the template is `PushDropWalletUnlock`, whose `sign` returns a future as
+the reference's `sign` is a promise, and not a `ScriptTemplateUnlock`, whose
+closure is synchronous and cannot await a wallet; `Transaction::sign` does
+not drive it (the reference's `tx.sign()` awaits its template), so a caller
+signs the input and sets its unlocking script. (b) The source amount and
+locking script are the `SigningContext`'s, where the reference takes them as
+two optional arguments or from the input's linked source and refuses a
+disagreement of the two, a missing one, a malformed outpoint and a
+`sourceTXID` that is not the linked source's (`resolveSourceDetails`,
+`SignatureUtils.ts:74-184`; #848's row: the context reads raw bytes and no
+linked source); bytes that are no transaction are refused in this crate's
+parser's words. (c) A scriptCode named by `SigningContext::with_script_code`
+is the one signed, as at every template here; the reference signs the
+locking script. (d) A wallet answer whose S is in the upper half of the
+order is written in its low-S form by `Signature::to_der` (as at the four
+sites sharing the signer, older than #803), 73 bytes at most, where the
+reference pushes the signature as answered (the recorded `answer_high_s`: a
+72-byte DER, the script 74 bytes, one past its estimate), a script its own
+default `Spend` refuses at version 1 (`The signature format is invalid.`, run
+on the recording). go-sdk at `2ca481c` asks its wallet with
+`HashToDirectlySign` (the double hash) where the reference and this crate
+send `data` (the single hash), wraps a wallet error (`unable to create
+wallet signature for sign: %w`) and estimates 73
+(`transaction/template/pushdrop/pushdrop.go:199-241`), writes a high-S answer in its low-S form too
+(`Signature.Serialize`, `primitives/ec/signature.go:77-82`, called at `pushdrop.go:228`),
+so of the three the reference alone pushes one as answered, and holds
+`UnlockOptions.SourceSatoshis` and `LockingScript` (`:272-273`), which its `Sign` never reads. A wallet answer whose R or S is longer than 32 bytes is
+pushed by the reference and refused here in `Integer component too large`
+(#842's row; the recorded `answer_r_past_32_bytes`).
 
 ### Tests: a stalled body, malformed JSON and one request a call at three transport doors (#98)
 
