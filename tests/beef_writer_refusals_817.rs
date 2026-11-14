@@ -228,7 +228,7 @@ fn the_raw_door_refuses_bytes_that_are_not_one_transaction_817() {
 /// The reference writes the bytes its door kept, and its strict reader
 /// refuses them: the frame the raw door's refusal keeps from the wire.
 #[test]
-fn the_raw_bytes_the_reference_door_keeps_are_written_unreadably_there_817() {
+fn the_writers_cells_of_the_three_raw_frames_are_pinned_as_recorded_817() {
     let v = vector();
     for name in [
         "raw_with_index_truncated",
