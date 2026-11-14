@@ -74,7 +74,16 @@ const cells = [
   ['sibling_of_64_digits', two(H(0), H(1))],
   ['sibling_of_66_digits', two(H(0), H(1) + 'ab')],
   ['empty_sibling', two(H(0), '')],
-  ['computed_node_of_64_digits', three(H(2), H(3))]
+  ['computed_node_of_64_digits', three(H(2), H(3))],
+  // The #817 pins: the node at level 1 offset 1 computed from a 63-digit
+  // leaf0 beside a duplicate (`findOrComputeLeaf`, `MerklePath.ts:442-443`,
+  // `hashPair(leaf0.hash, leaf0.hash)`): an odd-length text paired with
+  // itself above level 0.
+  ['computed_node_leaf0_of_63_digits_beside_a_duplicate', [
+    [{ offset: 0, hash: H(0), txid: true }, { offset: 1, hash: H(1) }, { offset: 2, hash: H(2).slice(1) }, { offset: 3, duplicate: true }],
+    [],
+    [{ offset: 1, hash: H(4) }]
+  ]]
 ]
 
 const BLOCK_HEIGHT = 800000
