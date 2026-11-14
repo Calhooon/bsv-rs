@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests and CI (words): the required-set guard says which contexts are live on `beta` and that `sibling` is listed ahead of the PATCH (#97)
+
+- What was wrong. `tests/arch_ci_pr_runs_the_required_set.rs` lists six contexts in `REQUIRED_ON_BETA`, `sibling` the sixth, under a comment that read "the captain PATCHes beta's protection after the job runs green on its tip", and its row in `tests/CLAUDE.md` said the list is what `gh api .../branches/<line>/protection/required_status_checks` reads and counted 6. Beta's live protection, read on 2026-11-14 at beta `6232488b`, holds five contexts under `strict: true` (`Test Suite (ubuntu-latest, stable)`, `main-in-beta`, `semver`, `lint`, `checks`, each of app 15368) and no `sibling`: the job runs and judges on every pull request into `beta`, and a red one blocks no merge today. The tree read as if it did (#97's comment of 2026-11-14, fact 1).
+- The change, words alone. The constant's comment and the entry's comment say the list is the set the tree intends and no live snapshot (the guard reads no network), that `sibling` is listed ahead of its PATCH with the date and the five live contexts, why the entry stays (the exact-set rule reads the list as the jobs a pull request may run, so the job without its entry is refused as one left on), and that the App's entry `{context: sibling-judge, app_id: 5700082}` is not live either and never joins this list: no workflow job reports that context (`tests/arch_ci_sibling_judge_97.rs` refuses a job of that id or name) and this guard proves each entry by a job of `ci.yml`. The row of `tests/CLAUDE.md` and a paragraph of `tests/sibling/CLAUDE.md` say the same.
+- What pins it. Nothing new: no list, no assertion and no test moved, so there is no RED. The guard's 20 tests pass as before; the fact the words state is a setting outside the tree, read by `gh api` on the date given and by no test (tests are hermetic). The words go stale at the PATCH and are the PATCH's sitting's to re-date; the lane record is `docs/lanes/fix-97-required-words.md`.
+- Migration. None: no file under `src/`, no workflow and no script changed.
+
+### Notes: cross-SDK parity (#97, the required-set words)
+
+No SDK has a twin of this guard. No verdict, word or byte of the crate moves, and no row of the root `CLAUDE.md` divergence list is touched.
+
 ### Fixed: a point is multiplied by a private key without a byte copy of the scalar, and `PublicKey`'s `==` has no early exit (#912, fix-912-primitives)
 
 The bucket #912's lines about `src/primitives/` and the ECDH result; the table of every line and the question left is `docs/lanes/fix-912-primitives.md`. No peer's bytes reach any of it: each is how this process holds its own secret.

@@ -112,6 +112,14 @@ on the runner. `sibling-judge` is required by no protection until the owner's PA
 witnesses and the soak (`RELEASING.md` step 25), so until then the sentence above stays true of
 what a merge needs.
 
+Nor is `sibling`, the `ci.yml` job's own context, in beta's protection yet. Read live on
+2026-11-14 (`gh api repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --jq
+'{strict, checks}'`): `strict: true` and five contexts (`Test Suite (ubuntu-latest, stable)`,
+`main-in-beta`, `semver`, `lint`, `checks`), none of them `sibling` or the App's. The job runs
+and judges on every pull request into beta, and a red one blocks no merge until the PATCH;
+`REQUIRED_ON_BETA` in `tests/arch_ci_pr_runs_the_required_set.rs` lists `sibling` ahead of it
+and says so (#97's comment of 2026-11-14, fact 1).
+
 ## column.json
 
 | Key | What |
