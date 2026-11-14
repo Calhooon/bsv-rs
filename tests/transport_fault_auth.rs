@@ -19,6 +19,9 @@ use bsv_rs::{Error, TransportFault};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+#[path = "support/body_stub.rs"]
+mod body_stub;
+
 fn handshake() -> AuthMessage {
     AuthMessage::new(
         MessageType::InitialRequest,
@@ -114,6 +117,7 @@ async fn a_timeout_after_the_request_was_written_may_have_been_received() {
     Mock::given(method("POST"))
         .and(path("/.well-known/auth"))
         .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+        .expect(1)
         .mount(&server)
         .await;
     let client = reqwest::Client::builder()
@@ -172,66 +176,72 @@ async fn any_other_status_stays_the_auth_error() {
     assert_eq!(err.transport_fault(), None);
 }
 
+/// #98: the head arrives, twelve bytes of the body, and nothing more. The
+/// client's timeout (`with_client`, as the timeout cell's) ends the call on
+/// both paths, in the class the timeout cell answers, after one request each,
+/// counted once the stub's reads ended.
+#[tokio::test]
+async fn a_body_that_never_ends_is_bounded_by_the_timeout_and_may_have_been_received_98() {
+    let stub = body_stub::BodyStub::stalled().await;
+    for (path, message) in [("handshake", handshake()), ("general", general())] {
+        let message = &message;
+        let url = &stub.url;
+        let err = stub
+            .stalled_once(path, || async move {
+                let client = reqwest::Client::builder()
+                    .timeout(body_stub::DOOR_TIMEOUT)
+                    .build()
+                    .unwrap();
+                let transport = SimplifiedFetchTransport::with_client(url, client);
+                transport.send(message).await
+            })
+            .await
+            .unwrap_err();
+        assert_fault(&err, TransportFault::MayHaveBeenReceived, None);
+    }
+    assert_eq!(stub.settled().await, 2, "one request a call");
+}
+
+/// #98: a handshake answered `200` with a body that is not the message's
+/// JSON is the transport's refusal in its own class, `AuthError`, never a
+/// panic and never a transport fault: the far side answered. The general
+/// path reads no JSON (its answer is the BRC-104 headers and a byte body).
+#[tokio::test]
+async fn a_handshake_answer_that_is_not_the_messages_json_is_an_auth_error_never_a_fault_98() {
+    for body in [
+        "",
+        "not json",
+        "{\"version\":",
+        "{\"version\":\"0.1\",\"messageType\":\"initialResponse\"",
+        "[]",
+        "{}",
+        "null",
+        "\u{feff}",
+        "{\"identityKey\":7}",
+    ] {
+        let (err, _) =
+            handshake_answered(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+                .await;
+        assert!(matches!(err, Error::AuthError(_)), "{body:?}: {err:?}");
+        assert_eq!(err.transport_fault(), None, "{body:?}");
+    }
+}
+
 /// A body cut after the request was written (the reviewer's probe on #87):
 /// reqwest reads it as a decode error whose source is not `serde_json`'s.
 #[cfg(not(target_arch = "wasm32"))]
 mod body_cut {
     use super::*;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    /// A stub that reads each whole request, answers `200` with
-    /// `Content-Length: 200`, sends twelve bytes of the body and closes: the
-    /// body cut after the request was written. wiremock cannot cut a body.
-    async fn cut_body_stub() -> String {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        tokio::spawn(async move {
-            loop {
-                let (mut stream, _) = listener.accept().await.unwrap();
-                let mut request = Vec::new();
-                let mut buf = [0u8; 4096];
-                while !request_read(&request) {
-                    let n = stream.read(&mut buf).await.unwrap();
-                    if n == 0 {
-                        break;
-                    }
-                    request.extend_from_slice(&buf[..n]);
-                }
-                stream
-                    .write_all(
-                        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
-                          Content-Length: 200\r\n\r\n0123456789ab",
-                    )
-                    .await
-                    .unwrap();
-                stream.shutdown().await.unwrap();
-            }
-        });
-        format!("http://{addr}")
-    }
-
-    /// Whether `request` holds its head and the body its `Content-Length`
-    /// names.
-    fn request_read(request: &[u8]) -> bool {
-        let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") else {
-            return false;
-        };
-        let head = String::from_utf8_lossy(&request[..end]).to_ascii_lowercase();
-        let length = head
-            .lines()
-            .find_map(|line| line.strip_prefix("content-length:"))
-            .and_then(|value| value.trim().parse::<usize>().ok())
-            .unwrap_or(0);
-        request.len() >= end + 4 + length
-    }
 
     #[tokio::test]
     async fn a_body_cut_after_the_request_was_written_may_have_been_received() {
-        let transport = SimplifiedFetchTransport::new(&cut_body_stub().await);
+        let stub = body_stub::BodyStub::cut().await;
+        let transport = SimplifiedFetchTransport::new(&stub.url);
         for message in [handshake(), general()] {
             let err = transport.send(&message).await.unwrap_err();
             assert_fault(&err, TransportFault::MayHaveBeenReceived, None);
         }
+        assert_eq!(stub.requests(), 2, "one request a call");
     }
 }
 

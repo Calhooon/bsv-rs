@@ -19,6 +19,9 @@ use bsv_rs::{Error, TransportFault};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+#[path = "support/body_stub.rs"]
+mod body_stub;
+
 fn create_action_args() -> CreateActionArgs {
     CreateActionArgs {
         description: "a served createAction".into(),
@@ -36,24 +39,32 @@ fn client(timeout: Duration) -> reqwest::Client {
     reqwest::Client::builder().timeout(timeout).build().unwrap()
 }
 
-/// `createAction` through both substrates against `url`.
-async fn both_at(url: &str, timeout: Duration) -> [(&'static str, Error); 2] {
+/// `createAction` through the JSON substrate against `url`.
+async fn json_at(url: &str, timeout: Duration) -> Error {
     let json = HttpWalletJson::with_client(
         client(timeout),
         Some("app.example.com".into()),
         Some(url.to_string()),
     )
     .expect("the substrate is configured");
-    let json_err = json
-        .create_action(create_action_args(), Some("app.example.com"))
+    json.create_action(create_action_args(), Some("app.example.com"))
         .await
-        .expect_err("the JSON substrate fails");
+        .expect_err("the JSON substrate fails")
+}
+
+/// `createAction` through the wire substrate against `url`.
+async fn wire_at(url: &str, timeout: Duration) -> Error {
     let wire = HttpWalletWire::with_client(client(timeout), None, Some(url.to_string()))
         .expect("the substrate is configured");
-    let wire_err = wire
-        .transmit_to_wallet(&[WalletCall::CreateAction as u8, 0, 1, 2, 3])
+    wire.transmit_to_wallet(&[WalletCall::CreateAction as u8, 0, 1, 2, 3])
         .await
-        .expect_err("the wire substrate fails");
+        .expect_err("the wire substrate fails")
+}
+
+/// `createAction` through both substrates against `url`.
+async fn both_at(url: &str, timeout: Duration) -> [(&'static str, Error); 2] {
+    let json_err = json_at(url, timeout).await;
+    let wire_err = wire_at(url, timeout).await;
     [("json", json_err), ("wire", wire_err)]
 }
 
@@ -98,6 +109,7 @@ async fn a_timeout_after_the_request_was_written_is_a_wallet_transport_fault() {
     Mock::given(method("POST"))
         .and(path("/createAction"))
         .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+        .expect(2)
         .mount(&server)
         .await;
     for (name, err) in both_at(&server.uri(), Duration::from_millis(300)).await {
@@ -148,6 +160,7 @@ async fn store_busy_on_a_503_is_wallet_busy_where_the_substrate_reads_one() {
                 .insert_header("Retry-After", "5")
                 .set_body_json(serde_json::json!({ "code": "STORE_BUSY", "message": "busy" })),
         )
+        .expect(1)
         .mount(&server)
         .await;
     let json = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
@@ -166,65 +179,76 @@ async fn store_busy_on_a_503_is_wallet_busy_where_the_substrate_reads_one() {
     assert_eq!(err.transport_fault(), None, "busy is not a transport fault");
 }
 
+/// #98: the head arrives, twelve bytes of the body, and nothing more. The
+/// client's timeout (`with_client`, as the timeout cell's) ends the call on
+/// each substrate, in the class the timeout cell answers, after one request.
+/// Each substrate is held by itself (the fold of #98): its own call waited
+/// out its own timeout and made its own one request, so one that answered at
+/// once beside one that waited is refused.
+#[tokio::test]
+async fn a_body_that_never_ends_is_bounded_by_the_timeout_and_a_wallet_transport_fault_98() {
+    let stub = body_stub::BodyStub::stalled().await;
+    let url = &stub.url;
+    let json = stub
+        .stalled_once("json", || json_at(url, body_stub::DOOR_TIMEOUT))
+        .await;
+    assert_transport("json", &json, None);
+    let wire = stub
+        .stalled_once("wire", || wire_at(url, body_stub::DOOR_TIMEOUT))
+        .await;
+    assert_transport("wire", &wire, None);
+    assert_eq!(stub.settled().await, 2, "one request a call");
+}
+
+/// `createAction` through the JSON substrate against one answer, asked once.
+async fn json_answered(answer: ResponseTemplate) -> Error {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/createAction"))
+        .respond_with(answer)
+        .expect(1)
+        .mount(&server)
+        .await;
+    HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+        .expect("the substrate is configured")
+        .create_action(create_action_args(), Some("app.example.com"))
+        .await
+        .expect_err("the JSON substrate fails")
+}
+
+/// #98: the JSON substrate's answer whose body is not the result's JSON, at
+/// a success status and at a refusal's, is the wallet's answer misread,
+/// `WalletError`, never a panic and never a transport fault. The wire
+/// substrate reads no JSON (its answer is a byte frame).
+#[tokio::test]
+async fn an_answer_that_is_not_the_results_json_is_a_wallet_error_never_a_fault_98() {
+    for status in [200, 400, 500] {
+        for body in ["", "{\"txid\":", "[]", "null", "{\"txid\":7}", "\u{feff}{"] {
+            let err =
+                json_answered(ResponseTemplate::new(status).set_body_raw(body, "application/json"))
+                    .await;
+            assert!(
+                matches!(err, Error::WalletError(_)),
+                "{status} {body:?}: {err:?}"
+            );
+            assert_eq!(err.transport_fault(), None, "{status} {body:?}");
+        }
+    }
+}
+
 /// A body cut after the request was written (the reviewer's probe on #87):
 /// reqwest reads it as a decode error whose source is not `serde_json`'s.
 #[cfg(not(target_arch = "wasm32"))]
 mod body_cut {
     use super::*;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    /// A stub that reads each whole request, answers `200` with
-    /// `Content-Length: 200`, sends twelve bytes of the body and closes: the
-    /// body cut after the request was written. wiremock cannot cut a body.
-    async fn cut_body_stub() -> String {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        tokio::spawn(async move {
-            loop {
-                let (mut stream, _) = listener.accept().await.unwrap();
-                let mut request = Vec::new();
-                let mut buf = [0u8; 4096];
-                while !request_read(&request) {
-                    let n = stream.read(&mut buf).await.unwrap();
-                    if n == 0 {
-                        break;
-                    }
-                    request.extend_from_slice(&buf[..n]);
-                }
-                stream
-                    .write_all(
-                        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
-                          Content-Length: 200\r\n\r\n0123456789ab",
-                    )
-                    .await
-                    .unwrap();
-                stream.shutdown().await.unwrap();
-            }
-        });
-        format!("http://{addr}")
-    }
-
-    /// Whether `request` holds its head and the body its `Content-Length`
-    /// names.
-    fn request_read(request: &[u8]) -> bool {
-        let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") else {
-            return false;
-        };
-        let head = String::from_utf8_lossy(&request[..end]).to_ascii_lowercase();
-        let length = head
-            .lines()
-            .find_map(|line| line.strip_prefix("content-length:"))
-            .and_then(|value| value.trim().parse::<usize>().ok())
-            .unwrap_or(0);
-        request.len() >= end + 4 + length
-    }
 
     #[tokio::test]
     async fn a_body_cut_after_the_request_was_written_is_a_wallet_transport_fault() {
-        let url = cut_body_stub().await;
-        for (name, err) in both_at(&url, Duration::from_secs(30)).await {
+        let stub = body_stub::BodyStub::cut().await;
+        for (name, err) in both_at(&stub.url, Duration::from_secs(30)).await {
             assert_transport(name, &err, None);
         }
+        assert_eq!(stub.requests(), 2, "one request a call");
     }
 
     /// The other half of the rule: a success body that is not the expected
@@ -235,6 +259,7 @@ mod body_cut {
         Mock::given(method("POST"))
             .and(path("/createAction"))
             .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+            .expect(1)
             .mount(&server)
             .await;
         let err = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
