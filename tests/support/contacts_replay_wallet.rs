@@ -14,7 +14,9 @@
 //! mode) are the recorder's: `throw` answers `<call> failed`, `no_tx` an
 //! answer without a transaction, the bound and signed modes the #326
 //! double's; two modes on one call apply together. Each call is recorded
-//! by the reference's name, with the arguments the recorder records.
+//! by the reference's name, with the arguments the recorder records
+//! (since #959 createHmac's protocol, key ID, counterparty and data and
+//! encrypt's protocol and counterparty among them).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -182,6 +184,21 @@ fn finished(outputs: &[CreateActionOutput]) -> Transaction {
     tx
 }
 
+/// A protocol as the reference's `[level, name]`.
+fn protocol_json(protocol: &Protocol) -> Value {
+    json!([protocol.security_level as u8, protocol.protocol_name])
+}
+
+/// A counterparty as the reference's text, `null` when the request names none.
+fn counterparty_json(counterparty: &Option<Counterparty>) -> Value {
+    match counterparty {
+        None => Value::Null,
+        Some(Counterparty::Self_) => json!("self"),
+        Some(Counterparty::Anyone) => json!("anyone"),
+        Some(Counterparty::Other(key)) => json!(key.to_hex()),
+    }
+}
+
 fn outpoint_text(outpoint: &Outpoint) -> String {
     format!(
         "{}.{}",
@@ -197,8 +214,8 @@ fn txid_of(tx: &Transaction) -> TxId {
 }
 
 // async_trait rewrites the impl it is applied to, so the macro writes the
-// whole impl: the six key calls through the ProtoWallet under `enter`, the
-// five the basket answers, the rest the ProtoWallet's unrecorded.
+// whole impl: four key calls through the ProtoWallet under `enter`, createHmac
+// and encrypt the same with their arguments noted, the five the basket answers, the rest the ProtoWallet's unrecorded.
 macro_rules! basket {
     ($(($method:ident, $name:literal, $args:ty, $result:ty)),* ; $(($other:ident, $oargs:ty, $oresult:ty)),* $(,)?) => {
         #[async_trait::async_trait]
@@ -210,6 +227,36 @@ macro_rules! basket {
             $(async fn $other(&self, args: $oargs, o: Option<&str>) -> bsv_rs::Result<$oresult> {
                 WalletInterface::$other(&*self.inner, args, o).await
             })*
+
+            async fn create_hmac(
+                &self,
+                args: CreateHmacArgs,
+                o: Option<&str>,
+            ) -> bsv_rs::Result<CreateHmacResult> {
+                self.enter("createHmac")?;
+                self.note(json!({
+                    "call": "createHmac",
+                    "protocol_id": protocol_json(&args.protocol_id),
+                    "key_id": args.key_id,
+                    "counterparty": counterparty_json(&args.counterparty),
+                    "data": bsv_rs::primitives::to_hex(&args.data),
+                }));
+                WalletInterface::create_hmac(&*self.inner, args, o).await
+            }
+
+            async fn encrypt(
+                &self,
+                args: EncryptArgs,
+                o: Option<&str>,
+            ) -> bsv_rs::Result<EncryptResult> {
+                self.enter("encrypt")?;
+                self.note(json!({
+                    "call": "encrypt",
+                    "protocol_id": protocol_json(&args.protocol_id),
+                    "counterparty": counterparty_json(&args.counterparty),
+                }));
+                WalletInterface::encrypt(&*self.inner, args, o).await
+            }
 
             async fn list_outputs(
                 &self,
@@ -456,8 +503,6 @@ basket! {
     (get_public_key, "getPublicKey", GetPublicKeyArgs, GetPublicKeyResult),
     (create_signature, "createSignature", CreateSignatureArgs, CreateSignatureResult),
     (verify_signature, "verifySignature", VerifySignatureArgs, VerifySignatureResult),
-    (create_hmac, "createHmac", CreateHmacArgs, CreateHmacResult),
-    (encrypt, "encrypt", EncryptArgs, EncryptResult),
     (decrypt, "decrypt", DecryptArgs, DecryptResult);
     (verify_hmac, VerifyHmacArgs, VerifyHmacResult),
     (reveal_counterparty_key_linkage, WalletRevealCounterpartyArgs, RevealCounterpartyKeyLinkageResult),

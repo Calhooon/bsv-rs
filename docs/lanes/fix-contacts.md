@@ -369,6 +369,8 @@ These tests and the differential replay (`tests/contacts_replay.rs`, against `te
 
 This sentence replaces the fourth fold's at `CHANGELOG.md`, in `tests/CLAUDE.md`'s rows and in `tests/contacts_wallet_failures.rs`' header.
 
+Since #959 (lane fix-identity-buckets, `docs/lanes/fix-identity-buckets.md`) three of those lines are held: a cache of four contacts; a save, an update and a read by key over a cold cache (replayed as a caller composes them, a plain read ahead of the call: the reference's own load there stays the stated residue); and `get_contacts_by_tag` (a test of its own). Every member of the record is compared, and the two `counterparty` deletions (row 3 of "The bound", and `create_identity_tag`'s) are caught by the replay. Left: a step with three or more faults, a cache of five or more, the load's concurrent reads compared by count, a member value the validator rewrites, `search_contacts`.
+
 ### Item 5: what the replay shows about the code
 
 One difference on the tip, older than #904, stated and not mended (a public order, a choice for the design reads of root rule 13):

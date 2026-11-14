@@ -124,6 +124,31 @@ add('fuzzy_lone_carriage_return', [['name', 'alice smith']], [[['name', 'x\ralic
 add('fuzzy_second_line_from_its_start', [['name', 'alice smith']], [[['name', 'alice\nalice smith']], [['name', 'alice\nsmith']]])
 add('any_index_name_below_u32_max', [['any', '"x y"']], [[['b', 'y'], ['4294967294', 'x']], [['b', 'x'], ['4294967294', 'y']]])
 add('any_two_index_names', [['any', '"x y"']], [[['2', 'y'], ['1', 'x']], [['10', 'y'], ['9', 'x']], [['1', 'y'], ['2', 'x']]])
+// #907: the inputs the strength read of #897 left, each one the code agreed
+// with by reading and no case served. A token three times needs three
+// occurrences; VT, FF and U+0085 are no line terminators of the split
+// (`:147`), so tokens either side of one are on one line; CR LF is one
+// terminator; and of the names `0`, `-0`, `1.0`, `4294967296` and the empty
+// name only `0` is an array index `Object.entries` walks ahead.
+add('fuzzy_thrice_repeated_token', [['email', 'a a a']], [[['email', 'a a']], [['email', 'a a a']], [['email', 'aaa']],
+  [['email', 'aa']], [['email', 'a b a x a']]])
+add('fuzzy_vertical_tab_form_feed_and_next_line', [['name', 'alice smith']], [[['name', 'alice\vsmith']],
+  [['name', 'alice\fsmith']], [['name', 'alice\u0085smith']], [['name', 'smith\valice']]])
+add('fuzzy_carriage_return_line_feed', [['name', 'alice smith']], [[['name', 'alice\r\nsmith']],
+  [['name', 'x\r\nalice smith']], [['name', 'alice smith\r\n']], [['name', 'alice\n\rsmith']]])
+add('any_index_name_zero', [['any', '"x y"']], [[['b', 'x'], ['0', 'y']], [['b', 'y'], ['0', 'x']]])
+add('any_index_name_minus_zero', [['any', '"x y"']], [[['-0', 'y'], ['1', 'x']], [['1', 'x'], ['-0', 'y']]])
+add('any_index_name_decimal_point', [['any', '"x y"']], [[['1.0', 'y'], ['1', 'x']], [['1', 'x'], ['1.0', 'y']]])
+add('any_index_name_two_to_the_32', [['any', '"x y"']], [[['4294967296', 'y'], ['1', 'x']], [['1', 'x'], ['4294967296', 'y']]])
+add('any_empty_name', [['any', '"x y"']], [[['', 'y'], ['1', 'x']], [['1', 'x'], ['', 'y']]])
+// #907's sweep (`cargo mutants` over the matcher: four survivors in the
+// phrase scanner, `/-?"([^"]*)"|[^\s"]+/g`, `identityUtils.ts:164-175`): a
+// phrase is the whole text between its quotes, and the scan goes on after
+// the closing quote, so a second phrase is read as one.
+add('any_phrase_is_the_whole_quoted_text', [['any', '"xy"']], [[['name', 'x y']], [['name', 'xy']], [['name', 'x']]])
+add('any_two_phrases', [['any', '"x y" "w z"']], [[['name', 'x y w z']], [['name', 'x y z w']], [['name', 'w z x y']]])
+add('any_negated_phrase_right_after_a_phrase', [['any', '"x y"-"w z"']], [[['name', 'x y']], [['name', 'x y w z']],
+  [['name', 'x y - w z']], [['name', 'x y -']]])
 
 process.stdout.write(JSON.stringify({
   description: '#751: the reference wallet\'s filterCertificatesByAttributes over records of decryptedFields alone: ' +

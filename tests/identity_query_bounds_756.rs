@@ -128,12 +128,12 @@ async fn an_offset_above_100000_is_refused_in_the_overlays_words_756() {
 
 #[tokio::test]
 async fn an_identity_key_the_overlay_refuses_is_refused_in_its_words_756() {
-    assert_eq!(agree("key_").await, 12);
+    assert_eq!(agree("key_").await, 15);
 }
 
 #[tokio::test]
 async fn a_certifier_the_overlay_refuses_is_refused_in_its_words_756() {
-    assert_eq!(agree("certifier_").await, 13);
+    assert_eq!(agree("certifier_").await, 16);
 }
 
 #[tokio::test]
@@ -150,7 +150,7 @@ async fn attributes_the_overlay_refuses_are_refused_in_its_words_756() {
 
 #[tokio::test]
 async fn of_two_faults_the_overlays_earlier_is_named_756() {
-    assert_eq!(agree("two_faults_").await, 9);
+    assert_eq!(agree("two_faults_").await, 12);
 }
 
 /// Every case of the vector is one of the groups above.
@@ -158,7 +158,7 @@ async fn of_two_faults_the_overlays_earlier_is_named_756() {
 fn every_recorded_case_is_judged_756() {
     assert_eq!(
         vector()["cases"].as_array().unwrap().len(),
-        4 + 3 + 12 + 13 + 9 + 3 + 12 + 5 + 9
+        4 + 3 + 15 + 16 + 9 + 3 + 12 + 5 + 12
     );
 }
 
@@ -237,5 +237,66 @@ async fn a_key_tagged_03_is_admitted_818() {
             "{name}: {got:?}"
         );
         assert_eq!(asked.lock().unwrap().len(), 1, "{name}: the question sent");
+    }
+}
+
+/// The recorded case `name`, judged: the error's words, else `None`, and
+/// the questions sent.
+async fn judged(name: &str) -> (Option<String>, usize, Value) {
+    let case = vector()["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == name)
+        .cloned()
+        .unwrap_or_else(|| panic!("no case {name}"));
+    let (client, asked) = client();
+    let words = match client.query(query_of(&case)).await {
+        Ok(_) => None,
+        Err(Error::IdentityError(words)) => Some(words),
+        Err(other) => panic!("{name}: {other:?}"),
+    };
+    let sent = asked.lock().unwrap().len();
+    (words, sent, case)
+}
+
+/// #907 (the inputs the strength read of #897 left): an `03` key and
+/// certifier in upper-case hex and with an x at or above p reach the
+/// overlay's storage and are sent; with an x of no point each is refused in
+/// the overlay's words, nothing sent (`queryValidation.ts:172-180`).
+#[tokio::test]
+async fn an_03_key_in_upper_case_or_past_p_is_sent_and_one_of_no_point_refused_907() {
+    for (member, field, reached) in [
+        ("key", "identityKey", "findByIdentityKey"),
+        ("certifier", "certifiers[0]", "findByCertifier"),
+    ] {
+        for form in ["upper_case", "p_plus_1"] {
+            let name = format!("{member}_prefix_03_{form}");
+            let (words, sent, case) = judged(&name).await;
+            assert_eq!(case["outcome"]["reached"], reached, "{name}");
+            assert_eq!((words, sent), (None, 1), "{name}");
+        }
+        let name = format!("{member}_prefix_03_no_point");
+        let (words, sent, case) = judged(&name).await;
+        let refusal =
+            format!("Invalid lookup query: {field} must be a valid compressed public key");
+        assert_eq!(case["outcome"]["refused"], refusal.as_str(), "{name}");
+        assert_eq!((words, sent), (Some(refusal), 0), "{name}");
+    }
+}
+
+/// #907: `4294967295`, `01` and `+1` are no array index, so the attributes'
+/// walk keeps them where they were inserted: a name fault ahead of one of
+/// them carrying a value fault is the fault named, as the overlay names it
+/// (`IdentityLookupService.ts:113`), where an index name is judged ahead
+/// (`an_index_name_is_judged_ahead_as_the_overlay_walks_it_751`).
+#[tokio::test]
+async fn a_name_that_is_no_array_index_is_judged_where_it_was_inserted_907() {
+    let name_fault = "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes";
+    for name in ["u32_max", "leading_zero", "plus_sign"] {
+        let name = format!("two_faults_name_then_value_{name}");
+        let (words, sent, case) = judged(&name).await;
+        assert_eq!(case["outcome"]["refused"], name_fault, "{name}");
+        assert_eq!((words.as_deref(), sent), (Some(name_fault), 0), "{name}");
     }
 }

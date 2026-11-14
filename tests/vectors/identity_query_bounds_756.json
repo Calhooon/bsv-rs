@@ -1024,6 +1024,96 @@
       "outcome": {
         "reached": "findByCertifier"
       }
+    },
+    {
+      "name": "key_prefix_03_upper_case",
+      "subject": "0379BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "key_prefix_03_p_plus_1",
+      "subject": "03fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "outcome": {
+        "reached": "findByIdentityKey"
+      }
+    },
+    {
+      "name": "key_prefix_03_no_point",
+      "subject": "030000000000000000000000000000000000000000000000000000000000000005",
+      "outcome": {
+        "refused": "Invalid lookup query: identityKey must be a valid compressed public key"
+      }
+    },
+    {
+      "name": "certifier_prefix_03_upper_case",
+      "certifier": "0379BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
+    },
+    {
+      "name": "certifier_prefix_03_p_plus_1",
+      "certifier": "03fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+      "outcome": {
+        "reached": "findByCertifier"
+      }
+    },
+    {
+      "name": "certifier_prefix_03_no_point",
+      "certifier": "030000000000000000000000000000000000000000000000000000000000000005",
+      "outcome": {
+        "refused": "Invalid lookup query: certifiers[0] must be a valid compressed public key"
+      }
+    },
+    {
+      "name": "two_faults_name_then_value_u32_max",
+      "attributes": [
+        [
+          "a.b",
+          "v"
+        ],
+        [
+          "4294967295",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "two_faults_name_then_value_leading_zero",
+      "attributes": [
+        [
+          "a.b",
+          "v"
+        ],
+        [
+          "01",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
+    },
+    {
+      "name": "two_faults_name_then_value_plus_sign",
+      "attributes": [
+        [
+          "a.b",
+          "v"
+        ],
+        [
+          "+1",
+          "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+        ]
+      ],
+      "outcome": {
+        "refused": "Invalid lookup query: attribute names must be safe MongoDB field segments of at most 50 UTF-8 bytes"
+      }
     }
   ]
 }

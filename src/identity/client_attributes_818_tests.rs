@@ -136,3 +136,81 @@ fn two_index_names_are_walked_in_ascending_numeric_order_818() {
     assert_eq!((reference.as_slice(), records), ([0, 1].as_slice(), 3));
     assert_eq!(kept, reference);
 }
+
+/// #907: the inputs the strength read of #897 left, each recorded since and
+/// read here by name. A token three times needs three occurrences, each
+/// searched from where the last ended (`a a a` keeps `a a a`, `aaa` and
+/// `a b a x a`, never `a a` or `aa`).
+#[test]
+fn a_token_three_times_needs_three_occurrences_907() {
+    let (kept, reference, records) = judged("fuzzy_thrice_repeated_token");
+    assert_eq!((reference.as_slice(), records), ([1, 2, 4].as_slice(), 5));
+    assert_eq!(kept, reference);
+}
+
+/// #907: VT, FF and U+0085 end no line of the split (`identityUtils.ts:147`),
+/// so tokens either side of one are found on one line, in order alone.
+#[test]
+fn a_vertical_tab_a_form_feed_and_a_next_line_end_no_line_907() {
+    let (kept, reference, records) = judged("fuzzy_vertical_tab_form_feed_and_next_line");
+    assert_eq!((reference.as_slice(), records), ([0, 1, 2].as_slice(), 4));
+    assert_eq!(kept, reference);
+}
+
+/// #907: CR LF is one terminator between two lines, and LF CR two.
+#[test]
+fn a_carriage_return_line_feed_is_one_line_end_907() {
+    let (kept, reference, records) = judged("fuzzy_carriage_return_line_feed");
+    assert_eq!((reference.as_slice(), records), ([1, 2].as_slice(), 4));
+    assert_eq!(kept, reference);
+}
+
+/// #907: of the names `0`, `-0`, `1.0`, `4294967296` and the empty name only
+/// `0` is an array index `Object.entries` walks ahead.
+#[test]
+fn zero_is_an_array_index_and_four_names_like_one_are_not_907() {
+    let mut wrong = Vec::new();
+    for (name, recorded) in [
+        ("any_index_name_zero", [1].as_slice()),
+        ("any_index_name_minus_zero", [0, 1].as_slice()),
+        ("any_index_name_decimal_point", [0, 1].as_slice()),
+        ("any_index_name_two_to_the_32", [0, 1].as_slice()),
+        ("any_empty_name", [0, 1].as_slice()),
+    ] {
+        let (kept, reference, records) = judged(name);
+        assert_eq!((reference.as_slice(), records), (recorded, 2), "{name}");
+        if kept != reference {
+            wrong.push(format!("{name}: {kept:?} for {reference:?}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+/// #907's sweep: a phrase is the whole text between its quotes
+/// (`identityUtils.ts:164-175`), so `"xy"` keeps `xy` and never `x y` or `x`.
+#[test]
+fn a_phrase_is_the_whole_text_between_its_quotes_907() {
+    let (kept, reference, records) = judged("any_phrase_is_the_whole_quoted_text");
+    assert_eq!((reference.as_slice(), records), ([1].as_slice(), 3));
+    assert_eq!(kept, reference);
+}
+
+/// #907's sweep: the scan goes on after a phrase's closing quote, so a
+/// second phrase is read as one: `"x y" "w z"` keeps the records holding
+/// both phrases in either order and never `x y z w`.
+#[test]
+fn a_second_phrase_is_read_after_the_first_ones_closing_quote_907() {
+    let (kept, reference, records) = judged("any_two_phrases");
+    assert_eq!((reference.as_slice(), records), ([0, 2].as_slice(), 3));
+    assert_eq!(kept, reference);
+}
+
+/// #907's sweep: after a phrase the scan goes on from the unit behind its
+/// closing quote, so a `-"…"` written right against it is a negated phrase:
+/// `"x y"-"w z"` keeps the records holding `x y` and not `w z`.
+#[test]
+fn a_negated_phrase_right_after_a_phrase_is_read_as_one_907() {
+    let (kept, reference, records) = judged("any_negated_phrase_right_after_a_phrase");
+    assert_eq!((reference.as_slice(), records), ([0, 3].as_slice(), 4));
+    assert_eq!(kept, reference);
+}
