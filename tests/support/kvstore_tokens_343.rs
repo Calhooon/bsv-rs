@@ -63,8 +63,11 @@ impl Store {
 
 fn source(lock: &LockingScript, index: u32, value: u64) -> Transaction {
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), index))
-        .unwrap();
+    tx.add_input(TransactionInput::new(
+        "11".repeat(32).parse().unwrap(),
+        index,
+    ))
+    .unwrap();
     for _ in 0..index {
         tx.add_output(TransactionOutput::new(
             0,

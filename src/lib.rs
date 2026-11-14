@@ -112,7 +112,7 @@ pub use script::{Address, LockingScript, Script, ScriptChunk, UnlockingScript};
 #[cfg(feature = "transaction")]
 pub use transaction::{
     ChangeDistribution, Transaction, TransactionInput, TransactionOutput, TransactionParts,
-    TransactionPartsMut,
+    TransactionPartsMut, Txid,
 };
 
 // Convenience re-exports from wallet

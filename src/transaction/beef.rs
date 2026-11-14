@@ -50,7 +50,7 @@ mod merge_graph;
 #[path = "beef_writable.rs"]
 mod writable;
 use super::merkle_path::MerklePath;
-use super::transaction::Transaction;
+use super::transaction::{outpoint_txid_name, Transaction};
 use collect::AfterFrame;
 
 /// Result of sorting transactions in a BEEF.
@@ -186,7 +186,7 @@ impl Beef {
         for i in 0..tx.inputs().len() {
             let input = &tx.inputs()[i];
             if input.source_transaction.is_none() {
-                let held = input.source_txid.as_deref().and_then(|t| self.find_txid(t));
+                let held = outpoint_txid_name(input).and_then(|t| self.find_txid(&t));
                 if let Some(found) = held.and_then(BeefTx::tx) {
                     tx.replace_source(i, Some(Box::new(found.clone())));
                 }
@@ -321,7 +321,7 @@ impl Beef {
             // fourth fold), else its text (`Beef.ts:649-679` at `ts-stack@edf6e03`).
             let src_txid = match (&input.source_transaction, &input.source_txid) {
                 (Some(own), _) => own.id(),
-                (None, Some(text)) => text.clone(),
+                (None, Some(txid)) => txid.to_string(),
                 (None, None) => continue, // links and names nothing: left as it is
             };
             if let Some(stub) = stubs.get(&src_txid) {
@@ -2164,7 +2164,7 @@ mod merkle_path_reattach_tests {
         // F (proven) -> M (unproven, two outputs) -> R spending M:0 AND M:1.
         let mut funding = Transaction::new();
         funding.inputs_mut().push(TransactionInput {
-            source_txid: Some("aa".repeat(32)),
+            source_txid: Some("aa".repeat(32).parse().unwrap()),
             source_output_index: 0,
             unlocking_script: Some(crate::script::UnlockingScript::from_script(
                 crate::script::Script::new(),
@@ -2351,7 +2351,7 @@ mod merkle_path_reattach_tests {
         let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
         let mut funding = Transaction::new();
         funding.inputs_mut().push(TransactionInput {
-            source_txid: Some("aa".repeat(32)),
+            source_txid: Some("aa".repeat(32).parse().unwrap()),
             source_output_index: 0,
             unlocking_script: Some(UnlockingScript::from_script(Script::new())),
             ..Default::default()
@@ -2416,7 +2416,7 @@ mod merkle_path_reattach_tests {
             let mut copy = tx.clone();
             for input in copy.inputs_mut().iter_mut() {
                 if let Some(source) = input.source_transaction.take() {
-                    input.source_txid.get_or_insert_with(|| source.id());
+                    input.source_txid.get_or_insert_with(|| source.txid());
                 }
             }
             copy
@@ -2427,7 +2427,7 @@ mod merkle_path_reattach_tests {
 
         let mut funding = Transaction::new();
         funding.inputs_mut().push(TransactionInput {
-            source_txid: Some("aa".repeat(32)),
+            source_txid: Some("aa".repeat(32).parse().unwrap()),
             source_output_index: 0,
             unlocking_script: Some(UnlockingScript::from_script(Script::new())),
             ..Default::default()
@@ -2531,7 +2531,7 @@ mod iterative_equivalence_tests {
             return; // proven: no ancestry needed
         }
         for input in tx.inputs_mut().iter_mut() {
-            let Some(src_txid) = input.source_txid.clone() else {
+            let Some(src_txid) = input.source_txid.map(|t| t.to_string()) else {
                 continue;
             };
             if let Some(stub) = stubs.get(&src_txid) {
@@ -2703,7 +2703,7 @@ mod iterative_equivalence_tests {
                     bump_index_by_root,
                 )?;
             } else if !allow_partial {
-                let source_txid = input.source_txid.as_deref().unwrap_or("unknown");
+                let source_txid = input.get_source_txid().unwrap_or_else(|_| "unknown".into());
                 return Err(crate::Error::TransactionError(format!(
                     "Missing source transaction for input {} (txid: {}). \
                      Set allow_partial=true to skip missing source transactions.",
@@ -2775,7 +2775,7 @@ mod iterative_equivalence_tests {
                     let (txid, outputs) = &made[rng.gen_range(0..made.len())];
                     (txid.clone(), rng.gen_range(0..*outputs))
                 };
-                let mut input = TransactionInput::new(txid, vout);
+                let mut input = TransactionInput::new(txid.parse().unwrap(), vout);
                 input.unlocking_script = Some(UnlockingScript::new());
                 tx.inputs_mut().push(input);
             }

@@ -320,7 +320,7 @@ fn op_true() -> LockingScript {
 fn spend(spends: &[(String, u32)], outputs: usize) -> Transaction {
     let mut tx = Transaction::new();
     for (txid, vout) in spends {
-        let mut input = TransactionInput::new(txid.clone(), *vout);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
         tx.inputs_mut().push(input);
     }
@@ -362,8 +362,9 @@ fn debug_of_a_deep_linked_chain_prints_each_source_as_its_txid() {
     let grandparent = tx.inputs()[0]
         .source_transaction
         .as_ref()
-        .and_then(|p| p.inputs()[0].source_txid.clone())
-        .expect("the parent spends the grandparent");
+        .and_then(|p| p.inputs()[0].source_txid)
+        .expect("the parent spends the grandparent")
+        .to_string();
     let (printed, tx) = on_stack("debug", SMALL_STACK, move || {
         let started = Instant::now();
         let printed = format!("{:?}", tx);

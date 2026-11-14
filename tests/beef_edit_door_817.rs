@@ -41,7 +41,7 @@ use bsv_rs::Error;
 /// `spends`, with an empty unlocking script.
 fn tx(spends: &str, sats: u64) -> Transaction {
     let mut t = Transaction::new();
-    let mut input = TransactionInput::new(spends.to_string(), 0);
+    let mut input = TransactionInput::new(spends.parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
     t.inputs_mut().push(input);
     t.outputs_mut().push(TransactionOutput::new(

@@ -33,7 +33,7 @@ pub struct Answer {
 /// pushing `TX_PUSH` bytes of `i % 256`.
 pub fn answer() -> Answer {
     let mut funding = Transaction::new();
-    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    let mut mined = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     mined.unlocking_script = Some(UnlockingScript::new());
     funding.add_input(mined).unwrap();
     funding

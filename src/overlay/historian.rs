@@ -320,7 +320,7 @@ mod tests {
         ));
 
         if let Some(source_tx) = source {
-            let mut input = TransactionInput::new(source_tx.id(), 0);
+            let mut input = TransactionInput::new(source_tx.txid(), 0);
             input.source_transaction = Some(Box::new(source_tx));
             tx.inputs_mut().push(input);
         }
@@ -462,11 +462,13 @@ mod tests {
             let mut tx = Transaction::new();
             for _ in 0..rng.gen_range(1..=3usize) {
                 if made.is_empty() {
-                    tx.inputs_mut()
-                        .push(TransactionInput::new(format!("{k:064x}"), 0));
+                    tx.inputs_mut().push(TransactionInput::new(
+                        (format!("{k:064x}")).parse().unwrap(),
+                        0,
+                    ));
                 } else {
                     let source = made[rng.gen_range(0..made.len())].clone();
-                    let mut input = TransactionInput::new(source.id(), 0);
+                    let mut input = TransactionInput::new(source.txid(), 0);
                     input.source_transaction = Some(Box::new(source));
                     tx.inputs_mut().push(input);
                 }

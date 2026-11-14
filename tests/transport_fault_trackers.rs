@@ -184,7 +184,7 @@ async fn a_trackers_transport_fault_reaches_the_crate_error_typed() {
 
     let mut tx = Transaction::new();
     tx.inputs_mut()
-        .push(TransactionInput::new("aa".repeat(32), 0));
+        .push(TransactionInput::new("aa".repeat(32).parse().unwrap(), 0));
     let op_true = LockingScript::from_binary(&[0x51]).unwrap();
     tx.outputs_mut().push(TransactionOutput::new(1000, op_true));
     tx.merkle_path = Some(MerklePath::from_coinbase_txid(&tx.id(), 800_000));

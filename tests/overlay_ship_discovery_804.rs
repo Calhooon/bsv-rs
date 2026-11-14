@@ -159,8 +159,11 @@ async fn admitted(outputs: Vec<OutputListItem>) -> bsv_rs::Result<Vec<String>> {
 /// lookup output at index 0 without a hint; and its txid.
 fn proven(seed: u32, output: TransactionOutput) -> (String, OutputListItem) {
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), seed))
-        .unwrap();
+    tx.add_input(TransactionInput::new(
+        "11".repeat(32).parse().unwrap(),
+        seed,
+    ))
+    .unwrap();
     tx.add_output(output).unwrap();
     let txid = tx.id();
     let mut beef = Beef::new();

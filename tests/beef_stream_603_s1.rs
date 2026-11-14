@@ -759,7 +759,7 @@ fn three_inputs_with(refused: Option<u32>) -> (Vec<u8>, HashMap<u64, Hash32>, u6
     let (funding, bump, roots) = funding(3);
     let mut spend = Transaction::new();
     for vout in 0..3 {
-        let mut input = TransactionInput::new(display(&sha256d(&funding)), vout);
+        let mut input = TransactionInput::new(display(&sha256d(&funding)).parse().unwrap(), vout);
         let unlock = if refused == Some(vout) {
             UnlockingScript::from_binary(&[0x00]).unwrap()
         } else {

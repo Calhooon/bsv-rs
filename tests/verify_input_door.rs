@@ -58,7 +58,7 @@ fn modes() -> Vec<Option<ScriptFlags>> {
 /// The spending transaction `Spend::new` builds from its parameters: one
 /// input of the zero outpoint, no output, lock time 0.
 fn one_input_transaction(unlocking: &[u8], version: u32) -> Vec<u8> {
-    let mut input = TransactionInput::new("00".repeat(32), 0);
+    let mut input = TransactionInput::new("00".repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_binary(unlocking).unwrap());
     Transaction::with_params(version, vec![input], vec![], 0).to_binary()
 }
@@ -323,7 +323,8 @@ fn signed_spends() -> Vec<Linked> {
         let mut spend = Transaction::new();
         for n in 0..inputs {
             let mut funding = Transaction::new();
-            let mut mined = TransactionInput::new(format!("{:02x}", n + 1).repeat(32), 0);
+            let mut mined =
+                TransactionInput::new((format!("{:02x}", n + 1).repeat(32)).parse().unwrap(), 0);
             mined.unlocking_script = Some(UnlockingScript::new());
             funding.add_input(mined).unwrap();
             funding

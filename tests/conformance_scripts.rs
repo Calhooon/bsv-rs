@@ -195,7 +195,9 @@ fn silence_panics() -> Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send>
 /// 0xffffffff), one output carrying the locking script and amount, locktime 0.
 fn crediting_txid(locking_script: &LockingScript, amount: u64) -> [u8; 32] {
     let mut input = TransactionInput::new(
-        "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        "0000000000000000000000000000000000000000000000000000000000000000"
+            .parse()
+            .unwrap(),
         0xffff_ffff,
     );
     input.unlocking_script = Some(UnlockingScript::from_chunks(vec![
@@ -821,7 +823,7 @@ fn eval_node_transaction_vector(
 
     for (vin, txin) in tx.inputs().iter().enumerate() {
         let prevout = prevouts.iter().find(|p| {
-            Some(s(p, "txid")) == txin.source_txid.as_deref()
+            txin.source_txid.is_some_and(|t| t == s(p, "txid"))
                 && (n(p, "vout") as u32) == txin.source_output_index
         });
         let Some(prevout) = prevout else {

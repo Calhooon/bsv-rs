@@ -13,7 +13,7 @@
 //! two agree is #848's coherence, not judged here.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code
 
-use bsv_rs::primitives::{from_hex, sha256d, to_hex};
+use bsv_rs::primitives::{sha256d, to_hex};
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::{Beef, MerklePath, Transaction, TransactionInput, TransactionOutput};
 
@@ -37,11 +37,7 @@ fn fields_bytes(tx: &Transaction) -> Vec<u8> {
     var_int(&mut out, tx.inputs().len() as u64);
     for input in tx.inputs() {
         let wire = match (&input.source_txid, &input.source_transaction) {
-            (Some(txid), _) => {
-                let mut b = from_hex(txid).unwrap();
-                b.reverse();
-                b
-            }
+            (Some(txid), _) => txid.as_wire_bytes().to_vec(),
             (None, Some(source)) => sha256d(&fields_bytes(source)).to_vec(),
             (None, None) => vec![0; 32],
         };
@@ -84,9 +80,9 @@ fn script(bytes: &[u8]) -> LockingScript {
 /// A transaction of two inputs and two outputs, its caches full.
 fn sample() -> Transaction {
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
-    let mut second = TransactionInput::new("22".repeat(32), 1);
+    let mut second = TransactionInput::new("22".repeat(32).parse().unwrap(), 1);
     second.unlocking_script = Some(UnlockingScript::from_binary(&[0x51, 0x52]).unwrap());
     tx.add_input(second).unwrap();
     tx.add_output(TransactionOutput::new(1_000, script(&[0x76, 0xa9])))
@@ -123,7 +119,7 @@ fn a_scripts_self_methods_through_the_reads_move_no_byte_869() {
 #[test]
 fn swap_take_and_replace_on_what_each_door_lends_keep_the_law_869() {
     let mut tx = sample();
-    let mut other = vec![TransactionInput::new("33".repeat(32), 7)];
+    let mut other = vec![TransactionInput::new("33".repeat(32).parse().unwrap(), 7)];
     std::mem::swap(tx.inputs_mut(), &mut other);
     law(&tx, "mem::swap on inputs_mut()");
     let taken = std::mem::take(tx.outputs_mut());
@@ -188,7 +184,7 @@ fn a_beef_door_lending_a_transaction_keeps_its_law_869() {
     let parent = sample();
     let mut child = Transaction::new();
     child
-        .add_input(TransactionInput::new(parent.id(), 0))
+        .add_input(TransactionInput::new(parent.txid(), 0))
         .unwrap();
     child
         .add_output(TransactionOutput::new(500, script(&[0x51])))
@@ -230,7 +226,7 @@ fn a_beef_door_lending_a_transaction_keeps_its_law_869() {
 fn a_source_txid_other_than_the_linked_sources_id_keeps_the_law_869() {
     let parent = sample();
     let mut input = TransactionInput::with_source_transaction(parent, 0);
-    input.source_txid = Some("55".repeat(32));
+    input.source_txid = Some("55".repeat(32).parse().unwrap());
     let mut child = Transaction::new();
     child.add_input(input).unwrap();
     child

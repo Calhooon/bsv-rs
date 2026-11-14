@@ -17,17 +17,14 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput, ChangeDistribution};
+//! use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput, ChangeDistribution, Txid};
 //! use bsv_rs::script::LockingScript;
 //!
 //! // Create a new transaction
 //! let mut tx = Transaction::new();
 //!
 //! // Add an input
-//! tx.add_input(TransactionInput::new(
-//!     "abc123...".to_string(),
-//!     0,
-//! ))?;
+//! tx.add_input(TransactionInput::new(Txid::from_hex("abc123...")?, 0))?;
 //!
 //! // Add an output
 //! tx.add_output(TransactionOutput::new(
@@ -109,6 +106,7 @@ mod spending;
 #[allow(clippy::module_inception)]
 pub mod transaction;
 pub mod tx_json;
+mod txid;
 mod verification_flags;
 mod verify;
 mod verify_refusal;
@@ -157,6 +155,7 @@ pub use transaction::{
     ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction, TransactionParts,
     TransactionPartsMut,
 };
+pub use txid::Txid;
 pub use work_budget::WorkBudget;
 
 // Sighash constants re-exported for convenience

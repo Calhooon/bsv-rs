@@ -111,7 +111,7 @@ fn revelation(subject: &PrivateKey, json: &[u8]) -> LockingScript {
 /// One lookup output: a proven transaction spending `<byte>`x32:0 into
 /// `lock` (#737's `proven_spend`).
 fn output(byte: &str, lock: LockingScript) -> OutputListItem {
-    let mut input = TransactionInput::new(byte.repeat(32), 0);
+    let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

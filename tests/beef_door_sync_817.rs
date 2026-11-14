@@ -171,14 +171,18 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
             }
             "edit" if arg == "u_input_to_y" => {
                 let cc = "cc".repeat(32);
-                beef.edit_tx(&txid(v, "u"), |t| t.inputs_mut()[0].source_txid = Some(cc))
-                    .unwrap();
+                beef.edit_tx(&txid(v, "u"), |t| {
+                    t.inputs_mut()[0].source_txid = Some(cc.parse().unwrap())
+                })
+                .unwrap();
                 None
             }
             "edit" if arg == "y_input_to_u" => {
                 let u = txid(v, "u");
-                beef.edit_tx(&txid(v, "y"), |t| t.inputs_mut()[0].source_txid = Some(u))
-                    .unwrap();
+                beef.edit_tx(&txid(v, "y"), |t| {
+                    t.inputs_mut()[0].source_txid = Some(u.parse().unwrap())
+                })
+                .unwrap();
                 None
             }
             "edit" => match beef.edit_tx(&txid(v, "u"), |t| t.set_lock_time(1)) {

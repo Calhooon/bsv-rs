@@ -6,7 +6,7 @@ use bsv_rs::primitives::PrivateKey;
 use bsv_rs::script::templates::P2PKH;
 use bsv_rs::script::{SignOutputs, UnlockingScript};
 use bsv_rs::transaction::{
-    MerklePath, MockChainTracker, Transaction, TransactionInput, TransactionOutput,
+    MerklePath, MockChainTracker, Transaction, TransactionInput, TransactionOutput, Txid,
 };
 
 fn main() {
@@ -19,7 +19,8 @@ fn main() {
     // transaction with no input, or with no output, is no transaction, and
     // `verify` refuses one.
     let mut funding = Transaction::new();
-    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    let coin = Txid::from_hex(&"11".repeat(32)).expect("64 hex digits");
+    let mut mined = TransactionInput::new(coin, 0);
     mined.unlocking_script = Some(UnlockingScript::new());
     funding.add_input(mined).unwrap();
     funding

@@ -37,7 +37,7 @@ fn one() -> LockingScript {
 
 /// An input spending `txid:vout` with the unlocking script `OP_1`.
 fn spend(txid: &str, vout: u32) -> TransactionInput {
-    let mut input = TransactionInput::new(txid.to_string(), vout);
+    let mut input = TransactionInput::new(txid.parse().unwrap(), vout);
     input.unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
     input
 }

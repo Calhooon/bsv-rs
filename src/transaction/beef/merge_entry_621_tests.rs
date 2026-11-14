@@ -11,7 +11,7 @@ use crate::transaction::{Beef, Transaction, TransactionInput, TransactionOutput}
 /// A one-input, one-output transaction's bytes.
 fn raw() -> Vec<u8> {
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1_000, LockingScript::new()))
         .unwrap();

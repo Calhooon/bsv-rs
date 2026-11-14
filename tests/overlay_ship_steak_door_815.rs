@@ -257,7 +257,7 @@ fn advertisement(origin: &str, topic: &str) -> (OutputListItem, Transaction) {
     let script =
         create_signed_overlay_admin_token(&PrivateKey::random(), Protocol::Ship, origin, topic);
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, script)).unwrap();
     let txid = tx.id();

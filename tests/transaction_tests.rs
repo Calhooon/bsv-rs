@@ -485,7 +485,7 @@ mod transaction_tests {
     #[test]
     fn test_add_input_with_txid() {
         let mut tx = Transaction::new();
-        let input = TransactionInput::new("a".repeat(64), 0);
+        let input = TransactionInput::new("a".repeat(64).parse().unwrap(), 0);
 
         assert!(tx.add_input(input).is_ok());
         assert_eq!(tx.inputs().len(), 1);
@@ -993,7 +993,7 @@ mod transaction_tests {
             let mut child = Transaction::new();
             let fake_txid = "a".repeat(64);
             child
-                .add_input(TransactionInput::new(fake_txid, 0))
+                .add_input(TransactionInput::new(fake_txid.parse().unwrap(), 0))
                 .unwrap();
             child
                 .add_output(TransactionOutput::new(500, LockingScript::new()))
@@ -1019,7 +1019,7 @@ mod transaction_tests {
             let mut child = Transaction::new();
             let fake_txid = "a".repeat(64);
             child
-                .add_input(TransactionInput::new(fake_txid, 0))
+                .add_input(TransactionInput::new(fake_txid.parse().unwrap(), 0))
                 .unwrap();
             child
                 .add_output(TransactionOutput::new(500, LockingScript::new()))
@@ -1520,7 +1520,7 @@ mod transaction_tests {
             // refuses one (0.4.3, bsv-stack-lean #59). A test that verifies
             // a spend of it proves it with a merkle path.
             let mut source_tx = Transaction::new();
-            let mut coin = TransactionInput::new("11".repeat(32), 0);
+            let mut coin = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
             coin.unlocking_script = Some(UnlockingScript::new());
             source_tx.add_input(coin).expect("add_input should work");
             source_tx
@@ -1915,7 +1915,7 @@ mod transaction_tests {
             let unlocking_script = bsv_rs::script::UnlockingScript::from_binary(&input_script_data)
                 .unwrap_or_else(|_| bsv_rs::script::UnlockingScript::new());
 
-            let mut input = TransactionInput::new("a".repeat(64), 0);
+            let mut input = TransactionInput::new("a".repeat(64).parse().unwrap(), 0);
             input.unlocking_script = Some(unlocking_script);
             tx.inputs_mut().push(input);
 
@@ -2171,7 +2171,7 @@ mod transaction_tests {
             let mut tx = Transaction::new();
 
             // Add input with no template and no unlocking script
-            let input = TransactionInput::new("a".repeat(64), 0);
+            let input = TransactionInput::new("a".repeat(64).parse().unwrap(), 0);
             tx.inputs_mut().push(input);
 
             // Add output with amount (so sign() doesn't fail on "missing amount")
@@ -2200,7 +2200,7 @@ mod transaction_tests {
             use bsv_rs::transaction::{FeeModel, SatoshisPerKilobyte};
 
             let mut tx = Transaction::new();
-            let input = TransactionInput::new("a".repeat(64), 0);
+            let input = TransactionInput::new("a".repeat(64).parse().unwrap(), 0);
             tx.inputs_mut().push(input);
             tx.outputs_mut()
                 .push(TransactionOutput::new(1000, LockingScript::new()));

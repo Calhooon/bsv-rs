@@ -100,7 +100,7 @@ fn display(wire: &Hash32) -> String {
 fn raw_tx(inputs: &[(Hash32, u32)], n_out: usize) -> Vec<u8> {
     let mut tx = Transaction::new();
     for (prev, vout) in inputs {
-        let mut input = TransactionInput::new(display(prev), *vout);
+        let mut input = TransactionInput::new(display(prev).parse().unwrap(), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
         tx.inputs_mut().push(input);
     }

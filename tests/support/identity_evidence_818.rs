@@ -40,7 +40,7 @@ pub fn subject() -> Transaction {
     ))
     .unwrap();
     let token = LockingScript::from_hex(v["cases"][0]["locking_script"].as_str().unwrap()).unwrap();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

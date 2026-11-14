@@ -293,7 +293,7 @@ async fn an_absent_lookup_result_is_refused_in_the_references_words() {
 /// `OP_FALSE OP_RETURN` data, this crate's writer's.
 fn beef_of(size: usize) -> Vec<u8> {
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.inputs_mut()[0].unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
     let mut script = vec![0x00, 0x6a, 0x4e];

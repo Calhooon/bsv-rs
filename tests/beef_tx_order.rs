@@ -64,7 +64,7 @@ fn root(proven: bool, salt: u8) -> Transaction {
     let mut t = Transaction::new();
     t.set_version(1);
     t.set_lock_time(salt as u32);
-    let mut input = TransactionInput::new(absent_source(salt), (salt % 4) as u32);
+    let mut input = TransactionInput::new(absent_source(salt).parse().unwrap(), (salt % 4) as u32);
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     t.inputs_mut().push(input);
     t.outputs_mut().push(TransactionOutput::new(
@@ -87,7 +87,7 @@ fn root(proven: bool, salt: u8) -> Transaction {
 /// An input spending `src`'s output `idx`, as the walk collects it.
 fn link(src: &Transaction, idx: u32) -> TransactionInput {
     let mut i = TransactionInput::with_source_transaction(src.clone(), idx);
-    i.source_txid = Some(src.id());
+    i.source_txid = Some(src.txid());
     i.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     i.sequence = 0xffffffff;
     i
@@ -491,7 +491,7 @@ fn generated_root(r: &mut R, mode: u32) -> Transaction {
     for _ in 0..32 {
         txid.push_str(&format!("{:02x}", r.b(256)));
     }
-    let mut input = TransactionInput::new(txid, r.b(4) as u32);
+    let mut input = TransactionInput::new(txid.parse().unwrap(), r.b(4) as u32);
     input.unlocking_script = Some(UnlockingScript::from_binary(&generated_script(r)).unwrap());
     t.inputs_mut().push(input);
     for _ in 0..1 + r.b(3) {
@@ -517,7 +517,7 @@ fn generated_link(r: &mut R, src: &Transaction) -> TransactionInput {
         src.clone(),
         r.b(src.outputs().len() as u64) as u32,
     );
-    i.source_txid = Some(src.id());
+    i.source_txid = Some(src.txid());
     i.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     i.sequence = if r.b(2) == 0 {
         0xffffffff
@@ -562,7 +562,10 @@ fn generated_subject(r: &mut R, mode: u32) -> Transaction {
 /// outputs of any of them (seed `0xd1ff_c0de_2026`).
 fn generated_tree(r: &mut R, i: u64) -> Transaction {
     let mut root = Transaction::new();
-    let mut input = TransactionInput::new(format!("{i:02x}{}", "7a".repeat(31)), r.b(4) as u32);
+    let mut input = TransactionInput::new(
+        (format!("{i:02x}{}", "7a".repeat(31))).parse().unwrap(),
+        r.b(4) as u32,
+    );
     input.unlocking_script = Some(UnlockingScript::from_binary(&[0x51]).unwrap());
     root.inputs_mut().push(input);
     for o in 0..1 + r.b(3) as usize {
