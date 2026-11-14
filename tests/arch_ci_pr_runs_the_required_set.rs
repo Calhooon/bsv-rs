@@ -40,8 +40,24 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
-/// `beta`'s required contexts as they will be after the speed cut lands
-/// (docs/lanes/ci-speed-2.md), not a live snapshot: `lint` carries Rustfmt, Clippy, deny and
+/// `beta`'s required contexts as the tree intends them, not a live snapshot (this guard reads no
+/// network): the five of the speed cut (docs/lanes/ci-speed-2.md) and `sibling`, which is listed
+/// AHEAD of its PATCH. Live on 2026-11-14 (`gh api
+/// repos/Calhooon/bsv-rs/branches/beta/protection/required_status_checks --jq '{strict, checks}'`,
+/// read at beta `6232488b`): `strict: true` and five contexts, `Test Suite (ubuntu-latest,
+/// stable)`, `main-in-beta`, `semver`, `lint`, `checks`, each bound to app 15368 (GitHub
+/// Actions); no `sibling`. So the `sibling` job runs and judges on every pull request into beta,
+/// and a red one does not block a merge until the PATCH (Calhooon/bsv-rs#97's comment of
+/// 2026-11-14, fact 1). The list keeps it because the exact-set rule below reads this list as
+/// the jobs a pull request may run: without the entry the job is refused as one left on.
+///
+/// The App's entry, `{context: sibling-judge, app_id: 5700082}` (RELEASING.md step 25), is not
+/// in the live protection either (the owner's PATCH, after the witnesses and the soak) and does
+/// not belong in this list when it is: no workflow job reports that context (the App posts it;
+/// `tests/arch_ci_sibling_judge_97.rs` refuses a job of that id or name), and this guard proves
+/// each entry by a job of `ci.yml`, so it would refuse the name here as a context nothing runs.
+///
+/// The speed cut's five: `lint` carries Rustfmt, Clippy, deny and
 /// ratchet, `checks` carries vectors, fixtures, front page, secrets, Documentation and wasm32 (combined),
 /// each a step with its own `PASS`/`FAIL` line; `main-in-beta` stays a job of its own (beta's
 /// alone, on its own events). The twelve before, read 2026-11-02 by
@@ -55,7 +71,9 @@ const REQUIRED_ON_BETA: &[&str] = &[
     "main-in-beta",
     "semver",
     // the node's oracle (#97, S1; the owner's decision of 2026-11-10): beta's line alone, as
-    // `main-in-beta`; the captain PATCHes beta's protection after the job runs green on its tip
+    // `main-in-beta`. Listed ahead of the PATCH: not in beta's live protection on 2026-11-14
+    // (five contexts, read by `gh api`; the constant's comment), required there only once the
+    // protection is PATCHed and read back
     "sibling",
 ];
 
