@@ -1401,28 +1401,66 @@ above), 0 timeouts, 12 unviable: 77 of 85 viable, 90.6%. No `src/` change.
 **Migration:** `beef.to_binary()`, `beef.to_hex()`, `beef.to_writer(w)`,
 `beef.merge_beef(&b)`, `beef.merge_raw_tx(..)`, `BeefTx::from_raw_tx(..)` and
 `BeefTx::to_writer(w, version)` now return `Result` (`Result<Vec<u8>>`, `Result<String>`,
-`Result<()>`, `Result<()>`, `Result<&BeefTx>`, `Result<BeefTx>`, `Result<()>`): add `?`.
-Where a caller dropped the value (`beef.merge_raw_tx(..);` or `beef.merge_beef(&b);` as a
-statement) the change is a warning, `unused_must_use` (``unused `Result` that must be used``),
-not an error, and the build goes on; `RUSTFLAGS="-D unused_must_use"` makes each such site an
-error (both compiled on 2026-11-12 in a scratch crate on this tree, rustc 1.98.1).
+`Result<()>`, `Result<()>`, `Result<&BeefTx>`, `Result<BeefTx>`, `Result<()>`): add `?`
+(the one-line migration: `beef.merge_raw_tx(raw, None);` becomes `beef.merge_raw_tx(raw, None)?;`
+and `let bytes = beef.to_binary();` becomes `let bytes = beef.to_binary()?;`).
+Where a caller uses the value, the compiler refuses the site (E0308, or E0599, E0277 or E0608
+by the use). Where a caller dropped the value (`beef.merge_raw_tx(..);` or `beef.merge_beef(&b);`
+as a statement) the change is a warning, `unused_must_use` (``unused `Result` that must be used``),
+not an error: the build goes on and the refusal is dropped with the value, so such a site wants
+its `?` as much as the others. `RUSTFLAGS="-D unused_must_use"`, `#![deny(unused_must_use)]` on
+the crate that takes the pin, or a clippy run under `-D warnings` makes each such site an
+error (the warning and the flag compiled on 2026-11-12 in a scratch crate on this tree, rustc
+1.98.1; the attribute on a scratch file and the clippy run on the CLI's beta line on
+2026-11-14). The doors carry no `#[must_use]` of their own, decided on #906: `Result`'s fires at
+every dropped site (32 of 32 in a compile of `bsv-wallet-cli`'s beta line, this entry's survey in the changelog), and an attribute with a message adds
+a second warning beside it under the same lint and makes nothing an error (rustc 1.88.0,
+1.98.1 and 1.100.0, a scratch file, 2026-11-14).
 An `Err` from a writer names an entry or a word the BEEF cannot carry: a txid-only entry
 under a word other than V2 (`a valid serialized Transaction is expected`; set
 `version = BEEF_V2` or drop the entry), a version word other than V1 or V2, a txid-only
 txid that is not 64 hex digits, or a BUMP `MerklePath`'s writer refuses. `to_binary_atomic`
 keeps its signature; its panic is an `Err`. `merge_bump`, `merge_transaction`,
 `merge_txid_only` and `make_txid_only` keep theirs. The semver tool does not flag a
-return type wrapped in `Result` on these receivers, so this line is the signal. A survey of
-the dependents (each grepped by its own path; counts by call text, the test column the
-files under a `tests` path): `bsv-wallet-toolbox-rs@a3377ef0` `merge_raw_tx` 52 (8 test),
-`merge_beef` 2 (1), BEEF writers about 22 (4); `bsv-overlay-cloudflare@2efad2f0`
-`merge_raw_tx` 56 (13), `merge_beef` 5 (0), BEEF writers about 63 (14), `to_writer` 3;
-`rust-message-box@08418ec` none of these doors; `bsv-wallet-cli@f4285bf` `merge_raw_tx` 3
-(3 test, `tests/compact_tracker_off.rs:102-104`; this survey said none until a count of
-2026-11-12), and its `origin/beta` at `6dc14ef5`, read the same day, `merge_raw_tx` 31 in
-16 files (14 under its tests, benches and fuzz crate) and `merge_beef` 1
-(`src/commands/export_beefs.rs:186`, of a BEEF `Beef::from_binary` returned), each a
-statement that drops the value (their `to_binary_atomic` calls keep their signature). The overlay engine's three accumulators
+return type wrapped in `Result` on these receivers, so this line is the signal.
+
+A survey of the dependents, re-read for #906 on 2026-11-14 in scratch clones of their public lines (a
+count is a text grep of `*.rs` lines naming a call, comment lines apart, unless it says a
+compile; "statement" a one-line statement that drops the value; the writers are not counted
+by grep, whose text cannot tell a `Beef` from a `Transaction`): `bsv-wallet-cli`'s beta line
+at `6dc14ef5`, by a compile: `merge_raw_tx` 31, each a statement, in 16 files (8 in the
+library and the binary: `src/commands/export_beefs.rs:122,132`, `gift_chain.rs:86,89,92`,
+`receive.rs:164`, `src/respend.rs:426`, `src/tracker_host.rs:1950`; 23 in test, bench and
+fuzz code), `merge_beef` 1 (`src/commands/export_beefs.rs:186`, a statement, of a BEEF
+`Beef::from_binary` returned), `Beef::to_binary` 23 (6 in the library and the binary:
+`export_beefs.rs:144`, `gift_chain.rs:93`, `receive.rs:165`, `respend.rs:339,428`,
+`tracker_host.rs:1951`), `Beef::to_hex` 2 (both tests), no `to_writer` and no `from_raw_tx`;
+its `to_binary_atomic` calls keep their signature. How the compile ran: against this tree
+the CLI is not reached, since its toolbox pin stops the build (`bsv-wallet-toolbox-rs`
+0.14.0-beta.6 from the registry 55 errors, the toolbox's beta line at `184c4182` 56, the
+field accessors of #843 and these writers' values among them); against 0.9.0-beta.6 with
+`merge_raw_tx` and `merge_beef` given the signatures above, every target of the CLI builds
+with 32 `unused_must_use` warnings and no error, one per statement, and its own CI's clippy
+step (`cargo clippy --workspace --all-targets -- -D warnings`) fails on them (run on the same
+tree: the library's two statements are errors and the run stops there); the writers' sites
+are the compiler's too (the writers marked deprecated on the same tree, each call site named
+by its warning), every one read as using the value, so an error at this pin. The CLI's `main` at `2cc76c9d` (on 0.8.3):
+`merge_raw_tx` 22 in 11 files, `merge_beef` 1, each a statement. `bsv-wallet-toolbox-rs`'s
+beta line at `184c4182`: `merge_raw_tx` 135 in 58 files (131 statements, 2 statements over
+several lines, 2 uses of the value in test code; 93 under a test, bench or fuzz path),
+`merge_beef` 4 in 3 files (statements); its `main` at `3ddf48db`: 84 in 17 files and 2.
+`bsv-overlay-cloudflare`'s `main` at `2abcd748` (on 0.7.2): `merge_raw_tx` 60 in 19 files (57
+statements), `merge_beef` 5 in 5 files (4 statements). `bsv-middleware-cloudflare`'s `main`
+at `d7ccb6c1` (on 0.8): `merge_raw_tx` 5 in 4 files (`core/src/brc29.rs:392`,
+`core/src/payment_verify.rs:1594,1595`, `src/payment_verify.rs:1115`,
+`src/refund/mod.rs:222`), each a statement. `bsv-middleware-rs`'s `main` at `5a1fd275` (on
+0.8.0): `merge_raw_tx` 6 in 2 files (`src/payment_core.rs:1286` and five lines of
+`tests/payment_limits.rs`), each a statement. `rust-message-box` (no public line found, so
+read at a local checkout's `08418ec` and `44a63204`, on 0.6.0): none of the three merge
+doors. None of them calls `BeefTx::from_raw_tx`. (Until #906 this survey named the CLI as calling none of these doors,
+then, from 2026-11-12, by its 31 `merge_raw_tx` lines and one `merge_beef` alone.)
+
+The overlay engine's three accumulators
 (`engine.rs` `hydrate_utxo_history`, `gasp_overlay.rs` `validate_graph_anchor`,
 `overlay-cloudflare/src/routes.rs`'s lookup answer) merge parsed BEEFs into a stored one
 and write it: where the accumulator was V1 and a merged BEEF held a txid-only entry they
@@ -1432,7 +1470,8 @@ Transaction is expected"))` from `to_binary`, each in a function that already re
 invariant below).
 
 The production sites in a function that does not return `Result` (read by their own paths at
-the pins above; a `.expect()` there brings the abort back on wasm32, so each wants its own
+`bsv-wallet-toolbox-rs@a3377ef0` and `bsv-overlay-cloudflare@2efad2f0`, the pins of this
+entry's earlier survey; a `.expect()` there brings the abort back on wasm32, so each wants its own
 fallback): `bsv-wallet-toolbox-rs` `src/storage/sqlx/create_action.rs:2082`
 (`merge_beef_linked`, `()`), `:2103` (`describe_invalid_beef`, `String`), `:2209`
 (`prune_beef_to_roots`, `()`); `bsv-overlay-cloudflare` `crates/overlay-cloudflare/src/ef.rs:193,199`
@@ -2071,15 +2110,23 @@ unchanged; no public API, wire byte or behaviour changes.
 
 **Migration:** `path.to_binary()`, `path.to_hex()` and `path.to_writer(w)` now return
 `Result<Vec<u8>>`, `Result<String>` and `Result<()>`: add `?` (or `.ok()?` where the
-caller returns an `Option`). A survey of the dependents (each grepped by its own path)
-counts 131 call sites on a `MerklePath`: `bsv-wallet-toolbox-rs` 19 (5 in production),
-`bsv-overlay-cloudflare` 112 (10 in production), `bsv-wallet-cli` and `rust-message-box`
-none; no dependent calls `MerklePath::to_writer`. `Beef`'s writers are unchanged here.
+caller returns an `Option`). `Beef`'s writers are unchanged here.
 No signature moves at `MerklePath::new`, `new_unchecked`, `compute_root` or `verify`, but
 each now answers `Err(MerklePathError("Invalid hex string"))` for a path whose walk pairs a
 hash with a non-hex character, where through 0.9.0-beta.7 it answered `Ok` (a root hashed
 from the text with that hash dropped; `verify` then `Ok(false)` from the tracker): a caller
 that read that `Ok` as a verdict now reads the `Err`.
+
+A survey of the dependents (each grepped by its own path)
+counts 131 call sites on a `MerklePath`: `bsv-wallet-toolbox-rs` 19 (5 in production),
+`bsv-overlay-cloudflare` 112 (10 in production), `bsv-wallet-cli` and `rust-message-box`
+none; no dependent calls `MerklePath::to_writer`. That survey read the CLI at an older ref:
+its beta line at `6dc14ef5`, compiled for #906 on 2026-11-14 against 0.9.0-beta.6 with these
+writers marked deprecated (each call site named by its warning), calls `MerklePath::to_binary`
+at 24 sites (1 in the library and the binary, `src/tracker_host.rs:1713`; 23 in test and bench
+code) and `MerklePath::to_hex` at 13 (3, `src/tracker_host.rs:1670,2179,2534`; 10 in test
+code), `to_writer` at none, every one read as using the value, so an error at this pin and
+never a silent drop.
 
 What was wrong: the writer wrote some states it cannot carry without a word. A leaf not
 flagged duplicate with no hash, or with a hash that was not hex, was written as its flag
