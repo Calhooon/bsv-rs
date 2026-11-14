@@ -51,6 +51,12 @@ pub fn subject() -> Transaction {
 /// The BEEF of `n` txid-only entries, the entry `00..01` again and the
 /// proven subject, under an Atomic prefix naming the subject.
 pub fn build(n: usize) -> Vec<u8> {
+    build_repeating(n, false)
+}
+
+/// As [`build`], the entry written twice the proven subject, raw, when `raw`
+/// (#907's two shapes), else the txid-only `00..01`.
+pub fn build_repeating(n: usize, raw: bool) -> Vec<u8> {
     let subject = subject();
     let mut beef = Beef::new();
     let index = beef.merge_bump(
@@ -58,7 +64,12 @@ pub fn build(n: usize) -> Vec<u8> {
     );
     beef.txs
         .extend((1..=n).map(|i| BeefTx::from_txid(format!("{i:064x}"))));
-    beef.txs.push(BeefTx::from_txid(format!("{:064x}", 1)));
+    beef.txs.push(if raw {
+        BeefTx::from_raw_tx(subject.to_binary(), Some(index))
+            .expect("the bytes are one transaction")
+    } else {
+        BeefTx::from_txid(format!("{:064x}", 1))
+    });
     beef.txs.push(
         BeefTx::from_raw_tx(subject.to_binary(), Some(index))
             .expect("the bytes are one transaction"),

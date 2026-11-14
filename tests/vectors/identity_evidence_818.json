@@ -41,6 +41,42 @@
       "site": "TransactionEvidence.ts:117",
       "refused_at": "TransactionEvidence.ts:117: 257 transactions",
       "outcome": "refused: Transaction evidence: limit"
+    },
+    {
+      "name": "raw_repeat_at_bound",
+      "writer": "an Atomic prefix naming the subject by hand, then Beef.toWriter over 254 txid-only entries and the proven subject raw twice",
+      "repeated": "raw",
+      "size": 254,
+      "entries": 256,
+      "distinct_txids": 255,
+      "repeated_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "output_index": 0,
+      "subject_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "beef_bytes": 10503,
+      "beef_sha256": "25ef2ccbc062f32094eeeb9b850c8b8d63e3520c10080e0e2c27651dc305e09a",
+      "selected_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "code": null,
+      "site": null,
+      "refused_at": null,
+      "outcome": "read"
+    },
+    {
+      "name": "raw_repeat_over_bound",
+      "writer": "an Atomic prefix naming the subject by hand, then Beef.toWriter over 255 txid-only entries and the proven subject raw twice",
+      "repeated": "raw",
+      "size": 255,
+      "entries": 257,
+      "distinct_txids": 256,
+      "repeated_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "output_index": 0,
+      "subject_txid": "0790c5da7fa04cf3b3c0f0b15b93b41fcd1f8eae6b7be65831c694fb27164931",
+      "beef_bytes": 10536,
+      "beef_sha256": "e4881e48b6abce51b8780af52dcd51351c5088d11b68f08e68e5b58382390315",
+      "selected_txid": "refused: Transaction evidence: limit",
+      "code": "limit",
+      "site": "TransactionEvidence.ts:117",
+      "refused_at": "TransactionEvidence.ts:117: 257 transactions",
+      "outcome": "refused: Transaction evidence: limit"
     }
   ]
 }

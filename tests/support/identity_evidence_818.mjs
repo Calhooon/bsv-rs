@@ -54,12 +54,14 @@ subject.addOutput({ satoshis: 1, lockingScript: LockingScript.fromHex(token) })
 const subjectTxid = subject.id('hex')
 const filler = (i) => i.toString(16).padStart(64, '0')
 
-const repeated = (n) => {
+// #907: the same two sizes with a RAW entry written twice (the proven
+// subject, the last two entries) where #818's shapes repeat a txid-only one.
+const repeated = (n, raw = false) => {
   const beef = new Beef()
   const bumpIndex = beef.mergeBump(new MerklePath(900, [[{ offset: 0, hash: subjectTxid, txid: true }]]))
   const entries = []
   for (let i = 1; i <= n; i++) entries.push(BeefTx.fromTxid(filler(i)))
-  entries.push(BeefTx.fromTxid(filler(1)))
+  entries.push(raw ? BeefTx.fromTx(subject, bumpIndex) : BeefTx.fromTxid(filler(1)))
   entries.push(BeefTx.fromTx(subject, bumpIndex))
   beef.txs = entries
   const writer = new Utils.Writer()
@@ -105,6 +107,31 @@ for (const [name, n] of [['repeat_at_bound', limits.transactions - 2], ['repeat_
     entries: read.txs.length,
     distinct_txids: new Set(read.txs.map(btx => btx.txid)).size,
     repeated_txid: filler(1),
+    output_index: 0,
+    subject_txid: subjectTxid,
+    beef_bytes: beef.length,
+    beef_sha256: createHash('sha256').update(Buffer.from(beef)).digest('hex'),
+    selected_txid: answer instanceof Error ? `refused: ${answer.message}` : answer.txid,
+    code: answer instanceof Error ? answer.code : null,
+    site: refusedAt === null ? null : refusedAt.split(': ')[0],
+    refused_at: refusedAt,
+    outcome: await judged(beef)
+  })
+}
+for (const [name, n] of [['raw_repeat_at_bound', limits.transactions - 2], ['raw_repeat_over_bound', limits.transactions - 1]]) {
+  const beef = repeated(n, true)
+  const read = Beef.fromBinaryStrict(beef)
+  const answer = selected(beef)
+  const refusedAt = replay(beef)
+  shapes.push({
+    name,
+    writer: `an Atomic prefix naming the subject by hand, then Beef.toWriter over ${n} txid-only entries ` +
+      'and the proven subject raw twice',
+    repeated: 'raw',
+    size: n,
+    entries: read.txs.length,
+    distinct_txids: new Set(read.txs.map(btx => btx.txid)).size,
+    repeated_txid: subjectTxid,
     output_index: 0,
     subject_txid: subjectTxid,
     beef_bytes: beef.length,

@@ -113,6 +113,21 @@ await add('type_beside_attributes', { subject: G, certificateType: TYPE, attribu
 // case above carried an `03` key, so a check admitting `02` alone passed.
 await add('key_prefix_03', { subject: '03' + G.slice(2) })
 await add('certifier_prefix_03', { certifier: '03' + G.slice(2) })
+// #907: the inputs the strength read of #897 left. An `03` key and certifier
+// in upper-case hex, with an x at or above p and with an x of no point
+// (`queryValidation.ts:172-180`); and the walk of the attributes' names
+// (`IdentityLookupService.ts:113`) on three names that are no array index
+// (`4294967295`, `01`, `+1`): a name fault inserted ahead of one of them
+// carrying a value fault is named, where an index name would be judged ahead
+// (`two_faults_index_value_then_name`).
+const keys03 = {
+  upper_case: '03' + G.slice(2).toUpperCase(), p_plus_1: '03' + P_PLUS_1.slice(2), no_point: '03' + noPoint.slice(2)
+}
+for (const [name, key] of Object.entries(keys03)) await add(`key_prefix_03_${name}`, { subject: key })
+for (const [name, key] of Object.entries(keys03)) await add(`certifier_prefix_03_${name}`, { certifier: key })
+for (const [name, field] of Object.entries({ u32_max: '4294967295', leading_zero: '01', plus_sign: '+1' })) {
+  await add(`two_faults_name_then_value_${name}`, { attributes: [['a.b', 'v'], [field, 'v'.repeat(501)]] })
+}
 
 process.stdout.write(JSON.stringify({
   description: '#756: the reference overlay\'s ls_identity lookup over the question IdentityClient::query sends ' +
