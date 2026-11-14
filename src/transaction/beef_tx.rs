@@ -276,7 +276,8 @@ impl BeefTx {
     /// `None` for an entry built by the public `from_raw_tx` or `from_tx`
     /// and for one mutated through `tx_mut` (#621's fold: `merge_beef` hashes
     /// such an entry's bytes, never trusting `txid()`'s reading of its
-    /// fields, which a stale cache after `raw_tx_or_compute` can part from).
+    /// fields, which a stale cache after `raw_tx_or_compute` could part from
+    /// until #843, whose doors empty the caches before every edit).
     pub(crate) fn held_txid(&self) -> Option<&str> {
         self.txid.as_deref()
     }

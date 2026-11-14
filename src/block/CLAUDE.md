@@ -82,4 +82,4 @@ The last three pin `primitives` items this module reads (`Reader`, `sha256d`) an
 
 - **chaintracks-cloudflare** (`Calhooon/chaintracks-cloudflare`): `block` alone, wasm32, warnings denied; the difficulty rule moved here from its `src/consensus.rs`. A change to `HeaderAncestry`, `ChainParams`'s fields or `DifficultyError`'s variants is a change to it.
 - **Everything on `transaction`** (the whole wasm32 line): `MerklePath::compute_root` and the streaming BEEF reader call `merkle_parent`; a change to its byte order changes every proof.
-- `~/bsv/rust-chaintracks` (root `CLAUDE.md`'s downstream list): grep its `Cargo.toml` before a change to a public shape here.
+- Every other dependent is a row of `docs/DEPENDENTS.md`'s pin table (the root `CLAUDE.md`'s "Downstreams to keep in mind" points there): grep a consumer's `Cargo.toml` before a change to a public shape here. `~/bsv/rust-chaintracks`, which this line named until 2026-11-14, is no folder on the captain's host; the consumer is chaintracks-cloudflare, this section's opening line.

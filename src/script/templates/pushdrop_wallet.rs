@@ -18,7 +18,8 @@
 //! Two residues, stated: (a) the reference pushes the wallet's key text
 //! unparsed once it decodes as hex, where this door reads it with
 //! `PublicKey::from_hex` and refuses a text that is no key in that parser's
-//! words (as the crate's five wallet sites do), after the key call alone: a
+//! words (through `read_wallet_key`, the reader the crate-visible
+//! `wallet_key_lock` reads through too), after the key call alone: a
 //! text that is not hex both refuse there, the reference in `Invalid hex
 //! string`, this door in the parser's words; a valid-hex text that is no key
 //! (`""`, a `05` tag) the reference signs and pushes; and (b) #545's

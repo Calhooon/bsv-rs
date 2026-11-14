@@ -22,8 +22,11 @@ impl Beef {
     /// A raw entry is filed under the txid the source entry holds
     /// ([`BeefTx::held_txid`]: the decoder's hash of the same bytes, or
     /// `merge_raw_tx`'s), else under the hash of its bytes, never under
-    /// `txid()`'s reading of its fields, which a stale serialization cached
-    /// after `tx_mut` can part from. Until #621 every raw entry was hashed
+    /// `txid()`'s reading of its fields. Until #843 a stale serialization
+    /// cached after `tx_mut` could part from that reading; since #843 an
+    /// edit's door empties the transaction's caches, and only the test door
+    /// `Transaction::with_cached_bytes_for_test` plants a cache that is not
+    /// its fields' serialization. Until #621 every raw entry was hashed
     /// again (one `sha256d` and one clone of the body per entry); the
     /// reference hashes twice per entry (`:842-846`, `BeefTx.ts:105-115`),
     /// go-sdk keeps the map's txid (`beef.go:1010-1017`).
