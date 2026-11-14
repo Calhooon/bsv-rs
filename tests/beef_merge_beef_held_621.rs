@@ -19,10 +19,14 @@
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
+use bsv_rs::primitives::{sha256, to_hex};
 use bsv_rs::transaction::{Beef, MerklePath, MerklePathLeaf, Transaction};
 use serde_json::Value;
 
 const VECTOR: &str = include_str!("vectors/beef_merge_beef_held_621.json");
+/// #817's pins (`support/beef_pins_817.mjs`): the reference's answers as
+/// entries and SHA-256 digests, no BEEF carried.
+const PINS: &str = include_str!("vectors/beef_pins_817.json");
 
 fn vector() -> Value {
     serde_json::from_str(VECTOR).unwrap()
@@ -299,6 +303,86 @@ fn a_source_read_then_given_a_txid_is_merged_in_its_sorted_order_621() {
 #[test]
 fn a_source_read_then_given_a_bump_is_merged_in_its_sorted_order_621() {
     assert_merged_as_recorded("read_source_then_bump_merged_is_sorted");
+}
+
+/// #817's pin beside the two above: a source read from bytes, then given a
+/// raw transaction through `merge_raw_tx`, is merged in its sort's order, as
+/// `mergeRawTx` ends the reference's cache and asks the sort
+/// (`#markMutated(true)`, `Beef.ts:835-839`): the mark cleared by the raw
+/// door's own body (`store_raw_entry`'s `mark_mutated`), which no test told
+/// from `merge_beef`'s mark of its target or the writer's sort. Read from
+/// bytes the source holds X, T; with Y appended the order read gives X, T, Y,
+/// and the reference's target holds Y, T, X. The reference's side is
+/// `vectors/beef_pins_817.json`'s `raw_after_read` (entries and the SHA-256
+/// of the bytes; the transactions and BUMPs the #621 vector's, compared).
+#[test]
+fn a_source_read_then_given_a_raw_transaction_is_merged_in_its_sorted_order_817() {
+    let v = vector();
+    let pins: Value = serde_json::from_str(PINS).unwrap();
+    for name in ["t", "x", "y"] {
+        assert_eq!(pins["txs"][name], v["txs"][name], "{name}: one transaction");
+    }
+    for name in ["t_800000", "x_800002"] {
+        assert_eq!(pins["bumps"][name], v["bumps"][name], "{name}: one BUMP");
+    }
+    let c = pins["raw_after_read"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "read_source_then_raw_merged_is_sorted")
+        .expect("the recorded case");
+    let entries = |beef: &Beef| -> Vec<(String, Option<u64>, bool)> {
+        beef.txs
+            .iter()
+            .map(|t| (t.txid(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
+            .collect()
+    };
+    let recorded = |list: &Value| -> Vec<(String, Option<u64>, bool)> {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let n = e["tx"].as_str().unwrap();
+                (
+                    v["txs"][n]["txid"].as_str().unwrap().to_string(),
+                    e["bump_index"].as_u64(),
+                    e["txid_only"].as_bool().unwrap(),
+                )
+            })
+            .collect()
+    };
+
+    let mut source = Beef::new();
+    apply(&v, &mut source, &c["source"]);
+    let held = entries(&source);
+    assert_eq!(
+        held,
+        recorded(&c["source_held_before_the_merge"]),
+        "the source as held: the order read, the raw transaction appended"
+    );
+    let mut target = Beef::new();
+    // No `to_hex` or `to_binary` of the source between its last step and the
+    // merge: either would sort it and hide the mark.
+    target
+        .merge_beef(&source)
+        .expect("the source BEEF writes and reads back");
+    assert_eq!(
+        entries(&target),
+        recorded(&c["entries"]),
+        "the target's entries, in the order the reference's mergeBeef leaves"
+    );
+    assert_eq!(target.bumps.len() as u64, c["bumps"].as_u64().unwrap());
+    assert_eq!(
+        to_hex(&sha256(&target.to_binary().expect("the BEEF is writable"))),
+        c["beef_sha256"].as_str().unwrap(),
+        "the bytes the reference's mergeBeef then toBinary writes"
+    );
+    assert_eq!(entries(&source), held, "merge_beef left the source as held");
+    assert_eq!(
+        to_hex(&sha256(&source.to_binary().expect("the BEEF is writable"))),
+        c["source_beef_sha256"].as_str().unwrap(),
+        "the source's bytes"
+    );
 }
 
 /// #621's fourth fold, the rule read's FIX: the target holds U and edits it

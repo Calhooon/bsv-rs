@@ -103,6 +103,10 @@ const COMPUTED: [&str; 2] = [
     "computed_node_leaf0_of_63_digits",
     "computed_node_leaf1_of_63_digits",
 ];
+/// #817's pin: a 63-digit `leaf0` beside a duplicate, the node above them
+/// computed by pairing the odd-length text with itself.
+const COMPUTED_FROM_A_DUPLICATE: [&str; 1] =
+    ["computed_node_leaf0_of_63_digits_beside_a_duplicate"];
 const EVEN: [&str; 5] = [
     "sibling_of_62_digits",
     "sibling_of_64_digits",
@@ -139,6 +143,19 @@ fn an_odd_length_child_of_a_computed_node_is_paired_as_the_reference_817() {
     }
 }
 
+/// A node computed above level 0 from a 63-digit `leaf0` whose sibling is a
+/// duplicate (`findOrComputeLeaf`, `MerklePath.ts:442-443`,
+/// `hashPair(leaf0.hash, leaf0.hash)`): the odd-length text paired with
+/// itself, 126 digits decoded across their boundary with no padding. The
+/// level-0 twin (`txid_of_63_digits_beside_a_duplicate`) goes through the
+/// walk's own step; this cell through the computed node's.
+#[test]
+fn an_odd_length_child_duplicated_into_a_computed_node_is_paired_as_the_reference_817() {
+    for name in COMPUTED_FROM_A_DUPLICATE {
+        agrees(name);
+    }
+}
+
 /// Even lengths (62, 64, 66 digits, the empty text, a computed node of
 /// 64-digit children) pair as before: green before and after #817.
 #[test]
@@ -155,6 +172,7 @@ fn every_recorded_hash_pair_cell_is_judged_817() {
         .iter()
         .chain(&TWO_ODD)
         .chain(&COMPUTED)
+        .chain(&COMPUTED_FROM_A_DUPLICATE)
         .chain(&EVEN)
         .copied()
         .collect();
@@ -166,6 +184,6 @@ fn every_recorded_hash_pair_cell_is_judged_817() {
         .map(|c| c["name"].as_str().expect("name").to_string())
         .collect();
     recorded.sort_unstable();
-    assert_eq!(recorded.len(), 13);
+    assert_eq!(recorded.len(), 14);
     assert_eq!(recorded, named);
 }

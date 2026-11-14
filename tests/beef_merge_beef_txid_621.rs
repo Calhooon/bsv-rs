@@ -11,6 +11,17 @@
 //! case of the 260 moves with the fold); the RED witnesses are the unit
 //! tests `src/transaction/beef/merge_entry_621_tests.rs` and the held-entry
 //! cases of `tests/beef_merge_beef_held_621.rs`.
+//!
+//! #817's pin: on those targets the held raw entry and the source's are the
+//! same bytes under the same index, so the differential stayed green with the
+//! held-entry rule's return removed (`src/transaction/beef/merge_entry.rs`,
+//! `holds_a_transaction`). Two more targets hold an entry that differs
+//! observably from the source's: a raw entry under a BUMP of the target's own
+//! at index 0 where the source's BUMP holding the txid lands later (a rescan
+//! names the later), and a parsed entry `merge_transaction` stored with its
+//! source link (a replacement holds the bytes alone). On every BEEF of the
+//! tree that offers the shape the index and the link are kept, and the bytes
+//! and entries equal the per-entry model's.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -19,7 +30,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use bsv_rs::primitives::{from_hex, sha256d, to_hex};
-use bsv_rs::transaction::{Beef, BeefTx};
+use bsv_rs::transaction::{Beef, BeefTx, MerklePath, MerklePathLeaf, Transaction};
 
 #[path = "support/beef_chain.rs"]
 mod beef_chain;
@@ -277,4 +288,157 @@ fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
     assert!(merged.find_txid(&new).is_some());
     assert!(merged.find_txid(&old).is_none());
     assert_eq!(merged.find_txid(&new).unwrap().tx().unwrap().lock_time(), 7);
+}
+
+/// #817: a target holding a raw entry of the source under a BUMP of its own
+/// at index 0 (the txid alone in a block one above the source's highest, so
+/// no BUMP of the source combines into it), where a BUMP of the source holds
+/// the txid at level 0 too: after the merge that BUMP sits at index 1 or
+/// later, the index a rescan of the entry would name. `None` where the source
+/// proves no raw entry. The target and the entry's txid.
+fn held_under_its_own_bump(source: &Beef) -> Option<(Beef, String)> {
+    let (txid, raw) = source.txs.iter().find_map(|t| {
+        let raw = t.raw_tx()?;
+        let txid = t.txid();
+        let bump = source.bumps.get(t.bump_index()?)?;
+        bump.path
+            .first()?
+            .iter()
+            .any(|leaf| leaf.hash.as_deref() == Some(txid.as_str()))
+            .then(|| (txid, raw.to_vec()))
+    })?;
+    let height = source.bumps.iter().map(|b| b.block_height).max()?;
+    let own = MerklePath::new(
+        height.checked_add(1)?,
+        vec![vec![MerklePathLeaf::new_txid(0, txid.clone())]],
+    )
+    .ok()?;
+    let mut target = Beef::new();
+    assert_eq!(target.merge_bump(own), 0);
+    let held = target
+        .merge_raw_tx(raw, None)
+        .expect("the bytes are one transaction");
+    assert_eq!(
+        held.bump_index(),
+        Some(0),
+        "the target's own BUMP proves it"
+    );
+    Some((target, txid))
+}
+
+/// #817: a target holding a raw child of the source as `merge_transaction`
+/// stores it, parsed and linked to its parent (a raw entry of the source
+/// too), or `None` where no raw entry of the source spends another. The
+/// target, the child's txid and the linked input's position.
+fn held_with_its_source_link(source: &Beef) -> Option<(Beef, String, usize)> {
+    source.txs.iter().find_map(|t| {
+        let mut child = Transaction::from_binary(t.raw_tx()?).ok()?;
+        let (at, parent) = child.inputs().iter().enumerate().find_map(|(at, input)| {
+            let parent = source.find_txid(input.source_txid.as_deref()?)?;
+            Some((at, Transaction::from_binary(parent.raw_tx()?).ok()?))
+        })?;
+        child.inputs_mut()[at].source_transaction = Some(Box::new(parent));
+        let txid = child.id();
+        let mut target = Beef::new();
+        target.merge_transaction(child);
+        Some((target, txid, at))
+    })
+}
+
+/// True when the entry under `txid` is held parsed with its input `at`
+/// linked to a source transaction.
+fn linked(beef: &Beef, txid: &str, at: usize) -> bool {
+    beef.find_txid(txid)
+        .and_then(BeefTx::tx)
+        .and_then(|tx| tx.inputs().get(at))
+        .is_some_and(|input| input.source_transaction.is_some())
+}
+
+/// #817, the bucket's line on this differential: an entry the target holds
+/// raw is left as it is by `merge_beef` (the reference's
+/// `#mergeBeefTxEntry`, `Beef.ts:950-967` at `ts-stack@edf6e03`; its recorded
+/// cell is `beef_merge_beef_held_621.rs`'s `held_raw_keeps_its_bump_index`),
+/// told here on every BEEF of the tree that proves a raw entry: the index 0
+/// of the target's own BUMP kept where the source's BUMP holding the txid
+/// lands later, the index a rescan would name.
+#[test]
+fn a_held_raw_entry_keeps_the_index_of_its_own_bump_on_every_beef_817() {
+    let sources = sources();
+    let mut indexed = 0;
+    for (name, source) in &sources {
+        let txids: Vec<String> = source.txs.iter().map(BeefTx::txid).collect();
+        let (Some((mut merged, txid)), Some((mut by_entry, _))) = (
+            held_under_its_own_bump(source),
+            held_under_its_own_bump(source),
+        ) else {
+            continue;
+        };
+        indexed += 1;
+        merged
+            .merge_beef(source)
+            .expect("the source BEEF writes and reads back");
+        let later = merged.bumps.iter().skip(1).any(|b| {
+            b.path
+                .first()
+                .is_some_and(|l| l.iter().any(|leaf| leaf.hash.as_deref() == Some(&txid)))
+        });
+        assert!(later, "{name}: a later BUMP holds the held txid");
+        assert_eq!(
+            merged.find_txid(&txid).unwrap().bump_index(),
+            Some(0),
+            "{name}: the held raw entry keeps the index it was held under"
+        );
+        merge_entry_by_entry(&mut by_entry, source);
+        assert_eq!(
+            seen(merged, &txids),
+            seen(by_entry, &txids),
+            "{name}: into a BEEF holding the entry under its own BUMP"
+        );
+    }
+    eprintln!(
+        "{} BEEFs, {indexed} merged into a BEEF holding an entry under its own BUMP",
+        sources.len()
+    );
+    assert!(indexed >= 10, "held under an own BUMP: {indexed}");
+}
+
+/// #817, the same line: an entry the target holds parsed, as
+/// `merge_transaction` stored it with its source link, is left as it is by
+/// `merge_beef` (the recorded cell `held_parsed_entry_keeps_its_links`), told
+/// here on every BEEF of the tree where a raw entry spends another: the link
+/// kept, where a replacement would hold the source's bytes alone.
+#[test]
+fn a_held_parsed_entry_keeps_its_source_link_on_every_beef_817() {
+    let sources = sources();
+    let mut with_links = 0;
+    for (name, source) in &sources {
+        let txids: Vec<String> = source.txs.iter().map(BeefTx::txid).collect();
+        let (Some((mut merged, txid, at)), Some((mut by_entry, _, _))) = (
+            held_with_its_source_link(source),
+            held_with_its_source_link(source),
+        ) else {
+            continue;
+        };
+        with_links += 1;
+        assert!(linked(&merged, &txid, at), "{name}: held with its link");
+        merged
+            .merge_beef(source)
+            .expect("the source BEEF writes and reads back");
+        assert!(
+            linked(&merged, &txid, at),
+            "{name}: the held parsed entry keeps its source link"
+        );
+        merge_entry_by_entry(&mut by_entry, source);
+        assert!(linked(&by_entry, &txid, at), "{name}: the model's too");
+        assert_eq!(
+            seen(merged, &txids),
+            seen(by_entry, &txids),
+            "{name}: into a BEEF holding the entry with its link"
+        );
+    }
+    eprintln!(
+        "{} BEEFs, {with_links} merged into a BEEF holding an entry with its source link",
+        sources.len()
+    );
+    assert!(with_links >= 10, "held with a source link: {with_links}");
 }

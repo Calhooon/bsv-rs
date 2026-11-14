@@ -412,6 +412,49 @@
         "accepted": true,
         "result": null
       }
+    },
+    {
+      "name": "computed_node_leaf0_of_63_digits_beside_a_duplicate",
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+            "txid": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254"
+          },
+          {
+            "offset": 2,
+            "hash": "9be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+          },
+          {
+            "offset": 3,
+            "duplicate": true
+          }
+        ],
+        [],
+        [
+          {
+            "offset": 1,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7"
+          }
+        ]
+      ],
+      "compute_root": {
+        "accepted": true,
+        "result": "b1633cc472e9bcdeaedc7b710ccbeb7a32b105efe4a2f8f5a769cd8a10fe4d4c"
+      },
+      "checked": {
+        "accepted": true,
+        "result": null
+      },
+      "unchecked": {
+        "accepted": true,
+        "result": null
+      }
     }
   ],
   "signing": {
