@@ -1543,6 +1543,81 @@ fn a_variable_read_only_inside_the_stage_r_block_is_read_958() {
     }
 }
 
+/// What the ritual says of the judge's silences and of a cancelled sync (#958), read from
+/// `RELEASING.md` beside the lines of the two workflows that make each sentence true: while the
+/// trampoline's jobs test the ref `main` the ritual names the default branch among the silences,
+/// with the read-back that prints it and the repository's visibility; while the sync runs in a
+/// group that is never cancelled in progress and waits for stage R, the direction rule says a
+/// cancelled sync run under a newer one is the group's; and the sentence on what `main` takes of
+/// the sync names the whole step.
+fn releasing_refusals(releasing: &str, judge: &str, sync: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mut need = |holds: bool, needle: &str, why: &str| {
+        if holds && !releasing.contains(needle) {
+            errors.push(format!("RELEASING.md: {why}; it lacks `{needle}` (#958)"));
+        }
+    };
+    let on_main = judge.contains("if: github.ref == 'refs/heads/main'");
+    need(
+        on_main,
+        "a default branch that is no longer `main`",
+        "the trampoline's jobs run on the ref `main` alone, so a changed default branch silences the judge",
+    );
+    need(
+        on_main,
+        "a repository that is no longer public",
+        "`report` reads through a token of `checks: write` alone, so a private repository silences the judge",
+    );
+    need(
+        on_main,
+        "gh api repos/Calhooon/bsv-rs --jq '{default_branch, visibility}'",
+        "the two settings have their read-back",
+    );
+    let grouped = sync.contains("  group: sync-main-into-beta\n  cancel-in-progress: false\n")
+        && sync.contains("      - name: Start the PR's stage R and its judge\n");
+    need(
+        grouped,
+        "A cancelled sync run under a newer one is the group's, not a failure",
+        "the sync holds its group through the stage R wait, so a replaced pending run reads cancelled",
+    );
+    need(
+        grouped,
+        "the sync workflow's step that starts stage R, waits for it and dispatches its judge",
+        "`main` carries the whole step, its wait and its dispatch of the judge included",
+    );
+    errors
+}
+
+#[test]
+fn releasing_names_the_settings_that_silence_the_judge_and_the_syncs_cancelled_run_958() {
+    let releasing = read("RELEASING.md");
+    let judge = read(".github/workflows/sibling-judge.yml");
+    let sync = read(SYNC_FILE);
+    let errors = releasing_refusals(&releasing, &judge, &sync);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    assert_eq!(
+        judge.matches("github.ref == 'refs/heads/main'").count(),
+        2,
+        "both jobs of the trampoline test the ref"
+    );
+    for needle in [
+        "a default branch that is no longer `main`",
+        "a repository that is no longer public",
+        "{default_branch, visibility}",
+        "A cancelled sync run under a newer one is the group's, not a failure",
+        "starts stage R, waits for it and dispatches its judge",
+    ] {
+        let planted = releasing.replace(needle, "");
+        assert_ne!(planted, releasing, "{needle}");
+        let errors = releasing_refusals(&planted, &judge, &sync);
+        assert!(
+            errors.iter().any(|e| e.contains("(#958)")),
+            "{needle}: {errors:?}"
+        );
+    }
+    assert!(releasing_refusals("", "", "").is_empty());
+}
+
 #[test]
 fn the_shape_check_names_a_job_with_no_runner_and_an_unpinned_action() {
     let text = "name: x\non:\n  push:\npermissions:\n  contents: read\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n  b:\n    steps: []\n";
