@@ -10,7 +10,7 @@ use crate::primitives::BigNumber;
 use k256::ecdsa::signature::hazmat::PrehashSigner;
 use k256::ecdsa::SigningKey;
 use k256::elliptic_curve::zeroize::Zeroizing;
-use k256::SecretKey;
+use k256::{NonZeroScalar, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
 
@@ -291,8 +291,16 @@ impl PrivateKey {
     /// ```
     pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<super::SharedSecret> {
         other_pubkey
-            .mul_scalar(&self.to_bytes())
+            .mul_secret(self)
             .map(super::SharedSecret::from_point)
+    }
+
+    /// The secret scalar for the crate's own point arithmetic, in a wrapper
+    /// that wipes it when dropped (#912): a multiplication by this key reads
+    /// the scalar here and exports no byte copy of it through
+    /// [`to_bytes`](Self::to_bytes).
+    pub(crate) fn secret_scalar(&self) -> Zeroizing<NonZeroScalar> {
+        Zeroizing::new(self.inner.to_nonzero_scalar())
     }
 
     /// Derives a child private key using BRC-42 key derivation.

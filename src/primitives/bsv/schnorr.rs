@@ -104,7 +104,7 @@ impl Schnorr {
         let big_r = r.public_key();
 
         // S' = r*B (blinded shared secret)
-        let s_prime = big_b.mul_scalar(&r.to_bytes())?;
+        let s_prime = big_b.mul_secret(&r)?;
 
         // e = H(A || B || S || S' || R) mod n
         let e = Self::compute_challenge(big_a, big_b, big_s, &s_prime, &big_r);

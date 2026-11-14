@@ -19,7 +19,9 @@ use super::PublicKey;
 /// `SharedSecret { .. }`; equality is constant time over the compressed
 /// bytes. Only the derivation doors make one: there is no public constructor.
 ///
-/// The point is not wiped from memory on drop.
+/// The point is not wiped from memory on drop. The private scalar a
+/// derivation door multiplies by is read in a wrapper that wipes it, with no
+/// byte copy exported (#912).
 ///
 /// What it does not offer, by the compiler:
 ///
@@ -98,7 +100,10 @@ impl SharedSecret {
 
     /// The secret as a [`PublicKey`] (for point arithmetic or a Schnorr
     /// proof's `S`). Reveals the secret: the returned key prints the point
-    /// under `Debug`, `Display` and serde.
+    /// under `Debug`, `Display` and serde. To compare two secrets, compare
+    /// the `SharedSecret`s; `PublicKey`'s `==` reads the same compressed
+    /// bytes without an early exit since #912, and its `Hash` feeds them to
+    /// the caller's hasher.
     pub fn to_point(&self) -> PublicKey {
         self.point.clone()
     }
