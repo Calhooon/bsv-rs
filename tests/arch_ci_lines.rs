@@ -32,6 +32,12 @@
 //! `contents: write` in that job alone, and runs the reconciler after it;
 //! `front-pages.yml` runs the reconciler on a dispatch and nothing else (no schedule).
 //!
+//! A version published once (#867; RELEASING.md step 8): the `version` job's last step is
+//! `PUBLISHED_ONCE` byte for byte (a version crates.io lists, a tag with a Release page and a tag
+//! that ran at another commit refused, an unreadable answer refused too), the job holds
+//! `contents: read` and `actions: read`, absorbs no failure, and every other job of
+//! `release.yml` waits for it.
+//!
 //! The sync's dispatch of stage R (#97): `SYNC_STAGE_R` holds its steps byte for byte, and
 //! `SYNC_FILE_DIGEST` holds `sync-main-into-beta.yml` whole, so a second definition of a variable
 //! the dispatch reads, in any spelling (a flow mapping, a multiline write to `$GITHUB_ENV`, a YAML
@@ -1917,6 +1923,322 @@ fn every_mutants_entry_is_checked_in_checks_and_the_pin_job_at_one_version_663()
             "checks: the mutants-entries gate does not run mutants_entries.py",
             "a workflow rewrites the entries (`--fix` is the captain's, by hand)",
         ]
+    );
+}
+
+/// The version job's last step (#867), byte for byte: the refusal of a version that is already
+/// published and of a tag an earlier run ran at another commit.
+const PUBLISHED_ONCE: &str = r##"      # A version is published once, from one commit (#867; RELEASING.md steps 8 and 9). The
+      # repository's ruleset forbids moving or deleting a `v*` tag; this step is the workflow's
+      # own refusal, should the ruleset ever change. It refuses, before any job that publishes
+      # starts (every one of them needs this job), a tag whose version crates.io's index
+      # lists (yanked included), a tag that has a Release page, and a tag an earlier run of
+      # this workflow ran at another commit (v0.9.0-beta.4 ran at three on 2026-10-30). It
+      # fails closed: an answer it cannot read (crates.io or GitHub unreachable, an index
+      # without 0.8.9, a status other than 200 or 404, a run list without this run's own
+      # commit) refuses too. Nothing here is consumed, so "Re-run failed jobs" tries again.
+      - name: The version is not published and the tag ran at no other commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          curl -fsS --retry 3 --max-time 60 -o "$RUNNER_TEMP/index.jsonl" https://index.crates.io/bs/v-/bsv-rs
+          listed="$(jq -r 'select(.name == "bsv-rs") | .vers' "$RUNNER_TEMP/index.jsonl")"
+          if ! grep -qxF '0.8.9' <<< "$listed"; then
+            echo "::error::crates.io's index for bsv-rs could not be read (its answer does not list 0.8.9); nothing is published on an answer that cannot be read: re-run this job when https://index.crates.io/bs/v-/bsv-rs answers"
+            exit 1
+          fi
+          if grep -qxF -- "$version" <<< "$listed"; then
+            echo "::error::bsv-rs ${version} is already on crates.io; a version is published once (RELEASING.md step 9). Leave the tag where it is and ship the fix as the next version, by a release pull request and a new tag (step 8)"
+            exit 1
+          fi
+          page="$(curl -sS --retry 3 --max-time 60 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}")"
+          case "$page" in
+            404) ;;
+            200)
+              echo "::error::${GITHUB_REF_NAME} already has a Release page (gh release view ${GITHUB_REF_NAME}); a version is released once. If the page was made by mistake for a version crates.io does not list, delete the page and re-run this job; otherwise ship the next version (RELEASING.md step 8)"
+              exit 1
+              ;;
+            *)
+              echo "::error::GitHub answered ${page} for the Release page of ${GITHUB_REF_NAME}; nothing is published on an answer that cannot be read: re-run this job"
+              exit 1
+              ;;
+          esac
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --branch "$GITHUB_REF_NAME" --event push --limit 100 --json headSha,headBranch > "$RUNNER_TEMP/runs.json"
+          count="$(jq -r 'if type == "array" then length else error("not a list") end' "$RUNNER_TEMP/runs.json")"
+          if [ "$count" -ge 100 ]; then
+            echo "::error::100 runs of release.yml or more name ${GITHUB_REF_NAME}; the list cannot be read whole, so the tag is refused: ship the next version (RELEASING.md step 8)"
+            exit 1
+          fi
+          commits="$(jq -r --arg tag "$GITHUB_REF_NAME" '[.[] | select(.headBranch == $tag) | .headSha] | unique | .[]' "$RUNNER_TEMP/runs.json")"
+          if ! grep -qxF -- "$GITHUB_SHA" <<< "$commits"; then
+            echo "::error::the runs of release.yml for ${GITHUB_REF_NAME} do not list this run's own commit ${GITHUB_SHA}; nothing is published on an answer that cannot be read: re-run this job"
+            exit 1
+          fi
+          others="$(grep -vxF -- "$GITHUB_SHA" <<< "$commits" || true)"
+          if [ -n "$others" ]; then
+            echo "::error::${GITHUB_REF_NAME} was moved: release.yml ran for it at $(tr '\n' ' ' <<< "$others")and now at ${GITHUB_SHA}. A v* tag is never moved (RELEASING.md step 8): leave it, say in its CHANGELOG.md section that it was tagged and never published, and ship the next version"
+            exit 1
+          fi
+          echo "bsv-rs ${version}: not on crates.io, no Release page, release.yml ran for ${GITHUB_REF_NAME} at ${GITHUB_SHA} alone"
+"##;
+
+/// The ids of the jobs under `jobs:`, in order.
+fn job_ids(text: &str) -> Vec<&str> {
+    block(text, 0, "jobs:")
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|l| {
+            l.starts_with("  ")
+                && !l.starts_with("   ")
+                && !l.trim_start().starts_with('#')
+                && l.trim_end().ends_with(':')
+        })
+        .map(|l| l.trim().trim_end_matches(':'))
+        .collect()
+}
+
+/// What release.yml must hold so that a version is published once, from one commit (#867):
+/// `PUBLISHED_ONCE` the version job's last step, byte for byte; the job's permissions the two
+/// its reads need; no failure of the job absorbed; and every other job behind it, directly or
+/// through a job that is (so nothing is published, and no page made, before it has passed).
+fn release_once(release: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let job = |name: &str| block(release, 2, &format!("{name}:")).unwrap_or_default();
+    let version = job("version").join("\n");
+    let head = "      # A version is published once, from one commit (#867;";
+    match version.find(head) {
+        None => errors.push(
+            "release.yml: the version job does not refuse a version that is already published (#867): no `PUBLISHED_ONCE` step".to_owned(),
+        ),
+        Some(at) => {
+            let tail = version[at..].trim_end();
+            let pin = PUBLISHED_ONCE.trim_end();
+            if tail != pin {
+                let found = tail
+                    .lines()
+                    .zip(pin.lines())
+                    .position(|(a, b)| a != b)
+                    .unwrap_or_else(|| tail.lines().count().min(pin.lines().count()));
+                errors.push(format!(
+                    "release.yml: the version job's last step is not `PUBLISHED_ONCE` byte for byte to the job's end (#867); line {} of the pin is `{}`, found `{}`",
+                    found + 1,
+                    pin.lines().nth(found).unwrap_or("<end>"),
+                    tail.lines().nth(found).unwrap_or("<end>"),
+                ));
+            }
+        }
+    }
+    if !version
+        .contains("\n    permissions:\n      contents: read\n      actions: read\n    steps:\n")
+    {
+        errors.push(
+            "release.yml: the version job's permissions are not `contents: read` and `actions: read` alone (the run list needs the second, #867)".to_owned(),
+        );
+    }
+    for line in version.lines() {
+        let key = line.trim().trim_start_matches("- ");
+        if key.starts_with("if:") || key.starts_with("continue-on-error") {
+            errors.push(format!(
+                "release.yml: the version job carries `{}`; every step of it runs and none of its failures is absorbed (#867)",
+                line.trim()
+            ));
+        }
+    }
+    // every other job waits for the version job, itself or through a job that does
+    let ids = job_ids(release);
+    let needs = |name: &str| -> Vec<String> {
+        job(name)
+            .iter()
+            .find_map(|l| l.strip_prefix("    needs:"))
+            .map(|list| {
+                list.trim()
+                    .trim_matches(|c| c == '[' || c == ']')
+                    .split(',')
+                    .map(|n| n.trim().to_owned())
+                    .filter(|n| !n.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let mut behind: Vec<String> = vec!["version".to_owned()];
+    loop {
+        let more: Vec<String> = ids
+            .iter()
+            .filter(|id| !behind.iter().any(|b| b == *id))
+            .filter(|id| needs(id).iter().any(|n| behind.contains(n)))
+            .map(|id| (*id).to_owned())
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        behind.extend(more);
+    }
+    for id in &ids {
+        if !behind.iter().any(|b| b == id) {
+            errors.push(format!(
+                "release.yml: job `{id}` does not wait for the version job (`needs:`), so it could run for a version the job refuses (#867)"
+            ));
+        }
+        let body = job(id).join("\n");
+        if *id != "version"
+            && (body.contains("always()")
+                || body.contains("failure()")
+                || body.contains("cancelled()"))
+        {
+            errors.push(format!(
+                "release.yml: job `{id}` runs on a failed or cancelled `needs:`; nothing runs past a refused version job (#867)"
+            ));
+        }
+    }
+    if !needs("publish").iter().any(|n| n == "version") {
+        errors.push(
+            "release.yml: `publish` does not name `version` in its `needs:` (#867)".to_owned(),
+        );
+    }
+    errors
+}
+
+#[test]
+fn a_tags_run_refuses_a_version_that_is_already_published_867() {
+    let release = read(".github/workflows/release.yml");
+    let errors = release_once(&release);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    assert_eq!(
+        job_ids(&release),
+        [
+            "version",
+            "ci",
+            "docs",
+            "msrv",
+            "features",
+            "machete",
+            "bench",
+            "publish",
+            "page",
+            "front-pages"
+        ]
+    );
+}
+
+#[test]
+fn a_release_whose_refusal_is_weakened_absorbed_or_bypassed_is_refused_867() {
+    let release = read(".github/workflows/release.yml");
+    let pin_message = |line: usize, pinned: &str, found: &str| {
+        format!(
+            "release.yml: the version job's last step is not `PUBLISHED_ONCE` byte for byte to the job's end (#867); line {line} of the pin is `{pinned}`, found `{found}`"
+        )
+    };
+    let plant = |from: &str, to: &str| {
+        assert_eq!(
+            release.matches(from).count(),
+            1,
+            "the plant's text `{from}` is in release.yml once"
+        );
+        release.replacen(from, to, 1)
+    };
+    // the step gone
+    let gone = plant(PUBLISHED_ONCE, "");
+    assert_eq!(
+        release_once(&gone),
+        ["release.yml: the version job does not refuse a version that is already published (#867): no `PUBLISHED_ONCE` step"]
+    );
+    // each of the three refusals, and each closed failure, turned into a pass
+    for (from, to) in [
+        // the index's read absorbed
+        (
+            "          curl -fsS --retry 3 --max-time 60 -o \"$RUNNER_TEMP/index.jsonl\" https://index.crates.io/bs/v-/bsv-rs\n",
+            "          curl -fsS --retry 3 --max-time 60 -o \"$RUNNER_TEMP/index.jsonl\" https://index.crates.io/bs/v-/bsv-rs || true\n",
+        ),
+        // an index that does not list a known version read as an answer
+        ("          if ! grep -qxF '0.8.9' <<< \"$listed\"; then\n", "          if false; then\n"),
+        // a listed version published again
+        ("          if grep -qxF -- \"$version\" <<< \"$listed\"; then\n", "          if false; then\n"),
+        // a status that is neither 200 nor 404 read as no page
+        ("            404) ;;\n", "            404|5*) ;;\n"),
+        // an earlier run at another commit let through
+        ("          if [ -n \"$others\" ]; then\n", "          if false; then\n"),
+        // a run list without this run's own commit trusted
+        ("          if ! grep -qxF -- \"$GITHUB_SHA\" <<< \"$commits\"; then\n", "          if false; then\n"),
+        // a failing command no longer stopping the step
+        ("          set -euo pipefail\n          version=\"${GITHUB_REF_NAME#v}\"\n          curl", "          version=\"${GITHUB_REF_NAME#v}\"\n          curl"),
+    ] {
+        let errors = release_once(&plant(from, to));
+        assert_eq!(errors.len(), 1, "{from}: {errors:?}");
+        assert!(
+            errors[0].starts_with("release.yml: the version job's last step is not `PUBLISHED_ONCE` byte for byte"),
+            "{from}: {errors:?}"
+        );
+    }
+    // a step added after it, where it could publish or undo the refusal's exit
+    let after = plant(
+        "\n  ci:\n    name: CI\n",
+        "      - name: late\n        run: echo late\n\n  ci:\n    name: CI\n",
+    );
+    assert_eq!(
+        release_once(&after),
+        [pin_message(
+            PUBLISHED_ONCE.trim_end().lines().count() + 1,
+            "<end>",
+            "      - name: late"
+        )]
+    );
+    // the failure absorbed
+    let absorbed = plant(
+        "      - name: The version is not published and the tag ran at no other commit\n",
+        "      - name: The version is not published and the tag ran at no other commit\n        continue-on-error: true\n",
+    );
+    let errors = release_once(&absorbed);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(
+        errors[1],
+        "release.yml: the version job carries `continue-on-error: true`; every step of it runs and none of its failures is absorbed (#867)"
+    );
+    // the permission the run list needs dropped
+    let unread = plant(
+        "      contents: read\n      actions: read\n    steps:\n",
+        "      contents: read\n    steps:\n",
+    );
+    assert_eq!(
+        release_once(&unread),
+        ["release.yml: the version job's permissions are not `contents: read` and `actions: read` alone (the run list needs the second, #867)"]
+    );
+    // the publish no longer behind the version job
+    let loose = plant(
+        "    needs: [version, ci, docs, msrv, features, machete]\n",
+        "    needs: [ci, docs, msrv, features, machete]\n",
+    );
+    assert_eq!(
+        release_once(&loose),
+        ["release.yml: `publish` does not name `version` in its `needs:` (#867)"]
+    );
+    // a called workflow started beside the version job, and the publish behind it alone
+    let beside = release
+        .replacen("    name: CI\n    needs: version\n", "    name: CI\n", 1)
+        .replacen(
+            "    needs: [version, ci, docs, msrv, features, machete]\n",
+            "    needs: [ci]\n",
+            1,
+        );
+    assert_eq!(
+        release_once(&beside),
+        [
+            "release.yml: job `ci` does not wait for the version job (`needs:`), so it could run for a version the job refuses (#867)",
+            "release.yml: job `publish` does not wait for the version job (`needs:`), so it could run for a version the job refuses (#867)",
+            "release.yml: job `page` does not wait for the version job (`needs:`), so it could run for a version the job refuses (#867)",
+            "release.yml: job `front-pages` does not wait for the version job (`needs:`), so it could run for a version the job refuses (#867)",
+            "release.yml: `publish` does not name `version` in its `needs:` (#867)",
+        ]
+    );
+    // the publish run whatever the version job answered
+    let always = plant(
+        "    name: Publish to crates.io\n    needs: [version, ci, docs, msrv, features, machete]\n",
+        "    name: Publish to crates.io\n    needs: [version, ci, docs, msrv, features, machete]\n    if: always()\n",
+    );
+    assert_eq!(
+        release_once(&always),
+        ["release.yml: job `publish` runs on a failed or cancelled `needs:`; nothing runs past a refused version job (#867)"]
     );
 }
 
