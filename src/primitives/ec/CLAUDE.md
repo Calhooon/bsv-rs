@@ -312,7 +312,8 @@ let recovered: PublicKey = serde_json::from_str(&json).unwrap();
 
 - **Private Key Zeroization**: `k256::SecretKey` automatically zeros memory on drop
 - **Debug Output**: PrivateKey debug shows only the public key, not the secret
-- **Constant-Time Comparison**: PrivateKey and SharedSecret equality use `subtle::ConstantTimeEq`
+- **Constant-Time Comparison**: PrivateKey, SharedSecret and (since #912) PublicKey equality use `subtle::ConstantTimeEq`
+- **The scalar in a multiplication** (#912): a point is multiplied by a private key through the crate-private `PublicKey::mul_secret`, which reads `PrivateKey::secret_scalar()` (`Zeroizing<NonZeroScalar>`); no internal site passes `to_bytes()` to `mul_scalar` (`tests/arch_ecdh_secret_hygiene_912.rs`). `SharedSecret`'s point is not wiped on drop
 - **ECDH result**: `SharedSecret`'s `Debug` writes `SharedSecret { .. }`; the secret leaves only through `to_compressed`, `x` and `to_point` (#843d6)
 - **RFC 6979**: Deterministic nonce prevents k-reuse vulnerabilities
 - **BIP 62 Low-S**: Prevents transaction malleability; S normalized to <= n/2
@@ -335,7 +336,7 @@ let recovered: PublicKey = serde_json::from_str(&json).unwrap();
 - `Clone` - Deep copy
 - `Debug` - Shows compressed hex
 - `Display` - Outputs compressed hex
-- `PartialEq`, `Eq` - Compares compressed bytes
+- `PartialEq`, `Eq` - Compares compressed bytes in constant time via `subtle::ConstantTimeEq` (#912)
 - `Hash` - Hash of compressed bytes
 - `Serialize`, `Deserialize` - Hex string format
 

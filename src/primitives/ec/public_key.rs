@@ -292,10 +292,23 @@ impl PublicKey {
     /// [`SharedSecret`](super::SharedSecret) instead.
     pub fn mul_scalar(&self, scalar_bytes: &[u8; 32]) -> Result<PublicKey> {
         let scalar = bytes_to_scalar(scalar_bytes)?;
+        Self::from_product(ProjectivePoint::from(*self.inner.as_affine()) * scalar)
+    }
 
-        let point = ProjectivePoint::from(*self.inner.as_affine());
-        let result = point * scalar;
+    /// `this * key`, the scalar read from the private key in a wrapper that
+    /// wipes it when dropped (#912): the same point as
+    /// `mul_scalar(&key.to_bytes())`, with no byte copy of the scalar
+    /// exported and left behind. The product is the ECDH shared secret when
+    /// `self` is the other party's key.
+    pub(crate) fn mul_secret(&self, key: &super::PrivateKey) -> Result<PublicKey> {
+        let scalar = key.secret_scalar();
+        let secret: &Scalar = &scalar;
+        Self::from_product(ProjectivePoint::from(*self.inner.as_affine()) * secret)
+    }
 
+    /// The public key a scalar multiplication's product is, the identity
+    /// refused.
+    fn from_product(result: ProjectivePoint) -> Result<PublicKey> {
         let affine = result.to_affine();
         if affine.is_identity().into() {
             return Err(Error::PointAtInfinity);
@@ -324,8 +337,7 @@ impl PublicKey {
         &self,
         other_privkey: &super::PrivateKey,
     ) -> Result<super::SharedSecret> {
-        let scalar_bytes = other_privkey.to_bytes();
-        self.mul_scalar(&scalar_bytes)
+        self.mul_secret(other_privkey)
             .map(super::SharedSecret::from_point)
     }
 
@@ -421,7 +433,10 @@ fn bytes_to_scalar(bytes: &[u8]) -> Result<Scalar> {
 
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
-        self.to_compressed() == other.to_compressed()
+        // No early exit where two bytes differ (#912): a `PublicKey`
+        // can hold a secret point (`SharedSecret::to_point`, `mul_scalar`).
+        use subtle::ConstantTimeEq;
+        self.to_compressed().ct_eq(&other.to_compressed()).into()
     }
 }
 
@@ -569,6 +584,42 @@ mod tests {
     fn test_public_key_invalid_hex() {
         assert!(PublicKey::from_hex("invalid").is_err());
         assert!(PublicKey::from_hex("02").is_err());
+    }
+
+    /// #912: the door that reads the scalar from the key answers the point
+    /// `mul_scalar` answers for the key's bytes, and both ECDH doors with it.
+    #[test]
+    fn mul_secret_is_mul_scalar_of_the_keys_bytes_912() {
+        for (a, b) in [(1u8, 2u8), (2, 3), (7, 250), (255, 1)] {
+            let mut a_bytes = [0u8; 32];
+            a_bytes[31] = a;
+            let mut b_bytes = [0x11u8; 32];
+            b_bytes[0] = b;
+            let alice = crate::primitives::ec::PrivateKey::from_bytes(&a_bytes).unwrap();
+            let bob = crate::primitives::ec::PrivateKey::from_bytes(&b_bytes).unwrap();
+            let by_bytes = bob.public_key().mul_scalar(&alice.to_bytes()).unwrap();
+            let by_key = bob.public_key().mul_secret(&alice).unwrap();
+            assert_eq!(by_key.to_compressed(), by_bytes.to_compressed());
+            assert_eq!(
+                alice
+                    .derive_shared_secret(&bob.public_key())
+                    .unwrap()
+                    .to_compressed(),
+                by_bytes.to_compressed()
+            );
+            assert_eq!(
+                bob.public_key()
+                    .derive_shared_secret(&alice)
+                    .unwrap()
+                    .to_compressed(),
+                by_bytes.to_compressed()
+            );
+            // a * B = b * A
+            assert_eq!(
+                alice.public_key().mul_secret(&bob).unwrap().to_compressed(),
+                by_bytes.to_compressed()
+            );
+        }
     }
 
     #[test]
