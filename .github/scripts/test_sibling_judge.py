@@ -940,6 +940,249 @@ class Interleavings(Base):
         self.assertNotIn(LISTING.format(R=R, head=w.head), gh.reads)
 
 
+class Timeouts(Base):
+    """A `gh` or `git` call that hangs (#958): every call carries a timeout, and a call that passes
+    it is the named error of its class (`GitHubError` naming the path, `sh.Stop` naming the git
+    command), so the arms that already answer a failed read answer a hung one: `judge` writes
+    `NOT JUDGED` with the re-judge, `report` exits 1 naming the read. Until #958 the call had no
+    timeout: a hung one spent the job's ten minutes and the log named no call."""
+
+    @staticmethod
+    def hung(only=None):
+        real = subprocess.run
+        calls = []
+
+        def run(command, *args, **kwargs):
+            if only is None or command[0] == only:
+                calls.append((command, kwargs))
+                raise subprocess.TimeoutExpired(command, kwargs.get("timeout"))
+            return real(command, *args, **kwargs)
+        return run, calls
+
+    def test_a_gh_call_that_hangs_is_a_github_error_naming_the_path_958(self):
+        path = f"repos/{R}/actions/runs/{RUN}"
+        for name, call in (("get", lambda gh: gh.get(path)),
+                           ("download", lambda gh: gh.download(path + "/zip", Path(self.dir.name) / "hung.zip")),
+                           ("post", lambda gh: gh.post(f"repos/{R}/check-runs", {"name": "x"}))):
+            with self.subTest(name):
+                run, calls = self.hung()
+                with mock.patch.object(sj.subprocess, "run", run):
+                    with self.assertRaises(sj.GitHubError) as caught:
+                        call(sj.GitHub())
+                self.assertEqual(caught.exception.status, 0)
+                self.assertIn("did not answer within", str(caught.exception))
+                self.assertIn(f"repos/{R}/", str(caught.exception))
+                self.assertEqual(len(calls), 1)
+                timeout = calls[0][1].get("timeout")
+                self.assertIsInstance(timeout, int)
+                self.assertTrue(0 < timeout <= 120, timeout)
+
+    def test_a_gh_that_cannot_be_run_is_a_github_error_958(self):
+        def absent(command, *args, **kwargs):
+            raise FileNotFoundError(command[0])
+        with mock.patch.object(sj.subprocess, "run", absent):
+            with self.assertRaises(sj.GitHubError) as caught:
+                sj.GitHub().get(f"repos/{R}/actions/runs/{RUN}")
+        self.assertIn("could not be run (FileNotFoundError)", str(caught.exception))
+
+    def test_a_git_call_that_hangs_is_a_stop_naming_the_command_958(self):
+        run, calls = self.hung()
+        with mock.patch.object(sj.subprocess, "run", run):
+            with self.assertRaises(sh.Stop) as caught:
+                sj.Git(self.world.judge).run("fetch", "--quiet", "origin", "0" * 40)
+        self.assertIn("git fetch did not end within", str(caught.exception))
+        self.assertIsInstance(calls[0][1].get("timeout"), int)
+
+    def test_a_judgement_whose_read_hangs_is_not_judged_with_the_rejudge_of_the_run_called_958(self):
+        w = self.world
+        run, _ = self.hung(only="gh")
+        with mock.patch.object(sj.subprocess, "run", run):
+            check, log = quiet(sj.judge, w.args(), sj.GitHub(), None)
+        self.assertCheck(check, "NOT JUDGED", "the judge could not read what it needs")
+        self.assertIn(f"gh api repos/{R}/actions/runs/{RUN} did not answer within", check.text)
+        self.assertIn(f"gh workflow run sibling-judge.yml --repo {R} --ref main -f run_id={RUN}", check.text)
+
+    def test_a_hung_fetch_of_the_head_is_not_judged_958(self):
+        w = self.world
+        head = w.head_on({"src/hung.rs": "// a head the judge's clone has not fetched\n"}, "hung")
+        real = subprocess.run
+
+        def run(command, *args, **kwargs):
+            if command[0] == "git" and "fetch" in command and head in command:
+                raise subprocess.TimeoutExpired(command, kwargs.get("timeout"))
+            return real(command, *args, **kwargs)
+        gh = GitHubFake(w.answers(head=head))
+        with mock.patch.object(sj.subprocess, "run", run):
+            check, _ = quiet(sj.judge, w.args(), gh, None)
+        self.assertCheck(check, "NOT JUDGED", "git fetch did not end within")
+        self.assertEqual(gh.writes, [])
+
+    def test_a_report_whose_read_hangs_exits_one_naming_the_read_and_posts_nothing_958(self):
+        run, calls = self.hung(only="gh")
+        args = ["report", "--run-id", str(RUN), "--repository", R, "--repository-id", str(RID), "--app-id", str(APP),
+                "--judge-result", "success"]
+        with mock.patch.object(sj.subprocess, "run", run):
+            code, log = quiet(sj.main, args, None, outputs(self.judged()[0]))
+        self.assertEqual(code, 1)
+        self.assertIn(f"could not read the run (gh api repos/{R}/actions/runs/{RUN} did not answer within", log)
+        self.assertEqual(len(calls), 1)
+
+    def test_the_wait_for_a_newer_run_is_bounded_by_the_clock_958(self):
+        """Reads that each take just under their timeout: the wait ends by the clock, inside
+        `wait` seconds and one read, never 21 reads and 20 sleeps of their own length."""
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="in_progress")
+        gh = GitHubFake(answers)
+        now = [0.0]
+        real_get = gh.get
+
+        def slow_get(path):
+            now[0] += sj.GH_SECONDS - 1
+            return real_get(path)
+        gh.get = slow_get
+
+        def sleep(seconds):
+            now[0] += seconds
+        with self.assertRaises(sj.Silent) as caught:
+            sj.resolve(gh, R, RID, RUN, wait=sj.WAIT_SECONDS, sleep=sleep, clock=lambda: now[0])
+        self.assertIn(f"run {RUN + 1} attempt 1, is still running", str(caught.exception))
+        self.assertLessEqual(now[0], sj.WAIT_SECONDS + 2 * sj.GH_SECONDS, now[0])
+        # the budget the judge job's ten minutes leave the judging after the longest wait
+        self.assertLessEqual(sj.WAIT_SECONDS + 2 * sj.GH_SECONDS, 360)
+
+
+class ResolveInputs(Interleavings):
+    """The inputs of `resolve` no test served and the changes of its meaning every test passed
+    (#958, the strength read of fix-97c's judge): each test here is RED on its planted change in a
+    scratch copy (`docs/lanes/fix-958-judge.md`), green on the script as it stands. Rows 12 to 15
+    of the lane's table."""
+
+    test_row1_the_pull_requests_run_then_a_token_dispatch_still_running_is_waited_for_and_judged = None
+    test_row1_a_newer_run_still_running_after_the_wait_posts_nothing_and_names_it = None
+    test_row2_a_token_dispatch_then_the_pull_requests_run_judges_the_pull_requests = None
+    test_row2_the_older_runs_judge_after_the_newer_completed_judges_the_newer = None
+    test_row3_a_reruns_newer_attempt_completed_is_judged_and_running_is_waited_for = None
+    test_row4_two_pushes_inside_a_minute_the_older_heads_run_posts_nothing = None
+    test_row5_a_hand_rejudge_of_an_older_run_judges_the_newest_as_the_events_judge_does = None
+    test_row6_a_newer_run_that_is_no_stage_r_run_of_this_repository_is_not_judged_and_silences_nothing = None
+    test_the_identity_is_read_on_the_run_judged = None
+
+    def test_a_newest_run_not_yet_started_is_waited_for_and_judged_once_it_completes_958(self):
+        """`queued`, `waiting`, `requested`, `pending`: every status but `completed` is a run still
+        to end, never a run to judge at once."""
+        w = self.world
+        for status in ("queued", "waiting", "requested", "pending", "in_progress"):
+            with self.subTest(status):
+                answers = w.answers()
+                newer = with_run(w, answers, RUN + 1, status=status)
+                done = {**newer, "status": "completed", "conclusion": "success"}
+                listing = answers[LISTING.format(R=R, head=w.head)]
+                answers[LISTING.format(R=R, head=w.head)] = Seq([json.loads(json.dumps(listing)),
+                                                                 {"workflow_runs": [listing["workflow_runs"][0], done]}])
+                answers[f"repos/{R}/actions/runs/{RUN + 1}"] = done
+                check, gh, log, slept = self.judge_of(answers, wait=300)
+                self.assertEqual((check.post, check.conclusion, check.title), ("yes", "success", "GREEN"), log + check.text)
+                self.assertEqual((self.judged_run(gh), slept), (RUN + 1, [sj.POLL_SECONDS]))
+                answers = w.answers()
+                with_run(w, answers, RUN + 1, status=status)
+                check, gh, log, slept = self.judge_of(answers, wait=30)
+                self.assertEqual((check.post, gh.writes, slept), ("no", [], [sj.POLL_SECONDS] * 2))
+                self.assertIn(f"run {RUN + 1} attempt 1, is still running", log)
+                self.assertFalse([r for r in gh.reads if "/attempts/" in r or r.endswith("/zip")], gh.reads)
+
+    def test_a_calling_run_that_is_no_stage_r_run_of_this_repository_reads_no_listing_958(self):
+        """A fork's run, or a `push` run, of a head this repository's own stage R run also built:
+        the caller is refused before the listing, so it cannot have that run judged in its name."""
+        w = self.world
+        for name, fields, needle in (("a fork's", {"head_repository": {"id": 1}}, "head is not this repository's"),
+                                     ("a null head repository", {"head_repository": None}, "head is not this repository's"),
+                                     ("a push run", {"event": "push"}, "event is not pull_request or workflow_dispatch"),
+                                     ("no head sha", {"head_sha": None}, "names no head sha"),
+                                     ("a short head sha", {"head_sha": w.head[:39]}, "names no head sha")):
+            with self.subTest(name):
+                answers = w.answers()
+                caller = RUN - 7
+                answers[f"repos/{R}/actions/runs/{caller}"] = {**answers[f"repos/{R}/actions/runs/{RUN}"], "id": caller, **fields}
+                check, gh, log, _ = self.judge_of(answers, run_id=caller, wait=300)
+                self.assertEqual((check.post, gh.writes), ("no", []))
+                self.assertIn(f"run {caller}", log)
+                self.assertIn(needle, log)
+                self.assertEqual(gh.reads, [f"repos/{R}/actions/runs/{caller}"])
+                gh = GitHubFake(answers)
+                args = ["report", "--run-id", str(caller), "--repository", R, "--repository-id", str(RID),
+                        "--app-id", str(APP), "--judge-result", "success"]
+                code, log = quiet(sj.main, args, gh, outputs(self.judged()[0]))
+                self.assertEqual((code, gh.writes, gh.reads), (0, [], [f"repos/{R}/actions/runs/{caller}"]), log)
+
+    def test_a_calling_run_the_listing_does_not_hold_is_judged_as_the_newest_958(self):
+        """GitHub's listing read before it holds the run that called (or cut at its 100): the run
+        called is still a run of its head, the newest when no listed run is newer."""
+        w = self.world
+        for name, listed in (("an empty listing", []), ("an older run alone", [RUN - 1])):
+            with self.subTest(name):
+                answers = w.answers()
+                for run_id in listed:
+                    with_run(w, answers, run_id, status="completed")
+                listing = answers[LISTING.format(R=R, head=w.head)]
+                listing["workflow_runs"] = [r for r in listing["workflow_runs"] if r["id"] != RUN]
+                check, gh, log, _ = self.judge_of(answers)
+                self.assertEqual((check.conclusion, check.title), ("success", "GREEN"), log + check.text)
+                self.assertEqual((self.judged_run(gh), check.run), (RUN, RUN))
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed")
+        listing = answers[LISTING.format(R=R, head=w.head)]
+        listing["workflow_runs"] = [r for r in listing["workflow_runs"] if r["id"] != RUN]
+        check, gh, _, _ = self.judge_of(answers)
+        self.assertEqual((check.title, self.judged_run(gh)), ("GREEN", RUN + 1))
+
+    def test_a_run_attempt_that_is_no_integer_is_never_judged_958(self):
+        """Waited for as a run still to end, then no check and its line: the attempt names the
+        artifact read, and one that is no number names none. An absent attempt is attempt 1."""
+        w = self.world
+        for attempt in ("2", 1.5, [1], {"n": 1}):
+            with self.subTest(repr(attempt)):
+                answers = w.answers()
+                answers[LISTING.format(R=R, head=w.head)]["workflow_runs"][0]["run_attempt"] = attempt
+                check, gh, log, slept = self.judge_of(answers, wait=30)
+                self.assertEqual((check.post, check.conclusion, gh.writes), ("no", "failure", []))
+                self.assertEqual(slept, [sj.POLL_SECONDS] * 2)
+                self.assertIn("is still running", log)
+                self.assertFalse([r for r in gh.reads if "/attempts/" in r or r.endswith("/zip")], gh.reads)
+        for attempt in (None, 0):
+            with self.subTest(repr(attempt)):
+                answers = w.answers()
+                answers[LISTING.format(R=R, head=w.head)]["workflow_runs"][0]["run_attempt"] = attempt
+                check, gh, log, _ = self.judge_of(answers)
+                self.assertEqual((check.title, check.attempt), ("GREEN", 1), log + check.text)
+
+    def test_a_cancelled_newest_run_is_not_judged_over_an_older_runs_verdict_stated_958(self):
+        """Row 15, stated and not changed: a dispatch someone cancelled is the head's newest
+        completed stage R run, so its judgement is `NOT JUDGED: stage R ended cancelled`, posted
+        (`post` `yes`) over a `GREEN` the older run of the same head earned, with the re-run named.
+        Whether it should displace that `GREEN` is a question for the captain's word (the lane
+        record); until then this is what the judge does, and it fails closed."""
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed", conclusion="cancelled")
+        answers[f"repos/{R}/actions/runs/{RUN + 1}/attempts/1"]["conclusion"] = "cancelled"
+        answers[f"repos/{R}/actions/runs/{RUN + 1}/attempts/1/jobs?per_page=100"] = {"jobs": []}
+        answers[f"repos/{R}/commits/{w.head}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"] = {
+            "check_runs": [app_check("GREEN", "success")]}
+        check, gh, log, _ = self.judge_of(answers)
+        self.assertCheck(check, "NOT JUDGED", "stage R ended cancelled")
+        self.assertEqual(check.run, RUN + 1)
+        self.assertIn(f"gh run rerun {RUN + 1} --repo {R}", check.text)
+        self.assertFalse([r for r in gh.reads if r.endswith("/zip")])
+        gh = GitHubFake(answers)
+        args = ["report", "--run-id", str(RUN), "--repository", R, "--repository-id", str(RID), "--app-id", str(APP),
+                "--judge-result", "success"]
+        code, _ = quiet(sj.main, args, gh, bound(check))
+        self.assertEqual(code, 0)
+        self.assertEqual([(b["conclusion"], b["output"]["title"]) for _, b in gh.writes],
+                         [("failure", "NOT JUDGED: stage R ended cancelled")])
+
+
 def outputs(check):
     return {"POST": check.post, "CONCLUSION": check.conclusion, "TITLE": check.title,
             "TEXT": base64.b64encode(check.text.encode()).decode()}
@@ -1049,6 +1292,239 @@ class Report(Base):
                 "--judge-result", "success"]
         code, _ = quiet(sj.main, args, gh, self.green())
         self.assertEqual(code, 1)
+
+
+def bound(check, **changes):
+    """The judge job's outputs as a trampoline that hands `report` the run judged would pass them."""
+    env = {**outputs(check), "JUDGED_RUN": "" if check.run is None else str(check.run),
+           "JUDGED_ATTEMPT": "" if check.attempt is None else str(check.attempt)}
+    env.update(changes)
+    return env
+
+
+class ReportBound(Base):
+    """`report` posts the judge's verdict only on the run and attempt the judge judged (#958). The
+    judge writes both as outputs; when the trampoline hands them on (`JUDGED_RUN`,
+    `JUDGED_ATTEMPT`) and `report`'s own resolution names another run or attempt, the verdict is
+    not posted: `NOT JUDGED` with the re-judge of the newest run. A trampoline that hands on
+    neither name (the file before its sitting) is read as before. Row 10 of the lane's table."""
+
+    def report(self, env, answers=None, result="success", run_id=RUN):
+        gh = GitHubFake(answers if answers is not None else self.world.answers())
+        args = ["report", "--run-id", str(run_id), "--repository", R, "--repository-id", str(RID), "--app-id", str(APP),
+                "--judge-result", result]
+        code, log = quiet(sj.main, args, gh, env)
+        self.assertEqual(code, 0, log)
+        return gh.writes
+
+    def assertNotJudged(self, writes, needle, target=RUN):
+        self.assertEqual(len(writes), 1)
+        body = writes[0][1]
+        self.assertEqual((body["conclusion"], body["head_sha"]), ("failure", self.world.head))
+        self.assertTrue(body["output"]["title"].startswith("NOT JUDGED: "), body["output"]["title"])
+        self.assertIn(needle, body["output"]["title"] + "\n" + body["output"]["text"])
+        self.assertIn(f"gh workflow run sibling-judge.yml --repo {R} --ref main -f run_id={target}\n", body["output"]["text"])
+
+    def test_the_judge_writes_the_run_and_attempt_it_judged_958(self):
+        w = self.world
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed", event="pull_request", attempt=3)
+        out = Path(self.dir.name) / "bound-out.txt"
+        for name, given, want in (("the newest run", answers, (str(RUN + 1), "3")),
+                                  ("no run read", {}, ("", ""))):
+            with self.subTest(name):
+                out.write_text("")
+                gh = GitHubFake(given)
+                gh.download_bytes = w.zipped(w.raw_files())
+                code, _ = quiet(sj.command_judge, w.args(output=str(out)), gh)
+                self.assertEqual(code, 0)
+                written = dict(line.split("=", 1) for line in out.read_text().splitlines())
+                self.assertEqual((written.get("run"), written.get("attempt")), want)
+                self.assertEqual(set(written), {"post", "conclusion", "title", "text", "run", "attempt"})
+
+    def test_a_newer_run_completed_between_the_two_jobs_does_not_get_the_older_runs_verdict_958(self):
+        w = self.world
+        check, _, _ = self.judged()
+        self.assertEqual((check.title, check.run, check.attempt), ("GREEN", RUN, 1))
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed", event="workflow_dispatch")
+        writes = self.report(bound(check), answers)
+        self.assertNotJudged(writes, f"the judge job judged run {RUN} attempt 1", target=RUN + 1)
+        self.assertIn(f"stage R run {RUN + 1} attempt 1", writes[0][1]["output"]["text"])
+
+    def test_a_newer_attempt_completed_between_the_two_jobs_does_not_get_the_older_attempts_verdict_958(self):
+        check, _, _ = self.judged()
+        writes = self.report(bound(check), self.world.answers(attempt=2))
+        self.assertNotJudged(writes, f"the judge job judged run {RUN} attempt 1")
+        self.assertIn(f"stage R run {RUN} attempt 2", writes[0][1]["output"]["text"])
+
+    def test_the_verdict_of_the_run_report_resolves_is_posted_958(self):
+        check, _, _ = self.judged()
+        writes = self.report(bound(check))
+        self.assertEqual([(b["conclusion"], b["output"]["title"]) for _, b in writes], [("success", "GREEN")])
+
+    def test_names_that_do_not_read_as_a_run_and_an_attempt_are_not_judged_958(self):
+        check, _, _ = self.judged()
+        for name, changes in (("a word", {"JUDGED_RUN": "abc"}), ("zero", {"JUDGED_RUN": "0"}),
+                              ("a sign", {"JUDGED_RUN": f"-{RUN}"}), ("a space", {"JUDGED_RUN": f"{RUN} "}),
+                              ("no attempt", {"JUDGED_ATTEMPT": ""}), ("an attempt alone", {"JUDGED_RUN": ""}),
+                              ("a word for the attempt", {"JUDGED_ATTEMPT": "one"}),
+                              ("one name of the two", {"JUDGED_ATTEMPT": None})):
+            with self.subTest(name):
+                env = {k: v for k, v in bound(check, **changes).items() if v is not None}
+                self.assertNotJudged(self.report(env), "the judge's outputs do not name the run it judged")
+
+    def test_a_success_that_names_no_run_is_not_judged_and_a_failure_that_names_none_is_posted_958(self):
+        check, _, _ = self.judged()
+        env = bound(check, JUDGED_RUN="", JUDGED_ATTEMPT="")
+        self.assertNotJudged(self.report(env), "the judge's outputs do not name the run it judged")
+        failed = {**env, "CONCLUSION": "failure", "TITLE": "NOT JUDGED: the judge could not read what it needs"}
+        writes = self.report(failed)
+        self.assertEqual([b["output"]["title"] for _, b in writes], ["NOT JUDGED: the judge could not read what it needs"])
+        self.assertEqual(writes[0][1]["conclusion"], "failure")
+
+    def test_an_unless_standing_verdict_of_an_older_run_stays_unless_standing_958(self):
+        w = self.world
+        check, _, _ = self.judged()
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed")
+        env = bound(check, POST="unless-standing", CONCLUSION="failure", TITLE="NOT JUDGED: gone")
+        self.assertNotJudged(self.report(env, answers), f"the judge job judged run {RUN} attempt 1", target=RUN + 1)
+        answers[f"repos/{R}/commits/{w.head}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"] = {
+            "check_runs": [app_check("GREEN", "success")]}
+        self.assertEqual(self.report(env, answers), [])
+
+    def test_a_trampoline_that_hands_on_neither_name_is_read_as_before_958(self):
+        w = self.world
+        check, _, _ = self.judged()
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed")
+        writes = self.report(outputs(check), answers)
+        self.assertEqual([(b["conclusion"], b["output"]["title"]) for _, b in writes], [("success", "GREEN")])
+
+    def test_reports_own_not_judged_names_the_run_it_resolved_958(self):
+        """Called for run A, resolving to run B: the text and the re-judge name B, and say A called."""
+        w = self.world
+        check, _, _ = self.judged()
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed")
+        for name, env, result in (("the judge job cancelled", outputs(check), "cancelled"),
+                                  ("outputs absent", {}, "success"),
+                                  ("post no", {**outputs(check), "POST": "no"}, "success")):
+            with self.subTest(name):
+                writes = self.report(env, answers, result=result)
+                self.assertNotJudged(writes, f"stage R run {RUN + 1}", target=RUN + 1)
+                text = writes[0][1]["output"]["text"]
+                self.assertNotIn(f"stage R run {RUN}\n", text)
+                self.assertIn(f"Called for run {RUN}", text)
+                self.assertNotIn(f"run_id={RUN}\n", text)
+
+    def test_a_judge_that_fails_says_which_run_called_and_claims_no_run_judged_958(self):
+        w = self.world
+        out = Path(self.dir.name) / "failed-out.txt"
+        out.write_text("")
+        with mock.patch.object(sj, "judge", side_effect=RuntimeError("planted")):
+            code, _ = quiet(sj.command_judge, w.args(output=str(out)), GitHubFake({}))
+        self.assertEqual(code, 0)
+        written = dict(line.split("=", 1) for line in out.read_text().splitlines())
+        text = base64.b64decode(written["text"]).decode()
+        self.assertEqual((written["post"], written["conclusion"], written["run"], written["attempt"]), ("yes", "failure", "", ""))
+        self.assertEqual(written["title"], "NOT JUDGED: the judge failed (RuntimeError)")
+        self.assertIn(f"Called for stage R run {RUN}; the judge failed before it wrote which run it judged", text)
+        self.assertIn(f"-f run_id={RUN}\n", text)
+
+
+class Owed(Base):
+    """`owed`: whether a check is owed for a run, read with no key (#958), so a trampoline can ask
+    before it mints the App's token. `no` exactly where `report` would post nothing (the run is no
+    stage R run of this repository, its newest run still runs, no open pull request into beta
+    holds its head); `yes` otherwise, a read that fails included, so no failure of this command
+    can silence a check `report` would post. It reads the run, the listing and the pull requests,
+    and writes nothing to GitHub."""
+
+    def owed(self, answers, run_id=RUN, output=True):
+        out = Path(self.dir.name) / "owed-out.txt"
+        out.write_text("")
+        gh = GitHubFake(answers)
+        args = ["owed", "--run-id", str(run_id), "--repository", R, "--repository-id", str(RID)]
+        args += ["--output", str(out)] if output else ["--output", str(Path(self.dir.name) / "absent" / "out.txt")]
+        code, log = quiet(sj.main, args, gh)
+        self.assertEqual(gh.writes, [])
+        self.assertFalse([r for r in gh.reads if "check-runs" in r or "artifacts" in r or "environments" in r], gh.reads)
+        return code, out.read_text(), log
+
+    def test_a_check_owed_answers_yes_958(self):
+        w = self.world
+        self.assertEqual(self.owed(w.answers())[:2], (0, "owed=yes\n"))
+        answers = w.answers()
+        with_run(w, answers, RUN + 1, status="completed")
+        self.assertEqual(self.owed(answers)[:2], (0, "owed=yes\n"))
+
+    def test_each_silence_of_report_answers_no_with_its_line_958(self):
+        w = self.world
+
+        def fork(a):
+            a[f"repos/{R}/actions/runs/{RUN}"]["head_repository"] = {"id": 1}
+
+        def decoy(a):
+            a[f"repos/{R}/actions/runs/{RUN}"]["path"] = ".github/workflows/other.yml"
+
+        def push(a):
+            a[f"repos/{R}/actions/runs/{RUN}"]["event"] = "push"
+
+        def closed(a):
+            a[f"repos/{R}/commits/{w.head}/pulls"][0]["state"] = "closed"
+
+        def into_main(a):
+            a[f"repos/{R}/commits/{w.head}/pulls"][0]["base"]["ref"] = "main"
+
+        def running(a):
+            with_run(w, a, RUN + 1, status="in_progress")
+
+        for name, change, needle in (("a fork's run", fork, "head is not this repository's"),
+                                     ("a decoy at another path", decoy, "is not .github/workflows/sibling-run.yml"),
+                                     ("a push run", push, "event is not pull_request or workflow_dispatch"),
+                                     ("a closed pull request", closed, "no open pull request into beta"),
+                                     ("a base of main", into_main, "no open pull request into beta"),
+                                     ("a newer run still running", running, "is still running")):
+            with self.subTest(name):
+                answers = w.answers()
+                change(answers)
+                code, written, log = self.owed(answers)
+                self.assertEqual((code, written), (0, "owed=no\n"), log)
+                self.assertIn(needle, log)
+                # and report, on the same answers, posts nothing: the two agree
+                gh = GitHubFake(answers)
+                args = ["report", "--run-id", str(RUN), "--repository", R, "--repository-id", str(RID),
+                        "--app-id", str(APP), "--judge-result", "success"]
+                code, _ = quiet(sj.main, args, gh, outputs(self.judged()[0]))
+                self.assertEqual((code, gh.writes), (0, []))
+
+    def test_a_read_that_fails_answers_yes_958(self):
+        w = self.world
+        for name, path in (("the run", f"repos/{R}/actions/runs/{RUN}"),
+                           ("the listing", LISTING.format(R=R, head=w.head)),
+                           ("the pull requests", f"repos/{R}/commits/{w.head}/pulls")):
+            for error in (sj.GitHubError(500, "down"), sj.GitHubError(0, "did not answer within 30 s"),
+                          sj.GitHubError(404, "gone")):
+                with self.subTest(f"{name} {error.status}"):
+                    answers = w.answers()
+                    answers[path] = error
+                    code, written, log = self.owed(answers)
+                    self.assertEqual((code, written), (0, "owed=yes\n"), log)
+                    self.assertIn("could not read", log)
+
+    def test_an_answer_that_is_no_object_answers_yes_958(self):
+        w = self.world
+        answers = w.answers()
+        answers[f"repos/{R}/actions/runs/{RUN}"] = ["not", "a", "run"]
+        code, written, log = self.owed(answers)
+        self.assertEqual((code, written), (0, "owed=yes\n"), log)
+
+    def test_an_output_that_cannot_be_written_exits_one_958(self):
+        code, written, log = self.owed(self.world.answers(), output=False)
+        self.assertEqual((code, written), (1, ""))
+        self.assertIn("the output could not be written", log)
 
 
 class Trampoline(Base):
@@ -1208,7 +1684,7 @@ class Sweep(unittest.TestCase):
             answers[f"repos/{R}/actions/workflows/sibling-run.yml/runs?head_sha={sha}&per_page=100"] = {
                 "workflow_runs": [sweep_run(sha=sha, **r) for r in made.get("runs", [])]}
             answers[f"repos/{R}/commits/{sha}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"] = {
-                "check_runs": [{"status": "completed", "app": {"id": APP}}] if made.get("stands") else []}
+                "check_runs": made.get("checks", [{"status": "completed", "app": {"id": APP}}] if made.get("stands") else [])}
         gh = GitHubFake(answers)
         code, log = quiet(sj.main, ["sweep", "--app-id", str(APP)], gh)
         self.assertEqual((code, gh.writes), (0, []), log)
@@ -1249,6 +1725,154 @@ class Sweep(unittest.TestCase):
         log = self.sweep([{"runs": [{"run_id": 701}, {"run_id": 702, "status": "in_progress", "event": "workflow_dispatch"}]}])
         self.assertIn("run 702 in_progress; check absent; act: once it completes, gh workflow run sibling-judge.yml "
                       "--repo Calhooon/bsv-rs --ref main -f run_id=702", log)
+
+
+def app_check(title, conclusion="failure", check_id=1, app=APP):
+    """A completed check run as GitHub lists it, less the fields the judge never reads."""
+    return {"id": check_id, "status": "completed", "conclusion": conclusion, "app": {"id": app},
+            "output": {"title": title, "summary": title}}
+
+
+class StandingNotJudged(Base):
+    """A `NOT JUDGED` failure is no verdict (#958): the sweep names it with the re-judge where it
+    said `check stands` with no act, and a re-judge whose artifact is gone (`unless-standing`)
+    posts over it where it was silent. A verdict (`GREEN`, `RED`, `REFUSED`, `JUDGE CHANGE`)
+    stands as before; of several checks of the App the newest (by id) decides, as on the head."""
+
+    VERDICTS = (("GREEN", "success"), ("JUDGE CHANGE: tests/sibling/x", "success"), ("RED: the run differs", "failure"),
+                ("REFUSED: behind beta by 2 commits", "failure"),
+                ("RED (JUDGE CHANGE: tests/sibling/x): the run differs", "failure"))
+
+    def sweep(self, checks, judging=()):
+        return Sweep.sweep(self, [{"runs": [{"run_id": 800}, {"run_id": 801, "event": "workflow_dispatch"}],
+                                   "checks": checks}], judging)
+
+    def test_the_sweep_names_a_not_judged_check_with_the_rejudge_of_the_newest_run_958(self):
+        log = self.sweep([app_check("NOT JUDGED: the judge posted nothing where a check is owed")])
+        self.assertIn("#1 " + "1" * 40 + ": run 801 success; check NOT JUDGED (NOT JUDGED: the judge posted nothing where a "
+                      "check is owed); act: gh workflow run sibling-judge.yml --repo Calhooon/bsv-rs --ref main -f run_id=801\n", log)
+        self.assertNotIn("check stands", log)
+
+    def test_the_sweep_reads_each_verdict_as_standing_958(self):
+        for title, conclusion in self.VERDICTS:
+            with self.subTest(title):
+                log = self.sweep([app_check(title, conclusion)])
+                self.assertIn("#1 " + "1" * 40 + ": run 801 success; check stands\n", log)
+
+    def test_of_two_checks_the_newest_decides_958(self):
+        green, lost = app_check("GREEN", "success", check_id=5), app_check("NOT JUDGED: stage R ended cancelled", check_id=6)
+        for listing in ([green, lost], [lost, green]):
+            self.assertIn("check NOT JUDGED (NOT JUDGED: stage R ended cancelled); act: ", self.sweep(listing))
+        green["id"] = 7
+        for listing in ([green, lost], [lost, green]):
+            self.assertIn("run 801 success; check stands\n", self.sweep(listing))
+
+    def test_a_not_judged_check_whose_rejudge_is_running_names_no_act_958(self):
+        log = self.sweep([app_check("NOT JUDGED: gone")], judging=[("sibling-judge of run 801", "queued")])
+        self.assertIn("#1 " + "1" * 40 + ": run 801 success; check NOT JUDGED (NOT JUDGED: gone), judge in progress\n", log)
+
+    def test_another_apps_not_judged_check_and_a_title_from_outside_are_read_as_before_958(self):
+        self.assertIn("check absent; act: ", self.sweep([app_check("NOT JUDGED: forged", app=APP + 1)]))
+        log = self.sweep([app_check("NOT JUDGED: a`b\nc")])
+        self.assertIn("check NOT JUDGED (NOT JUDGED: a'b?c); act: ", log)
+
+    def report(self, checks, env=None):
+        w = self.world
+        env = env or {**outputs(self.judged()[0]), "POST": "unless-standing", "CONCLUSION": "failure",
+                      "TITLE": "NOT JUDGED: 0 unexpired sibling-raw artifacts of attempt 1, not one"}
+        answers = w.answers()
+        answers[f"repos/{R}/commits/{w.head}/check-runs?check_name=sibling-judge&app_id={APP}&per_page=100"] = {
+            "check_runs": checks}
+        gh = GitHubFake(answers)
+        args = ["report", "--run-id", str(RUN), "--repository", R, "--repository-id", str(RID), "--app-id", str(APP),
+                "--judge-result", "success"]
+        code, log = quiet(sj.main, args, gh, env)
+        self.assertEqual(code, 0, log)
+        return gh.writes
+
+    def test_unless_standing_posts_over_a_standing_not_judged_958(self):
+        writes = self.report([app_check("NOT JUDGED: the judge job ended cancelled")])
+        self.assertEqual(len(writes), 1)
+        body = writes[0][1]
+        self.assertEqual((body["conclusion"], body["head_sha"]), ("failure", self.world.head))
+        self.assertTrue(body["output"]["title"].startswith("NOT JUDGED: 0 unexpired"))
+
+    def test_unless_standing_is_silent_over_each_standing_verdict_958(self):
+        for title, conclusion in self.VERDICTS:
+            with self.subTest(title):
+                self.assertEqual(self.report([app_check(title, conclusion)]), [])
+
+    def test_unless_standing_never_posts_a_success_958(self):
+        """`unless-standing` is the judge's word for a failure whose artifact is gone; outputs that
+        pair it with a success are posted as a failure, with or without a check to post over."""
+        env = {**outputs(self.judged()[0]), "POST": "unless-standing"}
+        self.assertEqual((env["CONCLUSION"], env["TITLE"]), ("success", "GREEN"))
+        for checks in ([], [app_check("NOT JUDGED: gone")]):
+            writes = self.report(checks, env)
+            self.assertEqual([body["conclusion"] for _, body in writes], ["failure"])
+
+
+class SweepEnvironment(unittest.TestCase):
+    """The sweep's last line reads back the two settings outside every file that hold the key
+    (#958): the environment `sibling-judge`'s `can_admins_bypass` and its deployment branches. A
+    read-back, never a gate: the sweep's exit status and its lines for the pull requests do not
+    move with it, and a setting that does not read says so."""
+
+    ENV = f"repos/{R}/environments/sibling-judge"
+
+    def sweep(self, environment=None, branches=None):
+        answers = {f"repos/{R}/pulls?state=open&base=beta&per_page=100": [],
+                   f"repos/{R}/actions/workflows/sibling-judge.yml/runs?per_page=100": {"workflow_runs": []}}
+        if environment is not None:
+            answers[self.ENV] = environment
+        if branches is not None:
+            answers[self.ENV + "/deployment-branch-policies?per_page=100"] = branches
+        gh = GitHubFake(answers)
+        code, log = quiet(sj.main, ["sweep", "--app-id", str(APP)], gh)
+        self.assertEqual((code, gh.writes), (0, []), log)
+        return log.splitlines()[-1]
+
+    def policy(self, *names):
+        return {"total_count": len(names), "branch_policies": [{"name": n, "type": "branch"} for n in names]}
+
+    def test_the_two_settings_are_read_back_as_github_answers_them_958(self):
+        custom = {"custom_branch_policies": True, "protected_branches": False}
+        for bypass in (True, False):
+            with self.subTest(bypass):
+                line = self.sweep({"can_admins_bypass": bypass, "deployment_branch_policy": custom}, self.policy("main"))
+                self.assertEqual(line, f"environment sibling-judge: can_admins_bypass {str(bypass).lower()}; "
+                                       "deployment branches: main (main alone)")
+
+    def test_a_branch_policy_other_than_main_alone_is_named_958(self):
+        custom = {"custom_branch_policies": True, "protected_branches": False}
+        for name, environment, branches, needle in (
+                ("two branches", {"can_admins_bypass": False, "deployment_branch_policy": custom}, self.policy("main", "beta"),
+                 "deployment branches: beta, main (NOT main alone"),
+                ("another branch", {"can_admins_bypass": False, "deployment_branch_policy": custom}, self.policy("beta"),
+                 "deployment branches: beta (NOT main alone"),
+                ("no entry", {"can_admins_bypass": False, "deployment_branch_policy": custom}, self.policy(),
+                 "deployment branches: none (NOT main alone"),
+                ("a tag named main", {"can_admins_bypass": False, "deployment_branch_policy": custom},
+                 {"branch_policies": [{"name": "main", "type": "tag"}]}, "(NOT main alone"),
+                ("no policy", {"can_admins_bypass": False, "deployment_branch_policy": None}, None,
+                 "deployment branches: every branch (NOT main alone"),
+                ("protected branches", {"can_admins_bypass": False, "deployment_branch_policy":
+                                        {"custom_branch_policies": False, "protected_branches": True}}, None,
+                 "deployment branches: every protected branch (NOT main alone")):
+            with self.subTest(name):
+                self.assertIn(needle, self.sweep(environment, branches))
+
+    def test_a_setting_that_does_not_read_says_so_and_the_sweep_still_ends_zero_958(self):
+        custom = {"custom_branch_policies": True, "protected_branches": False}
+        self.assertTrue(self.sweep().startswith("environment sibling-judge: not read (no answer for "))
+        line = self.sweep({"can_admins_bypass": True, "deployment_branch_policy": custom})
+        self.assertTrue(line.startswith("environment sibling-judge: can_admins_bypass true; deployment branches: not read ("), line)
+        line = self.sweep({"can_admins_bypass": "yes", "deployment_branch_policy": custom}, self.policy("main"))
+        self.assertIn("can_admins_bypass not read", line)
+        line = self.sweep({"can_admins_bypass": True, "deployment_branch_policy": custom},
+                          {"branch_policies": [{"name": "ma`in\nx", "type": "branch"}]})
+        self.assertIn("deployment branches: ma'in?x (NOT main alone", line)
+        self.assertTrue(self.sweep(["not", "an", "object"]).startswith("environment sibling-judge: not read"))
 
 
 class DryRun(Base):

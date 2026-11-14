@@ -14,14 +14,18 @@ are staged by this script from the public sibling at the pin. tests/sibling/CLAU
 judge", is the manual.
 
   judge   read the run, the git objects and the artifact; write `post`, `conclusion`, `title`
-          and `text` (base64) to the output file. Holds no key. `--dry-run` judges a local
+          and `text` (base64), and the `run` and `attempt` judged, to the output file. Holds no key. `--dry-run` judges a local
           artifact zip or raw tree against local git objects and a local sibling and prints
           the check it would post, calling no GitHub write.
   report  resolve the run again (no wait), repeat the identity check on the run judged, and
-          create the check run once, already completed. Never opens the artifact.
+          create the check run once, already completed. Never opens the artifact. Handed the run
+          and attempt `judge` judged (`JUDGED_RUN`, `JUDGED_ATTEMPT`), it posts that verdict only
+          when its own resolution names the same run and attempt.
+  owed    whether a check is owed for a run, with no key: `owed=yes` or `owed=no` to the output
+          file, `no` exactly where `report` would post nothing, `yes` when a read fails.
   sweep   for every open pull request into beta: its head, its newest stage R run, whether a
-          completed check of the App stands on it or a judge of it is running, and the act for
-          each gap.
+          verdict of the App stands on it (a `NOT JUDGED` failure is none), or a judge of it is
+          running, and the act for each gap; then the key's environment, read back.
 
 One verdict per head: a judgement of a stage R run judges the newest stage R run of the same
 head (`resolve`), so a run nobody will judge (one a `GITHUB_TOKEN` dispatch started, which raises
@@ -132,31 +136,50 @@ class GitHubError(Exception):
         self.status = status
 
 
+# how long one `gh api` call, one artifact download and one git command may take (#958). A call
+# that passes its figure is the named error of its class, so a hung call ends the judgement with
+# its line where it once spent the job's ten minutes. The longest wait (`WAIT_SECONDS`, by the
+# clock) and the two reads around it stay within 360 seconds of the judge job's 600.
+GH_SECONDS = 30
+DOWNLOAD_SECONDS = 120
+GIT_SECONDS = 120
+
+
 class GitHub:
     """GitHub, behind `gh api` (the tests replace this class). Reads the token from the
     environment `gh` reads; this script names none."""
 
-    def _gh(self, args, data=None):
-        done = subprocess.run(["gh", "api", *args], input=data, capture_output=True, check=False)
+    def _gh(self, path, args, data=None, timeout=GH_SECONDS):
+        """One `gh api` call of `path`, bounded: a call that does not answer within `timeout`
+        seconds, or a `gh` that cannot be run, is a `GitHubError` naming the path (status 0)."""
+        try:
+            done = subprocess.run(["gh", "api", *args], input=data, capture_output=True, check=False, timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            raise GitHubError(0, f"gh api {path} did not answer within {timeout} s") from error
+        except OSError as error:
+            raise GitHubError(0, f"gh api {path} could not be run ({type(error).__name__})") from error
         if done.returncode != 0:
             found = re.search(rb"HTTP (\d{3})", done.stderr)
             status = int(found.group(1)) if found else 0
-            raise GitHubError(status, f"gh api {args[-1]} exited {done.returncode} (HTTP {status or 'unknown'})")
+            raise GitHubError(status, f"gh api {path} exited {done.returncode} (HTTP {status or 'unknown'})")
         return done.stdout
 
     def get(self, path):
         try:
-            return json.loads(self._gh(["-H", "Accept: application/vnd.github+json", path]))
+            return json.loads(self._gh(path, ["-H", "Accept: application/vnd.github+json", path]))
         except ValueError as error:
             raise GitHubError(0, f"gh api {path}: not JSON") from error
 
     def download(self, path, dest):
         """An artifact's zip (the endpoint answers 302 to a storage host: `gh` follows it)."""
-        Path(dest).write_bytes(self._gh([path]))
+        Path(dest).write_bytes(self._gh(path, [path], timeout=DOWNLOAD_SECONDS))
         return Path(dest)
 
     def post(self, path, body):
-        return json.loads(self._gh(["-X", "POST", path, "--input", "-"], json.dumps(body).encode()) or b"{}")
+        try:
+            return json.loads(self._gh(path, ["-X", "POST", path, "--input", "-"], json.dumps(body).encode()) or b"{}")
+        except ValueError as error:
+            raise GitHubError(0, f"gh api {path}: not JSON") from error
 
 
 class Git:
@@ -166,7 +189,11 @@ class Git:
         self.directory = str(directory)
 
     def run(self, *args, ok=(0,)):
-        done = subprocess.run(["git", "-C", self.directory, *args], capture_output=True, check=False)
+        try:
+            done = subprocess.run(["git", "-C", self.directory, *args], capture_output=True, check=False,
+                                  timeout=GIT_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            raise sh.Stop(f"git {args[0]} did not end within {GIT_SECONDS} s") from error
         if done.returncode not in ok:
             raise sh.Stop(f"git {args[0]} exited {done.returncode}")
         return done
@@ -250,6 +277,8 @@ class Check:
         self.conclusion = "failure"
         self.title = f"{NOT_JUDGED}: the judge did not reach a verdict"
         self.text = ""
+        # the stage R run and attempt this judgement judged, once `resolve` named them (#958)
+        self.run = self.attempt = None
 
     def passed(self):
         self.conclusion = "success"
@@ -731,12 +760,14 @@ def runs_of(gh, repository, repository_id, head):
             if is_stage_r(r, repository_id) and r.get("head_sha") == head and isinstance(r.get("id"), int)}
 
 
-def resolve(gh, repository, repository_id, run_id, wait=0, sleep=None):
+def resolve(gh, repository, repository_id, run_id, wait=0, sleep=None, clock=None):
     """The run a judgement of `run_id` judges: the newest stage R run of the same head, completed,
     at its latest attempt; (run id, attempt). The calling run must itself be a stage R run of this
     repository (a decoy named `sibling-run` at another path calls nothing). When the newest run
     (or the newest attempt) is still running the judgement waits up to `wait` seconds for it and
-    then posts nothing, a line in the log (`Silent`): the sweep names the head."""
+    then posts nothing, a line in the log (`Silent`): the sweep names the head. The wait is bounded
+    twice (#958): by its count of reads and by the clock, the reads' own time counted, so slow
+    reads cannot stretch it past `wait` seconds and one read."""
     run = gh.get(f"repos/{repository}/actions/runs/{run_id}")
     if run.get("path") != RUN_WORKFLOW:
         raise Silent(f"run {run_id} is not {RUN_WORKFLOW} (by its path)")
@@ -748,7 +779,10 @@ def resolve(gh, repository, repository_id, run_id, wait=0, sleep=None):
     if not SHA.fullmatch(head):
         raise Silent(f"run {run_id} names no head sha")
     sleep = sleep or time.sleep
-    polls = max(0, int(wait)) // POLL_SECONDS
+    clock = clock or time.monotonic
+    wait = max(0, int(wait))
+    polls = wait // POLL_SECONDS
+    started = clock()
     pending = None
     for at in range(polls + 1):
         runs = runs_of(gh, repository, repository_id, head)
@@ -758,18 +792,41 @@ def resolve(gh, repository, repository_id, run_id, wait=0, sleep=None):
         if newest.get("status") == "completed" and isinstance(attempt, int):
             return newest["id"], attempt
         pending = f"run {newest['id']} attempt {attempt}"
-        if at < polls:
-            sleep(POLL_SECONDS)
+        if at == polls or clock() - started + POLL_SECONDS > wait:
+            break
+        sleep(POLL_SECONDS)
     raise Silent(f"run {run_id} of head {head}: the newest stage R run of the head, {pending}, is still running; "
                  f"the sweep names the head (re-judge it once it completes)")
 
 
-def standing(gh, repository, head, app_id):
-    """Whether a completed check of this App stands on the head: a check counts only when its
-    app id is the configured one (a check with no app, a null app or another App's never does)."""
+def newest_check(gh, repository, head, app_id):
+    """The newest completed check of this App on the head, or None: a check counts only when its
+    app id is the configured one (a check with no app, a null app or another App's never does),
+    and of several the highest id is the newest, the one the head's state reads."""
     answer = gh.get(f"repos/{repository}/commits/{head}/check-runs?check_name={CHECK_NAME}&app_id={app_id}&per_page=100")
-    return any(c.get("status") == "completed" and isinstance(c.get("app"), dict) and c["app"].get("id") == app_id
-               for c in answer.get("check_runs") or [])
+    mine = [c for c in answer.get("check_runs") or []
+            if isinstance(c, dict) and c.get("status") == "completed"
+            and isinstance(c.get("app"), dict) and c["app"].get("id") == app_id]
+    if not mine:
+        return None
+    return max(mine, key=lambda c: c["id"] if type(c.get("id")) is int else -1)  # pylint: disable=unidiomatic-typecheck
+
+
+def not_judged_title(check):
+    """The title of a check that is a `NOT JUDGED` failure, or None for a verdict. `NOT JUDGED`
+    is no verdict of the head (#958): stage R, the artifact, the trampoline or GitHub failed, and
+    a re-judge is owed. Anything else a completed check of the App carries stands as its verdict."""
+    title = (check.get("output") or {}).get("title") if isinstance(check.get("output"), dict) else None
+    if check.get("conclusion") == "failure" and isinstance(title, str) and title.startswith(NOT_JUDGED):
+        return title
+    return None
+
+
+def standing(gh, repository, head, app_id):
+    """Whether a verdict of this App stands on the head: its newest completed check, unless that
+    check is a `NOT JUDGED` failure."""
+    check = newest_check(gh, repository, head, app_id)
+    return check is not None and not_judged_title(check) is None
 
 
 def judge(args, gh, out):
@@ -801,8 +858,10 @@ def _judge(args, gh, temp):
                     j.beta = git.rev_parse(args.beta)
             else:
                 target, j.attempt = resolve(gh, args.repository, args.repository_id, args.run_id,
-                                            wait=getattr(args, "wait", 0) or 0, sleep=getattr(args, "sleep", None))
+                                            wait=getattr(args, "wait", 0) or 0, sleep=getattr(args, "sleep", None),
+                                            clock=getattr(args, "clock", None))
                 j.run_id = target
+                check.run, check.attempt = target, j.attempt
                 run, pr = identity(gh, args.repository, args.repository_id, target)
                 j.run, j.pr, j.head, j.event = run, pr, run["head_sha"], run["event"]
                 j.pr_number = pr.get("number")
@@ -844,8 +903,18 @@ def _judge(args, gh, temp):
     except (GitHubError, sh.Stop) as error:
         check.post = "yes"
         check.title = f"{NOT_JUDGED}: the judge could not read what it needs"
-        check.text = bounded(j.header(), [f"{type(error).__name__}: {error}"], j.redrive())
+        # a read that failed before the run judged was known (`resolve`'s own): the re-judge names
+        # the run called, which resolves again to the newest run of its head
+        called = rejudge_of_the_call(args)
+        check.text = bounded(j.header(), [f"{type(error).__name__}: {error}"], j.redrive() or called)
     return check
+
+
+def rejudge_of_the_call(args):
+    """The re-judge of the run a judgement was called for, or None in a dry run."""
+    if getattr(args, "dry_run", False) or not getattr(args, "run_id", None):
+        return None
+    return f"gh workflow run sibling-judge.yml --repo {args.repository} --ref main -f run_id={args.run_id}"
 
 
 def local_artifact(path):
@@ -938,6 +1007,9 @@ Judgment.artifact_files = _artifact_files
 def write_outputs(check, path):
     text = base64.b64encode(check.text.encode()).decode()
     lines = [f"post={check.post}", f"conclusion={check.conclusion}", f"title={clean(check.title, 240)}", f"text={text}"]
+    # the run and attempt judged, empty when the judgement named none: `report` posts the verdict
+    # only on the run it resolves itself (#958)
+    lines += [f"run={'' if check.run is None else int(check.run)}", f"attempt={'' if check.attempt is None else int(check.attempt)}"]
     with open(path, "a", encoding="utf-8") as output:
         output.write("\n".join(lines) + "\n")
 
@@ -965,7 +1037,9 @@ def command_judge(args, gh=None):
     except Exception as error:  # pylint: disable=broad-except
         check = Check()
         check.title = f"{NOT_JUDGED}: the judge failed ({type(error).__name__})"
-        check.text = bounded([f"stage R run {args.run_id}"], [], f"gh workflow run sibling-judge.yml --repo {args.repository} --ref main -f run_id={args.run_id}")
+        check.text = bounded([f"Called for stage R run {args.run_id}; the judge failed before it wrote which run it judged "
+                              "(a re-judge of the run called judges the newest stage R run of its head)"], [],
+                             f"gh workflow run sibling-judge.yml --repo {args.repository} --ref main -f run_id={args.run_id}")
     try:
         write_outputs(check, args.output)
     except OSError as error:
@@ -987,13 +1061,31 @@ def outputs_of(env):
     return post, conclusion, clean(title, 240), decoded[:TEXT_LIMIT]
 
 
+NUMBER = re.compile(r"[1-9][0-9]{0,19}")
+
+
+def judged_of(env):
+    """The run and attempt the judge job says it judged, from `JUDGED_RUN` and `JUDGED_ATTEMPT`:
+    `None` when the trampoline hands on neither name (the file before the sitting that adds them:
+    `report` then reads the outputs as it did), `()` when both are empty (the judgement named no
+    run), `(run, attempt)` when both read as positive integers, and `False` for anything else."""
+    run, attempt = env.get("JUDGED_RUN"), env.get("JUDGED_ATTEMPT")
+    if run is None and attempt is None:
+        return None
+    if run == "" and attempt == "":
+        return ()
+    if isinstance(run, str) and isinstance(attempt, str) and NUMBER.fullmatch(run) and NUMBER.fullmatch(attempt):
+        return int(run), int(attempt)
+    return False
+
+
 def command_report(args, gh=None, env=None):
     gh = gh or GitHub()
     env = os.environ if env is None else env
     try:
         # the same resolution as the judge's, with no wait: the run judged is the newest completed
         # stage R run of the head, and the identity is read on it
-        target, _ = resolve(gh, args.repository, args.repository_id, args.run_id)
+        target, attempt = resolve(gh, args.repository, args.repository_id, args.run_id)
         run, _ = identity(gh, args.repository, args.repository_id, target)
     except Silent as silent:
         print(f"sibling_judge: no check: {silent}", flush=True)
@@ -1003,25 +1095,45 @@ def command_report(args, gh=None, env=None):
         return 1
     head = run["head_sha"]
     redrive = f"gh workflow run sibling-judge.yml --repo {args.repository} --ref main -f run_id={target}"
+    called = [f"Called for run {args.run_id}; the head's newest stage R run is run {target}"] if target != args.run_id else []
     got = outputs_of(env)
     if args.judge_result != "success" or got is None:
         why = f"the judge job ended {clean(args.judge_result, 40)}" if args.judge_result != "success" else "the judge's outputs are absent or malformed"
         post, conclusion, title = "yes", "failure", f"{NOT_JUDGED}: {why}"
-        text = bounded([f"stage R run {args.run_id}", why], [], redrive)
+        text = bounded([f"stage R run {target} attempt {attempt}", *called, why], [], redrive)
     else:
         post, conclusion, title, text = got
         if conclusion == "success" and not (title == "GREEN" or title.startswith("JUDGE CHANGE: ")):
             conclusion = "failure"
+        judged = judged_of(env)
+        if post != "no" and (judged is False or (judged == () and conclusion == "success")):
+            # a success must name its run, and a name that does not read is no name
+            post, conclusion = "yes", "failure"
+            title = f"{NOT_JUDGED}: the judge's outputs do not name the run it judged"
+            text = bounded([f"stage R run {target} attempt {attempt}", *called,
+                            "the judge's outputs do not name the run it judged; no verdict is posted without it"], [], redrive)
+        elif post != "no" and judged and judged != (target, attempt):
+            # a newer run or attempt of the head completed between the two jobs: the verdict in the
+            # outputs is another run's, and is not posted on this one (an `unless-standing` stays so:
+            # nothing over a standing verdict)
+            post, conclusion = ("unless-standing" if post == "unless-standing" else "yes"), "failure"
+            title = f"{NOT_JUDGED}: a newer stage R run of the head completed after the judge read it"
+            text = bounded([f"stage R run {target} attempt {attempt}", *called,
+                            f"the judge job judged run {judged[0]} attempt {judged[1]}; the head's newest stage R run is now "
+                            f"run {target} attempt {attempt}, and one run's verdict is not posted for another"], [], redrive)
     if post == "no":
         # report's own reading owes a check (the run judged is completed and its identity holds):
         # the judge's `no` is not trusted over it, and a failure names the re-judge
         post, conclusion = "yes", "failure"
         title = f"{NOT_JUDGED}: the judge posted nothing where a check is owed"
-        text = bounded([f"stage R run {target}",
+        text = bounded([f"stage R run {target} attempt {attempt}", *called,
                         "the judge job said no check; the report job, reading the run again, owes one"], [], redrive)
+    if post == "unless-standing":
+        # the judge's word for a failure whose artifact is gone: never a success, whatever the outputs say
+        conclusion = "failure"
     try:
         if post == "unless-standing" and standing(gh, args.repository, head, args.app_id):
-            print("sibling_judge: no check: a completed check of the App stands on the head", flush=True)
+            print("sibling_judge: no check: a verdict of the App stands on the head", flush=True)
             return 0
         body = {
             "name": CHECK_NAME,
@@ -1044,6 +1156,73 @@ def command_report(args, gh=None, env=None):
         return 1
     print(f"sibling_judge: posted {conclusion} on {head}", flush=True)
     return 0
+
+
+def command_owed(args, gh=None):
+    """Whether a check is owed for a run, with no key: `owed=no` exactly where `report` posts
+    nothing (its own two reads, `resolve` with no wait and `identity`, say so), `owed=yes`
+    otherwise. A read that fails, or an answer that does not read, is `yes`: the question is left
+    to `report`, so no failure here can silence a check. Writes one line to the output file and
+    nothing to GitHub."""
+    gh = gh or GitHub()
+    owed = "yes"
+    try:
+        target, _ = resolve(gh, args.repository, args.repository_id, args.run_id)
+        identity(gh, args.repository, args.repository_id, target)
+    except Silent as silent:
+        owed = "no"
+        print(f"sibling_judge: no check is owed: {silent}", flush=True)
+    except Exception as error:  # pylint: disable=broad-except
+        print(f"sibling_judge: could not read whether a check is owed ({type(error).__name__}: {clean(error, LINE_LIMIT)}); "
+              "owed=yes, report decides", flush=True)
+    try:
+        with open(args.output, "a", encoding="utf-8") as output:
+            output.write(f"owed={owed}\n")
+    except (OSError, TypeError) as error:
+        print(f"sibling_judge: the output could not be written ({type(error).__name__})", file=sys.stderr)
+        return 1
+    print(f"sibling_judge: owed {owed}", flush=True)
+    return 0
+
+
+ENVIRONMENT = "sibling-judge"
+
+
+def environment_line(gh, repository):
+    """The two settings outside every file that hold the key, read back (tests/sibling/CLAUDE.md,
+    "What the judge does not hold"): the environment's `can_admins_bypass` and the branches its
+    deployment policy admits, which must be `main` alone. One line; a setting that does not read
+    says so. A read-back for the person who runs the sweep, never a gate."""
+    head = f"environment {ENVIRONMENT}"
+    try:
+        found = gh.get(f"repos/{repository}/environments/{ENVIRONMENT}")
+        if not isinstance(found, dict):
+            raise GitHubError(0, "the answer is no object")
+    except GitHubError as error:
+        return f"{head}: not read ({clean(error, LINE_LIMIT)})"
+    bypass = found.get("can_admins_bypass")
+    bypass = str(bypass).lower() if isinstance(bypass, bool) else "not read"
+    policy = found.get("deployment_branch_policy")
+    if policy is None:
+        branches, alone = "every branch", False
+    elif not isinstance(policy, dict):
+        branches, alone = "not read", None
+    elif not policy.get("custom_branch_policies"):
+        branches, alone = ("every protected branch" if policy.get("protected_branches") else "not read"), False
+    else:
+        try:
+            listed = gh.get(f"repos/{repository}/environments/{ENVIRONMENT}/deployment-branch-policies?per_page=100")
+            entries = listed.get("branch_policies") if isinstance(listed, dict) else None
+            if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+                raise GitHubError(0, "the answer names no branch policies")
+            alone = len(entries) == 1 and entries[0].get("name") == "main" and entries[0].get("type") == "branch"
+            names = sorted(clean(e.get("name"), 100) + ("" if e.get("type") == "branch" else f" [{clean(e.get('type'), 20)}]")
+                           for e in entries)
+            branches = ", ".join(names) or "none"
+        except GitHubError as error:
+            branches, alone = f"not read ({clean(error, LINE_LIMIT)})", None
+    note = {True: " (main alone)", False: " (NOT main alone: the key's environment must admit main alone)", None: ""}[alone]
+    return f"{head}: can_admins_bypass {bypass}; deployment branches: {branches}{note}"
 
 
 def judging(gh, repository):
@@ -1076,7 +1255,9 @@ def command_sweep(args, gh=None):
             # workflow file that does not parse is none) and this repository's head
             stage_r = [r for r in every if is_stage_r(r, repo.get("id"))]
             newest = max(stage_r, key=lambda r: r.get("id") or 0) if stage_r else None
-            stands = standing(gh, repository, head, args.app_id)
+            check = newest_check(gh, repository, head, args.app_id)
+            lost = not_judged_title(check) if check is not None else None
+            stands = check is not None and lost is None
             ids = {f"sibling-judge of run {r.get('id')}" for r in stage_r}
             judged_now = f"sibling-judge {head}" in running or bool(ids & running)
             if newest is None:
@@ -1085,7 +1266,11 @@ def command_sweep(args, gh=None):
                 run_text = f"run {newest.get('id')} {newest.get('status')}"
             else:
                 run_text = f"run {newest.get('id')} {newest.get('conclusion')}"
-            state = "stands" if stands else ("judge in progress" if judged_now else "absent")
+            if lost is not None:
+                # a NOT JUDGED failure is no verdict: named, with the act of a head with no check
+                state = f"{NOT_JUDGED} ({clean(lost, 240)})" + (", judge in progress" if judged_now else "")
+            else:
+                state = "stands" if stands else ("judge in progress" if judged_now else "absent")
             line = f"#{number} {head}: {run_text}; check {state}"
             redrive = f"gh workflow run sibling-run.yml --repo {repository} --ref {shlex.quote(branch)}"
             if detail.get("mergeable_state") == "dirty":
@@ -1110,6 +1295,7 @@ def command_sweep(args, gh=None):
     except GitHubError as error:
         print(f"sibling_judge: the sweep could not read ({error})", file=sys.stderr)
         return 1
+    print(environment_line(gh, repository))
     return 0
 
 
@@ -1143,6 +1329,11 @@ def parser():
     r.add_argument("--app-id", type=int, required=True)
     r.add_argument("--judge-result", required=True, help="needs.judge.result")
     r.add_argument("--details-url")
+    o = sub.add_parser("owed", help="whether a check is owed for a run (no key): owed=yes or owed=no")
+    o.add_argument("--run-id", type=int, required=True)
+    o.add_argument("--repository", required=True)
+    o.add_argument("--repository-id", type=int, required=True)
+    o.add_argument("--output", default=os.environ.get("GITHUB_OUTPUT"))
     s = sub.add_parser("sweep", help="every open pull request into beta and the act for each gap")
     s.add_argument("--repository", default="Calhooon/bsv-rs")
     s.add_argument("--app-id", type=int, required=True)
@@ -1165,6 +1356,8 @@ def main(argv=None, gh=None, env=None):
         return command_judge(args, gh)
     if args.command == "report":
         return command_report(args, gh, env)
+    if args.command == "owed":
+        return command_owed(args, gh)
     if args.command == "sweep":
         return command_sweep(args, gh)
     if args.command == "members":

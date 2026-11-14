@@ -215,10 +215,19 @@ pin reads `REFUSED` and never `NOT JUDGED`):
    would be; and the identity above is read on the run judged, never on the run that called. When
    that newest run or attempt is still running, the judgement waits for it (`--wait`, 300 seconds,
    a read every 15) and judges it once it completes; still running after the wait: no check, a line
-   in the log, and the sweep names the head with its re-judge. `report` resolves again with no wait
+   in the log, and the sweep names the head with its re-judge. The wait is bounded twice (#958): by
+   its count of reads and by the clock, the reads' own time counted, so it ends within `--wait`
+   seconds and one read whatever GitHub's pace. `report` resolves again with no wait
    and posts nothing while the newest run runs; where it owes a check and the judge job wrote
-   `post` `no`, it does not trust the `no` and posts `NOT JUDGED` with the re-judge. The table of
-   interleavings, with the test of each row, is `docs/lanes/fix-97c.md`. Until fix-97c a run that
+   `post` `no`, it does not trust the `no` and posts `NOT JUDGED` with the re-judge. `judge` writes
+   the run and attempt it judged beside its verdict (`run`, `attempt`), and `report`, handed them as
+   `JUDGED_RUN` and `JUDGED_ATTEMPT`, posts that verdict only when its own resolution names the
+   same run and attempt: a newer run or attempt that completed between the two jobs gets `NOT
+   JUDGED` with its re-judge, never the older run's verdict; names that do not read, or a success
+   that names no run, the same (#958; the trampoline hands the two names on after its own sitting,
+   and until then `report` reads the outputs as it did). The table of
+   interleavings, with the test of each row, is `docs/lanes/fix-97c.md`, rows 10 to 16 in
+   `docs/lanes/fix-958-judge.md`. Until fix-97c a run that
    a newer `sibling-run` run or a newer attempt superseded earned no check, and trusted that run's
    own judge to come, which never came for a run the `GITHUB_TOKEN` started (witness 11, #947). No
    branch name enters a URL.
@@ -265,7 +274,10 @@ pin reads `REFUSED` and never `NOT JUDGED`):
    earlier attempt's artifact, and one GitHub still lists from before the attempt is not counted:
    a re-run is judged, never `NOT JUDGED`, `test_sibling_judge.py`'s `Rerun`); none or two is
    `NOT JUDGED`, and a
-   dispatch whose artifact is gone posts `unless-standing` (nothing over a standing check). The
+   dispatch whose artifact is gone posts `unless-standing`: nothing over a standing verdict, and
+   never a success. A verdict stands when the newest completed check of the App on the head (by
+   id) is not a `NOT JUDGED` failure: `NOT JUDGED` is no verdict, and `unless-standing` posts over
+   it (#958; until then any completed check of the App stood, a `NOT JUDGED` one included). The
    zip is taken by `gh api .../artifacts/<id>/zip` (it follows the 302 to storage) and read in
    memory by the allowlist: no extraction, no `download-artifact`, nothing written under the
    workspace; an unlisted, repeated or oversized member (64 MiB the artifact, 16 MiB a member,
@@ -273,7 +285,18 @@ pin reads `REFUSED` and never `NOT JUDGED`):
    refused. The stamp and the run's record are compared with what the judge read and never used.
 8. **The verdict**, `judge_run` over the artifact's files, the head's column and the judge's own
    corpus facts. Then `post`, `conclusion` (`success` or `failure` alone: `neutral` and
-   `skipped` would satisfy a required check), `title` and `text` (base64) go to the outputs.
+   `skipped` would satisfy a required check), `title` and `text` (base64) go to the outputs, and
+   beside them `run` and `attempt`, the stage R run and attempt judged (empty when the judgement
+   named none).
+
+Every `gh api` call and every git command the script runs through its `Git` class is bounded
+(#958): 30 seconds a read, 120 the artifact's download and a git command (the harness's own `git`,
+`sibling_harness.py`'s `rev-parse` and `archive` of the fetched sibling when `Facts` stages it, is
+not: two local reads, whose hang ends with the job's ten minutes as before). A call that passes its figure is the named error of
+its class, a `GitHubError` naming the path or a stop naming the git command, so a hung call ends
+the judgement as a failed read does (`NOT JUDGED` with the re-judge; `report` exits 1 naming the
+read) where it once spent the job's ten minutes and left no line. The longest wait and the two
+reads around it stay within 360 of the judge job's 600 seconds.
 
 A failed check's title opens with one of three words: `RED` (a divergence: the change's),
 `REFUSED` (its shape: the classes, the pin, the column's rules, a head behind beta) or
@@ -309,15 +332,27 @@ sibling's `main` is then unmade) and prints the check it would post; it says whi
 not make (the run's identity, the superseded test, the artifact's record, the trampoline's
 comparison). The sweep reads and never writes: for every open pull request into beta its head,
 its newest stage R run (a run whose path, event and head repository are stage R's: GitHub's failed
-`push` run of a `sibling-run.yml` it could not parse is none) and whether the App's check stands
-(a completed check whose app id is the configured one: a check with no app id never stands, the
-rule read's R3) or a judgement of the head is queued or running (`check judge in progress`, read
+`push` run of a `sibling-run.yml` it could not parse is none) and whether a verdict of the App
+stands (`check stands`: its newest completed check, one whose app id is the configured one, a check
+with no app id never standing, the rule read's R3; a `NOT JUDGED` failure is no verdict and reads
+`check NOT JUDGED (<its title>)` with the act of a head with no check, #958) or a judgement of the
+head is queued or running (`check judge in progress`, read
 from the trampoline's runs by their `run-name:`), and the act for each gap as a command, the branch
 name quoted by `shlex.quote` there and in every re-push act a check carries (no stage R run: a
 dispatch of stage R; only GitHub's failed run of an unparsed file: a push of a `sibling-run.yml`
 that parses, since a re-judge of that run is silent (its event) and a dispatch of a file that does
 not parse is refused; a run still running: its re-judge once it completes; a run and no check: its
-re-judge; a conflict with beta; a fork's head).
+re-judge; a conflict with beta; a fork's head). Its last line reads back the key's environment
+(#958): `environment sibling-judge: can_admins_bypass <true|false>; deployment branches: <names>
+(main alone)`, or `(NOT main alone: ...)`, or `not read (...)` for a setting GitHub did not
+answer; the line is a read-back for whoever runs the sweep and moves no exit status.
+
+`sibling_judge.py owed --run-id <run> --repository <owner/name> --repository-id <id>` answers, with
+no key, whether a check is owed for a run: one line, `owed=yes` or `owed=no`, to the output file.
+It makes `report`'s own two reads (`resolve` with no wait, `identity`): `no` exactly where `report`
+would post nothing, `yes` otherwise and whenever a read fails, so no failure of it can silence a
+check. The trampoline does not call it yet (#958's line on the mint's order: a step before the
+mint, the mint under its answer, one sitting with main's pick).
 
 ## Where no check is posted, and the re-drives
 
@@ -361,7 +396,9 @@ repository is public, whose resources those endpoints serve without a permission
 repository makes `report` exit 1 and post nothing.
 
 Two settings outside every file hold the key: the environment `sibling-judge`'s deployment branch
-policy (`main` alone) and its `can_admins_bypass` (true when read on 2026-11-13), each an admin's
+policy (`main` alone) and its `can_admins_bypass` (true when read on 2026-11-13 and again on
+2026-11-14, by `gh api repos/Calhooon/bsv-rs/environments/sibling-judge` and by the sweep's last
+line, which reads both back on every run), each an admin's
 to change; and the trampoline's concurrency group keeps one pending judgement per head, a newer
 pending one replacing the older (GitHub's documented rule), recovered by every judgement judging
 the newest stage R run of its head and by the sweep.
