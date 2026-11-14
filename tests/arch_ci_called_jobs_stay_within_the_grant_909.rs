@@ -29,6 +29,14 @@
 //! spelling this file does not read cannot pass it unread. Each refusal is shown on a planted
 //! copy of the tree's own text.
 //!
+//! What the plants ask (the fold of #980): the rule, never a count of today's jobs. A plant on a
+//! workflow's own permissions reaches every job of that workflow that states none of its own, so
+//! the refusals asked are one for each such job under each caller whose grant is below it, read
+//! from the planted tree by `owed` (the parsed jobs, never `judge`), each present once and none
+//! beside them; a plant on one job, one line or one call asks that one refusal alone. A workflow
+//! that gains a job, or a file that gains a caller, moves no assertion here. One list is a pin
+//! on purpose and says so where it stands: the jobs of `ci.yml` that hold the run's token.
+//!
 //! What it cannot see, stated: a workflow called from another repository or by a ref, a
 //! permission GitHub adds or renames, the repository's default token setting, and whether
 //! GitHub's own check is this one (the rule is step 22's as written, and the one run that
@@ -332,13 +340,96 @@ fn planted(tree: &Tree, file: &str, old: &str, new: &str) -> Tree {
     out
 }
 
+/// The parts of one refusal a test asks for.
+type Wanted = Vec<String>;
+
+fn parts(of: &[&str]) -> Wanted {
+    of.iter().map(|part| (*part).to_string()).collect()
+}
+
+/// The tree's refusals are the wanted ones and no other: each wanted refusal is held by exactly
+/// one refusal found, and each refusal found holds a wanted one. An empty `wanted` is refused,
+/// since a plant that owes nothing shows nothing.
 #[track_caller]
-fn refused(tree: &Tree, wanted: &[&str]) {
+fn refused(tree: &Tree, wanted: &[Wanted]) {
     let (_, refusals) = judge(tree);
+    let holds = |refusal: &String, want: &Wanted| want.iter().all(|part| refusal.contains(part));
     assert!(
-        refusals.len() == 1 && wanted.iter().all(|part| refusals[0].contains(part)),
-        "wanted one refusal holding {wanted:?}, found {refusals:#?}"
+        !wanted.is_empty(),
+        "the plant owes no refusal: it shows nothing"
     );
+    for want in wanted {
+        let held = refusals.iter().filter(|r| holds(r, want)).count();
+        assert_eq!(
+            held, 1,
+            "wanted exactly one refusal holding {want:?}, found {held} among {refusals:#?}"
+        );
+    }
+    for refusal in &refusals {
+        assert!(
+            wanted.iter().any(|want| holds(refusal, want)),
+            "a refusal beside the wanted {wanted:#?}: {refusal}"
+        );
+    }
+    assert_eq!(
+        refusals.len(),
+        wanted.len(),
+        "{refusals:#?} against {wanted:#?}"
+    );
+}
+
+/// What the first rule owes a tree for one scope asked of one called file, read from the parsed
+/// jobs and not from `judge`: for every job, of any workflow, that calls `target` and states a
+/// grant (its own, else its workflow's), one refusal for each job of `target` that asks `scope`
+/// (by its own permissions, else the file's) above what that grant holds. So a plant on the
+/// called file's own permissions owes one refusal for each of its jobs that states none, under
+/// each caller, however many jobs or callers the tree has that day.
+fn owed(tree: &Tree, target: &str, scope: &str) -> Vec<Wanted> {
+    let called = parse(target, &tree[target]).expect("the called file parses");
+    let mut out = Vec::new();
+    for (file, text) in tree {
+        let workflow = parse(file, text).expect("the tree parses");
+        for caller in &workflow.jobs {
+            if caller
+                .uses
+                .as_deref()
+                .and_then(|u| u.strip_prefix(CALL_PREFIX))
+                != Some(target)
+            {
+                continue;
+            }
+            let Some(grant) = caller
+                .permissions
+                .as_ref()
+                .or(workflow.permissions.as_ref())
+            else {
+                continue;
+            };
+            let granted = grant.get(scope).copied().unwrap_or(0);
+            for job in &called.jobs {
+                let asked = job
+                    .permissions
+                    .as_ref()
+                    .or(called.permissions.as_ref())
+                    .and_then(|asked| asked.get(scope).copied())
+                    .unwrap_or(0);
+                if asked > granted {
+                    out.push(vec![
+                        format!(
+                            "{file} `{}` (line {}) calls {target} ",
+                            caller.id, caller.line
+                        ),
+                        format!("{target}'s job `{}` (line {})", job.id, job.line),
+                        format!(
+                            "asks `{scope}: {}`",
+                            ["none", "read", "write"][asked as usize]
+                        ),
+                    ]);
+                }
+            }
+        }
+    }
+    out
 }
 
 const CI_GRANT: &str = "    uses: ./.github/workflows/ci.yml
@@ -385,65 +476,112 @@ fn every_called_job_asks_no_more_than_its_caller_grants_909() {
 fn a_called_job_asking_more_than_the_grant_is_refused_909() {
     let tree = tree();
     // the scenario of the finding: the calling job grants `contents: read` alone, as the
-    // stable line's did when the finding was written, and two jobs of ci.yml ask the label read's scope
+    // stable line's did when the finding was written. One refusal for each job of ci.yml that
+    // asks the label read's scope, whichever they are that day (`semver` and `test` when this
+    // was written), and none beside them
     let lone = planted(
         &tree,
         "release.yml",
         CI_GRANT,
         &CI_GRANT.replace("      pull-requests: read\n", ""),
     );
+    let asking = owed(&lone, "ci.yml", "pull-requests");
+    assert!(
+        asking
+            .iter()
+            .any(|want| want[0].starts_with("release.yml `ci` ")),
+        "{asking:#?}"
+    );
+    refused(&lone, &asking);
     let (_, refusals) = judge(&lone);
-    assert_eq!(refusals.len(), 2, "{refusals:#?}");
-    for (refusal, job) in refusals.iter().zip(["semver", "test"]) {
-        assert!(
-            refusal.contains("release.yml `ci`")
-                && refusal.contains("granting `contents: read`")
-                && refusal.contains(&format!("ci.yml's job `{job}`"))
-                && refusal.contains("asks `pull-requests: read`"),
-            "{refusal}"
-        );
-    }
-    // a called job asking a scope above the grant's level (the token rule speaks of it too:
-    // `semver` hands a step the token), and one the grant does not name
-    let (_, refusals) = judge(&planted(
+    assert!(
+        refusals
+            .iter()
+            .all(|r| r.contains("granting `contents: read`, and ")),
+        "{refusals:#?}"
+    );
+    // a plant on ONE job, asking a scope above the grant's level: that job's refusal alone
+    // under each caller of ci.yml, and the token rule's for the same job when it hands a step
+    // the token (it does while the pin of the last test names `semver`)
+    let above = planted(
         &tree,
         "ci.yml",
         SEMVER_ASKS,
         &SEMVER_ASKS.replace("contents: read", "contents: write"),
-    ));
-    assert_eq!(refusals.len(), 2, "{refusals:#?}");
+    );
+    let mut wanted = owed(&above, "ci.yml", "contents");
     assert!(
-        refusals[0].contains("ci.yml's job `semver`")
-            && refusals[0].contains("asks `contents: write`"),
-        "{refusals:#?}"
+        !wanted.is_empty()
+            && wanted
+                .iter()
+                .all(|want| want[1].starts_with("ci.yml's job `semver` ")),
+        "{wanted:#?}"
     );
-    refused(
-        &planted(
-            &tree,
-            "docs.yml",
-            "\npermissions:\n  contents: read\n",
-            "\npermissions:\n  contents: read\n  issues: write\n",
-        ),
-        &[
-            "release.yml `docs`",
-            "docs.yml's job",
-            "asks `issues: write`",
-        ],
+    let ci = parse("ci.yml", &above["ci.yml"]).expect("ci.yml parses");
+    if ci
+        .jobs
+        .iter()
+        .any(|j| j.id == "semver" && j.names_the_token)
+    {
+        wanted.push(parts(&[
+            "ci.yml `semver` (line ",
+            "holds `contents: write`",
+        ]));
+    }
+    refused(&above, &wanted);
+    // a plant on a called WORKFLOW's own permissions, a scope the grant does not name: it
+    // reaches every job of that file that states no permissions of its own, so one refusal for
+    // each of them, named, none missing and none beside them. Until the fold this asked for
+    // exactly one refusal, which pinned docs.yml at one job and failed when it gained a second
+    let widened = planted(
+        &tree,
+        "docs.yml",
+        "\npermissions:\n  contents: read\n",
+        "\npermissions:\n  contents: read\n  issues: write\n",
     );
-    // the called file's own permissions are what a job with none of its own asks
-    let (_, refusals) = judge(&planted(
+    let docs = parse("docs.yml", &widened["docs.yml"]).expect("docs.yml parses");
+    let reached: Vec<&Job> = docs
+        .jobs
+        .iter()
+        .filter(|j| j.permissions.is_none())
+        .collect();
+    assert!(!reached.is_empty(), "the plant reaches no job of docs.yml");
+    let wanted = owed(&widened, "docs.yml", "issues");
+    for job in &reached {
+        assert!(
+            wanted
+                .iter()
+                .any(|want| want[0].starts_with("release.yml `docs` ")
+                    && want[1].starts_with(&format!("docs.yml's job `{}` ", job.id))
+                    && want[2] == "asks `issues: write`"),
+            "no refusal owed for docs.yml's job `{}` under release.yml `docs`: {wanted:#?}",
+            job.id
+        );
+    }
+    let callers = wanted
+        .iter()
+        .map(|want| want[0].as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    assert_eq!(wanted.len(), reached.len() * callers, "{wanted:#?}");
+    refused(&widened, &wanted);
+    // the called file's own permissions are what a job with none of its own asks: the same
+    // rule at a level above the grant's
+    let raised = planted(
         &tree,
         "msrv.yml",
         "\npermissions:\n  contents: read\n",
         "\npermissions:\n  contents: write\n",
-    ));
-    assert!(
-        !refusals.is_empty()
-            && refusals
-                .iter()
-                .all(|r| r.contains("release.yml `msrv`") && r.contains("asks `contents: write`")),
-        "{refusals:#?}"
     );
+    let wanted = owed(&raised, "msrv.yml", "contents");
+    assert!(
+        wanted
+            .iter()
+            .any(|want| want[0].starts_with("release.yml `msrv` ")
+                && want[2] == "asks `contents: write`"),
+        "{wanted:#?}"
+    );
+    refused(&raised, &wanted);
     // a grant of nothing grants nothing
     let (_, refusals) = judge(&planted(
         &tree,
@@ -481,7 +619,32 @@ fn a_caller_that_states_no_grant_and_an_unread_spelling_are_refused_909() {
             "",
         ),
     );
-    refused(&bare_caller, &["release.yml `ci`", "states no grant"]);
+    // one refusal for each calling job of release.yml that then states no grant: `ci`, and any
+    // other caller there that leans on the workflow's grant (none when this was written)
+    let release = parse("release.yml", &bare_caller["release.yml"]).expect("release.yml parses");
+    let leaning: Vec<Wanted> = release
+        .jobs
+        .iter()
+        .filter(|j| j.permissions.is_none())
+        .filter(|j| {
+            j.uses
+                .as_deref()
+                .is_some_and(|u| u.starts_with(CALL_PREFIX))
+        })
+        .map(|j| {
+            vec![
+                format!("release.yml `{}` (line ", j.id),
+                "states no grant".to_string(),
+            ]
+        })
+        .collect();
+    assert!(
+        leaning
+            .iter()
+            .any(|want| want[0] == "release.yml `ci` (line "),
+        "{leaning:#?}"
+    );
+    refused(&bare_caller, &leaning);
     // the job's grant absent, the workflow's is the grant: `contents: read` alone
     let inherited = planted(
         &tree,
@@ -492,8 +655,14 @@ fn a_caller_that_states_no_grant_and_an_unread_spelling_are_refused_909() {
             "",
         ),
     );
-    let (_, refusals) = judge(&inherited);
-    assert_eq!(refusals.len(), 2, "{refusals:#?}");
+    let asking = owed(&inherited, "ci.yml", "pull-requests");
+    assert!(
+        asking
+            .iter()
+            .any(|want| want[0].starts_with("release.yml `ci` ")),
+        "{asking:#?}"
+    );
+    refused(&inherited, &asking);
     // spellings the reader does not take are refused by name, never passed unread
     for spelling in [
         "    permissions: { contents: read, pull-requests: read }\n",
@@ -520,6 +689,7 @@ fn a_caller_that_states_no_grant_and_an_unread_spelling_are_refused_909() {
             "{spelling:?}: {refusals:#?}"
         );
     }
+    // one unread line is one refusal, the file's (a file that does not parse is judged no further)
     refused(
         &planted(
             &tree,
@@ -527,9 +697,9 @@ fn a_caller_that_states_no_grant_and_an_unread_spelling_are_refused_909() {
             CI_GRANT,
             &CI_GRANT.replace("pull-requests: read", "pull-requests: all"),
         ),
-        &["release.yml line ", "level is not"],
+        &[parts(&["release.yml line ", "level is not"])],
     );
-    // a call of a file the folder does not hold
+    // a call of a file the folder does not hold: a plant on one call, that call's refusal alone
     refused(
         &planted(
             &tree,
@@ -537,14 +707,21 @@ fn a_caller_that_states_no_grant_and_an_unread_spelling_are_refused_909() {
             "uses: ./.github/workflows/msrv.yml",
             "uses: ./.github/workflows/msrv2.yml",
         ),
-        &["release.yml `msrv`", "does not hold"],
+        &[parts(&["release.yml `msrv` (line ", "does not hold"])],
     );
 }
 
 #[test]
 fn a_job_of_ci_that_hands_a_step_the_token_holds_read_alone_909() {
     let tree = tree();
-    // the three jobs the rule reads today, so the rule is seen to read them
+    // A PIN, on purpose, unlike the plants above: the jobs of ci.yml that hand a step the run's
+    // token, by name and in the file's order. The rule itself reads whatever jobs name the
+    // token; this list is the record of who holds it, so that a job gaining or losing the token
+    // is a change somebody reads. When it moves: read the job's steps (does it run the pull
+    // request's own code with the token in a step's environment?), confirm its permissions,
+    // its own or the workflow's, hold `read` alone (the rule below refuses a `write`), then
+    // change this list in the same commit and say so in the lane's record. A job added to
+    // ci.yml that names the token nowhere moves nothing here.
     let ci = parse("ci.yml", &tree["ci.yml"]).expect("ci.yml parses");
     let holders: Vec<&str> = ci
         .jobs
