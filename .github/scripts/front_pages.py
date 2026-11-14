@@ -7,7 +7,9 @@ Two commands (the design reads of 2026-11-11, decisions D7 to D9; RELEASING.md s
 a line saying what kind of release it is and how to take it; a notice for each PUBLISHED
 advisory whose range holds the version; the entries of the tag's own `CHANGELOG.md`
 section (each `### ` heading is a sentence: one bullet each, its issue numbers kept; the
-`Notes: cross-SDK parity` headings are counted, not listed); every Migration line of the
+`### Notes` headings, the cross-SDK parity ones, are counted, not listed, and the page says
+"heading(s)": one whose paragraph says that nothing moves is counted with the rest, #909);
+every Migration line of the
 section; the published advisories this version fixes and those it is affected by; when a
 run id is given, a "Measured at this tag" block read from that run's jobs and logs (the
 corpus summary line, the summed `test result:` lines of the Linux stable cell, the script
@@ -20,6 +22,11 @@ for a version with a `-`, `--latest` for the newest stable version (`newest_stab
 highest stable version of those crates.io lists and the tag's own, a version crates.io
 lists as yanked left out, the tag's own included), `--latest=false` for a back-patch (it
 must not take the mark).
+
+`notes` and `flags` read a source that did not answer once more after `RETRY_PAUSE` (`again`,
+#909): crates.io for `flags`; the advisories, the run, its jobs and each job's log for `notes`.
+A second miss is `notes`'s "not recorded" line, and for `flags` one line on stderr and exit 1,
+so the page job stops before a page is made with no mark.
 
 `check` is the reconciler, red on any miss (one PASS or FAIL line per rule, exit 1 on a
 FAIL): crates.io's `max_stable_version`, GitHub's Latest release and the newest stable
@@ -40,7 +47,11 @@ first release whose README was written to this rule); `SECURITY.md` exists on `m
 published advisory's range names that advisory. `--wait <seconds>` polls while the only
 failures are ones time heals (docs.rs queued or building, crates.io behind the newest
 stable tag), up to the bound; after it, exit 0 with a warning only when every failure left
-is one of those, red when any other is. It is run by `release.yml` after the publish and by a dispatch
+is one of those, red when any other is. A rule whose source did not answer is read once more
+after `RETRY_PAUSE` (20 s; seven rules, so at most 140 s a pass); those pauses are not taken
+off `--wait`'s bound, so the pass that crosses the deadline can end up to 140 s after it
+plus the time of its reads (an HTTP read times out at 60 s, a `gh` call has no timeout of
+its own; the job's `timeout-minutes` bounds both) (#909). It is run by `release.yml` after the publish and by a dispatch
 of `front-pages.yml` at an advisory sitting, never on a schedule (the owner's word of
 2026-11-10).
 
@@ -74,7 +85,7 @@ USER_AGENT = "bsv-rs front_pages.py (https://github.com/Calhooon/bsv-rs)"
 BODY_LIMIT = 120_000
 # the first stable version whose README is held to the rule (D1; the hand fix of 2026-11-11)
 README_FROM = "0.8.7"
-# seconds before a rule whose source did not answer is read once more (`guarded`, #886)
+# seconds before a source that did not answer is read once more (`guarded`, #886; `again`, #909)
 RETRY_PAUSE = 20
 # the published filter, in the call itself: no other state is fetched (the brief's rule)
 ADVISORY_JQ = (
@@ -193,6 +204,18 @@ def http(url):
         raise Unavailable(f"{url}: HTTP {error.code}") from error
     except (urllib.error.URLError, TimeoutError) as error:
         raise Unavailable(f"{url}: {error}") from error
+
+
+def again(read):
+    """`read()`, asked once more after `RETRY_PAUSE` when the source did not answer; the second
+    miss is the caller's (#909). For `notes` and `flags`, which read each source outside
+    `check`'s `guarded`: one 5xx in the page job, after the publish, must not leave a figure
+    "not recorded" or stop the page."""
+    try:
+        return read()
+    except Unavailable:
+        time.sleep(RETRY_PAUSE)
+    return read()
 
 
 def published_rows(rows):
@@ -428,7 +451,7 @@ def first_sentence(text, limit=400):
 
 
 def entries(lines):
-    """(entries, parity notes counted, migrations): each `### ` heading a bullet; a bare kind
+    """(entries, `### Notes` headings counted, migrations): each `### ` heading a bullet; a bare kind
     heading (`### Changed`) gives one bullet per top-level bullet under it."""
     out, notes, migrations = [], 0, []
     heading, bare = None, False
@@ -506,7 +529,7 @@ def verdicts_line(log):
 def measured(source, tag, run_id):
     """The "Measured at this tag" block, from the run's jobs and their logs."""
     try:
-        run = source.run(run_id)
+        run = again(lambda: source.run(run_id))
     except Unavailable as error:
         # a run it cannot read is not recorded, never a traceback (the cold re-read, `:476`): the
         # page job's grep makes each line a warning of the run, and `notes` exits 0
@@ -518,7 +541,7 @@ def measured(source, tag, run_id):
         raise Stop(f"run {run_id} is the run of {run.get('head_branch')!r}, not of {tag}")
     out = ["## Measured at this tag", ""]
     try:
-        jobs = source.jobs(run_id)
+        jobs = again(lambda: source.jobs(run_id))
     except Unavailable as error:
         out.append(f"- Every figure of the run: not recorded ({error}).")
         out.append(f"- The run: {run['html_url']}")
@@ -528,7 +551,7 @@ def measured(source, tag, run_id):
 
     def log_of(job):
         try:
-            return source.job_log(job["id"]), None
+            return again(lambda: source.job_log(job["id"])), None
         except Unavailable as error:
             return None, str(error)
 
@@ -690,7 +713,7 @@ def notes(source, tag, run_id=None, hand=None):
         raise Stop(f"{tag}: no CHANGELOG.md at the tag")
     listed, parity, migrations = entries(section(changelog, version))
     try:
-        advisories, advisory_error = source.advisories(), None
+        advisories, advisory_error = again(source.advisories), None
     except Unavailable as error:
         advisories, advisory_error = [], str(error)
     fixes, affected = touching(version, advisories)
@@ -706,7 +729,9 @@ def notes(source, tag, run_id=None, hand=None):
     out += ["## Changes", ""]
     out += [f"- {entry}" for entry in listed] or ["- The section lists no entry."]
     if parity:
-        out += ["", f"The section carries {parity} cross-SDK parity note(s); the changelog at the tag has them."]
+        # "heading(s)", not "note(s)": a `### Notes` heading whose paragraph says that nothing
+        # moves is counted with the rest, and the page must not call it a note of a move (#909)
+        out += ["", f"The section carries {parity} `### Notes` heading(s) on cross-SDK parity (one that says nothing moves is counted too); the changelog at the tag has them."]
     migration_lines = [f"- {('(' + issues_of(h) + ') ') if issues_of(h) else ''}{text}" for h, text in migrations]
     out += ["", "## Migration", ""]
     out += migration_lines or ["- The section names no Migration line."]
@@ -750,7 +775,7 @@ def flags(source, tag):
     # reconciler's `versions` rule reads, leaves it out, and the mark must agree with it (#886).
     # The tag's own version is counted beside the listed ones (the index may not show it yet),
     # unless crates.io lists it as yanked: a yanked version never takes the mark.
-    crate = source.crate()
+    crate = again(source.crate)
     newest = newest_stable([v["num"] for v in crate.get("versions", [])] + [version], yanked(crate))
     return "--latest" if newest is not None and key(version) == key(newest) else "--latest=false"
 
@@ -1062,6 +1087,11 @@ def main(argv=None):
     except Stop as stop:
         print(f"front_pages: {stop}", file=sys.stderr)
         return 2
+    except Unavailable as error:
+        # `flags` with crates.io unreadable twice: one line, never a traceback (#909); exit 1
+        # stops the page job's step on its own line, before a page is made with no mark
+        print(f"front_pages: could not read: {error}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

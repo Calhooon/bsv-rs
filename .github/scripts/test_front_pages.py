@@ -852,5 +852,154 @@ class Check(World):
         self.assertTrue(out.getvalue().endswith("FAIL: 2 failure(s)\n"), out.getvalue())
 
 
+class Again(World):
+    """`notes` and `flags` read a source that did not answer once more (#909): one 5xx in the
+    page job, after the publish, is not a missing figure or a stopped page."""
+
+    def test_flags_reads_crates_io_again_after_one_miss_909(self):
+        source = Flaky(self.source(), "crate", 1)
+        with mock.patch.object(fp, "RETRY_PAUSE", 20), mock.patch.object(fp.time, "sleep") as sleep:
+            self.assertEqual(fp.flags(source, "v0.8.7"), "--latest")
+        self.assertEqual(source.calls, 2)
+        sleep.assert_called_once_with(20)
+        # a prerelease reads nothing, so it waits for nothing
+        source = Flaky(self.source(), "crate", 9)
+        with mock.patch.object(fp.time, "sleep") as sleep:
+            self.assertEqual(fp.flags(source, "v0.9.0-beta.1"), "--prerelease --latest=false")
+        self.assertEqual(source.calls, 0)
+        sleep.assert_not_called()
+
+    def test_flags_with_crates_io_unreadable_twice_is_one_line_and_exit_1_909(self):
+        # no mark is printed: the page job's step stops on the line that reads the flags
+        source = Flaky(self.source(), "crate", 9)
+        with self.assertRaises(fp.Unavailable):
+            fp.flags(source, "v0.8.7")
+        self.assertEqual(source.calls, 2)  # two calls and no third
+        self.drop("crate.json")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            self.assertEqual(fp.main(["--offline", str(self.root), "flags", "v0.8.7"]), 1)
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(err.getvalue(), "front_pages: could not read: crates.io has no crate\n")
+
+    def test_notes_reads_each_source_again_after_one_miss_909(self):
+        undisturbed = fp.notes(self.source(), "v0.8.7", "7")
+        self.assertNotIn("not recorded (HTTP 502)", undisturbed)
+        for method in ("advisories", "run", "jobs", "job_log"):
+            source = Flaky(self.source(), method, 1)
+            with mock.patch.object(fp, "RETRY_PAUSE", 20), mock.patch.object(fp.time, "sleep") as sleep:
+                self.assertEqual(fp.notes(source, "v0.8.7", "7"), undisturbed, method)
+            sleep.assert_called_once_with(20)
+
+    def test_notes_with_a_source_unreadable_twice_says_not_recorded_909(self):
+        wanted = {
+            "advisories": "- Published advisories: not recorded (HTTP 502).",
+            "run": "- Every figure of the run: not recorded (run 7 could not be read: HTTP 502).",
+            "jobs": "- Every figure of the run: not recorded (HTTP 502).",
+        }
+        for method, line in wanted.items():
+            source = Flaky(self.source(), method, 2)
+            with mock.patch.object(fp.time, "sleep") as sleep, contextlib.redirect_stderr(io.StringIO()):
+                text = fp.notes(source, "v0.8.7", "7")
+            self.assertIn(line, text.splitlines(), method)
+            self.assertEqual((source.calls, sleep.call_count), (2, 1), method)
+
+
+class RaisingResult(fp.Result):
+    """A `Result` whose named rule fails with `Unavailable` once, AFTER it wrote its PASS line:
+    the shape of a rule that reads a source after it wrote a line or filled a shared list."""
+
+    rule = None
+
+    def __init__(self):
+        super().__init__()
+        self.raised = False
+
+    def ok(self, rule, text):
+        super().ok(rule, text)
+        if rule == self.rule and not self.raised:
+            self.raised = True
+            raise fp.Unavailable("HTTP 502")
+
+
+class RetryState(World):
+    """The four lines of `guarded` no test failed without (#909, the strength read of #898):
+    the result's lines put back, crates.io's answer put back, the advisories put back, and
+    the pause's figure."""
+
+    def raising(self, rule):
+        return mock.patch.object(fp, "Result", type("R", (RaisingResult,), {"rule": rule}))
+
+    def test_a_retried_rule_keeps_no_line_of_its_failed_attempt_909(self):
+        undisturbed = fp.check(self.source())
+        with self.raising("security"):
+            result = fp.check(self.source())
+        self.assertEqual(result.lines, undisturbed.lines)
+        self.assertEqual(len([line for line in result.lines if line.startswith("PASS security:")]), 1)
+        self.assertEqual((result.failed, result.pending), (0, 0))
+
+    def test_a_retried_rule_keeps_no_advisory_of_its_failed_attempt_909(self):
+        # `notices` fills the shared `advisories` before it writes its line: read twice from a
+        # list not put back, the line would count every published advisory twice
+        undisturbed = fp.check(self.source())
+        with self.raising("notices"):
+            result = fp.check(self.source())
+        self.assertEqual(result.lines, undisturbed.lines)
+        self.assertEqual(len([line for line in result.lines if line.endswith("names it (3 published)")]), 1)
+
+    def test_versions_failing_twice_leaves_no_answer_of_crates_io_behind_909(self):
+        # the earlier attempt read crates.io and then failed at GitHub; the second fails at
+        # crates.io. The rules after `versions` must not run on the answer of an attempt that
+        # was given up: they need crates.io's answer, and this pass has none.
+        source = Flaky(self.source(), "latest_release", 1)
+        calls = {"n": 0}
+        inner_crate = self.source().crate
+
+        def crate():
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise fp.Unavailable("HTTP 502")
+            return inner_crate()
+
+        source.inner.crate = crate
+        result = fp.check(source)
+        self.assertEqual(result.lines, [
+            "FAIL versions: could not read: HTTP 502",
+            "(the rules after `versions` need crates.io's answer)",
+        ])
+        self.assertEqual((calls["n"], result.failed, result.pending), (2, 1, 0))
+
+
+class Pause(unittest.TestCase):
+    """The pause's own figure, which every other test patches (#909)."""
+
+    def test_the_pause_is_the_figure_the_module_states_909(self):
+        self.assertEqual(fp.RETRY_PAUSE, 20)
+        source = Path(fp.__file__).read_text()
+        rules = re.findall(r'^    guarded\("([a-z.]+)", ', source, re.M)
+        self.assertEqual(rules, ["versions", "pages", "docs.rs", "readme", "security", "about", "notices"])
+        # the module's words on `--wait` name the pause, the rules and their product
+        words = " ".join(fp.__doc__.split())
+        self.assertIn(f"`RETRY_PAUSE` ({fp.RETRY_PAUSE} s; seven rules, so at most {len(rules) * fp.RETRY_PAUSE} s a pass)", words)
+        self.assertIn(f"up to {len(rules) * fp.RETRY_PAUSE} s after it", words)
+
+
+class ParityHeadings(World):
+    def test_a_notes_heading_that_says_nothing_moves_is_called_a_heading_909(self):
+        # the page counts `### Notes` headings; one of them may say that no behaviour moves, so
+        # the line says "heading(s)" and what is counted, never "N parity note(s)"
+        self.write("tree/v0.8.7/CHANGELOG.md", "\n".join([
+            "## [0.8.7] - 2026-11-11", "",
+            "### Fixed: a thing (#1)", "", "It was wrong.", "",
+            "### Notes: cross-SDK parity", "", "The reference does the same.", "",
+            "### Changed: a gate (#2)", "", "It judges now.", "",
+            "### Notes: cross-SDK parity (#2)", "", "No SDK behaviour moves.", "",
+        ]))
+        text = fp.notes(self.source(), "v0.8.7")
+        self.assertIn("The section carries 2 `### Notes` heading(s) on cross-SDK parity "
+                      "(one that says nothing moves is counted too); the changelog at the tag has them.", text.splitlines())
+        self.assertNotIn("note(s)", text)
+
+
 if __name__ == "__main__":
     unittest.main()
