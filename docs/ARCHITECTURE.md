@@ -167,6 +167,17 @@ yanked crates fail, the ignore list stays empty, licenses are allowlisted,
 sources are crates.io only. [RELEASING.md](../RELEASING.md) step 2.
 Duplicate versions warn and are never skipped (`deny.toml`, `[bans]`
 `multiple-versions = "warn"`, no `skip` or `skip-tree`); #104 tracks them.
+A new one is refused beside cargo-deny, in the same step:
+`.github/scripts/duplicate_versions.py` reads the four graphs the crate ships
+from the resolved lockfile (the three above and `full,http,websocket`) and
+fails on a crate held in two versions that
+[duplicate-versions.txt](duplicate-versions.txt) does not hold, on a row
+whose semver lines moved and on a row whose pair ended; the list is one row
+a crate with its graphs, lines and reason, its totals (11 rows; 11, 11, 3
+and 5 a graph; 22 lines over the rows) pinned by `tests/arch_duplicate_versions_104.rs`, so a row
+added or widened is a change of that test in the same diff. The table below is the
+census the list was written from, the same eleven on 2026-11-14 at
+`80532565`.
 Measured 2026-11-09 at `c96f3c7e` (0.9.0-beta.7, a fresh lockfile, cargo-deny
 0.20.2; all three graphs pass with eleven duplicate warnings in all, three in
 the wasm32 slice, five in the defaults; the census in

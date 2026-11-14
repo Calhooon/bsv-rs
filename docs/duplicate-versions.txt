@@ -1,0 +1,28 @@
+# The duplicate dependency versions this crate's graphs hold (#104), one row a crate, by name:
+#
+#   graphs | crate | lines | reason
+#
+# `graphs`: the graphs holding the pair, of `all` (--all-features), `native`
+# (full,http,websocket), `wasm32` (the Cloudflare slice) and `default`, in that order.
+# `lines`: the semver-compatible lines held (a patch release under a row moves nothing).
+# `reason`: the older side's parents and what would end the pair.
+#
+# `.github/scripts/duplicate_versions.py` (the `deny` step of ci.yml's `lint` job) refuses a
+# duplicate with no row here, a row whose lines moved and a row naming a graph that no longer
+# holds the pair; `tests/arch_duplicate_versions_104.rs` pins the totals (11 rows; 11, 11, 3
+# and 5 a graph; 22 lines over the rows). A row is added only with its reason and the totals moved in the same change;
+# the list is meant to shrink. Measured 2026-11-14 at 80532565 (0.9.0-beta.7), the parents by
+# `cargo tree -i`, the newest releases read from crates.io that day; the census of 2026-11-09 is
+# docs/lanes/fix-104.md, this list's record docs/lanes/fix-104-dups.md.
+
+all, native | base64 | 0.22, 0.23 | bsv-rs ("0.22"), reqwest 0.12 and wiremock 0.6.2 (dev, pinned) against hyper-util 0.1.21; ends with a wiremock release on base64 0.23 (0.6.5, the newest, asks 0.22), then this crate and reqwest 0.13 with it
+all, native | block-buffer | 0.10, 0.12 | digest 0.10 under sha1 0.10 under tungstenite 0.24 (the `websocket` feature); ends with tokio-tungstenite 0.30, a slice of its own (it brings rand and thiserror pairs)
+all, native | core-foundation | 0.9, 0.10 | system-configuration 0.7 (hyper-util's macOS proxy lookup) against security-framework 3; ends with a hyper-util release on system-configuration 0.8 (0.1.21, the newest, asks 0.7)
+all, native, default | cpufeatures | 0.2, 0.3 | aes 0.8 and polyval 0.6 (and sha1 0.10 under tungstenite) against sha1 0.11 and sha2 0.11; ends with the cipher slice (aes-gcm 0.11 without default features, aes 0.9, cbc 0.2) and, in all and native, tokio-tungstenite 0.30
+all, native, wasm32, default | crypto-common | 0.1, 0.2 | aead 0.5, cipher 0.4 and universal-hash 0.5 (aes-gcm 0.10, aes 0.8, cbc 0.1) against the curves' and hashes' 0.14 and 0.11 lines; ends with the cipher slice and, in all and native, tokio-tungstenite 0.30
+all, native | digest | 0.10, 0.11 | sha1 0.10 under tungstenite 0.24 (the `websocket` feature); ends with tokio-tungstenite 0.30
+all, native | getrandom | 0.2, 0.4 | bsv-rs ("0.2", `js`) and rand_core 0.6 against tempfile 3 under native-tls (native only, in no Worker's build); the owner's question of #104: keep 0.2, or rand 0.10 and the `wasm` feature on getrandom 0.4's `wasm_js`
+all, native, wasm32, default | rand_core | 0.6, 0.10 | rand 0.8, rand_chacha 0.3 and crypto-common 0.1 against the curves' 0.14 line; rides with getrandom (rand 0.8 to 0.10), the owner's question of #104
+all, native | sha1 | 0.10, 0.11 | tungstenite 0.24 (the `websocket` feature) against bsv-rs; ends with tokio-tungstenite 0.30
+all, native, wasm32, default | syn | 2, 3 | zerocopy-derive 0.8 (under rand 0.8's ppv-lite86 and criterion's half), thiserror-impl 1 and openssl-macros 0.1 (all, native); ends with zerocopy-derive and openssl-macros on syn 3 (each the newest, on syn 2); thiserror 2 alone moves no graph
+all, native, default | windows-sys | 0.52, 0.61 | memory-stats 1.2.0 (dev, Windows) against tokio, mio, rustix and the rest; ends with a memory-stats release past 1.2.0 (the newest, of 2024-06-26)
